@@ -106,6 +106,11 @@ Consequences worth stating:
   podman 5.8, remain `PodmanArgs=`.
 - **The edge publishes on loopback only** and is pinned with `ip=` on every network it joins, so
   the set of addresses haproxy's PROXY header can arrive from is finite (§11.5c).
+- **The API vhost admits operations, not paths.** Its admission is one generated nginx `map` on
+  verb and path (`docker/edge/include/api-admission.conf`), rendered from the frozen contract set
+  with the nightly probe's table, and it ships in the config bundle like the rest of `docker/edge`;
+  `reconcile_edge` applies it in the promotion that carries the matching backend (REQ-API-021,
+  REQ-OPS-042).
 
 ## 7.3 What moved out of containers, and what was deleted
 

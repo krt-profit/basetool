@@ -2194,14 +2194,16 @@ sites and the nine `hasRole(Roles.ADMIN)` URL matchers in the backend `SecurityC
 not a client — the remaining boundary is the **default-deny vhost allow-list** of
 [REQ-SEC-037](#req-sec-037--the-public-api-vhosts-anonymous-surface-is-enumerated-not-incidental).
 When this was written that list lived in the edge proxy's database, out of reach of any test; since
-2026-09-12 it is `docker/edge/include/api-allowlist.conf` in this repository, read by
-`ExternalContractTest`, checked against the nightly probe by the `probe-vs-allowlist` check and
-validated by `scripts/check-edge-nginx.sh` in `repo-lint.yml`. Two consequences, both load-bearing:
+2026-09-12 it is in this repository, and since 2026-10-03 it is a map generated from the frozen
+set (`docker/edge/include/api-admission.conf`, REQ-API-021), checked by `EdgeAdmissionTest` and
+`EdgeAdmissionNginxTest` and validated by `scripts/check-edge-nginx.sh` in `repo-lint.yml`. Two
+consequences, both load-bearing:
 
 - `POST /api/v1/refining-methods` was the one allow-listed path carrying a bare `hasRole('ADMIN')`
-  write. `refining-methods` is therefore in the read-only family of `api-allowlist.conf` (it was
-  first added to the runbook block, now archived at
-  [`API_VHOST_ROLLOUT_RUNBOOK.md`](../archive/API_VHOST_ROLLOUT_RUNBOOK.md)). Nothing loses a
+  write. `refining-methods` was therefore put in the read-only family of the include (first in
+  the runbook block, now archived at
+  [`API_VHOST_ROLLOUT_RUNBOOK.md`](../archive/API_VHOST_ROLLOUT_RUNBOOK.md)); since 2026-10-03 the
+  map admits only its frozen `GET` and the `POST` answers `404` (REQ-API-021). Nothing loses a
   capability: the app only reads it (the refinery form's method picker) and the web admin does not
   traverse this vhost at all.
 - The allow-list is now load-bearing for what this requirement itself used to guarantee. Anyone
@@ -2498,7 +2500,8 @@ for an anonymous write and getting `403`, because the CSRF filter runs ahead of 
 > Proxy Manager, where no PR and no test could read it — several statements below were written in
 > that world. It is now [`docker/edge/include/api-allowlist.conf`](../../docker/edge/include/api-allowlist.conf),
 > included by `conf.d/50-api.conf.template` and applied by the deploy reconcile. Three things read
-> it in CI: `ExternalContractTest`, the `probe-vs-allowlist` check in `repo-lint.yml` (the nightly
+> it in CI (since 2026-10-03 the generated map and the tests of REQ-API-021 replace the first two):
+> `ExternalContractTest`, the `probe-vs-allowlist` check in `repo-lint.yml` (the nightly
 > probe's rows against the list) and `scripts/check-edge-nginx.sh` (renders and starts the edge).
 > The runbook is archived at [`API_VHOST_ROLLOUT_RUNBOOK.md`](../archive/API_VHOST_ROLLOUT_RUNBOOK.md)
 > and still explains *why* each family was admitted in which phase; it no longer carries the list.
@@ -2598,48 +2601,35 @@ refuses gets the entry point's `401`. Before ADR-0159 the Finanzen paths sat und
 stem `GET /api/v1/missions/**` and answered an anonymous caller `403`; with the stem gone they answer
 `401` like the me-scoped paths, and `ApiVhostAnonymousSurfaceTest` pins that.
 
-**The missions and operations families are additionally read-only on this vhost.**
-`/api/v1/missions/<uuid>` and `/api/v1/operations/<uuid>` answer `PUT` and `DELETE` as well as
-`GET`, and an allow-list that matches on the path cannot tell them apart, so the vhost refuses
-every non-`GET`/`HEAD` under a read-only family (`$krt_readonly_family` in `api-allowlist.conf`,
-which covers more prefixes than these two) with `405` before the request reaches the backend —
-except where a write is named explicitly. `@PreAuthorize` would refuse them too; the point is that it
-does not have to be the only thing that does. Under operations the write that matters is `PUT
-/api/v1/operations/<uuid>/payouts/paid-out`, which marks a member as paid — phase 3 opened it by
-naming that one path rather than widening the family, because the guard is verb-blind by design.
-Later phases opened more writes the same way (the participation writes, the Einsatz planning set,
-and a **method-scoped** `PUT` on `/operations/<uuid>` and `/orders/<uuid>` that keeps `DELETE` on
-both shut). `POST /api/v1/operations` (the Android app raises an Operation with it) is the first
-**collection** write: the path is admitted for every verb by the allow-list, but `$krt_collection_post`
-answers `404` for any verb but `POST` on exactly `/api/v1/operations` — so `GET` on the collection,
-`PUT`/`DELETE` and `/api/v1/operations/`, `/api/v1/operationsX` stay refused as before — and only the
-`POST` clears the read-only family. `PUT /api/v1/orders/<uuid>/requested`, the requester's order
-edit the app has called since v0.2.0, is admitted the same way since 2026-10-03 (REQ-API-016 found it
-refused): `$krt_requester_edit` answers `404` for any verb but `PUT` on exactly that path, and only
-the `PUT` clears the read-only family. `scripts/check-edge-allowlist-behaviour.sh` runs the real
-nginx against both matrices in CI.
+> [!note] Amended 2026-10-03 (REQ-API-021, guard G-08) — admission by operation, every refusal `404`
+> Until 2026-10-03 the include admitted by **path**: 172 `if ($uri …)` rules, two of them prefix
+> rules without an end anchor (`^/api/v1/terms/`, `^/api/v1/me/`), a read-only family of 16 prefixes
+> that answered `405` to every non-`GET`/`HEAD` it did not explicitly clear, per-path resets of that
+> family, and two method-scoping variables (`$krt_collection_post` for `POST /api/v1/operations`,
+> `$krt_requester_edit` for `PUT /api/v1/orders/<uuid>/requested`) that answered `404` to every other
+> verb. A refusal was therefore `404` or `405` depending on the order of the rules, and the two
+> episodes this paragraph used to record — REQ-OBS-012's run asserting `405` on a path the vhost
+> answered `404` for, and phase X leaving an old refusal row next to its new admission (2026-09-06)
+> — both came from that. The prefix rules also admitted `GET /api/v1/me/layout`, which REQ-API-012
+> said was not on the vhost, and would have admitted `/terms/admin` the day it moved there.
+>
+> The admission is now **one generated map keyed on verb and path**, one anchored expression per
+> admitted operation, rendered from the frozen set (REQ-API-021). There is no family, no prefix and
+> no method-scoping variable left, and every refusal — an unknown path or another verb on an
+> admitted one, `HEAD` and `OPTIONS` included — is `404`. The probe table is generated from the
+> same model, so an admission can no longer leave its old refusal row standing.
 
-**A refusal by this vhost is `404` or `405`, and which one is decided by order, not by family.** The
-allow-list's default deny runs first; the read-only guard runs after it. A path that is on no
-allow-list line is therefore `404` for **every** verb — its family membership in the read-only guard
-is never consulted, because the request is already refused. Only an *admitted* path can answer
-`405`, and that is what `PUT` and `DELETE /api/v1/missions/<uuid>` do: the detail is on the list as a
-read, so the verb is the only thing left to refuse (`POST /api/v1/orders`, the example that stood
-here, has since been admitted and answers `401`). `POST /api/v1/hangar/import/fleetview` used to read the
-other way round: `404`, not `405`, because it was on no allow-list line and the `/hangar` prefix
-sitting in the read-only family only decided what would happen on the day it was admitted. **Phase X
-was that day** — it added both the allow-list line and the `$krt_readonly_family` clearing, so the
-path answers `401` now, and the sentence that once ended „phase 4 has not admitted it" is corrected
-here rather than deleted, because the reasoning it carried is still the reasoning that decides every
-other row.
-
-Stating this is worth the paragraph because the two are trivially confused when reading the block
-top-down, and the confusion is silent in the direction that matters least and loud in a nightly
-probe. It has now cost two episodes. REQ-OBS-012's run asserted `405` on that path for three nights
-against a vhost that had always answered `404`; then phase X admitted the path, added its `401` row
-to the probe and left the old `404` row standing, so the probe demanded both answers of one path and
-went red on the first scheduled run after the merge (2026-09-06). **An admission has to delete the
-refusal row, not only add an admitted one.**
+**Writes are admitted one operation at a time.** `/api/v1/missions/<uuid>` and
+`/api/v1/operations/<uuid>` answer `PUT` and `DELETE` as well as `GET` in the backend; the vhost
+admits exactly the verbs the frozen set lists for each path (`GET` on the mission, `GET` and `PUT` on
+the Operation) and refuses the others with `404` before the request reaches the backend.
+`@PreAuthorize` would refuse them too; the point is that it does not have to be the only thing that
+does. `PUT /api/v1/operations/<uuid>/payouts/paid-out`, which marks a member as paid,
+`POST /api/v1/operations` (the app raises an Operation with it) and
+`PUT /api/v1/orders/<uuid>/requested` (the requester's order edit, refused until REQ-API-016 found it
+on 2026-10-03) are each one entry of the map like every other operation. `EdgeAdmissionNginxTest`
+drives the committed map through the edge's own image in CI: every admitted operation passes, and
+every other verb on every admitted path, near-miss spellings and non-uuid ids answer `404`.
 
 **Phase 4's Beförderung reads are the least remarkable entries on the list, and that is the point
 of naming them.** `GET /api/v1/promotion/evaluations/my` and `…/eligibility/my` are
@@ -2694,9 +2684,10 @@ REQ-SEC-052 requires a method gate on every controller as well.
 
 **Acceptance**
 
-- [x] Every allow-listed path has a recorded expected status without a token — today in the nightly
-  `edge-deny-probe.yml`, checked against `api-allowlist.conf` by `probe-vs-allowlist` (the archived
-  runbook's § D.3a was its first form). The previous single-number check raised a false alarm the
+- [x] Every admitted operation has a recorded expected status without a token — today in the
+  nightly `edge-deny-probe.yml`, whose table is generated with the admission map since 2026-10-03
+  (REQ-API-021) and pinned at the backend by `EdgeProbeBackendStatusTest` (the archived runbook's
+  § D.3a was its first form, the `probe-vs-allowlist` check its second). The previous single-number check raised a false alarm the
   first time it was run against a `permitAll` path.
 - [x] Both anonymous operations are named, each with the already-public surface it mirrors.
 - [x] The two live-sync paths were checked specifically: `isAuthenticated()` at the controller, so
@@ -2731,7 +2722,7 @@ REQ-SEC-052 requires a method gate on every controller as well.
 
 The probe's refusals are the *expected output of a passing assertion*. Every row it asserts `401`
 is refused by the entry point, which logs at **DEBUG** (the REQ-OBS-001 `401` carve-out), and the
-edge-level `404`/`405` rows never reach the backend — so a passing run leaves **no** backend WARN
+edge-level `404` rows never reach the backend — so a passing run leaves **no** backend WARN
 line. The schedule is `17 5 * * *` UTC, but match on paths, not the clock: a burst at another hour
 is equally a `workflow_dispatch`, a delayed schedule or an unrelated anonymous caller.
 
@@ -2741,9 +2732,11 @@ back. Keep that line at WARN and out of the `401`→DEBUG carve-out; `AccessDeni
 10m`) is a spike detector, not a drift detector.
 
 **Enforced by:** review at the moment a path is added, backed by the probe and the pin below ·
-**Code:** `SecurityConfig` (filter chain), `docker/edge/include/api-allowlist.conf`,
+**Code:** `SecurityConfig` (filter chain), `docker/edge/include/api-admission.conf` (generated by
+`EdgeAdmission`), `docker/edge/include/api-allowlist.conf`,
 `docker/edge/conf.d/50-api.conf.template` · **Tests:** `ApiVhostAnonymousSurfaceTest` (the
-anonymous status of every admitted path), `edge-deny-probe.yml`, `probe-vs-allowlist` ·
+anonymous status of every admitted path), `EdgeProbeBackendStatusTest`, `EdgeAdmissionTest`,
+`EdgeAdmissionNginxTest`, `edge-deny-probe.yml` ·
 **Decision:** [ADR-0135](../adr/0135-public-api-vhost-not-a-gateway.md),
 [ADR-0138](../adr/0138-terms-wording-is-a-backend-resource.md)
 

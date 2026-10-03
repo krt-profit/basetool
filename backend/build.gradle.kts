@@ -133,8 +133,13 @@ tasks.named<Test>("test") {
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   inputs
-    .file(rootProject.file("docker/edge/include/api-allowlist.conf"))
-    .withPropertyName("apiVhostAllowList")
+    .files(
+      rootProject.file("docker/edge/include/api-admission.conf"),
+      rootProject.file("docker/edge/include/api-allowlist.conf"),
+      rootProject.file(".github/workflows/edge-deny-probe.yml"),
+      rootProject.file("docker-compose.yml"),
+    )
+    .withPropertyName("apiVhostAdmission")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   inputs
@@ -150,4 +155,13 @@ tasks.named<Test>("test") {
     .file(rootProject.file("quadlet/env.d/backend.env.tmpl"))
     .withPropertyName("backendQuadletEnvTemplate")
     .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
+tasks.register<JavaExec>("generateEdgeAdmission") {
+  description =
+    "Writes the API vhost's admission map, its include and the nightly probe table from the" +
+      " frozen contract set (REQ-API-021)."
+  classpath = sourceSets["test"].runtimeClasspath
+  mainClass.set("de.greluc.krt.profit.basetool.backend.api.EdgeAdmission")
+  args(rootDir.absolutePath)
 }

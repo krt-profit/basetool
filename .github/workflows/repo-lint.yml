@@ -145,10 +145,6 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 .github/scripts/dependabot_compose_followup.py --selftest
 
-      - name: probe-vs-allowlist / Check the edge probe against the vhost allow-list
-        if: ${{ !cancelled() }}
-        run: python3 .github/scripts/check_probe_against_allowlist.py
-
       - name: ingest-audience / Self-test the ingest audience checker
         if: ${{ !cancelled() }}
         run: python3 scripts/check-ingest-audience.py --selftest
@@ -454,10 +450,6 @@ jobs:
       - name: edge-nginx / Check edge nginx configuration
         if: ${{ !cancelled() }}
         run: scripts/check-edge-nginx.sh
-
-      - name: edge-allowlist / Check the API allow-list's method gating against a live nginx
-        if: ${{ !cancelled() }}
-        run: scripts/check-edge-allowlist-behaviour.sh
 
       - name: acme-publish / Check acme certificate publishing
         if: ${{ !cancelled() }}

@@ -603,7 +603,9 @@ gates of the moved operations.
 3. **Public exposure: 1 move.** `/admin/terms` → `/terms/admin` would be admitted on the public
    vhost by the prefix rule `^/api/v1/terms/` (allow-list line 2), and the terms filter's prefix
    exemption would exempt it from the terms gate. It must not ship before G-08 (a generated,
-   verb-aware include without prefix rules) and G-07 (exemptions pinned to exact sets).
+   verb-aware include without prefix rules) and G-07 (exemptions pinned to exact sets). *G-08 is
+   built (2026-10-03): the prefix rule is gone, `GET /terms/admin` answers `404` at the edge, and a
+   moved path is admitted only by being frozen (REQ-API-021).*
 4. **Lost rate limit: 1 rule.** `finance-entry-create` (`POST /api/v1/finance-entries`) stops
    applying when the ledger is nested, unless the rule is re-keyed in the same change. Guard: G-07,
    every rate-limit rule matches at least one documented operation.
@@ -786,6 +788,24 @@ what wave 1 already needs.
   the two anonymous reads, in both directions. The generated file stays committed and reviewed
   (ADR-0135 amendment); the per-request cost of about 250 regexes is measured with `nginx -t` and a
   load probe.
+
+  > [!note] Built 2026-10-03 (REQ-API-021, REQ-OPS-042) — three corrections to the sketch above
+  > The generator is `EdgeAdmission` (backend test scope, `./gradlew :backend:generateEdgeAdmission`);
+  > the map is `docker/edge/include/api-admission.conf`, included at `http` level by
+  > `conf.d/50-api.conf.template`, because a `map` cannot sit in the `server` block the old include
+  > lives in; that include now holds only the refusal. **No `405`**: every refusal is `404`, since a
+  > `405` must carry an `Allow` header the edge never sent, the old include already answered `404`
+  > for every other verb on its two method-scoped admissions, and a second per-path table would
+  > double the expressions — the probe table has no `405` rows. **The probe table is generated into
+  > the workflow** (the rows between `done <<'PROBES'` and `PROBES`), and the backend half of each
+  > admitted row is pinned by `EdgeProbeBackendStatusTest`. The live check is a Testcontainers test
+  > with the edge's image (`EdgeAdmissionNginxTest`), which replaced
+  > `scripts/check-edge-allowlist-behaviour.sh` and `check_probe_against_allowlist.py`. Placeholders
+  > other than uuids and booleans take only a reviewed shape (`{roleCode}`, and `{key}` as the two
+  > readable settings keys). **Cost**, measured with the edge's image (one worker, worker CPU per
+  > request): about 52 µs without any admission, 61–74 µs with the old include on every request,
+  > 51–52 µs with the map for an early entry and 68–72 µs for the last entry or a refusal; `nginx -t`
+  > 6–14 ms against 9–12 ms. The map's worst case is the old include's ordinary case.
 - **Mandatory baseline.** The previous-release baseline is fetched with `continue-on-error: true`
   (`.github/workflows/ci.yml:34-60`) and the test `assumeTrue`s it
   (`backend/src/test/…/api/ExternalContractTest.java:2238`), so a failed fetch is a green check
@@ -876,6 +896,14 @@ a read-only family of 16 prefixes that answers 405 to writes (line 177) and per-
 documented operations pass it against 234 frozen pairs; 11 of the 25 extra ones are refused by the
 read-only rule and 14 stay reachable, `GET /me/layout` among them although REQ-API-012 says it is
 not on the vhost. Every one is gated in the backend; nothing asserts admitted ⊆ frozen. → G-08.
+
+> [!note] Closed 2026-10-03 by G-08 (REQ-API-021)
+> After #2337 froze the ten app calls among the extras, four documented operations remained admitted
+> and unfrozen: `GET /me/layout`, `POST /job-types` (an admin write outside the read-only family),
+> `GET /hangar/ships` and `GET /material-requests/{id}`. The generated map refuses all four, every
+> undocumented path under the two prefixes, every `HEAD` and `OPTIONS`, and answers the read-only
+> family's eleven `405`s with `404`; it admits nothing the old include refused (simulated over all
+> 573 documented operations).
 
 **Read and write DTOs are not separated.** 13 DTOs are request body and response type at once; the
 ArchUnit list `RESPONSE_ONLY_DTOS` protects one type, `MissionDto` (`ArchitectureTest.java:131`).

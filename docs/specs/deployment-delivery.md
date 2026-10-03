@@ -2436,6 +2436,46 @@ resolve; an unresolvable one keeps its existing "no change this tick" behaviour.
 (`rt_image_revision`) · `scripts/deploy.test.sh` (`scenario_mixed_release_*`) · **Runbook:**
 `docs/deployment.md` → *Promoting to production* · **Related:** REQ-OPS-002, REQ-OPS-015
 
+### REQ-OPS-042 — The edge's API admission ships as generated config, and the nightly probe checks the same table
+
+The API vhost's admission (REQ-API-021) is configuration in `docker/edge/`, and it is delivered the
+way every edge change is: it rides the config bundle of the release that carries the matching
+backend, and `deploy.sh`'s `reconcile_edge` recreates the edge once the on-disk `docker/edge`
+differs from the last applied snapshot. A change to the frozen set, the declared-break ledger or the
+retired list therefore reaches the public vhost in the same promotion as the API it describes, after
+the apps are recreated (the brief all-vhost outage of an edge recreate included).
+
+- **One writer.** `docker/edge/include/api-admission.conf`, `docker/edge/include/api-allowlist.conf`
+  and the API vhost table of `.github/workflows/edge-deny-probe.yml` (the rows between
+  `done <<'PROBES'` and `PROBES`) are written only by `./gradlew :backend:generateEdgeAdmission`, and
+  `EdgeAdmissionTest` fails a pull request whose committed copies differ. A hand edit is a red build,
+  not a review question.
+- **The nightly probe asserts the generated table from outside.** One row per admitted operation —
+  `200` for the two anonymous reads, `401` for every frozen operation, `410` for a retired one — one
+  refused verb per admitted path, and a reviewed list of near-misses (`/me/layout`, `/terms/admin`,
+  the exchange, `HEAD` on the anonymous reads, the web-only admin trees), each `404`. About 480 rows;
+  the job allows 15 minutes. `HEAD` rows are sent with `curl -I`, which does not wait for a body.
+- **The table runs from `main` against production.** Between the merge of an admission change and
+  its promotion, the probe expects what `main` admits while the edge still serves the previous
+  release, so the rows that differ fail for those nights. That is the probe reporting a pending
+  deploy, not drift; it clears with the promotion.
+- **The whole edge is validated with it.** `scripts/check-edge-nginx.sh` renders every vhost through
+  `render-and-run.sh` — the map included at `http` level — and starts nginx without a warning, and
+  `EdgeAdmissionNginxTest` drives the committed files through the edge's pinned image.
+
+**Acceptance**
+
+- [x] The generated files and the probe table are committed and equal the generator's output
+  (`EdgeAdmissionTest`).
+- [x] The edge renders and starts with the map in all four shapes (`check-edge-nginx.sh`).
+- [x] The probe table's admitted rows answer as stated at the backend (`EdgeProbeBackendStatusTest`)
+  and pass or stop at the edge as stated (`EdgeAdmissionNginxTest.theProbeRowsAgreeWithTheEdge`).
+
+**Enforced by:** `EdgeAdmissionTest`, `EdgeAdmissionNginxTest`, `EdgeProbeBackendStatusTest` ·
+`scripts/check-edge-nginx.sh` (`repo-lint.yml`) · `edge-deny-probe.yml` · `scripts/deploy.sh`
+(`reconcile_edge`) · **Runbook:** `docs/deployment.md` → *The edge* · **Related:** REQ-API-021,
+REQ-SEC-037, ADR-0135, ADR-0162
+
 ## Open questions
 
 - Deepening the infra health gate beyond `redis-cli ping` / `pg_isready` (which do not

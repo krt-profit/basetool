@@ -104,7 +104,9 @@ What the Android app calls is a contract of its own: the frozen set of `External
 cover the call list each app release publishes (committed under
 `backend/src/test/resources/api/app-calls/`), and a frozen operation or field breaks only by a line
 of the declared-break ledger, checked against the previous release's document, which CI must fetch
-(REQ-API-016, REQ-API-017).
+(REQ-API-016, REQ-API-017). The public API vhost admits exactly that set, by verb and path, through a
+map generated from it, plus the two anonymous reads and the retired operations; everything else
+stops at the edge with `404` (REQ-API-021).
 
 Authority: [`api-conventions.md`](../specs/api-conventions.md) (`REQ-API-*`).
 
