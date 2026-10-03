@@ -103,6 +103,15 @@ a relayed exchange client, otherwise `system` — and the exchange change feed's
 a change reaches the feed with its writer whatever path made it, a bulk path included (ADR-0224,
 `REQ-XCH-013`).
 
+Every table has exactly one owning module of the target cut, recorded in a table-ownership map that
+a test holds against the migrated schema; a trigger or native statement reaches another module's
+table only through a listed crossing, and every column a trigger function names must resolve,
+because PostgreSQL would otherwise only notice a renamed column on the next insert
+(`REQ-DATA-020`). Every column that references a member has a disposition in the erasure, the
+Art. 15 export and the account merge (`REQ-DATA-021`). A master-data cache shares one instance
+between every reader, so no mutator may edit an instance a cache handed out; caches move to read
+models, and the entity-returning ones are a list that may only shrink (`REQ-DATA-022`).
+
 ## 8.4 Concurrency — the landmine field
 
 Optimistic locking with `@Version`, surfaced as HTTP 409, with the **finest granularity the data
@@ -228,7 +237,12 @@ mutation to an audited area without its audit event is an incomplete change — 
 type, the recording call, the viewer's per-area filter, the DE/EN labels and the coverage list. No
 user free text and no personal data in the details payload.
 
-Authority: [`audit.md`](../specs/audit.md) (`REQ-AUDIT-001`).
+Audit is a direct, synchronous call inside the business transaction, never an event: no
+after-commit or asynchronous method records an audit row, no listener reads the request-bound scope
+or security context, and an observer SPI implementation (`@ObserverSpi`) joins the caller's
+transaction as `MANDATORY` (`REQ-AUDIT-007`).
+
+Authority: [`audit.md`](../specs/audit.md) (`REQ-AUDIT-001`, `REQ-AUDIT-007`).
 
 ## 8.9 Observability
 

@@ -21,6 +21,12 @@
   `400 ILLEGAL_ARGUMENT`, wird aber als `basetool_security_expression_failures_total` gezählt und
   löst `SecurityExpressionEvaluationFailed` aus (REQ-OBS-020).
 
+- **Backend-Wächter für Daten und Transaktionen (Modularisierung, Phase 0).** Tests prüfen jetzt, dass
+  jede Tabelle genau einem Modul gehört, Trigger und natives SQL fremde Tabellen nur über gelistete
+  Ausnahmen erreichen, jede Mitgliedsreferenz in Löschung, Datenauskunft und Kontozusammenführung
+  geregelt ist, Audit nie nach dem Commit geschrieben wird und Mutatoren keine gecachte Instanz
+  verändern (REQ-DATA-020…022, REQ-AUDIT-007). Keine Verhaltensänderung.
+
 ### Changed
 
 - **Modularisierung: die Entscheidungen sind festgehalten.** ADR-0231 bis ADR-0239 (Modulschnitt,
