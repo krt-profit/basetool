@@ -67,6 +67,16 @@
       basetool_host_public_name_aliases: ["{{ basetool_host_public_name_alias | default('name:ip') }}"]
     quiet: true
 
+- name: Create the drop-in directory of every service the role writes a drop-in for
+  ansible.builtin.file:
+    path: >-
+      /etc/containers/systemd/users/{{ basetool_host_service_uid }}/{{ item }}.container.d
+    state: directory
+    owner: "{{ basetool_host_deploy_user }}"
+    group: "{{ basetool_host_deploy_user }}"
+    mode: "0755"
+  loop: "{{ basetool_host_public_name_alias_services | union(basetool_host_jvm_truststore_services) }}"
+
 - name: Write the public-name alias drop-in
   ansible.builtin.copy:
     dest: >-
