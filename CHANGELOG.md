@@ -30,6 +30,7 @@
 - **Sicherheitsausdrücke werden beim Build geprüft.** Jede Bean-Referenz in `@PreAuthorize` muss im
   Kontext mit Namen und Parameterzahl auflösbar sein, die Sicherheits-Beans tragen feste Namen, und
   kein Gate darf über `this` umgangen werden (REQ-SEC-075, REQ-SEC-076).
+
 - **Metrik und Alarm für nicht auswertbare Sicherheitsausdrücke.** Ein solcher Fehler bleibt ein
   `400 ILLEGAL_ARGUMENT`, wird aber als `basetool_security_expression_failures_total` gezählt und
   löst `SecurityExpressionEvaluationFailed` aus (REQ-OBS-020).
@@ -50,21 +51,6 @@
   leere Liste lehnt jetzt das Gateway selbst mit `400 SCHEMA_INVALID` und `errors[]` ab statt des weitergereichten
   Backend-Fehlers. Dasselbe gilt für `goods` und `sourceImages` jedes Auftrags, die ebenfalls mindestens
   einen Eintrag verlangen. Keine Vertragsänderung im Sinne von v2 (REQ-XCH-026).
-- **Lager einbuchen: „Mit vorhandenem Bestand zusammenführen" erscheint nur noch, wenn es etwas zum
-  Zusammenführen gibt.** Das Formular fragt beim Backend (`GET /api/v1/inventory/merge-candidates`), ob
-  dasselbe Material in derselben Qualität am selben Ort mit demselben Besitzer und derselben Einheit schon
-  liegt; sonst bleibt die Zeile weg. Der Hilfetext nennt die Merge-Kriterien jetzt richtig.
-
-- **„Zuordnen zu" wählt die aktive Org-Einheit vor.** Ist die Einheit aus der Sidebar unter den Optionen,
-  steht sie schon ausgewählt (Lager, Hangar, Einsatz, Operation, Raffinerie); sonst heißt die leere
-  Auswahl „Bitte wählen" statt des irreführenden „Heimat-Staffel beibehalten".
-
-- **Einbuchen für ein anderes Mitglied: „Zuordnen zu" zeigt dessen Einheiten.** Wer im Globalen Lager
-  einen Nutzer wählt, bekommt dessen Org-Einheiten angeboten statt der eigenen.
-
-- **Einbuchen: mehrere Zuordnungen brauchen jede eine Menge.** Eine Auftrags- oder Einsatzzeile ohne Menge
-  wurde bisher stillschweigend verworfen; jetzt markiert das Formular sie und bucht erst, wenn sie ausgefüllt
-  ist.
 
 - **Build: Qualitätsschwellen pro Modul ausdrücklich.** Testheap, JaCoCo-Schwellen und PIT-Ziele
   stehen in `<modul>/build-settings.properties`; fehlt ein Wert, bricht die Konfiguration ab, statt
@@ -114,6 +100,53 @@
   Navigation überholte sonst die noch ladende Seite; in WebKit verlor der Browser dabei vereinzelt alle
   Cookies, und `JobOrderProductionE2eTest` landete abgemeldet auf `/?error`. Kein Fehler der App.
 
+### Security
+
+- **Pfadgebundene Schutzregeln prüfen sich selbst.** Tests über die echten Endpunkte stellen sicher,
+  dass jeder schreibende Endpunkt in der CSRF-Ausnahme liegt, jede Ratenlimit-Regel einen Endpunkt
+  trifft und die Ausnahmen der Freigabe-, Nutzungsbedingungs- und Datenaustausch-Filter exakte
+  Pfadlisten sind (REQ-SEC-078…080).
+
+- **Backend: Prüfregeln für Mandantentrennung und Massenzuweisung.** Org-Einheiten-gebundene Aggregate
+  tragen `@TenantScoped`; ein Test verlangt für jeden Controller, der solche Daten schreibt, den
+  Scope-Gate, und für Request-Bodies `@Valid`, keine Antwort-DTOs und keine servergeführten Felder
+  (REQ-ORG-028, REQ-SEC-077, REQ-API-015). 13 Admin-/SPI-Endpunkte validieren ihren Body jetzt;
+  gültige Anfragen ändern sich nicht.
+
+## [v1.13.7](https://github.com/krt-profit/basetool/releases/tag/v1.13.7) - 2026-10-03
+
+### Added
+
+- **Schnellzugriff (Strg K / ⌘ K).** Ein Suchfeld in der Kopfzeile findet jede Seite, die man sehen darf,
+  dazu „Zuletzt besucht" und Aktionen wie „Neuen Auftrag anlegen" oder „Abmelden"; bedienbar per Tastatur.
+
+- **Tab-Leiste auf dem Smartphone.** Einsätze, Lager, Aufträge, Meldungen und „Menü" sitzen unten fest; das
+  Menü öffnet als Sheet, die Suche als Vollbild. Die Fußzeilen-Links stehen dort am Ende des Menüs.
+
+### Changed
+
+- **Neues Navigationsmenü.** Das Menü hat einen Menüfilter, Gruppen mit Icons und unten eine Nutzerzeile mit
+  „Persönlich", Sprache und Abmelden. „Administration" ist ein eigener Modus (auf Admin-Seiten automatisch),
+  „Rechtliches" steht nur noch in der Fußzeile, die Glocke sitzt in der Kopfzeile.
+
+- **Lager einbuchen: „Mit vorhandenem Bestand zusammenführen" erscheint nur noch, wenn es etwas zum
+  Zusammenführen gibt.** Das Formular fragt beim Backend (`GET /api/v1/inventory/merge-candidates`), ob
+  dasselbe Material in derselben Qualität am selben Ort mit demselben Besitzer und derselben Einheit schon
+  liegt; sonst bleibt die Zeile weg. Der Hilfetext nennt die Merge-Kriterien jetzt richtig.
+
+- **„Zuordnen zu" wählt die aktive Org-Einheit vor.** Ist die Einheit aus der Sidebar unter den Optionen,
+  steht sie schon ausgewählt (Lager, Hangar, Einsatz, Operation, Raffinerie); sonst heißt die leere
+  Auswahl „Bitte wählen" statt des irreführenden „Heimat-Staffel beibehalten".
+
+- **Einbuchen für ein anderes Mitglied: „Zuordnen zu" zeigt dessen Einheiten.** Wer im Globalen Lager
+  einen Nutzer wählt, bekommt dessen Org-Einheiten angeboten statt der eigenen.
+
+- **Einbuchen: mehrere Zuordnungen brauchen jede eine Menge.** Eine Auftrags- oder Einsatzzeile ohne Menge
+  wurde bisher stillschweigend verworfen; jetzt markiert das Formular sie und bucht erst, wenn sie ausgefüllt
+  ist.
+
+### Fixed
+
 - **Deploy: die Edge startet vor den Anwendungen.** Ändert ein Release die Edge-Unit, stoppte das eine
   Neustartfenster sie mit und startete sie zuletzt; Backend und Frontend holen die OIDC-Konfiguration
   aber über den öffentlichen Namen, also über die Edge, und kamen nicht hoch. Gilt auch für `backup.sh`.
@@ -129,19 +162,6 @@
   Suche umstellt (z. B. „Nutzungsbedingungen", Hangar, Kontoverlauf, Blueprints) und dann blättert oder
   die Seite verlässt, wird nicht mehr gewarnt. Der Filter der Nutzungsbedingungen hat keinen
   „Anwenden"-Button mehr, er greift sofort.
-
-### Security
-
-- **Pfadgebundene Schutzregeln prüfen sich selbst.** Tests über die echten Endpunkte stellen sicher,
-  dass jeder schreibende Endpunkt in der CSRF-Ausnahme liegt, jede Ratenlimit-Regel einen Endpunkt
-  trifft und die Ausnahmen der Freigabe-, Nutzungsbedingungs- und Datenaustausch-Filter exakte
-  Pfadlisten sind (REQ-SEC-078…080).
-
-- **Backend: Prüfregeln für Mandantentrennung und Massenzuweisung.** Org-Einheiten-gebundene Aggregate
-  tragen `@TenantScoped`; ein Test verlangt für jeden Controller, der solche Daten schreibt, den
-  Scope-Gate, und für Request-Bodies `@Valid`, keine Antwort-DTOs und keine servergeführten Felder
-  (REQ-ORG-028, REQ-SEC-077, REQ-API-015). 13 Admin-/SPI-Endpunkte validieren ihren Body jetzt;
-  gültige Anfragen ändern sich nicht.
 
 ## [v1.13.6](https://github.com/krt-profit/basetool/releases/tag/v1.13.6) - 2026-10-02
 
