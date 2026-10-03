@@ -30,6 +30,7 @@ import com.microsoft.playwright.Request;
 import com.microsoft.playwright.Response;
 import com.microsoft.playwright.TimeoutError;
 import com.microsoft.playwright.options.LoadState;
+import com.microsoft.playwright.options.WaitUntilState;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -69,6 +70,12 @@ final class E2eSupport {
    * runs on the abort path.
    */
   private static final int NAVIGATE_RETRY_BACKOFF_MILLIS = 500;
+
+  /**
+   * Time, in milliseconds, {@link #awaitFormPost} grants the post-submit document to arrive, and
+   * then again to commit and load.
+   */
+  private static final double FORM_POST_TIMEOUT_MILLIS = 15_000;
 
   /** Per-attempt navigation timeout of {@link #navigate}, in milliseconds. */
   private static final double NAVIGATE_TIMEOUT_MILLIS = 45_000;
@@ -423,24 +430,46 @@ final class E2eSupport {
    * Runs a submit action that triggers a full-page form POST and waits until the resulting document
    * (the redirect target, or a non-redirect POST response) has loaded.
    *
+   * <p>Returning on the document's response alone would leave its navigation in flight, so a
+   * following {@link #navigate} would race it; the main frame must have committed that document's
+   * URL and fired {@code load} first.
+   *
    * @param page the page whose main-frame post-submit navigation to await
    * @param submitAction the action (typically a submit-button click) that starts the form POST
    */
   static void awaitFormPost(Page page, Runnable submitAction) {
-    page.waitForResponse(
-        response -> {
-          Request request = response.request();
-          if (!request.isNavigationRequest() || !"document".equals(request.resourceType())) {
-            return false;
-          }
-          if ("GET".equals(request.method())) {
-            return true;
-          }
-          int status = response.status();
-          return "POST".equals(request.method()) && (status < 300 || status >= 400);
-        },
-        new Page.WaitForResponseOptions().setTimeout(15_000),
-        submitAction);
+    Response document =
+        page.waitForResponse(
+            response -> {
+              Request request = response.request();
+              if (!request.isNavigationRequest() || !"document".equals(request.resourceType())) {
+                return false;
+              }
+              if ("GET".equals(request.method())) {
+                return true;
+              }
+              int status = response.status();
+              return "POST".equals(request.method()) && (status < 300 || status >= 400);
+            },
+            new Page.WaitForResponseOptions().setTimeout(FORM_POST_TIMEOUT_MILLIS),
+            submitAction);
+    String landing = withoutFragment(document.url());
+    page.waitForURL(
+        url -> withoutFragment(url).equals(landing),
+        new Page.WaitForURLOptions()
+            .setWaitUntil(WaitUntilState.LOAD)
+            .setTimeout(FORM_POST_TIMEOUT_MILLIS));
+  }
+
+  /**
+   * Strips the fragment from a URL, which the browser keeps on the committed URL but never sends.
+   *
+   * @param url an absolute URL
+   * @return {@code url} without its {@code #fragment}, or unchanged when it has none
+   */
+  private static String withoutFragment(String url) {
+    int hash = url.indexOf('#');
+    return hash < 0 ? url : url.substring(0, hash);
   }
 
   /**
@@ -456,6 +485,8 @@ final class E2eSupport {
   static Response navigate(Page page, String url) {
     Page.NavigateOptions options = new Page.NavigateOptions().setTimeout(NAVIGATE_TIMEOUT_MILLIS);
     for (int attempt = 1; attempt < NAVIGATE_MAX_ATTEMPTS; attempt++) {
+      int cookiesBefore = page.context().cookies().size();
+      long started = System.nanoTime();
       try {
         return page.navigate(url, options);
       } catch (TimeoutError timeout) {
@@ -467,11 +498,20 @@ final class E2eSupport {
           throw abort;
         }
         System.out.printf(
-            "[E2E][navigate] attempt %d/%d to %s aborted (%s); settling then retrying%n",
+            "[E2E][navigate] attempt %d/%d to %s aborted after %d ms (%s); settling then"
+                + " retrying%n",
             attempt,
             NAVIGATE_MAX_ATTEMPTS,
             url,
-            String.valueOf(abort.getMessage()).lines().findFirst().orElse("navigation aborted"));
+            (System.nanoTime() - started) / 1_000_000,
+            abortSummary(abort.getMessage()));
+      }
+      int cookiesAfter = page.context().cookies().size();
+      if (cookiesBefore > 0 && cookiesAfter == 0) {
+        System.out.printf(
+            "[E2E][navigate] the browser context lost all %d cookies during attempt %d/%d to %s;"
+                + " the retry runs without a session%n",
+            cookiesBefore, attempt, NAVIGATE_MAX_ATTEMPTS, url);
       }
       page.waitForTimeout(NAVIGATE_RETRY_BACKOFF_MILLIS);
       try {
@@ -485,6 +525,26 @@ final class E2eSupport {
       }
     }
     return page.navigate(url, options);
+  }
+
+  /**
+   * Picks the line of a Playwright error message that names the failure, rather than its opening
+   * line.
+   *
+   * @param message the exception message, possibly {@code null}
+   * @return the trimmed {@code message=} line, else the first non-blank line, else {@code
+   *     "navigation aborted"}
+   */
+  private static String abortSummary(String message) {
+    if (message == null) {
+      return "navigation aborted";
+    }
+    List<String> lines = message.lines().map(String::strip).filter(l -> !l.isEmpty()).toList();
+    return lines.stream()
+        .filter(l -> l.startsWith("message="))
+        .findFirst()
+        .or(() -> lines.stream().findFirst())
+        .orElse("navigation aborted");
   }
 
   /**
@@ -504,25 +564,34 @@ final class E2eSupport {
   }
 
   /**
-   * Best-effort failure diagnostics: writes a full-page screenshot and the page HTML under {@code
-   * build/e2e/<label>-failure.*} and prints the current URL, so a CI run can see what the browser
-   * was showing when a flow failed.
+   * Best-effort failure diagnostics: prints the current URL and writes the page HTML and a
+   * screenshot under {@code build/e2e/<label>-failure.*}, so a CI run can see what the browser was
+   * showing when a flow failed.
+   *
+   * <p>The HTML is written first, and a page too tall for a full-page capture falls back to a
+   * viewport screenshot, so neither artefact is lost to the other's failure.
    *
    * @param page the page at the point of failure
    * @param label short prefix for the artifact filenames
    */
   static void dump(Page page, String label) {
+    Path dir = Path.of("build", "e2e");
     try {
-      Path dir = Path.of("build", "e2e");
       Files.createDirectories(dir);
-      page.screenshot(
-          new Page.ScreenshotOptions()
-              .setPath(dir.resolve(label + "-failure.png"))
-              .setFullPage(true));
-      Files.writeString(dir.resolve(label + "-failure.html"), page.content());
       System.out.printf("[E2E][FAIL] %s url=%s%n", label, page.url());
+      Files.writeString(dir.resolve(label + "-failure.html"), page.content());
     } catch (RuntimeException | IOException e) {
-      System.out.println("[E2E][FAIL] diagnostics dump failed: " + e);
+      System.out.println("[E2E][FAIL] HTML dump failed: " + e);
+    }
+    Path screenshot = dir.resolve(label + "-failure.png");
+    try {
+      page.screenshot(new Page.ScreenshotOptions().setPath(screenshot).setFullPage(true));
+    } catch (RuntimeException tooTall) {
+      try {
+        page.screenshot(new Page.ScreenshotOptions().setPath(screenshot));
+      } catch (RuntimeException e) {
+        System.out.println("[E2E][FAIL] screenshot failed: " + e);
+      }
     }
   }
 
