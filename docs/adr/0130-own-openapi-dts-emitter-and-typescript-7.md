@@ -138,5 +138,9 @@ Node-ESM block for `scripts/**/*.mjs`. No gate reads those files. `:frontend:lin
 `src/main/resources/static/js/**/*.js`, `:frontend:prettierCheck` only the static CSS and JS and
 `types/**/*.d.ts`, and no workflow lints `frontend/scripts/`. The five `.mjs` files there — the
 emitter, its test, the probe extractor and two script tests — are therefore neither linted nor
-format-checked. Adding `scripts/**/*.mjs` to the arguments and inputs of both tasks is the open
+format-checked. Adding `scripts/**/*.mjs` to the arguments and inputs of both tasks was the open
 follow-up that makes the bullet true.
+
+**Closed** (2026-10-03, #2327): `:frontend:lintJs`, `:frontend:prettierCheck` and
+`:frontend:prettierApply` now pass `scripts/**/*.mjs` and declare the files as task inputs, so the
+decision bullet holds as written.
