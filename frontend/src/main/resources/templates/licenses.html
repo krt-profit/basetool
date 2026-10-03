@@ -1,15 +1,18 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="${appTitle} + ' - ' + #{licenses.title}">Profit Basetool - Open-Source-Lizenzen</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/legal.css}">
+    </th:block>
 </head>
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
 
 <th:block th:replace="~{fragments/header :: header}" />
 <main>
-    <div class="hud-box mt-2">
-        <h1 th:text="#{licenses.title}">Open-Source-Lizenzen</h1>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.legal', titleText=#{licenses.title})}"></th:block>
+    <div class="card legal-doc" data-testid="legal-doc">
         <p th:text="#{licenses.intro}">Das Profit Basetool enth&auml;lt Open-Source-Komponenten Dritter.</p>
         <p th:text="#{licenses.choice}">Bietet eine Komponente mehrere Lizenzen zur Wahl an, steht sie unter jeder davon.</p>
         <p>
@@ -19,7 +22,7 @@
                th:text="#{licenses.own.source}">Quelltext auf GitHub</a>
         </p>
 
-        <p th:if="${!ossAvailable}" class="oss-unavailable" th:text="#{licenses.unavailable}">
+        <p th:if="${!ossAvailable}" class="alert alert-warning" th:text="#{licenses.unavailable}">
             Das Lizenzverzeichnis konnte nicht geladen werden.
         </p>
 
