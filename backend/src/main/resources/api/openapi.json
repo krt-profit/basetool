@@ -76,21 +76,12 @@
             "description" : "The default set.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -359,21 +350,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -655,21 +637,12 @@
             "description" : "Every registry client",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -847,21 +820,12 @@
             "description" : "One row per client in use",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -954,21 +918,12 @@
             "description" : "The client",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -1503,21 +1458,12 @@
             "description" : "At most 500 installations",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -1702,21 +1648,12 @@
             "description" : "The switch",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -1903,21 +1840,12 @@
             "description" : "At most twenty runs",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -2010,21 +1938,12 @@
             "description" : "The run",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -2111,21 +2030,12 @@
             "description" : "The recent jobs.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -2319,21 +2229,12 @@
             "description" : "The job.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -2530,21 +2431,12 @@
             "description" : "The hits, possibly capped",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -2938,21 +2830,12 @@
             "description" : "Paginated list.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -3681,21 +3564,12 @@
             "description" : "Paginated list.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -3895,21 +3769,12 @@
             "description" : "Registrations in that status, oldest first.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -4511,21 +4376,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -4825,21 +4681,12 @@
             "description" : "One page of consent rows",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -4924,21 +4771,12 @@
             "description" : "The pending count",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -5131,21 +4969,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -5239,21 +5068,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -5408,7 +5228,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -5593,7 +5413,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -5691,7 +5511,7 @@
             "description" : "The policy in force",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -5957,21 +5777,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -6087,21 +5898,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -6213,21 +6015,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -6364,21 +6157,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -6560,21 +6344,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -6881,21 +6656,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -7311,21 +7077,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -7457,21 +7214,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -7714,21 +7462,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -7836,21 +7575,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -7954,21 +7684,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -8133,21 +7854,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -8330,21 +8042,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -8448,21 +8151,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -8835,21 +8529,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -9122,21 +8807,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -9350,21 +9026,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -9484,21 +9151,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -9881,21 +9539,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -10213,7 +9862,7 @@
             "description" : "Blueprint page returned",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -10331,7 +9980,7 @@
             "description" : "Matching products returned.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -10456,7 +10105,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -10562,7 +10211,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -10847,21 +10496,12 @@
             "description" : "The connected clients",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -11487,7 +11127,7 @@
             "description" : "The locations",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -11787,21 +11427,12 @@
             "description" : "The page",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -12172,21 +11803,12 @@
             "description" : "The installation",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -12361,21 +11983,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -12477,21 +12090,12 @@
             "description" : "The page",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -12695,21 +12299,12 @@
             "description" : "The page",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -13195,7 +12790,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -13556,7 +13151,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -14050,21 +13645,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -14244,21 +13830,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -14804,21 +14381,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -14933,21 +14501,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -15445,21 +15004,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -15711,21 +15261,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -15900,21 +15441,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -16079,21 +15611,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -16570,21 +16093,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -16702,21 +16216,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -16833,21 +16338,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -16988,21 +16484,12 @@
             "description" : "Probe answered",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -17098,21 +16585,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -17228,21 +16706,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -17434,21 +16903,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -17639,21 +17099,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -17818,21 +17269,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -18886,7 +18328,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -19513,21 +18955,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -19710,21 +19143,12 @@
             "description" : "SSE stream opened.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -19843,7 +19267,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -20032,7 +19456,7 @@
             "description" : "List of home locations",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -20133,7 +19557,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -20233,7 +19657,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -20361,7 +19785,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -20547,7 +19971,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -20773,7 +20197,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -20879,7 +20303,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -21075,7 +20499,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -21349,7 +20773,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -21543,21 +20967,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -21893,21 +21308,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -22095,21 +21501,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -22595,21 +21992,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -22712,21 +22100,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -22817,7 +22196,7 @@
             "description" : "Alias list returned",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -23094,7 +22473,7 @@
             "description" : "Alias returned",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -23344,21 +22723,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -23537,21 +22907,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -23741,21 +23102,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -24260,7 +23612,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -24449,7 +23801,7 @@
             "description" : "List of job-order materials returned successfully",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -24550,7 +23902,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -24705,7 +24057,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -24833,7 +24185,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -24952,7 +24304,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -25096,7 +24448,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -25282,7 +24634,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -25508,7 +24860,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -25617,7 +24969,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -25714,21 +25066,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -25811,21 +25154,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -25910,21 +25244,12 @@
             "description" : "The caller's layout context",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -26012,21 +25337,12 @@
             "description" : "Pinnable org-unit options",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -26134,7 +25450,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -26325,7 +25641,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -26423,7 +25739,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -26586,7 +25902,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -26774,7 +26090,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -28829,7 +28145,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -30288,7 +29604,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -31051,21 +30367,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -31157,21 +30464,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -31263,21 +30561,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -31363,21 +30652,12 @@
             "description" : "All rules.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -31649,21 +30929,12 @@
             "description" : "Rule found.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -31875,21 +31146,12 @@
             "description" : "Paginated list of the caller's notifications.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -32157,21 +31419,12 @@
             "description" : "Most-recent-first list.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -32258,21 +31511,12 @@
             "description" : "SSE stream opened.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -32359,21 +31603,12 @@
             "description" : "Unread count.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -32667,21 +31902,12 @@
             "description" : "Paginated list of operations.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -32858,21 +32084,12 @@
             "description" : "Reference list returned.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -33017,21 +32234,12 @@
             "description" : "Paginated list of operations.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -33207,21 +32415,12 @@
             "description" : "Operation found.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -33414,21 +32613,12 @@
             "description" : "Finance roll-up returned.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -33522,21 +32712,12 @@
             "description" : "Finance summary returned.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -33638,21 +32819,12 @@
             "description" : "Mission finance detail returned.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -33746,21 +32918,12 @@
             "description" : "Payout breakdown returned.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -33995,21 +33158,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -34218,7 +33372,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -34335,7 +33489,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -34446,7 +33600,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -34649,21 +33803,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -34748,21 +33893,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -34885,21 +34021,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -35075,21 +34202,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -35897,21 +35015,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -36005,21 +35114,12 @@
             "description" : "Blueprint coverage for the item order.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -36546,21 +35646,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -37059,21 +36150,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -37475,21 +36557,12 @@
             "description" : "PDF generated successfully",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -37690,21 +36763,12 @@
             "description" : "PDF generated successfully",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -37801,21 +36865,12 @@
             "description" : "Item stock returned successfully",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -37912,21 +36967,12 @@
             "description" : "Material collection returned successfully",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -38103,21 +37149,12 @@
             "description" : "The assembled org chart.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -38588,7 +37625,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -38973,7 +38010,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -39185,7 +38222,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -39746,7 +38783,7 @@
             "description" : "Active org-unit options",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -39848,7 +38885,7 @@
             "description" : "Active org-unit options",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -39955,21 +38992,12 @@
             "description" : "Read-only account detail",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -40860,21 +39888,12 @@
             "description" : "Balance series",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -41067,21 +40086,12 @@
             "description" : "Account settings",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -41197,21 +40207,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -41343,21 +40344,12 @@
             "description" : "Redacted booking history",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -42025,21 +41017,12 @@
             "description" : "Overseen org-unit balances",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -42126,21 +41109,12 @@
             "description" : "The caller's requests",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -42317,21 +41291,12 @@
             "description" : "Requests on own accounts",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -42796,21 +41761,12 @@
             "description" : "Active accounts",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -42918,7 +41874,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -43024,7 +41980,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -43419,21 +42375,12 @@
             "description" : "Paginated list of the caller's blueprints.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -43718,21 +42665,12 @@
             "description" : "Per-blueprint craftability for the caller.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -44045,21 +42983,12 @@
             "description" : "Paginated list of available blueprints.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -44157,21 +43086,12 @@
             "description" : "Owners of the blueprint within the scope.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -44454,21 +43374,12 @@
             "description" : "Recipe view for the owned blueprint.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -44586,21 +43497,12 @@
             "description" : "Paginated list of the caller's items.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -44872,21 +43774,12 @@
             "description" : "Item found.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -45098,7 +43991,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -45204,7 +44097,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -45510,21 +44403,12 @@
             "description" : "Paginated list of categories.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -45735,21 +44619,12 @@
             "description" : "Paginated list of categories for the topic.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -45848,21 +44723,12 @@
             "description" : "All categories for the topic.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -46042,21 +44908,12 @@
             "description" : "Category found.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -46247,21 +45104,12 @@
             "description" : "Per-transition eligibility for the caller.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -46367,21 +45215,12 @@
             "description" : "Eligibility for the requested transition.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -46480,21 +45319,12 @@
             "description" : "Per-transition eligibility for the target member.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -46605,21 +45435,12 @@
             "description" : "All evaluations.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -46730,21 +45551,12 @@
             "description" : "Evaluatable members.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -46834,21 +45646,12 @@
             "description" : "Own evaluations.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -46959,21 +45762,12 @@
             "description" : "Paginated own evaluations.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -47281,21 +46075,12 @@
             "description" : "Paginated list of level contents.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -47486,21 +46271,12 @@
             "description" : "Level contents for the category.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -47680,21 +46456,12 @@
             "description" : "Level content found.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -47906,21 +46673,12 @@
             "description" : "Paginated list of rank requirements.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -48119,21 +46877,12 @@
             "description" : "Requirements for the rank transition.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -48313,21 +47062,12 @@
             "description" : "Rank requirement found.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -48539,21 +47279,12 @@
             "description" : "Paginated list of topics.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -48735,21 +47466,12 @@
             "description" : "All topics ordered by sortOrder.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -48929,21 +47651,12 @@
             "description" : "Topic found.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -49256,21 +47969,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -49457,21 +48161,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -49566,21 +48261,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -49698,21 +48384,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -49827,21 +48504,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -50305,21 +48973,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -50615,7 +49274,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -50889,7 +49548,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -51086,7 +49745,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -51191,7 +49850,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -51416,7 +50075,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -51522,7 +50181,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -51739,7 +50398,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -51845,7 +50504,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -52160,7 +50819,7 @@
             "description" : "Paged list of Spezialkommandos.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -52440,7 +51099,7 @@
             "description" : "Matching Spezialkommando.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -52734,21 +51393,12 @@
             "description" : "Membership list.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -53370,7 +52020,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -54135,7 +52785,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -54567,7 +53217,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -54841,7 +53491,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -55156,7 +53806,7 @@
             "description" : "Sync-report page returned",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -55252,7 +53902,7 @@
             "description" : "Ping response",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -55374,7 +54024,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -55480,7 +54130,7 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -56127,7 +54777,7 @@
             "description" : "The wording in force",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -56227,21 +54877,12 @@
             "description" : "Consent status",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -56344,7 +54985,7 @@
             "description" : "Up to 2000 matches, sorted alphabetically.",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }
@@ -56469,21 +55110,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -56569,21 +55201,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -56666,21 +55289,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -56763,21 +55377,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -57022,13 +55627,7 @@
             "description" : "The caller has a pending request",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
@@ -57044,9 +55643,6 @@
               }
             },
             "description" : "The caller has no pending request"
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -57311,21 +55907,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -57411,21 +55998,12 @@
             "description" : "The PDF",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -57521,21 +56099,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -57623,21 +56192,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -57720,21 +56280,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -57908,21 +56459,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -58094,21 +56636,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -58191,21 +56724,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -58407,21 +56931,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -58535,21 +57050,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -58663,21 +57169,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -58791,21 +57288,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -59057,21 +57545,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -59372,21 +57851,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -59575,21 +58045,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -59681,21 +58142,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -59779,7 +58231,7 @@
             "description" : "Ping response with timestamp",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "description" : "Caching policy: no-cache, must-revalidate",
                 "schema" : {
                   "type" : "string"
                 }

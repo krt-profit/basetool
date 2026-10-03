@@ -2107,6 +2107,10 @@ answer from it identically for seventeen paths.
 - [x] The ETag filter skips exactly the same families, and no response header changes when it does
   (`StreamAwareShallowEtagHeaderFilterTest`, which asserts the premise against Spring's own filter
   rather than against a reading of its source).
+- [x] The committed `openapi.json` documents it the same way: a `GET` of a `no-store` family carries
+  `Cache-Control` (`private, no-store`) and neither an `ETag` nor a `304` response, every other
+  `GET` the `ETag`, `Cache-Control` (`no-cache, must-revalidate`) and `304`
+  (`OpenApiCachingConfig`, classified by `NoStoreApiScopes`; `OpenApiCachingConfigTest`).
 - [x] Every `/api` mapping of the real dispatcher belongs to a classified family, and every family
   names at least one mapping (`ApiCacheFamilyCoverageTest`, selection floor 572 mappings).
 - [x] Every `GET` mapping, with its path variables filled, answers its family's directive through

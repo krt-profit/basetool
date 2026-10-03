@@ -314,9 +314,14 @@ under a name of its own.
   `dashboard`, `exchange`, `hangar`, `identity`, `inventory`, `joborder`, `leadership`, `livesync`,
   `materialexchange`, `mission`, `notification`, `operation`, `orgchart`, `orgunit`,
   `personalinventory`, `promotion`, `refinery`). The controller-to-domain table is explicit in main
-  code, `config/ApiDomains`, because the backend domain map of plan guard G-09
-  (`backend/src/test/resources/architecture/domain-map.txt`) is not on `main` yet; once it is, the
-  table is derived from it. One committed document stays — the app vendors it and the frontend
+  code, `config/ApiDomains`: the backend domain map of plan guard G-09
+  (`backend/src/test/resources/architecture/domain-map.txt`, REQ-MOD-001) lives in test scope, where
+  the running application cannot read it, and the REST cut's 22 domains are not the map's 26 modules.
+  `ApiDomainsMatchTheDomainMapTest` therefore holds the table to the map: a controller's tag is its
+  module, or the API domain one of five reviewed entries names — the `privacy` module's endpoints
+  are tagged `identity`, the `admin` module's `admin-system`, and `LeitungController`,
+  `BlueprintController` and `UexLocationController` keep the domain the REST cut gives them —, and
+  an entry no controller needs fails. One committed document stays — the app vendors it and the frontend
   generates its test types from it; per-domain views are filtered from it.
 - **One contract tier per operation**, as `x-contract-tier` (REQ-API-001 names the tiers):
   `T0` never breaks, `T1` is the Android contract, `T2` is web-only. The single source is

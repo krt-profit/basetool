@@ -53,6 +53,10 @@
 
 ### Changed
 
+- **API-Dokumentation: `no-store`-Bereiche ohne ETag und `304`.** `openapi.json` beschreibt für die
+  nie zwischengespeicherten API-Familien nur noch `Cache-Control: private, no-store`, wie das Backend
+  antwortet; ETag und `304 Not Modified` stehen nur bei den revalidierbaren (REQ-SEC-031).
+
 - **Tests: Testklassen teilen sich ihre Spring-Kontexte.** Das Backend startet 34 statt 46
   Anwendungskontexte, das Frontend 19 statt 21: ungenutzte Mocks sind entfernt, acht Klassen nutzen
   den gemeinsamen Mock-Satz `@LeafServiceMockTest`, Sicherheits-Beans bleiben echt. Ein Budget-Test
