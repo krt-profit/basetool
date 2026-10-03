@@ -36,6 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -43,6 +44,8 @@ import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,13 +57,15 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC test for {@link AdminSettingsPageController}'s settings AJAX twin: it applies the invariants
+ * MVC test for {@link AdminSettingsPageController}: the settings AJAX twin applies the invariants
  * and per-setting PUTs and returns the new versions as JSON, a yellow &gt;= red violation returns
- * {@code 422 problem+json}, and without {@code X-Requested-With} the URL still redirects. The page
- * itself renders on the form pattern.
+ * {@code 422 problem+json}, without {@code X-Requested-With} the URL still redirects, and the page
+ * renders on the form pattern with one profit toggle per active Spezialkommando.
  */
 @SpringBootTest
 class AdminSettingsPageControllerMvcTest {
+
+  private static final Pattern SK_TOGGLE = Pattern.compile("<input[^>]*sk-profit-toggle[^>]*>");
 
   private MockMvc mockMvc;
 
@@ -156,6 +161,38 @@ class AdminSettingsPageControllerMvcTest {
         .perform(get("/admin/settings"))
         .andExpect(status().isOk())
         .andExpect(PageStylesheets.content(not(containsString(".form-group input"))));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void viewSettings_rendersOneProfitTogglePerActiveSpecialCommandSortedByName() throws Exception {
+    UUID zuluId = UUID.randomUUID();
+    UUID alphaId = UUID.randomUUID();
+    SpecialCommandDto zulu =
+        new SpecialCommandDto(zuluId, "Zulu-Kommando", "ZK", "", true, true, 3L);
+    SpecialCommandDto alpha =
+        new SpecialCommandDto(alphaId, "Alpha-Kommando", "AK", "", true, false, 1L);
+    when(backendApiClient.get(
+            eq("/api/v1/special-commands?size=1000&sort=name,asc&page=0"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(zulu, alpha), 0, 1000, 2, 1, List.of()));
+
+    String html =
+        mockMvc
+            .perform(get("/admin/settings"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    Matcher toggles = SK_TOGGLE.matcher(html);
+    assertThat(toggles.find()).as("first SK toggle").isTrue();
+    String first = toggles.group();
+    assertThat(toggles.find()).as("second SK toggle").isTrue();
+    String second = toggles.group();
+    assertThat(toggles.find()).as("exactly one toggle per SK").isFalse();
+    assertThat(first).contains("data-sk-id=\"" + alphaId + "\"").doesNotContain("checked");
+    assertThat(second).contains("data-sk-id=\"" + zuluId + "\"").contains("checked");
+    assertThat(html).contains("Alpha-Kommando", "Zulu-Kommando");
   }
 
   @Test
