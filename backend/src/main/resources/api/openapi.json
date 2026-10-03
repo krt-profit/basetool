@@ -58205,6 +58205,20 @@
           }
         }, {
           "in" : "query",
+          "name" : "ready",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
+        }, {
+          "in" : "query",
+          "name" : "q",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
@@ -58713,6 +58727,20 @@
               "type" : "string",
               "enum" : [ "OPEN", "IN_PROGRESS", "COMPLETED", "CANCELED" ]
             }
+          }
+        }, {
+          "in" : "query",
+          "name" : "ready",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
+        }, {
+          "in" : "query",
+          "name" : "q",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
           }
         }, {
           "in" : "query",
