@@ -302,7 +302,7 @@ final class SessionBoundTypeScan {
       TypeShape shape = new TypeShape();
       Instruction pushing = pushingInstruction(elements, i, mergeTargets, shape);
       if (pushing != null) {
-        describePushed(pushing, i, elements, labelIndex, locals, localSignatures, loader, shape);
+        describePushed(pushing, i, labelIndex, locals, localSignatures, loader, shape);
       }
       writes.add(new SessionWrite(site, sink, shape.classes, shape.problems));
     }
@@ -342,7 +342,6 @@ final class SessionBoundTypeScan {
    *
    * @param pushing the instruction
    * @param callIndex the position of the sink call, for local-variable scopes
-   * @param elements the method body
    * @param labelIndex the position of each bound label
    * @param locals the method's local variable table
    * @param localSignatures generic signatures keyed by slot and scope start
@@ -352,7 +351,6 @@ final class SessionBoundTypeScan {
   private static void describePushed(
       @NotNull Instruction pushing,
       int callIndex,
-      @NotNull List<CodeElement> elements,
       @NotNull Map<Label, Integer> labelIndex,
       @NotNull List<LocalVariable> locals,
       @NotNull Map<String, String> localSignatures,
@@ -712,7 +710,7 @@ final class SessionBoundTypeScan {
     void addSignature(@NotNull Signature signature, @NotNull ClassLoader loader) {
       switch (signature) {
         case Signature.ArrayTypeSig array -> addSignature(array.componentSignature(), loader);
-        case Signature.BaseTypeSig base -> {}
+        case Signature.BaseTypeSig _ -> {}
         case Signature.TypeVarSig variable ->
             problems.add("type variable " + variable.identifier());
         case Signature.ClassTypeSig type -> {
@@ -730,8 +728,7 @@ final class SessionBoundTypeScan {
           for (Signature.TypeArg argument : type.typeArgs()) {
             switch (argument) {
               case Signature.TypeArg.Bounded bounded -> addSignature(bounded.boundType(), loader);
-              case Signature.TypeArg.Unbounded unbounded ->
-                  problems.add("unbounded wildcard in " + name);
+              case Signature.TypeArg.Unbounded _ -> problems.add("unbounded wildcard in " + name);
             }
           }
         }

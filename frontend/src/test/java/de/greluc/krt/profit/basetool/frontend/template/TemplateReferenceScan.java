@@ -244,7 +244,7 @@ final class TemplateReferenceScan {
    * fragment"} literal of any class.
    *
    * @param source the source's path, for reporting
-   * @param content the source's content
+   * @param javaSource the source's content
    * @return the references, deduplicated
    */
   static @NotNull @Unmodifiable List<ViewReference> javaViewReferences(
