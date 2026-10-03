@@ -20,9 +20,8 @@ read/write is isolated to the calling user unless the caller is privileged.
 > ends on a page with a way back). The mission finance-entry scope below shared `REQ-SEC-019` with the
 > Discord-link indicator until 2026-09-22, when it was renumbered to **REQ-SEC-065** on the owner's
 > decision (see the renumbering table in [`INDEX.md`](INDEX.md)). **REQ-SEC-054** was never
-> allocated. The next free id is **REQ-SEC-077** (corrected 2026-10-02: this note still said
-> REQ-SEC-072 after REQ-SEC-072 had been allocated, and REQ-SEC-073…076 went to the Phase 0 guard
-> packages of the modularisation plan) — re-check `origin/main` and open PRs before claiming it. Requirements are grouped by subject, not strictly by number.
+> allocated. The next free id is **REQ-SEC-081** (corrected 2026-10-03: REQ-SEC-073…080 went to the
+> Phase 0 guard packages of the modularisation plan) — re-check `origin/main` and open PRs before claiming it. Requirements are grouped by subject, not strictly by number.
 
 ### REQ-SEC-001 — OIDC topology
 
