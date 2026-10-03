@@ -33,8 +33,11 @@ public class ScopedFixtureController {
    * Updates a resource by role only.
    *
    * @param id the resource id
+   * @return the id of the updated resource
    */
   @PreAuthorize("hasRole('OFFICER')")
   @PutMapping("/fixture/{id}")
-  public void update(@PathVariable UUID id) {}
+  public UUID update(@PathVariable UUID id) {
+    return id;
+  }
 }

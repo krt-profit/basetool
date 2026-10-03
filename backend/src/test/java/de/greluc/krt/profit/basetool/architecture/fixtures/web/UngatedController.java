@@ -60,9 +60,11 @@ public class UngatedController {
    * Binds a response-only DTO and writes an audit row.
    *
    * @param body the body
+   * @return the bound body
    */
   @PostMapping("/fixture/write")
-  public void write(@RequestBody ResponseOnlyFixtureDto body) {
+  public ResponseOnlyFixtureDto write(@RequestBody ResponseOnlyFixtureDto body) {
     audit.record();
+    return body;
   }
 }
