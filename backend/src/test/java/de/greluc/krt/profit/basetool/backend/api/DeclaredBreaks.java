@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -221,6 +222,41 @@ final class DeclaredBreaks {
       }
     }
     return breaks;
+  }
+
+  /**
+   * Lists the ledger lines that declare a break of a {@code T0} operation, which no wave may do.
+   *
+   * @param ledger the parsed ledger
+   * @param tierZero the {@code T0} operations as {@code VERB path}
+   * @return the offending lines rendered without their version, in ledger order
+   */
+  static @NotNull @Unmodifiable List<String> onTierZero(
+      @NotNull List<Entry> ledger, @NotNull Set<String> tierZero) {
+    return ledger.stream()
+        .map(Entry::declared)
+        .filter(declared -> tierZero.contains(declared.method() + " " + declared.path()))
+        .map(Break::toString)
+        .toList();
+  }
+
+  /**
+   * Lists the operations a previous document marks {@code T0} or {@code T1}.
+   *
+   * @param previous the previous release's document
+   * @return the operations, verb upper case; empty for a document without tier marks
+   */
+  static @NotNull @Unmodifiable List<OperationKey> frozenIn(@NotNull JsonNode previous) {
+    List<OperationKey> frozen = new ArrayList<>();
+    for (Map.Entry<String, JsonNode> path : previous.path("paths").properties()) {
+      for (Map.Entry<String, JsonNode> verb : path.getValue().properties()) {
+        String tier = verb.getValue().path("x-contract-tier").asString("");
+        if ("T0".equals(tier) || "T1".equals(tier)) {
+          frozen.add(new OperationKey(verb.getKey().toUpperCase(Locale.ROOT), path.getKey()));
+        }
+      }
+    }
+    return List.copyOf(frozen);
   }
 
   /**

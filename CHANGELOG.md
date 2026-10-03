@@ -118,6 +118,15 @@
   dem letzten Release muss in `declared-breaks.txt` stehen, und dieser Vergleich läuft in CI verpflichtend
   statt still übersprungen zu werden (REQ-API-016, REQ-API-017).
 
+- **API-Dokumentation: `no-store`-Bereiche ohne ETag und `304`.** `openapi.json` beschreibt für die
+  nie zwischengespeicherten API-Familien nur noch `Cache-Control: private, no-store`, wie das Backend
+  antwortet; ETag und `304 Not Modified` stehen nur bei den revalidierbaren (REQ-SEC-031).
+
+- **`openapi.json`: ein Tag pro Fachdomäne, Vertragsstufe pro Operation.** Jede Operation trägt genau
+  ein Domänen-Tag (22 Domänen, `x-domain`) und ihre Stufe `x-contract-tier` (T0/T1/T2, Quelle
+  `api/contract-tiers.txt`); die Change-Set-`Op`s von Blueprint und Schiff sind erstmals richtig
+  dokumentiert, und der Generator prüft das Dokument vor dem Schreiben (REQ-API-018).
+
 ### Fixed
 
 - **Crew-Board auf dem Smartphone: Ziehen unter die Tab-Leiste.** Beim Ziehen eines Teilnehmers scrollt die

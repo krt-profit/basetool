@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.model.dto.exchange;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -49,5 +50,6 @@ public record ExchangeBlueprintDto(
    *
    * @param source {@code log}, {@code manual}, {@code import}, {@code default} or {@code other}
    */
+  @Schema(name = "ExchangeBlueprintProvenance")
   public record Provenance(@NotNull String source) {}
 }

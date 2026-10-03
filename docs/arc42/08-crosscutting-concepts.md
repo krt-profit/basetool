@@ -148,7 +148,9 @@ What the Android app calls is a contract of its own: the frozen set of `External
 cover the call list each app release publishes (committed under
 `backend/src/test/resources/api/app-calls/`), and a frozen operation or field breaks only by a line
 of the declared-break ledger, checked against the previous release's document, which CI must fetch
-(REQ-API-016, REQ-API-017).
+(REQ-API-016, REQ-API-017). Every operation of the document carries one domain tag (`x-domain`,
+22 domains) and one contract tier (`x-contract-tier`: T0 never breaks, T1 the Android contract,
+T2 web-only), and every schema name belongs to one Java type (REQ-API-018).
 
 Authority: [`api-conventions.md`](../specs/api-conventions.md) (`REQ-API-*`).
 

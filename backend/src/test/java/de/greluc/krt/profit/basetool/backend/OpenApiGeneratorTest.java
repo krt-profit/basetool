@@ -19,11 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.api.ExposedTypes;
+import de.greluc.krt.profit.basetool.backend.api.OpenApiDocumentAssertions;
+import de.greluc.krt.profit.basetool.backend.config.ContractTiers;
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
@@ -40,8 +44,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+/**
+ * Generates the committed {@code openapi.json} from the running controllers, after asserting what
+ * the document must satisfy (REQ-API-007, REQ-API-018).
+ */
 @SpringBootTest
 @Slf4j
 class OpenApiGeneratorTest {
@@ -57,6 +66,11 @@ class OpenApiGeneratorTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
+  /**
+   * Fetches the document, refuses a wrong one, and writes it sorted.
+   *
+   * @throws Exception if the request, the assertions' inputs or the write fail
+   */
   @Test
   void generateOpenApiDocs() throws Exception {
     MvcResult result =
@@ -68,6 +82,23 @@ class OpenApiGeneratorTest {
             .andReturn();
 
     String json = result.getResponse().getContentAsString();
+    JsonNode document = objectMapper.readTree(json);
+
+    assertThat(
+            OpenApiDocumentAssertions.problems(
+                document, ContractTiers.load(), OpenApiDocumentAssertions.DOMAIN_FLOOR))
+        .as(
+            "the generated document is wrong and is not written (REQ-API-007, REQ-API-018): the"
+                + " security scheme, the two anonymous operations, one domain tag and one contract"
+                + " tier per operation, and each domain's operation-count floor")
+        .isEmpty();
+    assertThat(ExposedTypes.collisions(ExposedTypes.bySchemaName(ExposedTypes.controllers())))
+        .as(
+            "two exposed Java types get one schema name, so the document describes only one of"
+                + " them; give each an explicit @Schema(name = ...) and keep the name an app"
+                + " build already knows (REQ-API-018)")
+        .isEmpty();
+
     Object jsonObject = objectMapper.readValue(json, Object.class);
 
     Path path = Paths.get("src/main/resources/api/openapi.json");
