@@ -502,9 +502,10 @@ The mechanism is `position: static` inside the `width <= 768px` block, and one c
 optional: **`--krt-footer-height` means "how much of the viewport bottom is covered", not "how tall
 the footer is".** `sidebar.js` publishes `0` whenever the footer is not `fixed`, because every
 reader of that property — `main`'s reserve, the shared `--krt-panel-viewport-rest` that caps the
-Materialbörse / Materialien-Übersicht / Gewinnberechnung / Beförderung panels, the org-chart proxy
-scrollbar's `bottom`, the mission-detail action bar's `bottom`, and the mission- and
-operation-detail paddings — would otherwise reserve space for a footer that is not there.
+Materialbörse / Preis-Übersicht / Beförderung panels, the org-chart proxy
+scrollbar's `bottom`, the `bottom` of the sticky form actions (`.form-actions--sticky`) and of the
+operation payout table's pinned sum row, and the mission-detail padding — would otherwise reserve
+space for a footer that is not there.
 
 **Two amendments to the dense-action exception, owner-approved 2026-09-13** after the first
 measured sweep of the touch classes found both:
@@ -852,9 +853,12 @@ The mechanics follow the established idiom (REQ-ORDERS-027, REQ-UI-016):
   breaking the page.
 
 Covered surfaces (beyond the pre-existing REQ-ORDERS-027 orders queue, REQ-UI-016 price matrix,
-bank request-queue/dashboard/org-layout modules and the grouping toggles): Materialbörse (both
-boards: mode/tab, min quality, min amount, sort), Mein Lager + Globales Lager (all multi-selects,
-min quality, personal-only flags, per view), Raffinerie-Aufträge (status + only-mine),
+bank request-queue/dashboard/org-layout modules and the grouping toggles): Materialbörse (view +
+scope, and per view min quality, min amount, sort and „Ohne gestohlene"; key
+`materialboerse_filters`), Mein Lager + Globales Lager (all multi-selects, min quality,
+„Gestohlen", the „Alle · Persönlich · Gemeinsam" segment stored as the two personal flags, per
+view), Raffinerie (the segment „Läuft · Abholbereit · Abgeschlossen · Alle" + only-mine, key
+`refinery_orders_filter`; a stored status list of the former checkboxes maps onto a segment),
 Profitberechnung (ship + systems), Missionen/Operationen (the period segment „Kommend · Vergangen ·
 Alle"; a stored `showPast` migrates), Aufträge scope „Meine · Alle" (`orders_scope_filter`,
 REQ-ORDERS-038), Benachrichtigungen „Ungelesen · Alle" (`notifications_filter`, REQ-NOTIF-022),
@@ -1537,6 +1541,62 @@ saves the changed sections one after another, REQ-FE-001). The hangar's insuranc
 segment „Keine · Monate · LTI" with a month field; the stored value stays `0` / `LTI` / `n`. The
 „Angemeldet" chip of the hand-off's home page is not built: no read says whether the member is signed
 up for a listed mission.
+
+**On the areas (phase 3):** Hangar: one page with the tabs „Meine Schiffe" · „Org-Einheit" (the
+former Org-Einheitsübersicht, ship types as tree rows with a readiness bar); „Meine Schiffe" filters
+by „Alle · Bereit · Nicht bereit" beside the search and counts „n von m einsatzbereit", and import,
+home location and „Hangar leeren …" sit in the page head (REQ-HANGAR-001/002). Mein Inventar →
+Blueprints: „Blueprints hinzufügen" opens a dialog, the extractor link and „Alle löschen …" sit in
+the „⋯" menu, one search, the segment „Alle · Craftbar" and the refinery switch; each row shows a
+status dot and „3×", the detail a key figure and the ingredients with need, stock and quality; the
+availability overview shows the first owners as chips with „+ n weitere" (REQ-INV-008/012/013/048).
+Materialbörse: tabs „Angebote · Gesuche" with the scope segment „Alle · Meine" (the former four
+tabs, `?view=&scope=`, old `mode`/`tab` honoured), one create menu per tab („Angebot erstellen ▾" /
+„Gesuch erstellen ▾"), the filter popover with chips and a compact sort menu, three detail figures.
+Raffinerie: the list with the run-state segment „Läuft · Abholbereit · Abgeschlossen · Alle" and its
+counters, a server-side search over owner, location, method and materials across all pages,
+server-side paging, progress bars and a row action „Einlagern" on ready rows; create and detail as
+one numbered form (Raffinerie · Zeit · Materialien · Finanzen · Besitzer) with a side card holding
+the status steps „Läuft → Abholbereit → Eingelagert", the profit with its calculation and the
+primary action „Ausbeute einlagern", and saving as an outline button in the sticky bar
+(REQ-REFINERY-019). Mein Lager and Globales Lager: page head with „Einbuchen" (and, for an admin on
+the shared Lager, „Globales Lager leeren" in the overflow menu), the filters in the transient
+popover with chips, the segment „Alle · Persönlich · Gemeinsam" on Mein Lager, and the bulk actions
+in a sticky selection bar that appears only while something is marked; the tree stays. The material
+and item drill-downs are data tables with a count chip in the head. Handel: the price matrix as a
+wide data view with the „UEX · vor n min" chip, dropdown filters that summarise their selection („6
+von 42"), „+ Filter" chips, the best sale/purchase rings, the spread and the legend; the material
+detail with category/flag chips, four figures and the terminal table sorted by sale price (segment
+„Verkauf · Einkauf"); the profit calculation with one input card, the Hull C chip and results ranked
+by max. profit with a two-line route (prices only — the calculation names no terminals).
+Auftragsdetail: page head with kind and status badges and the admin overflow „Auftrag löschen", the
+progress tile „Geliefert / benötigt" leading the KPI grid, tabs filtered per kind (Material: Bedarf
+· Übergaben · Bearbeiter · Verknüpft; Item: Items · Materialien · Herstellung · Übergaben ·
+Bearbeiter · Verknüpft) with empty tabs hidden, and „Übergabe erfassen" as the one action of the
+handover tab (REQ-ORDERS-026). Einsatz and Operation detail: both heads are page heads with the back
+link, the title and a translated `.status-badge`. The Einsatz page keeps three tabs (Übersicht ·
+Teilnehmer & Einheiten · Finanzen & Auszahlung); its „Verwaltung" tab became an edit mode behind
+„Bearbeiten" (tabs show views, not forms), „Anmelden" is the head's one CTA and deleting sits in the
+„⋯" menu. The Operation page has a KPI bar and four tabs (Übersicht · Einsätze · Auszahlung ·
+Finanzen), and is edited in a dialog (REQ-MISSION-004, REQ-MISSION-011). Leitung and
+Spezialkommandos: „Leitung" is a master-detail — a unit tree grouped OL · Bereiche · Staffeln ·
+Spezialkommandos with Bereich colour, member count and a search over units and people, and the
+selected unit with „Mitglied hinzufügen" and the tabs „Mitglieder · Kommandogruppen" (`?unit=`,
+`?tab=groups`); rank and group selects save on change, rare and destructive actions sit in the row's
+„⋯" menu. The SK member page renders the same roster fragment (name · Rollen as `.matrix-flag`
+toggles · Leiter) (REQ-ROLE-004). Beförderung and Einsatzdaten: „Themenbereiche verwalten" and the
+admin page „Einsatzdaten verwalten" are master-detail pages (topics | categories with their level
+texts; data kinds | list), each selection a deep link (`?topic=`, `?kind=`) and the list driven by
+the arrow keys; „Rangvoraussetzungen verwalten" leads with a Rangsprung × Themenbereich matrix;
+„Beförderungssystem" shows the rank path as `.ablauf` steps; „Meine Bewertungen" opens with a
+progress card to the next rank (REQ-PROMO-002, REQ-PROMO-003). Kartellbank: both account-detail
+pages lead with four KPI tiles (Saldo, Ziel, ± 30 Tage, Buchungen) over the tabs „Buchungen" and
+„Konto-Info" (bank) or „Ziel & Sichtbarkeit" (org unit); the history has the period segment „30 Tage
+· 90 Tage · Zeitraum …" and a „Saldo nach Buchung" column, and no panel collapses any more. The
+org-unit bank names its tab „Anträge an unsere Konten", „Laufende Anträge" shows each pending
+request's approval path, the staff request queue filters by the status segment „Ausstehend ·
+Bestätigt · Abgelehnt · Alle" with „n warten auf dich", and the KRT approval thresholds are drawn as
+a tier bar (REQ-BANK-023, REQ-BANK-047).
 
 **Enforced by:** `PagePatternFragmentsRenderTest` (the fragments' markup and ARIA) · Stylelint
 `media-feature-name-value-allowed-list` (breakpoints) · `TouchClassLayoutE2eTest` (touch floors) ·
