@@ -156,6 +156,10 @@
 
 ### Fixed
 
+- **Systemeinstellungen: Auftragsbearbeitung pro Spezialkommando wieder schaltbar.** Der Abschnitt
+  zeigte seit dem Wegfall des anonymen Auftragsformulars immer „Keine Spezialkommandos gefunden.";
+  jetzt listet er alle aktiven SKs mit ihrem Schalter (Frontend-Controller, REQ-ADMIN-001).
+
 - **Aufträge: Übergaben buchen auf die richtige Zeile.** Eine Übergabe verringerte bisher immer die
   erste Zeile eines Materials und löste alle Zuordnungen, sobald diese erfüllt war — auch wenn eine
   zweite Qualitätsstufe noch offen war. Bestand unter der Mindestqualität wird jetzt abgelehnt; die
