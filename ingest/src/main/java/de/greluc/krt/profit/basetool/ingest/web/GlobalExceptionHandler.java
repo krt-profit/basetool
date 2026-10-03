@@ -29,7 +29,6 @@ import de.greluc.krt.profit.basetool.logging.LogSafe;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -151,8 +150,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
               "Bad request",
               CODE_SCHEMA_INVALID,
               "The body is not a JSON document.");
-      problem.setProperty(
-          "errors", List.of(Map.of("pointer", "", "message", "is not a JSON document")));
+      problem.setProperty("errors", List.of(new Problems.FieldError("", "is not a JSON document")));
       return handleExceptionInternal(ex, problem, headers, HttpStatus.BAD_REQUEST, request);
     }
     ProblemDetail problem =

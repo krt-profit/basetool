@@ -337,6 +337,13 @@ Three rules hold for every exchange route, and each new resource or capability i
   stay open, a published `$id` never changes, and identifiers and cursors are opaque. A breaking
   change is `v2`, served beside `v1` for at least twelve months. The contract test fails a schema
   that shrank since the last release (REQ-XCH-026, ADR-0219).
+- **Frozen across the relay, pinned at build time.** The backend surface the gateway relays to
+  keeps its behaviour byte-identical (D-05). Every identifier the modules share — relay paths,
+  headers, capability scopes, gate codes, the registry mirror document, the revocation and handoff
+  keys — is declared once in `test-support`'s `ExchangeSeam` and each module asserts its side
+  against it; the backend's answers are validated against the published schemas, every gateway
+  route has a committed golden answer, the gateway's security filter order is pinned, and a pull
+  request touching the exchange path needs the `e2e` label (REQ-XCH-036…-038).
 
 Authority: [`external-exchange.md`](../specs/external-exchange.md) (`REQ-XCH-*`), ADR-0216 …
 ADR-0221, ADR-0224 … ADR-0228; the third-party view is published from `docs/exchange/`.

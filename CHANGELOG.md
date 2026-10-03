@@ -27,6 +27,12 @@
   geregelt ist, Audit nie nach dem Commit geschrieben wird und Mutatoren keine gecachte Instanz
   verändern (REQ-DATA-020…022, REQ-AUDIT-007). Keine Verhaltensänderung.
 
+- **Datenaustausch: der eingefrorene Vertrag wird beim Bauen geprüft.** Backend-Antworten werden gegen die
+  veröffentlichten Schemas und Fixtures geprüft, jede Gateway-Route hat eine festgeschriebene Antwort, die
+  gemeinsamen Bezeichner von Backend, Gateway und Frontend stehen an einer Stelle, und ein PR am Austauschpfad
+  braucht das Label `e2e` (REQ-XCH-036…-038). Die Refinery-Entwurfsroute hat einen eigenen Request-Typ mit
+  identischem JSON; das Verhalten bleibt unverändert.
+
 ### Changed
 
 - **Modularisierung: die Entscheidungen sind festgehalten.** ADR-0231 bis ADR-0239 (Modulschnitt,
@@ -49,6 +55,12 @@
 - **API: höchstens 1 000 Einträge pro Seite.** Nur Preismatrix, Preisübersicht, Materialpreise,
   Terminals und die UEX-Ortskataloge erlauben weiter 100 000 (REQ-API-005); Frontend und App fordern
   sonst nirgends größere Seiten an.
+
+- **Datenaustausch: ein Refinery-Entwurf verlangt laut Schema mindestens einen Auftrag.**
+  `refinery-draft.schema.json` setzt `minItems: 1` auf `orders`, wie das Backend es schon immer verlangt; eine
+  leere Liste lehnt jetzt das Gateway selbst mit `400 SCHEMA_INVALID` und `errors[]` ab statt des weitergereichten
+  Backend-Fehlers. Dasselbe gilt für `goods` und `sourceImages` jedes Auftrags, die ebenfalls mindestens
+  einen Eintrag verlangen. Keine Vertragsänderung im Sinne von v2 (REQ-XCH-026).
 
 ### Fixed
 

@@ -32,6 +32,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -42,6 +43,7 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Pins the exchange API v1 contract (REQ-XCH-011, REQ-XCH-025, REQ-XCH-026): every published schema
@@ -79,6 +81,23 @@ class ExchangeContractTest {
           "/exchange/v1/me/org-demand",
           "/exchange/v1/me/drafts/blueprints",
           "/exchange/v1/me/drafts/refinery-orders");
+
+  /**
+   * Narrowings within v1 the owner accepted as corrections, each with the reason: the schema now
+   * refuses what the Basetool has always refused, so no request it newly refuses ever succeeded
+   * (REQ-XCH-026).
+   */
+  private static final Map<String, String> ACCEPTED_NARROWINGS =
+      Map.of(
+          "refinery-draft.schema.json#/properties/orders/minItems: narrowed from 0 to 1",
+          "the backend has always refused an empty orders list with 400 VALIDATION_FAILED",
+          "refinery-draft.schema.json#/$defs/order/properties/goods/minItems: narrowed from 0 to 1",
+          "the backend has always refused an order with an empty goods list with 400"
+              + " VALIDATION_FAILED",
+          "refinery-draft.schema.json#/$defs/order/properties/sourceImages/minItems: narrowed from"
+              + " 0 to 1",
+          "the backend has always refused an order with an empty sourceImages list with 400"
+              + " VALIDATION_FAILED");
 
   private static final Pattern ERROR_ROW =
       Pattern.compile("^\\| `([A-Z][A-Z0-9_]+)` \\| (\\d{3}) \\|", Pattern.MULTILINE);
@@ -240,7 +259,47 @@ class ExchangeContractTest {
               mapper.readTree(read(current)),
               released.getFileName() + "#"));
     }
-    assertThat(breaking).as("breaking changes within v1 (REQ-XCH-026)").isEmpty();
+    assertThat(unaccepted(breaking)).as("breaking changes within v1 (REQ-XCH-026)").isEmpty();
+  }
+
+  @Test
+  void theAcceptedNarrowingsAreExactlyWhatTheComparisonReportsForThem() throws IOException {
+    JsonNode current = mapper.readTree(read(SCHEMAS.resolve("refinery-draft.schema.json")));
+    JsonNode released = current.deepCopy();
+    ((ObjectNode) released.at("/properties/orders")).put("minItems", 0);
+    ((ObjectNode) released.at("/$defs/order/properties/goods")).put("minItems", 0);
+    ((ObjectNode) released.at("/$defs/order/properties/sourceImages")).put("minItems", 0);
+
+    List<String> breaking =
+        SchemaCompatibility.breakingChanges(released, current, "refinery-draft.schema.json#");
+
+    assertThat(breaking).containsExactlyInAnyOrderElementsOf(ACCEPTED_NARROWINGS.keySet());
+    assertThat(unaccepted(breaking)).isEmpty();
+  }
+
+  @Test
+  void anAcceptedNarrowingHidesNoOtherBreakingChange() throws IOException {
+    JsonNode current = mapper.readTree(read(SCHEMAS.resolve("refinery-draft.schema.json")));
+    JsonNode released = current.deepCopy();
+    ((ObjectNode) released.at("/properties/orders")).put("minItems", 0).put("maxItems", 6);
+
+    List<String> breaking =
+        SchemaCompatibility.breakingChanges(released, current, "refinery-draft.schema.json#");
+
+    assertThat(breaking).hasSize(2);
+    assertThat(unaccepted(breaking))
+        .containsExactly(
+            "refinery-draft.schema.json#/properties/orders/maxItems: narrowed from 6 to 5");
+  }
+
+  /**
+   * Drops the breaking changes the owner accepted as corrections.
+   *
+   * @param breaking the breaking changes the comparison reported
+   * @return those not in {@link #ACCEPTED_NARROWINGS}
+   */
+  private static @NotNull List<String> unaccepted(@NotNull List<String> breaking) {
+    return breaking.stream().filter(change -> !ACCEPTED_NARROWINGS.containsKey(change)).toList();
   }
 
   /**

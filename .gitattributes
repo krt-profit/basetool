@@ -54,4 +54,5 @@ docker/maintenance/** text eol=lf
 
 docker/sandbox/** text eol=lf
 
+*.golden text eol=lf
 backend/src/test/resources/architecture/** text eol=lf

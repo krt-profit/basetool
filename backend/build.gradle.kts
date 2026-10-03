@@ -75,6 +75,9 @@ dependencies {
   testImplementation(libs.spring.modulith.core)
   testImplementation(libs.spring.modulith.docs)
   testImplementation(libs.okhttp3.mockwebserver)
+  testImplementation(libs.json.schema.validator) {
+    exclude(group = "tools.jackson.dataformat", module = "jackson-dataformat-yaml")
+  }
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -122,6 +125,15 @@ tasks.named<Test>("test") {
       ),
     )
     .withPropertyName("crossModuleParitySources")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+
+  inputs
+    .dir(rootProject.file("ingest/src/main/resources/exchange/v1/schemas"))
+    .withPropertyName("exchangeContractSchemas")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+  inputs
+    .dir(rootProject.file("docs/exchange/examples"))
+    .withPropertyName("exchangeContractFixtures")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   inputs

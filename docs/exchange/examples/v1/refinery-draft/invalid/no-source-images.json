@@ -1,12 +1,9 @@
 {
+  "schemaVersion": 1,
   "orders": [
     {
       "panelType": "SETUP",
-      "sourceImages": [
-        {
-          "name": "refinery-setup.png"
-        }
-      ],
+      "sourceImages": [],
       "goods": [
         {
           "rawMaterialName": "QUANTANIUM (RAW)",
