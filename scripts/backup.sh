@@ -98,7 +98,7 @@ write_backup_metrics() {
 [[ -f "${BACKUP_ENV}" ]] || fail "missing ${BACKUP_ENV} (restic repo + rclone config; see docs/backup.md)"
 rt_detect
 rt_wait_for_startup
-export RT_STACK_SERVICES="db-backend db-keycloak redis keycloak backend ingest frontend edge acme"
+export RT_STACK_SERVICES="db-backend db-keycloak redis keycloak edge backend ingest frontend acme"
 log "container runtime: ${RT_BACKEND}"
 rt_require_pinned_image "backup" "${HELPER_IMAGE}" db-backend "${COMPOSE_DIR}/quadlet/systemd"
 HELPER_IMAGE="${RT_PINNED_IMAGE}"

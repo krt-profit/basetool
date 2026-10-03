@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.DiscordAccountExistenceRe
 import de.greluc.krt.profit.basetool.backend.service.DiscordAccountExistenceService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.swagger.v3.oas.annotations.Hidden;
+import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import lombok.RequiredArgsConstructor;
@@ -76,7 +77,7 @@ public class DiscordAccountExistenceController {
   @PostMapping
   public ResponseEntity<DiscordAccountExistenceResponse> checkAccountExistence(
       @RequestHeader(value = SECRET_HEADER, required = false) @Nullable String providedSecret,
-      @RequestBody DiscordAccountExistenceRequest request) {
+      @RequestBody @Valid DiscordAccountExistenceRequest request) {
     String configuredSecret = properties.sharedSecret();
     if (configuredSecret == null || configuredSecret.isBlank()) {
       log.debug("Discord account-existence precheck called but no shared secret is configured.");

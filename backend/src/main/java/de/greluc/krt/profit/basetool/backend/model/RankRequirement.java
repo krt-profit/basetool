@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
+import de.greluc.krt.profit.basetool.backend.annotation.TenantScoped;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -44,6 +45,7 @@ import lombok.ToString;
  * categories must reach {@link #minimumLevel}), which is why every requirement carries its own
  * {@link #owningSquadron}.
  */
+@TenantScoped("owningSquadron")
 @Entity
 @Table(name = "rank_requirement")
 @Getter

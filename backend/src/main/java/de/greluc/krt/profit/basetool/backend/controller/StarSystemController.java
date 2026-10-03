@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.service.StarSystemService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
+import jakarta.validation.Valid;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -96,7 +97,7 @@ public class StarSystemController {
    */
   @PostMapping
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
-  public StarSystemDto createStarSystem(@RequestBody @NotNull StarSystemDto starSystem) {
+  public StarSystemDto createStarSystem(@RequestBody @Valid @NotNull StarSystemDto starSystem) {
     var toCreate = starSystemMapper.toEntity(starSystem);
     toCreate.setId(null);
     toCreate.setVersion(null);
@@ -113,7 +114,7 @@ public class StarSystemController {
   @PutMapping("/{id}")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public StarSystemDto updateStarSystem(
-      @PathVariable @NotNull UUID id, @RequestBody @NotNull StarSystemDto starSystem) {
+      @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull StarSystemDto starSystem) {
     return starSystemMapper.toDto(
         starSystemService.updateStarSystem(id, starSystemMapper.toEntity(starSystem)));
   }

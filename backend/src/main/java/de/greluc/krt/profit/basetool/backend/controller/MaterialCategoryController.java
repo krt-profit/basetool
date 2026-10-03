@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.service.MaterialCategoryService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -82,7 +83,7 @@ public class MaterialCategoryController {
    */
   @PostMapping
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
-  public MaterialCategoryDto create(@RequestBody MaterialCategoryDto dto) {
+  public MaterialCategoryDto create(@RequestBody @Valid MaterialCategoryDto dto) {
     MaterialCategory category = mapper.toEntity(dto);
     category.setId(null);
     category.setVersion(null);
@@ -99,7 +100,8 @@ public class MaterialCategoryController {
    */
   @PutMapping("/{id}")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
-  public MaterialCategoryDto update(@PathVariable UUID id, @RequestBody MaterialCategoryDto dto) {
+  public MaterialCategoryDto update(
+      @PathVariable UUID id, @RequestBody @Valid MaterialCategoryDto dto) {
     MaterialCategory category = mapper.toEntity(dto);
     MaterialCategory updated = service.update(id, category);
     return mapper.toDto(updated);

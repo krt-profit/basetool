@@ -92,7 +92,14 @@ class ExchangeContractTest {
   private static final Map<String, String> ACCEPTED_NARROWINGS =
       Map.of(
           "refinery-draft.schema.json#/properties/orders/minItems: narrowed from 0 to 1",
-          "the backend has always refused an empty orders list with 400 VALIDATION_FAILED");
+          "the backend has always refused an empty orders list with 400 VALIDATION_FAILED",
+          "refinery-draft.schema.json#/$defs/order/properties/goods/minItems: narrowed from 0 to 1",
+          "the backend has always refused an order with an empty goods list with 400"
+              + " VALIDATION_FAILED",
+          "refinery-draft.schema.json#/$defs/order/properties/sourceImages/minItems: narrowed from"
+              + " 0 to 1",
+          "the backend has always refused an order with an empty sourceImages list with 400"
+              + " VALIDATION_FAILED");
 
   private static final Pattern ERROR_ROW =
       Pattern.compile("^\\| `([A-Z][A-Z0-9_]+)` \\| (\\d{3}) \\|", Pattern.MULTILINE);
@@ -258,15 +265,17 @@ class ExchangeContractTest {
   }
 
   @Test
-  void theAcceptedNarrowingIsExactlyWhatTheComparisonReportsForIt() throws IOException {
+  void theAcceptedNarrowingsAreExactlyWhatTheComparisonReportsForThem() throws IOException {
     JsonNode current = mapper.readTree(read(SCHEMAS.resolve("refinery-draft.schema.json")));
     JsonNode released = current.deepCopy();
     ((ObjectNode) released.at("/properties/orders")).put("minItems", 0);
+    ((ObjectNode) released.at("/$defs/order/properties/goods")).put("minItems", 0);
+    ((ObjectNode) released.at("/$defs/order/properties/sourceImages")).put("minItems", 0);
 
     List<String> breaking =
         SchemaCompatibility.breakingChanges(released, current, "refinery-draft.schema.json#");
 
-    assertThat(breaking).containsExactlyElementsOf(ACCEPTED_NARROWINGS.keySet());
+    assertThat(breaking).containsExactlyInAnyOrderElementsOf(ACCEPTED_NARROWINGS.keySet());
     assertThat(unaccepted(breaking)).isEmpty();
   }
 

@@ -1,6 +1,6 @@
 # ADR-0069 — Extract inline template JavaScript into static page modules (bootstrap-dict + verbatim module)
 
-- **Status:** Accepted
+- **Status:** Accepted — amended 2026-10-02 (IIFE namespaces per domain; a correction, see below)
 - **Date:** 2026-07-03
 - **Deciders:** Repository owner (@greluc)
 - **Related:** issue #924 (L5 part 2, epic #905) · ADR-0068 (the controller split of the same issue) · ADR-0012/0013 (krtFetch foundation) · REQ-FE-001…011 ([`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md)) · #574 (mission i18n-dict precedent)
@@ -81,3 +81,21 @@ module*, moved verbatim.**
   (`let`/`const`) — verified unread as `window.*` anywhere; per-module `/* global */` headers
   couple module and bootstrap explicitly; the `sectionWrite` factory adds a small generic surface
   to `krt-fetch.js` that only mission uses until the next page adopts it.
+
+## Amendment — 2026-10-02: IIFE namespaces per domain, and a correction
+
+**Correction (found by the domain modularisation audit, plan §15).** "No IIFE wrapping" was the rule
+for the page modules this decision extracted, and those five still follow it. It was never a property
+of the scripts as a whole: on 2026-10-02, 50 of the 100 scripts under `static/js` are wrapped in an
+IIFE and 50 are not. "Non-defer" no longer holds either: since the ADR-0125 amendment of 2026-09-23,
+120 of the 121 `th:src` script tags carry `defer`; the bootstraps and the order between a
+bootstrap and its module are unchanged.
+
+**Decision (plan §5.9 and §7.8 step F5).** The scripts move into per-domain folders and each domain
+exposes what other scripts need through one namespace object on `window`, built inside an IIFE,
+instead of top-level bindings in the shared global scope, which held 523 top-level names in the 50
+non-IIFE files at the audit. An ESLint `no-implicit-globals` ratchet keeps the count from growing,
+and a boundary text test forbids one domain's page from reading another domain's `window.*` API
+outside an allow-list. The bootstrap/module split of the decision above stays, and every new
+namespace is declared in `frontend/types/globals.d.ts` (REQ-FE-018). The remaining 70 inline
+script blocks move into modules on the same recipe.

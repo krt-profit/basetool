@@ -203,24 +203,22 @@ class ExchangeRefineryDraftRequestIdentityTest {
    */
   private static @NotNull List<JsonNode> mutations(@NotNull JsonNode document) {
     List<JsonNode> out = new ArrayList<>();
-    for (String pointer : pointers(document, "")) {
-      int slash = pointer.lastIndexOf('/');
-      String parent = pointer.substring(0, slash);
-      String member = pointer.substring(slash + 1);
+    for (Member member : members(document, "")) {
       for (int variant = 0; variant < 6; variant++) {
         JsonNode copy = document.deepCopy();
-        JsonNode holder = parent.isEmpty() ? copy : copy.at(parent);
+        JsonNode holder = member.parent().isEmpty() ? copy : copy.at(member.parent());
         if (holder instanceof ObjectNode object) {
+          String name = member.name();
           switch (variant) {
-            case 0 -> object.remove(member);
-            case 1 -> object.putNull(member);
-            case 2 -> object.put(member, -1);
-            case 3 -> object.put(member, 2_000_000_000.5);
-            case 4 -> object.put(member, "x".repeat(300));
-            default -> object.putArray(member);
+            case 0 -> object.remove(name);
+            case 1 -> object.putNull(name);
+            case 2 -> object.put(name, -1);
+            case 3 -> object.put(name, 2_000_000_000.5);
+            case 4 -> object.put(name, "x".repeat(300));
+            default -> object.putArray(name);
           }
         } else if (holder instanceof ArrayNode array) {
-          int index = Integer.parseInt(member);
+          int index = member.index();
           switch (variant) {
             case 0 -> array.remove(index);
             case 1 -> array.set(index, array.nullNode());
@@ -234,27 +232,36 @@ class ExchangeRefineryDraftRequestIdentityTest {
   }
 
   /**
-   * Lists the JSON Pointers of every member and element of a document, depth first.
+   * Lists every member and element of a document with its parent's JSON Pointer, depth first.
    *
    * @param node the node
    * @param at the node's own pointer
-   * @return the pointers below it
+   * @return the members and elements below it
    */
-  private static @NotNull List<String> pointers(@NotNull JsonNode node, @NotNull String at) {
-    List<String> out = new ArrayList<>();
+  private static @NotNull List<Member> members(@NotNull JsonNode node, @NotNull String at) {
+    List<Member> out = new ArrayList<>();
     if (node.isObject()) {
       for (String name : node.propertyNames()) {
-        out.add(at + "/" + name);
-        out.addAll(pointers(node.get(name), at + "/" + name));
+        out.add(new Member(at, name, -1));
+        out.addAll(members(node.get(name), at + "/" + name));
       }
     } else if (node.isArray()) {
       for (int i = 0; i < node.size(); i++) {
-        out.add(at + "/" + i);
-        out.addAll(pointers(node.get(i), at + "/" + i));
+        out.add(new Member(at, String.valueOf(i), i));
+        out.addAll(members(node.get(i), at + "/" + i));
       }
     }
     return out;
   }
+
+  /**
+   * One member of an object or element of an array.
+   *
+   * @param parent the JSON Pointer of the containing node, empty for the document root
+   * @param name the member name, or the element index as text
+   * @param index the element index, {@code -1} for an object member
+   */
+  private record Member(@NotNull String parent, @NotNull String name, int index) {}
 
   /**
    * Lists the published refinery draft fixtures.
