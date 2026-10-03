@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.guardfixture.massassignment;
 
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -65,34 +66,38 @@ public class FixtureMassAssignmentController {
    *
    * @param id the row id
    * @param request the transition
-   * @return the row id and the requested status
+   * @return an empty response
    */
   @PutMapping("/{id}/status")
-  public String transition(
+  public ResponseEntity<Void> transition(
       @PathVariable UUID id, @RequestBody @Valid FixtureStatusRequest request) {
-    return id + ":" + request.status();
+    Objects.requireNonNull(id);
+    Objects.requireNonNull(request);
+    return ResponseEntity.noContent().build();
   }
 
   /**
    * Planted violation: a status bound outside a transition path.
    *
    * @param request the body
-   * @return the number of rows the request names
+   * @return an empty response
    */
   @PutMapping("/bulk")
-  public int bulk(@RequestBody @Valid BulkStatusRequest request) {
-    return request.ids().size();
+  public ResponseEntity<Void> bulk(@RequestBody @Valid BulkStatusRequest request) {
+    Objects.requireNonNull(request);
+    return ResponseEntity.noContent().build();
   }
 
   /**
    * Planted violation: a nested line carries a server-managed org unit.
    *
    * @param request the body
-   * @return the number of lines in the request
+   * @return an empty response
    */
   @PostMapping("/nested")
-  public int nested(@RequestBody @Valid FixtureNestedRequest request) {
-    return request.lines().size();
+  public ResponseEntity<Void> nested(@RequestBody @Valid FixtureNestedRequest request) {
+    Objects.requireNonNull(request);
+    return ResponseEntity.noContent().build();
   }
 
   /**
