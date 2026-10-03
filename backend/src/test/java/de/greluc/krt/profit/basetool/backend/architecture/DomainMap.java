@@ -145,6 +145,15 @@ public final class DomainMap {
   }
 
   /**
+   * One {@code allow} line, kept until every module is declared so it can be checked.
+   *
+   * @param from the module that may depend on {@code to}
+   * @param to the module {@code from} may depend on
+   * @param line the 1-based line of the row in its source
+   */
+  private record AllowRow(@NotNull String from, @NotNull String to, int line) {}
+
+  /**
    * Loads the backend's domain map from the test classpath.
    *
    * @return the parsed map
@@ -175,7 +184,7 @@ public final class DomainMap {
     String base = null;
     Map<String, Integer> ranks = new LinkedHashMap<>();
     Set<String> allowed = new HashSet<>();
-    List<String[]> allowRows = new ArrayList<>();
+    List<AllowRow> allowRows = new ArrayList<>();
     List<Rule> rules = new ArrayList<>();
     Set<String> classRules = new HashSet<>();
     String[] lines = text.split("\n", -1);
@@ -199,7 +208,7 @@ public final class DomainMap {
         }
         case "allow" -> {
           require(parts.length == 3, source, lineNo, "'allow <from> <to>'");
-          allowRows.add(new String[] {parts[1], parts[2], String.valueOf(lineNo)});
+          allowRows.add(new AllowRow(parts[1], parts[2], lineNo));
           allowed.add(parts[1] + "->" + parts[2]);
         }
         case "class", "package", "name", "layer" -> {
@@ -222,16 +231,17 @@ public final class DomainMap {
       }
     }
     require(base != null, source, 0, "a 'base <package>' line");
-    for (String[] row : allowRows) {
-      int lineNo = Integer.parseInt(row[2]);
-      require(ranks.containsKey(row[0]) && ranks.containsKey(row[1]), source, lineNo, "modules");
+    for (AllowRow row : allowRows) {
+      int lineNo = row.line();
       require(
-          ranks.get(row[0]).equals(ranks.get(row[1])) && !row[0].equals(row[1]),
+          ranks.containsKey(row.from()) && ranks.containsKey(row.to()), source, lineNo, "modules");
+      require(
+          ranks.get(row.from()).equals(ranks.get(row.to())) && !row.from().equals(row.to()),
           source,
           lineNo,
           "an allow row between two different modules of the same rank");
       require(
-          !allowed.contains(row[1] + "->" + row[0]),
+          !allowed.contains(row.to() + "->" + row.from()),
           source,
           lineNo,
           "no allow row in both directions");
