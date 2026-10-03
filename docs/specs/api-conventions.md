@@ -1020,8 +1020,8 @@ because the build fails when they differ.
   list per released build follows with the app release.
 - [x] **A retired path answers `APP_UPDATE_REQUIRED`.** **Closed by REQ-API-020** (2026-10-03):
   `RetiredOperationFilter` answers every operation of `retired-operations.txt` with `410
-  APP_UPDATE_REQUIRED` ahead of authentication; on the public API vhost once the edge admits the
-  ledger's retired paths (plan guard G-08).
+  APP_UPDATE_REQUIRED` ahead of authentication, and the API vhost's generated admission admits
+  every retired operation so the answer reaches the app there (REQ-API-021).
 
 **Enforced by:** `ExternalContractTest` (backend) · the *Fail if a committed openapi.json is stale*
 step in `ci.yml` (since 2026-09-23), which is what keeps the document `ExternalContractTest` reads
@@ -1473,10 +1473,10 @@ skipped for every request.
   (`<VERB> <path> - <versionCode>`) of the ledger `backend/src/test/resources/api/declared-breaks.txt`
   (REQ-API-017, plan guard G-23); the build fails on an entry the ledger does not declare that way —
   a field-level line does not retire its operation — and when the ledger is missing.
-- **The edge comes first.** On the public API vhost the edge allow-list refuses a path it does not
-  admit with a bare `404` before the backend sees it. Until the generated edge include (plan guard
-  G-08) also admits the ledger's retired paths, an app on the API vhost meets that `404` — which the
-  app answers by re-reading the policy — and not this answer.
+- **The edge comes first.** On the public API vhost the edge refuses an operation it does not admit
+  with a bare `404` before the backend sees it. Its generated admission (REQ-API-021) admits every
+  operation of `retired-operations.txt`, so an app on the API vhost meets this answer and not the
+  edge's `404`.
 
 **A wave's pull request** therefore carries, together: the re-cut operations; one ledger line per
 break; one line here per retired operation; and the release floor and newest build raised to the
@@ -1498,8 +1498,9 @@ and retired answers at once, and a rollback takes all three back.
 - [x] The list refuses wildcards, T0 operations and duplicates, is dormant while empty, never shadows
   a documented operation, and is tied to the ledger (`RetiredOperationsTest`,
   `RetiredOperationsContractTest`).
-- [ ] The edge admits the ledger's retired paths, so the answer reaches the app on the API vhost.
-  **Open** — plan guard G-08.
+- [x] The edge admits the retired operations, so the answer reaches the app on the API vhost —
+  closed by REQ-API-021 (2026-10-03): `EdgeAdmission` reads `retired-operations.txt` into the
+  generated map.
 
 **Enforced by:** `AndroidClientPropertiesTest`, `AppVersionPolicyDeploySeamTest`,
 `AndroidVersionPolicyReportTest`, `AppVersionPolicyControllerTest`, `RetiredOperationsTest`,
