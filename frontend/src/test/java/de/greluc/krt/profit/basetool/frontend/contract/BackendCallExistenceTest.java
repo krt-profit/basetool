@@ -205,6 +205,35 @@ class BackendCallExistenceTest {
             "WRITE authProbePath GET /api/v1/missions/{id}/owner/{userId}");
   }
 
+  @Test
+  void anExplicitFormatIndexIsFollowedAndAnOverflowingOneStaysDynamic() {
+    assertThat(BackendCallScanner.argumentIndex("2")).isEqualTo(1);
+    assertThat(BackendCallScanner.argumentIndex("99999999999")).isEqualTo(-1);
+
+    BackendCallScanner.Result indexed =
+        BackendCallScanner.scanSources(Map.of("Indexed.java", INDEXED_SOURCE));
+
+    assertThat(indexed.calls())
+        .extracting(c -> c.verb() + " " + BackendCallScanner.display(c.template()))
+        .containsExactlyInAnyOrder("GET /api/v1/missions/crew", "GET /api/v1/missions/{}");
+  }
+
+  /** A source formatting its paths with explicit argument indexes, one of them out of range. */
+  private static final String INDEXED_SOURCE =
+      """
+      package fixture;
+
+      class Indexed {
+        private static final String BASE = "/api/v1/missions";
+        private BackendApiClient backendApiClient;
+
+        void indexed() {
+          backendApiClient.get("%2$s/%1$s".formatted("crew", BASE), Object.class);
+          backendApiClient.get("%1$s/%99999999999$s".formatted(BASE), Object.class);
+        }
+      }
+      """;
+
   /** A source whose calls cover every folding rule, one retired path and one wrong verb. */
   private static final String FIXTURE_SOURCE =
       """

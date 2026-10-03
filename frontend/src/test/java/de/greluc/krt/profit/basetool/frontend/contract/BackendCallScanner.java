@@ -140,7 +140,7 @@ final class BackendCallScanner {
 
   /** A {@code String.format} conversion that inserts a runtime value. */
   private static final Pattern FORMAT_CONVERSION =
-      Pattern.compile("%(?:\\d+\\$)?[-#+ 0,(]*\\d*(?:\\.\\d+)?([a-zA-Z%])");
+      Pattern.compile("%(?:(\\d+)\\$)?[-#+ 0,(]*\\d*(?:\\.\\d+)?([a-zA-Z%])");
 
   /** A URI-template variable such as {@code {id}}. */
   private static final Pattern TEMPLATE_VARIABLE = Pattern.compile("\\{[^}/]*}");
@@ -1023,15 +1023,14 @@ final class BackendCallScanner {
       while (matcher.find()) {
         results = concat(results, Set.of(pattern.substring(last, matcher.start())));
         last = matcher.end();
-        String conversion = matcher.group(1);
+        String conversion = matcher.group(2);
         if ("%".equals(conversion)) {
           results = concat(results, Set.of("%"));
         } else if ("n".equals(conversion)) {
           results = concat(results, Set.of("\n"));
         } else {
-          String explicit = matcher.group();
-          int dollar = explicit.indexOf('$');
-          int index = dollar > 0 ? Integer.parseInt(explicit.substring(1, dollar)) - 1 : next++;
+          String explicit = matcher.group(1);
+          int index = explicit != null ? argumentIndex(explicit) : next++;
           results =
               concat(
                   results,
@@ -1043,6 +1042,21 @@ final class BackendCallScanner {
       formatted.addAll(concat(results, Set.of(pattern.substring(last))));
     }
     return formatted;
+  }
+
+  /**
+   * Converts the digits of an explicit {@code %n$} format index into a zero-based argument index.
+   *
+   * @param digits the one-based index as written in the pattern, digits only
+   * @return the zero-based index, or {@code -1} when the number does not fit an {@code int}, which
+   *     the caller treats like any other index without an argument
+   */
+  static int argumentIndex(@NotNull String digits) {
+    try {
+      return Integer.parseInt(digits) - 1;
+    } catch (NumberFormatException ignored) {
+      return -1;
+    }
   }
 
   private static boolean isTextual(@Nullable Tree type) {
