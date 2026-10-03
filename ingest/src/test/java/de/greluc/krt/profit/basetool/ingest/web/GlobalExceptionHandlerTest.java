@@ -23,7 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
-import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.ingest.observability.MetricNames;
+import de.greluc.krt.profit.basetool.ingest.problem.BadRequestException;
 import de.greluc.krt.profit.basetool.ingest.support.LogCapture;
 import de.greluc.krt.profit.basetool.ingest.support.TestLoggingProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;

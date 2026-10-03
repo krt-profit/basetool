@@ -29,8 +29,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests the served-version policy of the forced-update gate (REQ-API-010), chiefly that an
- * unconfigured server answers "no floor".
+ * Tests the served-version policy of the forced-update gate (REQ-API-010, REQ-API-020), chiefly
+ * that an unconfigured server answers "no floor" and that the override takes precedence.
  */
 class AppVersionPolicyControllerTest {
 
@@ -50,12 +50,31 @@ class AppVersionPolicyControllerTest {
     AndroidClientProperties properties =
         BoundProperties.bind(
             AndroidClientProperties.class,
-            Map.of("minimum-version-code", 7, "latest-version-code", 11));
+            Map.of("release.minimum-version-code", 7, "release.latest-version-code", 11));
 
     AppVersionPolicyDto policy = policyOf(properties);
 
     assertThat(policy.minimumVersionCode()).isEqualTo(7);
     assertThat(policy.latestVersionCode()).isEqualTo(11);
+  }
+
+  @Test
+  @DisplayName("the answer carries the emergency override where one is set")
+  void answersTheEmergencyOverride() {
+    AndroidClientProperties properties =
+        BoundProperties.bind(
+            AndroidClientProperties.class,
+            Map.of(
+                "release.minimum-version-code", 7,
+                "release.latest-version-code", 11,
+                "emergency-override.minimum-version-code", 9,
+                "emergency-override.releases-url", "https://example.org/releases"));
+
+    AppVersionPolicyDto policy = policyOf(properties);
+
+    assertThat(policy.minimumVersionCode()).isEqualTo(9);
+    assertThat(policy.latestVersionCode()).isEqualTo(11);
+    assertThat(policy.releasesUrl()).isEqualTo("https://example.org/releases");
   }
 
   /**

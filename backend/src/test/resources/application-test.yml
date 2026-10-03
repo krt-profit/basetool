@@ -28,6 +28,8 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: http://keycloak.example.com/realms/test
+  modulith:
+    detection-strategy: explicitly-annotated
 
 krt:
   uex:
@@ -39,6 +41,9 @@ krt:
 app:
   cors:
     allowed-origin-patterns: http://localhost:8080
+  security:
+    ingest-gateway:
+      client-ids: test-ingest-gateway
   keycloak:
     sync:
       enabled: false

@@ -146,6 +146,26 @@ public final class MetricNames {
   /** Counter {@code basetool_http_error_total} — tag {@code code} (stable RFC-7807 code). */
   public static final String HTTP_ERROR = "basetool.http.error";
 
+  /**
+   * Counter {@code basetool_security_expression_failures_total} — tag {@code kind} ({@link
+   * #SECURITY_EXPRESSION_EVALUATION} / {@link #SECURITY_EXPRESSION_OTHER}). Bumped when Spring
+   * Security cannot evaluate a method-security expression and the request is refused with {@code
+   * 400 ILLEGAL_ARGUMENT}; normally zero (REQ-OBS-020).
+   */
+  public static final String SECURITY_EXPRESSION_FAILURES = "basetool.security.expression.failures";
+
+  /**
+   * {@code kind} on {@link #SECURITY_EXPRESSION_FAILURES}: the SpEL evaluation threw, e.g. on an
+   * unresolvable bean or method.
+   */
+  public static final String SECURITY_EXPRESSION_EVALUATION = "evaluation";
+
+  /**
+   * {@code kind} on {@link #SECURITY_EXPRESSION_FAILURES}: any other argument error Spring Security
+   * raised, e.g. an expression that yields no decision.
+   */
+  public static final String SECURITY_EXPRESSION_OTHER = "other";
+
   /** Counter {@code basetool_audit_events_total} — tag {@code domain} ({@code AuditDomain}). */
   public static final String AUDIT_EVENTS = "basetool.audit.events";
 
@@ -1010,6 +1030,27 @@ public final class MetricNames {
 
   /** {@link #TAG_OUTCOME} value on {@link #EXCHANGE_MIRROR_WRITES}: the mirror already agreed. */
   public static final String OUTCOME_UNCHANGED = "unchanged";
+
+  /**
+   * Gauge {@code basetool_android_version_policy_override{field}}: {@code 1} while the emergency
+   * override replaces that field's release default, else {@code 0} (REQ-API-020).
+   *
+   * <p>Per process — read it with {@code max()}, never {@code sum()}.
+   */
+  public static final String ANDROID_VERSION_POLICY_OVERRIDE =
+      "basetool.android.version.policy.override";
+
+  /** Tag key: the version-policy field on {@link #ANDROID_VERSION_POLICY_OVERRIDE}. */
+  public static final String TAG_FIELD = "field";
+
+  /** {@link #TAG_FIELD} value: the served floor. */
+  public static final String FIELD_MINIMUM_VERSION_CODE = "minimum_version_code";
+
+  /** {@link #TAG_FIELD} value: the newest published build. */
+  public static final String FIELD_LATEST_VERSION_CODE = "latest_version_code";
+
+  /** {@link #TAG_FIELD} value: the release page. */
+  public static final String FIELD_RELEASES_URL = "releases_url";
 
   private MetricNames() {}
 }

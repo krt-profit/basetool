@@ -114,7 +114,7 @@ class ScLinksPageControllerMvcTest {
 
     int group = html.indexOf("data-group-key=\"resources\"");
     assertThat(group).isPositive();
-    String groupHtml = html.substring(group, html.indexOf("</details>", group));
+    String groupHtml = html.substring(group, html.indexOf("</section>", group));
     assertThat(groupHtml)
         .contains("Ressourcen")
         .contains("href=\"/sc-links\"")

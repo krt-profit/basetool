@@ -42,9 +42,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * Verifies the {@code Mission @Version} optimistic-locking guarantee under real concurrency: worker
@@ -55,7 +52,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * <p>Not {@code @Transactional}, so each worker runs in its own session.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class ConcurrencyTest {
 
   private static final int THREADS = 5;
@@ -69,8 +65,6 @@ class ConcurrencyTest {
   @Autowired private MissionRepository missionRepository;
 
   @Autowired private MissionService missionService;
-
-  @MockitoBean private JwtDecoder jwtDecoder;
 
   private UUID seedMissionId;
 

@@ -80,13 +80,13 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
   private static final PathPattern API_SCOPE = PathPatternParser.defaultInstance.parse("/api/**");
 
   /** The one read that is not cheap: it holds a server-side emitter open for the caller. */
-  private static final PathPattern SSE_CONNECT =
+  static final PathPattern SSE_CONNECT =
       PathPatternParser.defaultInstance.parse("/api/v1/notifications/stream");
 
   /**
    * The app's live-sync stream (ADR-0143), counted like {@link #SSE_CONNECT} although it is a GET.
    */
-  private static final PathPattern LIVE_SYNC_CONNECT =
+  static final PathPattern LIVE_SYNC_CONNECT =
       PathPatternParser.defaultInstance.parse("/api/v1/live-sync/stream");
 
   /**

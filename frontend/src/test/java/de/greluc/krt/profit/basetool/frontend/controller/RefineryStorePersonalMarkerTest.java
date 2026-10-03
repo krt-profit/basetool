@@ -60,7 +60,6 @@ import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -72,7 +71,6 @@ import org.springframework.web.context.WebApplicationContext;
  * before the backend call (toast on the form path, 400 on the AJAX twin).
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class RefineryStorePersonalMarkerTest {
 
   @Autowired private WebApplicationContext context;

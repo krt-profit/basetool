@@ -27,14 +27,16 @@ import jakarta.annotation.PostConstruct;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.i18n.LocaleContextHolder;
 import reactor.core.publisher.Hooks;
 
 /**
  * Enables Reactor's automatic context propagation and registers {@code ThreadLocalAccessor}s so
- * {@link ActiveSquadronContext} and {@link CorrelationContext} are visible in {@code WebClient}
- * exchange filters running on Reactor worker threads.
+ * {@link ActiveSquadronContext}, {@link CorrelationContext}, the user locale and {@link
+ * ClientIpContext} are visible in {@code WebClient} exchange filters running on Reactor worker
+ * threads and in the sections {@code ParallelPageLoader} runs on virtual threads.
  */
 @Configuration
 @Slf4j
@@ -77,8 +79,27 @@ public class ReactorContextPropagationConfig {
   @PostConstruct
   void enableContextPropagation() {
     Hooks.enableAutomaticContextPropagation();
-    ContextRegistry registry = ContextRegistry.getInstance();
+    registerRelayAccessors(ContextRegistry.getInstance());
+    log.info(
+        "Reactor automatic context propagation enabled; registered ThreadLocalAccessors for "
+            + "ActiveSquadronContext ({}), CorrelationContext ({}), the user locale ({}), the "
+            + "client IP ({}).",
+        ACTIVE_ORG_UNIT_CONTEXT_KEY,
+        CORRELATION_CONTEXT_KEY,
+        USER_LOCALE_CONTEXT_KEY,
+        CLIENT_IP_CONTEXT_KEY);
+  }
 
+  /**
+   * Registers the four relay accessors (org unit, correlation id, user locale, client IP) on a
+   * registry, replacing any accessor already registered under the same key.
+   *
+   * <p>Both Reactor's automatic propagation and {@code ParallelPageLoader} restore exactly these on
+   * another thread (REQ-FE-030).
+   *
+   * @param registry the registry to register on
+   */
+  public static void registerRelayAccessors(@NotNull ContextRegistry registry) {
     registry.registerThreadLocalAccessor(
         ACTIVE_ORG_UNIT_CONTEXT_KEY,
         ActiveSquadronContext::get,
@@ -129,14 +150,5 @@ public class ReactorContextPropagationConfig {
           }
         },
         ClientIpContext::clear);
-
-    log.info(
-        "Reactor automatic context propagation enabled; registered ThreadLocalAccessors for "
-            + "ActiveSquadronContext ({}), CorrelationContext ({}), the user locale ({}), the "
-            + "client IP ({}).",
-        ACTIVE_ORG_UNIT_CONTEXT_KEY,
-        CORRELATION_CONTEXT_KEY,
-        USER_LOCALE_CONTEXT_KEY,
-        CLIENT_IP_CONTEXT_KEY);
   }
 }

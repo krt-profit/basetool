@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PostConstruct;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -51,6 +52,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.expression.EvaluationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -608,8 +610,42 @@ public class GlobalExceptionHandler {
   }
 
   /**
+   * Registers both {@code basetool_security_expression_failures_total} series at zero, so the first
+   * failure after a start is an increase a rate query can see (REQ-OBS-020).
+   */
+  @PostConstruct
+  void registerSecurityExpressionFailureCounters() {
+    for (String kind :
+        List.of(
+            MetricNames.SECURITY_EXPRESSION_EVALUATION, MetricNames.SECURITY_EXPRESSION_OTHER)) {
+      meterRegistry.counter(MetricNames.SECURITY_EXPRESSION_FAILURES, MetricNames.TAG_KIND, kind);
+    }
+  }
+
+  /**
+   * Classifies an {@link IllegalArgumentException} that Spring Security raised while evaluating a
+   * method-security expression (REQ-OBS-020).
+   *
+   * @param ex the exception the handler received
+   * @return {@link MetricNames#SECURITY_EXPRESSION_EVALUATION} when the SpEL evaluation threw,
+   *     {@link MetricNames#SECURITY_EXPRESSION_OTHER} for any other argument error thrown by Spring
+   *     Security itself, {@code null} when the exception was not thrown by Spring Security
+   */
+  static @Nullable String securityExpressionFailureKind(@NotNull IllegalArgumentException ex) {
+    StackTraceElement[] trace = ex.getStackTrace();
+    if (trace.length == 0 || !trace[0].getClassName().startsWith("org.springframework.security.")) {
+      return null;
+    }
+    return ex.getCause() instanceof EvaluationException
+        ? MetricNames.SECURITY_EXPRESSION_EVALUATION
+        : MetricNames.SECURITY_EXPRESSION_OTHER;
+  }
+
+  /**
    * Maps {@link IllegalArgumentException} to 400 with code {@code ILLEGAL_ARGUMENT}; the message is
-   * logged but never echoed to the client.
+   * logged but never echoed to the client. One that Spring Security raised while evaluating a
+   * method-security expression is also counted on {@code
+   * basetool_security_expression_failures_total} (REQ-OBS-020).
    *
    * @param ex thrown {@link IllegalArgumentException}
    * @param request servlet request for instance URI + access-log enrichment
@@ -618,6 +654,13 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(IllegalArgumentException.class)
   public ResponseEntity<ProblemDetail> handleIllegalArgument(
       IllegalArgumentException ex, HttpServletRequest request) {
+    String expressionFailure = securityExpressionFailureKind(ex);
+    if (expressionFailure != null) {
+      meterRegistry
+          .counter(
+              MetricNames.SECURITY_EXPRESSION_FAILURES, MetricNames.TAG_KIND, expressionFailure)
+          .increment();
+    }
     ProblemDetail pd =
         problem(
             HttpStatus.BAD_REQUEST,

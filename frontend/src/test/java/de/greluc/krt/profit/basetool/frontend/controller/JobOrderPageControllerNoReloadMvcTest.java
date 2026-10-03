@@ -65,7 +65,6 @@ import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -77,7 +76,6 @@ import org.springframework.web.context.WebApplicationContext;
  * the RFC 7807 error passthrough, and a fragment-sized error response instead of a redirect.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class JobOrderPageControllerNoReloadMvcTest {
 
   @Autowired private WebApplicationContext context;

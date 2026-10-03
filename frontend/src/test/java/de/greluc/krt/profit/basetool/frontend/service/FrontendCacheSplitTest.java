@@ -30,7 +30,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Integration test for the per-domain frontend caches: pins the {@link CachedCatalog} URIs and
@@ -38,7 +37,6 @@ import org.springframework.test.context.ActiveProfiles;
  * evict(domain)} drops only that domain's cache.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class FrontendCacheSplitTest {
 
   @Autowired private CacheManager cacheManager;

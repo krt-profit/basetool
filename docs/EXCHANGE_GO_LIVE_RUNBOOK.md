@@ -532,6 +532,14 @@ krt-profit/basetool-android --json tagName,isLatest,assets`; install it on the P
 
 ### S8 — Raise the app's minimum version
 
+> [!note] Superseded 2026-10-03 for every later floor raise (REQ-API-020, owner decision D-11)
+> The floor is now a literal committed in the backend's `application.yml` and rides the release: a
+> later wave raises it in its own pull request, and a rollback restores the previous release's floor
+> without a host step. `APP_ANDROID_MINIMUM_VERSION_CODE` / `…_LATEST_VERSION_CODE` below reach no
+> container of such a release; the host keeps only the break-glass `APP_ANDROID_*_OVERRIDE`. The
+> living procedure is [`deployment.md` → *The Android app floor*](deployment.md#the-android-app-floor).
+> The step below is the record of 2026-09-28; the value it set, 17 / 17, is the committed default.
+
 **PRODUCTION WRITE — needs @greluc's explicit per-action yes.** About **one minute of web and app
 outage** — announce and schedule it.
 
@@ -1034,7 +1042,10 @@ Fastest first; each is its own production write with its own yes.
    an admin undoes a client for every member since a point in time with the bulk undo on the admin
    page (REQ-XCH-034, which suspends the client first; vault *Suspending an exchange client*).
    Materialbörse offers a sync removed are not restored.
-6. **Marking and the app floor** — S9's and S8's rollbacks; marked rows stay marked.
+6. **Marking and the app floor** — S9's and S8's rollbacks; marked rows stay marked. *Since
+   2026-10-03 (REQ-API-020):* a release that carries the release-bound floor takes its floor back
+   with it — S8's rollback applies only to a rollback onto a release older than that, which still
+   reads `APP_ANDROID_MINIMUM_VERSION_CODE` from `.env`.
 7. **What stays**: the Redis ACL (S3) and — except under step 3 — the Redis size.
 
 ---

@@ -96,21 +96,25 @@ public class ActingMemberFilter extends OncePerRequestFilter {
    * <p>Deliberately the exhaustive list rather than a prefix: a prefix would silently widen the
    * boundary the moment a sibling endpoint is added under the same path.
    */
-  private static final List<PathPattern> EXCHANGE_PATHS =
+  static final List<String> ACTING_PATHS =
       List.of(
-          PATH_PARSER.parse("/api/v1/exchange/catalog/locations"),
-          PATH_PARSER.parse("/api/v1/exchange/catalog/resolve"),
-          PATH_PARSER.parse("/api/v1/exchange/me/account-check"),
-          PATH_PARSER.parse("/api/v1/exchange/me/blueprints"),
-          PATH_PARSER.parse("/api/v1/exchange/me/blueprints/changes"),
-          PATH_PARSER.parse("/api/v1/exchange/me/drafts/blueprints"),
-          PATH_PARSER.parse("/api/v1/exchange/me/drafts/refinery-orders"),
-          PATH_PARSER.parse("/api/v1/exchange/me/installation"),
-          PATH_PARSER.parse("/api/v1/exchange/me/org-demand"),
-          PATH_PARSER.parse("/api/v1/exchange/me/ships"),
-          PATH_PARSER.parse("/api/v1/exchange/me/ships/changes"),
-          PATH_PARSER.parse("/api/v1/exchange/me/stock"),
-          PATH_PARSER.parse("/api/v1/exchange/me/stock/changes"));
+          "/api/v1/exchange/catalog/locations",
+          "/api/v1/exchange/catalog/resolve",
+          "/api/v1/exchange/me/account-check",
+          "/api/v1/exchange/me/blueprints",
+          "/api/v1/exchange/me/blueprints/changes",
+          "/api/v1/exchange/me/drafts/blueprints",
+          "/api/v1/exchange/me/drafts/refinery-orders",
+          "/api/v1/exchange/me/installation",
+          "/api/v1/exchange/me/org-demand",
+          "/api/v1/exchange/me/ships",
+          "/api/v1/exchange/me/ships/changes",
+          "/api/v1/exchange/me/stock",
+          "/api/v1/exchange/me/stock/changes");
+
+  /** {@link #ACTING_PATHS} parsed once, matched on the decoded path. */
+  private static final List<PathPattern> EXCHANGE_PATHS =
+      ACTING_PATHS.stream().map(PATH_PARSER::parse).toList();
 
   /** The path prefix of the backend's exchange layer. */
   private static final String EXCHANGE_PREFIX = "/api/v1/exchange/";
