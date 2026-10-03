@@ -21,10 +21,10 @@ the how-to behind that rule.
 | --- | --- | --- |
 | `:frontend:lintCss` | Stylelint | `static/css/**` — e.g. media-query *range* notation `(width <= Npx)` not `(max-width: Npx)`, modern `rgb(r g b / a%)` not `rgba(...)` |
 | `:frontend:lintCssInline` | Stylelint (+ postcss-html for templates) | the page stylesheets under `static/css/pages/` (the former inline `<style>` blocks, FE-PERF-02) and any `<style>` block that comes back — with the tiny `.stylelintrc.templates.json` rule set, not the strict one |
-| `:frontend:lintJs` | ESLint | `static/js/**` — `no-var` → `let`/`const`, `prefer-const`, `object-shorthand` (both autofixable, since 2026-09-23), unused caught errors `_`-prefixed, raw `fetch` writes (REQ-FE-002), unescaped HTML sinks (REQ-FE-022), … |
+| `:frontend:lintJs` | ESLint | `static/js/**` and the Node scripts `scripts/**/*.mjs` — `no-var` → `let`/`const`, `prefer-const`, `object-shorthand` (both autofixable, since 2026-09-23), unused caught errors `_`-prefixed, raw `fetch` writes (REQ-FE-002), unescaped HTML sinks (REQ-FE-022), … |
 | `:frontend:lintProbeJs` | ESLint | the e2e probe script, extracted from its Java text block |
 | `:frontend:lintHtml` | HTMLHint | `templates/**` |
-| `:frontend:prettierCheck` | Prettier | CSS / JS / `types/**/*.d.ts` formatting |
+| `:frontend:prettierCheck` | Prettier | CSS / JS / `types/**/*.d.ts` / `scripts/**/*.mjs` formatting |
 | `:frontend:typecheckJs` | `tsc --noEmit` | files carrying `// @ts-check` (REQ-FE-018, ADR-0125) |
 | `:frontend:testGenApiTypes` | Node | the self-test of the OpenAPI → `.d.ts` emitter |
 

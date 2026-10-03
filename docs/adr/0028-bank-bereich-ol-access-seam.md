@@ -5,6 +5,7 @@
 - **Deciders:** @greluc, Claude
 - **Related:** spec REQ-BANK-027 · REQ-BANK-028 · REQ-BANK-008 · REQ-BANK-021 · REQ-BANK-022 · ADR-0011 · ADR-0020 · ADR-0026 · issue #692 · #699
 - **Amended:** 2026-06-22 — special-account (Sonderkonto) view for Bereich/OL + active-only listing (REQ-BANK-028, see the Amendment section below)
+- **Amended:** 2026-10-02 — the two ArchUnit pins re-keyed from the `Bank` name prefix to class literals and the bank domain (owner-approved; see ADR-0020's 2026-10-02 amendment, REQ-SEC-073)
 
 ## Context
 
@@ -101,3 +102,17 @@ Consequence: zero bank-domain change again — the new predicate lives in `Owner
 non-`Bank*` class, already the seam's collaborator) and the seam consumes it; `BankSecurityService`,
 the ledger and the grant model stay org-unit-blind. The asymmetry from the base decision holds: the
 special-account view, like the subordinate drill-down, is view-only.
+
+## Amendment — 2026-10-02: the pins no longer rely on the `Bank*` name
+
+Owner-approved on 2026-10-02, the same change as the ADR-0020 amendment (domain modularisation plan
+§5.4, guard G-01, REQ-SEC-073). The "deliberately non-`Bank*` name" above was what kept the seam out
+of `bankClassesMustNotConsultOrgUnitScope`. Both pins now select the bank domain by class literal
+and module package instead of the `Bank` name prefix and FQCN strings: a new bridge is refused by
+`orgUnitAwareBankSeamIsContainedToOneClass` whatever its name, and a new class named after the bank
+must be listed as a bank class or on the org-unit side before the build passes. The rejected
+alternative above ("any new bridge must be non-`Bank*`") becomes: any new bridge is a new decision
+and a new class literal in the containment rule. The bridge set stays exactly
+`OrgUnitBankAccessService`, and its collaborators `OrgUnitBankVisibilityService` and
+`OrgUnitBankApprovalLimitService` (ADR-0065) still depend on neither `OwnerScopeService` nor, for
+the first, `BankAccountRepository`. The decision of this ADR is unchanged.

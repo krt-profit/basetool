@@ -77,15 +77,20 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
   private static final PathPattern API_SCOPE = PATH_PARSER.parse("/api/**");
 
   /**
-   * The only endpoints an unconsented caller may still reach. Patterns, not string prefixes: a bare
-   * {@code startsWith("/api/v1/terms")} would also exempt a future {@code /api/v1/terms-export}.
+   * The only endpoints an unconsented caller may still reach, as exact paths: a new endpoint under
+   * {@code /api/v1/terms} stays gated until it is added here (REQ-SEC-080).
    */
-  private static final List<PathPattern> EXEMPT_PATHS =
+  static final List<String> EXEMPT_PATHS =
       List.of(
-          PATH_PARSER.parse("/api/v1/terms"),
-          PATH_PARSER.parse("/api/v1/terms/**"),
-          PATH_PARSER.parse("/api/v1/users/me/registration-status"),
-          PATH_PARSER.parse("/api/v1/app/version-policy"));
+          "/api/v1/terms/document",
+          "/api/v1/terms/status",
+          "/api/v1/terms/acceptance",
+          "/api/v1/users/me/registration-status",
+          "/api/v1/app/version-policy");
+
+  /** {@link #EXEMPT_PATHS} parsed once, matched on the decoded path. */
+  private static final List<PathPattern> EXEMPT_PATTERNS =
+      EXEMPT_PATHS.stream().map(PATH_PARSER::parse).toList();
 
   /** App-wide correlation-id response header. */
   static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
@@ -128,7 +133,7 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
     PathContainer path =
         PathContainer.parsePath(
             request.getRequestURI().substring(request.getContextPath().length()));
-    if (!API_SCOPE.matches(path) || EXEMPT_PATHS.stream().anyMatch(p -> p.matches(path))) {
+    if (!API_SCOPE.matches(path) || EXEMPT_PATTERNS.stream().anyMatch(p -> p.matches(path))) {
       return null;
     }
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();

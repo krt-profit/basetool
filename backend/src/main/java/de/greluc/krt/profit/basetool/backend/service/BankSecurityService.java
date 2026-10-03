@@ -40,7 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Decides only from the bank roles ({@code ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE}) and the
  * {@link BankAccountGrant} rows; org-unit membership and scope are never consulted (REQ-BANK-008).
  */
-@Service
+@Service("bankSecurityService")
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)

@@ -84,6 +84,15 @@ public class MeController {
   @NotNull
   @GetMapping("/active-org-unit")
   public ActiveOrgUnitResponse getActiveOrgUnit() {
+    return activeOrgUnit();
+  }
+
+  /**
+   * Resolves the effective org-unit context for {@link #getActiveOrgUnit()} and {@link #getLayout}.
+   *
+   * @return current effective org-unit context
+   */
+  private @NotNull ActiveOrgUnitResponse activeOrgUnit() {
     return new ActiveOrgUnitResponse(ownerScopeService.currentOrgUnitId().orElse(null));
   }
 
@@ -102,6 +111,15 @@ public class MeController {
   @Operation(
       summary = "Per-principal UI capability flags (blueprint overview, job orders, bank staff).")
   public CapabilitiesResponse getCapabilities() {
+    return capabilities();
+  }
+
+  /**
+   * Computes the capability flags for {@link #getCapabilities()} and {@link #getLayout}.
+   *
+   * @return the caller's UI capability flags
+   */
+  private @NotNull CapabilitiesResponse capabilities() {
     return new CapabilitiesResponse(
         ownerScopeService.canAccessBlueprintOverview(),
         ownerScopeService.canViewJobOrders(),
@@ -137,6 +155,16 @@ public class MeController {
   @ApiResponses(
       value = {@ApiResponse(responseCode = "200", description = "Pinnable org-unit options")})
   public List<OrgUnitMembershipOptionDto> getPinnableOrgUnits(@AuthenticationPrincipal Jwt jwt) {
+    return pinnableOrgUnits(jwt);
+  }
+
+  /**
+   * Lists the pinnable org units for {@link #getPinnableOrgUnits(Jwt)} and {@link #getLayout}.
+   *
+   * @param jwt the caller's JWT
+   * @return the pinnable options, possibly empty
+   */
+  private List<OrgUnitMembershipOptionDto> pinnableOrgUnits(Jwt jwt) {
     return authHelperService.isAdmin()
         ? orgUnitMembershipQueryService.listAllPinnableOptions()
         : orgUnitMembershipQueryService.listPickerOptionsWithDescendants(
@@ -170,9 +198,9 @@ public class MeController {
       })
   public LayoutResponse getLayout(@AuthenticationPrincipal Jwt jwt, @CurrentUserId UUID callerId) {
     return new LayoutResponse(
-        getActiveOrgUnit().orgUnitId(),
-        getPinnableOrgUnits(jwt),
-        getCapabilities(),
+        activeOrgUnit().orgUnitId(),
+        pinnableOrgUnits(jwt),
+        capabilities(),
         notificationService.unreadCount(callerId));
   }
 

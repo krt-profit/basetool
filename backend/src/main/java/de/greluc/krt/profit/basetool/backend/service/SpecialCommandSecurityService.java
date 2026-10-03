@@ -37,7 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>An admin may manage any SK's members; a non-admin only those of an SK where their membership
  * carries {@code SK_LEAD}.
  */
-@Service
+@Service("specialCommandSecurityService")
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)
