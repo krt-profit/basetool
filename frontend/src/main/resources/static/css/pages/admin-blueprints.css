@@ -132,10 +132,18 @@
     @media (width <= 768px) {
         table.bp-table thead {
             position: absolute;
+            display: block;
             width: 1px;
             height: 1px;
             overflow: hidden;
             clip-path: inset(50%);
+        }
+        table.bp-table thead tr,
+        table.bp-table thead th {
+            display: block;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
         }
         table.bp-table,
         table.bp-table tbody,
