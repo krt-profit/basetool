@@ -5,6 +5,7 @@
     <th:block th:fragment="extraLinks">
         <meta name="_csrf" th:content="${_csrf.token}"/>
         <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+        <link rel="stylesheet" th:href="@{/css/organisation-unit-detail.css}"/>
         <link rel="stylesheet" th:href="@{/css/leitung.css}"/>
     </th:block>
 </head>
@@ -14,230 +15,351 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{leitung.title}">Leitung</h1>
-        <p class="leitung-intro" th:text="#{leitung.intro}">Vergabe der Führungsränge entlang der delegierten Leiter.</p>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.organisation', titleText=#{leitung.title})}"></th:block>
 
-    <div th:if="${error != null}" class="hud-box mt-2 leitung-error" th:text="#{${error}}">Fehler beim Laden.</div>
+    <div th:if="${error != null}" class="alert alert-danger" role="alert" th:text="#{${error}}">Fehler beim Laden.</div>
 
     <div id="leitung-sections">
     <th:block th:fragment="leitungSections">
-        <th:block th:if="${leitung != null}">
+        <th:block th:if="${leitung != null}"
+                  th:with="allEmpty=${#lists.isEmpty(leitung.organisationsleitungen()) and #lists.isEmpty(leitung.bereiche()) and #lists.isEmpty(leitung.squadrons()) and #lists.isEmpty(leitung.specialCommands())}">
+            <th:block th:if="${allEmpty}">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='leitung.empty.title', textKey='leitung.empty.all')}"></th:block>
+            </th:block>
 
-            <section class="leitung-tier" th:if="${!#lists.isEmpty(leitung.organisationsleitungen())}">
-                <h2 class="section-title" th:text="#{leitung.tier.ol}">Organisationsleitung</h2>
-                <div class="hud-box mt-2 leitung-unit" th:each="ol : ${leitung.organisationsleitungen()}" th:data-unit-id="${ol.id()}">
-                    <div class="leitung-unit-head">
-                        <h3 class="leitung-unit-title" th:text="${ol.name()}">OL</h3>
-                        <button type="button" class="btn btn--cta" th:if="${ol.canAppointLead()}"
-                                data-leitung-open="add-ol" th:data-unit-id="${ol.id()}" th:data-unit-name="${ol.name()}"
-                                th:text="#{leitung.ol.add}">OL-Mitglied hinzufügen</button>
+            <div th:unless="${allEmpty}" class="card card--flush leitung-md" id="leitung-md" data-testid="leitung-md"
+                 th:data-selected-unit="${selectedUnitId}" th:data-selected-tab="${selectedTab}">
+                <div class="leitung-tree">
+                    <div class="leitung-tree__search">
+                        <th:block th:replace="~{fragments/components :: toolbarSearch('leitung-tree-search', 'q', null, 'leitung.search.placeholder')}"></th:block>
                     </div>
-                    <p class="leitung-empty" th:if="${#lists.isEmpty(ol.members())}" th:text="#{leitung.empty.members}">Keine Mitglieder.</p>
-                    <div class="table-responsive" th:if="${!#lists.isEmpty(ol.members())}">
-                        <table class="krt-table">
-                            <thead>
-                                <tr>
-                                    <th th:text="#{leitung.column.name}">Name</th>
-                                    <th th:text="#{leitung.column.rank}">Rang</th>
-                                    <th class="leitung-col-action" th:text="#{leitung.column.action}">Aktion</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr th:each="m : ${ol.members()}"
-                                    th:with="isGa=${ol.grandAdmiralUserId() != null and ol.grandAdmiralUserId() == m.userId()}">
-                                    <td th:text="${m.userDisplayName()}">Name</td>
-                                    <td>
-                                        <span class="chip chip--primary" th:text="#{'leitung.rank.' + ${m.role()}}">OL-Mitglied</span>
-                                        <span class="chip chip--accent" th:if="${isGa}" th:text="#{leitung.grandAdmiral.badge}">Grand Admiral</span>
-                                    </td>
-                                    <td class="leitung-col-action">
-                                        <button type="button" class="btn btn-quiet" th:if="${ol.canAppointLead() and !isGa}"
-                                                data-leitung-action="set-grand-admiral" th:data-unit-id="${ol.id()}" th:data-user-id="${m.userId()}"
-                                                th:title="#{leitung.grandAdmiral.set}" th:text="#{leitung.grandAdmiral.set}">Zum Grand Admiral</button>
-                                        <button type="button" class="btn btn-quiet-danger" th:if="${ol.canAppointLead() and isGa}"
-                                                data-leitung-action="remove-grand-admiral" th:data-unit-id="${ol.id()}"
-                                                th:title="#{leitung.grandAdmiral.remove}" th:text="#{leitung.grandAdmiral.remove}">Grand Admiral entfernen</button>
-                                        <button type="button" class="btn btn-quiet-danger btn-icon" th:if="${ol.canAppointLead()}"
-                                                data-leitung-action="remove-ol-member" th:data-unit-id="${ol.id()}" th:data-user-id="${m.userId()}"
-                                                th:title="#{leitung.action.remove}" th:aria-label="#{leitung.action.remove}">
-                                            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
-                                        </button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    <nav class="leitung-tree__nav" id="leitung-tree" th:aria-label="#{leitung.tree.label}">
+                        <div class="leitung-tree__group" th:unless="${#lists.isEmpty(leitung.organisationsleitungen())}">
+                            <span class="leitung-tree__label" th:text="#{leitung.tier.ol}">Organisationsleitung</span>
+                            <a th:each="u : ${leitung.organisationsleitungen()}" class="master-row leitung-tree__row"
+                               th:with="on=${u.id().toString() == selectedUnitId}"
+                               th:href="@{/organisation/leitung(unit=${u.id()})}" th:data-unit-id="${u.id()}"
+                               th:data-search="${#strings.toLowerCase(u.name() + ' ' + (u.shorthand() ?: '') + ' ' + (u.members() != null ? #strings.listJoin(u.members().![userDisplayName()], ' ') : ''))}"
+                               th:classappend="${on} ? 'is-active'" th:attr="aria-current=${on} ? 'true' : null"
+                               data-testid="leitung-tree-row">
+                                <span class="leitung-dept leitung-dept--ol" aria-hidden="true"></span>
+                                <span class="leitung-tree__name" th:text="${u.name()}">OL</span>
+                                <span class="leitung-tree__count" th:text="${u.members() != null ? #lists.size(u.members()) : 0}">0</span>
+                            </a>
+                        </div>
+                        <div class="leitung-tree__group" th:unless="${#lists.isEmpty(leitung.bereiche())}">
+                            <span class="leitung-tree__label" th:text="#{leitung.tier.bereiche}">Bereiche</span>
+                            <a th:each="u : ${leitung.bereiche()}" class="master-row leitung-tree__row"
+                               th:with="on=${u.id().toString() == selectedUnitId}, ctx=${unitContext.get(u.id())}"
+                               th:href="@{/organisation/leitung(unit=${u.id()})}" th:data-unit-id="${u.id()}"
+                               th:data-search="${#strings.toLowerCase(u.name() + ' ' + (u.shorthand() ?: '') + ' ' + (u.members() != null ? #strings.listJoin(u.members().![userDisplayName()], ' ') : ''))}"
+                               th:classappend="${on} ? 'is-active'" th:attr="aria-current=${on} ? 'true' : null"
+                               data-testid="leitung-tree-row">
+                                <span class="leitung-dept" th:classappend="${'leitung-dept--' + (ctx != null ? ctx.departmentModifier() : 'none')}" aria-hidden="true"></span>
+                                <span class="leitung-tree__name" th:text="${u.name()}">Bereich</span>
+                                <span class="leitung-tree__count" th:text="${u.members() != null ? #lists.size(u.members()) : 0}">0</span>
+                            </a>
+                        </div>
+                        <div class="leitung-tree__group" th:unless="${#lists.isEmpty(leitung.squadrons())}">
+                            <span class="leitung-tree__label" th:text="#{leitung.tier.squadrons}">Staffeln</span>
+                            <a th:each="u : ${leitung.squadrons()}" class="master-row leitung-tree__row"
+                               th:with="on=${u.id().toString() == selectedUnitId}, ctx=${unitContext.get(u.id())}"
+                               th:href="@{/organisation/leitung(unit=${u.id()})}" th:data-unit-id="${u.id()}"
+                               th:data-search="${#strings.toLowerCase(u.name() + ' ' + (u.shorthand() ?: '') + ' ' + (u.members() != null ? #strings.listJoin(u.members().![userDisplayName()], ' ') : ''))}"
+                               th:classappend="${on} ? 'is-active'" th:attr="aria-current=${on} ? 'true' : null"
+                               data-testid="leitung-tree-row">
+                                <span class="leitung-dept" th:classappend="${'leitung-dept--' + (ctx != null ? ctx.departmentModifier() : 'none')}" aria-hidden="true"></span>
+                                <span class="leitung-tree__name" th:text="${u.name()}">Staffel</span>
+                                <span class="leitung-tree__count" th:text="${u.members() != null ? #lists.size(u.members()) : 0}">0</span>
+                            </a>
+                        </div>
+                        <div class="leitung-tree__group" th:unless="${#lists.isEmpty(leitung.specialCommands())}">
+                            <span class="leitung-tree__label" th:text="#{leitung.tier.specialCommands}">Spezialkommandos</span>
+                            <a th:each="u : ${leitung.specialCommands()}" class="master-row leitung-tree__row"
+                               th:with="on=${u.id().toString() == selectedUnitId}, ctx=${unitContext.get(u.id())}"
+                               th:href="@{/organisation/leitung(unit=${u.id()})}" th:data-unit-id="${u.id()}"
+                               th:data-search="${#strings.toLowerCase(u.name() + ' ' + (u.shorthand() ?: '') + ' ' + (u.members() != null ? #strings.listJoin(u.members().![userDisplayName()], ' ') : ''))}"
+                               th:classappend="${on} ? 'is-active'" th:attr="aria-current=${on} ? 'true' : null"
+                               data-testid="leitung-tree-row">
+                                <span class="leitung-dept" th:classappend="${'leitung-dept--' + (ctx != null ? ctx.departmentModifier() : 'none')}" aria-hidden="true"></span>
+                                <span class="leitung-tree__name" th:text="${u.name()}">Spezialkommando</span>
+                                <span class="leitung-tree__count" th:text="${u.members() != null ? #lists.size(u.members()) : 0}">0</span>
+                            </a>
+                        </div>
+                        <p class="leitung-tree__nomatch" id="leitung-tree-nomatch" hidden th:text="#{leitung.tree.noMatch}">Keine Einheit passt zur Suche.</p>
+                    </nav>
                 </div>
-            </section>
 
-            <section class="leitung-tier" th:if="${!#lists.isEmpty(leitung.bereiche())}">
-                <h2 class="section-title" th:text="#{leitung.tier.bereiche}">Bereiche</h2>
-                <div class="hud-box mt-2 leitung-unit" th:each="b : ${leitung.bereiche()}" th:data-unit-id="${b.id()}">
-                    <div class="leitung-unit-head">
-                        <h3 class="leitung-unit-title" th:text="${b.name()}">Bereich</h3>
-                        <button type="button" class="btn btn--cta" th:if="${b.canAppointLead() or b.canManageRoster()}"
-                                data-leitung-open="add-bereich" th:data-unit-id="${b.id()}" th:data-unit-name="${b.name()}"
-                                th:data-can-lead="${b.canAppointLead()}" th:data-can-roster="${b.canManageRoster()}"
-                                th:text="#{leitung.bereich.add}">Mitglied hinzufügen</button>
-                    </div>
-                    <p class="leitung-empty" th:if="${#lists.isEmpty(b.members())}" th:text="#{leitung.empty.members}">Keine Mitglieder.</p>
-                    <div class="table-responsive" th:if="${!#lists.isEmpty(b.members())}">
-                        <table class="krt-table">
-                            <thead>
-                                <tr>
-                                    <th th:text="#{leitung.column.name}">Name</th>
-                                    <th th:text="#{leitung.column.rank}">Rang</th>
-                                    <th class="leitung-col-action" th:text="#{leitung.column.action}">Aktion</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr th:each="m : ${b.members()}">
-                                    <td th:text="${m.userDisplayName()}">Name</td>
-                                    <td><span class="chip chip--primary" th:text="#{'leitung.rank.' + ${m.role()}}">Bereichsleiter</span></td>
-                                    <td class="leitung-col-action">
-                                        <button type="button" class="btn btn-quiet-danger btn-icon"
-                                                th:if="${(leitung.admin() or !m.self()) and ((m.role() == 'BEREICHSLEITER' and b.canAppointLead()) or ((m.role() == 'BEREICHSKOORDINATOR' or m.role() == 'BEREICHSOPERATOR') and b.canManageRoster()))}"
-                                                data-leitung-action="remove-bereich-role" th:data-unit-id="${b.id()}" th:data-user-id="${m.userId()}"
-                                                th:title="#{leitung.action.remove}" th:aria-label="#{leitung.action.remove}">
-                                            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
-                                        </button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-            <section class="leitung-tier" th:if="${!#lists.isEmpty(leitung.squadrons())}">
-                <h2 class="section-title" th:text="#{leitung.tier.squadrons}">Staffeln</h2>
-                <div class="hud-box mt-2 leitung-unit" th:each="s : ${leitung.squadrons()}"
-                     th:data-unit-id="${s.id()}" th:data-can-lead="${s.canAppointLead()}" th:data-can-roster="${s.canManageRoster()}">
-                    <div class="leitung-unit-head">
-                        <h3 class="leitung-unit-title" th:text="${s.name()}">Staffel</h3>
-                    </div>
-
-                    <div th:if="${s.canManageRoster()}">
-                        <h4 class="leitung-subhead" th:text="#{leitung.groups.title}">Kommandogruppen</h4>
-                        <div class="leitung-group-grid">
-                            <div class="card card--accent leitung-group" th:each="g : ${s.groups()}" th:data-group-id="${g.id()}" th:data-group-version="${g.version()}" th:data-group-sort="${g.sortIndex()}">
-                                <input type="text" class="leitung-group-name" th:value="${g.name()}" th:aria-label="#{leitung.groups.name}"/>
-                                <div class="leitung-group-actions">
-                                    <button type="button" class="btn btn-ghost btn-icon" data-leitung-action="rename-group"
-                                            th:title="#{leitung.action.save}" th:aria-label="#{leitung.action.save}">
-                                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg>
-                                    </button>
-                                    <button type="button" class="btn btn-quiet-danger btn-icon" data-leitung-action="delete-group"
-                                            th:title="#{leitung.action.delete}" th:aria-label="#{leitung.action.delete}">
-                                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
-                                    </button>
-                                </div>
+                <div class="leitung-detail">
+                    <section class="leitung-pane" th:each="u : ${leitung.organisationsleitungen()}"
+                             th:id="'lt-pane-' + ${u.id()}" th:data-unit-id="${u.id()}" data-unit-kind="ORGANISATIONSLEITUNG"
+                             th:hidden="${u.id().toString() != selectedUnitId}" th:aria-labelledby="'lt-title-' + ${u.id()}">
+                        <div class="unit-head">
+                            <div class="unit-head__titles">
+                                <span class="page-eyebrow" th:text="#{admin.orgStructure.kind.ORGANISATIONSLEITUNG}">Organisationsleitung</span>
+                                <h2 class="unit-head__title" th:id="'lt-title-' + ${u.id()}" th:text="${u.name()}">OL</h2>
                             </div>
-                            <div class="card card--inset leitung-group-add" th:if="${#lists.size(s.groups()) < 4}">
-                                <input type="text" class="leitung-new-group-name" th:placeholder="#{leitung.groups.name}" th:aria-label="#{leitung.groups.name}"/>
-                                <button type="button" class="btn btn-outline" data-leitung-action="create-group" th:data-unit-id="${s.id()}"
-                                        th:text="#{leitung.groups.add}">+ Gruppe</button>
+                            <button type="button" class="btn btn--cta" th:if="${u.canAppointLead()}" data-testid="leitung-unit-primary"
+                                    data-leitung-open="add-ol" th:data-unit-id="${u.id()}" th:data-unit-name="${u.name()}"
+                                    ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user-plus"/></svg><span th:text="#{leitung.bereich.add}">Mitglied hinzufügen</span></button>
+                        </div>
+                        <div class="tab-nav unit-tabs" role="tablist" th:aria-label="${u.name()}">
+                            <button type="button" class="tab active" role="tab" aria-selected="true" data-lt-tab="members"
+                                    th:id="'lt-tab-' + ${u.id()} + '-members'" th:aria-controls="'lt-panel-' + ${u.id()} + '-members'"
+                                    ><span th:text="#{leitung.members.title}">Mitglieder</span> <span class="tab-count" th:text="${#lists.size(u.members())}">0</span></button>
+                        </div>
+                        <div class="unit-tabpanel" role="tabpanel" data-lt-panel="members"
+                             th:id="'lt-panel-' + ${u.id()} + '-members'" th:aria-labelledby="'lt-tab-' + ${u.id()} + '-members'">
+                            <th:block th:if="${#lists.isEmpty(u.members())}">
+                                <th:block th:replace="~{fragments/components :: emptyState(titleKey='leitung.empty.rosterTitle', textKey='leitung.empty.members')}"></th:block>
+                            </th:block>
+                            <table th:unless="${#lists.isEmpty(u.members())}" class="data-table data-table--stack unit-roster" data-testid="leitung-roster">
+                                <thead>
+                                    <tr>
+                                        <th th:text="#{leitung.column.name}">Name</th>
+                                        <th th:text="#{leitung.column.rank}">Rang</th>
+                                        <th class="cell-actions"><span class="visually-hidden" th:text="#{leitung.column.action}">Aktion</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="m : ${u.members()}"
+                                        th:with="isGa=${u.grandAdmiralUserId() != null and u.grandAdmiralUserId() == m.userId()}"
+                                        th:data-user-id="${m.userId()}" th:data-version="${m.version()}">
+                                        <td>
+                                            <span class="cell-title unit-roster__name">
+                                                <span th:text="${m.userDisplayName()}">Name</span>
+                                                <span class="chip chip--primary" th:if="${isGa}" th:text="#{leitung.grandAdmiral.badge}">Grand Admiral</span>
+                                            </span>
+                                        </td>
+                                        <td th:attr="data-label=#{leitung.column.rank}" th:text="#{'leitung.rank.' + ${m.role()}}">OL-Mitglied</td>
+                                        <td class="cell-actions">
+                                            <th:block th:if="${u.canAppointLead()}">
+                                                <th:block th:replace="~{fragments/components :: overflowMenu(id=${'lt-menu-' + u.id() + '-' + m.userId()}, items=~{organisation/leitung :: lt-ol-items})}">
+                                                    <th:block th:ref="lt-ol-items">
+                                                        <button th:unless="${isGa}" type="button" class="overflow-menu__item" role="menuitem"
+                                                                data-leitung-action="set-grand-admiral" th:data-unit-id="${u.id()}" th:data-user-id="${m.userId()}"
+                                                                th:data-user-name="${m.userDisplayName()}" th:text="#{leitung.grandAdmiral.set}">Zum Grand Admiral ernennen</button>
+                                                        <button th:if="${isGa}" type="button" class="overflow-menu__item" role="menuitem"
+                                                                data-leitung-action="remove-grand-admiral" th:data-unit-id="${u.id()}" th:data-user-id="${m.userId()}"
+                                                                th:data-user-name="${m.userDisplayName()}" th:text="#{leitung.grandAdmiral.remove}">Grand Admiral entfernen</button>
+                                                        <button type="button" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
+                                                                data-leitung-action="remove-ol-member" th:data-unit-id="${u.id()}" th:data-user-id="${m.userId()}"
+                                                                th:data-user-name="${m.userDisplayName()}" th:text="#{leitung.action.remove}">Entfernen</button>
+                                                    </th:block>
+                                                </th:block>
+                                            </th:block>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section class="leitung-pane" th:each="u : ${leitung.bereiche()}"
+                             th:with="ctx=${unitContext.get(u.id())}"
+                             th:id="'lt-pane-' + ${u.id()}" th:data-unit-id="${u.id()}" data-unit-kind="BEREICH"
+                             th:hidden="${u.id().toString() != selectedUnitId}" th:aria-labelledby="'lt-title-' + ${u.id()}">
+                        <div class="unit-head">
+                            <div class="unit-head__titles">
+                                <span class="page-eyebrow"
+                                      th:text="${ctx != null and ctx.department() != null} ? (#{admin.orgStructure.kind.BEREICH} + ' · ' + #{'department.' + ${ctx.department()}}) : #{admin.orgStructure.kind.BEREICH}">Bereich</span>
+                                <h2 class="unit-head__title" th:id="'lt-title-' + ${u.id()}" th:text="${u.name()}">Bereich</h2>
+                            </div>
+                            <button type="button" class="btn btn--cta" th:if="${u.canAppointLead() or u.canManageRoster()}" data-testid="leitung-unit-primary"
+                                    data-leitung-open="add-bereich" th:data-unit-id="${u.id()}" th:data-unit-name="${u.name()}"
+                                    th:data-can-lead="${u.canAppointLead()}" th:data-can-roster="${u.canManageRoster()}"
+                                    ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user-plus"/></svg><span th:text="#{leitung.bereich.add}">Mitglied hinzufügen</span></button>
+                        </div>
+                        <div class="tab-nav unit-tabs" role="tablist" th:aria-label="${u.name()}">
+                            <button type="button" class="tab active" role="tab" aria-selected="true" data-lt-tab="members"
+                                    th:id="'lt-tab-' + ${u.id()} + '-members'" th:aria-controls="'lt-panel-' + ${u.id()} + '-members'"
+                                    ><span th:text="#{leitung.members.title}">Mitglieder</span> <span class="tab-count" th:text="${#lists.size(u.members())}">0</span></button>
+                        </div>
+                        <div class="unit-tabpanel" role="tabpanel" data-lt-panel="members"
+                             th:id="'lt-panel-' + ${u.id()} + '-members'" th:aria-labelledby="'lt-tab-' + ${u.id()} + '-members'">
+                            <th:block th:if="${#lists.isEmpty(u.members())}">
+                                <th:block th:replace="~{fragments/components :: emptyState(titleKey='leitung.empty.rosterTitle', textKey='leitung.empty.members')}"></th:block>
+                            </th:block>
+                            <table th:unless="${#lists.isEmpty(u.members())}" class="data-table data-table--stack unit-roster" data-testid="leitung-roster">
+                                <thead>
+                                    <tr>
+                                        <th th:text="#{leitung.column.name}">Name</th>
+                                        <th th:text="#{leitung.column.rank}">Rang</th>
+                                        <th class="cell-actions"><span class="visually-hidden" th:text="#{leitung.column.action}">Aktion</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="m : ${u.members()}"
+                                        th:with="removable=${(leitung.admin() or !m.self()) and ((m.role() == 'BEREICHSLEITER' and u.canAppointLead()) or ((m.role() == 'BEREICHSKOORDINATOR' or m.role() == 'BEREICHSOPERATOR') and u.canManageRoster()))}"
+                                        th:data-user-id="${m.userId()}" th:data-version="${m.version()}">
+                                        <td><span class="cell-title" th:text="${m.userDisplayName()}">Name</span></td>
+                                        <td th:attr="data-label=#{leitung.column.rank}" th:text="#{'leitung.rank.' + ${m.role()}}">Bereichsleiter</td>
+                                        <td class="cell-actions">
+                                            <th:block th:if="${removable}">
+                                                <th:block th:replace="~{fragments/components :: overflowMenu(id=${'lt-menu-' + u.id() + '-' + m.userId()}, items=~{organisation/leitung :: lt-bereich-items})}">
+                                                    <th:block th:ref="lt-bereich-items">
+                                                        <button type="button" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
+                                                                data-leitung-action="remove-bereich-role" th:data-unit-id="${u.id()}" th:data-user-id="${m.userId()}"
+                                                                th:data-user-name="${m.userDisplayName()}" th:text="#{leitung.action.remove}">Entfernen</button>
+                                                    </th:block>
+                                                </th:block>
+                                            </th:block>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section class="leitung-pane" th:each="u : ${leitung.squadrons()}"
+                             th:with="ctx=${unitContext.get(u.id())}, groupsOn=${selectedTab == 'groups'}"
+                             th:id="'lt-pane-' + ${u.id()}" th:data-unit-id="${u.id()}" data-unit-kind="SQUADRON"
+                             th:data-can-lead="${u.canAppointLead()}" th:data-can-roster="${u.canManageRoster()}"
+                             th:hidden="${u.id().toString() != selectedUnitId}" th:aria-labelledby="'lt-title-' + ${u.id()}">
+                        <div class="unit-head">
+                            <div class="unit-head__titles">
+                                <span class="page-eyebrow"
+                                      th:text="${ctx != null and ctx.bereichName() != null} ? (#{admin.orgStructure.kind.SQUADRON} + ' · ' + ${ctx.bereichName()}) : #{admin.orgStructure.kind.SQUADRON}">Staffel</span>
+                                <h2 class="unit-head__title" th:id="'lt-title-' + ${u.id()}" th:text="${u.name()}">Staffel</h2>
                             </div>
                         </div>
-                    </div>
+                        <div class="tab-nav unit-tabs" role="tablist" th:aria-label="${u.name()}">
+                            <button type="button" class="tab" role="tab" data-lt-tab="members"
+                                    th:classappend="${!groupsOn} ? 'active'" th:aria-selected="${!groupsOn}"
+                                    th:id="'lt-tab-' + ${u.id()} + '-members'" th:aria-controls="'lt-panel-' + ${u.id()} + '-members'"
+                                    ><span th:text="#{leitung.members.title}">Mitglieder</span> <span class="tab-count" th:text="${#lists.size(u.members())}">0</span></button>
+                            <button type="button" class="tab" role="tab" data-lt-tab="groups"
+                                    th:classappend="${groupsOn} ? 'active'" th:aria-selected="${groupsOn}"
+                                    th:id="'lt-tab-' + ${u.id()} + '-groups'" th:aria-controls="'lt-panel-' + ${u.id()} + '-groups'"
+                                    ><span th:text="#{leitung.groups.title}">Kommandogruppen</span> <span class="tab-count" th:text="${#lists.size(u.groups())}">0</span></button>
+                        </div>
+                        <div class="unit-tabpanel" role="tabpanel" data-lt-panel="members" th:hidden="${groupsOn}"
+                             th:id="'lt-panel-' + ${u.id()} + '-members'" th:aria-labelledby="'lt-tab-' + ${u.id()} + '-members'">
+                            <th:block th:if="${#lists.isEmpty(u.members())}">
+                                <th:block th:replace="~{fragments/components :: emptyState(titleKey='leitung.empty.rosterTitle', textKey='admin.specialcommands.members.empty')}"></th:block>
+                            </th:block>
+                            <table th:unless="${#lists.isEmpty(u.members())}" class="data-table data-table--stack unit-roster leitung-rank-table" data-testid="leitung-roster">
+                                <thead>
+                                    <tr>
+                                        <th th:text="#{leitung.column.name}">Name</th>
+                                        <th th:text="#{leitung.column.rank}">Rang</th>
+                                        <th th:text="#{leitung.column.group}">Kommandogruppe</th>
+                                        <th class="cell-actions"><span class="visually-hidden" th:text="#{leitung.column.action}">Aktion</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="m : ${u.members()}"
+                                        th:with="lowerRank=${m.role() == 'KOMMANDOLEITER' or m.role() == 'STELLV_KOMMANDOLEITER' or m.role() == 'ENSIGN'},
+                                                 editable=${(leitung.admin() or !m.self()) and ((m.role() == 'MEMBER' and (u.canAppointLead() or u.canManageRoster())) or (m.role() == 'STAFFELLEITER' and u.canAppointLead()) or (lowerRank and u.canManageRoster()))}"
+                                        th:class="${editable} ? 'leitung-rank-row' : null"
+                                        th:data-unit-id="${u.id()}" th:data-user-id="${m.userId()}" th:data-version="${m.version()}"
+                                        th:data-user-name="${m.userDisplayName()}" th:data-rank="${m.role()}"
+                                        th:data-group-id="${m.kommandoGroupId()}">
+                                        <td>
+                                            <span class="cell-title unit-roster__name">
+                                                <span th:text="${m.userDisplayName()}">Name</span>
+                                                <span class="chip chip--primary" th:if="${m.role() == 'STAFFELLEITER'}" th:text="#{leitung.rank.STAFFELLEITER}">Staffelleiter</span>
+                                            </span>
+                                        </td>
+                                        <td th:unless="${editable}" th:attr="data-label=#{leitung.column.rank}" th:text="#{'leitung.rank.' + ${m.role()}}">Mitglied</td>
+                                        <td th:unless="${editable}" th:attr="data-label=#{leitung.column.group}"><th:block th:each="g : ${u.groups()}" th:if="${g.id().equals(m.kommandoGroupId())}" th:text="${g.name()}">Gruppe</th:block><th:block th:if="${m.kommandoGroupId() == null and lowerRank}" th:text="#{leitung.group.none}">— allgemein —</th:block></td>
+                                        <td th:if="${editable}" th:attr="data-label=#{leitung.column.rank}">
+                                            <select class="leitung-rank-select" th:aria-label="#{leitung.column.rank} + ': ' + ${m.userDisplayName()}">
+                                                <option value="MEMBER" th:selected="${m.role() == 'MEMBER'}" th:text="#{leitung.rank.MEMBER}">Mitglied</option>
+                                                <option value="STAFFELLEITER" th:if="${u.canAppointLead()}" th:selected="${m.role() == 'STAFFELLEITER'}" th:text="#{leitung.rank.STAFFELLEITER}">Staffelleiter</option>
+                                                <option value="KOMMANDOLEITER" th:if="${u.canManageRoster()}" th:selected="${m.role() == 'KOMMANDOLEITER'}" th:text="#{leitung.rank.KOMMANDOLEITER}">Kommandoleiter</option>
+                                                <option value="STELLV_KOMMANDOLEITER" th:if="${u.canManageRoster()}" th:selected="${m.role() == 'STELLV_KOMMANDOLEITER'}" th:text="#{leitung.rank.STELLV_KOMMANDOLEITER}">Stv. Kommandoleiter</option>
+                                                <option value="ENSIGN" th:if="${u.canManageRoster()}" th:selected="${m.role() == 'ENSIGN'}" th:text="#{leitung.rank.ENSIGN}">Ensign</option>
+                                            </select>
+                                        </td>
+                                        <td th:if="${editable}" th:attr="data-label=#{leitung.column.group}">
+                                            <select class="leitung-group-select" th:aria-label="#{leitung.column.group} + ': ' + ${m.userDisplayName()}" th:disabled="${!lowerRank}">
+                                                <option value="" th:text="#{leitung.group.none}">— allgemein —</option>
+                                                <option th:each="g : ${u.groups()}" th:value="${g.id()}" th:selected="${m.kommandoGroupId() != null and g.id().equals(m.kommandoGroupId())}" th:text="${g.name()}">Gruppe</option>
+                                            </select>
+                                        </td>
+                                        <td class="cell-actions">
+                                            <th:block th:if="${editable and m.role() != 'MEMBER'}">
+                                                <th:block th:replace="~{fragments/components :: overflowMenu(id=${'lt-menu-' + u.id() + '-' + m.userId()}, items=~{organisation/leitung :: lt-squadron-items})}">
+                                                    <th:block th:ref="lt-squadron-items">
+                                                        <button type="button" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
+                                                                data-leitung-action="clear-rank" th:data-unit-id="${u.id()}" th:data-user-id="${m.userId()}"
+                                                                th:data-user-name="${m.userDisplayName()}" th:text="#{leitung.rank.clear}">Rang entziehen</button>
+                                                    </th:block>
+                                                </th:block>
+                                            </th:block>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <p class="form-hint unit-hint" th:if="${u.canAppointLead() or u.canManageRoster()}" th:text="#{leitung.autosave.hint}">Änderungen an Rang und Gruppe werden sofort gespeichert und mit einer Meldung bestätigt.</p>
+                        </div>
+                        <div class="unit-tabpanel" role="tabpanel" data-lt-panel="groups" th:hidden="${!groupsOn}"
+                             th:id="'lt-panel-' + ${u.id()} + '-groups'" th:aria-labelledby="'lt-tab-' + ${u.id()} + '-groups'">
+                            <th:block th:if="${#lists.isEmpty(u.groups())}">
+                                <th:block th:replace="~{fragments/components :: emptyState(titleKey='leitung.groups.emptyTitle', textKey='leitung.groups.empty')}"></th:block>
+                            </th:block>
+                            <table th:unless="${#lists.isEmpty(u.groups())}" class="data-table unit-roster leitung-groups" data-testid="leitung-groups">
+                                <thead>
+                                    <tr>
+                                        <th th:text="#{leitung.groups.name}">Gruppenname</th>
+                                        <th class="cell-actions"><span class="visually-hidden" th:text="#{leitung.column.action}">Aktion</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="g : ${u.groups()}" class="leitung-group"
+                                        th:data-group-id="${g.id()}" th:data-group-version="${g.version()}" th:data-group-sort="${g.sortIndex()}">
+                                        <td>
+                                            <input th:if="${u.canManageRoster()}" type="text" class="leitung-group-name" maxlength="100"
+                                                   th:value="${g.name()}" th:data-original="${g.name()}" th:aria-label="#{leitung.groups.name}"/>
+                                            <span th:unless="${u.canManageRoster()}" class="cell-title" th:text="${g.name()}">Alpha</span>
+                                        </td>
+                                        <td class="cell-actions">
+                                            <button type="button" class="btn btn-quiet-danger btn-icon" th:if="${u.canManageRoster()}"
+                                                    data-leitung-action="delete-group" th:data-group-name="${g.name()}"
+                                                    th:title="#{leitung.action.delete}" th:aria-label="#{leitung.action.delete} + ': ' + ${g.name()}">
+                                                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <div class="cluster gap-2 leitung-group-add" th:if="${u.canManageRoster() and #lists.size(u.groups()) < 4}">
+                                <input type="text" class="leitung-new-group-name" maxlength="100"
+                                       th:placeholder="#{leitung.groups.name}" th:aria-label="#{leitung.groups.name}"/>
+                                <button type="button" class="btn btn-ghost" data-leitung-action="create-group" th:data-unit-id="${u.id()}"
+                                        th:text="#{leitung.groups.add}">+ Gruppe</button>
+                            </div>
+                            <p class="form-hint unit-hint" th:if="${u.canManageRoster() and #lists.size(u.groups()) >= 4}" th:text="#{leitung.groups.limit}">Höchstens vier Kommandogruppen je Staffel.</p>
+                        </div>
+                    </section>
 
-                    <h4 class="leitung-subhead" th:text="#{leitung.members.title}">Mitglieder</h4>
-                    <p class="leitung-empty" th:if="${#lists.isEmpty(s.members())}" th:text="#{leitung.empty.squadronMembers}">Keine Mitglieder.</p>
-                    <div class="table-responsive" th:if="${!#lists.isEmpty(s.members())}">
-                        <table class="krt-table leitung-rank-table">
-                            <thead>
-                                <tr>
-                                    <th th:text="#{leitung.column.name}">Name</th>
-                                    <th th:text="#{leitung.column.rank}">Rang</th>
-                                    <th th:text="#{leitung.column.group}">Kommandogruppe</th>
-                                    <th class="leitung-col-action" th:text="#{leitung.column.action}">Aktion</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr th:each="m : ${s.members()}"
-                                    th:with="lowerRank=${m.role() == 'KOMMANDOLEITER' or m.role() == 'STELLV_KOMMANDOLEITER' or m.role() == 'ENSIGN'},
-                                             editable=${(leitung.admin() or !m.self()) and ((m.role() == 'MEMBER' and (s.canAppointLead() or s.canManageRoster())) or (m.role() == 'STAFFELLEITER' and s.canAppointLead()) or (lowerRank and s.canManageRoster()))}"
-                                    th:class="${editable} ? 'leitung-rank-row' : null" th:data-user-id="${m.userId()}" th:data-version="${m.version()}">
-                                    <td th:text="${m.userDisplayName()}">Name</td>
-                                    <td th:unless="${editable}">
-                                        <span class="chip" th:classappend="${m.role() == 'MEMBER'} ? 'chip--muted' : 'chip--primary'" th:text="#{'leitung.rank.' + ${m.role()}}">Staffelleiter</span>
-                                    </td>
-                                    <td th:unless="${editable}">
-                                        <th:block th:each="g : ${s.groups()}" th:if="${g.id().equals(m.kommandoGroupId())}" th:text="${g.name()}">Gruppe</th:block>
-                                    </td>
-                                    <td class="leitung-col-action" th:unless="${editable}"></td>
-                                    <td th:if="${editable}">
-                                        <select class="leitung-rank-select" th:aria-label="#{leitung.column.rank}">
-                                            <option value="MEMBER" th:selected="${m.role() == 'MEMBER'}" th:text="#{leitung.rank.MEMBER}">Mitglied</option>
-                                            <option value="STAFFELLEITER" th:if="${s.canAppointLead()}" th:selected="${m.role() == 'STAFFELLEITER'}" th:text="#{leitung.rank.STAFFELLEITER}">Staffelleiter</option>
-                                            <option value="KOMMANDOLEITER" th:if="${s.canManageRoster()}" th:selected="${m.role() == 'KOMMANDOLEITER'}" th:text="#{leitung.rank.KOMMANDOLEITER}">Kommandoleiter</option>
-                                            <option value="STELLV_KOMMANDOLEITER" th:if="${s.canManageRoster()}" th:selected="${m.role() == 'STELLV_KOMMANDOLEITER'}" th:text="#{leitung.rank.STELLV_KOMMANDOLEITER}">Stv. Kommandoleiter</option>
-                                            <option value="ENSIGN" th:if="${s.canManageRoster()}" th:selected="${m.role() == 'ENSIGN'}" th:text="#{leitung.rank.ENSIGN}">Ensign</option>
-                                        </select>
-                                    </td>
-                                    <td th:if="${editable}">
-                                        <select class="leitung-group-select" th:aria-label="#{leitung.column.group}">
-                                            <option value="" th:text="#{leitung.group.none}">— allgemein —</option>
-                                            <option th:each="g : ${s.groups()}" th:value="${g.id()}" th:selected="${g.id().toString() == (m.kommandoGroupId() != null ? m.kommandoGroupId().toString() : '')}" th:text="${g.name()}">Gruppe</option>
-                                        </select>
-                                    </td>
-                                    <td class="leitung-col-action" th:if="${editable}">
-                                        <button type="button" class="btn btn-ghost btn-icon" data-leitung-action="save-rank" th:data-unit-id="${s.id()}"
-                                                th:title="#{leitung.action.save}" th:aria-label="#{leitung.action.save}">
-                                            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg>
-                                        </button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    <section class="leitung-pane" th:each="u : ${leitung.specialCommands()}"
+                             th:with="ctx=${unitContext.get(u.id())}, flagsKnown=${skFlagsKnown.contains(u.id())}"
+                             th:id="'lt-pane-' + ${u.id()}" th:data-unit-id="${u.id()}" data-unit-kind="SPECIAL_COMMAND"
+                             th:hidden="${u.id().toString() != selectedUnitId}" th:aria-labelledby="'lt-title-' + ${u.id()}">
+                        <div class="unit-head">
+                            <div class="unit-head__titles">
+                                <span class="page-eyebrow"
+                                      th:text="${ctx != null and ctx.bereichName() != null} ? (#{admin.orgStructure.kind.SPECIAL_COMMAND} + ' · ' + ${ctx.bereichName()}) : #{admin.orgStructure.kind.SPECIAL_COMMAND}">Spezialkommando</span>
+                                <h2 class="unit-head__title" th:id="'lt-title-' + ${u.id()}" th:text="${u.name()}">Spezialkommando</h2>
+                            </div>
+                            <button type="button" class="btn btn--cta" th:if="${u.canManageRoster()}" data-testid="leitung-unit-primary"
+                                    data-leitung-open="add-sk" th:data-unit-id="${u.id()}" th:data-unit-name="${u.name()}"
+                                    ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user-plus"/></svg><span th:text="#{leitung.bereich.add}">Mitglied hinzufügen</span></button>
+                        </div>
+                        <div class="tab-nav unit-tabs" role="tablist" th:aria-label="${u.name()}">
+                            <button type="button" class="tab active" role="tab" aria-selected="true" data-lt-tab="members"
+                                    th:id="'lt-tab-' + ${u.id()} + '-members'" th:aria-controls="'lt-panel-' + ${u.id()} + '-members'"
+                                    ><span th:text="#{leitung.members.title}">Mitglieder</span> <span class="tab-count" th:text="${#lists.size(u.members())}">0</span></button>
+                        </div>
+                        <div class="unit-tabpanel" role="tabpanel" data-lt-panel="members"
+                             th:id="'lt-panel-' + ${u.id()} + '-members'" th:aria-labelledby="'lt-tab-' + ${u.id()} + '-members'">
+                            <th:block th:replace="~{organisation/unit-detail :: skRoster(skId=${u.id()}, members=${skRosters.get(u.id())}, showFlags=${flagsKnown}, canLead=${u.canAppointLead()}, canRemove=${u.canManageRoster()}, leadMode='leitung', selfUserId=${selfUserId}, admin=${leitung.admin()}, refreshUrl=${'/organisation/leitung?unit=' + u.id()}, refreshContainer='#leitung-sections', refreshFragment='leitungSections')}"></th:block>
+                        </div>
+                    </section>
                 </div>
-            </section>
-
-            <section class="leitung-tier" th:if="${!#lists.isEmpty(leitung.specialCommands())}">
-                <h2 class="section-title" th:text="#{leitung.tier.specialCommands}">Spezialkommandos</h2>
-                <div class="hud-box mt-2 leitung-unit" th:each="sk : ${leitung.specialCommands()}" th:data-unit-id="${sk.id()}">
-                    <div class="leitung-unit-head">
-                        <h3 class="leitung-unit-title" th:text="${sk.name()}">Spezialkommando</h3>
-                        <a class="btn btn-outline" th:if="${sk.canManageRoster()}"
-                           th:href="@{/organisation/special-commands/{id}(id=${sk.id()})}"
-                           th:text="#{leitung.sk.manageMembers}">Mitglieder verwalten</a>
-                    </div>
-                    <p class="leitung-empty" th:if="${#lists.isEmpty(sk.members())}" th:text="#{leitung.empty.squadronMembers}">Keine Mitglieder.</p>
-                    <div class="table-responsive" th:if="${!#lists.isEmpty(sk.members())}">
-                        <table class="krt-table">
-                            <thead>
-                                <tr>
-                                    <th th:text="#{leitung.column.name}">Name</th>
-                                    <th th:text="#{leitung.column.rank}">Rang</th>
-                                    <th class="leitung-col-action" th:if="${sk.canAppointLead()}" th:text="#{leitung.column.action}">Aktion</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr th:each="m : ${sk.members()}" th:data-user-id="${m.userId()}" th:data-version="${m.version()}">
-                                    <td th:text="${m.userDisplayName()}">Name</td>
-                                    <td>
-                                        <span th:if="${m.role() == 'SK_LEAD'}" class="chip chip--primary" th:text="#{leitung.rank.SK_LEAD}">SK-Leiter</span>
-                                        <span th:unless="${m.role() == 'SK_LEAD'}" class="chip chip--muted" th:text="#{leitung.rank.MEMBER}">Mitglied</span>
-                                    </td>
-                                    <td class="leitung-col-action" th:if="${sk.canAppointLead()}">
-                                        <button type="button" class="btn btn-ghost" data-leitung-action="toggle-sk-lead" th:data-unit-id="${sk.id()}"
-                                                th:if="${leitung.admin() or !m.self()}"
-                                                th:data-lead="${m.role() == 'SK_LEAD'}"
-                                                th:text="${m.role() == 'SK_LEAD'} ? #{leitung.sk.demote} : #{leitung.sk.promote}">Leiter umschalten</button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-            <div class="hud-box mt-2 leitung-empty-all"
-                 th:if="${#lists.isEmpty(leitung.organisationsleitungen()) and #lists.isEmpty(leitung.bereiche()) and #lists.isEmpty(leitung.squadrons()) and #lists.isEmpty(leitung.specialCommands())}"
-                 th:text="#{leitung.empty.all}">Du verwaltest derzeit keine Einheiten.</div>
+            </div>
         </th:block>
     </th:block>
     </div>
@@ -253,7 +375,7 @@
                     <option value="" th:text="#{leitung.modal.user.placeholder}">-- Bitte wählen --</option>
                 </select>
             </div>
-            <div class="form-group" id="leitung-modal-role-group">
+            <div class="form-group" id="leitung-modal-role-group" hidden>
                 <label for="leitung-modal-role" th:text="#{leitung.modal.role}">Rang</label>
                 <select id="leitung-modal-role"></select>
             </div>
@@ -275,6 +397,13 @@
         rankLeiter: /*[[#{leitung.rank.BEREICHSLEITER}]]*/ 'Bereichsleiter',
         rankKoordinator: /*[[#{leitung.rank.BEREICHSKOORDINATOR}]]*/ 'Bereichskoordinator',
         rankOperator: /*[[#{leitung.rank.BEREICHSOPERATOR}]]*/ 'Bereichsoperator',
+        confirm: /*[[#{general.confirm}]]*/ 'Bestätigen',
+        cancel: /*[[#{general.cancel}]]*/ 'Abbrechen',
+        confirmRemove: /*[[#{leitung.confirm.remove}]]*/ 'Wirklich entfernen?',
+        confirmClearRank: /*[[#{leitung.confirm.clearRank}]]*/ 'Rang entziehen?',
+        confirmSetGrandAdmiral: /*[[#{leitung.confirm.setGrandAdmiral}]]*/ 'Ernennen?',
+        confirmRemoveGrandAdmiral: /*[[#{leitung.confirm.removeGrandAdmiral}]]*/ 'Entfernen?',
+        confirmDeleteGroup: /*[[#{leitung.confirm.deleteGroup}]]*/ 'Löschen?',
         conflict: {
             title: /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
             reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Neu laden.',
@@ -283,7 +412,19 @@
             reloadQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Neu laden?'
         }
     };
+    window.MEMBER_MSG = {
+        saved: /*[[#{notification.success.save}]]*/ 'Gespeichert.',
+        deleted: /*[[#{notification.success.delete}]]*/ 'Entfernt.',
+        error: /*[[#{notification.error.save}]]*/ 'Fehler.',
+        confirm: /*[[#{general.confirm}]]*/ 'Bestätigen',
+        cancel: /*[[#{general.cancel}]]*/ 'Abbrechen',
+        confirmRemove: /*[[#{leitung.confirm.remove}]]*/ 'Wirklich entfernen?',
+        confirmPromote: /*[[#{leitung.confirm.skLeadPromote}]]*/ 'Ernennen?',
+        confirmDemote: /*[[#{leitung.confirm.skLeadDemote}]]*/ 'Entfernen?'
+    };
+    window.MEMBER_CONFLICT = window.leitungI18n.conflict;
 </script>
 <script th:src="@{/js/leitung.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/special-command-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

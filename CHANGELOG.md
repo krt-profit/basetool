@@ -37,6 +37,12 @@
   Aktualitätsprüfung statt in `openapi.json`; der Vergleich mit dem letzten Release prüft beide
   Dokumente. Keine Verhaltensänderung (REQ-XCH-039).
 
+- **Leitung als Liste mit Detailbereich.** Links der Einheitenbaum (OL · Bereiche · Staffeln ·
+  Spezialkommandos) mit Suche nach Einheiten und Personen, rechts die gewählte Einheit mit „Mitglied
+  hinzufügen" und den Reitern „Mitglieder · Kommandogruppen". Rang und Kommandogruppe speichern
+  sofort bei Auswahl, und die Mitglieder eines Spezialkommandos werden direkt auf „Leitung"
+  verwaltet (REQ-ROLE-004).
+
 - **Aufträge: Qualitätsstufen als pflegbarer Katalog.** Admins legen Stufen mit Code, Mindestqualität
   und deutscher/englischer Bezeichnung unter „Qualitätsstufen“ an; neue Stufen brauchen kein Release.
   „Keine“ und „Gut (650+)“ bleiben unverändert (REQ-ORDERS-036, ADR-0241, Migration V261–V264).
