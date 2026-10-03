@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -17,345 +18,310 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-function toggleMultiSelect(id) {
-    const el = document.getElementById(id);
-    const isOpened = el.classList.contains('open');
+(function () {
+    'use strict';
 
-    document.querySelectorAll('.multi-select-options').forEach(function (opt) {
-        opt.classList.remove('open');
+    /**
+     * One result row of the profit calculation.
+     *
+     * @typedef {object} ProfitRow
+     * @property {string} materialId the material
+     * @property {string} materialName the material's name
+     * @property {number | null} minBuyPrice the lowest purchase price per SCU
+     * @property {number | null} maxSellPrice the highest sale price per SCU
+     * @property {number | null} profitPerScu the profit per SCU
+     * @property {number | null} marginPercent the margin in percent
+     * @property {number | null} fullLoadCost the capital a full load ties up
+     * @property {number | null} maxProfitFullLoad the profit of a full load
+     */
+
+    const PROFIT_FILTER_KEY = 'profit_calculation_filters';
+    const config = document.getElementById('profitConfig');
+
+    /**
+     * A label from the page's config element.
+     *
+     * @param {string} name the attribute suffix after `data-label-`
+     * @returns {string} the label, or an empty string
+     */
+    function label(name) {
+        return (config && config.getAttribute('data-label-' + name)) || '';
+    }
+
+    const WHOLE = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
+    const PRICE = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 });
+    const PER_SCU = new Intl.NumberFormat('de-DE', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+    const PERCENT = new Intl.NumberFormat('de-DE', {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
     });
 
-    if (!isOpened) {
-        el.classList.add('open');
+    /**
+     * Formats a number, or a dash when it is absent.
+     *
+     * @param {Intl.NumberFormat} format the format
+     * @param {number | null | undefined} value the number
+     * @returns {string} the text
+     */
+    function num(format, value) {
+        return value == null || !isFinite(Number(value)) ? '–' : format.format(Number(value));
     }
-}
 
-function getTranslations(headerId) {
-    const header = document.getElementById(headerId);
-    return {
-        allText: header.getAttribute('data-all'),
-        selectedTextStr: header.getAttribute('data-selected'),
-    };
-}
-
-function toggleSelectAll(allId, checkClass, headerId) {
-    const isAllChecked = document.getElementById(allId).checked;
-    const checkboxes = document.getElementsByClassName(checkClass);
-    for (let i = 0; i < checkboxes.length; i++) {
-        checkboxes[i].checked = isAllChecked;
+    /** @returns {HTMLSelectElement | null} the ship select */
+    function shipSelect() {
+        return /** @type {HTMLSelectElement | null} */ (document.getElementById('shipSelect'));
     }
-    updateSelectedText(checkboxes, headerId);
-}
 
-function updateSelectState(allId, checkClass, headerId) {
-    const checkboxes = document.getElementsByClassName(checkClass);
-    let allChecked = true;
-    for (let i = 0; i < checkboxes.length; i++) {
-        if (!checkboxes[i].checked) {
-            allChecked = false;
-            break;
+    /** @returns {HTMLInputElement[]} the star-system checkboxes */
+    function systemChecks() {
+        return /** @type {HTMLInputElement[]} */ (
+            Array.prototype.slice.call(document.getElementsByClassName('sysCheck'))
+        );
+    }
+
+    /**
+     * Shows the result state below the table: a message, or nothing once rows are shown.
+     *
+     * @param {'idle' | 'loading' | 'ready' | 'empty' | 'error'} state the state
+     * @param {string} [message] the message for every state but `ready`
+     */
+    function setState(state, message) {
+        const results = document.getElementById('profitResults');
+        const box = document.getElementById('profitState');
+        const text = document.getElementById('profitStateText');
+        if (results) results.setAttribute('data-state', state);
+        if (box) {
+            box.hidden = state === 'ready';
+            box.classList.toggle('profit-state--error', state === 'error');
         }
-    }
-    document.getElementById(allId).checked = allChecked;
-    updateSelectedText(checkboxes, headerId);
-}
-
-function updateSelectedText(checkboxes, headerId) {
-    const translations = getTranslations(headerId);
-    let count = 0;
-    const total = checkboxes.length;
-    let firstChecked = null;
-    for (let i = 0; i < checkboxes.length; i++) {
-        if (checkboxes[i].checked) {
-            count++;
-            if (!firstChecked) firstChecked = checkboxes[i].previousElementSibling.innerText;
-        }
+        if (text) text.textContent = message || '';
     }
 
-    const textElement = document.getElementById(headerId).querySelector('.selected-text');
-    if (count === total) {
-        textElement.innerText = translations.allText;
-    } else if (count === 1) {
-        textElement.innerText = firstChecked;
-    } else {
-        textElement.innerText = count + ' ' + translations.selectedTextStr;
-    }
-}
-
-function sortTable(n, forcedDir) {
-    const table = document.getElementById('resultsTable');
-    let rows, switching, i, x, y, shouldSwitch, dir;
-    switching = true;
-
-    if (forcedDir) {
-        dir = forcedDir;
-    } else {
-        dir = table.getAttribute('data-sort-dir') === 'asc' ? 'desc' : 'asc';
-        if (table.getAttribute('data-sort-col') !== n.toString()) {
-            dir = 'asc';
-        }
-    }
-
-    table.setAttribute('data-sort-dir', dir);
-    table.setAttribute('data-sort-col', n);
-
-    while (switching) {
-        switching = false;
-        rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
-
-        for (i = 0; i < rows.length - 1; i++) {
-            if (rows[i].cells.length < 2) continue;
-
-            shouldSwitch = false;
-            x = rows[i].getElementsByTagName('td')[n];
-            y = rows[i + 1].getElementsByTagName('td')[n];
-
-            if (!x || !y) continue;
-
-            const valX = x.textContent || x.innerText;
-            const valY = y.textContent || y.innerText;
-
-            if (n >= 1 && n <= 6) {
-                let numX = parseFloat(
-                    valX
-                        .replace(/[^-0-9,.]/g, '')
-                        .replace(/\./g, '')
-                        .replace(',', '.'),
-                );
-                if (n === 4) {
-                    numX = parseFloat(valX.replace(/[^0-9.-]/g, ''));
-                }
-                let numY = parseFloat(
-                    valY
-                        .replace(/[^-0-9,.]/g, '')
-                        .replace(/\./g, '')
-                        .replace(',', '.'),
-                );
-                if (n === 4) {
-                    numY = parseFloat(valY.replace(/[^0-9.-]/g, ''));
-                }
-
-                if (isNaN(numX)) numX = -Infinity;
-                if (isNaN(numY)) numY = -Infinity;
-
-                if (dir === 'asc') {
-                    if (numX > numY) {
-                        shouldSwitch = true;
-                        break;
-                    }
-                } else {
-                    if (numX < numY) {
-                        shouldSwitch = true;
-                        break;
-                    }
-                }
-            } else {
-                if (dir === 'asc') {
-                    if (valX.toLowerCase() > valY.toLowerCase()) {
-                        shouldSwitch = true;
-                        break;
-                    }
-                } else {
-                    if (valX.toLowerCase() < valY.toLowerCase()) {
-                        shouldSwitch = true;
-                        break;
-                    }
-                }
-            }
-        }
-        if (shouldSwitch) {
-            rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
-            switching = true;
-        }
-    }
-    updateSortIndicators(n, dir);
-}
-
-function updateSortIndicators(columnIndex, direction) {
-    for (let i = 0; i <= 6; i++) {
-        const iconElement = document.getElementById('sort-icon-' + i);
-        if (iconElement) {
-            if (i === columnIndex) {
-                iconElement.textContent = direction === 'asc' ? '▲' : '▼';
-                iconElement.style.color = 'var(--color-primary)';
-            } else {
-                iconElement.textContent = '↕';
-                iconElement.style.color = 'var(--color-gray-2-text)';
-            }
-        }
-    }
-}
-
-async function updateProfitCalculation() {
-    const shipId = document.getElementById('shipSelect').value;
-    const body = document.getElementById('profitBody');
-
-    if (!shipId) {
-        body.innerHTML = `<tr><td colspan="7" class="profit-msg">${escapeHtml(window.krtProfitI18n.selectShip)}</td></tr>`;
-        return;
-    }
-
-    body.innerHTML = `<tr><td colspan="7" class="profit-msg-loading">${escapeHtml(window.krtProfitI18n.loading)}</td></tr>`;
-
-    try {
-        let url = `/api/proxy/materials/profit-calculation?shipId=${shipId}`;
-
-        const sysCheckboxes = document.getElementsByClassName('sysCheck');
-        const activeSys = [];
-        for (let i = 0; i < sysCheckboxes.length; i++) {
-            if (sysCheckboxes[i].checked) activeSys.push(sysCheckboxes[i].value);
-        }
-
-        activeSys.forEach((s) => {
-            url += `&starSystemNames=${encodeURIComponent(s)}`;
+    /** Writes the systems summary into the dropdown button: "Alle", one name, or a list. */
+    function updateSystemSummary() {
+        const header = document.getElementById('systemHeader');
+        const textEl = header ? header.querySelector('.selected-text') : null;
+        const checks = systemChecks();
+        const picked = checks.filter(function (c) {
+            return c.checked;
         });
+        const allBox = /** @type {HTMLInputElement | null} */ (document.getElementById('sysAll'));
+        if (allBox) allBox.checked = picked.length === checks.length;
+        if (!textEl) return;
+        textEl.textContent =
+            picked.length === checks.length || picked.length === 0
+                ? label('all')
+                : picked
+                      .map(function (c) {
+                          return c.value;
+                      })
+                      .join(', ');
+    }
 
-        const response = await fetch(url);
-        const data = await response.json();
+    /** Shows the Hull C chip when the chosen ship loads at loading docks only. */
+    function updateHullChip() {
+        const select = shipSelect();
+        const chip = document.getElementById('profitHullC');
+        if (!select || !chip) return;
+        const option = select.selectedOptions[0];
+        chip.hidden = !(option && option.getAttribute('data-hull-c') === 'true');
+    }
 
-        if (data.length === 0) {
-            body.innerHTML = `<tr><td colspan="7" class="profit-msg">${escapeHtml(window.krtProfitI18n.noData)}</td></tr>`;
+    /**
+     * One route line: the side label and the price.
+     *
+     * @param {string} cls the side class
+     * @param {string} side the side label
+     * @param {number | null} price the price per SCU
+     * @returns {string} the line's HTML
+     */
+    function routeLine(cls, side, price) {
+        return (
+            '<span class="profit-route__line"><span class="' +
+            cls +
+            '">' +
+            escapeHtml(side) +
+            '</span> ' +
+            escapeHtml(num(PRICE, price)) +
+            '</span>'
+        );
+    }
+
+    /**
+     * Renders the result rows, highest full-load profit first and numbered.
+     *
+     * @param {ProfitRow[]} data the rows
+     */
+    function renderRows(data) {
+        const body = document.getElementById('profitBody');
+        if (!body) return;
+        const rows = data.slice().sort(function (a, b) {
+            const pa = Number(a.maxProfitFullLoad);
+            const pb = Number(b.maxProfitFullLoad);
+            const diff = (isFinite(pb) ? pb : -Infinity) - (isFinite(pa) ? pa : -Infinity);
+            return diff !== 0
+                ? diff
+                : String(a.materialName).localeCompare(String(b.materialName), undefined, {
+                      sensitivity: 'base',
+                  });
+        });
+        let html = '';
+        rows.forEach(function (item, index) {
+            const rank = index + 1;
+            html +=
+                '<tr class="profit-row' +
+                (rank === 1 ? ' profit-row--top' : '') +
+                '" data-testid="profit-row"><td><a class="row-link" data-testid="row-link" href="/materials/' +
+                escapeAttr(encodeURIComponent(item.materialId)) +
+                '"><span class="profit-rank">' +
+                escapeHtml(rank) +
+                '</span><span class="cell-title">' +
+                escapeHtml(item.materialName) +
+                '</span></a></td><td class="profit-route">' +
+                routeLine('profit-route__buy', label('buy'), item.minBuyPrice) +
+                routeLine('profit-route__sell', label('sell'), item.maxSellPrice) +
+                '</td><td class="num">' +
+                escapeHtml(num(PER_SCU, item.profitPerScu)) +
+                '</td><td class="num">' +
+                escapeHtml(num(PERCENT, item.marginPercent)) +
+                ' %</td><td class="num">' +
+                escapeHtml(num(WHOLE, item.fullLoadCost)) +
+                '</td><td class="num profit-max">' +
+                escapeHtml(num(WHOLE, item.maxProfitFullLoad)) +
+                '</td></tr>';
+        });
+        window.krtFetch.setTrustedHtml(body, html);
+    }
+
+    let requestToken = 0;
+
+    /** Fetches and renders the calculation for the chosen ship and systems. */
+    async function updateProfitCalculation() {
+        const select = shipSelect();
+        const body = document.getElementById('profitBody');
+        const shipId = select ? select.value : '';
+        const token = ++requestToken;
+        if (!shipId) {
+            if (body) body.innerHTML = '';
+            setState('idle', label('select-ship'));
             return;
         }
-
-        body.innerHTML = '';
-        data.forEach((item) => {
-            const tr = document.createElement('tr');
-
-            tr.innerHTML = `
-                <td class="text-left">
-                    <a href="/materials/${escapeAttr(item.materialId)}">
-                        <strong>${escapeHtml(item.materialName)}</strong>
-                    </a>
-                </td>
-                <td>-${escapeHtml(formatNumber(item.minBuyPrice))}</td>
-                <td>+${escapeHtml(formatNumber(item.maxSellPrice))}</td>
-                <td>${escapeHtml((item.profitPerScu > 0 ? '+' : '') + formatNumber(item.profitPerScu))}</td>
-                <td>${escapeHtml(item.marginPercent.toFixed(2))}%</td>
-                <td>${escapeHtml(formatNumber(item.fullLoadCost))}</td>
-                <td>${escapeHtml((item.maxProfitFullLoad > 0 ? '+' : '') + formatNumber(item.maxProfitFullLoad))}</td>
-            `;
-            body.appendChild(tr);
+        setState('loading', label('loading'));
+        const params = new URLSearchParams();
+        params.append('shipId', shipId);
+        systemChecks().forEach(function (c) {
+            if (c.checked) params.append('starSystemNames', c.value);
         });
-
-        const sortCol = document.getElementById('resultsTable').getAttribute('data-sort-col');
-        const sortDir = document.getElementById('resultsTable').getAttribute('data-sort-dir');
-        if (sortCol !== null && sortDir !== null) {
-            sortTable(parseInt(sortCol), sortDir);
+        try {
+            const response = await fetch(
+                '/api/proxy/materials/profit-calculation?' + params.toString(),
+                { headers: { 'X-Requested-With': 'XMLHttpRequest' } },
+            );
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            const data = await response.json();
+            if (token !== requestToken) return;
+            if (!Array.isArray(data) || data.length === 0) {
+                if (body) body.innerHTML = '';
+                setState('empty', label('no-data'));
+                return;
+            }
+            renderRows(data);
+            setState('ready');
+        } catch (_error) {
+            if (token !== requestToken) return;
+            if (body) body.innerHTML = '';
+            setState('error', label('fetch-error'));
         }
-    } catch (error) {
-        console.error('Error fetching profit calculation:', error);
-        body.innerHTML = `<tr><td colspan="7" class="text-danger profit-msg-error">${escapeHtml(window.krtProfitI18n.fetchError)}</td></tr>`;
     }
-}
 
-function formatNumber(num) {
-    return new Intl.NumberFormat('de-DE').format(num);
-}
-
-const PROFIT_FILTER_KEY = 'profit_calculation_filters';
-
-function readProfitFilterPref() {
-    try {
-        const raw = localStorage.getItem(PROFIT_FILTER_KEY);
-        const parsed = raw === null ? null : JSON.parse(raw);
-        return parsed && typeof parsed === 'object' ? parsed : null;
-    } catch (_e) {
-        return null;
+    /**
+     * The saved ship and systems (REQ-UI-017).
+     *
+     * @returns {any} the parsed object, or `null`
+     */
+    function readProfitFilterPref() {
+        try {
+            const raw = localStorage.getItem(PROFIT_FILTER_KEY);
+            const parsed = raw === null ? null : JSON.parse(raw);
+            return parsed && typeof parsed === 'object' ? parsed : null;
+        } catch (_e) {
+            return null;
+        }
     }
-}
 
-function writeProfitFilterPref(value) {
-    try {
-        localStorage.setItem(PROFIT_FILTER_KEY, JSON.stringify(value));
-    } catch (_e) {}
-}
-
-function persistProfitFilters() {
-    const shipSelect = document.getElementById('shipSelect');
-    const boxes = document.getElementsByClassName('sysCheck');
-    const picked = [];
-    for (let i = 0; i < boxes.length; i++) {
-        if (boxes[i].checked) picked.push(boxes[i].value);
+    /** Saves the ship and the systems, all systems as `null`. */
+    function persistProfitFilters() {
+        const select = shipSelect();
+        const checks = systemChecks();
+        const picked = checks
+            .filter(function (c) {
+                return c.checked;
+            })
+            .map(function (c) {
+                return c.value;
+            });
+        try {
+            localStorage.setItem(
+                PROFIT_FILTER_KEY,
+                JSON.stringify({
+                    shipId: select && select.value !== '' ? select.value : null,
+                    systems: picked.length === 0 || picked.length === checks.length ? null : picked,
+                }),
+            );
+        } catch (_e) {}
     }
-    writeProfitFilterPref({
-        shipId: shipSelect && shipSelect.value !== '' ? shipSelect.value : null,
-        systems: picked.length === 0 || picked.length === boxes.length ? null : picked,
-    });
-}
 
-function restoreProfitFilters() {
-    const saved = readProfitFilterPref();
-    if (!saved || typeof saved !== 'object') return;
-    const shipSelect = document.getElementById('shipSelect');
-    if (shipSelect && typeof saved.shipId === 'string' && saved.shipId !== '') {
-        for (let i = 0; i < shipSelect.options.length; i++) {
-            if (shipSelect.options[i].value === saved.shipId) {
-                shipSelect.value = saved.shipId;
-                break;
+    /** Restores the last chosen ship and systems; stale values fall back to the defaults. */
+    function restoreProfitFilters() {
+        const saved = readProfitFilterPref();
+        if (!saved) return;
+        const select = shipSelect();
+        if (select && typeof saved.shipId === 'string' && saved.shipId !== '') {
+            for (let i = 0; i < select.options.length; i++) {
+                if (select.options[i].value === saved.shipId) {
+                    select.value = saved.shipId;
+                    break;
+                }
             }
         }
-    }
-    if (Array.isArray(saved.systems) && saved.systems.length > 0) {
-        const boxes = document.getElementsByClassName('sysCheck');
-        if (boxes.length === 0) return;
-        let any = false;
-        for (let i = 0; i < boxes.length; i++) {
-            const on = saved.systems.indexOf(boxes[i].value) >= 0;
-            boxes[i].checked = on;
-            if (on) any = true;
-        }
-        if (!any) {
-            for (let i = 0; i < boxes.length; i++) boxes[i].checked = true;
-        }
-        updateSelectState('sysAll', 'sysCheck', 'systemHeader');
-    }
-}
-
-window.addEventListener('DOMContentLoaded', () => {
-    document.addEventListener('click', function (event) {
-        if (!event.target.closest('.multi-select-container')) {
-            document.querySelectorAll('.multi-select-options').forEach(function (opt) {
-                opt.classList.remove('open');
+        if (Array.isArray(saved.systems) && saved.systems.length > 0) {
+            const checks = systemChecks();
+            const any = checks.some(function (c) {
+                return saved.systems.indexOf(c.value) >= 0;
+            });
+            checks.forEach(function (c) {
+                c.checked = !any || saved.systems.indexOf(c.value) >= 0;
             });
         }
-    });
+    }
 
-    restoreProfitFilters();
-
-    const shipId = document.getElementById('shipSelect').value;
-    if (shipId) {
+    /** Applies a changed input: summary, chip, persistence and a new calculation. */
+    function onInputChanged() {
+        updateSystemSummary();
+        updateHullChip();
+        persistProfitFilters();
         updateProfitCalculation();
     }
-});
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('change', 'profit-update', function () {
-        persistProfitFilters();
+    document.addEventListener('DOMContentLoaded', function () {
+        restoreProfitFilters();
+        updateSystemSummary();
+        updateHullChip();
         updateProfitCalculation();
     });
-    window.krtEvents.on('click', 'profit-toggle-multi', function (el) {
-        toggleMultiSelect(el.getAttribute('data-multi-target'));
-    });
-    window.krtEvents.on('change', 'profit-toggle-all', function (el) {
-        toggleSelectAll(
-            el.getAttribute('data-all-id'),
-            el.getAttribute('data-check-class'),
-            el.getAttribute('data-header-id'),
-        );
-        persistProfitFilters();
-        updateProfitCalculation();
-    });
-    window.krtEvents.on('change', 'profit-update-state', function (el) {
-        updateSelectState(
-            el.getAttribute('data-all-id'),
-            el.getAttribute('data-check-class'),
-            el.getAttribute('data-header-id'),
-        );
-        persistProfitFilters();
-        updateProfitCalculation();
-    });
-    window.krtEvents.on('click', 'profit-sort', function (el) {
-        sortTable(parseInt(el.getAttribute('data-sort-column'), 10));
-    });
-}
+
+    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
+        window.krtEvents.on('change', 'profit-update', onInputChanged);
+        window.krtEvents.on('change', 'profit-toggle-all', function (el) {
+            const all = /** @type {HTMLInputElement} */ (el);
+            systemChecks().forEach(function (c) {
+                c.checked = all.checked;
+            });
+            onInputChanged();
+        });
+        window.krtEvents.on('change', 'profit-update-state', onInputChanged);
+    }
+})();

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
-    <title th:text="#{nav.materials.overview} + ' - ' + ${appTitle}">Material-Übersicht - Profit Basetool</title>
+    <title th:text="#{nav.materials.overview} + ' - ' + ${appTitle}">Preis-Übersicht - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/materials-overview.css}">
     </th:block>
@@ -11,98 +11,136 @@
 
 <th:block th:replace="~{fragments/header :: header}" />
 
-<main class="materials-overview-main">
-    <div class="greeting hud-box flex-between">
-        <h1 th:text="#{nav.materials.overview}">Material-Übersicht</h1>
+<main>
+    <div class="page-head" data-testid="page-head">
+        <div class="page-head__main">
+            <span class="page-eyebrow" data-testid="page-eyebrow" th:text="#{nav.materials}">Handel</span>
+            <div class="page-title">
+                <h1 th:text="#{nav.materials.overview}">Preis-Übersicht</h1>
+                <span th:if="${uexAge != null}" class="chip chip--muted" data-testid="uex-age"
+                      th:title="${uexAge.syncedAt}"
+                      th:text="#{${'materials.uexAge.' + uexAge.unit}(${uexAge.amount})}">UEX · vor 14 min</span>
+            </div>
+        </div>
     </div>
 
-    <div class="hud-box mt-2">
-        <div th:if="${error}" class="hud-box hud-box-error">
-            <p th:text="#{__${error}__}">Fehler</p>
-        </div>
+    <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
 
-        <div class="actions-bar">
-            <div th:replace="~{fragments/components :: filterToggle('materials-filter-panel', 'materials-filter-toggle')}"></div>
-        </div>
+    <div id="matrixConfig"
+         th:data-data-url="@{/materials/overview/data}"
+         th:data-label-material="#{materials.matrix.material}"
+         th:data-label-unsorted="#{material.category.unsorted}"
+         th:data-label-illegal="#{material.is_illegal}"
+         th:data-label-volatile-qt="#{material.is_volatile_qt}"
+         th:data-label-volatile-time="#{material.is_volatile_time}"
+         th:data-label-spread="#{materials.matrix.spread}"
+         th:data-label-all="#{filter.all}"
+         th:data-label-selection-of="#{materials.matrix.selectionOf('{0}', '{1}')}"
+         th:data-label-remove="#{filter.remove}"
+         hidden></div>
 
-        <div class="filter-panel" id="materials-filter-panel" data-filter-panel="materials-overview">
-        <div class="filters-container">
-            <div class="form-group">
-                <label th:text="#{filter.material}">Material filtern</label>
-                <div class="multi-select-container" id="materialFilterContainer">
-                    <div class="multi-select-header mtx-multi-header" data-options-id="materialOptions" th:data-all="#{filter.material.all}" th:data-selected="#{filter.selected}" id="materialHeader">
-                        <span class="selected-text" id="materialSelectedText" th:text="#{filter.material.all}">Alle Materialien</span>
-                    </div>
-                    <div class="multi-select-options" id="materialOptions">
-                        <label class="multi-select-option">
-                            <span th:text="#{filter.all}">Alle</span>
-                            <input type="checkbox" id="matAll" value="ALL" checked class="mtx-select-all" data-filter-ignore data-check-class="matCheck" data-header-id="materialHeader">
-                        </label>
-                        <label class="multi-select-option" th:each="mat : ${materialNames}">
-                            <span th:text="${mat}">Material</span>
-                            <input type="checkbox" class="matCheck mtx-check" th:value="${mat}" checked data-all-id="matAll" data-check-class="matCheck" data-header-id="materialHeader">
-                        </label>
-                    </div>
-                </div>
-            </div>
-            <div class="form-group">
-                <label th:text="#{filter.system}">System filtern</label>
-                <div class="multi-select-container" id="systemFilterContainer">
-                    <div class="multi-select-header mtx-multi-header" data-options-id="systemOptions" th:data-all="#{filter.system.all}" th:data-selected="#{filter.selected}" id="systemHeader">
-                        <span class="selected-text" id="systemSelectedText" th:text="#{filter.system.all}">Alle Systeme</span>
-                    </div>
-                    <div class="multi-select-options" id="systemOptions">
-                        <label class="multi-select-option">
-                            <span th:text="#{filter.all}">Alle</span>
-                            <input type="checkbox" id="sysAll" value="ALL" checked class="mtx-select-all" data-filter-ignore data-check-class="sysCheck" data-header-id="systemHeader">
-                        </label>
-                        <label class="multi-select-option" th:each="sys : ${starSystems}">
-                            <span th:text="${sys}">System</span>
-                            <input type="checkbox" class="sysCheck mtx-check" th:value="${sys}" checked data-all-id="sysAll" data-check-class="sysCheck" data-header-id="systemHeader">
-                        </label>
-                    </div>
-                </div>
-            </div>
-            <div class="form-group krtm-display-flex-align-items-center-gap-0-5rem-m-dd56">
-                <input type="checkbox" id="filterLoadingDock" class="mtx-bool-filter">
-                <label for="filterLoadingDock" class="krtm-margin-bottom-0-margin-top-0-acac" th:text="#{filter.hasLoadingDock}">Hat Loading Dock</label>
-            </div>
-            <div class="form-group krtm-display-flex-align-items-center-gap-0-5rem-m-dd56">
-                <input type="checkbox" id="filterAutoLoad" class="mtx-bool-filter">
-                <label for="filterAutoLoad" class="krtm-margin-bottom-0-margin-top-0-acac" th:text="#{filter.hasAutoLoad}">Hat Auto Load</label>
-            </div>
-            <div class="form-group krtm-display-flex-align-items-center-gap-0-5rem-m-dd56">
-                <input type="checkbox" id="filterGroupByCategory" checked data-filter-ignore>
-                <label for="filterGroupByCategory" class="krtm-margin-bottom-0-margin-top-0-acac" th:text="#{filter.groupByCategory}">Nach Kategorie gruppieren</label>
+    <div class="toolbar mtx-toolbar" id="materials-overview-filters">
+        <div class="filter-popover mtx-dropdown">
+            <button type="button" class="mtx-dropdown__toggle" id="materialHeader" data-testid="materials-filter-materials"
+                    aria-controls="materialOptions" aria-expanded="false">
+                <span th:text="#{materials.matrix.filter.materials}">Materialien</span>
+                <strong class="selected-text" id="materialSelectedText" th:text="#{filter.all}">Alle</strong>
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg>
+            </button>
+            <div class="filter-popover__panel mtx-dropdown__panel" id="materialOptions" role="group"
+                 data-filter-panel="materials-overview-materials" data-filter-transient
+                 th:attr="aria-label=#{filter.material}">
+                <label class="mtx-option mtx-option--all">
+                    <input type="checkbox" id="matAll" value="ALL" checked class="mtx-select-all" data-filter-ignore
+                           data-check-class="matCheck" data-header-id="materialHeader">
+                    <span th:text="#{filter.all}">Alle</span>
+                </label>
+                <label class="mtx-option" th:each="mat : ${materialNames}">
+                    <input type="checkbox" class="matCheck mtx-check" th:value="${mat}" checked data-all-id="matAll"
+                           data-check-class="matCheck" data-header-id="materialHeader">
+                    <span th:text="${mat}">Material</span>
+                </label>
             </div>
         </div>
+
+        <div class="filter-popover mtx-dropdown">
+            <button type="button" class="mtx-dropdown__toggle" id="systemHeader" data-testid="materials-filter-systems"
+                    aria-controls="systemOptions" aria-expanded="false">
+                <span th:text="#{materials.matrix.filter.system}">System</span>
+                <strong class="selected-text" id="systemSelectedText" th:text="#{filter.all}">Alle</strong>
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg>
+            </button>
+            <div class="filter-popover__panel mtx-dropdown__panel" id="systemOptions" role="group"
+                 data-filter-panel="materials-overview-systems" data-filter-transient
+                 th:attr="aria-label=#{filter.system}">
+                <label class="mtx-option mtx-option--all">
+                    <input type="checkbox" id="sysAll" value="ALL" checked class="mtx-select-all" data-filter-ignore
+                           data-check-class="sysCheck" data-header-id="systemHeader">
+                    <span th:text="#{filter.all}">Alle</span>
+                </label>
+                <label class="mtx-option" th:each="sys : ${starSystems}">
+                    <input type="checkbox" class="sysCheck mtx-check" th:value="${sys}" checked data-all-id="sysAll"
+                           data-check-class="sysCheck" data-header-id="systemHeader">
+                    <span th:text="${sys}">System</span>
+                </label>
+            </div>
         </div>
 
-        <div id="matrixConfig"
-             th:data-data-url="@{/materials/overview/data}"
-             th:data-label-material="#{materials.matrix.material}"
-             th:data-label-unsorted="#{material.category.unsorted}"
-             th:data-label-no-results="#{materials.matrix.noResults}"
-             th:data-label-illegal="#{material.is_illegal}"
-             th:data-label-volatile-qt="#{material.is_volatile_qt}"
-             th:data-label-volatile-time="#{material.is_volatile_time}"
-             hidden></div>
+        <div class="mtx-active-chips" id="mtxActiveChips" data-testid="filter-chips"></div>
 
-        <div id="matrixLoading" class="matrix-loading" th:text="#{materials.matrix.loading}">Lade Matrix...</div>
-
-        <div id="matrixError" class="hud-box hud-box-error krtm-display-none-5790">
-            <p th:text="#{error.materials.matrix.load}">Fehler</p>
+        <div class="filter-popover">
+            <button type="button" class="filter-add filter-toggle" data-testid="materials-filter-toggle"
+                    aria-controls="materials-filter-panel" aria-expanded="false">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                <span th:text="#{filter.add}">Filter</span>
+            </button>
+            <div class="filter-panel filter-popover__panel" id="materials-filter-panel"
+                 role="group" data-filter-panel="materials-overview" data-filter-transient
+                 th:attr="aria-label=#{filter.add}">
+                <label class="mtx-option">
+                    <input type="checkbox" id="filterLoadingDock" class="mtx-bool-filter">
+                    <span th:text="#{filter.hasLoadingDock}">Hat Loading Dock</span>
+                </label>
+                <label class="mtx-option">
+                    <input type="checkbox" id="filterAutoLoad" class="mtx-bool-filter">
+                    <span th:text="#{filter.hasAutoLoad}">Hat Auto Load</span>
+                </label>
+            </div>
         </div>
 
-        <div class="table-wrapper krtm-display-none-5790" id="tableContainer">
+        <label class="switch" data-testid="materials-overview-group-switch">
+            <input type="checkbox" id="filterGroupByCategory" checked data-filter-ignore>
+            <span class="switch__track" aria-hidden="true"></span>
+            <span th:text="#{filter.groupByCategory}">Nach Kategorie gruppieren</span>
+        </label>
+
+        <span class="toolbar__spacer"></span>
+
+        <div class="mtx-legend" data-testid="materials-matrix-legend">
+            <span class="mtx-legend__item"><span class="mtx-legend__swatch mtx-legend__swatch--sell" aria-hidden="true"></span><span th:text="#{materials.matrix.bestSell}">bester Verkauf</span></span>
+            <span class="mtx-legend__item"><span class="mtx-legend__swatch mtx-legend__swatch--buy" aria-hidden="true"></span><span th:text="#{materials.matrix.bestBuy}">bester Einkauf</span></span>
+        </div>
+    </div>
+
+    <div id="matrixLoading" class="matrix-loading" role="status" th:text="#{materials.matrix.loading}">Lade Matrix...</div>
+
+    <div id="matrixError" class="alert alert-danger" role="alert" hidden th:text="#{error.materials.matrix.load}">Fehler</div>
+
+    <div id="matrixEmpty" class="card card--flush" hidden>
+        <th:block th:replace="~{fragments/components :: emptyState(titleKey='materials.matrix.noResults', textKey='materials.matrix.noResults.text')}"></th:block>
+    </div>
+
+    <div class="card card--flush mtx-card" id="tableContainer" hidden>
+        <div class="table-wrapper" id="matrixScroll">
             <table class="matrix-table" id="matrixTable">
                 <colgroup id="matrixColgroup"></colgroup>
                 <thead id="matrixHead"></thead>
                 <tbody id="matrixBody"></tbody>
             </table>
         </div>
-
     </div>
+
+    <p class="mtx-hint" th:text="#{materials.matrix.hint}">Obere Zahl Verkauf (+), untere Einkauf (−), aUEC je SCU.</p>
 </main>
 
 <script th:src="@{/js/materials-matrix.js}" defer th:attr="nonce=${cspNonce}"></script>
