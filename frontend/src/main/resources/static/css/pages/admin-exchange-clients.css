@@ -7,6 +7,10 @@
     .xc-heading {
         margin: 0;
     }
+
+    #xc-registry-host .table-responsive {
+        position: relative;
+    }
     .xc-switch-state,
     .xc-hint {
         margin: 0;
