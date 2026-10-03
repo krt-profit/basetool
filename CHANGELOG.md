@@ -22,6 +22,11 @@
 
 ### Fixed
 
+- **Datenschutzerklärung korrigiert: der Sitzungs-Cookie ist `SameSite=Lax`.** Konfiguriert war
+  `Strict`, gesetzt wurde aber immer `Lax`; `Lax` bleibt bewusst, weil Anmeldung über Discord und
+  Links aus anderen Seiten den Cookie brauchen. Das Frontend setzt jetzt jedes konfigurierte
+  Cookie-Attribut tatsächlich, ein Test hält den gesendeten `Set-Cookie` fest.
+
 - **Deploy: die Edge startet vor den Anwendungen.** Ändert ein Release die Edge-Unit, stoppte das eine
   Neustartfenster sie mit und startete sie zuletzt; Backend und Frontend holen die OIDC-Konfiguration
   aber über den öffentlichen Namen, also über die Edge, und kamen nicht hoch. Gilt auch für `backup.sh`.

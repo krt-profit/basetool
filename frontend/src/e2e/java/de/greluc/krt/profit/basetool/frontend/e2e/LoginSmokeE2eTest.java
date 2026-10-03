@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.microsoft.playwright.Browser;
@@ -27,9 +28,11 @@ import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.Tracing;
 import com.microsoft.playwright.options.Cookie;
+import com.microsoft.playwright.options.SameSiteAttribute;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -87,9 +90,9 @@ class LoginSmokeE2eTest {
   }
 
   /**
-   * Logs in through Keycloak, asserts a Spring Session cookie, and writes {@code
-   * build/e2e/storageState.json}; a Playwright trace is saved to {@code build/e2e/trace.zip} and
-   * failure diagnostics are captured on error.
+   * Logs in through Keycloak, asserts a {@code Secure}, {@code HttpOnly}, {@code SameSite=Lax}
+   * Spring Session cookie, and writes {@code build/e2e/storageState.json}; a Playwright trace is
+   * saved to {@code build/e2e/trace.zip} and failure diagnostics are captured on error.
    *
    * @throws Exception if a diagnostic artifact cannot be written
    */
@@ -119,8 +122,9 @@ class LoginSmokeE2eTest {
         long redirectMillis = (landedNanos - submittedNanos) / 1_000_000L;
 
         List<Cookie> cookies = context.cookies();
-        boolean hasSessionCookie =
-            cookies.stream().anyMatch(cookie -> "__Host-SESSION".equals(cookie.name));
+        Optional<Cookie> sessionCookie =
+            cookies.stream().filter(cookie -> "__Host-SESSION".equals(cookie.name)).findFirst();
+        boolean hasSessionCookie = sessionCookie.isPresent();
 
         Path storageState = Path.of("build", "e2e", "storageState.json");
         Files.createDirectories(storageState.getParent());
@@ -141,6 +145,13 @@ class LoginSmokeE2eTest {
             "after login the browser must be back on the frontend origin, was: " + page.url());
         assertTrue(
             hasSessionCookie, "a Spring Session cookie must be set after a successful OIDC login");
+        Cookie session = sessionCookie.orElseThrow();
+        assertEquals(
+            SameSiteAttribute.LAX,
+            session.sameSite,
+            "the session cookie must be SameSite=Lax (REQ-SEC-025)");
+        assertTrue(Boolean.TRUE.equals(session.secure), "the session cookie must be Secure");
+        assertTrue(Boolean.TRUE.equals(session.httpOnly), "the session cookie must be HttpOnly");
       } catch (RuntimeException | AssertionError failure) {
         captureFailureDiagnostics(page);
         throw failure;

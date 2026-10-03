@@ -1294,9 +1294,25 @@ Redis `maxmemory noeviction` ceiling, where login / token-refresh writes start f
 (`HttpSessionCsrfTokenRepository`, REQ-SEC-010) are all **unchanged** — this is a TTL policy, not a
 CSRF-transport change. Cookie-based CSRF (`CookieCsrfTokenRepository`) was considered as a way to
 stop anonymous CSRF-token sessions at the source and **rejected**: an unsigned double-submit cookie
-is a weaker CSRF model than the retained server-side synchronizer token + `SameSite=Strict` (see
+is a weaker CSRF model than the retained server-side synchronizer token + `SameSite=Lax` (see
 ADR-0088). Runaway regression is caught by `ActiveSessionsRunaway`
 ([`observability.md`](observability.md)).
+
+**The cookie is `SameSite=Lax`, deliberately (corrected 2026-10-03).** This requirement used to
+say `SameSite=Strict`, and `application.yml` configured it — but the value never reached the
+browser. Spring Session writes the session cookie with its own `CookieSerializer`; with no such
+bean it builds one from the servlet `SessionCookieConfig`, which carries no `SameSite`, and falls
+back to `Lax`. Boot's mapping of `server.servlet.session.cookie.same-site` sits in
+`spring-boot-session`, which the frontend does not depend on. Production therefore emitted `Lax`
+for as long as it has used Spring Session. The owner chose to keep `Lax`: under `Strict` the
+browser withholds the cookie on any top-level navigation started on another site, so the return
+from the Discord consent screen would lose the saved OAuth2 authorization request
+(`authorization_request_not_found`), and a link opened from Discord in a browser or from webmail
+would arrive without the session, start a fresh one that overwrites the member's cookie, and land
+on `/?error`. CSRF protection does not rest on the attribute: the synchronizer token
+(REQ-SEC-010) carries it, and `Lax` already withholds the cookie from cross-site `POST`s,
+subresources and frames. `SessionCookieSerializerConfig` now builds the serializer from
+`server.servlet.session.cookie.*`, so every configured attribute is the emitted one.
 
 **The cookie is `__Host-SESSION` (FE-SEC-06, 2026-09-22).** The session cookie was called
 `SESSION`; it now carries the `__Host-` prefix (`server.servlet.session.cookie.name`). A browser
@@ -1320,13 +1336,20 @@ no flush). The owner approved that trade.
   `app.session.authenticated-timeout`.
 - [ ] No throwaway session is created merely to bump the timeout when none exists at login success.
 - [ ] Members keep the 30-day "stay logged in" behaviour (cookie `max-age` + authenticated window).
+- [ ] Spring Session emits the session cookie with exactly the configured attributes —
+  `__Host-SESSION=…; Max-Age=2592000; Expires=…; Path=/; Secure; HttpOnly; SameSite=Lax` — and no
+  profile overrides `http-only`, `same-site` or `max-age`.
 
 **Enforced by:** `SessionCookiePrefixTest` (the `__Host-` name and its three conditions, in
-`application.yml` and in no profile override), `LoginSmokeE2eTest` (a real browser holds
-`__Host-SESSION` after the OIDC login), `RedisSessionConfigTest` (anonymous window is the repository
-default),
+`application.yml` and in no profile override), `SessionCookieAttributesTest` (the exact
+`Set-Cookie` written by Spring Session's `SessionRepositoryFilter` with the shipped
+`application.yml`; it rejects the cookie Spring Session writes without the configured serializer
+and a `Strict` one), `LoginSmokeE2eTest` (a real browser holds a `Secure`, `HttpOnly`,
+`SameSite=Lax` `__Host-SESSION` after the OIDC login), `RedisSessionConfigTest` (anonymous window
+is the repository default),
 `SessionLifetimeUpgradeSuccessHandlerTest` (login promotes to the authenticated window; no session
-minted when absent) · **Code:** `RedisSessionConfig#sessionRepositoryCustomizer`,
+minted when absent) · **Code:** `SessionCookieSerializerConfig`,
+`RedisSessionConfig#sessionRepositoryCustomizer`,
 `SessionLifetimeUpgradeSuccessHandler`, `SecurityConfig#oauth2LoginSuccessHandler` · **Monitoring:**
 `ActiveSessionsRunaway` · **ADR:** [ADR-0088](../adr/0088-two-tier-session-idle-timeout.md)
 
