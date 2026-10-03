@@ -169,7 +169,7 @@
         loadRecipe(attr(row, 'data-id'));
         renderCraftDetail(attr(row, 'data-id'));
 
-        if (options.showDetail && mdEl && window.matchMedia('(max-width: 900px)').matches) {
+        if (options.showDetail && mdEl && window.matchMedia('(width <= 1024px)').matches) {
             mdEl.classList.add('is-detail');
         }
     }
@@ -1025,7 +1025,7 @@
             initial = rows()[0] || null;
         }
         if (initial) {
-            const mobile = window.matchMedia('(max-width: 900px)').matches;
+            const mobile = window.matchMedia('(width <= 1024px)').matches;
             select(initial, { showDetail: fromDeeplink || !mobile });
             if (!fromDeeplink && mobile) {
                 mdEl.classList.remove('is-detail');

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div id="harness-page-head">
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='filter.add', titleText='HEAD-TITLE', count=${total},
+        actions=~{::harness-actions})}">
+        <th:block th:ref="harness-actions">
+            <button type="button" class="btn btn--cta" data-testid="page-head-primary">PRIMARY</button>
+            <th:block th:replace="~{fragments/components :: overflowMenu(id='harness-more', items=~{::harness-more-items})}">
+                <th:block th:ref="harness-more-items">
+                    <button type="button" class="overflow-menu__item" role="menuitem">ITEM-A</button>
+                </th:block>
+            </th:block>
+        </th:block>
+    </th:block>
+</div>
+<div id="harness-page-head-back">
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='filter.add', eyebrowHref='/back', titleText='BACK-TITLE')}"></th:block>
+</div>
+<div id="harness-empty">
+    <th:block th:replace="~{fragments/components :: emptyState(titleKey='filter.add', textKey='filter.remove',
+        actionHref='/new', actionKey='filter.resetAll')}"></th:block>
+</div>
+<form id="harness-filter-form">
+    <div class="toolbar">
+        <th:block th:replace="~{fragments/components :: toolbarSearch('harness-q', 'q', ${query}, 'filter.add')}"></th:block>
+        <th:block th:replace="~{fragments/components :: segmented(name='scope', labelKey='filter.add', selected=${scope},
+            options=${ {{value: null, labelKey: 'filter.all'}, {value: 'MINE', labelKey: 'filter.add', count: 3}} })}"></th:block>
+    </div>
+    <th:block th:replace="~{fragments/components :: filterChips('harness-filter-form')}"></th:block>
+</form>
+</body>
+</html>

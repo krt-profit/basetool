@@ -330,14 +330,14 @@
         }
     }
 
-    @media (width >= 769px) and (width <= 1024px) {
+    @media (768px < width <= 1024px) {
         .krt-pi-table th,
         .krt-pi-table td {
             padding: 0.45rem 0.6rem;
         }
     }
 
-    @media (width >= 1600px) {
+    @media (width >= 1440px) {
         .krt-personal-inventory {
             padding: 1.5rem 2rem;
         }
@@ -917,7 +917,7 @@
         top: 50%;
         transform: translateY(-50%);
         display: inline-flex;
-        color: var(--color-gray-2);
+        color: var(--color-gray-2-text);
         pointer-events: none;
     }
 
@@ -1054,7 +1054,7 @@
         width: 95%;
     }
 
-    @media (width <= 900px) {
+    @media (width <= 1024px) {
         .krt-bp-md .detail-pane {
             display: none;
         }

@@ -596,6 +596,22 @@ interface KrtFilterPanelApi {
     refresh(panelId?: string): void;
 }
 
+/** The page-head overflow menus (`krt-overflow-menu.js`, REQ-UI-027). */
+interface KrtOverflowMenuApi {
+    /** Closes every open overflow menu without moving focus. */
+    closeAll(): void;
+}
+
+/** The active-filter chip bars (`krt-filter-chips.js`, REQ-UI-027). */
+interface KrtFilterChipsApi {
+    /**
+     * Re-renders the chip bars; a page that swaps its filter form calls this after the swap.
+     *
+     * @param root the subtree to scan; the whole document when omitted
+     */
+    refresh(root?: ParentNode): void;
+}
+
 /** The navigation drawer and mobile menu sheet (`sidebar.js`, REQ-UI-026). */
 interface KrtNavApi {
     /**
@@ -635,6 +651,8 @@ interface Window {
     krtEvents: KrtEventsApi;
     krtLiveSync: KrtLiveSyncApi;
     krtFilterPanel: KrtFilterPanelApi;
+    krtOverflowMenu: KrtOverflowMenuApi;
+    krtFilterChips: KrtFilterChipsApi;
     escapeHtml: typeof escapeHtml;
     escapeAttr: typeof escapeAttr;
 

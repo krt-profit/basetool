@@ -23,7 +23,7 @@
         border-radius: var(--radius-none);
         margin-left: 0.25rem;
     }
-    .role-badge.lead {
+    .role-badge--lead {
         background-color: var(--color-accent-light);
         color: var(--color-bg-black);
     }

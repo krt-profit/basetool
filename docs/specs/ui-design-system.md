@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-27.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
 > **Owner area:** UI · **Related ADRs:**
 > [0053](../adr/0053-standardize-user-selection-on-searchable-combobox.md) (searchable user pickers, REQ-UI-012) ·
 > [0093](../adr/0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md) (no inline `style=""`, REQ-UI-013) ·
@@ -12,7 +12,8 @@
 > [0197](../adr/0197-shipped-dependencies-pass-a-gpl-compatible-licence-gate-and-are-listed-on-a-public-page.md) (REQ-UI-021) ·
 > [0212](../adr/0212-every-stylesheet-sits-in-a-cascade-layer.md) (REQ-UI-024) ·
 > [0240](../adr/0240-navigation-is-a-structured-drawer-a-quick-access-and-a-phone-tab-bar.md) (REQ-UI-026) ·
-> **Next free id:** `REQ-UI-027` · **Visual source of truth:** the design
+> [0242](../adr/0242-page-patterns-a-to-c-and-the-design-system-update-2026-10.md) (REQ-UI-027, REQ-UI-009) ·
+> **Next free id:** `REQ-UI-028` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)).
 
@@ -160,26 +161,27 @@ honeycomb wash masked this from the automated a11y gate; the flat-black surface 
 REQ-UI-003 exposed it). When muted grey **is the text itself** — `.text-muted`, secondary
 labels, hints, placeholders, the quiet-danger button label — use `--color-gray-2-text`
 `#8A8A8A` (≈ 6.1:1 on black, ≥ 4.9:1 on the `#141414` / `#1C1C1C` surfaces). Keep the
-canonical `--color-gray-2` for hairline borders, scrollbar thumbs, disabled fills and
-purely decorative glyphs.
+canonical `--color-gray-2` for hairline borders, scrollbar thumbs and disabled fills. A glyph that
+sits in text — even an `aria-hidden` one — takes the tint too (DS-1, REQ-UI-027).
 
 **Acceptance**
 
 - [x] Semantic colour used as small text uses the matching `*-text` tint, not the dark
   canonical hue; the canonical hues stay on fills/borders/tags.
 - [x] Muted grey used as small text uses `--color-gray-2-text`, not the canonical
-  `--color-gray-2`; the canonical Grau 2 stays on borders/scrollbars/decorative glyphs.
+  `--color-gray-2`; the canonical Grau 2 stays on borders, scrollbars and disabled fills.
 
 Until 2026-09-25 nothing checked this, and 49 declarations broke it: the item badge in the order
 list (#355DDC, 3.29:1, the `/orders` finding of the a11y smoke that appeared only once another test
 had created an item order), the price column of the materials matrix, the outline danger button,
 error texts, empty-state hints and more, most of them on elements no test had data to render. All
-now take the tints. The two exceptions are the `aria-hidden` glyphs that keep Grau 2 as allowed
-above: the unsorted-column indicator of the material demand table and the blueprint search icon.
+now take the tints. Two `aria-hidden` glyphs kept Grau 2 as decorative exceptions until
+2026-10-03 — the unsorted-column indicator of the material demand table and the blueprint search
+icon; DS-1 (REQ-UI-027) gave them the tint as well, so there is no exception left.
 
 **Enforced by:** `AccessibleTextTintTest` (no stylesheet sets `color` to the danger, info or Grau 2
-hue, and no script writes one into `style.color`; the two decorative glyphs are exempted by
-selector) · `AccessibilitySmokeE2eTest` (axe WCAG A/AA on five pages; its report now names every
+hue, and no script writes one into `style.color`; its selector exemption list for decorative
+glyphs is empty) · `AccessibilitySmokeE2eTest` (axe WCAG A/AA on five pages; its report now names every
 failing node with its colours and ratio)
 
 ### REQ-UI-007 — Visual style: square-first sci-fi HUD
@@ -450,8 +452,18 @@ Every layout change and new component works on **four** classes:
 
 - **Smartphone** (≤768px) and **Tablet** (768–1024px) — touch first; minimum click target
   **44px**; collapse multi-column grids to one column; wide tables scroll horizontally.
-- **Desktop** (1024–1600px) and **Ultra-wide** (1600px+) — exploit space (docked sidebars,
-  auto-fit card/dashboard grids) but cap long-form text at `max-width: 80ch` on `<p>`.
+- **Desktop** (1024–1440px) and **Wide** (1440px+) — exploit space (docked sidebars,
+  auto-fit card/dashboard grids) but cap long-form text at `max-width: 80ch` on `<p>`. From
+  1440px `main` widens to `--content-max-data` (1600px).
+
+**Breakpoints are only the class boundaries** (DS-11, ADR-0242, amended 2026-10-03): a media query
+uses `(width <= 768px)`, `(width <= 1024px)` or `(width >= 1440px)` — or a range between two of them —
+and nothing else. Stylelint's `media-feature-name-value-allowed-list` enforces it in both
+configurations, for `width`, `min-width` and `max-width`. A component that has to react to its own
+width uses a container query. The tokens `--bp-phone-max`, `--bp-tablet-max` and `--bp-wide-min`
+document the values (a custom property cannot be used inside `@media`). The fifteen earlier values
+moved to the next boundary — 460–760 → 768, 820–980 → 1024, 1600 and 1800 → 1440 — and a script's
+`matchMedia` moves with the stylesheet it mirrors. Until 2026-10-03 the Desktop class ended at 1600px.
 
 **Dense row actions are an explicit exception at 32px.** The two compact variants `.btn-xs`
 and `.btn-icon` — the *repeated* per-row actions of a dense table / tree action cluster
@@ -1406,6 +1418,102 @@ sheet) · `DialogA11yE2eTest` (the quick access follows the dialog contract) ·
 chrome budget) · **Code:** `fragments/header.html`, `fragments/sidebar.html`,
 `fragments/palette.html`, `fragments/mobile-nav.html`, `static/js/sidebar.js`,
 `static/js/krt-palette.js` · **Related:** REQ-UI-009, REQ-UI-013, REQ-UI-019
+
+### REQ-UI-027 — Work pages follow three page patterns built from shared fragments
+
+The website audit of 2026-10-03 found the same faults on almost every template — a banner that
+repeats the title, nested `.hud-box`es, up to twelve filled orange buttons, tables that scroll
+sideways on a phone, raw status values, `colspan` empty rows, collapsed filter panels with a
+„Filtern" button, forms as one long column. The design system answers with twelve changes, DS-1 to
+DS-12 ([ADR-0242](../adr/0242-page-patterns-a-to-c-and-the-design-system-update-2026-10.md),
+krt-profit/design-system#6), and every work page follows one of three patterns.
+
+**Type and surfaces (DS-1, DS-2, DS-3, DS-10)** — global, migrated page or not:
+
+- Body text is Lato **400** (`--fw-regular`); Lato 300 only as `.lead` (1.1 rem) for lead text.
+- Only `h1` carries the house orange. `h2` and `h3` are white, `h4`–`h6` Grau 1; upper case and
+  tracking stay. Orange is for `h1`, the one primary action, the active state and identity.
+- Muted text is `--color-gray-2-text`, never `--color-gray-2` (REQ-UI-006).
+- At most **one** `.hud-box` per view, never nested; a nested legacy `.hud-box` loses its corner
+  brackets. Content never sits with white text directly on `#000`: lists and tables in
+  `.card.card--flush`, notices as `.alert`.
+
+**Global rules of a work page:**
+
+1. **One primary action per context** — at most one `.btn--cta` in the page head and one per panel
+   or dialog. Row actions are `.btn-ghost.btn-xs`, `.btn-success.btn-xs` or
+   `.btn-quiet-danger.btn-xs`, never `.btn--cta`.
+2. **The page head is `.page-head`** (DS-4): an eyebrow naming the navigation area — or, on a form
+   or detail page, a back link „← Aufträge" —, the `h1` with an optional count chip, and
+   `.page-actions`. `.greeting` stays only on the home page, the landing page and the error pages.
+   A `*.description` subtitle is dropped unless it says something the title does not; the keys stay
+   for a later clean-up.
+3. **Rare and destructive actions go into the overflow menu** („⋯", `.overflow-menu`). Deleting
+   always goes through `showKrtConfirm` or a `.krt-modal--danger`.
+4. **Status is always translated** (`#{…status.<value>}`), never `${x.status}` raw.
+5. **An empty list is an `.empty-state`** with a title, one sentence and optionally an action —
+   never a `<td colspan>` row.
+6. **Tables** are `.card.card--flush > table.data-table.data-table--stack` (DS-7, DS-8): rows of at
+   least 56 px, the first column an `a.row-link` with `.cell-title` and `.cell-sub` (the whole row is
+   clickable), numbers `.num`, status `.cell-status`, actions `.cell-actions`, a `.row-chevron` at
+   the end — no column holding only an „Öffnen" button. Below 768 px a row stacks: title and status
+   on the first line, the other cells as one meta line (a `data-label` prefixes its cell), a lone
+   chevron centred on the right; nothing scrolls sideways.
+7. **Filters** sit in a `.toolbar` (DS-5): the search always visible, a `.segmented` control for two
+   to four exclusive options (DS-6), further filters behind „Filter" with a `.filter-badge`, active
+   filters as `.filter-chips` with „Alle zurücksetzen". Filters apply live through `krtFetch`, never
+   through a „Filtern" button; per-browser persistence (REQ-UI-017) stays.
+8. **Forms** use `.form-layout` (at most 760 px) with numbered `.form-section`s, a `.form-grid` that
+   is two columns from tablet up, computed values as `.field-computed`, two to four exclusive options
+   as `.segmented--lg` instead of radios, and the actions in `.form-actions--sticky` with a live
+   `.form-actions__summary` (DS-9).
+9. **Layout** uses `.stack`, `.cluster`, `.split` and `.grid-auto` (DS-12). No new `krtm-*` class;
+   every touched template replaces its own.
+10. **Touch targets** stay at 44 px on phones and tablets (REQ-UI-009), including the overflow-menu
+    entries, the filter chips and the toolbar search.
+
+**The three patterns:**
+
+- **A · List** — page head, toolbar, filter chips, the list table with the pagination below it.
+- **B · Overview** (the home page) — `.greeting` without a description, information first in a 2 : 1
+  grid that is one column from 1024 px down.
+- **C · Form** — page head with the back link, `.form-layout.card`, sticky actions whose primary
+  button names verb and object („Auftrag anlegen"); field errors under the field (`.field-error`),
+  page errors as `.alert.alert-danger` above the first section.
+
+**The fragments** — pages call these instead of repeating the markup:
+
+| Fragment | Renders |
+| --- | --- |
+| `fragments/page-head :: pageHead` | `.page-head`; parameters `eyebrowKey`, `eyebrowHref` (makes the eyebrow a back link), `titleText`, `count`, `countId`, and the slot `actions=~{::ref}` |
+| `fragments/components :: emptyState` | `.empty-state`; `titleKey`, `textKey`, `filterHintKey`, `actionHref`, `actionKey`, `emptyId` — `emptyStateBody` stays for existing callers |
+| `fragments/components :: toolbarSearch(id, name, value, placeholderKey)` | the search field, excluded from the chips |
+| `fragments/components :: segmented` | a `role="radiogroup"` of radios inside labels; `name`, `options` (each with `value`, `labelKey`, optional `count`; a `null` value is the „all" option), `selected`, `labelKey`, `variant`, `form` |
+| `fragments/components :: overflowMenu` | the „⋯" toggle (`aria-haspopup`, `aria-expanded`, `aria-controls`) and a hidden `role="menu"` panel; `id` and the slot `items` |
+| `fragments/components :: filterChips(formId)` | the chip bar bound to a filter form |
+
+Two global scripts drive them: `krt-overflow-menu.js` opens and closes the menus (toggle, Escape,
+outside click, Tab, focus back to the toggle, arrow keys, Home/End) and closes a menu when one of its
+entries is clicked; `krt-filter-chips.js` renders a chip per active control of the bound form
+(skipping search fields, segmented controls and `data-filter-chip-ignore`), and removing a chip
+clears that control and fires its `input` and `change` events, so the page's own live filter runs.
+Pages that swap their filter form call `window.krtFilterChips.refresh()`.
+
+New `data-testid`s: `page-head`, `page-eyebrow`, `page-head-count`, `page-head-primary` (set by
+the page on its primary action), `overflow-menu-toggle`, `toolbar-search`, `segment-<name>-<value>`,
+`filter-chips`, `filter-chip-<name>`, `filter-chips-reset`, `empty-state`, `empty-state-action`.
+
+**Rollout.** Phase 0 (this requirement's foundation) ships the design-system update, the fragments,
+the scripts and the breakpoint gate; the list pages, the home page and the forms, the areas of the
+audit (hangar, blueprints, operations, Materialbörse, refinery, Leitung, bank, trade) and the removal
+of `inline-migration.css` follow as their own PRs, each moving its pages onto these patterns.
+
+**Enforced by:** `PagePatternFragmentsRenderTest` (the fragments' markup and ARIA) · Stylelint
+`media-feature-name-value-allowed-list` (breakpoints) · `TouchClassLayoutE2eTest` (touch floors) ·
+**Code:** `static/css/styles.css` (`components` layer), `fragments/page-head.html`,
+`fragments/components.html`, `static/js/krt-overflow-menu.js`, `static/js/krt-filter-chips.js`,
+`frontend/.stylelintrc.json`, `frontend/.stylelintrc.templates.json` · **Related:** REQ-UI-004,
+REQ-UI-006, REQ-UI-009, REQ-UI-017, REQ-UI-022, REQ-FE-021
 
 ## Out of scope
 

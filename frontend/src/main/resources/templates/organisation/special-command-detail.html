@@ -52,7 +52,7 @@
                     <tr th:each="m : ${members}">
                         <td>
                             <span th:text="${m.userDisplayName()}">Display Name</span>
-                            <span th:if="${m.isLead()}" class="role-badge lead" th:text="#{admin.specialcommands.members.lead_badge}">Lead</span>
+                            <span th:if="${m.isLead()}" class="role-badge role-badge--lead" th:text="#{admin.specialcommands.members.lead_badge}">Lead</span>
                         </td>
                         <td>
                             <form th:action="@{/organisation/special-commands/{id}/members/{userId}/flags(id=${specialCommand.id()},userId=${m.userId()})}"

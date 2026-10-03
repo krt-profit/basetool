@@ -72,7 +72,9 @@ class ScLinksPageControllerMvcTest {
             .getContentAsString();
 
     assertThat(html)
-        .contains("Star-Citizen-Links")
+        .contains("<h1>Star-Citizen-Links</h1>")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Ressourcen<")
+        .doesNotContain("hud-box")
         .contains("Offizielles")
         .contains("Handel &amp; Fracht")
         .contains("/css/pages/sc-links.css");

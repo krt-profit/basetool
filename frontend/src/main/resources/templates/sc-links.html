@@ -11,9 +11,9 @@
 
 <th:block th:replace="~{fragments/header :: header}" />
 <main>
-    <div class="hud-box mt-2">
-        <h1 th:text="#{scLinks.title}">Star-Citizen-Links</h1>
-        <p th:text="#{scLinks.intro}">Hilfreiche Websites rund um Star Citizen.</p>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.resources', titleText=#{scLinks.title})}"></th:block>
+    <div>
+        <p class="lead" th:text="#{scLinks.intro}">Hilfreiche Websites rund um Star Citizen.</p>
 
         <section class="sc-links-section" th:each="category : ${scLinkCategories}"
                  th:attr="data-testid='sc-links-' + ${category.key}">

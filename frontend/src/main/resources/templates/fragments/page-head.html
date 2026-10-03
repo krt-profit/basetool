@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="pageHead" class="page-head" data-testid="page-head">
+  <div class="page-head__main">
+    <a th:if="${eyebrowHref != null}" class="page-eyebrow" th:href="${eyebrowHref}" data-testid="page-eyebrow"
+      ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"/></svg
+      ><span th:text="#{__${eyebrowKey}__}">Bereich</span></a>
+    <span th:if="${eyebrowHref == null and eyebrowKey != null}" class="page-eyebrow" data-testid="page-eyebrow"
+          th:text="#{__${eyebrowKey}__}">Bereich</span>
+    <div class="page-title">
+      <h1 th:text="${titleText}">Titel</h1>
+      <span th:if="${count != null}" class="chip chip--muted" data-testid="page-head-count"
+            th:id="${countId}" th:text="${count}">0</span>
+    </div>
+  </div>
+  <div th:if="${actions != null}" class="page-actions">
+    <th:block th:replace="${actions}"></th:block>
+  </div>
+</div>
+</body>
+</html>
