@@ -101,148 +101,150 @@
                     <span th:if="${group.orgUnit() == null}" th:text="#{orders.demand.group.unassigned}">Ohne bearbeitende Einheit</span>
                 </h2>
 
-                <table class="data-table data-table--stack demand-table">
-                    <thead>
-                    <tr>
-                        <th class="demand-sortable" data-sort-col="material" aria-sort="none">
-                            <button type="button" class="demand-sort-btn" data-trigger="demand-sort"
-                                    data-sort-key="material" data-testid="demand-sort-material">
-                                <span th:text="#{orders.demand.col.material}">Material</span>
-                                <span class="demand-sort-indicator" aria-hidden="true"></span>
-                            </button>
-                        </th>
-                        <th class="cell-status" th:text="#{orders.demand.col.quality}">Qualit&auml;t</th>
-                        <th class="num demand-sortable" data-sort-col="required" aria-sort="none">
-                            <button type="button" class="demand-sort-btn" data-trigger="demand-sort"
-                                    data-sort-key="required" data-testid="demand-sort-required">
-                                <span th:text="#{orders.demand.col.required}">Bedarf</span>
-                                <span class="demand-sort-indicator" aria-hidden="true"></span>
-                            </button>
-                        </th>
-                        <th class="num demand-sortable" data-sort-col="booked" aria-sort="none">
-                            <button type="button" class="demand-sort-btn" data-trigger="demand-sort"
-                                    data-sort-key="booked" data-testid="demand-sort-booked">
-                                <span th:text="#{orders.demand.col.booked}">Bestand</span>
-                                <span class="demand-sort-indicator" aria-hidden="true"></span>
-                            </button>
-                        </th>
-                        <th class="num demand-sortable" data-sort-col="claimed" aria-sort="none">
-                            <button type="button" class="demand-sort-btn" data-trigger="demand-sort"
-                                    data-sort-key="claimed" data-testid="demand-sort-claimed">
-                                <span th:text="#{orders.demand.col.claimed}">Eintragungen</span>
-                                <span class="demand-sort-indicator" aria-hidden="true"></span>
-                            </button>
-                        </th>
-                        <th class="num demand-sortable" data-sort-col="outstanding" aria-sort="none">
-                            <button type="button" class="demand-sort-btn" data-trigger="demand-sort"
-                                    data-sort-key="outstanding" data-testid="demand-sort-outstanding">
-                                <span th:text="#{orders.demand.col.outstanding}">Offen</span>
-                                <span class="demand-sort-indicator" aria-hidden="true"></span>
-                            </button>
-                        </th>
-                        <th class="demand-coverage-head" th:text="#{orders.demand.col.coverage}">Deckung</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <th:block th:each="row : ${group.materials()}"
-                              th:with="bucketKey=${(group.orgUnit() != null ? group.orgUnit().id() : 'none') + '|' + row.material().id() + '|' + row.qualityRequirement()},
-                                       req=${row.requiredAmount() ?: 0.0},
-                                       bk=${row.bookedAmount() ?: 0.0},
-                                       cl=${row.claimedAmount() ?: 0.0},
-                                       bookedPct=${req > 0 ? (bk >= req ? 100.0 : bk * 100.0 / req) : 0.0},
-                                       coveredPct=${req > 0 ? (bk + cl >= req ? 100.0 : (bk + cl) * 100.0 / req) : 0.0}">
-                        <tr data-testid="demand-row" th:data-bucket-key="${bucketKey}"
-                            th:data-material-id="${row.material().id()}"
-                            th:data-material-name="${row.material().name()}"
-                            th:data-quality="${row.qualityRequirement()}"
-                            th:data-required="${row.requiredAmount()}"
-                            th:data-booked="${row.bookedAmount()}"
-                            th:data-claimed="${row.claimedAmount()}"
-                            th:data-outstanding="${row.outstandingAmount()}">
-                            <td>
-                                <button type="button" class="btn btn-ghost demand-orders-toggle"
-                                        data-trigger="demand-toggle-orders"
-                                        th:data-bucket-key="${bucketKey}"
-                                        aria-expanded="false"
-                                        th:aria-label="#{orders.demand.orders.toggle}">
-                                    <span class="toggle-icon" aria-hidden="true">&#9654;</span>
-                                    <span class="cell-title" th:text="${row.material().name()}" th:title="${row.material().name()}">Titanium</span>
-                                    <span class="text-muted"
-                                          th:text="'(' + ${row.orders() != null ? row.orders().size() : 0} + ')'">(0)</span>
+                <div class="table-responsive">
+                    <table class="data-table data-table--stack demand-table">
+                        <thead>
+                        <tr>
+                            <th class="demand-sortable" data-sort-col="material" aria-sort="none">
+                                <button type="button" class="demand-sort-btn" data-trigger="demand-sort"
+                                        data-sort-key="material" data-testid="demand-sort-material">
+                                    <span th:text="#{orders.demand.col.material}">Material</span>
+                                    <span class="demand-sort-indicator" aria-hidden="true"></span>
                                 </button>
-                            </td>
-                            <td class="cell-status">
-                                <th:block th:replace="~{fragments/quality-tier :: badge(${row.qualityTier()})}"></th:block>
-                            </td>
-                            <td class="num" data-testid="demand-required" th:attr="data-label=#{orders.demand.col.required}">
-                                <th:block th:replace="~{fragments/material-amount :: amount(${row.requiredAmount()}, ${row.material().quantityType()})}" />
-                            </td>
-                            <td class="num" data-testid="demand-booked" th:attr="data-label=#{orders.demand.col.booked}">
-                                <th:block th:replace="~{fragments/material-amount :: amount(${row.bookedAmount()}, ${row.material().quantityType()})}" />
-                            </td>
-                            <td class="num" data-testid="demand-claimed" th:attr="data-label=#{orders.demand.col.claimed}">
-                                <th:block th:replace="~{fragments/material-amount :: amount(${row.claimedAmount()}, ${row.material().quantityType()})}" />
-                            </td>
-                            <td class="num demand-outstanding" data-testid="demand-outstanding"
-                                th:attr="data-label=#{orders.demand.col.outstanding}"
-                                th:classappend="${row.outstandingAmount() != null and row.outstandingAmount() <= 0} ? 'demand-covered' : ''">
-                                <th:block th:replace="~{fragments/material-amount :: amount(${row.outstandingAmount()}, ${row.material().quantityType()})}" />
-                            </td>
-                            <td class="demand-coverage" data-testid="demand-coverage">
-                                <span class="demand-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"
-                                      th:aria-valuenow="${#numbers.formatInteger(coveredPct, 1)}"
-                                      th:aria-label="#{orders.demand.coverage.aria(${#numbers.formatInteger(coveredPct, 1)})}"
-                                      th:title="#{orders.demand.coverage.aria(${#numbers.formatInteger(coveredPct, 1)})}">
-                                    <i class="demand-bar__booked" th:attr="data-krtm-width=${bookedPct}"></i>
-                                    <i class="demand-bar__claimed" th:attr="data-krtm-width=${coveredPct - bookedPct}"></i>
-                                </span>
-                                <span class="demand-bar__value" aria-hidden="true"
-                                      th:text="${#numbers.formatInteger(coveredPct, 1)} + ' %'">0 %</span>
-                            </td>
+                            </th>
+                            <th class="cell-status" th:text="#{orders.demand.col.quality}">Qualit&auml;t</th>
+                            <th class="num demand-sortable" data-sort-col="required" aria-sort="none">
+                                <button type="button" class="demand-sort-btn" data-trigger="demand-sort"
+                                        data-sort-key="required" data-testid="demand-sort-required">
+                                    <span th:text="#{orders.demand.col.required}">Bedarf</span>
+                                    <span class="demand-sort-indicator" aria-hidden="true"></span>
+                                </button>
+                            </th>
+                            <th class="num demand-sortable" data-sort-col="booked" aria-sort="none">
+                                <button type="button" class="demand-sort-btn" data-trigger="demand-sort"
+                                        data-sort-key="booked" data-testid="demand-sort-booked">
+                                    <span th:text="#{orders.demand.col.booked}">Bestand</span>
+                                    <span class="demand-sort-indicator" aria-hidden="true"></span>
+                                </button>
+                            </th>
+                            <th class="num demand-sortable" data-sort-col="claimed" aria-sort="none">
+                                <button type="button" class="demand-sort-btn" data-trigger="demand-sort"
+                                        data-sort-key="claimed" data-testid="demand-sort-claimed">
+                                    <span th:text="#{orders.demand.col.claimed}">Eintragungen</span>
+                                    <span class="demand-sort-indicator" aria-hidden="true"></span>
+                                </button>
+                            </th>
+                            <th class="num demand-sortable" data-sort-col="outstanding" aria-sort="none">
+                                <button type="button" class="demand-sort-btn" data-trigger="demand-sort"
+                                        data-sort-key="outstanding" data-testid="demand-sort-outstanding">
+                                    <span th:text="#{orders.demand.col.outstanding}">Offen</span>
+                                    <span class="demand-sort-indicator" aria-hidden="true"></span>
+                                </button>
+                            </th>
+                            <th class="demand-coverage-head" th:text="#{orders.demand.col.coverage}">Deckung</th>
                         </tr>
-                        <tr class="demand-orders-row" hidden th:data-bucket-orders="${bucketKey}">
-                            <td colspan="7" class="demand-orders-cell">
-                                <table class="data-table data-table--compact demand-orders-table">
-                                    <thead>
-                                    <tr>
-                                        <th th:text="#{orders.demand.orders.col.order}">Auftrag</th>
-                                        <th class="cell-status" th:text="#{orders.demand.orders.col.status}">Status</th>
-                                        <th class="num" th:text="#{orders.demand.col.required}">Bedarf</th>
-                                        <th class="num" th:text="#{orders.demand.col.booked}">Bestand</th>
-                                        <th class="num" th:text="#{orders.demand.col.claimed}">Eintragungen</th>
-                                    </tr>
-                                    </thead>
-                                    <tbody>
-                                    <tr th:each="share : ${row.orders()}" data-testid="demand-order-share">
-                                        <td>
-                                            <a th:href="@{/orders/{id}(id=${share.jobOrderId()})}"
-                                               th:text="'#' + ${share.displayId()}">#42</a>
-                                            <span class="order-kind-badge"
-                                                  th:classappend="${share.type() == 'ITEM'} ? 'order-kind-item' : 'order-kind-material'"
-                                                  th:text="${share.type() == 'ITEM'} ? #{orders.kind.item} : #{orders.kind.material}">Material</span>
-                                        </td>
-                                        <td class="cell-status">
-                                            <span class="status-pill"
-                                                  th:classappend="${'status-' + #strings.toLowerCase(share.status())}"
-                                                  th:text="#{__${'status.' + share.status()}__}">Offen</span>
-                                        </td>
-                                        <td class="num" th:attr="data-label=#{orders.demand.col.required}">
-                                            <th:block th:replace="~{fragments/material-amount :: amount(${share.requiredAmount()}, ${row.material().quantityType()})}" />
-                                        </td>
-                                        <td class="num" th:attr="data-label=#{orders.demand.col.booked}">
-                                            <th:block th:replace="~{fragments/material-amount :: amount(${share.bookedAmount()}, ${row.material().quantityType()})}" />
-                                        </td>
-                                        <td class="num" th:attr="data-label=#{orders.demand.col.claimed}">
-                                            <th:block th:replace="~{fragments/material-amount :: amount(${share.claimedAmount()}, ${row.material().quantityType()})}" />
-                                        </td>
-                                    </tr>
-                                    </tbody>
-                                </table>
-                            </td>
-                        </tr>
-                    </th:block>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                        <th:block th:each="row : ${group.materials()}"
+                                  th:with="bucketKey=${(group.orgUnit() != null ? group.orgUnit().id() : 'none') + '|' + row.material().id() + '|' + row.qualityRequirement()},
+                                           req=${row.requiredAmount() ?: 0.0},
+                                           bk=${row.bookedAmount() ?: 0.0},
+                                           cl=${row.claimedAmount() ?: 0.0},
+                                           bookedPct=${req > 0 ? (bk >= req ? 100.0 : bk * 100.0 / req) : 0.0},
+                                           coveredPct=${req > 0 ? (bk + cl >= req ? 100.0 : (bk + cl) * 100.0 / req) : 0.0}">
+                            <tr data-testid="demand-row" th:data-bucket-key="${bucketKey}"
+                                th:data-material-id="${row.material().id()}"
+                                th:data-material-name="${row.material().name()}"
+                                th:data-quality="${row.qualityRequirement()}"
+                                th:data-required="${row.requiredAmount()}"
+                                th:data-booked="${row.bookedAmount()}"
+                                th:data-claimed="${row.claimedAmount()}"
+                                th:data-outstanding="${row.outstandingAmount()}">
+                                <td>
+                                    <button type="button" class="btn btn-ghost demand-orders-toggle"
+                                            data-trigger="demand-toggle-orders"
+                                            th:data-bucket-key="${bucketKey}"
+                                            aria-expanded="false"
+                                            th:aria-label="#{orders.demand.orders.toggle}">
+                                        <span class="toggle-icon" aria-hidden="true">&#9654;</span>
+                                        <span class="cell-title" th:text="${row.material().name()}" th:title="${row.material().name()}">Titanium</span>
+                                        <span class="text-muted"
+                                              th:text="'(' + ${row.orders() != null ? row.orders().size() : 0} + ')'">(0)</span>
+                                    </button>
+                                </td>
+                                <td class="cell-status">
+                                    <th:block th:replace="~{fragments/quality-tier :: badge(${row.qualityTier()})}"></th:block>
+                                </td>
+                                <td class="num" data-testid="demand-required" th:attr="data-label=#{orders.demand.col.required}">
+                                    <th:block th:replace="~{fragments/material-amount :: amount(${row.requiredAmount()}, ${row.material().quantityType()})}" />
+                                </td>
+                                <td class="num" data-testid="demand-booked" th:attr="data-label=#{orders.demand.col.booked}">
+                                    <th:block th:replace="~{fragments/material-amount :: amount(${row.bookedAmount()}, ${row.material().quantityType()})}" />
+                                </td>
+                                <td class="num" data-testid="demand-claimed" th:attr="data-label=#{orders.demand.col.claimed}">
+                                    <th:block th:replace="~{fragments/material-amount :: amount(${row.claimedAmount()}, ${row.material().quantityType()})}" />
+                                </td>
+                                <td class="num demand-outstanding" data-testid="demand-outstanding"
+                                    th:attr="data-label=#{orders.demand.col.outstanding}"
+                                    th:classappend="${row.outstandingAmount() != null and row.outstandingAmount() <= 0} ? 'demand-covered' : ''">
+                                    <th:block th:replace="~{fragments/material-amount :: amount(${row.outstandingAmount()}, ${row.material().quantityType()})}" />
+                                </td>
+                                <td class="demand-coverage" data-testid="demand-coverage">
+                                    <span class="demand-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+                                          th:aria-valuenow="${#numbers.formatInteger(coveredPct, 1)}"
+                                          th:aria-label="#{orders.demand.coverage.aria(${#numbers.formatInteger(coveredPct, 1)})}"
+                                          th:title="#{orders.demand.coverage.aria(${#numbers.formatInteger(coveredPct, 1)})}">
+                                        <i class="demand-bar__booked" th:attr="data-krtm-width=${bookedPct}"></i>
+                                        <i class="demand-bar__claimed" th:attr="data-krtm-width=${coveredPct - bookedPct}"></i>
+                                    </span>
+                                    <span class="demand-bar__value" aria-hidden="true"
+                                          th:text="${#numbers.formatInteger(coveredPct, 1)} + ' %'">0 %</span>
+                                </td>
+                            </tr>
+                            <tr class="demand-orders-row" hidden th:data-bucket-orders="${bucketKey}">
+                                <td colspan="7" class="demand-orders-cell">
+                                    <table class="data-table data-table--compact demand-orders-table">
+                                        <thead>
+                                        <tr>
+                                            <th th:text="#{orders.demand.orders.col.order}">Auftrag</th>
+                                            <th class="cell-status" th:text="#{orders.demand.orders.col.status}">Status</th>
+                                            <th class="num" th:text="#{orders.demand.col.required}">Bedarf</th>
+                                            <th class="num" th:text="#{orders.demand.col.booked}">Bestand</th>
+                                            <th class="num" th:text="#{orders.demand.col.claimed}">Eintragungen</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr th:each="share : ${row.orders()}" data-testid="demand-order-share">
+                                            <td>
+                                                <a th:href="@{/orders/{id}(id=${share.jobOrderId()})}"
+                                                   th:text="'#' + ${share.displayId()}">#42</a>
+                                                <span class="order-kind-badge"
+                                                      th:classappend="${share.type() == 'ITEM'} ? 'order-kind-item' : 'order-kind-material'"
+                                                      th:text="${share.type() == 'ITEM'} ? #{orders.kind.item} : #{orders.kind.material}">Material</span>
+                                            </td>
+                                            <td class="cell-status">
+                                                <span class="status-pill"
+                                                      th:classappend="${'status-' + #strings.toLowerCase(share.status())}"
+                                                      th:text="#{__${'status.' + share.status()}__}">Offen</span>
+                                            </td>
+                                            <td class="num" th:attr="data-label=#{orders.demand.col.required}">
+                                                <th:block th:replace="~{fragments/material-amount :: amount(${share.requiredAmount()}, ${row.material().quantityType()})}" />
+                                            </td>
+                                            <td class="num" th:attr="data-label=#{orders.demand.col.booked}">
+                                                <th:block th:replace="~{fragments/material-amount :: amount(${share.bookedAmount()}, ${row.material().quantityType()})}" />
+                                            </td>
+                                            <td class="num" th:attr="data-label=#{orders.demand.col.claimed}">
+                                                <th:block th:replace="~{fragments/material-amount :: amount(${share.claimedAmount()}, ${row.material().quantityType()})}" />
+                                            </td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                </td>
+                            </tr>
+                        </th:block>
+                        </tbody>
+                    </table>
+                </div>
             </section>
 
             <div id="demandNoMatch" hidden data-testid="demand-no-match">
