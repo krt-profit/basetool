@@ -27,6 +27,20 @@ authorization chain, the scope predicate, the audited areas, the aggregates and 
   a submodule, so a worktree or a fresh machine may not have it. Never guess a path and never treat
   its absence as the rule not applying.
 
+## Module map — every class belongs to one target module
+
+The backend is being cut by domain (ADR-0231, `docs/DOMAIN_MODULARISATION_PLAN.md`). Until the
+domain packages exist, `src/test/resources/architecture/domain-map.txt` assigns every main class to
+its target module, first matching rule wins (REQ-MOD-001…005).
+
+- **A new class must match a rule.** `DomainMapTest` fails on an unassigned class, a dead rule, an
+  empty module and a duplicate simple name. Add an explicit `class` rule with its reason when no name
+  or package rule fits.
+- **The coupling baseline only shrinks.** `module-baseline/` freezes today's rank-violating class
+  edges. A new upward edge fails `ModuleBaselineTest`; when you remove one, a local test run shrinks
+  the file and CI refuses until the shrunk file is committed. Never add a security rule to a
+  baseline.
+
 ## Concurrency — read this before touching multi-step transactions
 
 The codebase has been bitten by optimistic-locking traps several times. The rules below exist

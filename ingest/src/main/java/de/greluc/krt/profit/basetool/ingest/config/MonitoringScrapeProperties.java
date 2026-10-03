@@ -50,8 +50,9 @@ public class MonitoringScrapeProperties {
 
   /**
    * Whether a complete scrape credential pair is configured. Only when this returns {@code true}
-   * does {@link MonitoringScrapeSecurityConfig} enable basic auth on {@code /actuator/prometheus};
-   * otherwise the endpoint denies all requests (fail-closed, REQ-OBS-005).
+   * does {@link de.greluc.krt.profit.basetool.ingest.assembly.MonitoringScrapeSecurityConfig}
+   * enable basic auth on {@code /actuator/prometheus}; otherwise the endpoint denies all requests
+   * (fail-closed, REQ-OBS-005).
    *
    * @return {@code true} when both {@link #username} and {@link #password} are non-blank
    */

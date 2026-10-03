@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.ingest.architecture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.ingest.service.HandoffStagingService;
+import de.greluc.krt.profit.basetool.ingest.handoff.HandoffStagingService;
 import de.greluc.krt.profit.basetool.testsupport.context.ContextShape;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

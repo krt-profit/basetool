@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-23.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
 > **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0213](../adr/0213-a-release-that-moves-the-provider-jar-costs-one-outage.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md)
 
 # Deployment delivery & promotion
@@ -417,7 +417,12 @@ the owner's decision of 2026-09-25). When the promoted `keycloak-spi` digest mov
    keycloak, the re-pinned app services, the units the config replaced — and, through `Requires=`,
    what requires them; then every stack unit is **started** in dependency order and waited for
    (`Notify=healthy`). Keycloak's start re-runs the provider build on the new JAR before backend
-   starts. **One health gate** covers the app images, the units and the JAR, and the run records
+   starts. **The edge starts right after keycloak, before backend, ingest and frontend**
+   (`db-backend db-keycloak redis keycloak edge backend ingest frontend acme`): the applications
+   fetch the issuer's discovery document through the public name, which the host alias routes
+   through haproxy to the edge, so an edge that the same window stopped and starts last fails every
+   application start with `Remote host terminated the handshake`. *(Corrected 2026-10-03: the edge
+   started last, which broke the testing host's jump from 1.10.0 to 1.13.6 twice.)* **One health gate** covers the app images, the units and the JAR, and the run records
    success only when every stack unit is healthy.
 
 If the gate fails, **everything the release changed is rolled back together** — the digest pin
@@ -2386,6 +2391,10 @@ the result onto the Dependabot branch.
 - **A digest that cannot be resolved is kept and warned about**, never dropped; the workflow never
   adds or removes a file.
 - **No `pull_request_target` or `workflow_run` trigger** is used for it.
+- **A Keycloak image bump to another minor is not completed automatically.** The follow-up does not
+  touch the version catalog, so `keycloak-version` (REQ-OPS-040) stays red until a human moves the
+  catalog's `keycloak` with it and the SPI is rebuilt and re-tested; a digest bump within the pinned
+  minor completes as above.
 
 **Acceptance**
 
@@ -2523,6 +2532,42 @@ what it guards:
 `frontend/…/i18n/I18nDictionaryCoverageTest` · `frontend/…/template/TemplateCommentHygieneTest` ·
 `frontend/…/DtoMirrorConsistencyTest` · `*/…/architecture/ContextShapeTest` ·
 `test-support/…/context/ContextShape` · **Related:** REQ-OPS-037
+
+### REQ-OPS-040 — The provider JAR is checked against the Keycloak that loads it
+
+`keycloak-spi` compiles against Keycloak's private SPIs at the catalog's `keycloak` version
+(`gradle/libs.versions.toml`) and is loaded by the image the stack pins as
+`quay.io/keycloak/keycloak:<tag>@sha256:…` in `docker-compose.yml`, `quadlet/systemd/keycloak.container`
+and `docker/sandbox/keycloak/Dockerfile`. Nothing else ties the two, and a provider that compiles
+but is not registered fails only at login, so both are checked at build time.
+
+- **One Keycloak line.** `scripts/check-keycloak-version.py` fails when an image tag differs from the
+  catalog version in major and minor (the repository pins a minor tag, `26.8`) or, for a tag pinned to
+  a patch, in any part; when a tag is neither form; when one of the three runtime pins disappears; and
+  when the pins disagree with each other in tag or digest. Documentation, CHANGELOGs and shell
+  self-tests are not pins. A Dependabot bump of the image to another minor therefore stays red until
+  the catalog moves with it and the SPI is rebuilt and re-tested against it; a digest bump within the
+  minor passes.
+- **Every registration loads.** `ServiceRegistrationsTest` reads the six files under
+  `keycloak-spi/src/main/resources/META-INF/services/` and fails when a file is missing or
+  unexpected, an entry does not resolve, does not implement the SPI interface it is registered for,
+  cannot be instantiated through its public no-arg constructor as the service loader does, or reports
+  another provider id than the realm and the backend use (`discord`, `discord-user-attribute-mapper`,
+  `discord-federated-identity-mapper`, `discord-guild-role-gate`, `krt-freemarker`,
+  `basetool-exchange`); it also asserts the `ServiceLoader` discovers each one.
+
+**Acceptance**
+
+- [x] `check-keycloak-version.py --selftest` breaks every rule once and passes on a clean fixture;
+  the check passes on the repository and fails when the catalog moves to `26.9.0` alone.
+- [x] `ServiceRegistrationsTest` passes on the module and its planted fixtures (missing class, wrong
+  type, no public no-arg constructor, changed provider id, missing and unexpected registration) each
+  yield exactly the expected problem; a services entry left on a moved class's old name fails it.
+
+**Enforced by:** `scripts/check-keycloak-version.py` · `repo-lint.yml` (`keycloak-version`) ·
+`keycloak-spi` `ServiceRegistrationsTest` · **Reference:** `docs/dependency-pins.md` (`keycloak`) ·
+**Related:** REQ-OPS-035 (the Dependabot compose follow-up), REQ-SEC-016 (the membership gate the
+authenticator registration carries), REQ-XCH-005, REQ-XCH-008
 
 ## Open questions
 
