@@ -9,19 +9,7 @@
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
 
-<header>
-    <nav>
-        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
-            <span></span>
-            <span></span>
-            <span></span>
-        </button>
-        <a th:href="@{/}" class="brand">
-            <img th:src="@{/logos/basetool-logo.svg}" alt="" height="50">
-            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
-        </a>
-    </nav>
-</header>
+<th:block th:replace="~{fragments/header :: header}" />
 
 <main>
     <span id="cac-i18n" hidden
