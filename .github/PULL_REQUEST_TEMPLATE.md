@@ -81,7 +81,7 @@ don't use "tests pass" as a stand-in.
 - [ ] `@Valid` on every `@RequestBody` (POST/PUT/PATCH); write DTOs carry Jakarta validation annotations.
 - [ ] List endpoints accept `Pageable` and return `PageResponse`; sort fields are limited via a **whitelist** in the service (no user input passed directly into `Sort`).
 - [ ] Timestamps as `Instant` / `OffsetDateTime` in UTC; timezone conversion happens exclusively in the display layer.
-- [ ] `backend/src/main/resources/api/openapi.json` is in sync with the controller changes.
+- [ ] `backend/src/main/resources/api/openapi.json` and `exchange-relay.openapi.json` are in sync with the controller changes.
 - [ ] New DB changes are provided as a `V<n>__<desc>.sql` Flyway migration; `ddl-auto` stays `validate`.
 - [ ] Destructive DB operations follow the two-phase pattern from `backend/src/main/resources/db/migration/README.md`.
 

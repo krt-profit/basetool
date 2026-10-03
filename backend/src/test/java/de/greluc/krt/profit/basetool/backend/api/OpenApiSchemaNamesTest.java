@@ -23,8 +23,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.config.ApiDomains;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,7 +33,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * Proves that every OpenAPI schema name belongs to exactly one exposed Java type, and that the
@@ -174,27 +171,23 @@ class OpenApiSchemaNamesTest {
   }
 
   /**
-   * Every exposed type the committed document names keeps that name: the explicit names chosen for
-   * the three former collisions are in the document.
-   *
-   * @throws IOException if the document cannot be read
+   * Every exposed type the committed documents name keeps that name: the explicit names chosen for
+   * the three former collisions are in the published or the relay document.
    */
   @Test
   @DisplayName("the formerly colliding schemas are documented under distinct names")
-  void theFormerCollisionsAreDocumentedApart() throws IOException {
-    try (InputStream in = OpenApiSchemaNamesTest.class.getResourceAsStream("/api/openapi.json")) {
-      JsonNode schemas = new ObjectMapper().readTree(in).path("components").path("schemas");
-      assertThat(schemas.propertyNames())
-          .contains(
-              "Op",
-              "ExchangeBlueprintOp",
-              "ExchangeShipOp",
-              "Provenance",
-              "ExchangeBlueprintProvenance",
-              "Skipped");
-      assertThat(schemas.path("Op").path("properties").has("expectedQuantity")).isTrue();
-      assertThat(schemas.path("ExchangeShipOp").path("properties").has("shipType")).isTrue();
-      assertThat(schemas.path("Provenance").path("properties").has("observedAt")).isTrue();
-    }
+  void theFormerCollisionsAreDocumentedApart() {
+    JsonNode schemas = CommittedOpenApi.merged().path("components").path("schemas");
+    assertThat(schemas.propertyNames())
+        .contains(
+            "Op",
+            "ExchangeBlueprintOp",
+            "ExchangeShipOp",
+            "Provenance",
+            "ExchangeBlueprintProvenance",
+            "Skipped");
+    assertThat(schemas.path("Op").path("properties").has("expectedQuantity")).isTrue();
+    assertThat(schemas.path("ExchangeShipOp").path("properties").has("shipType")).isTrue();
+    assertThat(schemas.path("Provenance").path("properties").has("observedAt")).isTrue();
   }
 }

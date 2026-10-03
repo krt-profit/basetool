@@ -613,7 +613,7 @@ audit found.
 | 0.4 Frontend guards — **done 2026-10-03** | G-13 … G-17; `ParallelPageLoader` on `ContextSnapshotFactory` (fixes the missing locale relay); the three kernel shapes (byte download with headers and per-call timeout, multipart upload, `Flux`) so the eleven bypassing controllers return to the kernel | Typed clients and the package move inherit whatever the kernel does |
 | 0.5 Exchange guards — **done 2026-10-03** | G-18; ingest re-package by concern (§5.11); keycloak-spi registrations test | The only contract that must not move |
 | 0.6 Build and CI guards — **done 2026-10-03** | G-20, G-21; `@SpringBootTest` profile unification (BLD-PERF-03, 191 of 231 classes carry `@ActiveProfiles("test")` although Gradle forces it) | Test-context count and coverage floors decide how painful every later step is |
-| 0.7 API machinery — **done 2026-10-03** except the app's re-read, which ships with basetool-android#209 | G-23 (the app's call list first, then the declared-break ledger), then G-08; one OpenAPI tag per domain; unique schema names; generator assertions; error-code registry; mandatory contract baseline on `main`; the app re-reads the version policy on resume and after an unexpected 404, shipped **before** the first cut (D-11) | The first hard-cut wave depends on all of it |
+| 0.7 API machinery — **done 2026-10-03** except the app's re-read, which ships with basetool-android#209 | G-23 (the app's call list first, then the declared-break ledger), then G-08; one OpenAPI tag per domain; unique schema names; generator assertions; error-code registry; mandatory contract baseline on `main`; the exchange fence (the relay surface in its own internal OpenAPI document, REQ-XCH-039); the app re-reads the version policy on resume and after an unexpected 404, shipped **before** the first cut (D-11) | The first hard-cut wave depends on all of it |
 
 ### 7.3 Phase 1 — behaviour-free inversions and re-homings
 
@@ -693,7 +693,8 @@ re-cut release is verified healthy — or, once the floor is release-bound (D-11
 Suggested order by risk and app impact: web-only moves first (admin sub-trees, notification rules,
 the demonstration ping), then identity and org units, mission, bank, job orders and the game-item
 catalogue, and the small rest (Materialbörse, hangar, refinery, typed settings). The T0 tier never
-moves; the exchange relay surface is fenced as its own internal OpenAPI document.
+moves; the exchange relay surface is fenced as its own internal OpenAPI document (done 2026-10-03,
+`exchange-relay.openapi.json`, REQ-XCH-039).
 
 ### 7.10 Effort
 

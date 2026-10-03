@@ -298,7 +298,7 @@ If you only need the stack to *start* (health checks, a UI smoke test that does 
 - **Security** — Spring Security with OAuth2 / OIDC (Keycloak 26.8)
 - **Frontend** — Thymeleaf + Spring Security OAuth2 Client, WebClient wrapped with Resilience4j (Timeout, Retry, CircuitBreaker, Bulkhead)
 - **Outbound HTTP in backend and ingest** — blocking `RestClient` on the JDK HTTP client; neither module carries WebFlux (ADR-0204)
-- **API docs** — SpringDoc / OpenAPI; each REST-serving module ships its committed contract as its documentation artifact — `backend/src/main/resources/api/openapi.json`, and for ingest `exchange-v1.openapi.json` (the exchange contract, also served anonymously at `/exchange/v1/openapi.json`)
+- **API docs** — SpringDoc / OpenAPI; each REST-serving module ships its committed contract as its documentation artifact — `backend/src/main/resources/api/openapi.json` (beside it the internal `exchange-relay.openapi.json`, the backend operations the gateway relays the exchange to, served to no one), and for ingest `exchange-v1.openapi.json` (the exchange contract, also served anonymously at `/exchange/v1/openapi.json`)
 - **DTO mapping** — MapStruct
 - **Containerization** — Docker Compose for local, test and E2E stacks; rootless Podman + Quadlet (generated from the compose files) in production; images published to GHCR, Cosign-signed with SLSA provenance + SBOM attestations, and additionally attested to GitHub's attestation store so provenance survives a registry-side rewrite (`gh attestation verify`, REQ-OPS-023)
 

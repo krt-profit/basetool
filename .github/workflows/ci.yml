@@ -52,6 +52,13 @@ jobs:
             echo "::error::$tag carries no backend openapi.json; the previous-release contract comparison is required (REQ-API-017)"
             exit 1
           fi
+          relay=backend/src/main/resources/api/exchange-relay.openapi.json
+          if git cat-file -e "$tag:$relay" 2>/dev/null; then
+            git show "$tag:$relay" > backend/build/contract-baseline/exchange-relay.openapi.json
+            echo "relay document in $tag: yes"
+          else
+            echo "relay document in $tag: no, its openapi.json carries the relay operations"
+          fi
           schemas=ingest/src/main/resources/exchange/v1/schemas
           mkdir -p ingest/build/exchange-baseline
           git ls-tree --name-only "$tag" "$schemas/" | while IFS= read -r file; do
@@ -65,10 +72,11 @@ jobs:
           CONTRACT_BASELINE_REQUIRED: 'true'
         run: ./gradlew build --continue --stacktrace --configuration-cache
 
-      - name: Fail if a committed openapi.json is stale
+      - name: Fail if a committed OpenAPI document is stale
         run: |
-          if ! git diff --exit-code --stat -- '*/src/main/resources/api/openapi.json'; then
-            echo "::error::openapi.json is stale -- run ./gradlew :backend:test --tests '*.OpenApiGeneratorTest' and commit the result"
+          if ! git diff --exit-code --stat -- '*/src/main/resources/api/openapi.json' \
+            backend/src/main/resources/api/exchange-relay.openapi.json; then
+            echo "::error::an OpenAPI document is stale -- run ./gradlew :backend:test --tests '*.OpenApiGeneratorTest' and commit the result"
             exit 1
           fi
 

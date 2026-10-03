@@ -31,6 +31,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Proves the generator's document assertions and the tier list parser able to fail, on planted
@@ -61,7 +62,25 @@ class OpenApiDocumentAssertionsTest {
         "tags": [{"name": "App"}],
         "paths": {
           "/api/v1/app/version-policy": {"get": {"tags": ["App", "admin-system"], "x-domain": "admin-system", "x-contract-tier": "T2", "security": []}},
-          "/api/v1/terms/document": {"get": {"tags": ["unassigned"], "x-domain": "unassigned", "x-contract-tier": "T1"}}
+          "/api/v1/terms/document": {"get": {"tags": ["unassigned"], "x-domain": "unassigned", "x-contract-tier": "T1"}},
+          "/api/v1/exchange/me/stock": {"get": {"tags": ["exchange"], "x-domain": "exchange", "x-contract-tier": "T2",
+            "responses": {"200": {"content": {"*/*": {"schema": {"$ref": "#/components/schemas/Gone"}}}}}}}
+        }
+      }
+      """;
+
+  /** A relay document with every relay-specific fault planted. */
+  private static final String BROKEN_RELAY =
+      """
+      {
+        "security": [{"bearer-jwt": []}],
+        "components": {"securitySchemes": {"bearer-jwt": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}}},
+        "tags": [{"name": "exchange"}, {"name": "identity"}],
+        "paths": {
+          "/api/v1/exchange/me/stock": {"get": {"tags": ["exchange"], "x-domain": "exchange", "x-contract-tier": "T0", "security": [],
+            "responses": {"200": {"content": {"*/*": {"schema": {"$ref": "#/components/schemas/Gone"}}}}}}},
+          "/api/v1/exchange/me/ships": {"get": {"tags": ["exchange"], "x-domain": "exchange", "x-contract-tier": "T2"}},
+          "/api/v1/terms/document": {"get": {"tags": ["identity"], "x-domain": "identity", "x-contract-tier": "T1"}}
         }
       }
       """;
@@ -96,7 +115,31 @@ class OpenApiDocumentAssertionsTest {
         .anySatisfy(problem -> assertThat(problem).contains("belongs to no known domain"))
         .anySatisfy(problem -> assertThat(problem).contains("contract tier 'T2', expected T0"))
         .anySatisfy(problem -> assertThat(problem).contains("tag list"))
-        .anySatisfy(problem -> assertThat(problem).contains("below its floor"));
+        .anySatisfy(problem -> assertThat(problem).contains("below its floor"))
+        .anySatisfy(problem -> assertThat(problem).contains("is an exchange relay path"))
+        .anySatisfy(problem -> assertThat(problem).contains("lacks the component"));
+  }
+
+  /** Every planted relay fault is reported, and a relay operation fewer fails the committed one. */
+  @Test
+  @DisplayName(
+      "a relay document with a foreign path, a wrong tier or count, or an anonymous op fails")
+  void everyPlantedRelayFaultIsReported() {
+    List<String> problems =
+        OpenApiDocumentAssertions.relayProblems(read(BROKEN_RELAY), ContractTiers.load());
+
+    assertThat(problems)
+        .anySatisfy(problem -> assertThat(problem).contains("is not an exchange relay path"))
+        .anySatisfy(problem -> assertThat(problem).contains("outside tier T0"))
+        .anySatisfy(problem -> assertThat(problem).contains("anonymous operations"))
+        .anySatisfy(problem -> assertThat(problem).contains("not exchange only"))
+        .anySatisfy(problem -> assertThat(problem).contains("expected exactly 14"))
+        .anySatisfy(problem -> assertThat(problem).contains("lacks the component"));
+
+    ObjectNode relay = (ObjectNode) CommittedOpenApi.relay().deepCopy();
+    ((ObjectNode) relay.path("paths")).remove("/api/v1/exchange/me/org-demand");
+    assertThat(OpenApiDocumentAssertions.relayProblems(relay, ContractTiers.load()))
+        .anySatisfy(problem -> assertThat(problem).contains("has 13 operations"));
   }
 
   /**

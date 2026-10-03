@@ -268,9 +268,11 @@ The [CI workflow](.github/workflows/ci.yml) runs `./gradlew build --continue
 SpotBugs, the frontend asset linters and JS type check, the full JUnit
 suite, and the JaCoCo coverage report. Reports are uploaded as workflow
 artefacts so reviewers can download them when investigating a failure.
-After a green build it fails the job when a committed `openapi.json` differs
-from the one the build just generated (`git diff --exit-code`): an API change
-must commit its regenerated document. **CI must be green before a PR merges** —
+After a green build it fails the job when a committed `openapi.json` or the
+backend's `exchange-relay.openapi.json` differs from the one the build just
+generated (`git diff --exit-code`); in CI the generator test already fails on a
+stale document instead of rewriting it. An API change must commit its
+regenerated documents. **CI must be green before a PR merges** —
 there is no "rerun until it passes" allowance.
 
 **The build scripts must stay configuration-cache compatible**, because CI

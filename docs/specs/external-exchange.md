@@ -2171,6 +2171,54 @@ request as it is.
 **Enforced by:** `ExchangeRefineryDraftRequestIdentityTest` · **Status:** implemented (plan guard
 G-18)
 
+### REQ-XCH-039 — The relay surface has its own internal OpenAPI document
+
+The backend operations the gateway relays to — the 14 operations under `/api/v1/exchange/**` —
+are described in their own committed document,
+`backend/src/main/resources/api/exchange-relay.openapi.json`, and in no other (ADR-0216, amendment
+of 2026-10-02). The published `openapi.json`, which the app vendors and the frontend generates its
+test types from, holds every other operation, so a per-domain diff, the frontend's generated types
+and `DtoOpenApiContractTest` never see the relay surface. The relay document is internal: it is
+never served to a client. The external contract stays the gateway's `exchange-v1.openapi.json`
+(REQ-XCH-011).
+
+- **One model, split.** `OpenApiGeneratorTest` fetches the one document springdoc generates and
+  splits it (`ExchangeFence`): the relay document takes the relay paths, every component they reach
+  and the security scheme; `openapi.json` keeps every other path and every component those still
+  reach. A component both reach is in both, identical. The runtime `/v3/api-docs` is unchanged: it
+  still describes the full model, ADMIN-only, and is switched off in production.
+- **Its own assertions.** Before writing, the generator requires of the relay document exactly the
+  14 relay operations, all of the `exchange` domain and tier `T0`, none anonymous, the `bearer-jwt`
+  scheme and requirement, and no dangling reference; of `openapi.json` no relay path and no dangling
+  reference (REQ-API-018).
+- **Its own staleness check.** Each document is compared with its committed file, line ends
+  ignored. Outside CI a stale file is rewritten; in CI (`CI=true`) the generator fails, naming the
+  file. CI's `git diff` step covers both files as well.
+- **The freeze reads both.** The `T0` tier check, the previous-release comparison
+  (REQ-API-017), the anonymous-operation check, the 429 header check and the API vhost's exchange
+  exclusion read the two documents joined. A previous release is compared together with its relay
+  document when it has one (CI fetches it beside `openapi.json`); a baseline that does not document
+  every `T0` operation fails instead of skipping them.
+
+**Acceptance**
+
+- [x] The relay document holds exactly the 14 relay operations and 64 schemas; `openapi.json` holds
+  none of them and the 48 schemas only they reach left it; the union of both is the generated
+  model. *`ExchangeFenceTest`, `OpenApiDocumentAssertionsTest`.*
+- [x] A stale relay document fails the generator in CI and is rewritten outside it — proven by
+  editing the committed file and running the generator with `CI=true`.
+  *`OpenApiGeneratorTest`, `ExchangeFenceTest.aStaleDocumentFailsOrIsRewritten`.*
+- [x] A field dropped from a relay answer since the previous release fails the release comparison;
+  a baseline without the relay document fails once `openapi.json` no longer carries it.
+  *`ExternalContractTest`.*
+- [x] Each guard proven able to fail: planted documents with a relay path in `openapi.json`, a
+  foreign path, a wrong tier, an anonymous operation, a missing operation and a dangling reference
+  in the relay document, two documents that disagree on a schema, and a baseline without its relay
+  document.
+
+**Enforced by:** `OpenApiGeneratorTest`, `ExchangeFenceTest`, `OpenApiDocumentAssertionsTest`,
+`ExternalContractTest` · **Status:** implemented (plan step 0.7, the exchange fence)
+
 ## Threat model
 
 | Threat | Countered by |

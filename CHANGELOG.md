@@ -4,6 +4,11 @@
 
 ### Added
 
+- **Eigenes internes OpenAPI-Dokument für die Exchange-Relay-Schnittstelle.** Die 14 Operationen
+  unter `/api/v1/exchange/**` stehen jetzt in `exchange-relay.openapi.json` mit eigener
+  Aktualitätsprüfung statt in `openapi.json`; der Vergleich mit dem letzten Release prüft beide
+  Dokumente. Keine Verhaltensänderung (REQ-XCH-039).
+
 - **Backend: Modulkarte und eingefrorene Modulkopplung (Guard G-09).** Eine Domain-Map ordnet jede
   Backend-Klasse einem der 26 Zielmodule zu; ein ArchUnit-`modules()`-Test friert die heutigen 138
   Kanten gegen die Rangordnung ein, neue scheitern. Spring Modulith 2.1.1 läuft nur im Testumfang

@@ -53,6 +53,7 @@ configure<com.diffplug.gradle.spotless.SpotlessExtension> {
       "**/src/test/**",
       "**/src/e2e/**",
       "backend/src/main/resources/api/openapi.json",
+      "backend/src/main/resources/api/exchange-relay.openapi.json",
       "**/docs/*-bom.json",
       "**/package.json",
       "**/package-lock.json",

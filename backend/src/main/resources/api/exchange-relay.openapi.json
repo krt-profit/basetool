@@ -1,0 +1,3297 @@
+{
+  "openapi" : "3.1.0",
+  "info" : {
+    "description" : "The backend operations the ingest gateway relays the exchange to. Internal: never served to a client; the external contract is the gateway's exchange-v1.openapi.json (ADR-0216).",
+    "title" : "KRT Basetool Backend exchange relay API (internal)",
+    "version" : "1.0"
+  },
+  "servers" : [ {
+    "url" : "http://localhost",
+    "description" : "Generated server url"
+  } ],
+  "security" : [ {
+    "bearer-jwt" : [ ]
+  } ],
+  "tags" : [ {
+    "name" : "exchange"
+  } ],
+  "paths" : {
+    "/api/v1/exchange/catalog/locations" : {
+      "get" : {
+        "description" : "Gateway-only. The non-hidden locations with their UEX city or space station, for any exchange capability.",
+        "operationId" : "locations",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeLocationListDto"
+                }
+              }
+            },
+            "description" : "The locations",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: no-cache, must-revalidate",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: the Lager's locations",
+        "tags" : [ "exchange" ],
+        "x-contract-tier" : "T0",
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/exchange/catalog/resolve" : {
+      "post" : {
+        "description" : "Gateway-only. Resolves each reference to one blueprint product, item, material or ship type, to several candidates, or to nothing; blueprint names go through the web import's matching.",
+        "operationId" : "resolve",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExchangeResolveRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeResolveResponse"
+                }
+              }
+            },
+            "description" : "One result per reference"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: resolve item references",
+        "tags" : [ "exchange" ],
+        "x-contract-tier" : "T0",
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/exchange/me/account-check" : {
+      "post" : {
+        "description" : "Gateway-only. The handle is compared, never returned, logged or stored.",
+        "operationId" : "check",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExchangeAccountCheckRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeAccountCheckDto"
+                }
+              }
+            },
+            "description" : "The answer"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: does this RSI handle belong to the member",
+        "tags" : [ "exchange" ],
+        "x-contract-tier" : "T0",
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/exchange/me/blueprints" : {
+      "get" : {
+        "description" : "Gateway-only. Without a cursor a snapshot, with one the changes since it.",
+        "operationId" : "blueprints_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "cursor",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 500
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeBlueprintPageDto"
+                }
+              }
+            },
+            "description" : "The page",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "410" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeBlueprintPageDto"
+                }
+              }
+            },
+            "description" : "The cursor has expired (CURSOR_EXPIRED)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: my blueprints and their changes",
+        "tags" : [ "exchange" ],
+        "x-contract-tier" : "T0",
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/exchange/me/blueprints/changes" : {
+      "post" : {
+        "description" : "Gateway-only. 409 MASS_CHANGE_CONFIRMATION_REQUIRED writes nothing.",
+        "operationId" : "blueprintChanges",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExchangeBlueprintChangeSet"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeChangeResultDto"
+                }
+              }
+            },
+            "description" : "The result"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: add or remove my blueprints",
+        "tags" : [ "exchange" ],
+        "x-contract-tier" : "T0",
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/exchange/me/drafts/blueprints" : {
+      "post" : {
+        "description" : "Gateway-only. Resolves the references and previews them as an upload would.",
+        "operationId" : "blueprints",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExchangeBlueprintDraftDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BlueprintImportPreviewDto"
+                }
+              }
+            },
+            "description" : "The preview"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: preview blueprints for review",
+        "tags" : [ "exchange" ],
+        "x-contract-tier" : "T0",
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/exchange/me/drafts/refinery-orders" : {
+      "post" : {
+        "description" : "Gateway-only. The same draft the extractor's upload builds.",
+        "operationId" : "refineryOrders",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExchangeRefineryDraftRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RefineryImportDraftDto"
+                }
+              }
+            },
+            "description" : "The draft"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: build a refinery draft for review",
+        "tags" : [ "exchange" ],
+        "x-contract-tier" : "T0",
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/exchange/me/installation" : {
+      "get" : {
+        "description" : "Gateway-only.",
+        "operationId" : "current",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeInstallationDto"
+                }
+              }
+            },
+            "description" : "The installation",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: the calling installation",
+        "tags" : [ "exchange" ],
+        "x-contract-tier" : "T0",
+        "x-domain" : "exchange"
+      },
+      "post" : {
+        "description" : "Gateway-only. The label is never logged or audited.",
+        "operationId" : "label",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExchangeInstallationLabelRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeInstallationDto"
+                }
+              }
+            },
+            "description" : "The labelled installation"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: label the calling installation",
+        "tags" : [ "exchange" ],
+        "x-contract-tier" : "T0",
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/exchange/me/org-demand" : {
+      "get" : {
+        "description" : "Gateway-only. Anonymised: no names, titles, free text or per-order figures.",
+        "operationId" : "orgDemand",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeOrgDemandDto"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: the open demand of my units",
+        "tags" : [ "exchange" ],
+        "x-contract-tier" : "T0",
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/exchange/me/ships" : {
+      "get" : {
+        "description" : "Gateway-only. Without a cursor a snapshot, with one the changes since it.",
+        "operationId" : "ships",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "cursor",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 500
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeShipPageDto"
+                }
+              }
+            },
+            "description" : "The page",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "410" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeShipPageDto"
+                }
+              }
+            },
+            "description" : "The cursor has expired (CURSOR_EXPIRED)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: my ships and their changes",
+        "tags" : [ "exchange" ],
+        "x-contract-tier" : "T0",
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/exchange/me/ships/changes" : {
+      "post" : {
+        "description" : "Gateway-only. 409 MASS_CHANGE_CONFIRMATION_REQUIRED writes nothing.",
+        "operationId" : "shipChanges",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExchangeShipChangeSet"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeChangeResultDto"
+                }
+              }
+            },
+            "description" : "The result"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: change my ships",
+        "tags" : [ "exchange" ],
+        "x-contract-tier" : "T0",
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/exchange/me/stock" : {
+      "get" : {
+        "description" : "Gateway-only. Without a cursor a snapshot, with one the changes since it.",
+        "operationId" : "stock",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "cursor",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 500
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeStockPageDto"
+                }
+              }
+            },
+            "description" : "The page",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "410" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeStockPageDto"
+                }
+              }
+            },
+            "description" : "The cursor has expired (CURSOR_EXPIRED)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: my stock lots and their changes",
+        "tags" : [ "exchange" ],
+        "x-contract-tier" : "T0",
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/exchange/me/stock/changes" : {
+      "post" : {
+        "description" : "Gateway-only. 409 MASS_CHANGE_CONFIRMATION_REQUIRED writes nothing.",
+        "operationId" : "stockChanges",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExchangeStockChangeSet"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeChangeResultDto"
+                }
+              }
+            },
+            "description" : "The result"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: set my stock lots",
+        "tags" : [ "exchange" ],
+        "x-contract-tier" : "T0",
+        "x-domain" : "exchange"
+      }
+    }
+  },
+  "components" : {
+    "headers" : {
+      "Retry-After" : {
+        "description" : "Whole seconds to wait before the next call.",
+        "schema" : {
+          "type" : "integer",
+          "format" : "int64"
+        }
+      },
+      "X-Rate-Limit-Limit" : {
+        "description" : "The capacity of the budget that refused the call.",
+        "schema" : {
+          "type" : "integer",
+          "format" : "int64"
+        }
+      },
+      "X-Rate-Limit-Remaining" : {
+        "description" : "The tokens left in that budget; 0 on a refusal.",
+        "schema" : {
+          "type" : "integer",
+          "format" : "int64"
+        }
+      },
+      "X-Rate-Limit-Retry-After-Seconds" : {
+        "description" : "The same wait as Retry-After.",
+        "schema" : {
+          "type" : "integer",
+          "format" : "int64"
+        }
+      }
+    },
+    "schemas" : {
+      "BlueprintImportEntryDto" : {
+        "type" : "object",
+        "properties" : {
+          "externalName" : {
+            "type" : "string"
+          },
+          "outputItemId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "productKey" : {
+            "type" : "string"
+          },
+          "productName" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "MATCHED", "MATCHED_BY_ALIAS", "SUGGESTED", "UNMATCHED", "ALREADY_OWNED" ]
+          },
+          "suggestedAcquiredAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "suggestions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintImportSuggestionDto"
+            }
+          }
+        }
+      },
+      "BlueprintImportPreviewDto" : {
+        "type" : "object",
+        "properties" : {
+          "alreadyOwned" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "entries" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintImportEntryDto"
+            }
+          },
+          "matched" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "matchedByAlias" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "suggested" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "unmatched" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "BlueprintImportSuggestionDto" : {
+        "type" : "object",
+        "properties" : {
+          "productKey" : {
+            "type" : "string"
+          },
+          "productName" : {
+            "type" : "string"
+          },
+          "score" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        }
+      },
+      "Entry" : {
+        "type" : "object",
+        "properties" : {
+          "bt" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ExchangeAccountCheckDto" : {
+        "type" : "object",
+        "properties" : {
+          "result" : {
+            "type" : "string",
+            "enum" : [ "match", "mismatch", "unknown" ]
+          }
+        }
+      },
+      "ExchangeAccountCheckRequest" : {
+        "type" : "object",
+        "properties" : {
+          "handle" : {
+            "type" : "string",
+            "pattern" : "^[A-Za-z0-9_-]{3,60}$"
+          }
+        },
+        "required" : [ "handle" ]
+      },
+      "ExchangeBlueprintChangeSet" : {
+        "type" : "object",
+        "properties" : {
+          "dryRun" : {
+            "type" : "boolean"
+          },
+          "ops" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeBlueprintOp"
+            },
+            "maxItems" : 500,
+            "minItems" : 1
+          }
+        },
+        "required" : [ "ops" ]
+      },
+      "ExchangeBlueprintDraftDto" : {
+        "type" : "object",
+        "properties" : {
+          "format" : {
+            "type" : "string",
+            "pattern" : "^basetool\\.blueprints$"
+          },
+          "formatVersion" : {
+            "type" : "string",
+            "pattern" : "^1\\.[0-9]+$"
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Item"
+            },
+            "maxItems" : 2000,
+            "minItems" : 0
+          }
+        },
+        "required" : [ "format", "items" ]
+      },
+      "ExchangeBlueprintDto" : {
+        "type" : "object",
+        "properties" : {
+          "acquiredAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "isDefault" : {
+            "type" : "boolean"
+          },
+          "key" : {
+            "type" : "string"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "provenance" : {
+            "$ref" : "#/components/schemas/ExchangeBlueprintProvenance"
+          },
+          "ref" : {
+            "$ref" : "#/components/schemas/ExchangeItemRefDto"
+          }
+        }
+      },
+      "ExchangeBlueprintOp" : {
+        "type" : "object",
+        "properties" : {
+          "acquiredAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "key" : {
+            "type" : "string",
+            "maxLength" : 128,
+            "minLength" : 1
+          },
+          "op" : {
+            "type" : "string",
+            "pattern" : "^(add|remove)$"
+          },
+          "opId" : {
+            "type" : "string",
+            "maxLength" : 64,
+            "minLength" : 1
+          },
+          "override" : {
+            "type" : "boolean"
+          },
+          "provenance" : {
+            "$ref" : "#/components/schemas/Provenance"
+          },
+          "ref" : {
+            "$ref" : "#/components/schemas/ExchangeItemRef"
+          }
+        },
+        "required" : [ "op" ]
+      },
+      "ExchangeBlueprintPageDto" : {
+        "type" : "object",
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeBlueprintDto"
+            }
+          },
+          "nextCursor" : {
+            "type" : "string"
+          },
+          "removed" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeTombstoneDto"
+            }
+          }
+        }
+      },
+      "ExchangeBlueprintProvenance" : {
+        "type" : "object",
+        "properties" : {
+          "source" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ExchangeChangeResultDto" : {
+        "type" : "object",
+        "properties" : {
+          "applied" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "detachedFromMissions" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "dryRun" : {
+            "type" : "boolean"
+          },
+          "notApplied" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "offersReduced" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "offersRemoved" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "results" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OpResult"
+            }
+          },
+          "unchanged" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "ExchangeDemandItemDto" : {
+        "type" : "object",
+        "properties" : {
+          "craftableByMe" : {
+            "type" : "boolean"
+          },
+          "item" : {
+            "$ref" : "#/components/schemas/ExchangeItemRefDto"
+          },
+          "openQuantity" : {
+            "$ref" : "#/components/schemas/ExchangeQuantityDto"
+          }
+        }
+      },
+      "ExchangeDemandMaterialDto" : {
+        "type" : "object",
+        "properties" : {
+          "material" : {
+            "$ref" : "#/components/schemas/ExchangeItemRefDto"
+          },
+          "minQuality" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "openQuantity" : {
+            "$ref" : "#/components/schemas/ExchangeQuantityDto"
+          },
+          "rawRefs" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeItemRefDto"
+            }
+          },
+          "source" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ExchangeInstallationDto" : {
+        "type" : "object",
+        "properties" : {
+          "firstSeenAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "installationId" : {
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "lastSeenAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ExchangeInstallationLabelRequest" : {
+        "type" : "object",
+        "properties" : {
+          "label" : {
+            "type" : "string",
+            "maxLength" : 40,
+            "minLength" : 1
+          }
+        },
+        "required" : [ "label" ]
+      },
+      "ExchangeInsuranceDto" : {
+        "type" : "object",
+        "properties" : {
+          "kind" : {
+            "type" : "string"
+          },
+          "months" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "ExchangeItemRef" : {
+        "type" : "object",
+        "properties" : {
+          "bt" : {
+            "type" : "string",
+            "maxLength" : 128,
+            "minLength" : 1
+          },
+          "locKey" : {
+            "type" : "string",
+            "maxLength" : 200,
+            "minLength" : 1,
+            "pattern" : "^[^@\\s]+$"
+          },
+          "name" : {
+            "type" : "string",
+            "maxLength" : 200,
+            "minLength" : 1
+          },
+          "nameLocale" : {
+            "type" : "string",
+            "pattern" : "^[a-z]{2}(-[A-Z]{2})?$"
+          },
+          "scGuid" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "scRecord" : {
+            "type" : "string",
+            "maxLength" : 200,
+            "minLength" : 1
+          },
+          "uexId" : {
+            "type" : "integer",
+            "format" : "int32",
+            "exclusiveMinimum" : 0
+          }
+        }
+      },
+      "ExchangeItemRefDto" : {
+        "type" : "object",
+        "properties" : {
+          "bt" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ExchangeLocationDto" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "uex" : {
+            "$ref" : "#/components/schemas/UexRef"
+          }
+        }
+      },
+      "ExchangeLocationListDto" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeLocationDto"
+            }
+          }
+        }
+      },
+      "ExchangeLocationRef" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "maxLength" : 200,
+            "minLength" : 1
+          },
+          "uex" : {
+            "$ref" : "#/components/schemas/Uex"
+          }
+        }
+      },
+      "ExchangeMaterialKindDto" : {
+        "type" : "object",
+        "properties" : {
+          "buyable" : {
+            "type" : "boolean"
+          },
+          "commodity" : {
+            "type" : "boolean"
+          },
+          "harvestable" : {
+            "type" : "boolean"
+          },
+          "mineral" : {
+            "type" : "boolean"
+          },
+          "raw" : {
+            "type" : "boolean"
+          },
+          "refined" : {
+            "type" : "boolean"
+          },
+          "sellable" : {
+            "type" : "boolean"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ExchangeOrgDemandDto" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeDemandItemDto"
+            }
+          },
+          "materials" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeDemandMaterialDto"
+            }
+          },
+          "reason" : {
+            "type" : "string",
+            "enum" : [ "NOT_PERMITTED" ]
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ExchangeQuantityDto" : {
+        "type" : "object",
+        "properties" : {
+          "amount" : {
+            "type" : "number"
+          },
+          "unit" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ExchangeRefineryDraftGood" : {
+        "type" : "object",
+        "properties" : {
+          "confidence" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0,
+            "minimum" : 0.0
+          },
+          "inputQuantity" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 0
+          },
+          "outputQuantity" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 0
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "rawMaterialName" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "refine" : {
+            "type" : "boolean"
+          },
+          "rowIndex" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 0
+          },
+          "sourceImage" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "inputQuantity", "rawMaterialName", "refine" ]
+      },
+      "ExchangeRefineryDraftImage" : {
+        "type" : "object",
+        "properties" : {
+          "capturedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "cropMode" : {
+            "type" : "string",
+            "maxLength" : 32,
+            "minLength" : 0
+          },
+          "height" : {
+            "type" : "integer",
+            "format" : "int32",
+            "exclusiveMinimum" : 0
+          },
+          "name" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "width" : {
+            "type" : "integer",
+            "format" : "int32",
+            "exclusiveMinimum" : 0
+          }
+        },
+        "required" : [ "name" ]
+      },
+      "ExchangeRefineryDraftOrder" : {
+        "type" : "object",
+        "properties" : {
+          "durationMinutes" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          },
+          "expenses" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0E9,
+            "minimum" : 0
+          },
+          "goods" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeRefineryDraftGood"
+            },
+            "maxItems" : 100,
+            "minItems" : 0
+          },
+          "layoutConfidence" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0,
+            "minimum" : 0.0
+          },
+          "panelType" : {
+            "type" : "string",
+            "maxLength" : 32,
+            "minLength" : 0
+          },
+          "quoted" : {
+            "type" : "boolean"
+          },
+          "rawInManifestTotal" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          },
+          "rawLocationName" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "rawMethodName" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "rawToRefineTotal" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          },
+          "sourceImages" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeRefineryDraftImage"
+            },
+            "maxItems" : 50,
+            "minItems" : 0
+          },
+          "totalYieldScu" : {
+            "type" : "number",
+            "format" : "double",
+            "minimum" : 0
+          }
+        },
+        "required" : [ "goods", "panelType", "sourceImages" ]
+      },
+      "ExchangeRefineryDraftRequest" : {
+        "type" : "object",
+        "properties" : {
+          "clientLanguage" : {
+            "type" : "string",
+            "maxLength" : 16,
+            "minLength" : 0
+          },
+          "generatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "model" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
+          },
+          "orders" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeRefineryDraftOrder"
+            },
+            "maxItems" : 5,
+            "minItems" : 0
+          },
+          "schemaVersion" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "tool" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
+          },
+          "toolVersion" : {
+            "type" : "string",
+            "maxLength" : 50,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "orders", "schemaVersion" ]
+      },
+      "ExchangeRemovedByDto" : {
+        "type" : "object",
+        "properties" : {
+          "channel" : {
+            "type" : "string"
+          },
+          "clientId" : {
+            "type" : "string"
+          },
+          "installationId" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ExchangeResolveRequest" : {
+        "type" : "object",
+        "properties" : {
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "BLUEPRINT", "ITEM", "MATERIAL", "SHIP_TYPE" ]
+          },
+          "refs" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeItemRef"
+            },
+            "maxItems" : 500,
+            "minItems" : 1
+          }
+        },
+        "required" : [ "kind", "refs" ]
+      },
+      "ExchangeResolveResponse" : {
+        "type" : "object",
+        "properties" : {
+          "results" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Result"
+            }
+          },
+          "warnings" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Warning"
+            }
+          }
+        }
+      },
+      "ExchangeShipChangeSet" : {
+        "type" : "object",
+        "properties" : {
+          "dryRun" : {
+            "type" : "boolean"
+          },
+          "ops" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeShipOp"
+            },
+            "maxItems" : 500,
+            "minItems" : 1
+          }
+        },
+        "required" : [ "ops" ]
+      },
+      "ExchangeShipDto" : {
+        "type" : "object",
+        "properties" : {
+          "externalId" : {
+            "type" : "string"
+          },
+          "fitted" : {
+            "type" : "boolean"
+          },
+          "insurance" : {
+            "$ref" : "#/components/schemas/ExchangeInsuranceDto"
+          },
+          "location" : {
+            "$ref" : "#/components/schemas/ExchangeLocationDto"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "shipId" : {
+            "type" : "string"
+          },
+          "shipType" : {
+            "$ref" : "#/components/schemas/ExchangeItemRefDto"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "ExchangeShipOp" : {
+        "type" : "object",
+        "properties" : {
+          "externalId" : {
+            "type" : "string",
+            "maxLength" : 128,
+            "minLength" : 1
+          },
+          "fitted" : {
+            "type" : "boolean"
+          },
+          "insurance" : {
+            "$ref" : "#/components/schemas/Insurance"
+          },
+          "location" : {
+            "$ref" : "#/components/schemas/ExchangeLocationRef"
+          },
+          "name" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          },
+          "op" : {
+            "type" : "string",
+            "pattern" : "^(link|upsert|remove)$"
+          },
+          "opId" : {
+            "type" : "string",
+            "maxLength" : 64,
+            "minLength" : 1
+          },
+          "override" : {
+            "type" : "boolean"
+          },
+          "shipId" : {
+            "type" : "string",
+            "maxLength" : 128,
+            "minLength" : 1
+          },
+          "shipType" : {
+            "$ref" : "#/components/schemas/ExchangeItemRef"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          }
+        },
+        "required" : [ "op" ]
+      },
+      "ExchangeShipPageDto" : {
+        "type" : "object",
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeShipDto"
+            }
+          },
+          "nextCursor" : {
+            "type" : "string"
+          },
+          "removed" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeTombstoneDto"
+            }
+          }
+        }
+      },
+      "ExchangeStockChangeSet" : {
+        "type" : "object",
+        "properties" : {
+          "dryRun" : {
+            "type" : "boolean"
+          },
+          "ops" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Op"
+            },
+            "maxItems" : 500,
+            "minItems" : 1
+          }
+        },
+        "required" : [ "ops" ]
+      },
+      "ExchangeStockLotDto" : {
+        "type" : "object",
+        "properties" : {
+          "key" : {
+            "type" : "string"
+          },
+          "location" : {
+            "$ref" : "#/components/schemas/ExchangeLocationDto"
+          },
+          "material" : {
+            "$ref" : "#/components/schemas/ExchangeItemRefDto"
+          },
+          "materialKind" : {
+            "$ref" : "#/components/schemas/ExchangeMaterialKindDto"
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "quantity" : {
+            "$ref" : "#/components/schemas/ExchangeQuantityDto"
+          },
+          "stolen" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "ExchangeStockPageDto" : {
+        "type" : "object",
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeStockLotDto"
+            }
+          },
+          "nextCursor" : {
+            "type" : "string"
+          },
+          "removed" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeTombstoneDto"
+            }
+          }
+        }
+      },
+      "ExchangeTombstoneDto" : {
+        "type" : "object",
+        "properties" : {
+          "key" : {
+            "type" : "string"
+          },
+          "removedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "removedBy" : {
+            "$ref" : "#/components/schemas/ExchangeRemovedByDto"
+          }
+        }
+      },
+      "ImportIssueDto" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "enum" : [ "UNMATCHED_MATERIAL", "LOW_CONFIDENCE_MATERIAL", "NO_REFINED_MATERIAL", "OUT_OF_RANGE_QUALITY", "UNRESOLVED_LOCATION", "UNRESOLVED_METHOD", "SKIPPED_REFINE_OFF", "SKIPPED_ZERO_QTY", "UNQUOTED_ROW", "UNQUOTED_ORDER", "SUM_MISMATCH", "MULTIPLE_ORDERS_TRUNCATED", "UNSUPPORTED_PANEL_TYPE" ]
+          },
+          "confidence" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "field" : {
+            "type" : "string"
+          },
+          "rawValue" : {
+            "type" : "string"
+          },
+          "severity" : {
+            "type" : "string",
+            "enum" : [ "BLOCKING", "WARNING", "INFO" ]
+          },
+          "suggestions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ImportSuggestionDto"
+            }
+          }
+        }
+      },
+      "ImportSuggestionDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "score" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        }
+      },
+      "Insurance" : {
+        "type" : "object",
+        "properties" : {
+          "kind" : {
+            "type" : "string",
+            "pattern" : "^(LTI|MONTHS)$"
+          },
+          "months" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 120,
+            "minimum" : 0
+          }
+        },
+        "required" : [ "kind" ]
+      },
+      "Item" : {
+        "type" : "object",
+        "properties" : {
+          "acquiredAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "ref" : {
+            "$ref" : "#/components/schemas/ExchangeItemRef"
+          }
+        },
+        "required" : [ "ref" ]
+      },
+      "LocationDto" : {
+        "type" : "object",
+        "properties" : {
+          "description" : {
+            "type" : "string"
+          },
+          "hidden" : {
+            "type" : "boolean"
+          },
+          "homeLocation" : {
+            "type" : "boolean"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "MaterialCategoryDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "MaterialDto" : {
+        "type" : "object",
+        "properties" : {
+          "category" : {
+            "$ref" : "#/components/schemas/MaterialCategoryDto"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "isIllegal" : {
+            "type" : "boolean"
+          },
+          "isJobOrder" : {
+            "type" : "boolean"
+          },
+          "isManualEntry" : {
+            "type" : "boolean"
+          },
+          "isManualRawMaterial" : {
+            "type" : "boolean"
+          },
+          "isVisible" : {
+            "type" : "boolean"
+          },
+          "isVolatileQt" : {
+            "type" : "boolean"
+          },
+          "isVolatileTime" : {
+            "type" : "boolean"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "quantityType" : {
+            "type" : "string"
+          },
+          "refinedMaterial" : {
+            "$ref" : "#/components/schemas/MaterialDto"
+          },
+          "type" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "MissionReferenceDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "plannedStartTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        }
+      },
+      "Op" : {
+        "type" : "object",
+        "properties" : {
+          "expectedQuantity" : {
+            "$ref" : "#/components/schemas/Quantity"
+          },
+          "location" : {
+            "$ref" : "#/components/schemas/ExchangeLocationRef"
+          },
+          "material" : {
+            "$ref" : "#/components/schemas/ExchangeItemRef"
+          },
+          "op" : {
+            "type" : "string",
+            "pattern" : "^set-quantity$"
+          },
+          "opId" : {
+            "type" : "string",
+            "maxLength" : 64,
+            "minLength" : 1
+          },
+          "override" : {
+            "type" : "boolean"
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 1000,
+            "minimum" : 0
+          },
+          "quantity" : {
+            "$ref" : "#/components/schemas/Quantity"
+          },
+          "stolen" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "expectedQuantity", "location", "material", "op", "quality", "quantity", "stolen" ]
+      },
+      "OpResult" : {
+        "type" : "object",
+        "properties" : {
+          "index" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "opId" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "result" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ProblemDetail" : {
+        "type" : "object",
+        "description" : "An RFC 7807 problem. code is the stable, machine-readable reason; a client compares it, never the localized title or detail.",
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "description" : "The stable reason, one of the values in x-problem-codes (registry CoreProblemCode, REQ-API-019). The exchange operations under /api/v1/exchange answer the codes of the frozen exchange contract instead (ExchangeProblemException). The list grows; a client treats an unknown code by its status.",
+            "x-problem-codes" : [ "OPTIMISTIC_LOCK", "PESSIMISTIC_LOCK", "ACCESS_DENIED", "UNAUTHENTICATED", "VALIDATION_FAILED", "CONSTRAINT_VIOLATION", "DUPLICATE_ENTITY", "ILLEGAL_ARGUMENT", "BAD_REQUEST", "TYPE_MISMATCH", "DATA_INTEGRITY_VIOLATION", "NOT_FOUND", "METHOD_NOT_ALLOWED", "UNSUPPORTED_MEDIA_TYPE", "NOT_ACCEPTABLE", "INTERNAL_ERROR", "BUSINESS_CONFLICT", "OVER_ALLOCATION", "PRODUCTION_ALLOCATION", "OWNER_ORG_UNIT_REQUIRED", "MISSION_PARTICIPANT_REQUIRED", "ENTITY_IN_USE", "EXTERNAL_SERVICE_ERROR", "REPORT_GENERATION_FAILED", "BANK_OVERDRAFT", "BANK_HOLDER_OVERDRAFT", "BANK_ACCOUNT_NOT_EMPTY", "BANK_ACCOUNT_CLOSED", "BANK_GRANTEE_MISSING_ROLE", "BANK_SELF_TRANSFER", "BANK_ALREADY_REVERSED", "BANK_HOLDER_INACTIVE", "BANK_NOT_REVERSIBLE", "BANK_REQUEST_NOT_PENDING", "BANK_REQUEST_ALREADY_APPROVED", "BANK_ACCOUNT_HAS_PENDING_REQUESTS", "BANK_OWNER_APPROVAL_REQUIRED", "BANK_CARTEL_APPROVAL_REQUIRED", "BANK_SPLIT_NO_TARGETS", "BANK_SPLIT_TOO_SMALL", "BANK_JUSTIFICATION_REQUIRED", "BANK_FEE_EXCEEDS_AMOUNT", "TERMS_NOT_ACCEPTED", "PENDING_APPROVAL", "NO_ROLE", "ACTING_MEMBER_REFUSED", "SERVICE_UNAVAILABLE", "RATE_LIMIT_EXCEEDED", "REQUEST_BODY_TOO_LARGE", "APP_UPDATE_REQUIRED" ]
+          },
+          "correlationId" : {
+            "type" : "string",
+            "description" : "Finds the request in the server log."
+          },
+          "detail" : {
+            "type" : "string"
+          },
+          "errors" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "Validation failures as field to message; see fieldErrors."
+          },
+          "fieldErrors" : {
+            "type" : "array",
+            "description" : "Validation failures, one per field or parameter (VALIDATION_FAILED, CONSTRAINT_VIOLATION).",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "field" : {
+                  "type" : "string",
+                  "description" : "The field or parameter path."
+                },
+                "message" : {
+                  "type" : "string",
+                  "description" : "The localized message."
+                }
+              }
+            }
+          },
+          "instance" : {
+            "type" : "string",
+            "format" : "uri"
+          },
+          "status" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string",
+            "format" : "uri"
+          }
+        }
+      },
+      "Provenance" : {
+        "type" : "object",
+        "properties" : {
+          "observedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "source" : {
+            "type" : "string",
+            "pattern" : "^(log|manual|import|default|other)$"
+          }
+        },
+        "required" : [ "source" ]
+      },
+      "Quantity" : {
+        "type" : "object",
+        "properties" : {
+          "amount" : {
+            "type" : "number",
+            "maximum" : 1000000000,
+            "minimum" : 0
+          },
+          "unit" : {
+            "type" : "string",
+            "pattern" : "^(SCU|PIECE)$"
+          }
+        },
+        "required" : [ "amount", "unit" ]
+      },
+      "RefineryGoodDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "inputMaterial" : {
+            "$ref" : "#/components/schemas/MaterialDto"
+          },
+          "inputQuantity" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 1
+          },
+          "outputMaterial" : {
+            "$ref" : "#/components/schemas/MaterialDto"
+          },
+          "outputQuantity" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 1
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "yieldBonusPercent" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        },
+        "required" : [ "inputMaterial", "inputQuantity", "outputQuantity" ]
+      },
+      "RefineryImportDraftDto" : {
+        "type" : "object",
+        "properties" : {
+          "goodsMatched" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "goodsTotal" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "issues" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ImportIssueDto"
+            }
+          },
+          "order" : {
+            "$ref" : "#/components/schemas/RefineryOrderDto"
+          },
+          "rowsSkipped" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "RefineryOrderDto" : {
+        "type" : "object",
+        "properties" : {
+          "durationMinutes" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          },
+          "expenses" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0E9,
+            "minimum" : 0
+          },
+          "goods" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/RefineryGoodDto"
+            },
+            "minItems" : 1
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "location" : {
+            "$ref" : "#/components/schemas/LocationDto"
+          },
+          "mission" : {
+            "$ref" : "#/components/schemas/MissionReferenceDto"
+          },
+          "oreSales" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0E9,
+            "minimum" : 0
+          },
+          "otherExpenses" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0E9,
+            "minimum" : 0
+          },
+          "owner" : {
+            "$ref" : "#/components/schemas/UserReferenceDto"
+          },
+          "owningOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "owningSquadron" : {
+            "$ref" : "#/components/schemas/SquadronReferenceDto"
+          },
+          "profit" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "refiningMethod" : {
+            "$ref" : "#/components/schemas/RefiningMethodDto"
+          },
+          "startedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "goods", "location" ]
+      },
+      "RefiningMethodDto" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "ratingCost" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "ratingSpeed" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "ratingYield" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "Result" : {
+        "type" : "object",
+        "properties" : {
+          "candidates" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Entry"
+            }
+          },
+          "index" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "ref" : {
+            "$ref" : "#/components/schemas/Entry"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "resolved", "ambiguous", "unmatched" ]
+          }
+        }
+      },
+      "SquadronReferenceDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "shorthand" : {
+            "type" : "string"
+          }
+        }
+      },
+      "Uex" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 1
+          },
+          "kind" : {
+            "type" : "string",
+            "pattern" : "^(CITY|SPACE_STATION)$"
+          }
+        },
+        "required" : [ "id", "kind" ]
+      },
+      "UexRef" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "kind" : {
+            "type" : "string"
+          }
+        }
+      },
+      "UserReferenceDto" : {
+        "type" : "object",
+        "properties" : {
+          "displayName" : {
+            "type" : "string"
+          },
+          "effectiveName" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "rank" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "username" : {
+            "type" : "string"
+          }
+        }
+      },
+      "Warning" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "pointer" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "securitySchemes" : {
+      "bearer-jwt" : {
+        "bearerFormat" : "JWT",
+        "scheme" : "bearer",
+        "type" : "http"
+      }
+    }
+  }
+}

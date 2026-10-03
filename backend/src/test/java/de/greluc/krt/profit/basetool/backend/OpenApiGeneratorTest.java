@@ -25,15 +25,13 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.api.CommittedOpenApi;
+import de.greluc.krt.profit.basetool.backend.api.ExchangeFence;
 import de.greluc.krt.profit.basetool.backend.api.ExposedTypes;
 import de.greluc.krt.profit.basetool.backend.api.OpenApiDocumentAssertions;
 import de.greluc.krt.profit.basetool.backend.config.ContractTiers;
-import java.io.IOException;
-import java.nio.file.AtomicMoveNotSupportedException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,8 +46,11 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Generates the committed {@code openapi.json} from the running controllers, after asserting what
- * the document must satisfy (REQ-API-007, REQ-API-018).
+ * Generates the committed {@code openapi.json} and the exchange's internal relay document {@code
+ * exchange-relay.openapi.json} from the running controllers, after asserting what each must satisfy
+ * (REQ-API-007, REQ-API-018, REQ-XCH-039).
+ *
+ * <p>Outside CI a stale document is rewritten; in CI ({@code CI=true}) it fails the test instead.
  */
 @SpringBootTest
 @Slf4j
@@ -67,9 +68,10 @@ class OpenApiGeneratorTest {
   }
 
   /**
-   * Fetches the document, refuses a wrong one, and writes it sorted.
+   * Fetches the full document, splits off the relay surface, refuses a wrong document, and writes
+   * both or reports which is stale.
    *
-   * @throws Exception if the request, the assertions' inputs or the write fail
+   * @throws Exception if the request, the assertions' inputs or a write fail
    */
   @Test
   void generateOpenApiDocs() throws Exception {
@@ -81,16 +83,23 @@ class OpenApiGeneratorTest {
             .andExpect(status().isOk())
             .andReturn();
 
-    String json = result.getResponse().getContentAsString();
-    JsonNode document = objectMapper.readTree(json);
+    JsonNode full = objectMapper.readTree(result.getResponse().getContentAsString());
+    ExchangeFence.Split split = ExchangeFence.split(full);
+    ContractTiers tiers = ContractTiers.load();
 
     assertThat(
             OpenApiDocumentAssertions.problems(
-                document, ContractTiers.load(), OpenApiDocumentAssertions.DOMAIN_FLOOR))
+                split.published(), tiers, OpenApiDocumentAssertions.DOMAIN_FLOOR))
         .as(
             "the generated document is wrong and is not written (REQ-API-007, REQ-API-018): the"
                 + " security scheme, the two anonymous operations, one domain tag and one contract"
-                + " tier per operation, and each domain's operation-count floor")
+                + " tier per operation, each domain's operation-count floor, no relay path and no"
+                + " dangling reference")
+        .isEmpty();
+    assertThat(OpenApiDocumentAssertions.relayProblems(split.relay(), tiers))
+        .as(
+            "the generated exchange relay document is wrong and is not written (REQ-XCH-039):"
+                + " exactly the 14 relay operations, all exchange, all T0, complete schemas")
         .isEmpty();
     assertThat(ExposedTypes.collisions(ExposedTypes.bySchemaName(ExposedTypes.controllers())))
         .as(
@@ -99,39 +108,16 @@ class OpenApiGeneratorTest {
                 + " build already knows (REQ-API-018)")
         .isEmpty();
 
-    Object jsonObject = objectMapper.readValue(json, Object.class);
-
-    Path path = Paths.get("src/main/resources/api/openapi.json");
-    if (path.getParent() != null) {
-      Files.createDirectories(path.getParent());
+    boolean rewrite = !"true".equalsIgnoreCase(System.getenv("CI"));
+    List<String> stale = new ArrayList<>();
+    if (CommittedOpenApi.refresh(
+        CommittedOpenApi.PUBLISHED_FILE, CommittedOpenApi.render(split.published()), rewrite)) {
+      stale.add(CommittedOpenApi.PUBLISHED_FILE.toString());
     }
-    writeAtomically(path, jsonObject);
-
-    log.info("OpenAPI documentation generated at: {}", path.toAbsolutePath());
-  }
-
-  /**
-   * Writes {@code document} to a temporary file in the target's directory and moves it into place,
-   * so concurrent readers of the committed spec never see a partial file.
-   *
-   * @param target the committed spec path to replace
-   * @param document the OpenAPI document to serialize
-   * @throws IOException if the document cannot be written or moved into place
-   */
-  private void writeAtomically(Path target, Object document) throws IOException {
-    Path directory = target.getParent() == null ? Paths.get(".") : target.getParent();
-    Path temporary = Files.createTempFile(directory, "openapi-", ".json.tmp");
-    try {
-      objectMapper.writerWithDefaultPrettyPrinter().writeValue(temporary.toFile(), document);
-      try {
-        Files.move(
-            temporary, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-      } catch (AtomicMoveNotSupportedException e) {
-        log.debug("Atomic move unsupported for {}; falling back to a plain replace.", target, e);
-        Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
-      }
-    } finally {
-      Files.deleteIfExists(temporary);
+    if (CommittedOpenApi.refresh(
+        CommittedOpenApi.RELAY_FILE, CommittedOpenApi.render(split.relay()), rewrite)) {
+      stale.add(CommittedOpenApi.RELAY_FILE.toString());
     }
+    log.info("OpenAPI documents generated; rewritten: {}", stale);
   }
 }

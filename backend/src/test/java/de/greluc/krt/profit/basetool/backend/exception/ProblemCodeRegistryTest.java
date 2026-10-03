@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.api.CommittedOpenApi;
 import de.greluc.krt.profit.basetool.backend.config.OpenApiProblemDetailsConfig;
 import java.io.IOException;
 import java.io.InputStream;
@@ -361,18 +362,13 @@ class ProblemCodeRegistryTest {
   }
 
   /**
-   * Every {@code /api/**} operation's 429 declares {@code Retry-After} and the rate-limit headers,
-   * each defined once under {@code components.headers}.
-   *
-   * @throws IOException if the document cannot be read
+   * Every {@code /api/**} operation's 429, in the published and the relay document, declares {@code
+   * Retry-After} and the rate-limit headers, each defined once under {@code components.headers}.
    */
   @Test
   @DisplayName("every documented 429 declares Retry-After and the rate-limit headers")
-  void everyDocumented429DeclaresItsHeaders() throws IOException {
-    JsonNode document;
-    try (InputStream in = ProblemCodeRegistryTest.class.getResourceAsStream("/api/openapi.json")) {
-      document = new ObjectMapper().readTree(in);
-    }
+  void everyDocumented429DeclaresItsHeaders() {
+    JsonNode document = CommittedOpenApi.merged();
     List<String> headers =
         List.of(
             "Retry-After",

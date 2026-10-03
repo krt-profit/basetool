@@ -180,26 +180,22 @@ class EdgeAdmissionTest {
   /**
    * Verifies that no exchange or connected-apps path is admitted under any verb: the exchange layer
    * answers only the gateway and the member controls only the browser (REQ-XCH-001, ADR-0216).
-   * Probes every such path the committed {@code openapi.json} documents, plus paths no controller
-   * serves yet, against the committed map.
+   * Probes every such path the committed {@code openapi.json} and relay document hold, plus paths
+   * no controller serves yet, against the committed map.
    *
    * @throws IOException if the map or the document cannot be read
    */
   @Test
   @DisplayName("no exchange or connected-apps path is admitted by the API vhost")
   void theExchangeStaysOffTheApiVhost() throws IOException {
-    JsonNode document;
-    try (InputStream in = EdgeAdmissionTest.class.getResourceAsStream("/api/openapi.json")) {
-      assertThat(in).isNotNull();
-      document = new ObjectMapper().readTree(in);
-    }
+    JsonNode document = CommittedOpenApi.merged();
     List<String> documented =
         document.get("paths").propertyNames().stream()
             .filter(EdgeAdmissionTest::isExchangeOrConnectionPath)
             .map(path -> path.replaceAll("\\{[A-Za-z]+}", EdgeAdmission.SAMPLE_UUID))
             .toList();
     assertThat(documented)
-        .as("openapi.json documents no exchange path — has the document or its prefixes moved?")
+        .as("the committed documents hold no exchange path — have they or their prefixes moved?")
         .contains("/api/v1/exchange/me/blueprints", "/api/v1/connected-apps");
 
     Set<String> probes = new TreeSet<>(documented);
