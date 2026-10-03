@@ -12072,7 +12072,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/RefineryExtractDto"
+                "$ref" : "#/components/schemas/ExchangeRefineryDraftRequest"
               }
             }
           },
@@ -63565,6 +63565,194 @@
             "type" : "string"
           }
         }
+      },
+      "ExchangeRefineryDraftGood" : {
+        "type" : "object",
+        "properties" : {
+          "confidence" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0,
+            "minimum" : 0.0
+          },
+          "inputQuantity" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 0
+          },
+          "outputQuantity" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 0
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "rawMaterialName" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "refine" : {
+            "type" : "boolean"
+          },
+          "rowIndex" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 0
+          },
+          "sourceImage" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "inputQuantity", "rawMaterialName", "refine" ]
+      },
+      "ExchangeRefineryDraftImage" : {
+        "type" : "object",
+        "properties" : {
+          "capturedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "cropMode" : {
+            "type" : "string",
+            "maxLength" : 32,
+            "minLength" : 0
+          },
+          "height" : {
+            "type" : "integer",
+            "format" : "int32",
+            "exclusiveMinimum" : 0
+          },
+          "name" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "width" : {
+            "type" : "integer",
+            "format" : "int32",
+            "exclusiveMinimum" : 0
+          }
+        },
+        "required" : [ "name" ]
+      },
+      "ExchangeRefineryDraftOrder" : {
+        "type" : "object",
+        "properties" : {
+          "durationMinutes" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          },
+          "expenses" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0E9,
+            "minimum" : 0
+          },
+          "goods" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeRefineryDraftGood"
+            },
+            "maxItems" : 100,
+            "minItems" : 0
+          },
+          "layoutConfidence" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0,
+            "minimum" : 0.0
+          },
+          "panelType" : {
+            "type" : "string",
+            "maxLength" : 32,
+            "minLength" : 0
+          },
+          "quoted" : {
+            "type" : "boolean"
+          },
+          "rawInManifestTotal" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          },
+          "rawLocationName" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "rawMethodName" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "rawToRefineTotal" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          },
+          "sourceImages" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeRefineryDraftImage"
+            },
+            "maxItems" : 50,
+            "minItems" : 0
+          },
+          "totalYieldScu" : {
+            "type" : "number",
+            "format" : "double",
+            "minimum" : 0
+          }
+        },
+        "required" : [ "goods", "panelType", "sourceImages" ]
+      },
+      "ExchangeRefineryDraftRequest" : {
+        "type" : "object",
+        "properties" : {
+          "clientLanguage" : {
+            "type" : "string",
+            "maxLength" : 16,
+            "minLength" : 0
+          },
+          "generatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "model" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
+          },
+          "orders" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeRefineryDraftOrder"
+            },
+            "maxItems" : 5,
+            "minItems" : 0
+          },
+          "schemaVersion" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "tool" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
+          },
+          "toolVersion" : {
+            "type" : "string",
+            "maxLength" : 50,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "orders", "schemaVersion" ]
       },
       "ExchangeRemovedByDto" : {
         "type" : "object",

@@ -55,7 +55,6 @@ import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -73,7 +72,6 @@ import org.testcontainers.utility.DockerImageName;
       "app.exchange.mirror.enabled=true",
       "app.exchange.mirror.reconcile-interval=PT1H"
     })
-@ActiveProfiles("test")
 @Testcontainers
 class ExchangeRevocationMirrorIntegrationTest {
 

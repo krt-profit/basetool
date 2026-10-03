@@ -45,7 +45,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -53,7 +52,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * completes the job order without an {@code ObjectOptimisticLockingFailureException}.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class JobOrderHandoverCompletionIntegrationTest {
 
   @Autowired private JobOrderHandoverService jobOrderHandoverService;

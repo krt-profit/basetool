@@ -1,6 +1,6 @@
 # ADR-0065 — Split `OwnerScopeService` into a scope/gate/stamping trio and extract the org-unit-bank write mechanics
 
-- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-07-02 (`9e37776bf`: `RequestScopeResolver`, `AccessGateService`, `OrgUnitStampingService`, `OrgUnitBankVisibilityService`, `OrgUnitBankApprovalLimitService`).
+- **Status:** Accepted — implemented; amended 2026-10-02 by [ADR-0236](0236-each-domain-owns-an-access-policy-over-the-scope-kernel.md) (access policies per domain, see below). *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-07-02 (`9e37776bf`: `RequestScopeResolver`, `AccessGateService`, `OrgUnitStampingService`, `OrgUnitBankVisibilityService`, `OrgUnitBankApprovalLimitService`).
 - **Date:** 2026-07-02
 - **Deciders:** Repository owner (@greluc)
 - **Related:** issue #922 (L3, epic #905) · ADR-0061 / ADR-0062 (the `MissionService` / `JobOrderService` splits, same delegating-facade pattern) · ADR-0020 (org-unit-aware bank seam) · REQ-BANK-008 / REQ-AUDIT-001 · the ArchUnit invariants `orgUnitAwareBankSeamIsContainedToOneClass`, `bankClassesMustNotConsultOrgUnitScope`, `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`
@@ -43,3 +43,15 @@ The read-side **`resolveApplicableLimit`** (both overloads) and **`setBalanceTar
 - **Security + audit invariants preserved.** The full backend suite — including `OwnerScopeServiceTest`, `OrgUnitBankAccessServiceTest`, the promotion-gate tests and `ArchitectureTest` (the seam + whitelist + no-security-context rules) — passes; `OrgUnitBankAccessService` remains the sole `OwnerScope`+`BankAccountRepository` bridge and keeps its `OwnerScopeService` dependency for the staffel-scoped whitelist.
 - **Tests follow the code.** The three mixed unit tests (`OwnerScopeServiceTest`, `PromotionFeatureFlagServiceGateTest`, `OrgUnitBankAccessServiceTest`) build real, mock-fed collaborators and inject them into the `@InjectMocks` facade via `ReflectionTestUtils` — a single shared `RequestScopeResolver` instance so the request-scoped memoisation still collapses repeated reads — because Mockito does not inject one `@InjectMocks` target into another.
 - **`OwnerScopeService` 2061 → ~470 LOC facade; `OrgUnitBankAccessService` shed its ~230 LOC of write mechanics.** The bank split is intentionally narrower than a symmetric visibility/approval-*service* extraction: the ArchUnit seam pins the authorization brain to the one bridge, so only the mechanical persistence + audit could move.
+
+## Amendment — 2026-10-02: access policies per domain
+
+Domain modularisation plan §5.4; [ADR-0236](0236-each-domain-owns-an-access-policy-over-the-scope-kernel.md).
+The delegating-facade pattern of this decision is now the migration path, not the end state. The
+`can*` gates of `AccessGateService` move domain by domain into named access-policy beans owned by
+their modules (`missionAccessPolicy`, `jobOrderAccessPolicy`, `inventoryAccessPolicy`, …), each
+owning its per-row gate and its JPQL scope fragment; the `ownerScopeService` bean is named
+explicitly first, the SpEL of one domain is re-pointed per pull request, the bodies move verbatim,
+a differential verdict test proves identical verdicts, and the facade methods are deleted last.
+`RequestScopeResolver` and `OrgUnitStampingService` stay in the `scope` kernel. The bank half of
+this decision is unchanged.

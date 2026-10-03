@@ -41,7 +41,7 @@ import org.springframework.stereotype.Service;
  * The single access point to the {@link SecurityContextHolder} for the current principal and its
  * role checks; direct access elsewhere is forbidden by {@code ArchitectureTest}.
  */
-@Service
+@Service("authHelperService")
 @RequiredArgsConstructor
 public class AuthHelperService {
 

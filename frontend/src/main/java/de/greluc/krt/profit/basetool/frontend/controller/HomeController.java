@@ -38,6 +38,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
@@ -188,6 +189,7 @@ public class HomeController {
    */
   @NotNull
   @org.springframework.web.bind.annotation.PostMapping("/announcement/read")
+  @PreAuthorize("isAuthenticated()")
   public String markAnnouncementAsRead(
       @org.springframework.web.bind.annotation.RequestParam UUID id) {
     try {
@@ -209,6 +211,7 @@ public class HomeController {
       value = "/announcement/read",
       headers = "X-Requested-With=XMLHttpRequest")
   @org.springframework.web.bind.annotation.ResponseBody
+  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Void> markAnnouncementAsReadAjax(
       @org.springframework.web.bind.annotation.RequestParam UUID id) {
     try {

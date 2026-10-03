@@ -221,4 +221,45 @@ class AdminPersonalInventoryPageControllerMvcTest {
 
     verify(backendApiClient, never()).put(anyString(), any(), any());
   }
+
+  /** Verifies that an admin update targets the backend's {@code items/{id}} operation. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void update_sendsThePutToTheBackendItemsPath() throws Exception {
+    UUID userSub = UUID.randomUUID();
+    UUID itemId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post("/admin/personal-inventory/" + userSub + "/" + itemId + "/update")
+                .with(csrf())
+                .param("name", "Kiste")
+                .param("quantity", "2")
+                .param("locationUexId", "7")
+                .param("locationType", "CITY")
+                .param("version", "3"))
+        .andExpect(status().is3xxRedirection());
+
+    verify(backendApiClient)
+        .put(
+            eq("/api/v1/admin/personal-inventory/items/" + itemId),
+            any(),
+            eq(PersonalInventoryItemDto.class));
+  }
+
+  /** Verifies that an admin delete targets the backend's {@code items/{id}} operation. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void delete_sendsTheDeleteToTheBackendItemsPath() throws Exception {
+    UUID userSub = UUID.randomUUID();
+    UUID itemId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post("/admin/personal-inventory/" + userSub + "/" + itemId + "/delete").with(csrf()))
+        .andExpect(status().is3xxRedirection());
+
+    verify(backendApiClient)
+        .delete(eq("/api/v1/admin/personal-inventory/items/" + itemId), eq(Void.class));
+  }
 }

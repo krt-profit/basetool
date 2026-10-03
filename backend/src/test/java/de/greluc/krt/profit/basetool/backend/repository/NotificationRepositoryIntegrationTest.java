@@ -35,7 +35,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -45,7 +44,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * created rows.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class NotificationRepositoryIntegrationTest {
 
   @Autowired private NotificationRepository repository;

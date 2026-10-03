@@ -48,11 +48,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest
-@ActiveProfiles("test")
 class ExchangeDepartureIntegrationTest {
 
   private static final UUID MEMBER = UUID.fromString("44444444-4444-4444-4444-4444444440f1");
