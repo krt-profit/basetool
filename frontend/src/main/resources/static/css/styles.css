@@ -7028,7 +7028,9 @@
         }
         .data-table--stack td:not(:first-child, .cell-status, .cell-actions) {
             order: 3;
-            flex: 0 0 auto;
+            flex: 0 1 auto;
+            min-width: 0;
+            overflow-wrap: anywhere;
             margin-right: -0.75rem;
             font-size: 0.85rem;
             text-align: left;
@@ -7178,8 +7180,19 @@
     }
 
     .overflow-menu__panel[hidden],
+    .overflow-menu__item[hidden],
     .filter-chips[hidden] {
         display: none;
+    }
+
+    .overflow-menu__item:disabled {
+        color: var(--color-gray-2-text);
+        background: transparent;
+        cursor: not-allowed;
+    }
+
+    .toolbar > .filter-chips {
+        margin: 0;
     }
 
     a.overflow-menu__item {
