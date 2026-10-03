@@ -28,7 +28,9 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -67,6 +69,28 @@ class MissionCrewBoardTouchDragE2eTest {
    */
   private static final int HOLD_WAIT_MS = 700;
 
+  /** How long a cancelled drag gets to show any crew request it would wrongly send. */
+  private static final int SETTLE_WAIT_MS = 1_000;
+
+  /**
+   * Opens an arrow function body that defines {@code visibleBottom()}: the top of the pinned bottom
+   * bar when one is fixed and shown, otherwise the viewport height. Callers append the rest of the
+   * body and its closing brace.
+   */
+  private static final String VISIBLE_BOTTOM_JS =
+      """
+      () => {
+        const visibleBottom = () => {
+          let bottom = window.innerHeight;
+          for (const bar of document.querySelectorAll('.mobile-tabbar, .krt-footer')) {
+            if (getComputedStyle(bar).position !== 'fixed') continue;
+            const r = bar.getBoundingClientRect();
+            if (r.height > 0 && r.top < bottom) bottom = r.top;
+          }
+          return bottom;
+        };
+      """;
+
   private static Playwright playwright;
   private static Browser browser;
   private static String missionId;
@@ -102,9 +126,10 @@ class MissionCrewBoardTouchDragE2eTest {
   }
 
   /**
-   * Holds the pool row and drags it onto the unit's drop zone, then asserts the participant is
-   * aboard that unit and gone from the pool — i.e. the pointer drag reached the same crew endpoint
-   * the mouse drop does.
+   * Holds the pool row, drags it to the bottom edge just above the phone tab bar so the board
+   * scrolls the unit's drop zone out from under the bar, and drops it there; the participant is
+   * then aboard that unit and gone from the pool. Releasing the unit row over the tab bar
+   * afterwards cancels the drag instead of unassigning it.
    */
   @Test
   void aHeldTouchDragMovesAParticipantIntoAUnit() {
@@ -113,19 +138,25 @@ class MissionCrewBoardTouchDragE2eTest {
           assertThat(page.locator("#board-pool .person-row")).hasCount(1);
           assertThat(page.locator(".board-units .drop-zone .person-row")).hasCount(0);
 
+          pressAndHold(page, "#board-pool .person-row", 1);
           page.evaluate(
-              """
-              () => {
-                const row = document.querySelector('#board-pool .person-row');
-                const r = row.getBoundingClientRect();
-                row.dispatchEvent(new PointerEvent('pointerdown', {
-                  bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
-                  isPrimary: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2
-                }));
-              }
-              """);
-          page.waitForTimeout(HOLD_WAIT_MS);
-
+              VISIBLE_BOTTOM_JS
+                  + """
+                    const row = document.querySelector('#board-pool .person-row');
+                    const r = row.getBoundingClientRect();
+                    row.dispatchEvent(new PointerEvent('pointermove', {
+                      bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
+                      isPrimary: true, clientX: r.left + r.width / 2, clientY: visibleBottom() - 8
+                    }));
+                  }
+                  """);
+          page.waitForFunction(
+              VISIBLE_BOTTOM_JS
+                  + """
+                    const hint = document.querySelector('.board-units .drop-zone .drop-hint');
+                    return hint.getBoundingClientRect().bottom <= visibleBottom();
+                  }
+                  """);
           page.evaluate(
               """
               () => {
@@ -145,7 +176,58 @@ class MissionCrewBoardTouchDragE2eTest {
 
           assertThat(page.locator(".board-units .drop-zone .person-row")).hasCount(1);
           assertThat(page.locator("#board-pool .person-row")).hasCount(0);
+
+          List<String> crewDeletes = new CopyOnWriteArrayList<>();
+          page.onRequest(
+              request -> {
+                if ("DELETE".equals(request.method()) && request.url().contains("/crew/")) {
+                  crewDeletes.add(request.url());
+                }
+              });
+          pressAndHold(page, ".board-units .drop-zone .person-row", 3);
+          page.evaluate(
+              VISIBLE_BOTTOM_JS
+                  + """
+                    const row = document.querySelector('.board-units .drop-zone .person-row');
+                    const y = (visibleBottom() + window.innerHeight) / 2;
+                    for (const type of ['pointermove', 'pointerup']) {
+                      row.dispatchEvent(new PointerEvent(type, {
+                        bubbles: true, cancelable: true, pointerId: 3, pointerType: 'touch',
+                        isPrimary: true, clientX: window.innerWidth / 2, clientY: y
+                      }));
+                    }
+                  }
+                  """);
+          page.waitForTimeout(SETTLE_WAIT_MS);
+
+          assertTrue(crewDeletes.isEmpty(), "release over the tab bar unassigned: " + crewDeletes);
+          assertThat(page.locator(".board-units .drop-zone .person-row")).hasCount(1);
+          assertThat(page.locator("#board-pool .person-row")).hasCount(0);
         });
+  }
+
+  /**
+   * Presses a touch pointer on the centre of the first row matching the selector and waits past the
+   * board's hold delay, so the drag is armed.
+   *
+   * @param page the opened crew board
+   * @param rowSelector the CSS selector of the row to press
+   * @param pointerId the pointer id the later move and release events must repeat
+   */
+  private static void pressAndHold(Page page, String rowSelector, int pointerId) {
+    page.evaluate(
+        """
+        ([sel, id]) => {
+          const row = document.querySelector(sel);
+          const r = row.getBoundingClientRect();
+          row.dispatchEvent(new PointerEvent('pointerdown', {
+            bubbles: true, cancelable: true, pointerId: id, pointerType: 'touch',
+            isPrimary: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2
+          }));
+        }
+        """,
+        List.of(rowSelector, pointerId));
+    page.waitForTimeout(HOLD_WAIT_MS);
   }
 
   /**
