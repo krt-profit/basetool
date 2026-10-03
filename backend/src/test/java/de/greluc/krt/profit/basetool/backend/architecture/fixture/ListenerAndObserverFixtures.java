@@ -55,13 +55,9 @@ public final class ListenerAndObserverFixtures {
       this.auditService = auditService;
     }
 
-    /**
-     * Records an audit row directly after commit.
-     *
-     * @param event the event
-     */
-    @TransactionalEventListener
-    public void recordsDirectly(Object event) {
+    /** Records an audit row directly after commit. */
+    @TransactionalEventListener(classes = Object.class)
+    public void recordsDirectly() {
       auditService.record(AuditEventType.USER_DELETED, null, null, null, null);
     }
 
@@ -71,13 +67,9 @@ public final class ListenerAndObserverFixtures {
       helper();
     }
 
-    /**
-     * Records an audit row after commit inside a lambda.
-     *
-     * @param event the event
-     */
-    @TransactionalEventListener
-    public void recordsInALambda(Object event) {
+    /** Records an audit row after commit inside a lambda. */
+    @TransactionalEventListener(classes = Object.class)
+    public void recordsInALambda() {
       Runnable work =
           () -> auditService.record(AuditEventType.USER_DELETED, null, null, null, null);
       work.run();
@@ -123,23 +115,15 @@ public final class ListenerAndObserverFixtures {
       requestScopeResolver.currentOrgUnitId();
     }
 
-    /**
-     * Reads the current user id in an event listener.
-     *
-     * @param event the event
-     */
-    @EventListener
-    public void readsTheCurrentUser(Object event) {
+    /** Reads the current user id in an event listener. */
+    @EventListener(classes = Object.class)
+    public void readsTheCurrentUser() {
       authHelperService.currentUserId();
     }
 
-    /**
-     * Reads the security context holder after commit.
-     *
-     * @param event the event
-     */
-    @TransactionalEventListener
-    public void readsTheSecurityContext(Object event) {
+    /** Reads the security context holder after commit. */
+    @TransactionalEventListener(classes = Object.class)
+    public void readsTheSecurityContext() {
       SecurityContextHolder.getContext();
     }
 
