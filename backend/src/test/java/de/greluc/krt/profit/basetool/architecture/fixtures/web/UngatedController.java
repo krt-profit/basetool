@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.architecture.fixtures.web;
 
 import java.util.List;
+import java.util.Objects;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -60,11 +61,10 @@ public class UngatedController {
    * Binds a response-only DTO and writes an audit row.
    *
    * @param body the body
-   * @return the bound body
    */
   @PostMapping("/fixture/write")
-  public ResponseOnlyFixtureDto write(@RequestBody ResponseOnlyFixtureDto body) {
+  public void write(@RequestBody ResponseOnlyFixtureDto body) {
+    Objects.requireNonNull(body);
     audit.record();
-    return body;
   }
 }

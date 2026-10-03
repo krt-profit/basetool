@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.architecture.fixtures.tenancy;
 
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,11 +34,10 @@ public class ScopedFixtureController {
    * Updates a resource by role only.
    *
    * @param id the resource id
-   * @return the id of the updated resource
    */
   @PreAuthorize("hasRole('OFFICER')")
   @PutMapping("/fixture/{id}")
-  public UUID update(@PathVariable UUID id) {
-    return id;
+  public void update(@PathVariable UUID id) {
+    Objects.requireNonNull(id);
   }
 }
