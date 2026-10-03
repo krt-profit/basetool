@@ -26,6 +26,11 @@
 - **Auftragsverwaltung: „Meine · Alle".** Wer beides sehen darf, wechselt zwischen eigenen und allen
   Aufträgen (REQ-ORDERS-038).
 
+- **Auftragsdetail im neuen Muster.** Oben zeigt „Geliefert / benötigt" mit Balken den Fortschritt;
+  die Reiter richten sich nach der Auftragsart (Material: Bedarf · Übergaben · Bearbeiter ·
+  Verknüpft; Item: Items · Materialien · Herstellung · Übergaben · Bearbeiter · Verknüpft), leere
+  Reiter entfallen, Übergaben laufen über „Übergabe erfassen" (REQ-ORDERS-026).
+
 - **Neues Erscheinungsbild der Website, Grundlage (Phase 0).** Fließtext in Lato 400 statt 300, nur
   noch die Seitentitel orange, Zwischenüberschriften weiß; dazu neue Bausteine für Seitenkopf mit
   „⋯“-Menü, Werkzeugleiste mit Filter-Chips, Segment-Schalter, Listentabellen, die auf dem Smartphone
