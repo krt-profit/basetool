@@ -246,18 +246,21 @@ class ExchangeWireContractTest {
   }
 
   @Test
-  void aRefineryDraftWithoutOrdersIsRefusedByTheBackendAsByItsSchema() throws Exception {
-    MockHttpServletResponse answer =
-        relay(
-            post(ExchangeSeam.RELAY_PREFIX + "/me/drafts/refinery-orders")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    Files.readString(
-                        FIXTURES.resolve("refinery-draft/invalid/no-orders.json"),
-                        StandardCharsets.UTF_8)));
-    assertThat(answer.getStatus()).as(answer.getContentAsString()).isEqualTo(400);
-    assertThat(mapper.readTree(answer.getContentAsString()).path("code").asString())
-        .isEqualTo("VALIDATION_FAILED");
+  void aRefineryDraftWithAnEmptyRequiredListIsRefusedByTheBackendAsByItsSchema() throws Exception {
+    for (String fixture : List.of("no-orders.json", "no-goods.json", "no-source-images.json")) {
+      MockHttpServletResponse answer =
+          relay(
+              post(ExchangeSeam.RELAY_PREFIX + "/me/drafts/refinery-orders")
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      Files.readString(
+                          FIXTURES.resolve("refinery-draft/invalid/" + fixture),
+                          StandardCharsets.UTF_8)));
+      assertThat(answer.getStatus()).as(fixture + " " + answer.getContentAsString()).isEqualTo(400);
+      assertThat(mapper.readTree(answer.getContentAsString()).path("code").asString())
+          .as(fixture)
+          .isEqualTo("VALIDATION_FAILED");
+    }
   }
 
   @Test

@@ -12,6 +12,12 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
   a breaking change ([versioning](versioning.md)). The gateway now refuses it itself, with
   `errors[]` naming `/orders` and the detail of its other schema refusals, instead of relaying it
   to the Basetool.
+- **Corrected: every refinery-draft order carries at least one good and one source image.**
+  `refinery-draft.schema.json` now requires one to 100 `goods` and one to 50 `sourceImages` per
+  order; the fixtures `refinery-draft/invalid/no-goods.json` and `invalid/no-source-images.json`
+  show the refused shapes. An order with either list empty never succeeded, so this too is a
+  correction, not a breaking change. The gateway refuses it itself, with `errors[]` naming the
+  list.
 
 ## 2026-09-28
 

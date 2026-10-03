@@ -1613,6 +1613,13 @@ most 200 characters.
 > breaking change and does not open `v2`. Decided by the owner on 2026-10-03. The client still gets
 > `400 SCHEMA_INVALID`; the refusal now comes from the gateway before the relay, with `errors[]`
 > naming `/orders`, instead of the backend's relayed refusal without `errors[]`.
+>
+> The same decision covers the two lists inside an order: `goods` and `sourceImages` gain
+> `"minItems": 1`, because the backend's order carries `@NotEmpty` on both, so an order with either
+> list empty never succeeded either. `refinery-draft/invalid/no-goods.json` and
+> `invalid/no-source-images.json` pin the refusal; the backend refuses all three invalid fixtures
+> with `400 VALIDATION_FAILED` (`ExchangeWireContractTest`), and all three narrowings are listed in
+> `ACCEPTED_NARROWINGS`.
 
 **Enforced by:** `ExchangeContractTest`, `SchemaCompatibilityTest` · **Status:** implemented —
 WP 0.2 (#2080)
