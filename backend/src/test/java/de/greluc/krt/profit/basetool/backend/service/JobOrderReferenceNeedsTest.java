@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.QualityTierMapper;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
@@ -37,7 +38,7 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
+import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemNeedDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemStockRow;
@@ -47,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -55,8 +57,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mapstruct.factory.Mappers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -95,6 +99,8 @@ class JobOrderReferenceNeedsTest {
 
   @Mock private MaterialClaimService materialClaimService;
 
+  @Spy private QualityTierMapper qualityTierMapper = Mappers.getMapper(QualityTierMapper.class);
+
   /** Real: the batching and quality-floor semantics are part of what is asserted. */
   @InjectMocks private JobOrderStockProjectionService stockProjectionService;
 
@@ -128,7 +134,7 @@ class JobOrderReferenceNeedsTest {
   @Test
   @DisplayName("withNeeds=false ships no figures and never touches the stock index")
   void withoutNeeds_shipsNothingAndSkipsTheQuery() {
-    givenOrders(materialOrder(400.0, null));
+    givenOrders(materialOrder(400.0, QualityTierFixtures.none()));
 
     List<JobOrderReferenceDto> result = queryService.findAllActiveReference(false);
 
@@ -140,8 +146,9 @@ class JobOrderReferenceNeedsTest {
   @Test
   @DisplayName("a MATERIAL line's need is its remaining amount minus the stock linked to it")
   void materialOrder_projectsRequiredMinusBooked() {
-    givenOrders(materialOrder(400.0, null));
-    givenLinkedStock(new JobOrderMaterialStockRow(ORDER_ID, MATERIAL_ID, null, 150.0));
+    givenOrders(materialOrder(400.0, QualityTierFixtures.none()));
+    givenLinkedStock(
+        new JobOrderMaterialStockRow(ORDER_ID, UUID.randomUUID(), MATERIAL_ID, null, 150.0));
 
     JobOrderMaterialNeedDto need = onlyNeed(queryService.findAllActiveReference(true));
 
@@ -155,11 +162,11 @@ class JobOrderReferenceNeedsTest {
   @Test
   @DisplayName("a GOOD bucket ignores below-floor stock, and states the floor it applied")
   void materialOrder_sumsStockAtTheBucketQualityFloor() {
-    givenOrders(materialOrder(400.0, 650));
+    givenOrders(materialOrder(400.0, QualityTierFixtures.good()));
     givenLinkedStock(
-        new JobOrderMaterialStockRow(ORDER_ID, MATERIAL_ID, 700, 100.0),
-        new JobOrderMaterialStockRow(ORDER_ID, MATERIAL_ID, 400, 90.0),
-        new JobOrderMaterialStockRow(ORDER_ID, MATERIAL_ID, null, 80.0));
+        new JobOrderMaterialStockRow(ORDER_ID, UUID.randomUUID(), MATERIAL_ID, 700, 100.0),
+        new JobOrderMaterialStockRow(ORDER_ID, UUID.randomUUID(), MATERIAL_ID, 400, 90.0),
+        new JobOrderMaterialStockRow(ORDER_ID, UUID.randomUUID(), MATERIAL_ID, null, 80.0));
 
     JobOrderMaterialNeedDto need = onlyNeed(queryService.findAllActiveReference(true));
 
@@ -178,8 +185,15 @@ class JobOrderReferenceNeedsTest {
         .thenReturn(
             List.of(
                 new AggregatedMaterialDto(
-                    materialDto("SCU"), QualityRequirement.NONE, 120.0, null, List.of(), null)));
-    givenLinkedStock(new JobOrderMaterialStockRow(ORDER_ID, MATERIAL_ID, null, 20.0));
+                    materialDto("SCU"),
+                    "NONE",
+                    QualityTierFixtures.noneDto(),
+                    120.0,
+                    null,
+                    List.of(),
+                    null)));
+    givenLinkedStock(
+        new JobOrderMaterialStockRow(ORDER_ID, UUID.randomUUID(), MATERIAL_ID, null, 20.0));
 
     JobOrderMaterialNeedDto need = onlyNeed(queryService.findAllActiveReference(true));
 
@@ -191,8 +205,9 @@ class JobOrderReferenceNeedsTest {
   @Test
   @DisplayName("a fully covered bucket reports 0, never a negative overshoot")
   void overCoveredBucket_isFlooredAtZero() {
-    givenOrders(materialOrder(100.0, null));
-    givenLinkedStock(new JobOrderMaterialStockRow(ORDER_ID, MATERIAL_ID, null, 250.0));
+    givenOrders(materialOrder(100.0, QualityTierFixtures.none()));
+    givenLinkedStock(
+        new JobOrderMaterialStockRow(ORDER_ID, UUID.randomUUID(), MATERIAL_ID, null, 250.0));
 
     assertEquals(0.0, onlyNeed(queryService.findAllActiveReference(true)).outstandingAmount());
   }
@@ -201,8 +216,9 @@ class JobOrderReferenceNeedsTest {
   @Test
   @DisplayName("a PIECE material's figures are whole units, not fractions")
   void pieceMaterial_roundsToWholeUnits() {
-    givenOrders(materialOrder(10.0, null), "PIECE");
-    givenLinkedStock(new JobOrderMaterialStockRow(ORDER_ID, MATERIAL_ID, null, 3.4));
+    givenOrders(materialOrder(10.0, QualityTierFixtures.none()), "PIECE");
+    givenLinkedStock(
+        new JobOrderMaterialStockRow(ORDER_ID, UUID.randomUUID(), MATERIAL_ID, null, 3.4));
 
     JobOrderMaterialNeedDto need = onlyNeed(queryService.findAllActiveReference(true));
 
@@ -297,7 +313,7 @@ class JobOrderReferenceNeedsTest {
   @Test
   @DisplayName("a MATERIAL order ships no game-item needs")
   void materialOrder_shipsNoGameItemNeeds() {
-    givenOrders(materialOrder(400.0, null));
+    givenOrders(materialOrder(400.0, QualityTierFixtures.none()));
     givenLinkedStock();
 
     assertTrue(
@@ -407,10 +423,10 @@ class JobOrderReferenceNeedsTest {
    * Builds a MATERIAL order carrying one line for {@link #MATERIAL_ID}.
    *
    * @param amount the line's remaining required amount.
-   * @param minQuality the line's stored quality floor, or {@code null} for "Keine".
+   * @param tier the line's quality tier.
    * @return the order.
    */
-  private JobOrder materialOrder(double amount, Integer minQuality) {
+  private JobOrder materialOrder(double amount, QualityTier tier) {
     JobOrder order = newOrder(JobOrderType.MATERIAL);
     Material material = new Material();
     material.setId(MATERIAL_ID);
@@ -418,7 +434,7 @@ class JobOrderReferenceNeedsTest {
     line.setId(UUID.randomUUID());
     line.setMaterial(material);
     line.setAmount(amount);
-    line.setMinQuality(minQuality);
+    line.setQualityTier(tier);
     order.setMaterials(new HashSet<>(Set.of(line)));
     when(materialMapper.toDto(material)).thenReturn(materialDto("SCU"));
     return order;

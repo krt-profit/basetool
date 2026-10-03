@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
 import java.util.List;
 
 /**
@@ -27,17 +26,20 @@ import java.util.List;
  * order at one quality bucket.
  *
  * @param material the aggregated material, with its {@code quantityType} for unit formatting
- * @param qualityRequirement the quality bucket ({@code GOOD} or {@code NONE})
+ * @param qualityRequirement the code of the bucket's quality tier, e.g. {@code GOOD} or {@code
+ *     NONE}
+ * @param qualityTier the bucket's quality tier
  * @param totalQuantity outstanding required quantity for units not yet manufactured
  *     (REQ-ORDERS-025); {@code 0} once all lines are done
- * @param currentStock linked stock at or above the bucket's quality floor; {@code null} only before
- *     {@code JobOrderService} enriches the row
+ * @param currentStock linked stock attributed to this bucket (REQ-ORDERS-037); {@code null} only
+ *     before the projection enriches the row
  * @param claims per-squadron claims; populated only for public SK orders
  * @param openAmount {@code totalQuantity} minus the claims; {@code null} for non-SK orders
  */
 public record AggregatedMaterialDto(
     MaterialDto material,
-    QualityRequirement qualityRequirement,
+    String qualityRequirement,
+    QualityTierDto qualityTier,
     Double totalQuantity,
     Double currentStock,
     List<ClaimDto> claims,

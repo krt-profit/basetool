@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderReferenceDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.LinkedStockAttributionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDemandOverviewDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderBlueprintCountingDto;
@@ -505,6 +506,7 @@ public class JobOrderController {
                     m.id(),
                     m.material(),
                     m.minQuality(),
+                    m.qualityTier(),
                     m.amount(),
                     null,
                     Collections.emptyList(),
@@ -683,6 +685,28 @@ public class JobOrderController {
     return ownerScopeService.canSeeJobOrderInventoryOwners(id)
         ? items
         : inventoryOwnerRedactor.redactInventoryItems(items);
+  }
+
+  /**
+   * Reports how much of each stock row linked to one material of the order counts toward which
+   * quality bucket, so every row counts exactly once (REQ-ORDERS-037). Carries row ids, tier ids
+   * and amounts only — no owner or location.
+   *
+   * @param id job-order id
+   * @param matId material id
+   * @return one entry per row and bucket, plus an entry without a bucket for stock no bucket
+   *     accepts
+   */
+  @GetMapping("/{id}/materials/{matId}/attribution")
+  @Operation(
+      summary = "Get the quality-bucket attribution of a job order material's linked stock",
+      description =
+          "Returns, per linked inventory row, the amount counted toward each quality bucket.")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id)")
+  @Transactional(readOnly = true)
+  public List<LinkedStockAttributionDto> getStockAttributionForJobOrderMaterial(
+      @PathVariable UUID id, @PathVariable UUID matId) {
+    return jobOrderQueryService.getStockAttributionForJobOrderMaterial(id, matId);
   }
 
   /**

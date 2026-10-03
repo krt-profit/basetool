@@ -114,6 +114,10 @@
 /admin/personal-inventory/{userSub}/add POST -> AdminPersonalInventoryPageController#add gate=class:hasRole('ADMIN') layout=yes
 /admin/personal-inventory/{userSub}/{id}/delete POST -> AdminPersonalInventoryPageController#delete gate=class:hasRole('ADMIN') layout=yes
 /admin/personal-inventory/{userSub}/{id}/update POST -> AdminPersonalInventoryPageController#update gate=class:hasRole('ADMIN') layout=yes
+/admin/quality-tiers GET -> AdminQualityTiersPageController#list gate=class:hasRole('ADMIN') layout=yes
+/admin/quality-tiers POST headers=[X-Requested-With=XMLHttpRequest] -> AdminQualityTiersRelayController#create gate=class:hasRole('ADMIN') layout=no
+/admin/quality-tiers/{id} POST headers=[X-Requested-With=XMLHttpRequest] -> AdminQualityTiersRelayController#update gate=class:hasRole('ADMIN') layout=no
+/admin/quality-tiers/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> AdminQualityTiersRelayController#delete gate=class:hasRole('ADMIN') layout=no
 /admin/settings GET -> AdminSettingsPageController#viewSettings gate=class:hasRole('ADMIN') layout=yes
 /admin/settings POST -> AdminSettingsPageController#updateSettings gate=class:hasRole('ADMIN') layout=yes
 /admin/settings POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSettingsPageController#updateSettingsAjax gate=class:hasRole('ADMIN') layout=yes
@@ -426,6 +430,7 @@
 /orders/{id}/items/update POST headers=[X-Requested-With=XMLHttpRequest] -> JobOrderWriteController#updateItemOrderAjax gate=method:hasRole('LOGISTICIAN') layout=yes
 /orders/{id}/items/{itemId}/production POST consumes=[application/json] -> JobOrderWriteController#bookProductionAjax gate=method:hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN') layout=yes
 /orders/{id}/materials/unlink POST -> JobOrderWriteController#unlinkMaterial gate=method:hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN') layout=yes
+/orders/{id}/materials/{matId}/attribution GET headers=[X-Requested-With=XMLHttpRequest] -> JobOrderStockAttributionProxyController#stockAttribution gate=class:isAuthenticated() layout=no
 /orders/{id}/materials/{matId}/inventory GET -> JobOrderPageController#getInventoryItemsForMaterial gate=class:isAuthenticated() layout=yes
 /orders/{id}/priority POST -> JobOrderWriteController#updatePriority gate=class:isAuthenticated() layout=yes
 /orders/{id}/priority/ajax PUT -> JobOrderWriteController#updatePriorityAjax gate=method:hasRole('LOGISTICIAN') layout=yes

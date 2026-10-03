@@ -33,9 +33,11 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemNeedDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemStockRow;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialNeedDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderReferenceDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.LinkedStockAttributionDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialRequirementResolver.MaterialRequirement;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService.OrderLinkedStockIndex;
 import de.greluc.krt.profit.basetool.backend.support.QuantityTypeRounding;
 import java.util.ArrayList;
@@ -195,29 +197,29 @@ public class JobOrderQueryService {
    */
   private List<JobOrderMaterialNeedDto> materialNeedsOf(
       @NotNull JobOrder order, @NotNull OrderLinkedStockIndex stockIndex) {
-    return materialRequirementResolver.requirementsOf(order).stream()
-        .map(
-            requirement -> {
-              Integer qualityFloor =
-                  JobOrderStockProjectionService.qualityFloorFor(requirement.quality());
-              double required =
+    List<MaterialRequirement> requirements = materialRequirementResolver.requirementsOf(order);
+    double[] attributed = stockIndex.bookedFor(order.getId(), requirements);
+    List<JobOrderMaterialNeedDto> needs = new ArrayList<>();
+    for (int i = 0; i < requirements.size(); i++) {
+      MaterialRequirement requirement = requirements.get(i);
+      int floor = requirement.tier().minQuality();
+      double required =
+          QuantityTypeRounding.roundForQuantityType(
+              requirement.requiredAmount(), requirement.material());
+      double booked =
+          QuantityTypeRounding.roundForQuantityType(attributed[i], requirement.material());
+      needs.add(
+          new JobOrderMaterialNeedDto(
+              requirement.material().id(),
+              floor == 0 ? null : floor,
+              required,
+              booked,
+              Math.max(
+                  0.0,
                   QuantityTypeRounding.roundForQuantityType(
-                      requirement.requiredAmount(), requirement.material());
-              double booked =
-                  QuantityTypeRounding.roundForQuantityType(
-                      stockIndex.stockFor(order.getId(), requirement.material().id(), qualityFloor),
-                      requirement.material());
-              return new JobOrderMaterialNeedDto(
-                  requirement.material().id(),
-                  qualityFloor,
-                  required,
-                  booked,
-                  Math.max(
-                      0.0,
-                      QuantityTypeRounding.roundForQuantityType(
-                          required - booked, requirement.material())));
-            })
-        .toList();
+                      required - booked, requirement.material()))));
+    }
+    return needs;
   }
 
   /**
@@ -333,6 +335,29 @@ public class JobOrderQueryService {
                 .thenComparing(
                     item -> item.amount() != null ? item.amount() : 0.0, Comparator.reverseOrder()))
         .toList();
+  }
+
+  /**
+   * Reports how much of each linked stock row of one material counts toward which quality bucket of
+   * the order (REQ-ORDERS-037).
+   *
+   * @param jobOrderId the order
+   * @param materialId the material
+   * @return one entry per row and bucket, plus an entry without a bucket for stock no bucket
+   *     accepts
+   * @throws NotFoundException when the order or the material does not exist
+   */
+  @NotNull
+  @Transactional(readOnly = true)
+  public List<LinkedStockAttributionDto> getStockAttributionForJobOrderMaterial(
+      UUID jobOrderId, UUID materialId) {
+    JobOrder order =
+        Entities.require(
+            jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
+    Entities.require(
+        materialRepository.findById(materialId), () -> "Material not found: " + materialId);
+    return jobOrderStockProjectionService.attributionFor(
+        order, materialRequirementResolver.requirementsOf(order), materialId);
   }
 
   /**

@@ -44,7 +44,6 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderItemMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -56,6 +55,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -128,7 +128,7 @@ class JobOrderItemProductionServiceTest {
             .id(UUID.randomUUID())
             .material(material)
             .requiredQuantity(160.0)
-            .qualityRequirement(QualityRequirement.NONE)
+            .qualityTier(QualityTierFixtures.none())
             .build();
     line.addMaterial(req);
 

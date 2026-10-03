@@ -92,6 +92,9 @@ public enum CachedCatalog {
    */
   ITEM_CATALOG(
       "/api/v1/orders/item-catalog?size=1&sort=name,asc", CacheDomain.ITEM_CATALOG, Fetch.SINGLE),
+  /** The whole quality-tier catalogue, inactive tiers included (REQ-ORDERS-036). */
+  QUALITY_TIERS(
+      "/api/v1/quality-tiers?includeInactive=true", CacheDomain.QUALITY_TIER, Fetch.SINGLE),
   /** Job-order yellow-age-threshold setting. */
   SETTING_JOB_ORDER_AGE_YELLOW(
       "/api/v1/settings/job_order.age_yellow_days", CacheDomain.SETTINGS, Fetch.SINGLE),

@@ -227,6 +227,18 @@ public enum AuditEventType {
   /** A squadron claim was withdrawn. */
   JOB_ORDER_CLAIM_WITHDRAWN(AuditDomain.JOB_ORDER),
 
+  /** A quality tier was added to the catalogue (REQ-ORDERS-036). */
+  QUALITY_TIER_CREATED(AuditDomain.JOB_ORDER),
+
+  /** A quality tier's code, labels, order or floor was changed. */
+  QUALITY_TIER_UPDATED(AuditDomain.JOB_ORDER),
+
+  /** A quality tier was withdrawn from the pickers; existing references keep it. */
+  QUALITY_TIER_DEACTIVATED(AuditDomain.JOB_ORDER),
+
+  /** An unreferenced quality tier was deleted. */
+  QUALITY_TIER_DELETED(AuditDomain.JOB_ORDER),
+
   /** The job-order audit log was exported as a PDF or JSON for a period. */
   JOB_ORDER_AUDIT_EXPORTED(AuditDomain.JOB_ORDER),
 

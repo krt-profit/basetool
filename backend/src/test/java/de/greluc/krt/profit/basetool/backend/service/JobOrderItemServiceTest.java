@@ -21,11 +21,17 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.QualityTierMapper;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
@@ -34,7 +40,7 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderItemMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
+import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto;
@@ -47,12 +53,15 @@ import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintIngredientKin
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -68,7 +77,36 @@ class JobOrderItemServiceTest {
   @Mock private GameItemRepository gameItemRepository;
   @Mock private MaterialRepository materialRepository;
   @Mock private MaterialMapper materialMapper;
-  @InjectMocks private JobOrderItemService service;
+  @Mock private QualityTierService qualityTierService;
+  private JobOrderItemService service;
+
+  @BeforeEach
+  void setUp() {
+    service =
+        new JobOrderItemService(
+            blueprintRepository,
+            gameItemRepository,
+            materialRepository,
+            materialMapper,
+            qualityTierService,
+            Mappers.getMapper(QualityTierMapper.class));
+    lenient()
+        .when(qualityTierService.defaultForIngredient(any()))
+        .thenAnswer(
+            inv -> {
+              Integer q = inv.getArgument(0);
+              return q != null && q >= 650
+                  ? QualityTierFixtures.good()
+                  : QualityTierFixtures.none();
+            });
+    lenient()
+        .when(qualityTierService.resolveForRequirement(any(), any(), any()))
+        .thenAnswer(
+            inv ->
+                "GOOD".equals(inv.getArgument(0))
+                    ? QualityTierFixtures.good()
+                    : QualityTierFixtures.none());
+  }
 
   @Test
   void findOrderableItemsEscapesLikeMetacharactersInTheSearch() {
@@ -90,8 +128,18 @@ class JobOrderItemServiceTest {
     gold.setId(UUID.randomUUID());
 
     JobOrder materialOrder = new JobOrder();
-    materialOrder.addMaterial(JobOrderMaterial.builder().material(steel).amount(5.0).build());
-    materialOrder.addMaterial(JobOrderMaterial.builder().material(gold).amount(1.0).build());
+    materialOrder.addMaterial(
+        JobOrderMaterial.builder()
+            .material(steel)
+            .qualityTier(QualityTierFixtures.none())
+            .amount(5.0)
+            .build());
+    materialOrder.addMaterial(
+        JobOrderMaterial.builder()
+            .material(gold)
+            .qualityTier(QualityTierFixtures.none())
+            .amount(1.0)
+            .build());
 
     assertThat(service.requiredMaterialIds(materialOrder))
         .containsExactlyInAnyOrder(steel.getId(), gold.getId());
@@ -102,7 +150,7 @@ class JobOrderItemServiceTest {
         JobOrderItemMaterial.builder()
             .material(iron)
             .requiredQuantity(2.0)
-            .qualityRequirement(QualityRequirement.GOOD)
+            .qualityTier(QualityTierFixtures.good())
             .build();
     JobOrderItem item = new JobOrderItem();
     item.addMaterial(req);
@@ -134,7 +182,12 @@ class JobOrderItemServiceTest {
     Material steel = new Material();
     steel.setId(UUID.randomUUID());
     JobOrder materialOrder = new JobOrder();
-    materialOrder.addMaterial(JobOrderMaterial.builder().material(steel).amount(5.0).build());
+    materialOrder.addMaterial(
+        JobOrderMaterial.builder()
+            .material(steel)
+            .qualityTier(QualityTierFixtures.none())
+            .amount(5.0)
+            .build());
 
     assertThat(service.requiredGameItemIds(materialOrder)).isEmpty();
   }
@@ -172,7 +225,7 @@ class JobOrderItemServiceTest {
             weapon.getId(),
             blueprint.getId(),
             3,
-            List.of(new CreateJobOrderItemMaterialDto(screws.getId(), QualityRequirement.GOOD)),
+            List.of(new CreateJobOrderItemMaterialDto(screws.getId(), "GOOD")),
             null,
             null);
     JobOrderItem built = service.buildItemLine(line);
@@ -183,11 +236,75 @@ class JobOrderItemServiceTest {
 
     JobOrderItemMaterial steelReq = requirementFor(built, steel);
     assertThat(steelReq.getRequiredQuantity()).isEqualTo(7.5);
-    assertThat(steelReq.getQualityRequirement()).isEqualTo(QualityRequirement.GOOD);
+    assertThat(steelReq.getQualityTier().getId()).isEqualTo(QualityTierFixtures.GOOD_ID);
 
     JobOrderItemMaterial screwsReq = requirementFor(built, screws);
     assertThat(screwsReq.getRequiredQuantity()).isEqualTo(12.0);
-    assertThat(screwsReq.getQualityRequirement()).isEqualTo(QualityRequirement.GOOD);
+    assertThat(screwsReq.getQualityTier().getId()).isEqualTo(QualityTierFixtures.GOOD_ID);
+  }
+
+  @Test
+  void buildItemLineDefaultsAnIngredientMinQualityToTheTierTheCatalogueReturns() {
+    GameItem weapon = gameItem("Ballista", GameItemKind.WEAPON);
+    Material steel = material("Steel", QuantityType.SCU);
+    Blueprint blueprint = blueprint(weapon);
+    blueprint.addIngredient(resource(steel, 1.0, 700));
+    QualityTier fine = QualityTierFixtures.tier("FINE", 700);
+
+    when(gameItemRepository.findById(weapon.getId())).thenReturn(Optional.of(weapon));
+    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
+    when(qualityTierService.defaultForIngredient(700)).thenReturn(fine);
+
+    JobOrderItem built =
+        service.buildItemLine(
+            new CreateJobOrderItemLineDto(
+                null, weapon.getId(), blueprint.getId(), 1, List.of(), null, null));
+
+    assertThat(requirementFor(built, steel).getQualityTier()).isSameAs(fine);
+    verify(qualityTierService).defaultForIngredient(700);
+  }
+
+  @Test
+  void applyItemLineResolvesAnExplicitChoiceKeepingTheTiersTheLineAlreadyUsed() {
+    GameItem weapon = gameItem("Ballista", GameItemKind.WEAPON);
+    Material steel = material("Steel", QuantityType.SCU);
+    Blueprint blueprint = blueprint(weapon);
+    blueprint.addIngredient(resource(steel, 2.0, null));
+    QualityTier legacy = QualityTierFixtures.tier("LEGACY", 800);
+    legacy.setActive(false);
+
+    JobOrderItem existing = JobOrderItem.builder().amount(1).build();
+    existing.setId(UUID.randomUUID());
+    existing.setGameItem(weapon);
+    existing.addMaterial(
+        JobOrderItemMaterial.builder()
+            .material(steel)
+            .requiredQuantity(2.0)
+            .qualityTier(legacy)
+            .build());
+
+    when(gameItemRepository.findById(weapon.getId())).thenReturn(Optional.of(weapon));
+    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
+    when(qualityTierService.resolveForRequirement(eq("LEGACY"), isNull(), any()))
+        .thenReturn(legacy);
+
+    service.applyItemLine(
+        existing,
+        new CreateJobOrderItemLineDto(
+            existing.getId(),
+            weapon.getId(),
+            blueprint.getId(),
+            1,
+            List.of(new CreateJobOrderItemMaterialDto(steel.getId(), "LEGACY")),
+            null,
+            null));
+
+    verify(qualityTierService)
+        .resolveForRequirement(
+            eq("LEGACY"),
+            isNull(),
+            argThat((Collection<UUID> ids) -> ids.size() == 1 && ids.contains(legacy.getId())));
+    assertThat(requirementFor(existing, steel).getQualityTier()).isSameAs(legacy);
   }
 
   @Test
@@ -250,21 +367,21 @@ class JobOrderItemServiceTest {
     stubMapper(steel);
 
     JobOrder order = JobOrder.builder().type(JobOrderType.ITEM).build();
-    order.addItem(itemLine(steel, 5.0, QualityRequirement.GOOD));
-    order.addItem(itemLine(steel, 3.0, QualityRequirement.GOOD));
-    order.addItem(itemLine(steel, 2.0, QualityRequirement.NONE));
+    order.addItem(itemLine(steel, 5.0, QualityTierFixtures.good()));
+    order.addItem(itemLine(steel, 3.0, QualityTierFixtures.good()));
+    order.addItem(itemLine(steel, 2.0, QualityTierFixtures.none()));
 
     List<AggregatedMaterialDto> aggregated = service.aggregateMaterials(order);
 
     assertThat(aggregated).hasSize(2);
     AggregatedMaterialDto good =
         aggregated.stream()
-            .filter(a -> a.qualityRequirement() == QualityRequirement.GOOD)
+            .filter(a -> "GOOD".equals(a.qualityRequirement()))
             .findFirst()
             .orElseThrow();
     AggregatedMaterialDto none =
         aggregated.stream()
-            .filter(a -> a.qualityRequirement() == QualityRequirement.NONE)
+            .filter(a -> "NONE".equals(a.qualityRequirement()))
             .findFirst()
             .orElseThrow();
     assertThat(good.totalQuantity()).isEqualTo(8.0);
@@ -277,8 +394,8 @@ class JobOrderItemServiceTest {
     stubMapper(steel);
 
     JobOrder order = JobOrder.builder().type(JobOrderType.ITEM).build();
-    order.addItem(itemLine(steel, 0.1, QualityRequirement.NONE));
-    order.addItem(itemLine(steel, 0.2, QualityRequirement.NONE));
+    order.addItem(itemLine(steel, 0.1, QualityTierFixtures.none()));
+    order.addItem(itemLine(steel, 0.2, QualityTierFixtures.none()));
 
     List<AggregatedMaterialDto> aggregated = service.aggregateMaterials(order);
 
@@ -296,7 +413,7 @@ class JobOrderItemServiceTest {
         JobOrderItemMaterial.builder()
             .material(steel)
             .requiredQuantity(160.0)
-            .qualityRequirement(QualityRequirement.NONE)
+            .qualityTier(QualityTierFixtures.none())
             .build());
     JobOrder order = JobOrder.builder().type(JobOrderType.ITEM).build();
     order.addItem(line);
@@ -317,7 +434,7 @@ class JobOrderItemServiceTest {
         JobOrderItemMaterial.builder()
             .material(steel)
             .requiredQuantity(80.0)
-            .qualityRequirement(QualityRequirement.NONE)
+            .qualityTier(QualityTierFixtures.none())
             .build());
     JobOrder order = JobOrder.builder().type(JobOrderType.ITEM).build();
     order.addItem(line);
@@ -347,7 +464,7 @@ class JobOrderItemServiceTest {
     assertThat(preview.amount()).isEqualTo(3);
     assertThat(preview.materials()).hasSize(1);
     assertThat(preview.materials().get(0).requiredQuantity()).isEqualTo(6.0);
-    assertThat(preview.materials().get(0).defaultQuality()).isEqualTo(QualityRequirement.GOOD);
+    assertThat(preview.materials().get(0).defaultQuality()).isEqualTo("GOOD");
     assertThat(preview.subAssemblies()).hasSize(1);
     assertThat(preview.subAssemblies().get(0).quantity()).isEqualTo(6);
     assertThat(preview.subAssemblies().get(0).gameItem().name()).isEqualTo("Scope");
@@ -390,7 +507,7 @@ class JobOrderItemServiceTest {
     assertThat(preview.materials()).hasSize(1);
     assertThat(preview.materials().get(0).material().name()).isEqualTo("Beradom");
     assertThat(preview.materials().get(0).requiredQuantity()).isEqualTo(60.0);
-    assertThat(preview.materials().get(0).defaultQuality()).isEqualTo(QualityRequirement.NONE);
+    assertThat(preview.materials().get(0).defaultQuality()).isEqualTo("NONE");
   }
 
   @Test
@@ -437,7 +554,7 @@ class JobOrderItemServiceTest {
     assertThat(ricciteReq.getRequiredQuantity()).isEqualTo(3.0);
     JobOrderItemMaterial beradomReq = requirementFor(built, beradomMaterial);
     assertThat(beradomReq.getRequiredQuantity()).isEqualTo(40.0);
-    assertThat(beradomReq.getQualityRequirement()).isEqualTo(QualityRequirement.NONE);
+    assertThat(beradomReq.getQualityTier().getId()).isEqualTo(QualityTierFixtures.NONE_ID);
   }
 
   @Test
@@ -457,7 +574,7 @@ class JobOrderItemServiceTest {
         JobOrderItemMaterial.builder()
             .material(screws)
             .requiredQuantity(40.0)
-            .qualityRequirement(QualityRequirement.NONE)
+            .qualityTier(QualityTierFixtures.none())
             .build());
 
     when(gameItemRepository.findById(weapon.getId())).thenReturn(Optional.of(weapon));
@@ -522,13 +639,13 @@ class JobOrderItemServiceTest {
                 null));
   }
 
-  private JobOrderItem itemLine(Material material, double quantity, QualityRequirement quality) {
+  private JobOrderItem itemLine(Material material, double quantity, QualityTier quality) {
     JobOrderItem item = JobOrderItem.builder().amount(1).build();
     item.addMaterial(
         JobOrderItemMaterial.builder()
             .material(material)
             .requiredQuantity(quantity)
-            .qualityRequirement(quality)
+            .qualityTier(quality)
             .build());
     return item;
   }

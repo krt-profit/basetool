@@ -33,7 +33,6 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto;
@@ -41,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDemandGroupDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDemandOverviewDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDemandRowDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.QualityTierDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeDemandMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeOrgDemandDto;
@@ -58,7 +58,9 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionServ
 import de.greluc.krt.profit.basetool.backend.service.MaterialClaimService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
+import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -85,6 +87,8 @@ import org.mockito.quality.Strictness;
 class ExchangeDemandParityTest {
 
   private static final UUID MEMBER = UUID.randomUUID();
+  private static final QualityTierDto GOOD = QualityTierFixtures.goodDto();
+  private static final QualityTierDto NONE = QualityTierFixtures.noneDto();
 
   @Mock private OrgUnitMembershipRepository membershipRepository;
   @Mock private JobOrderRepository jobOrderRepository;
@@ -101,6 +105,7 @@ class ExchangeDemandParityTest {
   private ExchangeDemandService exchange;
   private JobOrderMaterialDemandService web;
   private OrderLinkedStockIndex stock;
+  private final Map<UUID, Map<TierBucket, Double>> bookedByOrder = new HashMap<>();
   private MaterialDto agricium;
   private MaterialDto beryl;
 
@@ -126,6 +131,9 @@ class ExchangeDemandParityTest {
             materialClaimService,
             squadronMapper);
     stock = mock(OrderLinkedStockIndex.class, withSettings().strictness(Strictness.LENIENT));
+    lenient()
+        .when(stock.bookedFor(any(), anyList()))
+        .thenAnswer(a -> bookedFor(a.getArgument(0), a.getArgument(1)));
     lenient().when(stockProjectionService.loadOrderLinkedStockIndex(any())).thenReturn(stock);
     lenient()
         .when(squadronMapper.orgUnitToReferenceDto(any()))
@@ -146,13 +154,13 @@ class ExchangeDemandParityTest {
     JobOrder items = order(iridium, 3, JobOrderType.ITEM, JobOrderStatus.OPEN);
     requires(
         first,
-        new MaterialRequirement(agricium, QualityRequirement.GOOD, 100.0),
-        new MaterialRequirement(beryl, QualityRequirement.NONE, 30.0));
-    requires(second, new MaterialRequirement(agricium, QualityRequirement.NONE, 20.0));
-    requires(items, new MaterialRequirement(agricium, QualityRequirement.GOOD, 12.5));
-    booked(first, agricium, QualityRequirement.GOOD, 40.0);
-    booked(first, beryl, QualityRequirement.NONE, 30.0);
-    booked(second, agricium, QualityRequirement.NONE, 5.0);
+        new MaterialRequirement(agricium, GOOD, 100.0),
+        new MaterialRequirement(beryl, NONE, 30.0));
+    requires(second, new MaterialRequirement(agricium, NONE, 20.0));
+    requires(items, new MaterialRequirement(agricium, GOOD, 12.5));
+    booked(first, agricium, GOOD, 40.0);
+    booked(first, beryl, NONE, 30.0);
+    booked(second, agricium, NONE, 5.0);
     givenOrders(Set.of(iridium.getId()), first, second, items);
 
     Map<Bucket, Double> webGaps = webGaps(web.getMaterialDemandOverview());
@@ -190,15 +198,14 @@ class ExchangeDemandParityTest {
   void claimsReduceNeitherTheWebGapNorTheOrgDemand() {
     SpecialCommand logistics = specialCommand("SKL");
     JobOrder order = order(logistics, 5, JobOrderType.MATERIAL, JobOrderStatus.OPEN);
-    requires(order, new MaterialRequirement(agricium, QualityRequirement.NONE, 50.0));
-    booked(order, agricium, QualityRequirement.NONE, 10.0);
+    requires(order, new MaterialRequirement(agricium, NONE, 50.0));
+    booked(order, agricium, NONE, 10.0);
     when(materialClaimService.getClaimBucketsForOrders(anyList()))
         .thenReturn(
             Map.of(
                 order.getId(),
                 List.of(
-                    new ClaimBucketDto(
-                        agricium, QualityRequirement.NONE, 50.0, 30.0, 20.0, List.of()))));
+                    new ClaimBucketDto(agricium, NONE.code(), NONE, 50.0, 30.0, 20.0, List.of()))));
     givenOrders(Set.of(logistics.getId()), order);
 
     MaterialDemandOverviewDto overview = web.getMaterialDemandOverview();
@@ -216,13 +223,13 @@ class ExchangeDemandParityTest {
     Squadron nova = squadron("NOV");
     JobOrder first = order(iridium, 1, JobOrderType.MATERIAL, JobOrderStatus.OPEN);
     JobOrder second = order(nova, 2, JobOrderType.MATERIAL, JobOrderStatus.OPEN);
-    requires(first, new MaterialRequirement(agricium, QualityRequirement.GOOD, 10.0));
+    requires(first, new MaterialRequirement(agricium, GOOD, 10.0));
     requires(
         second,
-        new MaterialRequirement(agricium, QualityRequirement.GOOD, 7.0),
-        new MaterialRequirement(beryl, QualityRequirement.NONE, 3.0));
-    booked(first, agricium, QualityRequirement.GOOD, 2.5);
-    booked(second, beryl, QualityRequirement.NONE, 3.0);
+        new MaterialRequirement(agricium, GOOD, 7.0),
+        new MaterialRequirement(beryl, NONE, 3.0));
+    booked(first, agricium, GOOD, 2.5);
+    booked(second, beryl, NONE, 3.0);
     givenOrders(Set.of(iridium.getId(), nova.getId()), first, second);
 
     MaterialDemandOverviewDto overview = web.getMaterialDemandOverview();
@@ -240,9 +247,9 @@ class ExchangeDemandParityTest {
     Squadron iridium = squadron("IRI");
     JobOrder covered = order(iridium, 1, JobOrderType.MATERIAL, JobOrderStatus.OPEN);
     JobOrder lacking = order(iridium, 2, JobOrderType.MATERIAL, JobOrderStatus.OPEN);
-    requires(covered, new MaterialRequirement(agricium, QualityRequirement.NONE, 10.0));
-    requires(lacking, new MaterialRequirement(agricium, QualityRequirement.NONE, 20.0));
-    booked(covered, agricium, QualityRequirement.NONE, 25.0);
+    requires(covered, new MaterialRequirement(agricium, NONE, 10.0));
+    requires(lacking, new MaterialRequirement(agricium, NONE, 20.0));
+    booked(covered, agricium, NONE, 25.0);
     givenOrders(Set.of(iridium.getId()), covered, lacking);
 
     Map<Bucket, Double> webGaps = webGaps(web.getMaterialDemandOverview());
@@ -257,8 +264,8 @@ class ExchangeDemandParityTest {
     MaterialDto frames = pieceMaterial("Frame");
     Squadron iridium = squadron("IRI");
     JobOrder order = order(iridium, 1, JobOrderType.MATERIAL, JobOrderStatus.OPEN);
-    requires(order, new MaterialRequirement(frames, QualityRequirement.NONE, 2.4));
-    booked(order, frames, QualityRequirement.NONE, 1.6);
+    requires(order, new MaterialRequirement(frames, NONE, 2.4));
+    booked(order, frames, NONE, 1.6);
     givenOrders(Set.of(iridium.getId()), order);
 
     Map<Bucket, Double> webGaps = webGaps(web.getMaterialDemandOverview());
@@ -293,11 +300,32 @@ class ExchangeDemandParityTest {
   private void booked(
       @NotNull JobOrder order,
       @NotNull MaterialDto material,
-      @NotNull QualityRequirement quality,
+      @NotNull QualityTierDto tier,
       double amount) {
-    when(stock.stockFor(
-            order.getId(), material.id(), JobOrderStockProjectionService.qualityFloorFor(quality)))
-        .thenReturn(amount);
+    bookedByOrder
+        .computeIfAbsent(order.getId(), id -> new HashMap<>())
+        .put(new TierBucket(material.id(), tier.id()), amount);
+  }
+
+  /**
+   * Answers the stock index the way the allocator would for the stubbed figures: each requirement
+   * gets the amount {@link #booked} recorded for its order, material and tier.
+   *
+   * @param orderId the order
+   * @param requirements the order's requirements
+   * @return the booked amount per requirement, aligned with the list
+   */
+  private double @NotNull [] bookedFor(
+      @NotNull UUID orderId, @NotNull List<MaterialRequirement> requirements) {
+    Map<TierBucket, Double> byBucket = bookedByOrder.getOrDefault(orderId, Map.of());
+    double[] booked = new double[requirements.size()];
+    for (int i = 0; i < requirements.size(); i++) {
+      MaterialRequirement requirement = requirements.get(i);
+      booked[i] =
+          byBucket.getOrDefault(
+              new TierBucket(requirement.material().id(), requirement.tier().id()), 0.0);
+    }
+    return booked;
   }
 
   /**
@@ -313,7 +341,7 @@ class ExchangeDemandParityTest {
         double gap = Math.max(0.0, row.requiredAmount() - row.bookedAmount());
         assertThat(row.outstandingAmount()).isEqualTo(gap);
         gaps.merge(
-            new Bucket(row.material().id(), floor(row.qualityRequirement())), gap, Double::sum);
+            new Bucket(row.material().id(), row.qualityTier().minQuality()), gap, Double::sum);
       }
     }
     return gaps;
@@ -342,11 +370,6 @@ class ExchangeDemandParityTest {
         .filter(e -> e.getValue() > 0)
         .collect(
             Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, Double::sum, TreeMap::new));
-  }
-
-  private static int floor(@NotNull QualityRequirement quality) {
-    Integer floor = JobOrderStockProjectionService.qualityFloorFor(quality);
-    return floor == null ? 0 : floor;
   }
 
   private static @NotNull JobOrder order(
@@ -422,4 +445,12 @@ class ExchangeDemandParityTest {
       return byMaterial != 0 ? byMaterial : Integer.compare(floor, other.floor);
     }
   }
+
+  /**
+   * One stubbed stock bucket of an order.
+   *
+   * @param materialId the material
+   * @param tierId the quality tier
+   */
+  private record TierBucket(@NotNull UUID materialId, @NotNull UUID tierId) {}
 }

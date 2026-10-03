@@ -26,7 +26,11 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
  *
  * @param material the required material (carries {@code quantityType} for unit-aware display)
  * @param requiredQuantity quantity needed for the previewed amount
- * @param defaultQuality the pre-selected quality choice ({@code GOOD} or {@code NONE})
+ * @param defaultQuality the code of the pre-selected quality tier
+ * @param defaultQualityTier the pre-selected quality tier
  */
 public record DerivedMaterialDto(
-    MaterialDto material, Double requiredQuantity, @BackendEnumAsString String defaultQuality) {}
+    MaterialDto material,
+    Double requiredQuantity,
+    String defaultQuality,
+    QualityTierDto defaultQualityTier) {}

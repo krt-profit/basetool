@@ -24,7 +24,6 @@ import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
@@ -32,8 +31,15 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow;
+import de.greluc.krt.profit.basetool.backend.model.dto.LinkedStockAttributionDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialRequirementResolver.MaterialRequirement;
+import de.greluc.krt.profit.basetool.backend.service.QualityBucketAllocator.Allocation;
+import de.greluc.krt.profit.basetool.backend.service.QualityBucketAllocator.Demand;
+import de.greluc.krt.profit.basetool.backend.service.QualityBucketAllocator.Supply;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -41,28 +47,21 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 
 /**
  * Projects managed {@link JobOrder}s into {@link JobOrderDto}s with per-bucket order-linked stock
- * and, for SK-responsible orders, per-squadron material claims. Read-only; single orders and paged
- * lists share one assembly in {@link #mapToDtoWithStock(JobOrder, StockResolver, ClaimResolver)}.
+ * and, for SK-responsible orders, per-squadron material claims. Every stock figure comes from one
+ * {@link QualityBucketAllocator} run per order and material, so a stock row counts toward exactly
+ * one quality bucket (REQ-ORDERS-037). Read-only.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class JobOrderStockProjectionService {
 
-  /**
-   * Inventory quality floor a {@code GOOD} aggregated bucket sums stock at or above (650+ =
-   * refining-grade); a {@code NONE} bucket imposes no floor. Mirrors the MATERIAL requirement's
-   * stored {@code minQuality} so item-order collection progress is computed the same way.
-   */
-  private static final int GOOD_QUALITY_FLOOR = 650;
-
-  /** Sums order-linked inventory stock (per-order query and page-batched index). */
+  /** Loads the order-linked stock rows. */
   private final InventoryItemRepository inventoryItemRepository;
 
   /** Supplies the per-order / page-batched SK material-claim view. */
@@ -78,37 +77,127 @@ public class JobOrderStockProjectionService {
   private final JobOrderItemHandoverMapper jobOrderItemHandoverMapper;
 
   /**
-   * Projects a single order with its per-bucket stock (per-order {@code SUM} queries) and, for an
-   * SK order, its per-order claim view.
+   * Projects a single order with its per-bucket stock and, for an SK order, its claim view.
    *
    * @param jobOrder the managed order to project.
    * @return the assembled order DTO.
    */
   @NotNull
-  public JobOrderDto mapToDtoWithStock(JobOrder jobOrder) {
-    StockResolver stockResolver =
-        (orderId, materialId, floor) -> {
-          Double stock =
-              inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(
-                  materialId, orderId, floor);
-          return stock != null ? stock : 0.0;
-        };
-    return mapToDtoWithStock(
-        jobOrder, stockResolver, order -> materialClaimService.getClaimBucketsForOrder(order));
+  public JobOrderDto mapToDtoWithStock(@NotNull JobOrder jobOrder) {
+    return assembleDto(
+        jobOrder,
+        loadOrderLinkedStockIndex(List.of(jobOrder.getId())),
+        order -> materialClaimService.getClaimBucketsForOrder(order));
   }
 
   /**
-   * Assembles the order DTO from pluggable stock and claim resolvers, backed by per-order queries
-   * on the single-order path and by page-batched lookups on the list path (REQ-DATA-003).
+   * Projects a page of orders, loading all linked stock and all SK claims in one query each
+   * (REQ-DATA-003).
+   *
+   * @param page the scoped page of managed orders
+   * @return the page mapped to stock- and claim-enriched DTOs
+   */
+  public Page<JobOrderDto> mapPageWithStock(@NotNull Page<JobOrder> page) {
+    List<JobOrder> orders = page.getContent();
+    OrderLinkedStockIndex stockIndex =
+        loadOrderLinkedStockIndex(orders.stream().map(JobOrder::getId).toList());
+    Map<UUID, List<ClaimBucketDto>> claimsByOrder =
+        materialClaimService.getClaimBucketsForOrders(
+            orders.stream()
+                .filter(JobOrderStockProjectionService::isSpecialCommandResponsible)
+                .toList());
+    ClaimResolver claimResolver = order -> claimsByOrder.getOrDefault(order.getId(), List.of());
+    jobOrderMapper.primeAssignees(orders);
+    return page.map(o -> assembleDto(o, stockIndex, claimResolver));
+  }
+
+  /**
+   * Loads the order-linked material stock of many orders in one query as a reusable lookup
+   * (REQ-DATA-003).
+   *
+   * @param orderIds the orders whose linked stock to index; empty yields an empty index without a
+   *     query
+   * @return the batched lookup, never {@code null}
+   */
+  @NotNull
+  public OrderLinkedStockIndex loadOrderLinkedStockIndex(@NotNull Collection<UUID> orderIds) {
+    if (orderIds.isEmpty()) {
+      return new OrderLinkedStockIndex(Map.of());
+    }
+    return new OrderLinkedStockIndex(
+        inventoryItemRepository.findMaterialStockRowsByJobOrderIds(orderIds).stream()
+            .collect(
+                Collectors.groupingBy(
+                    JobOrderMaterialStockRow::jobOrderId,
+                    Collectors.groupingBy(JobOrderMaterialStockRow::materialId))));
+  }
+
+  /**
+   * Reports, per linked stock row of one material, which quality buckets it counts toward
+   * (REQ-ORDERS-037). Rows below every floor appear with no bucket.
+   *
+   * @param jobOrder the managed order
+   * @param requirements the order's requirements, from {@link
+   *     JobOrderMaterialRequirementResolver#requirementsOf(JobOrder)}
+   * @param materialId the material
+   * @return one entry per row and bucket, plus one entry without a bucket per unattributed row
+   */
+  @NotNull
+  public List<LinkedStockAttributionDto> attributionFor(
+      @NotNull JobOrder jobOrder,
+      @NotNull List<MaterialRequirement> requirements,
+      @NotNull UUID materialId) {
+    OrderLinkedStockIndex index = loadOrderLinkedStockIndex(List.of(jobOrder.getId()));
+    List<MaterialRequirement> ofMaterial =
+        requirements.stream().filter(r -> r.material().id().equals(materialId)).toList();
+    Allocation<Integer> allocation =
+        index.allocate(jobOrder.getId(), materialId, demandsOf(ofMaterial));
+    List<LinkedStockAttributionDto> result = new ArrayList<>();
+    for (Supply supply : index.suppliesFor(jobOrder.getId(), materialId)) {
+      Map<Integer, Double> byDemand = allocation.byRow().getOrDefault(supply.rowId(), Map.of());
+      Map<UUID, Double> byTier = new LinkedHashMap<>();
+      byDemand.forEach(
+          (demandIndex, amount) ->
+              byTier.merge(ofMaterial.get(demandIndex).tier().id(), amount, Double::sum));
+      double attributed = byTier.values().stream().mapToDouble(Double::doubleValue).sum();
+      byTier.forEach(
+          (tierId, amount) ->
+              result.add(new LinkedStockAttributionDto(supply.rowId(), tierId, round3(amount))));
+      double rest = Math.max(0.0, supply.amount() - attributed);
+      if (rest > 1e-9) {
+        result.add(new LinkedStockAttributionDto(supply.rowId(), null, round3(rest)));
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Builds the allocator demands of one material's requirements, keyed by their list index.
+   *
+   * @param requirements the requirements of one order and one material
+   * @return the demands, in list order
+   */
+  @NotNull
+  static List<Demand<Integer>> demandsOf(@NotNull List<MaterialRequirement> requirements) {
+    List<Demand<Integer>> demands = new ArrayList<>();
+    for (int i = 0; i < requirements.size(); i++) {
+      MaterialRequirement requirement = requirements.get(i);
+      demands.add(new Demand<>(i, requirement.tier().minQuality(), requirement.requiredAmount()));
+    }
+    return demands;
+  }
+
+  /**
+   * Assembles the order DTO from the batched stock index and a pluggable claim resolver.
    *
    * @param jobOrder the managed order to project
-   * @param stockResolver resolves the order-linked stock of one material at a quality floor
+   * @param stockIndex the order-linked stock of at least this order
    * @param claimResolver resolves the SK claim view of one order ({@code List.of()} for non-SK)
    * @return the order DTO with per-bucket stock and, for SK orders, claims
    */
   @NotNull
-  private JobOrderDto mapToDtoWithStock(
-      JobOrder jobOrder, StockResolver stockResolver, ClaimResolver claimResolver) {
+  private JobOrderDto assembleDto(
+      JobOrder jobOrder, OrderLinkedStockIndex stockIndex, ClaimResolver claimResolver) {
     JobOrderDto baseDto = jobOrderMapper.toDto(jobOrder);
 
     Map<String, ClaimBucketDto> claimByBucket =
@@ -116,47 +205,41 @@ public class JobOrderStockProjectionService {
             ? claimResolver.claimsFor(jobOrder).stream()
                 .collect(
                     Collectors.toMap(
-                        b -> bucketKey(b.material().id(), b.qualityRequirement().name()), b -> b))
+                        b -> bucketKey(b.material().id(), b.qualityTier().id()), b -> b))
             : Map.of();
 
-    List<JobOrderMaterialDto> updatedMaterials =
-        baseDto.materials().stream()
-            .map(
-                matDto -> {
-                  double stock =
-                      stockResolver.stockFor(
-                          jobOrder.getId(), matDto.material().id(), matDto.minQuality());
-                  log.debug(
-                      "Stock for job order #{} (ID: {}), material {}: {} / required: {} (min"
-                          + " quality: {})",
-                      jobOrder.getDisplayId(),
-                      jobOrder.getId(),
-                      matDto.material().name(),
-                      stock,
-                      matDto.amount(),
-                      matDto.minQuality());
-                  String qualityName =
-                      matDto.minQuality() != null
-                          ? QualityRequirement.GOOD.name()
-                          : QualityRequirement.NONE.name();
-                  ClaimBucketDto bucket =
-                      claimByBucket.get(bucketKey(matDto.material().id(), qualityName));
-                  return new JobOrderMaterialDto(
-                      matDto.id(),
-                      matDto.material(),
-                      matDto.minQuality(),
-                      matDto.amount(),
-                      stock,
-                      bucket != null ? bucket.claims() : List.of(),
-                      bucket != null ? bucket.openRemaining() : null,
-                      matDto.version());
-                })
-            .toList();
+    List<JobOrderMaterialDto> baseMaterials = baseDto.materials();
+    double[] booked =
+        stockIndex.bookedFor(
+            jobOrder.getId(),
+            baseMaterials.stream()
+                .map(
+                    m ->
+                        new MaterialRequirement(
+                            m.material(), m.qualityTier(), m.amount() == null ? 0.0 : m.amount()))
+                .toList());
+    List<JobOrderMaterialDto> updatedMaterials = new ArrayList<>();
+    for (int i = 0; i < baseMaterials.size(); i++) {
+      JobOrderMaterialDto matDto = baseMaterials.get(i);
+      ClaimBucketDto bucket =
+          claimByBucket.get(bucketKey(matDto.material().id(), matDto.qualityTier().id()));
+      updatedMaterials.add(
+          new JobOrderMaterialDto(
+              matDto.id(),
+              matDto.material(),
+              matDto.minQuality(),
+              matDto.qualityTier(),
+              matDto.amount(),
+              round3(booked[i]),
+              bucket != null ? bucket.claims() : List.of(),
+              bucket != null ? bucket.openRemaining() : null,
+              matDto.version()));
+    }
 
     boolean isItem = jobOrder.getType() == JobOrderType.ITEM;
     List<JobOrderItemDto> items = isItem ? jobOrderItemService.toItemDtos(jobOrder) : List.of();
     List<AggregatedMaterialDto> aggregatedMaterials =
-        isItem ? enrichAggregatedWithClaims(jobOrder, claimByBucket, stockResolver) : List.of();
+        isItem ? enrichAggregatedWithClaims(jobOrder, claimByBucket, stockIndex) : List.of();
     List<JobOrderItemHandoverDto> itemHandovers =
         isItem
             ? jobOrder.getItemHandovers().stream().map(jobOrderItemHandoverMapper::toDto).toList()
@@ -186,66 +269,61 @@ public class JobOrderStockProjectionService {
   }
 
   /**
-   * Projects a page of orders, loading all linked stock and all SK claims in one query each and
-   * summing buckets in memory (REQ-DATA-003).
+   * Enriches the item order's aggregated-material rows with the stock attributed to each bucket
+   * and, for SK orders, with claims and open amount; non-SK rows keep empty claims and a {@code
+   * null} open amount.
    *
-   * @param page the scoped page of managed orders
-   * @return the page mapped to stock- and claim-enriched DTOs
+   * @param jobOrder the item order
+   * @param claimByBucket the SK claim view keyed by {@link #bucketKey}, or empty for non-SK orders
+   * @param stockIndex the order-linked stock of at least this order
+   * @return the stock- and claim-enriched rows
    */
-  public Page<JobOrderDto> mapPageWithStock(@NotNull Page<JobOrder> page) {
-    List<JobOrder> orders = page.getContent();
-    OrderLinkedStockIndex stockIndex =
-        loadOrderLinkedStockIndex(orders.stream().map(JobOrder::getId).toList());
-    Map<UUID, List<ClaimBucketDto>> claimsByOrder =
-        materialClaimService.getClaimBucketsForOrders(
-            orders.stream()
-                .filter(JobOrderStockProjectionService::isSpecialCommandResponsible)
+  private List<AggregatedMaterialDto> enrichAggregatedWithClaims(
+      JobOrder jobOrder,
+      Map<String, ClaimBucketDto> claimByBucket,
+      OrderLinkedStockIndex stockIndex) {
+    List<AggregatedMaterialDto> aggregated = jobOrderItemService.aggregateMaterials(jobOrder);
+    double[] booked =
+        stockIndex.bookedFor(
+            jobOrder.getId(),
+            aggregated.stream()
+                .map(
+                    agg ->
+                        new MaterialRequirement(
+                            agg.material(),
+                            agg.qualityTier(),
+                            agg.totalQuantity() == null ? 0.0 : agg.totalQuantity()))
                 .toList());
-    StockResolver stockResolver = stockIndex::stockFor;
-    ClaimResolver claimResolver = order -> claimsByOrder.getOrDefault(order.getId(), List.of());
-    jobOrderMapper.primeAssignees(orders);
-    return page.map(o -> mapToDtoWithStock(o, stockResolver, claimResolver));
+    List<AggregatedMaterialDto> result = new ArrayList<>();
+    for (int i = 0; i < aggregated.size(); i++) {
+      AggregatedMaterialDto agg = aggregated.get(i);
+      ClaimBucketDto bucket =
+          claimByBucket.get(bucketKey(agg.material().id(), agg.qualityTier().id()));
+      result.add(
+          new AggregatedMaterialDto(
+              agg.material(),
+              agg.qualityRequirement(),
+              agg.qualityTier(),
+              agg.totalQuantity(),
+              round3(booked[i]),
+              bucket != null ? bucket.claims() : agg.claims(),
+              bucket != null ? bucket.openRemaining() : agg.openAmount()));
+    }
+    return result;
   }
 
   /**
-   * Loads the order-linked material stock of many orders in one query as a reusable lookup
-   * (REQ-DATA-003), with the same floor semantics as the per-order sum.
-   *
-   * @param orderIds the orders whose linked stock to index; empty yields an index answering {@code
-   *     0.0} without a query
-   * @return the batched lookup, never {@code null}
-   */
-  @NotNull
-  public OrderLinkedStockIndex loadOrderLinkedStockIndex(Collection<UUID> orderIds) {
-    return new OrderLinkedStockIndex(loadStockIndex(orderIds));
-  }
-
-  /**
-   * Maps a bucket's quality requirement to its stock-summing floor: {@code GOOD} sums from {@value
-   * #GOOD_QUALITY_FLOOR}, {@code NONE} has no floor.
-   *
-   * @param qualityRequirement the bucket's quality requirement
-   * @return the minimum quality to sum at, or {@code null} for no floor
-   */
-  @Nullable
-  public static Integer qualityFloorFor(QualityRequirement qualityRequirement) {
-    return qualityRequirement == QualityRequirement.GOOD ? GOOD_QUALITY_FLOOR : null;
-  }
-
-  /**
-   * A pre-loaded, order-batched view of job-order-linked material inventory that answers "how much
-   * of material M is linked to order O at or above quality floor Q" purely in memory. Obtained from
-   * {@link #loadOrderLinkedStockIndex(Collection)}; the backing index is never handed out, so the
-   * lookup cannot be mutated after it has been built.
+   * A pre-loaded, order-batched view of job-order-linked material inventory that distributes each
+   * order's stock across its quality buckets in memory. Obtained from {@link
+   * #loadOrderLinkedStockIndex(Collection)}; the backing index is never handed out.
    */
   public static final class OrderLinkedStockIndex {
 
-    /** Order id &rarr; material id &rarr; the linked material inventory rows of that bucket. */
+    /** Order id &rarr; material id &rarr; the linked material inventory rows. */
     private final Map<UUID, Map<UUID, List<JobOrderMaterialStockRow>>> rowsByOrderAndMaterial;
 
     /**
-     * Wraps an already-loaded stock index; private so an instance can only originate from {@link
-     * #loadOrderLinkedStockIndex(Collection)} and always reflects one batched query.
+     * Wraps an already-loaded stock index.
      *
      * @param rowsByOrderAndMaterial the loaded index.
      */
@@ -255,77 +333,83 @@ public class JobOrderStockProjectionService {
     }
 
     /**
-     * Sums the linked stock of one order and material at a quality floor, in memory, with the same
-     * semantics as {@code sumAmountByMaterialAndJobOrderAndMinQuality}.
+     * Returns the stock rows of one order and material as allocator supplies.
      *
-     * @param jobOrderId the order the stock is linked to
-     * @param materialId the material to sum
-     * @param qualityFloor the minimum quality, or {@code null} for no floor
-     * @return the summed amount; {@code 0.0} when nothing matches
+     * @param jobOrderId the order
+     * @param materialId the material
+     * @return the supplies, empty when nothing is linked
      */
-    public double stockFor(UUID jobOrderId, UUID materialId, Integer qualityFloor) {
-      return sumStockAtFloor(rowsByOrderAndMaterial, jobOrderId, materialId, qualityFloor);
+    @NotNull
+    public List<Supply> suppliesFor(@NotNull UUID jobOrderId, @NotNull UUID materialId) {
+      List<JobOrderMaterialStockRow> rows =
+          rowsByOrderAndMaterial.getOrDefault(jobOrderId, Map.of()).get(materialId);
+      if (rows == null) {
+        return List.of();
+      }
+      Map<UUID, Supply> byRow = new LinkedHashMap<>();
+      for (JobOrderMaterialStockRow row : rows) {
+        double amount = row.amount() == null ? 0.0 : row.amount();
+        byRow.merge(
+            row.inventoryItemId(),
+            new Supply(row.inventoryItemId(), row.quality(), amount),
+            (a, b) -> new Supply(a.rowId(), a.quality(), a.amount() + b.amount()));
+      }
+      return List.copyOf(byRow.values());
+    }
+
+    /**
+     * Distributes one order's stock of one material across the given demands.
+     *
+     * @param jobOrderId the order
+     * @param materialId the material
+     * @param demands the order's demands for that material
+     * @param <K> the demand key type
+     * @return the distribution
+     */
+    @NotNull
+    public <K> Allocation<K> allocate(
+        @NotNull UUID jobOrderId, @NotNull UUID materialId, @NotNull List<Demand<K>> demands) {
+      return QualityBucketAllocator.allocate(demands, suppliesFor(jobOrderId, materialId));
+    }
+
+    /**
+     * Returns the stock attributed to each requirement of one order, unrounded.
+     *
+     * @param jobOrderId the order
+     * @param requirements the order's requirements, any materials, any order
+     * @return the attributed amount per requirement, aligned with the list
+     */
+    public double @NotNull [] bookedFor(
+        @NotNull UUID jobOrderId, @NotNull List<MaterialRequirement> requirements) {
+      double[] booked = new double[requirements.size()];
+      Map<UUID, List<Integer>> indexesByMaterial = new LinkedHashMap<>();
+      for (int i = 0; i < requirements.size(); i++) {
+        indexesByMaterial
+            .computeIfAbsent(requirements.get(i).material().id(), unused -> new ArrayList<>())
+            .add(i);
+      }
+      indexesByMaterial.forEach(
+          (materialId, indexes) -> {
+            List<Demand<Integer>> demands = new ArrayList<>();
+            for (int index : indexes) {
+              MaterialRequirement requirement = requirements.get(index);
+              demands.add(
+                  new Demand<>(
+                      index, requirement.tier().minQuality(), requirement.requiredAmount()));
+            }
+            Allocation<Integer> allocation = allocate(jobOrderId, materialId, demands);
+            for (int index : indexes) {
+              booked[index] = allocation.attributedTo(index);
+            }
+          });
+      return booked;
     }
   }
 
   /**
-   * Enriches the item order's aggregated-material rows with {@code currentStock} at each bucket's
-   * quality floor and, for SK orders, with claims and open amount; non-SK rows keep empty claims
-   * and a {@code null} open amount.
-   *
-   * @param jobOrder the item order
-   * @param claimByBucket the SK claim view keyed by {@link #bucketKey}, or empty for non-SK orders
-   * @param stockResolver resolves the order-linked stock of one material at a quality floor
-   * @return the stock- and claim-enriched rows
-   */
-  private List<AggregatedMaterialDto> enrichAggregatedWithClaims(
-      JobOrder jobOrder, Map<String, ClaimBucketDto> claimByBucket, StockResolver stockResolver) {
-    return jobOrderItemService.aggregateMaterials(jobOrder).stream()
-        .map(
-            agg -> {
-              Integer minQuality = qualityFloorFor(agg.qualityRequirement());
-              double stock =
-                  stockResolver.stockFor(jobOrder.getId(), agg.material().id(), minQuality);
-              ClaimBucketDto bucket =
-                  claimByBucket.get(
-                      bucketKey(agg.material().id(), agg.qualityRequirement().name()));
-              return new AggregatedMaterialDto(
-                  agg.material(),
-                  agg.qualityRequirement(),
-                  agg.totalQuantity(),
-                  stock,
-                  bucket != null ? bucket.claims() : agg.claims(),
-                  bucket != null ? bucket.openRemaining() : agg.openAmount());
-            })
-        .toList();
-  }
-
-  /**
-   * Resolves the order-linked stock of one material at a quality floor for {@link
-   * #mapToDtoWithStock(JobOrder, StockResolver, ClaimResolver)}. The single-order path backs it
-   * with the per-order {@code SUM} query; the paged list backs it with an in-memory sum over the
-   * page-batched stock index (REQ-DATA-003).
-   */
-  @FunctionalInterface
-  private interface StockResolver {
-    /**
-     * Returns the stock of {@code materialId} linked to {@code jobOrderId} with quality at least
-     * {@code qualityFloor}, with the semantics of {@code
-     * sumAmountByMaterialAndJobOrderAndMinQuality}.
-     *
-     * @param jobOrderId the order the stock is linked to
-     * @param materialId the material to sum
-     * @param qualityFloor the minimum quality, or {@code null} for no floor
-     * @return the summed amount, {@code 0.0} when nothing matches
-     */
-    double stockFor(UUID jobOrderId, UUID materialId, Integer qualityFloor);
-  }
-
-  /**
-   * Resolves the SK claim view of one order for {@link #mapToDtoWithStock(JobOrder, StockResolver,
-   * ClaimResolver)}. The single-order path backs it with the per-order claim query; the paged list
-   * backs it with the page-batched claim lookup (REQ-DATA-003). Only invoked for SK-responsible
-   * orders.
+   * Resolves the SK claim view of one order. The single-order path backs it with the per-order
+   * claim query; the paged list backs it with the page-batched claim lookup (REQ-DATA-003). Only
+   * invoked for SK-responsible orders.
    */
   @FunctionalInterface
   private interface ClaimResolver {
@@ -336,60 +420,6 @@ public class JobOrderStockProjectionService {
      * @return the claim buckets, never {@code null}.
      */
     List<ClaimBucketDto> claimsFor(JobOrder order);
-  }
-
-  /**
-   * Loads every linked material inventory row of the given orders in one query, indexed by order id
-   * and material id (REQ-DATA-003). Game-item earmarks are excluded by the query.
-   *
-   * @param orderIds the orders whose linked stock to index; empty yields an empty index
-   * @return order id to material id to linked material rows, never {@code null}
-   */
-  private Map<UUID, Map<UUID, List<JobOrderMaterialStockRow>>> loadStockIndex(
-      Collection<UUID> orderIds) {
-    if (orderIds.isEmpty()) {
-      return Map.of();
-    }
-    return inventoryItemRepository.findMaterialStockRowsByJobOrderIds(orderIds).stream()
-        .collect(
-            Collectors.groupingBy(
-                JobOrderMaterialStockRow::jobOrderId,
-                Collectors.groupingBy(JobOrderMaterialStockRow::materialId)));
-  }
-
-  /**
-   * Sums the pre-loaded rows of one order and material at a quality floor, with the semantics of
-   * {@code sumAmountByMaterialAndJobOrderAndMinQuality}.
-   *
-   * @param stockIndex the index from {@link #loadStockIndex(Collection)}
-   * @param jobOrderId the order to sum within
-   * @param materialId the material to sum
-   * @param qualityFloor the minimum quality, or {@code null} for no floor
-   * @return the summed amount; {@code 0.0} when nothing matches
-   */
-  private static double sumStockAtFloor(
-      @NotNull Map<UUID, Map<UUID, List<JobOrderMaterialStockRow>>> stockIndex,
-      UUID jobOrderId,
-      UUID materialId,
-      Integer qualityFloor) {
-    Map<UUID, List<JobOrderMaterialStockRow>> byMaterial = stockIndex.get(jobOrderId);
-    if (byMaterial == null) {
-      return 0.0;
-    }
-    List<JobOrderMaterialStockRow> rows = byMaterial.get(materialId);
-    if (rows == null) {
-      return 0.0;
-    }
-    double sum = 0.0;
-    for (JobOrderMaterialStockRow row : rows) {
-      if (row.amount() == null) {
-        continue;
-      }
-      if (qualityFloor == null || (row.quality() != null && row.quality() >= qualityFloor)) {
-        sum += row.amount();
-      }
-    }
-    return sum;
   }
 
   /**
@@ -405,15 +435,25 @@ public class JobOrderStockProjectionService {
   }
 
   /**
-   * Builds the composite key identifying a material bucket ({@code materialId|QUALITY}) used to
-   * join claim buckets onto the material / aggregated rows.
+   * Builds the composite key identifying a material bucket ({@code materialId|tierId}) used to join
+   * claim buckets onto the material / aggregated rows.
    *
    * @param materialId the material id.
-   * @param qualityName the {@code GOOD}/{@code NONE} quality name.
+   * @param qualityTierId the bucket's quality tier id.
    * @return the composite bucket key.
    */
   @NotNull
-  private static String bucketKey(UUID materialId, String qualityName) {
-    return materialId + "|" + qualityName;
+  private static String bucketKey(UUID materialId, UUID qualityTierId) {
+    return materialId + "|" + qualityTierId;
+  }
+
+  /**
+   * Rounds an attributed amount to SCU scale, removing floating-point noise.
+   *
+   * @param value the raw amount
+   * @return the amount rounded to three decimals
+   */
+  private static double round3(double value) {
+    return Math.round(value * 1000.0) / 1000.0;
   }
 }

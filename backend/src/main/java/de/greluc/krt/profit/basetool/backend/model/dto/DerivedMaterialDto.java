@@ -19,17 +19,19 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
-
 /**
  * One resolved material requirement in an item-order derivation preview: the material, the quantity
- * needed for the previewed amount (unit from {@code material.quantityType}), and the quality the UI
- * should pre-select ({@code GOOD} when the blueprint ingredient's {@code minQuality} is 650+, else
- * {@code NONE}). The requester may override {@code defaultQuality} per material before submitting.
+ * needed for the previewed amount (unit from {@code material.quantityType}), and the quality tier
+ * the UI should pre-select: the active tier with the highest floor the blueprint ingredient's
+ * {@code minQuality} reaches. The requester may override it per material before submitting.
  *
  * @param material the required material (carries {@code quantityType} for unit-aware display)
  * @param requiredQuantity quantity needed for the previewed amount
- * @param defaultQuality the pre-selected quality choice derived from the ingredient
+ * @param defaultQuality the code of the pre-selected quality tier
+ * @param defaultQualityTier the pre-selected quality tier
  */
 public record DerivedMaterialDto(
-    MaterialDto material, Double requiredQuantity, QualityRequirement defaultQuality) {}
+    MaterialDto material,
+    Double requiredQuantity,
+    String defaultQuality,
+    QualityTierDto defaultQualityTier) {}

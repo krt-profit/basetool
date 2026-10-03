@@ -19,10 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
+import de.greluc.krt.profit.basetool.backend.validation.QualityValue;
 import de.greluc.krt.profit.basetool.backend.validation.QuantityAware;
 import de.greluc.krt.profit.basetool.backend.validation.ValidQuantityAmount;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
@@ -45,7 +44,7 @@ import java.util.UUID;
 public record RefineryOrderStoreItemDto(
     @NotNull UUID materialId,
     @NotNull UUID locationId,
-    @NotNull @Min(0) @Max(1000) Integer quality,
+    @NotNull @QualityValue Integer quality,
     @NotNull Double amount,
     UUID userId,
     UUID jobOrderId,

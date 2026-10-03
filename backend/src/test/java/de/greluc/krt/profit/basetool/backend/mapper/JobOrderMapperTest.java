@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
+import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -67,7 +68,13 @@ class JobOrderMapperTest {
     var squadronMapper = Mappers.getMapper(SquadronMapper.class);
     var handoverMapper = new JobOrderHandoverMapperImpl(materialMapper, userMapper, squadronMapper);
 
-    mapper = new JobOrderMapperImpl(userMapper, materialMapper, handoverMapper, squadronMapper);
+    mapper =
+        new JobOrderMapperImpl(
+            userMapper,
+            materialMapper,
+            handoverMapper,
+            squadronMapper,
+            Mappers.getMapper(QualityTierMapper.class));
     ReflectionTestUtils.setField(mapper, "assigneeUserMapper", userMapper);
     ReflectionTestUtils.setField(
         mapper,
@@ -94,7 +101,7 @@ class JobOrderMapperTest {
     JobOrderMaterial jm = new JobOrderMaterial();
     jm.setId(UUID.randomUUID());
     jm.setMaterial(gold);
-    jm.setMinQuality(800);
+    jm.setQualityTier(QualityTierFixtures.tier("Q800", 800));
     jm.setAmount(5.0);
     jm.setVersion(1L);
 
@@ -218,7 +225,7 @@ class JobOrderMapperTest {
     JobOrderMaterial jm = new JobOrderMaterial();
     jm.setId(UUID.randomUUID());
     jm.setMaterial(material);
-    jm.setMinQuality(900);
+    jm.setQualityTier(QualityTierFixtures.tier("Q900", 900));
     jm.setAmount(2.5);
     jm.setVersion(3L);
 
@@ -227,6 +234,7 @@ class JobOrderMapperTest {
     assertNotNull(dto);
     assertEquals(jm.getId(), dto.id());
     assertEquals(900, dto.minQuality());
+    assertEquals("Q900", dto.qualityTier().code());
     assertEquals(2.5, dto.amount());
     assertEquals(3L, dto.version());
     assertNotNull(dto.material());
@@ -246,22 +254,22 @@ class JobOrderMapperTest {
     JobOrderMaterial jm1 = new JobOrderMaterial();
     jm1.setId(UUID.randomUUID());
     jm1.setMaterial(gold);
-    jm1.setMinQuality(0);
+    jm1.setQualityTier(QualityTierFixtures.none());
     jm1.setAmount(1.0);
     JobOrderMaterial jm2 = new JobOrderMaterial();
     jm2.setId(UUID.randomUUID());
     jm2.setMaterial(iron);
-    jm2.setMinQuality(0);
+    jm2.setQualityTier(QualityTierFixtures.none());
     jm2.setAmount(1.0);
     JobOrderMaterial jm3 = new JobOrderMaterial();
     jm3.setId(UUID.randomUUID());
     jm3.setMaterial(silver);
-    jm3.setMinQuality(0);
+    jm3.setQualityTier(QualityTierFixtures.none());
     jm3.setAmount(1.0);
     JobOrderMaterial jm4 = new JobOrderMaterial();
     jm4.setId(UUID.randomUUID());
     jm4.setMaterial(copper);
-    jm4.setMinQuality(0);
+    jm4.setQualityTier(QualityTierFixtures.none());
     jm4.setAmount(1.0);
 
     Set<JobOrderMaterial> materials = Set.of(jm1, jm2, jm3, jm4);
@@ -280,14 +288,14 @@ class JobOrderMapperTest {
     JobOrderMaterial broken = new JobOrderMaterial();
     broken.setId(UUID.randomUUID());
     broken.setMaterial(null);
-    broken.setMinQuality(0);
+    broken.setQualityTier(QualityTierFixtures.none());
     broken.setAmount(1.0);
 
     Material gold = newMaterial("Gold", QuantityType.SCU);
     JobOrderMaterial ok = new JobOrderMaterial();
     ok.setId(UUID.randomUUID());
     ok.setMaterial(gold);
-    ok.setMinQuality(0);
+    ok.setQualityTier(QualityTierFixtures.none());
     ok.setAmount(1.0);
 
     List<JobOrderMaterialDto> result = mapper.mapAndSortMaterials(Set.of(broken, ok));
@@ -314,13 +322,14 @@ class JobOrderMapperTest {
     JobOrderMaterial jm = new JobOrderMaterial();
     jm.setId(UUID.randomUUID());
     jm.setMaterial(material);
-    jm.setMinQuality(null);
+    jm.setQualityTier(QualityTierFixtures.none());
     jm.setAmount(42.0);
 
     JobOrderMaterialDto dto = mapper.toDto(jm);
 
     assertNotNull(dto);
-    assertNull(dto.minQuality(), "null minQuality (Keine) must map through as null");
+    assertNull(dto.minQuality(), "the base tier maps to a null minQuality");
+    assertEquals("NONE", dto.qualityTier().code());
   }
 
   private static Material newMaterial(String name, QuantityType quantityType) {

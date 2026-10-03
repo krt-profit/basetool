@@ -4,6 +4,10 @@
 
 ### Added
 
+- **Aufträge: Qualitätsstufen als pflegbarer Katalog.** Admins legen Stufen mit Code, Mindestqualität
+  und deutscher/englischer Bezeichnung unter „Qualitätsstufen“ an; neue Stufen brauchen kein Release.
+  „Keine“ und „Gut (650+)“ bleiben unverändert (REQ-ORDERS-036, ADR-0241, Migration V261–V264).
+
 - **Backend: Modulkarte und eingefrorene Modulkopplung (Guard G-09).** Eine Domain-Map ordnet jede
   Backend-Klasse einem der 26 Zielmodule zu; ein ArchUnit-`modules()`-Test friert die heutigen 138
   Kanten gegen die Rangordnung ein, neue scheitern. Spring Modulith 2.1.1 läuft nur im Testumfang
@@ -147,6 +151,14 @@
   `promote.yml` die fünf `:stable`-Tags nacheinander verschiebt, wartet `deploy.sh` jetzt ab, statt
   `DeployFailed` auszulösen. Erst ein Satz, der länger als `IRI_MIXED_RELEASE_GRACE` (900 s) gemischt bleibt, gilt
   als Fehler.
+
+- **Aufträge: Bestand wird nicht mehr doppelt gezählt, wenn ein Material in mehreren Qualitäten
+  gebraucht wird.** Verknüpfter Bestand wird genau einer Stufe angerechnet (höchste Stufe zuerst);
+  Auftragsdetail, Materialbedarf, Lager-Auswahl und Exchange-Feed zeigen den echten offenen Bedarf
+  (REQ-ORDERS-037).
+
+- **Qualität ist überall auf 0–1000 begrenzt.** Die Datenbank prüft es, Eingaben darüber werden
+  abgelehnt, importierte Blueprint-Werte werden gekappt (REQ-DATA-023, V265).
 
 - **Crew-Board auf dem Smartphone: Ziehen unter die Tab-Leiste.** Beim Ziehen eines Teilnehmers scrollt die
   Seite jetzt schon oberhalb der Tab-Leiste, sodass eine verdeckte Einheit erreichbar wird; Loslassen über

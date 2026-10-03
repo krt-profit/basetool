@@ -19,18 +19,20 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 /**
  * Per-material quality choice the requester makes for one ordered item line. The server re-derives
  * the required quantity from the blueprint (authoritative) and applies this {@code quality} to the
  * matching derived material; a material the client omits falls back to the blueprint-derived
- * default (GOOD when the ingredient's {@code minQuality} is 650+, else NONE).
+ * default (the active tier with the highest floor the ingredient's {@code minQuality} reaches).
  *
  * @param materialId the material this choice applies to
- * @param quality the requested quality floor ({@code GOOD} = 650+, {@code NONE} = no floor)
+ * @param quality the code of the requested quality tier, e.g. {@code GOOD} or {@code NONE}
+ *     (REQ-ORDERS-036)
  */
 public record CreateJobOrderItemMaterialDto(
-    @NotNull UUID materialId, @NotNull QualityRequirement quality) {}
+    @NotNull UUID materialId, @NotBlank @Size(max = 32) String quality) {}

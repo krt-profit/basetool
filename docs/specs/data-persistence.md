@@ -1161,6 +1161,40 @@ the list may only shrink.
 **Enforced by:** `CachedCatalogueEntityInvariantTest`, `CacheableEntityRulesTest` · **Code:**
 `CacheConfig`, the catalogue `…Service` classes
 
+### REQ-DATA-023 — every quality lies in 0–1000
+
+Every material quality and every quality floor the system stores lies in **0 to 1000 inclusive**:
+`inventory_item.quality`, `refinery_good.quality`, `job_order_handover_item.quality`,
+`blueprint_ingredient.min_quality`, `job_order_material.min_quality`, the `quality_min` /
+`quality_max` bounds of `blueprint_requirement_modifier` and `blueprint_modifier_segment`,
+`material_exchange_request.min_quality` and `quality_tier.min_quality`. The bound holds in three
+places, so no path can slip past it:
+
+- **The database** checks it (`ck_*_quality_range`, V265; `ck_quality_tier_min_quality`, V261;
+  `ck_material_exchange_request_min_quality`, V224).
+- **Input from members and clients** is refused with a 400: every write DTO carrying a quality uses
+  the shared `@QualityValue` constraint (`Quality.MIN` / `Quality.MAX`), not its own `@Min` / `@Max`.
+  The one deliberate exception is a **refinery extraction** (`RefineryExtractGoodDto`, web import
+  and exchange draft): the SC extractor sends `-1` for a grade it could not read, so the draft
+  carries the value with an `OUT_OF_RANGE_QUALITY` warning instead of failing the whole screenshot,
+  and the range is enforced when the member saves the corrected order (`RefineryGoodDto`).
+- **External catalogue data** (SC Wiki and P4K blueprints) is **clamped** to the range with a
+  warning in the log (`Quality.clampImported`), because one out-of-range value must not abort a whole
+  sync.
+
+Production held no value outside the range when the checks were added (read-only count,
+2026-10-03).
+
+**Acceptance**
+
+- [x] A quality tier with floor 1001 is refused by the database; the seven `ck_*_quality_range`
+  constraints exist (`V261QualityTierMigrationTest`).
+- [x] Every quality-carrying write DTO uses `@QualityValue`; 1000 passes, 1001 is a 400.
+- [x] An imported ingredient minimum or modifier bound above 1000 is stored as 1000.
+
+**Enforced by:** `V261QualityTierMigrationTest`, `QualityTierServiceTest` · **Code:** `Quality`,
+`QualityValue`, V265, `ScWikiBlueprintSyncService`, `P4kImportService`
+
 ## Out of scope
 
 **Material-amount SCU-scale storage and rounding** (the `@PrePersist`/`@PreUpdate` HALF_UP-to-three-

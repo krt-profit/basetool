@@ -49,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -83,6 +84,7 @@ class JobOrderServicePriorityAndStatusTest {
   @Mock private MaterialClaimService materialClaimService;
 
   @Mock private AuditService auditService;
+  @Mock private QualityTierService qualityTierService;
 
   @InjectMocks private JobOrderStockProjectionService jobOrderStockProjectionService;
   private JobOrderPriorityService jobOrderPriorityService;
@@ -110,7 +112,8 @@ class JobOrderServicePriorityAndStatusTest {
             auditService,
             null,
             jobOrderStockProjectionService,
-            jobOrderPriorityService);
+            jobOrderPriorityService,
+            qualityTierService);
     lenient()
         .when(jobOrderMapper.toDto(any(JobOrder.class)))
         .thenAnswer(
@@ -387,13 +390,15 @@ class JobOrderServicePriorityAndStatusTest {
       JobOrderMaterial existingMat =
           JobOrderMaterial.builder()
               .material(materialWithId(xId))
-              .minQuality(700)
+              .qualityTier(QualityTierFixtures.tier("Q700", 700))
               .amount(10.0)
               .build();
       o.getMaterials().add(existingMat);
 
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(o));
       when(materialRepository.findById(yId)).thenReturn(Optional.of(materialWithId(yId)));
+      when(qualityTierService.resolveForRequirement(any(), any(), any()))
+          .thenReturn(QualityTierFixtures.good());
       when(jobOrderRepository.saveAndFlush(o)).thenReturn(o);
 
       CreateJobOrderDto dto =
@@ -500,7 +505,7 @@ class JobOrderServicePriorityAndStatusTest {
       JobOrderMaterial mat =
           JobOrderMaterial.builder()
               .material(materialWithId(matId))
-              .minQuality(700)
+              .qualityTier(QualityTierFixtures.tier("Q700", 700))
               .amount(10.0)
               .build();
       o.getMaterials().add(mat);

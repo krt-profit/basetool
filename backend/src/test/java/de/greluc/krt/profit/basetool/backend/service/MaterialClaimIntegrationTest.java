@@ -29,7 +29,7 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
+import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto;
@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.repository.QualityTierRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import java.util.List;
@@ -66,6 +67,7 @@ class MaterialClaimIntegrationTest {
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private SpecialCommandRepository specialCommandRepository;
   @Autowired private MaterialRepository materialRepository;
+  @Autowired private QualityTierRepository qualityTierRepository;
   @Autowired private TransactionTemplate transactionTemplate;
 
   private record Fixture(UUID orderId, UUID materialId, UUID squadronAId, UUID squadronBId) {}
@@ -105,7 +107,11 @@ class MaterialClaimIntegrationTest {
                   .status(JobOrderStatus.OPEN)
                   .build();
           JobOrderMaterial line =
-              JobOrderMaterial.builder().material(mat).minQuality(700).amount(10.0).build();
+              JobOrderMaterial.builder()
+                  .material(mat)
+                  .qualityTier(qualityTierRepository.findByCode("GOOD").orElseThrow())
+                  .amount(10.0)
+                  .build();
           order.addMaterial(line);
           order = jobOrderRepository.save(order);
 
@@ -238,18 +244,19 @@ class MaterialClaimIntegrationTest {
                       .handle("orph")
                       .status(JobOrderStatus.OPEN)
                       .build();
+              QualityTier good = qualityTierRepository.findByCode("GOOD").orElseThrow();
               order.addMaterial(
-                  JobOrderMaterial.builder().material(matA).minQuality(700).amount(10.0).build());
+                  JobOrderMaterial.builder().material(matA).qualityTier(good).amount(10.0).build());
               order.addMaterial(
-                  JobOrderMaterial.builder().material(matB).minQuality(700).amount(8.0).build());
+                  JobOrderMaterial.builder().material(matB).qualityTier(good).amount(8.0).build());
               order = jobOrderRepository.save(order);
               return new Setup(order.getId(), matA.getId(), matB.getId(), sqA.getId(), sqB.getId());
             });
 
     materialClaimService.upsertClaim(
-        s.orderId(), new CreateClaimDto(s.matA(), QualityRequirement.GOOD, s.sqA(), 5.0));
+        s.orderId(), new CreateClaimDto(s.matA(), "GOOD", s.sqA(), 5.0));
     materialClaimService.upsertClaim(
-        s.orderId(), new CreateClaimDto(s.matB(), QualityRequirement.GOOD, s.sqB(), 4.0));
+        s.orderId(), new CreateClaimDto(s.matB(), "GOOD", s.sqB(), 4.0));
     assertThat(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(s.orderId()))
         .hasSize(2);
 
@@ -276,6 +283,6 @@ class MaterialClaimIntegrationTest {
   }
 
   private CreateClaimDto claim(UUID materialId, UUID claimingOrgUnitId, double amount) {
-    return new CreateClaimDto(materialId, QualityRequirement.GOOD, claimingOrgUnitId, amount);
+    return new CreateClaimDto(materialId, "GOOD", claimingOrgUnitId, amount);
   }
 }

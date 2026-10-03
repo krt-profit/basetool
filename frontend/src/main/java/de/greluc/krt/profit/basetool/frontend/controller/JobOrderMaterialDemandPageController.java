@@ -24,8 +24,10 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDemandGroupDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDemandOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDemandRowDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.QualityTierDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.QualityTierCatalog;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -62,6 +64,9 @@ public class JobOrderMaterialDemandPageController {
   /** Loads the aggregated demand from the backend. */
   private final BackendApiClient backendApiClient;
 
+  /** Supplies the quality tiers the filter panel offers. */
+  private final QualityTierCatalog qualityTierCatalog;
+
   /**
    * Renders the cross-order material demand at {@code /orders/material-demand}, as scoped by the
    * backend.
@@ -91,10 +96,38 @@ public class JobOrderMaterialDemandPageController {
 
     model.addAttribute("demand", demand);
     model.addAttribute("materialOptions", materialOptions(demand));
+    model.addAttribute("qualityOptions", qualityOptions(demand));
     if ("results".equals(fragment)) {
       return "orders-material-demand :: demandResults";
     }
     return "orders-material-demand";
+  }
+
+  /**
+   * Collects the quality tiers the filter panel offers: every active tier plus any inactive tier a
+   * shown row still uses, highest floor first (REQ-ORDERS-036).
+   *
+   * @param demand the overview being rendered; never {@code null}
+   * @return the tiers to offer as filter checkboxes
+   */
+  @NotNull
+  private List<QualityTierDto> qualityOptions(@NotNull MaterialDemandOverviewDto demand) {
+    Map<UUID, QualityTierDto> byId = new LinkedHashMap<>();
+    for (QualityTierDto tier : qualityTierCatalog.all()) {
+      if (tier.active()) {
+        byId.put(tier.id(), tier);
+      }
+    }
+    for (MaterialDemandGroupDto group : demand.groups()) {
+      for (MaterialDemandRowDto row : group.materials()) {
+        if (row.qualityTier() != null && row.qualityTier().id() != null) {
+          byId.putIfAbsent(row.qualityTier().id(), row.qualityTier());
+        }
+      }
+    }
+    return byId.values().stream()
+        .sorted(Comparator.comparingInt(QualityTierDto::minQuality).reversed())
+        .toList();
   }
 
   /**

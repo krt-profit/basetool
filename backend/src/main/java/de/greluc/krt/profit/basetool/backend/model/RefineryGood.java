@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import de.greluc.krt.profit.basetool.backend.validation.QualityValue;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -28,7 +29,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -70,8 +70,7 @@ public class RefineryGood extends AbstractEntity<UUID> {
   private Integer outputQuantity;
 
   @Column(nullable = false)
-  @Min(0)
-  @Max(1000)
+  @QualityValue
   private Integer quality;
 
   @ManyToOne(fetch = FetchType.LAZY)

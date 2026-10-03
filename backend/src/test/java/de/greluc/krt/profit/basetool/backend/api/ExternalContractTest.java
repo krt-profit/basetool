@@ -1978,13 +1978,11 @@ class ExternalContractTest {
           Map.entry(
               "CreateBankAccountRequest.type",
               Set.of("ORG_UNIT", "AREA", "CARTEL", "CARTEL_BANK", "SPECIAL")),
-          Map.entry("CreateJobOrderItemMaterialDto.quality", Set.of("GOOD", "NONE")),
           Map.entry("AddMissionObjectiveRequest.kind", Set.of("PRIMARY", "SECONDARY", "NON_GOAL")),
           Map.entry(
               "UpdateMissionObjectiveRequest.kind", Set.of("PRIMARY", "SECONDARY", "NON_GOAL")),
           Map.entry("BulkRebookRequest.mode", Set.of("LOCATION", "PERSONALIZE", "DEPERSONALIZE")),
           Map.entry("InventoryAllocationWriteDto.field", Set.of("JOB_ORDER", "MISSION")),
-          Map.entry("CreateClaimDto.qualityRequirement", Set.of("GOOD", "NONE")),
           Map.entry(
               "OperationCreateDto.status", Set.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELED")),
           Map.entry(

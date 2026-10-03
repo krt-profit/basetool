@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
+import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverItemCreateDto;
@@ -36,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.repository.QualityTierRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.time.Instant;
@@ -67,6 +69,7 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
   @Autowired private MaterialRepository materialRepository;
   @Autowired private LocationRepository locationRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private QualityTierRepository qualityTierRepository;
 
   @Autowired
   private de.greluc.krt.profit.basetool.backend.repository.SquadronRepository squadronRepository;
@@ -116,16 +119,17 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
                   .status(JobOrderStatus.OPEN)
                   .build();
 
+          QualityTier good = qualityTierRepository.findByCode("GOOD").orElseThrow();
           JobOrderMaterial m1 =
               JobOrderMaterial.builder()
                   .material(aslarite)
-                  .minQuality(700)
+                  .qualityTier(good)
                   .amount(ASLARITE_REQUIRED)
                   .build();
           JobOrderMaterial m2 =
               JobOrderMaterial.builder()
                   .material(ouratite)
-                  .minQuality(800)
+                  .qualityTier(good)
                   .amount(OURATITE_REQUIRED)
                   .build();
           jobOrder.addMaterial(m1);

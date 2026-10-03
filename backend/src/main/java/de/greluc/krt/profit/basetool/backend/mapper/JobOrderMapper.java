@@ -44,7 +44,8 @@ import org.springframework.beans.factory.annotation.Autowired;
       UserMapper.class,
       MaterialMapper.class,
       JobOrderHandoverMapper.class,
-      SquadronMapper.class
+      SquadronMapper.class,
+      QualityTierMapper.class
     })
 public abstract class JobOrderMapper {
 
@@ -95,6 +96,8 @@ public abstract class JobOrderMapper {
   @Mapping(target = "currentStock", ignore = true)
   @Mapping(target = "claims", ignore = true)
   @Mapping(target = "openAmount", ignore = true)
+  @Mapping(target = "minQuality", expression = "java(floorOrNull(material))")
+  @Mapping(target = "qualityTier", source = "qualityTier")
   public abstract JobOrderMaterialDto toDto(JobOrderMaterial material);
 
   /**
@@ -104,6 +107,21 @@ public abstract class JobOrderMapper {
    * @return the assignee DTO
    */
   public abstract JobOrderAssigneeDto toDto(JobOrderAssignee assignee);
+
+  /**
+   * Reads the floor of a line's quality tier for the legacy {@code minQuality} field.
+   *
+   * @param material the line; {@code null} or tier-less yields {@code null}
+   * @return the floor, or {@code null} for the base tier
+   */
+  @Nullable
+  protected Integer floorOrNull(@Nullable JobOrderMaterial material) {
+    if (material == null || material.getQualityTier() == null) {
+      return null;
+    }
+    int floor = material.getQualityTier().getMinQuality();
+    return floor == 0 ? null : floor;
+  }
 
   /**
    * Seeds the {@link UserMapper} request memo for the assignees of a whole page of orders in one go

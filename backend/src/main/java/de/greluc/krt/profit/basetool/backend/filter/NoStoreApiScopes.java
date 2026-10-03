@@ -103,6 +103,7 @@ public final class NoStoreApiScopes {
           "/api/v1/org-units/**",
           "/api/v1/outposts/**",
           "/api/v1/pois/**",
+          "/api/v1/quality-tiers/**",
           "/api/v1/refining-methods/**",
           "/api/v1/settings/**",
           "/api/v1/ship-types/**",

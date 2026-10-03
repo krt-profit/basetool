@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.QualityTierMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
@@ -35,7 +36,7 @@ import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
+import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ClaimDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateClaimDto;
@@ -50,6 +51,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -68,9 +70,9 @@ import org.springframework.transaction.annotation.Transactional;
  * Manages material claims ("Eintragungen"): profit squadrons signing up for partial quantities of a
  * material bucket on a public Spezialkommando job order.
  *
- * <p>A claim is keyed on the bucket {@code (jobOrder, material, qualityRequirement)} and the
- * claiming squadron. Claims exist only on SK orders, never exceed the bucket's required amount in
- * sum (guarded by a pessimistic order lock, REQ-ORDERS-024, ADR-0092), and are deleted through the
+ * <p>A claim is keyed on the bucket {@code (jobOrder, material, qualityTier)} and the claiming
+ * squadron. Claims exist only on SK orders, never exceed the bucket's required amount in sum
+ * (guarded by a pessimistic order lock, REQ-ORDERS-024, ADR-0092), and are deleted through the
  * repository without bumping the order's {@code @Version}.
  */
 @Service
@@ -88,6 +90,7 @@ public class MaterialClaimService {
   private final AuditService auditService;
   private final MaterialMapper materialMapper;
   private final SquadronMapper squadronMapper;
+  private final QualityTierMapper qualityTierMapper;
 
   /**
    * Proxied self-reference so each {@link #upsertClaim} attempt runs {@link
@@ -102,13 +105,13 @@ public class MaterialClaimService {
   private static final int MAX_UPSERT_ATTEMPTS = 5;
 
   /**
-   * Identity of one aggregated material bucket — a material at a single quality level. Shared key
+   * Identity of one aggregated material bucket — a material at a single quality tier. Shared key
    * type for the required-amount aggregation and the per-bucket claim grouping.
    *
    * @param materialId the material.
-   * @param quality the quality bucket.
+   * @param tierId the quality tier.
    */
-  private record Bucket(UUID materialId, QualityRequirement quality) {}
+  private record Bucket(UUID materialId, UUID tierId) {}
 
   /**
    * Returns the claim view of an order: one {@link ClaimBucketDto} per required bucket with
@@ -150,12 +153,13 @@ public class MaterialClaimService {
       JobOrder order, @NotNull List<MaterialClaim> orderClaims) {
     Map<Bucket, Double> required = requiredByBucket(order);
     Map<UUID, Material> materials = materialsByBucket(order);
+    Map<UUID, QualityTier> tiers = tiersOf(order);
 
     Map<Bucket, List<MaterialClaim>> claimsByBucket = new LinkedHashMap<>();
     for (MaterialClaim claim : orderClaims) {
       claimsByBucket
           .computeIfAbsent(
-              new Bucket(claim.getMaterial().getId(), claim.getQualityRequirement()),
+              new Bucket(claim.getMaterial().getId(), claim.getQualityTier().getId()),
               k -> new ArrayList<>())
           .add(claim);
     }
@@ -167,10 +171,12 @@ public class MaterialClaimService {
       List<MaterialClaim> claims = claimsByBucket.getOrDefault(bucket, List.of());
       double claimedAmount = round3(claims.stream().mapToDouble(MaterialClaim::getAmount).sum());
       double openRemaining = round3(Math.max(0.0, requiredAmount - claimedAmount));
+      QualityTier tier = tiers.get(bucket.tierId());
       buckets.add(
           new ClaimBucketDto(
               materialMapper.toDto(materials.get(bucket.materialId())),
-              bucket.quality(),
+              tier.getCode(),
+              qualityTierMapper.toDto(tier),
               requiredAmount,
               claimedAmount,
               openRemaining,
@@ -266,7 +272,8 @@ public class MaterialClaimService {
     assertClaimable(order);
     assertCanManage(order, dto.claimingOrgUnitId());
 
-    Bucket bucket = new Bucket(dto.materialId(), dto.qualityRequirement());
+    QualityTier tier = resolveBucketTier(order, dto);
+    Bucket bucket = new Bucket(dto.materialId(), tier.getId());
     Map<Bucket, Double> required = requiredByBucket(order);
     Double requiredAmount = required.get(bucket);
     if (requiredAmount == null) {
@@ -274,7 +281,7 @@ public class MaterialClaimService {
           "No such material bucket on this order: material="
               + dto.materialId()
               + " quality="
-              + dto.qualityRequirement());
+              + tier.getCode());
     }
 
     jobOrderRepository.lockForClaimUpsert(jobOrderId);
@@ -282,8 +289,8 @@ public class MaterialClaimService {
     double amount = dto.amount();
     double claimedByOthers =
         materialClaimRepository
-            .findByJobOrderIdAndMaterialIdAndQualityRequirement(
-                jobOrderId, dto.materialId(), dto.qualityRequirement())
+            .findByJobOrderIdAndMaterialIdAndQualityTierId(
+                jobOrderId, dto.materialId(), tier.getId())
             .stream()
             .filter(c -> !c.getClaimingOrgUnit().getId().equals(dto.claimingOrgUnitId()))
             .mapToDouble(MaterialClaim::getAmount)
@@ -301,14 +308,14 @@ public class MaterialClaimService {
 
     MaterialClaim claim =
         materialClaimRepository
-            .findByJobOrderIdAndMaterialIdAndQualityRequirementAndClaimingOrgUnitId(
-                jobOrderId, dto.materialId(), dto.qualityRequirement(), dto.claimingOrgUnitId())
+            .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
+                jobOrderId, dto.materialId(), tier.getId(), dto.claimingOrgUnitId())
             .orElseGet(
                 () -> {
                   MaterialClaim fresh = new MaterialClaim();
                   fresh.setJobOrder(order);
                   fresh.setMaterial(resolveMaterial(order, dto.materialId()));
-                  fresh.setQualityRequirement(dto.qualityRequirement());
+                  fresh.setQualityTier(tier);
                   fresh.setClaimingOrgUnit(resolveClaimingOrgUnit(dto.claimingOrgUnitId()));
                   return fresh;
                 });
@@ -324,7 +331,7 @@ public class MaterialClaimService {
         "Material claim upserted: order={} material={} quality={} claimingOrgUnit={} amount={}",
         order.getId(),
         dto.materialId(),
-        dto.qualityRequirement(),
+        tier.getCode(),
         dto.claimingOrgUnitId(),
         amount);
     auditService.record(
@@ -334,7 +341,7 @@ public class MaterialClaimService {
         null,
         AuditDetails.of("claim", saved.getId())
             .with("material", dto.materialId())
-            .with("quality", dto.qualityRequirement())
+            .with("quality", tier.getCode())
             .with("claimingOrgUnit", dto.claimingOrgUnitId())
             .with("amount", amount)
             .with("mode", isNew ? "created" : "updated"));
@@ -364,7 +371,7 @@ public class MaterialClaimService {
     }
     assertCanManage(order, claim.getClaimingOrgUnit().getId());
     final UUID claimMaterialId = claim.getMaterial().getId();
-    final QualityRequirement claimQuality = claim.getQualityRequirement();
+    final String claimQuality = claim.getQualityTier().getCode();
     final UUID claimingOrgUnitId = claim.getClaimingOrgUnit().getId();
     materialClaimRepository.delete(claim);
     auditService.record(
@@ -380,9 +387,9 @@ public class MaterialClaimService {
         "Material claim withdrawn: order={} claim={} material={} quality={} claimingOrgUnit={}",
         jobOrderId,
         claimId,
-        claim.getMaterial().getId(),
-        claim.getQualityRequirement(),
-        claim.getClaimingOrgUnit().getId());
+        claimMaterialId,
+        claimQuality,
+        claimingOrgUnitId);
   }
 
   /**
@@ -421,7 +428,7 @@ public class MaterialClaimService {
             .filter(
                 c ->
                     !required.containsKey(
-                        new Bucket(c.getMaterial().getId(), c.getQualityRequirement())))
+                        new Bucket(c.getMaterial().getId(), c.getQualityTier().getId())))
             .toList();
     if (!orphaned.isEmpty()) {
       materialClaimRepository.deleteAll(orphaned);
@@ -434,9 +441,8 @@ public class MaterialClaimService {
   }
 
   /**
-   * Computes the required amount per material bucket: per {@code (material, quality)} for an {@code
-   * ITEM} order, and per material with {@code GOOD} / {@code NONE} derived from {@code minQuality}
-   * for a {@code MATERIAL} order.
+   * Computes the required amount per material bucket {@code (material, quality tier)} for either
+   * order kind.
    *
    * @param order the order.
    * @return required amount keyed by bucket, insertion-ordered.
@@ -448,22 +454,63 @@ public class MaterialClaimService {
       for (JobOrderItem item : order.getItems()) {
         for (JobOrderItemMaterial req : item.getMaterials()) {
           required.merge(
-              new Bucket(req.getMaterial().getId(), req.getQualityRequirement()),
+              new Bucket(req.getMaterial().getId(), req.getQualityTier().getId()),
               req.getRequiredQuantity() == null ? 0.0 : req.getRequiredQuantity(),
               Double::sum);
         }
       }
     } else {
       for (JobOrderMaterial mat : order.getMaterials()) {
-        QualityRequirement quality =
-            mat.getMinQuality() != null ? QualityRequirement.GOOD : QualityRequirement.NONE;
         required.merge(
-            new Bucket(mat.getMaterial().getId(), quality),
+            new Bucket(mat.getMaterial().getId(), mat.getQualityTier().getId()),
             mat.getAmount() == null ? 0.0 : mat.getAmount(),
             Double::sum);
       }
     }
     return required;
+  }
+
+  /**
+   * Collects the quality tiers the order's buckets use.
+   *
+   * @param order the order.
+   * @return tier id → tier, for every tier referenced by a bucket.
+   */
+  @NotNull
+  private static Map<UUID, QualityTier> tiersOf(JobOrder order) {
+    Map<UUID, QualityTier> tiers = new LinkedHashMap<>();
+    if (order.getType() == JobOrderType.ITEM) {
+      for (JobOrderItem item : order.getItems()) {
+        for (JobOrderItemMaterial req : item.getMaterials()) {
+          tiers.putIfAbsent(req.getQualityTier().getId(), req.getQualityTier());
+        }
+      }
+    } else {
+      for (JobOrderMaterial mat : order.getMaterials()) {
+        tiers.putIfAbsent(mat.getQualityTier().getId(), mat.getQualityTier());
+      }
+    }
+    return tiers;
+  }
+
+  /**
+   * Resolves the bucket tier a claim payload names by its code, among the tiers the order uses.
+   *
+   * @param order the order.
+   * @param dto the claim payload.
+   * @return the tier.
+   * @throws BadRequestException when the order uses no tier of that code.
+   */
+  @NotNull
+  private static QualityTier resolveBucketTier(JobOrder order, CreateClaimDto dto) {
+    String code = dto.qualityRequirement().trim().toUpperCase(Locale.ROOT);
+    return tiersOf(order).values().stream()
+        .filter(t -> t.getCode().equals(code))
+        .findFirst()
+        .orElseThrow(
+            () ->
+                new BadRequestException(
+                    "Quality tier " + code + " is not used by order " + order.getId()));
   }
 
   /**

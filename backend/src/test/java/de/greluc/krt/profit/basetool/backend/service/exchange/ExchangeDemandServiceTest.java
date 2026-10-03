@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service.exchange;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -37,9 +38,9 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemStockRow;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.QualityTierDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeDemandMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeOrgDemandDto;
 import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
@@ -55,6 +56,7 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialRequirement
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService.OrderLinkedStockIndex;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -133,7 +135,7 @@ class ExchangeDemandServiceTest {
   void aMemberWhoPassesTheJobOrderGateGetsTheDemandWithoutAReason() {
     JobOrder order = order(JobOrderType.MATERIAL);
     givenOrders(order);
-    requires(order, QualityRequirement.NONE, 8.0, 0.0);
+    requires(order, QualityTierFixtures.noneDto(), 8.0, 0.0);
 
     ExchangeOrgDemandDto demand = service.demand(MEMBER);
 
@@ -162,10 +164,10 @@ class ExchangeDemandServiceTest {
     JobOrder items = order(JobOrderType.ITEM);
     JobOrder covered = order(JobOrderType.MATERIAL);
     givenOrders(first, second, items, covered);
-    requires(first, QualityRequirement.GOOD, 10.0, 4.0);
-    requires(second, QualityRequirement.GOOD, 6.5, 0.0);
-    requires(items, QualityRequirement.NONE, 3.0, 0.0);
-    requires(covered, QualityRequirement.NONE, 2.0, 5.0);
+    requires(first, QualityTierFixtures.goodDto(), 10.0, 4.0);
+    requires(second, QualityTierFixtures.goodDto(), 6.5, 0.0);
+    requires(items, QualityTierFixtures.noneDto(), 3.0, 0.0);
+    requires(covered, QualityTierFixtures.noneDto(), 2.0, 5.0);
     Material ore = material("Quantanium (Ore)", "SCU");
     ore.setRefinedMaterial(quantanium);
     when(materialRepository.findAllByRefinedMaterialIdIn(Set.of(quantanium.getId())))
@@ -231,22 +233,15 @@ class ExchangeDemandServiceTest {
    * Gives an order one quantanium requirement and its linked stock.
    *
    * @param order the order
-   * @param quality the quality requirement
+   * @param tier the quality tier
    * @param required the required amount
    * @param booked the stock linked to it
    */
   private void requires(
-      @NotNull JobOrder order,
-      @NotNull QualityRequirement quality,
-      double required,
-      double booked) {
+      @NotNull JobOrder order, @NotNull QualityTierDto tier, double required, double booked) {
     when(requirementResolver.requirementsOf(order))
-        .thenReturn(List.of(new MaterialRequirement(quantaniumDto, quality, required)));
-    when(stock.stockFor(
-            order.getId(),
-            quantanium.getId(),
-            JobOrderStockProjectionService.qualityFloorFor(quality)))
-        .thenReturn(booked);
+        .thenReturn(List.of(new MaterialRequirement(quantaniumDto, tier, required)));
+    when(stock.bookedFor(eq(order.getId()), anyList())).thenReturn(new double[] {booked});
   }
 
   private static @NotNull JobOrder order(@NotNull JobOrderType type) {

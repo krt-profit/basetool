@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.QualityTierMapper;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
@@ -30,7 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderItemMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
+import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto;
@@ -81,16 +82,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class JobOrderItemService {
 
-  /**
-   * Refining-grade quality threshold: an ingredient {@code minQuality} at or above this maps to
-   * {@link QualityRequirement#GOOD}.
-   */
-  private static final int GOOD_QUALITY_THRESHOLD = 650;
-
   private final BlueprintRepository blueprintRepository;
   private final GameItemRepository gameItemRepository;
   private final MaterialRepository materialRepository;
   private final MaterialMapper materialMapper;
+  private final QualityTierService qualityTierService;
+  private final QualityTierMapper qualityTierMapper;
 
   /**
    * Builds one new, detached ordered-item line with its derived material snapshot; the caller
@@ -137,12 +134,18 @@ public class JobOrderItemService {
           "Blueprint " + line.blueprintId() + " does not produce game item " + line.gameItemId());
     }
 
+    Set<UUID> keptTierIds = new LinkedHashSet<>();
+    for (JobOrderItemMaterial existing : item.getMaterials()) {
+      if (existing.getQualityTier() != null) {
+        keptTierIds.add(existing.getQualityTier().getId());
+      }
+    }
+    final Map<UUID, String> qualityChoices = qualityChoicesByMaterial(line.materials());
+
     item.setGameItem(gameItem);
     item.setBlueprint(blueprint);
     item.setAmount(line.amount());
     item.getMaterials().clear();
-
-    Map<UUID, QualityRequirement> qualityChoices = qualityChoicesByMaterial(line.materials());
 
     for (BlueprintIngredient ingredient : blueprint.getIngredients()) {
       Material material;
@@ -164,14 +167,17 @@ public class JobOrderItemService {
       }
 
       double required = QuantityTypeRounding.roundForQuantityType(rawQuantity, material);
-      QualityRequirement quality =
-          qualityChoices.getOrDefault(material.getId(), defaultQuality(ingredient.getMinQuality()));
+      String choice = qualityChoices.get(material.getId());
+      QualityTier tier =
+          choice == null || choice.isBlank()
+              ? qualityTierService.defaultForIngredient(ingredient.getMinQuality())
+              : qualityTierService.resolveForRequirement(choice, null, keptTierIds);
 
       item.addMaterial(
           JobOrderItemMaterial.builder()
               .material(material)
               .requiredQuantity(required)
-              .qualityRequirement(quality)
+              .qualityTier(tier)
               .build());
     }
   }
@@ -196,38 +202,43 @@ public class JobOrderItemService {
 
   /**
    * Aggregates the outstanding material demand of all ordered lines into one row per {@code
-   * (material, quality)}, counting only each line's not-yet-manufactured share. Sorted SCU first,
-   * then by name, then GOOD before NONE.
+   * (material, quality tier)}, counting only each line's not-yet-manufactured share. Sorted SCU
+   * first, then by name, then by descending tier floor.
    *
    * @param order the job order to aggregate
    * @return the outstanding-material rows; empty for a material order
    */
   @NotNull
   public List<AggregatedMaterialDto> aggregateMaterials(@NotNull JobOrder order) {
-    record Key(UUID materialId, QualityRequirement quality) {}
+    record Key(UUID materialId, UUID tierId) {}
 
     Map<Key, Double> sums = new LinkedHashMap<>();
     Map<UUID, Material> materials = new LinkedHashMap<>();
+    Map<UUID, QualityTier> tiers = new LinkedHashMap<>();
     for (JobOrderItem item : order.getItems()) {
       int lineAmount = item.getAmount() != null ? item.getAmount() : 0;
       int manufactured = item.getManufacturedAmount() != null ? item.getManufacturedAmount() : 0;
       int remaining = Math.max(0, lineAmount - manufactured);
       for (JobOrderItemMaterial req : item.getMaterials()) {
         Material material = req.getMaterial();
-        Key key = new Key(material.getId(), req.getQualityRequirement());
+        QualityTier tier = req.getQualityTier();
+        Key key = new Key(material.getId(), tier.getId());
         double reqTotal = req.getRequiredQuantity() == null ? 0.0 : req.getRequiredQuantity();
         double outstanding = lineAmount > 0 ? reqTotal * remaining / lineAmount : 0.0;
         sums.merge(key, outstanding, Double::sum);
         materials.putIfAbsent(material.getId(), material);
+        tiers.putIfAbsent(tier.getId(), tier);
       }
     }
     return sums.entrySet().stream()
         .map(
             e -> {
               Material material = materials.get(e.getKey().materialId());
+              QualityTier tier = tiers.get(e.getKey().tierId());
               return new AggregatedMaterialDto(
                   materialMapper.toDto(material),
-                  e.getKey().quality(),
+                  tier.getCode(),
+                  qualityTierMapper.toDto(tier),
                   QuantityTypeRounding.roundForQuantityType(e.getValue(), material),
                   null,
                   List.of(),
@@ -245,7 +256,7 @@ public class JobOrderItemService {
                             ? a.material().name()
                             : "",
                     String.CASE_INSENSITIVE_ORDER)
-                .thenComparing(a -> a.qualityRequirement().name()))
+                .thenComparing(a -> -a.qualityTier().minQuality()))
         .toList();
   }
 
@@ -317,7 +328,8 @@ public class JobOrderItemService {
                         m.getId(),
                         materialMapper.toDto(m.getMaterial()),
                         m.getRequiredQuantity(),
-                        m.getQualityRequirement(),
+                        m.getQualityTier().getCode(),
+                        qualityTierMapper.toDto(m.getQualityTier()),
                         m.getVersion()))
             .toList();
     GameItem gameItem = item.getGameItem();
@@ -354,9 +366,9 @@ public class JobOrderItemService {
   }
 
   @NotNull
-  private static Map<UUID, QualityRequirement> qualityChoicesByMaterial(
+  private static Map<UUID, String> qualityChoicesByMaterial(
       List<CreateJobOrderItemMaterialDto> choices) {
-    Map<UUID, QualityRequirement> map = new LinkedHashMap<>();
+    Map<UUID, String> map = new LinkedHashMap<>();
     if (choices != null) {
       for (CreateJobOrderItemMaterialDto choice : choices) {
         map.put(choice.materialId(), choice.quality());
@@ -365,11 +377,23 @@ public class JobOrderItemService {
     return map;
   }
 
+  /**
+   * Builds the preview row of one derived material with its default quality tier.
+   *
+   * @param material the derived material
+   * @param quantity the scaled quantity
+   * @param ingredientMinQuality the ingredient's minimum quality, or {@code null}
+   * @return the preview row
+   */
   @NotNull
-  private static QualityRequirement defaultQuality(Integer minQuality) {
-    return minQuality != null && minQuality >= GOOD_QUALITY_THRESHOLD
-        ? QualityRequirement.GOOD
-        : QualityRequirement.NONE;
+  private DerivedMaterialDto derived(
+      @NotNull Material material, double quantity, @Nullable Integer ingredientMinQuality) {
+    QualityTier tier = qualityTierService.defaultForIngredient(ingredientMinQuality);
+    return new DerivedMaterialDto(
+        materialMapper.toDto(material),
+        QuantityTypeRounding.roundForQuantityType(quantity, material),
+        tier.getCode(),
+        qualityTierMapper.toDto(tier));
   }
 
   /**
@@ -433,11 +457,7 @@ public class JobOrderItemService {
           continue;
         }
         double perUnit = ingredient.getQuantityScu() == null ? 0.0 : ingredient.getQuantityScu();
-        materials.add(
-            new DerivedMaterialDto(
-                materialMapper.toDto(material),
-                QuantityTypeRounding.roundForQuantityType(perUnit * scaledBy, material),
-                defaultQuality(ingredient.getMinQuality())));
+        materials.add(derived(material, perUnit * scaledBy, ingredient.getMinQuality()));
       } else {
         GameItem subItem = ingredient.getGameItem();
         if (subItem == null) {
@@ -450,11 +470,7 @@ public class JobOrderItemService {
           Material material = resolveItemMaterial(subItem, ingredient);
           if (material != null) {
             materials.add(
-                new DerivedMaterialDto(
-                    materialMapper.toDto(material),
-                    QuantityTypeRounding.roundForQuantityType(
-                        (double) perUnit * scaledBy, material),
-                    defaultQuality(ingredient.getMinQuality())));
+                derived(material, (double) perUnit * scaledBy, ingredient.getMinQuality()));
             continue;
           }
         }
