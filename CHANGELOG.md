@@ -37,6 +37,12 @@
   Aktualitätsprüfung statt in `openapi.json`; der Vergleich mit dem letzten Release prüft beide
   Dokumente. Keine Verhaltensänderung (REQ-XCH-039).
 
+- **Leitung als Liste mit Detailbereich.** Links der Einheitenbaum (OL · Bereiche · Staffeln ·
+  Spezialkommandos) mit Suche nach Einheiten und Personen, rechts die gewählte Einheit mit „Mitglied
+  hinzufügen" und den Reitern „Mitglieder · Kommandogruppen". Rang und Kommandogruppe speichern
+  sofort bei Auswahl, und die Mitglieder eines Spezialkommandos werden direkt auf „Leitung"
+  verwaltet (REQ-ROLE-004).
+
 - **Aufträge: Qualität bei Übergabe und Herstellung selbst wählen.** Braucht ein Auftrag ein Material in
   mehreren Qualitätsstufen, wählst du bei der Übergabe je Position die Stufe (vorbelegt, änderbar). Die
   Herstellung schlägt die niedrigste passende Qualität vor (REQ-ORDERS-038/039).
