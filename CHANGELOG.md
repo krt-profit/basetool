@@ -27,6 +27,13 @@
 
 ### Fixed
 
+- **Deploy: die Edge startet vor den Anwendungen.** Ändert ein Release die Edge-Unit, stoppte das eine
+  Neustartfenster sie mit und startete sie zuletzt; Backend und Frontend holen die OIDC-Konfiguration
+  aber über den öffentlichen Namen, also über die Edge, und kamen nicht hoch. Gilt auch für `backup.sh`.
+
+- **Host-Rolle: Drop-in-Verzeichnisse werden angelegt.** Die Rolle schrieb den Host-Alias für
+  `grafana` und `blackbox-exporter` in Verzeichnisse, die es auf einem Host noch nicht gab, und brach ab.
+
 - **Einsatzdaten: „Inaktive anzeigen" bei den Aufgaben lädt die Seite nicht mehr neu.** `sidebar.js`
   schickte das Filterformular zusätzlich zum In-Place-Tausch ab und lud so die ganze Seite; der
   Filter tauscht jetzt nur noch seinen Abschnitt aus, wie bei Staffeln und Frequenztypen.
