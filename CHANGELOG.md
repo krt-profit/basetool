@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Sicherheitsausdrücke werden beim Build geprüft.** Jede Bean-Referenz in `@PreAuthorize` muss im
+  Kontext mit Namen und Parameterzahl auflösbar sein, die Sicherheits-Beans tragen feste Namen, und
+  kein Gate darf über `this` umgangen werden (REQ-SEC-075, REQ-SEC-076).
+- **Metrik und Alarm für nicht auswertbare Sicherheitsausdrücke.** Ein solcher Fehler bleibt ein
+  `400 ILLEGAL_ARGUMENT`, wird aber als `basetool_security_expression_failures_total` gezählt und
+  löst `SecurityExpressionEvaluationFailed` aus (REQ-OBS-020).
+
+- **Berechtigungsmatrix des Backends als geprüfte Datei.** `authorization-matrix.txt` hält für jede
+  Operation die entscheidende URL-Regel und das wirksame `@PreAuthorize` fest, dazu die
+  Service-Gates; `AuthorizationMatrixTest` schlägt bei jeder Abweichung fehl (REQ-SEC-074).
+
+- **Backend: Modulkarte und eingefrorene Modulkopplung (Guard G-09).** Eine Domain-Map ordnet jede
+  Backend-Klasse einem der 26 Zielmodule zu; ein ArchUnit-`modules()`-Test friert die heutigen 138
+  Kanten gegen die Rangordnung ein, neue scheitern. Spring Modulith 2.1.1 läuft nur im Testumfang
+  (REQ-MOD-001…005).
+
 ### Changed
 
 - **Lager einbuchen: „Mit vorhandenem Bestand zusammenführen" erscheint nur noch, wenn es etwas zum
@@ -30,7 +48,30 @@
   Terminals und die UEX-Ortskataloge erlauben weiter 100 000 (REQ-API-005); Frontend und App fordern
   sonst nirgends größere Seiten an.
 
+- **Architekturtests schlagen bei verschobenen Klassen an.** Die ArchUnit-Regeln des Backends wählen
+  Klassen nach Rolle (`@RestController`, `@Service`, Repository, `@Mapper`, `@Entity`) und Klassenliteral
+  statt nach Paket- und Namensstrings, jede Regel prüft eine Mindestauswahl, und ein Metatest prüft, dass
+  jeder verbliebene Klassenname auflösbar ist (REQ-SEC-073). Eine Verschiebung lässt den Build scheitern,
+  statt eine Regel still leerlaufen zu lassen.
+
+- **Modularisierung: die Entscheidungen sind festgehalten.** ADR-0231 bis ADR-0239 (Modulschnitt,
+  Zusammenspiel der Module, Prüfwerkzeuge, harter API-Schnitt mit erzwungenem App-Update, Fehlermodell,
+  Zugriffsregeln je Fachbereich, NullAway, `switch` ohne `default`, Browser-Baseline 2025), dazu
+  REQ-API-001/009/010 und REQ-FE-018. Checkstyle akzeptiert `_` als Namen eines leeren `catch`.
+
 ### Fixed
+
+- **Build: die Node-Skripte unter `frontend/scripts/` werden gelintet und auf Formatierung geprüft.**
+  `:frontend:lintJs` und `:frontend:prettierCheck` lasen `scripts/**/*.mjs` entgegen ADR-0130 nicht; jetzt
+  tun sie es, und die fünf Skripte sind ohne Verhaltensänderung nach Prettier formatiert. ADR-0222 nennt
+  die zwei lokalen Änderungen an `google_checks.xml`, statt es „verbatim" zu nennen.
+
+- **Deploy: die Edge startet vor den Anwendungen.** Ändert ein Release die Edge-Unit, stoppte das eine
+  Neustartfenster sie mit und startete sie zuletzt; Backend und Frontend holen die OIDC-Konfiguration
+  aber über den öffentlichen Namen, also über die Edge, und kamen nicht hoch. Gilt auch für `backup.sh`.
+
+- **Host-Rolle: Drop-in-Verzeichnisse werden angelegt.** Die Rolle schrieb den Host-Alias für
+  `grafana` und `blackbox-exporter` in Verzeichnisse, die es auf einem Host noch nicht gab, und brach ab.
 
 - **Einsatzdaten: „Inaktive anzeigen" bei den Aufgaben lädt die Seite nicht mehr neu.** `sidebar.js`
   schickte das Filterformular zusätzlich zum In-Place-Tausch ab und lud so die ganze Seite; der
@@ -47,6 +88,12 @@
   dass jeder schreibende Endpunkt in der CSRF-Ausnahme liegt, jede Ratenlimit-Regel einen Endpunkt
   trifft und die Ausnahmen der Freigabe-, Nutzungsbedingungs- und Datenaustausch-Filter exakte
   Pfadlisten sind (REQ-SEC-078…080).
+
+- **Backend: Prüfregeln für Mandantentrennung und Massenzuweisung.** Org-Einheiten-gebundene Aggregate
+  tragen `@TenantScoped`; ein Test verlangt für jeden Controller, der solche Daten schreibt, den
+  Scope-Gate, und für Request-Bodies `@Valid`, keine Antwort-DTOs und keine servergeführten Felder
+  (REQ-ORG-028, REQ-SEC-077, REQ-API-015). 13 Admin-/SPI-Endpunkte validieren ihren Body jetzt;
+  gültige Anfragen ändern sich nicht.
 
 ## [v1.13.6](https://github.com/krt-profit/basetool/releases/tag/v1.13.6) - 2026-10-02
 

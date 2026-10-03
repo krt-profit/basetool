@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
+import de.greluc.krt.profit.basetool.backend.annotation.TenantScoped;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -36,6 +37,7 @@ import lombok.Setter;
 import lombok.ToString;
 
 /** Ship JPA entity. */
+@TenantScoped("owningOrgUnit")
 @Entity
 @Getter
 @Setter
