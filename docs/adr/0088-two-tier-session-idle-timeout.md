@@ -93,3 +93,12 @@ Codified as **REQ-SEC-025**.
   out-of-band by adding an explicit password-bearing `default` entry to the ACL file. The
   `docker-compose.yml` comment claiming the ACL file "MUST NOT define a `default` user" is backwards
   and is corrected alongside this change.
+
+## Amendment (2026-10-03)
+
+Where this record says "synchronizer token + `SameSite=Strict`", read `SameSite=Lax`. The session
+cookie was configured `Strict` but always emitted `Lax`, because Spring Session's implicit cookie
+serializer does not take `SameSite` from the configuration; `Lax` is now the deliberate, pinned
+value (@greluc, 2026-10-03, REQ-SEC-025). The comparison above does not change: the session-bound
+synchronizer token is what carries CSRF protection, and it remains stronger than an unsigned
+double-submit cookie.

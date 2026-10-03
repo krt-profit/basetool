@@ -184,6 +184,11 @@
   Pro-Konto-Limits und `POST /api/v1/live-sync/changed` (bisher ohne Body). Vier Bank-Codes zeigen jetzt
   einen übersetzten Titel statt des Schlüssels.
 
+- **Datenschutzerklärung korrigiert: der Sitzungs-Cookie ist `SameSite=Lax`.** Konfiguriert war
+  `Strict`, gesetzt wurde aber immer `Lax`; `Lax` bleibt bewusst, weil Anmeldung über Discord und
+  Links aus anderen Seiten den Cookie brauchen. Das Frontend setzt jetzt jedes konfigurierte
+  Cookie-Attribut tatsächlich, ein Test hält den gesendeten `Set-Cookie` fest.
+
 ### Security
 
 - **Backend: Prüfregeln für Mandantentrennung und Massenzuweisung.** Org-Einheiten-gebundene Aggregate
