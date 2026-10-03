@@ -1980,6 +1980,13 @@ ADR-0165
 
 ### REQ-FE-021 — A list page's filters collapse behind one toggle
 
+> **Amended 2026-10-03 (website overhaul phases 1–3).** Every list page now renders its filter block
+> as the toolbar's transient filter popover (`fragments/components :: filterPopover`, REQ-UI-027):
+> it keeps the `.filter-toggle` / `.filter-panel` contract, the count badge and the
+> script-collapses-a-rendered-panel fallback below, but it **always starts closed and stores no
+> open/closed preference** — the third property below is retired. No page uses `filterToggle` any
+> more; active filters are additionally shown as `.filter-chips`.
+
 Every list page whose filter block carries **more than a single control** must render that block as
 a collapsible panel: the block gets `data-filter-panel="<page>"`, and the shared
 `fragments/components :: filterToggle` sits beside it in an `actions-bar` that also carries the
@@ -2024,8 +2031,8 @@ calls `refresh()` after the swap so a collapsed panel never under-reports.
 > handler, where the deferred script has run and the restored widget state is also in place.
 
 **Enforced by:** `InventoryFilterPanelCollapseE2eTest`, `JobOrderMaterialDemandE2eTest`,
-`InventoryPageControllerMvcTest` (the panel markup and the shared `filterToggle`) · **Code:**
-`krt-filter-panel.js`, `fragments/components.html` (`filterToggle`)
+`InventoryPageControllerMvcTest` (the filters inside the toolbar popover) · **Code:**
+`krt-filter-panel.js`, `fragments/components.html` (`filterPopover`)
 
 ### REQ-FE-023 — Every script is deferred, and an inline script runs nothing at parse time
 

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
-    <title>Item Details - Profit Basetool</title>
+    <title th:text="${gameItemName ?: #messages.msg('inventory.items.drilldown.title')} + ' - ' + ${appTitle}">Item - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
 <link rel="stylesheet" th:href="@{/css/pages/inventory-game-item.css}">
     </th:block>
@@ -12,52 +12,45 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box flex-between">
-        <h1 th:text="#{inventory.items.drilldown.title}">Detailansicht Item</h1>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.inventory', eyebrowHref=@{/inventory(view='items')},
+        titleText=${gameItemName ?: #messages.msg('inventory.items.drilldown.title')},
+        count=${inventoryGameItemPage != null ? inventoryGameItemPage.totalElements() : null},
+        countId='inventory-game-item-count', countFor='inventory-game-item-results', actions=null)}"></th:block>
 
-    <div class="hud-box mt-2">
-        <div th:if="${error}" class="hud-box hud-box-error">
-            <p th:text="#{__${error}__}">Fehler</p>
-        </div>
-
-        <div class="actions-bar">
-            <a th:href="@{/inventory(view='items')}" class="btn btn-ghost">&laquo; <span th:text="#{inventory.items.back}">Zurück zur Übersicht</span></a>
-        </div>
-
-        <div id="inventory-game-item-results">
+    <div id="inventory-game-item-results" class="card card--flush">
         <th:block th:fragment="inventoryGameItemResults">
-        <h3 class="krtm-font-family-lato-sans-serif-font-weight-700-957b" th:if="${gameItemName != null}" th:text="${gameItemName}">Item</h3>
-        <div class="overflow-x-auto">
-            <div class="table-responsive">
-            <table class="krt-table">
-                <thead>
-                    <tr>
-                        <th th:text="#{inventory.items.drilldown.col.user}">Nutzer</th>
-                        <th th:text="#{inventory.items.drilldown.col.location}">Ort</th>
-                        <th th:text="#{inventory.items.drilldown.col.amount}">Menge</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="item : ${items}">
-                        <td th:text="${item.user.effectiveName}">Username</td>
-                        <td th:text="${item.location.name}">Ort</td>
-                        <td><span th:text="${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'}">10</span> <span th:text="#{material.quantity.piece}">Stück</span></td>
-                    </tr>
-                    <tr th:if="${#lists.isEmpty(items)}">
-                        <td colspan="3" class="text-center text-muted" th:text="#{inventory.items.drilldown.empty}">Keine Einträge für dieses Item gefunden.</td>
-                    </tr>
-                </tbody>
-            </table>
-            </div>
-        </div>
-        <div class="pagination-controls" th:if="${inventoryGameItemPage != null}"
+        <div th:if="${error}" class="alert alert-danger drill-alert" role="alert" th:text="#{__${error}__}">Fehler</div>
+
+        <table th:if="${!#lists.isEmpty(items)}" class="data-table data-table--stack">
+            <thead>
+                <tr>
+                    <th th:text="#{inventory.items.drilldown.col.user}">Nutzer</th>
+                    <th th:text="#{inventory.items.drilldown.col.location}">Ort</th>
+                    <th class="num" th:text="#{inventory.items.drilldown.col.amount}">Menge</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="item : ${items}" data-testid="inventory-game-item-row">
+                    <td><span class="cell-title" th:text="${item.user.effectiveName}">Username</span></td>
+                    <td th:attr="data-label=#{inventory.items.drilldown.col.location}" th:text="${item.location.name}">Ort</td>
+                    <td class="num" th:attr="data-label=#{inventory.items.drilldown.col.amount}"><span th:text="${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'}">10</span> <span th:text="#{material.quantity.piece}">St&uuml;ck</span></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <th:block th:if="${#lists.isEmpty(items)}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='inventory.items.drilldown.empty', textKey='inventory.drilldown.empty.text')}"></th:block>
+        </th:block>
+
+        <div class="list-foot" th:if="${inventoryGameItemPage != null and inventoryGameItemPage.totalElements() > 0}"
+             th:data-list-total="${inventoryGameItemPage.totalElements()}"
              th:with="itemBase=${'/inventory/game-item/' + selectedGameItemId}">
+            <span data-testid="list-count"
+                  th:text="#{list.countOf(${inventoryGameItemPage.page() * inventoryGameItemPage.size() + 1}, ${inventoryGameItemPage.page() * inventoryGameItemPage.size() + #lists.size(inventoryGameItemPage.content())}, ${inventoryGameItemPage.totalElements()})}">1–50 von 120</span>
             <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${inventoryGameItemPage}, baseUrl=${itemBase}, sizes=${pageSizes})}"></nav>
             <nav th:replace="~{fragments/pagination :: pagination(pageResponse=${inventoryGameItemPage}, baseUrl=${itemBase})}"></nav>
         </div>
         </th:block>
-        </div>
     </div>
 </main>
 <th:block th:replace="~{fragments/toast :: toast}" />
