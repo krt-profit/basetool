@@ -204,6 +204,9 @@
                 th:data-material-id="${mat.material.id}"
                 th:data-amount-type="${mat.material.quantityType}"
                 th:data-quality-tier-id="${mat.qualityTier != null ? mat.qualityTier.id : ''}"
+                th:data-quality-code="${mat.qualityTier != null ? mat.qualityTier.code : ''}"
+                th:data-quality-floor="${mat.qualityTier != null ? mat.qualityTier.minQuality : 0}"
+                th:data-quality-label="${mat.qualityTier != null ? mat.qualityTier.label(#locale) : ''}"
                 data-trigger="od-toggle-inventory"
                >
                 <td th:text="${mat.material.name}"></td>
@@ -306,7 +309,9 @@
                             th:data-material-id="${m.material != null ? m.material.id() : ''}"
                             th:data-material-name="${m.material != null ? m.material.name() : ''}"
                             th:data-quantity-type="${m.material != null ? m.material.quantityType() : 'SCU'}"
-                            th:data-required-total="${m.requiredQuantity != null ? m.requiredQuantity : 0}"></li>
+                            th:data-required-total="${m.requiredQuantity != null ? m.requiredQuantity : 0}"
+                            th:data-quality-floor="${m.qualityTier != null ? m.qualityTier.minQuality : 0}"
+                            th:data-quality-label="${m.qualityTier != null ? m.qualityTier.label(#locale) : ''}"></li>
                     </ul>
                 </td>
                 <td class="num" th:attr="data-label=#{orders.detail.item.amount}" th:text="${#numbers.formatInteger(amt, 1)}">0</td>
@@ -418,6 +423,8 @@
                 th:data-material-id="${agg.material != null ? agg.material.id() : ''}"
                 th:data-amount-type="${agg.material != null ? agg.material.quantityType() : 'SCU'}"
                 th:data-quality-tier-id="${agg.qualityTier != null ? agg.qualityTier.id : ''}"
+                th:data-quality-floor="${agg.qualityTier != null ? agg.qualityTier.minQuality : 0}"
+                th:data-quality-label="${agg.qualityTier != null ? agg.qualityTier.label(#locale) : ''}"
                 data-trigger="od-toggle-inventory"
                >
                 <td th:text="${agg.material != null ? agg.material.name() : '-'}"></td>
@@ -1177,6 +1184,7 @@
         option: /*[[#{orders.handover.row.option}]]*/ '{0} (Qual. {1}) - {2} {3} von {4}',
         entry: /*[[#{orders.handover.row.entry}]]*/ 'Lagereintrag',
         remove: /*[[#{orders.handover.row.remove}]]*/ 'Entfernen',
+        tier: /*[[#{orders.handover.row.tier}]]*/ 'Anrechnen auf',
         reportFilename: /*[[#{orders.handover.report.filename}]]*/ '\u00dcbergabe Auftrag #{0} {1} {2}.pdf',
         keepOneMaterial: /*[[#{error.joborder.material.lastRow}]]*/ 'Es muss mindestens ein Material im Auftrag verbleiben.'
     };
@@ -1200,6 +1208,7 @@
     const MSG_EMPTY_INVENTORY = /*[[#{orders.detail.inventory.empty}]]*/ 'Keine Lagereintr\u00e4ge verkn\u00fcpft.';
     const MSG_INVENTORY_BELOW_FLOOR = /*[[#{orders.detail.inventory.belowFloor}]]*/ 'Unter Mindestqualit\u00e4t';
     const MSG_INVENTORY_PART_OF = /*[[#{orders.detail.inventory.partOf}]]*/ '{0} von {1} angerechnet';
+    const MSG_PRODUCTION_COUNTED_HIGHER = /*[[#{orders.detail.production.countedHigher}]]*/ 'Wird f\u00fcr {0} angerechnet';
     const MSG_INVENTORY_UNLINK_TOOLTIP = /*[[#{orders.detail.inventory.unlink.tooltip}]]*/ 'Lagereintrag vom Auftrag entlinken';
     const MSG_INVENTORY_UNLINK_SUCCESS = /*[[#{orders.detail.inventory.unlink.success}]]*/ 'Lagereintrag erfolgreich entlinkt';
     const MSG_INVENTORY_UNLINK_ERROR = /*[[#{orders.detail.inventory.unlink.error}]]*/ 'Fehler beim Entlinken des Lagereintrags';

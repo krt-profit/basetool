@@ -45,5 +45,11 @@ public class JobOrderHandoverForm {
      * null} lets the backend auto-clamp the mission dimension (rest-first, then proportional).
      */
     private List<AllocationReductionDto> missionReductions;
+
+    /**
+     * The code of the quality tier the amount is booked against (REQ-ORDERS-038); {@code null}
+     * books it against the highest tier the entry meets.
+     */
+    private String qualityRequirement;
   }
 }
