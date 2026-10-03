@@ -20,16 +20,18 @@
 package de.greluc.krt.profit.basetool.ingest.web;
 
 import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeIdempotencyFilter;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeUnavailableException;
-import de.greluc.krt.profit.basetool.ingest.filter.IngestPathScope;
-import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.ingest.service.ServiceAccountTokenProvider;
+import de.greluc.krt.profit.basetool.ingest.edge.IngestPathScope;
+import de.greluc.krt.profit.basetool.ingest.idempotency.ExchangeIdempotencyFilter;
+import de.greluc.krt.profit.basetool.ingest.observability.MetricNames;
+import de.greluc.krt.profit.basetool.ingest.problem.BadRequestException;
+import de.greluc.krt.profit.basetool.ingest.problem.NotFoundException;
+import de.greluc.krt.profit.basetool.ingest.problem.Problems;
+import de.greluc.krt.profit.basetool.ingest.registry.ExchangeUnavailableException;
+import de.greluc.krt.profit.basetool.ingest.relay.ServiceAccountTokenProvider;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -151,8 +153,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
               "Bad request",
               CODE_SCHEMA_INVALID,
               "The body is not a JSON document.");
-      problem.setProperty(
-          "errors", List.of(Map.of("pointer", "", "message", "is not a JSON document")));
+      problem.setProperty("errors", List.of(new Problems.FieldError("", "is not a JSON document")));
       return handleExceptionInternal(ex, problem, headers, HttpStatus.BAD_REQUEST, request);
     }
     ProblemDetail problem =

@@ -199,7 +199,7 @@ public class AdminPersonalInventoryPageController {
               form.getQuantity(),
               form.getVersion());
       backendApiClient.put(
-          "/api/v1/admin/personal-inventory/" + id, request, PersonalInventoryItemDto.class);
+          "/api/v1/admin/personal-inventory/items/" + id, request, PersonalInventoryItemDto.class);
       redirectAttributes.addFlashAttribute("successToast", "personalInventory.toast.updated");
     } catch (Exception e) {
       log.error("Admin failed to update personal inventory item {}", id, e);
@@ -224,7 +224,7 @@ public class AdminPersonalInventoryPageController {
       @PathVariable @NotNull UUID id,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/admin/personal-inventory/" + id, Void.class);
+      backendApiClient.delete("/api/v1/admin/personal-inventory/items/" + id, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "personalInventory.toast.deleted");
     } catch (Exception e) {
       log.error("Admin failed to delete personal inventory item {}", id, e);

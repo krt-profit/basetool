@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -41,5 +42,6 @@ public record ExchangeUndoResultDto(int restored, @NotNull @Unmodifiable List<Sk
    * @param reason {@code CHANGED_AFTERWARDS} when it was changed after the client's last write, or
    *     {@code GONE} when it no longer belongs to the member or what it names is gone
    */
+  @Schema(name = "Skipped")
   public record Skipped(@NotNull String resource, @Nullable String label, @NotNull String reason) {}
 }

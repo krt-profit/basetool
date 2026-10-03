@@ -13,19 +13,33 @@ stable, predictable surface.
 
 ### REQ-API-001 — Versioned URI paths
 
-Paths are `/api/v1/...`. Breaking changes go to a new version (`/api/v2/...`). Retired
-endpoints carry `@ApiDeprecation(sunset = "YYYY-MM-DD", replacement = "/api/v2/...")`;
-`DeprecationInterceptor` emits `Deprecation` / `Sunset` / `Link` headers and
+Paths are `/api/v1/...`. A breaking change is made by **hard cut** (ADR-0234): the operation
+moves or changes in place in one release, with no parallel old path, no deprecation alias and no
+sunset window. Every operation belongs to one contract tier — **T0** never breaks (the version gate
+`GET /api/v1/app/version-policy`, `POST /internal/discord/account-existence`, the 14 exchange relay
+operations under `/api/v1/exchange/**`, the two SSE streams and `POST /api/v1/live-sync/changed`);
+**T1**, what a released Android build calls, breaks only in a declared hard-cut wave under
+REQ-API-009 and REQ-API-010; **T2**, web-only, changes freely under the carve-out below.
+`@ApiDeprecation(sunset = "YYYY-MM-DD", replacement = "…")` stays available for a deliberate
+deprecation: `DeprecationInterceptor` emits `Deprecation` / `Sunset` / `Link` headers and
 `OpenApiDeprecationConfig` reflects it in the spec.
+
+> [!note] Amended 2026-10-02 — the hard cut (owner decisions D-03, D-04, D-11; ADR-0234)
+> Breaking changes used to go to `/api/v2/...` beside `/api/v1`. **Decided, implementation
+> pending:** the tier marker (`x-contract-tier`) and the T0 record do not exist yet; until they do,
+> the tiers are the lists named here and in REQ-API-009.
 
 **The web frontend never calls a deprecated operation** (since 2026-09-22, BE-SIMP-02). The headers
 are read only by a human, so a deprecation the in-repo client kept using used to surface on its
 sunset day as a broken page — the frontend was still calling twelve of the seventeen deprecated
 mission endpoints weeks before theirs. `DeprecatedBackendEndpointCallGuardTest` (frontend) reads
 every `deprecated: true` operation out of the committed `openapi.json` and fails the build when a
-`backendApiClient.<verb>("/api/…")` call in the frontend's main sources matches one, verb included.
-A new deprecation is guarded as soon as the document is regenerated; move the caller to the named
-replacement in the same change.
+frontend call matches one, verb included. It reads the call sites from the same scan as the
+existence guard of REQ-FE-028, so `backendApiClient.execute(…)` and concatenated, constant or
+builder-built URIs are seen too. A new deprecation is guarded as soon as the document is
+regenerated; move the caller to the named replacement in the same change. The one deprecated
+operation the frontend still relays on purpose, `POST /api/v1/hangar/import/fleetview` (sunset
+2027-05-14), is named in the guard's list of reviewed relays.
 
 **The seventeen deprecated mission endpoints are deleted — early** (owner decision 2026-09-22,
 #1996): the MissionDto-returning unit, crew, participant, check-in/-out, payout-preference,
@@ -37,14 +51,15 @@ slim paths) must be updated. Their `/slim` twins and the versioned `PUT …/owne
 nightly probe asserts 404 for it. Its manager-only successor for the app is
 `POST …/participants/by-id/slim` (REQ-MISSION-020, ADR-0170 amendment), admitted and frozen.
 
-**Carve-out — internal-only endpoints:** a `/api/v1` endpoint consumed solely by the in-repo
-frontend may change its response *shape* in place (no `/api/v2` bump) when frontend and
-backend deploy atomically and `DtoOpenApiContractTest` guards the frontend mirror against
+**Carve-out — internal-only endpoints (T2):** a `/api/v1` endpoint consumed solely by the in-repo
+frontend may change its response *shape* or its path in place when frontend and backend deploy
+atomically and `DtoOpenApiContractTest` guards the frontend mirror against
 `openapi.json` — e.g. the inventory `/grouped` move from `items` to `stacks` (ADR-0003).
 
 **The carve-out stops at the external contract set.** Its whole justification is the atomic
 deploy, which a released native client does not have. Operations listed in REQ-API-009 are
-therefore frozen against in-place shape change even though they live under `/api/v1`.
+therefore frozen against in-place shape change even though they live under `/api/v1`, and change
+only in a declared hard-cut wave (REQ-API-009).
 
 ### REQ-API-002 — DTOs only at boundaries
 
@@ -62,7 +77,7 @@ one real gap — the job type a mission embeds never carried `isMissionLead`.
 
 ### REQ-API-003 — Validation on writes
 
-`@Valid` on every `@RequestBody` for write operations (POST/PUT/PATCH).
+`@Valid` on every `@RequestBody` for write operations (POST/PUT/PATCH). Enforced since REQ-API-015.
 
 ### REQ-API-004 — RFC 7807 error format
 
@@ -118,7 +133,45 @@ challenge is preserved, then writes the problem body on top. Unlike the backend'
 name it mints no correlation id: the gateway's `CorrelationIdFilter` runs *outside* the security
 chain, so the MDC is already populated and the header already echoed.
 
-Document the format in OpenAPI and keep frontend error display in sync.
+Document the format in OpenAPI and keep frontend error display in sync. **Every `code` value comes
+from the error-code registry (REQ-API-019)**, and the document's `ProblemDetail` schema carries
+`code` (with the registered values), `correlationId`, `errors` and `fieldErrors`, plus a `429` on
+every `/api/**` operation, since both rate limiters answer it there.
+
+> [!note] Corrected 2026-10-03
+> Until REQ-API-019 the document's `ProblemDetail` listed none of `code`, `correlationId` or
+> `fieldErrors` — the fields this requirement calls the contract — and its properties carried no
+> `type`, because the OpenAPI 3.1 writer ignores the 3.0 setter the customizer used; `429` was
+> documented on one operation. Five producers are missing from the list above and are sanctioned
+> the same way: `TermsAcceptanceAccessFilter` (403 `TERMS_NOT_ACCEPTED`), `ActingMemberFilter`
+> (403 `ACTING_MEMBER_REFUSED`), `IdentityProviderUnavailableFilter` (503 `SERVICE_UNAVAILABLE`),
+> `SubjectRateLimitingFilter` (429 `RATE_LIMIT_EXCEEDED`) and `RequestBodySizeLimitFilter` (413
+> `REQUEST_BODY_TOO_LARGE`); `PendingApprovalAccessFilter` also answers `NO_ROLE`.
+
+**Spring MVC's client errors answer their own 4xx, never the catch-all 500.** A missing request
+parameter, header, cookie or matrix variable, a mapping's unsatisfied parameter condition
+(`ServletRequestBindingException` and its subtypes) and a missing multipart part
+(`MissingServletRequestPartException`) are `400 BAD_REQUEST`, the detail naming the missing value; a
+response no accepted media type can carry (`HttpMediaTypeNotAcceptableException`) is
+`406 NOT_ACCEPTABLE`; an upload over the multipart limit (`MaxUploadSizeExceededException`) is
+`413 REQUEST_BODY_TOO_LARGE`. A binding exception Spring itself classifies as a server error — a path
+variable the mapping does not declare (`MissingPathVariableException`) — stays `500 INTERNAL_ERROR`.
+The status-derived fallback (`codeForStatus` in the handler, `mappingFor` in `BasetoolErrorController`)
+maps `429` to `RATE_LIMIT_EXCEEDED`.
+
+**Every `429` carries `code = RATE_LIMIT_EXCEEDED`, a `correlationId` and `Retry-After`** (whole
+seconds), beside the limiters' `X-Rate-Limit-*` headers: the per-IP `RateLimitingFilter`, the
+per-subject `SubjectRateLimitingFilter` (REQ-SEC-033) and `POST /api/v1/live-sync/changed`
+(`RateLimitExceededException`, REQ-FE-019). The document declares `Retry-After` and the three
+`X-Rate-Limit-*` headers on every `/api/**` operation's `429`.
+
+> [!note] Corrected 2026-10-03
+> Until then the five exception types above answered `500 INTERNAL_ERROR` through the catch-all;
+> `SubjectRateLimitingFilter`'s `429` had a `null` `correlationId` and no `Retry-After`;
+> `POST /api/v1/live-sync/changed` answered its `400` and `429` with an empty body although the
+> document promised a problem; the status fallback mapped `429` to `BAD_REQUEST`; and four bank codes
+> (`BANK_REQUEST_NOT_PENDING`, `BANK_REQUEST_ALREADY_APPROVED`, `BANK_ACCOUNT_HAS_PENDING_REQUESTS`,
+> `BANK_OWNER_APPROVAL_REQUIRED`) had no `title` key, so the client was shown the bundle key.
 
 **A raw `IllegalStateException` is a 500, never a 400 (APPSEC-06, 2026-09-22).** The handler used to
 answer every `IllegalStateException` with a 400 and echo its message as `detail`, on the assumption
@@ -149,18 +202,21 @@ were migrated message by message (BE-SIMP-01, 2026-09-23); `Entities` itself is 
 **Domain exceptions carry their own error-code contract (S4, #910).** `BadRequestException`,
 `NotFoundException`, `BusinessConflictException`, `DuplicateEntityException`,
 `EntityInUseException`, `ExternalServiceException`, `ReportGenerationException`,
-`OverAllocationException`, `ProductionAllocationException`, `OwnerOrgUnitRequiredException` and
-`BankConflictException` — eleven in all — extend the sealed `exception.AppException`, exposing `status()`,
+`OverAllocationException`, `ProductionAllocationException`, `OwnerOrgUnitRequiredException`,
+`MissionParticipantRequiredException`, `RateLimitExceededException` and `BankConflictException` —
+thirteen in all, beside the exchange's own `ExchangeProblemException` — extend the sealed `exception.AppException`, exposing `status()`,
 `code()`, `titleKey()`, `detailKey()`, `typeSuffix()` and `logLabel()` on the type itself instead of
 leaving that identity scattered across `GlobalExceptionHandler`'s `CODE_*` constants and per-type
 `@ExceptionHandler` methods. A single `handleAppException` dispatch handler reads those accessors
 for every subtype except `NotFoundException`, whose handler stays dedicated because it also covers
 three non-`AppException` JPA/JDK "not found" flavors (`EntityNotFoundException`,
 `NoSuchElementException`, `NoResourceFoundException`) that cannot be sealed under this hierarchy.
-Ten of the eleven subtypes never override an accessor: they pass their fixed
+Every subtype but `BankConflictException` passes its fixed
 `exception.AppExceptionKind` constant to the `AppException(AppExceptionKind, String)` /
 `AppException(AppExceptionKind, String, Throwable)` superclass constructor and inherit every
-accessor from `AppException`, which delegates to that stored kind. `BankConflictException` is the
+accessor from `AppException`, which delegates to that stored kind; the one addition is
+`RateLimitExceededException`, which also overrides `responseHeaders()` so the dispatch handler sends
+its `Retry-After`. `BankConflictException` is the
 one exception that overrides every accessor directly, computing them per-instance from its own
 `code` field (it has no single fixed identity — each throw site picks one of its `CODE_BANK_*`
 constants) via the legacy kind-less `AppException(String)` / `AppException(String, Throwable)`
@@ -173,16 +229,92 @@ constant to the superclass constructor (the common case, requiring zero accessor
 implementing the accessors directly (only if its identity is genuinely per-instance, as
 `BankConflictException`'s is) — never by hand-rolling a new `@ExceptionHandler` method.
 
+### REQ-API-019 — Every problem code is registered once and documented
+
+A client branches on `code`, never on the localized `title` or `detail`, so the set of codes is a
+contract — and until 2026-10-03 it lived as about fifty string literals across the exception package,
+the handler, six filters and the error controller, with no list, no uniqueness check and no
+documentation. The app once listened for `TERMS_ACCEPTANCE_REQUIRED` while the server sends
+`TERMS_NOT_ACCEPTED`. This is the registry and documentation half of ADR-0235; the exception
+hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) follows in Phase 1.
+
+- **`exception.ProblemCode`** — a code's wire value (`code()`) and its HTTP status (`status()`). The
+  code string is the contract; the Java name is not.
+- **`exception.CoreProblemCode`** — one kernel enum listing every code the backend emits outside the
+  exchange: the handler's, the twelve `AppExceptionKind` codes, the 18 bank codes, the filters'
+  (`TERMS_NOT_ACCEPTED`, `PENDING_APPROVAL`, `NO_ROLE`, `ACTING_MEMBER_REFUSED`,
+  `SERVICE_UNAVAILABLE`, `RATE_LIMIT_EXCEEDED`, `REQUEST_BODY_TOO_LARGE`) and `NOT_ACCEPTABLE`
+  (`406`) — 50 in all. Three are
+  **reserved**, registered but not emitted: `BANK_HOLDER_OVERDRAFT` (ADR-0039),
+  `BANK_CARTEL_APPROVAL_REQUIRED` (ADR-0109) and `APP_UPDATE_REQUIRED`, which retired paths will
+  answer (ADR-0234, D-11; registered with `410`). Every producer references the enum; no code is a
+  literal any more.
+- **The committed list** `backend/src/test/resources/api/problem-codes.txt`, one `<CODE> <status>`
+  line per code, sorted. A new, renamed or removed code changes it in the same PR, so the change is
+  reviewed.
+- **The exchange's own registry stays separate.** Its nine codes are constants of
+  `ExchangeProblemException`, frozen with the exchange contract (REQ-XCH, ADR-0216); the registry
+  only asserts that no kernel code clashes with one of them.
+- **The document lists the codes.** `ProblemDetail.code` is a string whose `x-problem-codes`
+  extension and description list the registered values — never a required enum, because
+  `theContractRequiredEnumsAreFrozen` would then freeze the list against every addition — beside
+  `correlationId`, `errors` and `fieldErrors` (`{field, message}`); every `/api/**` operation
+  documents `429` (`OpenApiProblemDetailsConfig`).
+
+**Acceptance**
+
+- [x] Every registered code is unique, also against the exchange's; the registry equals the committed
+  list, code and status (`ProblemCodeRegistryTest`).
+- [x] Every code `AppExceptionKind`, `GlobalExceptionHandler`, `BankConflictException` and the six
+  filters declare is registered; no main source writes a code as a literal (a source scan whose four
+  site shapes are each proven on a planted line); runtime probes through the real filter chain — an
+  anonymous read, a wrong verb, an unreadable body, a path no controller serves — answer
+  registered codes (`ProblemCodeRuntimeProbeTest`).
+- [x] A planted enum repeating `NOT_FOUND` is caught.
+- [x] Every registered code has a non-blank title and detail in every backend bundle
+  (`messages`, `messages_de`, `messages_en`) under `problem.<code in lower case>`, or under the
+  key its producer reads (`problem.data_integrity`, `problem.external_service`), and so has every key
+  an `AppExceptionKind` or a `BankConflictException` reads; a planted bundle missing or blanking a
+  key is caught (`ProblemCodeRegistryTest`).
+- [x] Spring MVC's client-error exceptions answer their registered 4xx code, one test per type
+  (`GlobalExceptionHandlerClientErrorTest`), and a missing parameter and an unacceptable media type
+  do so through the real chain (`ProblemCodeRuntimeProbeTest`).
+- [x] The committed document's `ProblemDetail` lists exactly the registered codes, keeps `code`
+  optional and not an enum.
+- [ ] One `ProblemCode` enum per module and the app generating its constants from the document —
+  **open**, plan Phase 1 (ADR-0235) and the app.
+
+**Enforced by:** `ProblemCodeRegistryTest`, `ProblemCodeRuntimeProbeTest`,
+`GlobalExceptionHandlerClientErrorTest` (backend) ·
+**Related:** REQ-API-004, REQ-API-007, REQ-API-009, ADR-0234, ADR-0235
+
 ### REQ-API-005 — Pagination & sorting
 
 All list endpoints take Spring's `Pageable` and return a `PageResponse` wrapper (total
 elements, pages, current page). **Whitelist allowed sort fields in the service** — never
 pass user input directly to `Sort` (unstable sorting + information-disclosure risk). Build the
 `Pageable` through `PaginationUtil`, which whitelists the sort field, appends `id` as a stable
-tiebreaker, and clamps `size` to `MAX_PAGE_SIZE` (100 000 — high on purpose so the "load all in one
-request" surfaces are not truncated). The clamp bounds the result-set size; the global
-query-execution timeout (REQ-DATA-009, finding SEC-03) bounds how long a heavy fetch may hold a
-database connection.
+tiebreaker, and clamps `size` to a **page ceiling**. The clamp bounds the result-set size; the
+global query-execution timeout (REQ-DATA-009, finding SEC-03) bounds how long a heavy fetch may hold
+a database connection.
+
+**The kernel page policy** (plan D-18, amended 2026-10-03). The default ceiling is
+`MAX_PAGE_SIZE` = **1 000**. A list opts out only explicitly, by passing `PageCeiling.LOAD_ALL`
+(`LOAD_ALL_MAX_PAGE_SIZE` = 100 000), and only for a caller that requests a larger page. The value
+was set from the callers in the code, not guessed: every frontend, Android-app and ingest call
+requests at most 1 000 except eight, which are the reviewed opt-outs —
+
+| Opt-out | Caller | Requested `size` |
+| --- | --- | ---: |
+| `GET /api/v1/materials/matrix` | frontend price matrix (`CachedCatalog.MATERIALS_MATRIX`) | 100 000 |
+| `GET /api/v1/materials/prices-overview` | frontend materials page, one page | 10 000 |
+| `GET /api/v1/materials/{id}/prices` | frontend materials page | 10 000 |
+| `GET /api/v1/terminals` | frontend terminal catalogue, admin UEX page | 10 000 |
+| `GET /api/v1/cities`, `/space-stations`, `/outposts`, `/pois` | frontend admin UEX page | 10 000 |
+
+A caller that asks a non-opted-out list for more than 1 000 gets a page of 1 000 and the true
+`totalPages`, so a page walk still reaches every row. `PageCeilingTest` pins the opt-outs to exactly
+these eight handlers and fails on a new one; adding one is a reviewed decision that names its caller.
 
 ### REQ-API-006 — All times in UTC
 
@@ -221,9 +353,17 @@ never write the document in place. `org.gradle.parallel=true` runs `:backend:tes
 parses a cut-off document and fails with `UnexpectedEndOfInputException` — an intermittent red build
 whose cause is nowhere near the test that reports it.
 
-The generator also **asserts** the document's load-bearing parts (title, the `bearer-jwt` scheme,
-the expected paths and request/response schemas) before writing, so a controller that silently stops
-being scanned fails the build instead of quietly shrinking the committed spec.
+The generator also **asserts** the document's load-bearing parts before writing, so a controller
+that silently stops being scanned fails the build instead of quietly shrinking the committed spec:
+the `bearer-jwt` scheme and the document-wide requirement on it, exactly the two anonymous
+operations (`GET /api/v1/app/version-policy`, `GET /api/v1/terms/document`), one domain tag and
+one contract tier on every operation, a per-domain operation-count floor, and unique schema names
+(REQ-API-018; `OpenApiDocumentAssertions`, `ExposedTypes`).
+
+> [!note] Corrected 2026-10-03
+> This paragraph described assertions (title, scheme, paths, schemas) that belonged to the removed
+> ingest generator; the backend's `OpenApiGeneratorTest` asserted only a `200` until the
+> assertions above were added with REQ-API-018 (rest-api-cut.md, *Findings*).
 
 Regeneration MUST also be **reproducible**: the same tree must produce the same bytes, so a
 `openapi.json` diff always means a real API change. The one thing that broke this was
@@ -259,6 +399,72 @@ contract tests then compared against a stale contract. Two parts close it:
   `git diff --exit-code -- '*/src/main/resources/api/openapi.json'` and fails the job on any
   difference. `.gitattributes` pins `*.json` to LF, so the comparison is on normalised content and a
   generator writing CRLF on Windows cannot produce a diff by itself.
+
+### REQ-API-018 — Every operation names its domain and its contract tier; every schema name one type
+
+The committed `openapi.json` is the review surface of the domain cut (ADR-0234, plan §5.10), so it
+says, per operation, which domain owns it and how frozen it is, and it describes every exposed type
+under a name of its own.
+
+- **One tag per domain.** `OpenApiDomainConfig.domainTagCustomizer` (an `OperationCustomizer`)
+  replaces every operation's tags with exactly one, its controller's domain, and mirrors it as
+  `x-domain`; the document's `tags` list holds those domains and nothing else, and springdoc's
+  class-name tags are off (`springdoc.auto-tag-classes: false`). The domains are the 22 of the REST
+  API cut's *Today's surface* (`admin-system`, `audit`, `bank`, `blueprint`, `catalogue`,
+  `dashboard`, `exchange`, `hangar`, `identity`, `inventory`, `joborder`, `leadership`, `livesync`,
+  `materialexchange`, `mission`, `notification`, `operation`, `orgchart`, `orgunit`,
+  `personalinventory`, `promotion`, `refinery`). The controller-to-domain table is explicit in main
+  code, `config/ApiDomains`: the backend domain map of plan guard G-09
+  (`backend/src/test/resources/architecture/domain-map.txt`, REQ-MOD-001) lives in test scope, where
+  the running application cannot read it, and the REST cut's 22 domains are not the map's 26 modules.
+  `ApiDomainsMatchTheDomainMapTest` therefore holds the table to the map: a controller's tag is its
+  module, or the API domain one of five reviewed entries names — the `privacy` module's endpoints
+  are tagged `identity`, the `admin` module's `admin-system`, and `LeitungController`,
+  `BlueprintController` and `UexLocationController` keep the domain the REST cut gives them —, and
+  an entry no controller needs fails. One committed document stays — the app vendors it and the frontend
+  generates its test types from it; per-domain views are filtered from it.
+- **One contract tier per operation**, as `x-contract-tier` (REQ-API-001 names the tiers):
+  `T0` never breaks, `T1` is the Android contract, `T2` is web-only. The single source is
+  `backend/src/main/resources/api/contract-tiers.txt`, one `<T0|T1> <VERB> <path>` line per frozen
+  operation; every operation it does not name is `T2`. `ExternalContractTest` holds it to the record
+  that never changes (`T0`: the version gate, the 14 exchange relay operations, the two streams and
+  `POST /api/v1/live-sync/changed` — the SPI endpoint is T0 too but not in the document) and to the
+  frozen set (`T1` = frozen set minus `T0`, both directions), checks the committed document carries
+  each tier, and refuses a declared-break ledger line on a `T0` operation (REQ-API-017). The
+  previous-release comparison also compares every operation the previous document marks `T0` or
+  `T1`. The tier is data, not an exposure switch: the edge allow-list stays a reviewed file.
+- **Unique schema names.** Every name under `components.schemas` belongs to exactly one exposed Java
+  type or an explicit `@Schema(name = …)`. `ExposedTypes` walks every main-source controller's
+  handlers — return types, `@RequestBody` / `@RequestPart` parameters, generic arguments, record
+  components and fields — and groups the reached own types by the name springdoc gives them. The
+  collisions found (2026-10-03) are named apart: the nested `Op` of the stock, blueprint and ship
+  change sets, and `Provenance` of the blueprint change set and the blueprint DTO. `Skipped` was
+  named as a third collision by the audit, but its namesake is a service record no controller
+  exposes; the exposed one gets its name explicitly all the same. The name the document already
+  showed — and that the app's vendored copy and its generated models carry — stays on the type that
+  had it (`Op` the stock op, `Provenance` the change-set provenance, `Skipped` the undo result); the
+  others became
+  `ExchangeBlueprintOp`, `ExchangeShipOp` and `ExchangeBlueprintProvenance`, so the blueprint and
+  ship change sets are documented correctly for the first time (and the ship op's `Insurance`
+  appears). `use-fqn` stays off: it would rename every schema and every generated app model.
+
+**Acceptance**
+
+- [x] Every operation carries exactly one tag, equal to `x-domain`, from the 22 domains; the tag list
+  is the domains; every operation carries the tier its list entry or `T2` gives it — asserted by the
+  generator before it writes and on the committed document (`OpenApiDocumentAssertionsTest`).
+- [x] Each domain's operation count has a floor at today's count (573 operations).
+- [x] `T0` equals its record, `T1` equals the frozen set minus `T0`, no ledger line breaks `T0`
+  (`ExternalContractTest.theContractTiersMatchTheFrozenSet`).
+- [x] No two exposed types share a schema name; the scan reaches at least 441 names, and the domain
+  table names exactly the 99 controllers (`OpenApiSchemaNamesTest`).
+- [x] Each guard proven able to fail: a planted document with every fault, planted tier lines, planted
+  fixture controllers with two `Op` records, the real ship op without its explicit name, and a dropped
+  `T1` line.
+
+**Enforced by:** `OpenApiGeneratorTest`, `OpenApiDocumentAssertionsTest`, `OpenApiSchemaNamesTest`,
+`ExternalContractTest` (backend) ·
+**Related:** REQ-API-001, REQ-API-007, REQ-API-009, REQ-API-017, ADR-0234
 
 ### REQ-API-008 — Shared controller boilerplate (argument resolvers & response helpers)
 
@@ -603,7 +809,7 @@ a new `required` entry turns every one of its saves into a `400` — the same cl
 dropped response field, arriving through the other direction. Making a required field optional is
 safe (the old build keeps sending it), which is why `ExternalContractTest` asserts the `required`
 list exactly rather than as a subset: adding is the break, removing is not. A field that genuinely
-must be mandatory goes to `/api/v2`.
+must be mandatory is a declared break of a hard-cut wave (below).
 
 `PUT /api/v1/personal-inventory/{id}` requires `version` and is the first entry to record that: it
 is the optimistic lock, echoed from the read, and a concurrent edit answers `409 OPTIMISTIC_LOCK`
@@ -702,9 +908,27 @@ path can answer. The switcher itself now reads `GET /api/v1/me/org-units` (ADR-0
 
 **Frozen means**, for an operation in the set: it keeps its path and verb; its response keeps every
 **recorded** field; its request accepts everything it accepted before (a new **required** field is a
-break); and retirement goes through `/api/v2` + `@ApiDeprecation` with a sunset rather than a
-deletion. Additive change stays free — new optional response fields, new optional request fields,
-new endpoints.
+break); and it is retired or changed only in a **declared hard-cut wave** (ADR-0234). Additive
+change stays free — new optional response fields, new optional request fields, new endpoints.
+
+**A hard-cut wave** removes or changes frozen operations and fields in one release, with no
+parallel `/api/v2` path and no sunset window. It ships together with:
+
+- **a line per break in the declared-break ledger** (`backend/src/test/resources/api/declared-breaks.txt`):
+  the operation, the field where one is meant — never a wildcard — and the app `versionCode` that
+  absorbs it; the previous-release comparison accepts exactly the declared breaks;
+- **the app's call list**: each app release publishes the calls it makes (verb, path, query
+  parameters, response fields read); the backend commits it per app release, the frozen set must
+  cover it, and the list of the absorbing app release calls nothing the ledger declares broken;
+- **a new app release published first and the minimum version raised for it** (REQ-API-010);
+- **`APP_UPDATE_REQUIRED` on the retired paths**: an operation the ledger retired answers one stable
+  RFC 7807 problem with that code, which later app versions map to the update wall.
+
+> [!note] Amended 2026-10-02 — retirement by hard cut (owner decisions D-03, D-04, D-11; ADR-0234)
+> This used to read: retirement goes through `/api/v2` + `@ApiDeprecation` with a sunset rather
+> than a deletion. **Implemented 2026-10-03:** the declared-break ledger (REQ-API-017), the committed
+> app call list (REQ-API-016) and the `APP_UPDATE_REQUIRED` answer (REQ-API-020) exist (plan guard
+> G-23, Phase 0 step 0.7); a frozen operation is retired only through them.
 
 > [!warning] Amended 2026-09-02 (owner-approved) — this sentence used to say every field it had
 > The wording was stricter than the rest of its own requirement and stricter than the gate that
@@ -789,11 +1013,20 @@ because the build fails when they differ.
   below it. What that unblocks is narrower than "old builds are gone", and the difference matters
   when planning a sunset — the floor stops a build from *running*, it does not remove it from
   anyone's phone, and a member who never opens the app never learns of it.
+- [x] **A break is declared before it ships** — the declared-break ledger, accepted exactly by the
+  previous-release comparison. **Closed by REQ-API-017** (2026-10-03).
+- [x] **The frozen set covers what the app calls** — the app's call list committed per release and
+  asserted against the set. **Closed by REQ-API-016** (2026-10-03) for the app's next build; the
+  list per released build follows with the app release.
+- [x] **A retired path answers `APP_UPDATE_REQUIRED`.** **Closed by REQ-API-020** (2026-10-03):
+  `RetiredOperationFilter` answers every operation of `retired-operations.txt` with `410
+  APP_UPDATE_REQUIRED` ahead of authentication; on the public API vhost once the edge admits the
+  ledger's retired paths (plan guard G-08).
 
 **Enforced by:** `ExternalContractTest` (backend) · the *Fail if a committed openapi.json is stale*
 step in `ci.yml` (since 2026-09-23), which is what keeps the document `ExternalContractTest` reads
 equal to the one the controllers produce (REQ-API-007) ·
-**Related:** ADR-0136, ADR-0135, ADR-0003, REQ-API-001, REQ-API-007, REQ-SEC-027
+**Related:** ADR-0136, ADR-0234, ADR-0135, ADR-0003, REQ-API-001, REQ-API-007, REQ-SEC-027
 
 ---
 
@@ -827,8 +1060,36 @@ non-dismissible „Update erforderlich" screen of design chapter 14.
   build. Locking members out is the expensive direction of a wrong default; serving an old build
   for one more day is the cheap one.
 
-Configuration (`app.android.*`), not a table: raising the floor is what an operator does at the
-moment a contract breaks, and it has to work without a migration, an admin screen or a deploy.
+**The floor is bound to the release** (owner decision D-11, ADR-0234). The minimum version is a
+reviewed default in the release's own configuration, so it deploys and rolls back together with the
+API it protects; the host value `APP_ANDROID_MINIMUM_VERSION_CODE` stays only as an emergency
+override. A floor raised on the host alone survives a rollback of the release it was meant for,
+and the old backend then walls old apps while new apps find their paths gone. Configuration
+(`app.android.*`), not a table: no migration and no admin screen.
+
+**Around a hard-cut wave (REQ-API-009) three more properties hold:**
+
+- **The app re-reads the policy on foreground resume and after an unexpected 404** (or `NOT_FOUND`
+  on a known path), so an app that is already running meets the wall; this ships in an app release
+  before the first wave that breaks an Android operation.
+- **Retired paths answer `APP_UPDATE_REQUIRED`**, which app versions that know it map to the wall.
+- **Cuts are announced and made at low usage.**
+
+> [!note] Amended 2026-10-02, implemented 2026-10-03 — the release-bound floor (owner decision D-11;
+> ADR-0234; REQ-API-020)
+> This used to read: configuration, not a table, because raising the floor has to work without a
+> migration, an admin screen or a deploy. Until 2026-10-03 the floor was bound at backend start from
+> `APP_ANDROID_MINIMUM_VERSION_CODE` (default `0`) in the host `.env` and raised by runbook step S8
+> of [`EXCHANGE_GO_LIVE_RUNBOOK.md`](../EXCHANGE_GO_LIVE_RUNBOOK.md), after the re-cut release was
+> verified healthy and reverted first on a rollback. Now the floor and the newest build are reviewed
+> literals in the backend's `application.yml` (`app.android.version-policy.release.*`), so they
+> deploy and roll back with the release; the host keeps only an emergency override under new names
+> (`APP_ANDROID_*_OVERRIDE`), and the retired `APP_ANDROID_MINIMUM_VERSION_CODE` /
+> `…_LATEST_VERSION_CODE` / `…_RELEASES_URL` reach no container. A raised floor is a change to that
+> literal in the wave's pull request, not runbook step S8. The code-level default stays `0`, so the
+> third property above still holds for a context without the committed block. Retired paths answer
+> `APP_UPDATE_REQUIRED`. The app's re-read on resume and after an unexpected 404 is not released yet
+> (basetool-android#209).
 
 The operation is itself in the frozen set, for an inverted reason worth stating — every other entry
 is frozen so a shipped app keeps working, this one so a shipped app can be told to stop. A renamed
@@ -841,7 +1102,7 @@ instead. Recorded here rather than left as a silent difference between design an
 
 **Enforced by:** `AppVersionPolicyControllerTest`, `ExternalContractTest`,
 `ApiVhostAnonymousSurfaceTest` (backend) ·
-**Related:** REQ-API-009, REQ-SEC-037, ADR-0136, app issue krt-profit/basetool-android#67
+**Related:** REQ-API-009, REQ-SEC-037, ADR-0136, ADR-0234, app issue krt-profit/basetool-android#67
 
 ---
 
@@ -1003,6 +1264,30 @@ ADR-0151
 
 ---
 
+### REQ-API-015 — Every request body is `@Valid`, and a test refuses one that is not
+
+Every `@RequestBody` parameter of every handler carries `@Valid` (or `@Validated`), whatever the verb
+and whatever the body type — a record, a collection or a plain `String`. REQ-API-003 stated it; until
+this requirement nothing checked it, and thirteen bodies lacked it: nine catalogue writes
+(frequency types, material categories, refining methods, star systems), the two role-catalogue
+writes, the registration approval, and the Discord account-existence pre-check the Keycloak SPI
+calls with its shared secret.
+
+The thirteen now carry `@Valid`. None of their body types declares a Jakarta constraint, so no
+request that passed before is refused now; the annotation makes a constraint added later effective
+instead of silently ignored. A body type that has no constraint is a REQ-API-002 gap, not a reason
+to leave the annotation off.
+
+**Acceptance**
+
+- [x] Every `@RequestBody` of the backend carries `@Valid` (208 bodies today, a floor).
+- [x] The rule fails on a planted fixture body without it.
+
+**Enforced by:** `MassAssignmentGuardTest#everyRequestBodyIsValidated`,
+`MassAssignmentGuardRules#unvalidatedBodies` · **Related:** REQ-API-002, REQ-API-003, REQ-SEC-077
+
+---
+
 ### REQ-API-016 — The frozen set covers every call the app publishes
 
 The frozen set of REQ-API-009 was assembled by hand and missed operations the app calls: eleven, one
@@ -1114,12 +1399,113 @@ type record (`theContractTypesAndNullabilityAreFrozen`) still runs.
   parameter yields exactly those breaks; each is accepted only by its own line (`DeclaredBreaksTest`).
 - [x] A required but missing baseline fails (`aMissingBaselineFailsWhereOneIsRequired`), and CI
   requires it (2026-10-03).
-- [ ] T0 operations refuse every ledger line — **open**, with the contract tiers (plan Phase 0
-  step 0.7).
+- [x] T0 operations refuse every ledger line, and the comparison also covers every operation the
+  previous document marks `T0` or `T1` (REQ-API-018, 2026-10-03).
 
 **Enforced by:** `ExternalContractTest`, `DeclaredBreaksTest`, `AppCallListTest` (backend) · the
 *Fetch the previous release's API contract* step of `ci.yml` ·
 **Related:** REQ-API-009, REQ-API-010, REQ-API-016, ADR-0136
+
+---
+
+### REQ-API-020 — The app floor rides the release, and a retired path tells the app to update
+
+Owner decision D-11 (ADR-0234): the minimum app version deploys and rolls back together with the API
+it protects, and an operation a hard-cut wave retired answers the app's update wall rather than a
+bare error.
+
+**The release-bound floor.** The three values of `GET /api/v1/app/version-policy` (REQ-API-010) are
+reviewed literals in `backend/src/main/resources/application.yml`, under
+`app.android.version-policy.release.*` — `minimum-version-code`, `latest-version-code` and
+`releases-url` (`https` only). They are packaged into the backend image, so a promotion applies them
+and a rollback — the health gate's or a promotion of an older version — restores the previous
+release's values with its API, with no host step. **Raising the floor is a change to these literals
+in the wave's pull request**, reviewed like the API change it protects; no profile file may
+redeclare them. The committed values are **17 / 17** (app v0.4.0, `versionCode` 17), the floor
+runbook step S8 of `EXCHANGE_GO_LIVE_RUNBOOK.md` set on 2026-09-28, so the release that introduces
+this requirement changes nothing on production. Without the committed block the record's own
+defaults apply — floor `0` — which keeps REQ-API-010's "an unconfigured server walls nobody".
+
+**The emergency override.** `APP_ANDROID_MINIMUM_VERSION_CODE_OVERRIDE`,
+`APP_ANDROID_LATEST_VERSION_CODE_OVERRIDE` and `APP_ANDROID_RELEASES_URL_OVERRIDE` — empty by
+default — replace the release default field by field (`app.android.version-policy.emergency-override.*`).
+They are break-glass: a floor that walls a working build, or one that must rise before a release can
+ship. An override may lower the floor to `0`. A negative number, a non-number or a non-`https` URL
+fails startup (`@Validated`). The backend logs every value with its source at startup — `WARN` while
+an override is in force — publishes `basetool_android_version_policy_override{field}`, and
+`AndroidVersionPolicyOverrideActive` fires after a day: an override does **not** roll back with a
+release, so it is folded into the next release's literal and emptied again.
+
+**A stale host value cannot pin the floor.** The variables the floor used to be read from —
+`APP_ANDROID_MINIMUM_VERSION_CODE`, `APP_ANDROID_LATEST_VERSION_CODE`, `APP_ANDROID_RELEASES_URL` —
+are passed by no compose file and no `env.d` template, which are closed allow-lists, and the
+properties moved under a prefix that relaxed binding cannot reach from those names, so a value left
+in a host `.env` binds to nothing even if it were passed. On production that line stays the floor of
+a rollback to a release older than this requirement (1.13.x and before still read it), so it is left
+in place until no such release is a rollback target, and never edited again.
+
+**`APP_UPDATE_REQUIRED` for retired paths** (ADR-0234 decision 7, plan option c). The committed list
+`backend/src/main/resources/api/retired-operations.txt` holds one retired operation per line,
+`VERB /api/v1/path`, a segment being a literal or a `{name}` placeholder for exactly one segment. A
+wildcard, a path outside `/api/`, a T0 operation (`/api/v1/app/version-policy`,
+`/api/v1/exchange/**`, `/api/v1/live-sync/**`, `/api/v1/notifications/stream`), an unsupported verb
+or a duplicate fails startup. A request whose verb and full path match an entry is answered
+`410 Gone` with an RFC 7807 problem — `code` `APP_UPDATE_REQUIRED`, type suffix
+`app-update-required`, the localised `problem.app_update_required.*` title and detail and the
+`correlationId` — counted as `basetool_http_error_total{code="APP_UPDATE_REQUIRED"}`. App releases
+that know the code map it to the update wall at any status (basetool-android#209); `410` and not
+`426`, because `426` is a protocol upgrade that requires an `Upgrade` header, while `410` says what
+is true — the operation is gone for good. **The list is empty today**; while it is, the filter is
+skipped for every request.
+
+- **Placement: ahead of authentication.** `RetiredOperationFilter` runs in the API chain before CSRF
+  and the bearer-token filter, so an old app whose login is what the cut broke, or whose token no
+  longer validates, still meets the wall instead of an authentication error — the reason
+  REQ-API-010's version gate is anonymous.
+- **No bypass.** A matched request is answered and never forwarded; another verb on the same path, a
+  longer path and every unlisted path continue to authentication unchanged. The retired operation
+  has no handler any more, and an entry that matches an operation the backend still documents fails
+  the build (`RetiredOperationsContractTest`), so the answer can never stand in front of a live one.
+- **No oracle.** The answer is the same for every value of a placeholder, reads nothing and names no
+  resource; all it says is that the operation was once part of the published API, which the public
+  repository's ledger already says.
+- **Only previously admitted paths.** Every entry is a whole-operation break
+  (`<VERB> <path> - <versionCode>`) of the ledger `backend/src/test/resources/api/declared-breaks.txt`
+  (REQ-API-017, plan guard G-23); the build fails on an entry the ledger does not declare that way —
+  a field-level line does not retire its operation — and when the ledger is missing.
+- **The edge comes first.** On the public API vhost the edge allow-list refuses a path it does not
+  admit with a bare `404` before the backend sees it. Until the generated edge include (plan guard
+  G-08) also admits the ledger's retired paths, an app on the API vhost meets that `404` — which the
+  app answers by re-reading the policy — and not this answer.
+
+**A wave's pull request** therefore carries, together: the re-cut operations; one ledger line per
+break; one line here per retired operation; and the release floor and newest build raised to the
+absorbing app release. The app release is published first; the promotion then applies API, floor
+and retired answers at once, and a rollback takes all three back.
+
+**Acceptance**
+
+- [x] The floor, the newest build and the release page are committed literals; a stale value under
+  the retired names cannot reach them; an override replaces them field by field; an invalid override
+  fails startup (`AndroidClientPropertiesTest`, `AppVersionPolicyControllerTest`).
+- [x] No compose file, `env.d` template or profile passes a retired name; the backend template passes
+  the three overrides, empty by default (`AppVersionPolicyDeploySeamTest`, `render-env-d.test.sh`).
+- [x] The source of every value is logged and gauged; a lingering override alerts
+  (`AndroidVersionPolicyReportTest`, `android_version_policy_override_test.yml`).
+- [x] A retired operation answers `410 APP_UPDATE_REQUIRED` ahead of authentication, without a token
+  and with an invalid one, and nothing else does (`RetiredOperationFilterTest`,
+  `RetiredOperationChainTest`).
+- [x] The list refuses wildcards, T0 operations and duplicates, is dormant while empty, never shadows
+  a documented operation, and is tied to the ledger (`RetiredOperationsTest`,
+  `RetiredOperationsContractTest`).
+- [ ] The edge admits the ledger's retired paths, so the answer reaches the app on the API vhost.
+  **Open** — plan guard G-08.
+
+**Enforced by:** `AndroidClientPropertiesTest`, `AppVersionPolicyDeploySeamTest`,
+`AndroidVersionPolicyReportTest`, `AppVersionPolicyControllerTest`, `RetiredOperationsTest`,
+`RetiredOperationFilterTest`, `RetiredOperationsContractTest`, `RetiredOperationChainTest` (backend) ·
+`scripts/render-env-d.test.sh` · `monitoring/prometheus/tests/android_version_policy_override_test.yml` ·
+**Related:** REQ-API-009, REQ-API-010, REQ-SEC-037, REQ-SEC-052, REQ-OBS-011, ADR-0135, ADR-0234
 
 ---
 

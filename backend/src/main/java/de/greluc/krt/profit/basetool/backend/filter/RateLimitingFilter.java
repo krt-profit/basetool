@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.filter;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import de.greluc.krt.profit.basetool.backend.exception.CoreProblemCode;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
@@ -74,7 +75,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   /**
    * Stable machine-readable error code echoed in the 429 body, mirroring GlobalExceptionHandler.
    */
-  private static final String CODE_RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED";
+  private static final String CODE_RATE_LIMIT_EXCEEDED = CoreProblemCode.RATE_LIMIT_EXCEEDED.code();
 
   /**
    * App-wide correlation-id response header, hardcoded to avoid a {@code filter -> config} package

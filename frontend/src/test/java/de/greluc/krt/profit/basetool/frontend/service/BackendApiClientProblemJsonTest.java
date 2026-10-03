@@ -53,7 +53,6 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
@@ -66,7 +65,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * service-unavailable cases.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @TestPropertySource(
     properties = {
       "app.http.connect-timeout=500ms",

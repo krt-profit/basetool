@@ -207,6 +207,37 @@ class DeclaredBreaksTest {
         .hasMessageContaining("line 2");
   }
 
+  /** A line breaking a T0 operation is reported; a T1 line is not. */
+  @Test
+  @DisplayName("a ledger line on a T0 operation is reported")
+  void aTierZeroDeclarationIsReported() {
+    List<DeclaredBreaks.Entry> ledger =
+        DeclaredBreaks.parse(
+            List.of("GET /api/v1/app/version-policy - 18", "GET /api/v1/things Thing.count 18"));
+
+    assertThat(DeclaredBreaks.onTierZero(ledger, Set.of("GET /api/v1/app/version-policy")))
+        .containsExactly("GET /api/v1/app/version-policy -");
+    assertThat(DeclaredBreaks.onTierZero(ledger, Set.of())).isEmpty();
+  }
+
+  /** A previous document's T0 and T1 marks select its frozen operations. */
+  @Test
+  @DisplayName("the frozen operations of a tier-marked previous document are found")
+  void theFrozenOperationsOfAMarkedDocumentAreFound() {
+    JsonNode marked =
+        read(
+            """
+            {"paths": {"/api/v1/a": {"get": {"x-contract-tier": "T0"}, "post": {"x-contract-tier": "T2"}},
+                       "/api/v1/b": {"put": {"x-contract-tier": "T1"}}}}
+            """);
+
+    assertThat(DeclaredBreaks.frozenIn(marked))
+        .containsExactlyInAnyOrder(
+            new DeclaredBreaks.OperationKey("GET", "/api/v1/a"),
+            new DeclaredBreaks.OperationKey("PUT", "/api/v1/b"));
+    assertThat(DeclaredBreaks.frozenIn(read(PREVIOUS))).isEmpty();
+  }
+
   /** A break declared twice fails the parse. */
   @Test
   @DisplayName("a break declared twice fails the parse")

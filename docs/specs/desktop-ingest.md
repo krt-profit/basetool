@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-28.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
 > **Owner area:** INGEST · **Related ADRs:** [ADR-0018](../adr/0018-desktop-ingest-gateway-device-grant.md), [ADR-0110](../adr/0110-ingest-handoff-consume-off-navigational-get.md), [ADR-0129](../adr/0129-ingest-gateway-is-a-trusted-subsystem-not-a-token-relay.md), [ADR-0204](../adr/0204-backend-and-ingest-call-http-through-restclient-without-webflux.md) · **Related:** epic [#639](https://github.com/krt-profit/basetool/issues/639), runbook [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md), [`refinery-screenshot-import.md`](refinery-screenshot-import.md) (`REQ-REFINERY-018`), [`security-and-access.md`](security-and-access.md), [`api-conventions.md`](api-conventions.md), [ADR-0007](../adr/0007-client-side-vlm-screenshot-extraction.md), [ADR-0008](../adr/0008-refinery-extract-json-contract.md)
 
 # Desktop one-click ingest (send-to-basetool)
@@ -963,6 +963,55 @@ authentication with no obvious cause, which is why the extractor names clock dri
 `ExchangeTokenGateFilter` · **Operator:** `INGEST_KEYCLOAK_SETUP.md` step 8 (nothing to configure) ·
 **Client:** the extractor keeps its DPoP key, sends token-endpoint proofs, and presents its bound
 token to the gateway as `Authorization: DPoP` with a proof.
+
+### REQ-INGEST-013 — The gateway is packaged by concern, without package cycles
+
+The gateway is the internet-facing module, so who may call out, who may touch Redis and what runs
+before authentication must be readable from its package structure. Every class below
+`de.greluc.krt.profit.basetool.ingest` other than the application class lives in exactly one of
+fifteen concern packages — `config`, `contract`, `registry`, `observability`, `problem`, `edge`,
+`auth`, `gate`, `store`, `limits`, `idempotency`, `relay`, `handoff`, `web`, `assembly` (what each
+holds: arc42 §5.4) — and the packages form no dependency cycle. `config` holds only the typed
+configuration records and depends on nothing; the security filter chains, the startup guards and
+the posture report live in `assembly`, which nothing depends on. A new concern package is added to
+the rule's list on purpose, not by accident.
+
+The re-packaging that introduced this rule was a move and nothing else: the exchange's committed
+golden answers (REQ-XCH-036), the relay seam parity and the filter-chain order pins pass unchanged.
+
+**Acceptance**
+
+- [x] Every main class sits in a named concern package and every named package holds a class.
+- [x] The concern packages are free of cycles; a planted two-package cycle is detected.
+
+**Enforced by:** `ConcernPackageRulesTest` (`everyClassLivesInANamedConcern`,
+`theConcernsFormNoCycle`, `theCycleRuleDetectsAPlantedCycle`).
+
+### REQ-INGEST-014 — Outbound HTTP only in `relay`, Redis only in `registry`, `store` and `handoff`
+
+Only classes in `relay` hold an outbound HTTP client type — `RestClient`, `RestTemplate`,
+`RestOperations`, anything in `java.net.http`, `org.springframework.http.client` or the reactive web
+client, or a `URLConnection`. That covers the relay to the backend, the service-account token grant
+and the Keycloak trust. One reviewed exception is named in the test with its reason:
+`assembly.SecurityConfig` builds the resource server's JWKS decoder, whose key fetch runs over a
+`RestTemplate` on `relay`'s pinned request factory. An exception that no longer holds such a type
+fails the test, so the list cannot go stale.
+
+Only classes in `registry` (reading the backend's mirror and revocations), `store` (the gateway's
+own `ingest:xch:*` state: byte budget, quotas, idempotency cache) and `handoff` (the browser
+handoffs) depend on a Redis client type.
+
+**Acceptance**
+
+- [x] No class outside `relay` and the named exception depends on an outbound HTTP client type; at
+  least six `relay` classes do, and every exception still does; a planted caller is detected.
+- [x] No class outside the three Redis packages depends on a Redis client type; each of the three
+  still does, at least six classes in all; a planted Redis user is detected.
+
+**Enforced by:** `ConcernPackageRulesTest` (`onlyRelayHoldsAnOutboundHttpClient`,
+`theOutboundRuleSelectsTheRelayAndEveryExceptionStillApplies`,
+`theOutboundRuleDetectsAPlantedCaller`, `onlyTheRedisConcernsTouchRedis`,
+`theRedisRuleSelectsEveryRedisConcern`, `theRedisRuleDetectsAPlantedToucher`).
 
 ## Out of scope
 

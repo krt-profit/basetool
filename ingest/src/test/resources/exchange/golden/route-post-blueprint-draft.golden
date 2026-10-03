@@ -1,0 +1,55 @@
+=== request
+POST /exchange/v1/me/drafts/blueprints
+{
+  "format": "basetool.blueprints",
+  "formatVersion": "1.0",
+  "generator": {
+    "name": "SC Extractor",
+    "version": "2.0.0"
+  },
+  "generatedAt": "2026-09-26T12:00:00Z",
+  "items": [
+    {
+      "ref": {
+        "name": "Oracle Helmet"
+      },
+      "acquiredAt": "2026-09-26T12:00:00Z",
+      "provenance": {
+        "source": "log",
+        "observedAt": "2026-09-26T12:00:00Z"
+      }
+    }
+  ]
+}
+=== relayed
+POST /api/v1/exchange/me/drafts/blueprints
+accept: application/json, application/problem+json
+accept-encoding: gzip, deflate
+authorization: Bearer gateway-service-token
+content-length: 291
+content-type: application/json
+traceparent: <trace>
+x-correlation-id: <correlation-id>
+x-exchange-capabilities: exchange.blueprints.read,exchange.blueprints.write,exchange.connect,exchange.demand.read,exchange.drafts.blueprints,exchange.drafts.refinery,exchange.hangar.read,exchange.hangar.write,exchange.stock.read,exchange.stock.write
+x-exchange-client: versekit
+x-exchange-connected-at: <connected-at>
+x-exchange-installation: <thumbprint>
+x-ingest-on-behalf-of: 6f1c2e7a-3b4d-4c5e-8f60-718293a4b5c6
+{"format":"basetool.blueprints","formatVersion":"1.0","generator":{"name":"SC Extractor","version":"2.0.0"},"generatedAt":"2026-09-26T12:00:00Z","items":[{"ref":{"name":"Oracle Helmet"},"acquiredAt":"2026-09-26T12:00:00Z","provenance":{"source":"log","observedAt":"2026-09-26T12:00:00Z"}}]}
+=== response
+200
+cache-control: no-cache, no-store, max-age=0, must-revalidate
+content-length: 139
+content-security-policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'
+content-type: application/json
+dpop-nonce: <dpop-nonce>
+expires: 0
+pragma: no-cache
+ratelimit: limit=1000, remaining=<remaining>, reset=<reset>
+ratelimit-policy: 1000;w=60
+vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+x-content-type-options: nosniff
+x-correlation-id: <correlation-id>
+x-frame-options: DENY
+x-xss-protection: 0
+{"frontendUrl":"http://localhost:18081/personal-inventory/blueprints?handoff=hid-blueprint","handoffId":"hid-blueprint","kind":"BLUEPRINT"}

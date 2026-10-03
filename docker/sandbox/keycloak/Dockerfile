@@ -3,12 +3,12 @@ WORKDIR /app
 COPY --chmod=755 gradlew .
 COPY gradle/ gradle/
 COPY build.gradle.kts settings.gradle.kts gradle.properties lombok.config ./
-COPY backend/build.gradle.kts backend/
-COPY frontend/build.gradle.kts frontend/
-COPY ingest/build.gradle.kts ingest/
-COPY keycloak-spi/build.gradle.kts keycloak-spi/lombok.config keycloak-spi/
-COPY test-support/build.gradle.kts test-support/
-COPY logging-support/build.gradle.kts logging-support/
+COPY backend/build.gradle.kts backend/build-settings.properties backend/
+COPY frontend/build.gradle.kts frontend/build-settings.properties frontend/
+COPY ingest/build.gradle.kts ingest/build-settings.properties ingest/
+COPY keycloak-spi/build.gradle.kts keycloak-spi/build-settings.properties keycloak-spi/lombok.config keycloak-spi/
+COPY test-support/build.gradle.kts test-support/build-settings.properties test-support/
+COPY logging-support/build.gradle.kts logging-support/build-settings.properties logging-support/
 RUN ./gradlew :keycloak-spi:dependencies --no-daemon
 COPY keycloak-spi/src/main/ keycloak-spi/src/main/
 RUN set -eu; \

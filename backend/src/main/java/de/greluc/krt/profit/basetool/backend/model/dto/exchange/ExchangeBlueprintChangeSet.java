@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto.exchange;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -48,6 +49,7 @@ public record ExchangeBlueprintChangeSet(
    * @param provenance where the client has it from, for an add, or {@code null}
    * @param override whether an add may re-add an entry removed elsewhere, after asking the member
    */
+  @Schema(name = "ExchangeBlueprintOp")
   public record Op(
       @Nullable @Size(min = 1, max = 64) String opId,
       @NotNull @Pattern(regexp = "^(add|remove)$") String op,
@@ -63,6 +65,7 @@ public record ExchangeBlueprintChangeSet(
    * @param source {@code log}, {@code manual}, {@code import}, {@code default} or {@code other}
    * @param observedAt when the client observed it, or {@code null}
    */
+  @Schema(name = "Provenance")
   public record Provenance(
       @NotNull @Pattern(regexp = "^(log|manual|import|default|other)$") String source,
       @Nullable Instant observedAt) {}

@@ -1,0 +1,62 @@
+=== request
+POST /exchange/v1/me/stock/changes
+{
+  "ops": [
+    {
+      "op": "set-quantity",
+      "material": {
+        "bt": "c3b1e0c2-8a4e-4f64-9a51-2b9f5c7e0a11",
+        "name": "Laranite"
+      },
+      "location": {
+        "name": "Area18",
+        "uex": {
+          "kind": "CITY",
+          "id": 4
+        }
+      },
+      "quality": 712,
+      "stolen": false,
+      "quantity": {
+        "amount": 20,
+        "unit": "SCU"
+      },
+      "expectedQuantity": {
+        "amount": 12.5,
+        "unit": "SCU"
+      }
+    }
+  ]
+}
+=== relayed
+POST /api/v1/exchange/me/stock/changes
+accept: application/json, application/problem+json
+accept-encoding: gzip, deflate
+authorization: Bearer gateway-service-token
+content-length: 279
+content-type: application/json
+traceparent: <trace>
+x-correlation-id: <correlation-id>
+x-exchange-capabilities: exchange.blueprints.read,exchange.blueprints.write,exchange.connect,exchange.demand.read,exchange.drafts.blueprints,exchange.drafts.refinery,exchange.hangar.read,exchange.hangar.write,exchange.stock.read,exchange.stock.write
+x-exchange-client: versekit
+x-exchange-connected-at: <connected-at>
+x-exchange-installation: <thumbprint>
+x-ingest-on-behalf-of: 6f1c2e7a-3b4d-4c5e-8f60-718293a4b5c6
+{"ops":[{"op":"set-quantity","material":{"bt":"c3b1e0c2-8a4e-4f64-9a51-2b9f5c7e0a11","name":"Laranite"},"location":{"name":"Area18","uex":{"kind":"CITY","id":4}},"quality":712,"stolen":false,"quantity":{"amount":20,"unit":"SCU"},"expectedQuantity":{"amount":12.5,"unit":"SCU"}}]}
+=== response
+409
+cache-control: no-cache, no-store, max-age=0, must-revalidate
+content-length: 228
+content-security-policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'
+content-type: application/problem+json
+dpop-nonce: <dpop-nonce>
+expires: 0
+pragma: no-cache
+ratelimit: limit=1000, remaining=<remaining>, reset=<reset>
+ratelimit-policy: 1000;w=60
+vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+x-content-type-options: nosniff
+x-correlation-id: <correlation-id>
+x-frame-options: DENY
+x-xss-protection: 0
+{"detail":"The entry changed since it was read; pull, merge and retry.","instance":"/exchange/v1/me/stock/changes","status":409,"title":"Conflict","code":"VERSION_CONFLICT","correlationId":"<correlation-id>"}

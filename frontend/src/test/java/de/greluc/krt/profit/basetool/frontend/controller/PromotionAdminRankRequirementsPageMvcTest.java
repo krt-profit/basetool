@@ -80,7 +80,8 @@ class PromotionAdminRankRequirementsPageMvcTest {
     UUID catId = UUID.randomUUID();
     UUID squadronId = UUID.randomUUID();
 
-    PromotionTopicDto topic = new PromotionTopicDto(topicId, 0L, "Profit", null, 0, null, null);
+    PromotionTopicDto topic =
+        new PromotionTopicDto(topicId, 0L, "Profit", null, 0, null, null, null);
     PromotionCategoryDto cat =
         new PromotionCategoryDto(catId, 0L, topicId, "Profit", "Trading", null, 0, null, null);
     RankRequirementDto req =
