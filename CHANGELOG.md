@@ -9,6 +9,10 @@
   Aktualitätsprüfung statt in `openapi.json`; der Vergleich mit dem letzten Release prüft beide
   Dokumente. Keine Verhaltensänderung (REQ-XCH-039).
 
+- **Aufträge: Qualität bei Übergabe und Herstellung selbst wählen.** Braucht ein Auftrag ein Material in
+  mehreren Qualitätsstufen, wählst du bei der Übergabe je Position die Stufe (vorbelegt, änderbar). Die
+  Herstellung schlägt die niedrigste passende Qualität vor (REQ-ORDERS-038/039).
+
 - **Aufträge: Qualitätsstufen als pflegbarer Katalog.** Admins legen Stufen mit Code, Mindestqualität
   und deutscher/englischer Bezeichnung unter „Qualitätsstufen“ an; neue Stufen brauchen kein Release.
   „Keine“ und „Gut (650+)“ bleiben unverändert (REQ-ORDERS-036, ADR-0241, Migration V261–V264).
@@ -151,6 +155,11 @@
   erreichbar; die App selbst ändert sich nicht (REQ-API-021, REQ-OPS-042).
 
 ### Fixed
+
+- **Aufträge: Übergaben buchen auf die richtige Zeile.** Eine Übergabe verringerte bisher immer die
+  erste Zeile eines Materials und löste alle Zuordnungen, sobald diese erfüllt war — auch wenn eine
+  zweite Qualitätsstufe noch offen war. Bestand unter der Mindestqualität wird jetzt abgelehnt; die
+  Herstellung prüft die Qualität ebenfalls (REQ-ORDERS-038/039).
 
 - **Deploy: kein Fehlalarm mehr während einer Promotion.** Trifft ein Deploy-Tick das kurze Fenster, in dem
   `promote.yml` die fünf `:stable`-Tags nacheinander verschiebt, wartet `deploy.sh` jetzt ab, statt
