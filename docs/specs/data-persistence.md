@@ -1106,13 +1106,15 @@ listed with its reason:
   `p4k_import_job.created_by`, the enqueuing admin's id on an import job, pruned to seven days
   after every import run).
 - **Export** (REQ-SEC-058, `DataExportSections`): a section selects the member's rows by it, or it
-  is listed as not exported. Today 35 columns are exported and 21 are not: 13 name the member as
-  the actor on somebody else's or the organisation's record, or mirror an exported column; **8
-  hold data about the member that no section selects yet** (`bank_account_approval_limit`,
-  `bank_account_grant.user_id`, `bank_booking_request.counterparty_user_id`,
-  `material_exchange_request_interest`, `mission.party_lead_user_id`,
-  `mission_unit.responsible_user_id`, `org_unit.grand_admiral_user_id`, `user_roles`) — an open
-  decision for the owner, listed so that a ninth cannot join silently.
+  is listed as not exported. Today 43 columns are exported and 13 are not, each of which names the
+  member as the actor on somebody else's or the organisation's record, or mirrors an exported
+  column. The eight columns that held data about the member without a section
+  (`bank_account_approval_limit.grantee_user_id`, `bank_account_grant.user_id`,
+  `bank_booking_request.counterparty_user_id`,
+  `material_exchange_request_interest.interested_user_id`, `mission.party_lead_user_id`,
+  `mission_unit.responsible_user_id`, `org_unit.grand_admiral_user_id`, `user_roles.user_id`)
+  each have one since 2026-10-03 (REQ-SEC-058), and the not-exported list no longer admits a
+  column that holds data about the member.
 - **Merge** (REQ-SEC-046, `UserAccountMergeService`): it follows the member or stays with the act;
   only `p4k_import_job.created_by` is listed as not merged. `UserAccountMergeCoverageTest` holds
   the foreign-key columns as before; this requirement adds the ones without a key.

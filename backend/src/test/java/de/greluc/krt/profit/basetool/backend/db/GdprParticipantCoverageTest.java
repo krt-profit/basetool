@@ -197,39 +197,7 @@ class GdprParticipantCoverageTest {
               "The concurrency companion of mission.owner_id, which missionsOwned exports."),
           Map.entry(
               "p4k_import_job.created_by",
-              "The admin who enqueued a catalogue import; operational, pruned after seven days."),
-          Map.entry(
-              "bank_account_approval_limit.grantee_user_id",
-              "An approval limit granted to the member; no section selects it yet, an open"
-                  + " decision under REQ-SEC-058."),
-          Map.entry(
-              "bank_account_grant.user_id",
-              "A bank account grant held by the member; no section selects it yet, an open"
-                  + " decision under REQ-SEC-058."),
-          Map.entry(
-              "bank_booking_request.counterparty_user_id",
-              "A booking request naming the member as counterparty; no section selects it yet, an"
-                  + " open decision under REQ-SEC-058."),
-          Map.entry(
-              "material_exchange_request_interest.interested_user_id",
-              "Interest the member registered in a market request; no section selects it yet, an"
-                  + " open decision under REQ-SEC-058."),
-          Map.entry(
-              "mission.party_lead_user_id",
-              "The member's designation as a mission's party lead; no section selects it yet, an"
-                  + " open decision under REQ-SEC-058."),
-          Map.entry(
-              "mission_unit.responsible_user_id",
-              "The member's responsibility for a mission unit; no section selects it yet, an open"
-                  + " decision under REQ-SEC-058."),
-          Map.entry(
-              "org_unit.grand_admiral_user_id",
-              "The member's appointment as an org unit's grand admiral; no section selects it yet,"
-                  + " an open decision under REQ-SEC-058."),
-          Map.entry(
-              "user_roles.user_id",
-              "The member's realm roles; no section selects them yet, an open decision under"
-                  + " REQ-SEC-058."));
+              "The admin who enqueued a catalogue import; operational, pruned after seven days."));
 
   /** Member references the account merge does not classify, each with the reason. */
   static final Map<String, String> NOT_MERGED =
