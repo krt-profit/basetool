@@ -131,6 +131,10 @@
   `CoreProblemCode` und in `problem-codes.txt`; `openapi.json` dokumentiert `code` mit seinen Werten,
   `correlationId`, `fieldErrors` und 429 auf allen `/api/**`-Operationen (REQ-API-019).
 
+- **Fehlercodes: ein Register statt verstreuter Strings.** Alle 50 Problem-Codes des Backends stehen in
+  `CoreProblemCode` und in `problem-codes.txt`; `openapi.json` dokumentiert `code` mit seinen Werten,
+  `correlationId`, `fieldErrors` und 429 auf allen `/api/**`-Operationen (REQ-API-019).
+
 ### Fixed
 
 - **Crew-Board auf dem Smartphone: Ziehen unter die Tab-Leiste.** Beim Ziehen eines Teilnehmers scrollt die
@@ -166,6 +170,13 @@
 - **App: Auftraggeber können ihren Auftrag wieder bearbeiten.** Die öffentliche API-Edge ließ
   `PUT /api/v1/orders/{id}/requested` nicht durch, die Bearbeitung in der App endete seit v0.2.0 mit 404.
   Nach dem Deploy ist genau dieser `PUT` freigegeben (andere Methoden bleiben 404).
+
+- **API-Fehler: richtige Status, Codes und Header statt 500 oder leerem Body.** Fehlende Parameter,
+  Header, Cookies oder Multipart-Teile antworten `400 BAD_REQUEST`, ein nicht lieferbarer Medientyp
+  `406 NOT_ACCEPTABLE` (neuer Code), ein zu großer Upload `413 REQUEST_BODY_TOO_LARGE` statt `500`; jeder
+  429 trägt `code = RATE_LIMIT_EXCEEDED`, `Retry-After` und eine Correlation-Id, auch der des
+  Pro-Konto-Limits und `POST /api/v1/live-sync/changed` (bisher ohne Body). Vier Bank-Codes zeigen jetzt
+  einen übersetzten Titel statt des Schlüssels.
 
 ### Security
 

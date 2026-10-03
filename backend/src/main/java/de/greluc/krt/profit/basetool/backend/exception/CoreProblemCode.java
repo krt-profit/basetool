@@ -76,6 +76,9 @@ public enum CoreProblemCode implements ProblemCode {
   /** The request body's media type is not accepted. */
   UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
 
+  /** No media type the request accepts can carry the response. */
+  NOT_ACCEPTABLE(HttpStatus.NOT_ACCEPTABLE),
+
   /** An unexpected failure; {@code correlationId} finds it in the log. */
   INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR),
 

@@ -43,6 +43,7 @@ import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.context.MessageSource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -95,8 +96,11 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
   static final Set<String> EXPORT_SEGMENTS =
       Set.of("export", "export.json", "statement", "report", "pdf", "three-month-report");
 
-  /** Correlation id echoed onto the problem body, matching the other filter-level problems. */
+  /** Header echoing the problem body's correlation id, matching the other filter-level problems. */
   private static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
+
+  /** Rounds a refill wait up to whole seconds, so a client never retries before the token. */
+  private static final long NANOS_PER_SECOND = TimeUnit.SECONDS.toNanos(1);
 
   private final RateLimitProperties properties;
   private final MessageSource messageSource;
@@ -267,7 +271,7 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
     reject(
         request,
         response,
-        TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill()),
+        TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill() + NANOS_PER_SECOND - 1),
         bucketLabel,
         capacity,
         refillPeriod);
@@ -339,22 +343,26 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
       Duration refillPeriod)
       throws IOException {
     long retryAfter = Math.max(1, retryAfterSeconds);
+    String correlationId = ProblemResponseFactory.correlationId();
     meterRegistry
         .counter(MetricNames.RATELIMIT_REJECTIONS, MetricNames.TAG_BUCKET, bucketLabel)
         .increment();
     log.warn(
-        "Per-subject rate limit exceeded (bucket={}, capacity={} per {}, retryAfter={}s)",
+        "Per-subject rate limit exceeded (bucket={}, capacity={} per {}, retryAfter={}s,"
+            + " correlationId={})",
         bucketLabel,
         capacity,
         refillPeriod,
-        retryAfter);
+        retryAfter,
+        correlationId);
 
     response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
     response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
     response.setHeader("X-Rate-Limit-Limit", String.valueOf(capacity));
     response.setHeader("X-Rate-Limit-Remaining", "0");
     response.setHeader("X-Rate-Limit-Retry-After-Seconds", String.valueOf(retryAfter));
-    String correlationId = response.getHeader(CORRELATION_ID_HEADER);
+    response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfter));
+    response.setHeader(CORRELATION_ID_HEADER, correlationId);
     Locale locale = request.getLocale();
     String title =
         messageSource.getMessage("problem.rate_limit.title", null, "Too Many Requests", locale);

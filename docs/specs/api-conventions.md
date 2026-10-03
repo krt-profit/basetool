@@ -148,6 +148,31 @@ every `/api/**` operation, since both rate limiters answer it there.
 > `SubjectRateLimitingFilter` (429 `RATE_LIMIT_EXCEEDED`) and `RequestBodySizeLimitFilter` (413
 > `REQUEST_BODY_TOO_LARGE`); `PendingApprovalAccessFilter` also answers `NO_ROLE`.
 
+**Spring MVC's client errors answer their own 4xx, never the catch-all 500.** A missing request
+parameter, header, cookie or matrix variable, a mapping's unsatisfied parameter condition
+(`ServletRequestBindingException` and its subtypes) and a missing multipart part
+(`MissingServletRequestPartException`) are `400 BAD_REQUEST`, the detail naming the missing value; a
+response no accepted media type can carry (`HttpMediaTypeNotAcceptableException`) is
+`406 NOT_ACCEPTABLE`; an upload over the multipart limit (`MaxUploadSizeExceededException`) is
+`413 REQUEST_BODY_TOO_LARGE`. A binding exception Spring itself classifies as a server error — a path
+variable the mapping does not declare (`MissingPathVariableException`) — stays `500 INTERNAL_ERROR`.
+The status-derived fallback (`codeForStatus` in the handler, `mappingFor` in `BasetoolErrorController`)
+maps `429` to `RATE_LIMIT_EXCEEDED`.
+
+**Every `429` carries `code = RATE_LIMIT_EXCEEDED`, a `correlationId` and `Retry-After`** (whole
+seconds), beside the limiters' `X-Rate-Limit-*` headers: the per-IP `RateLimitingFilter`, the
+per-subject `SubjectRateLimitingFilter` (REQ-SEC-033) and `POST /api/v1/live-sync/changed`
+(`RateLimitExceededException`, REQ-FE-019). The document declares `Retry-After` and the three
+`X-Rate-Limit-*` headers on every `/api/**` operation's `429`.
+
+> [!note] Corrected 2026-10-03
+> Until then the five exception types above answered `500 INTERNAL_ERROR` through the catch-all;
+> `SubjectRateLimitingFilter`'s `429` had a `null` `correlationId` and no `Retry-After`;
+> `POST /api/v1/live-sync/changed` answered its `400` and `429` with an empty body although the
+> document promised a problem; the status fallback mapped `429` to `BAD_REQUEST`; and four bank codes
+> (`BANK_REQUEST_NOT_PENDING`, `BANK_REQUEST_ALREADY_APPROVED`, `BANK_ACCOUNT_HAS_PENDING_REQUESTS`,
+> `BANK_OWNER_APPROVAL_REQUIRED`) had no `title` key, so the client was shown the bundle key.
+
 **A raw `IllegalStateException` is a 500, never a 400 (APPSEC-06, 2026-09-22).** The handler used to
 answer every `IllegalStateException` with a 400 and echo its message as `detail`, on the assumption
 that only the application's own guards threw it. The JDK, Spring, Hibernate and every library throw
@@ -177,18 +202,21 @@ were migrated message by message (BE-SIMP-01, 2026-09-23); `Entities` itself is 
 **Domain exceptions carry their own error-code contract (S4, #910).** `BadRequestException`,
 `NotFoundException`, `BusinessConflictException`, `DuplicateEntityException`,
 `EntityInUseException`, `ExternalServiceException`, `ReportGenerationException`,
-`OverAllocationException`, `ProductionAllocationException`, `OwnerOrgUnitRequiredException` and
-`BankConflictException` — eleven in all — extend the sealed `exception.AppException`, exposing `status()`,
+`OverAllocationException`, `ProductionAllocationException`, `OwnerOrgUnitRequiredException`,
+`MissionParticipantRequiredException`, `RateLimitExceededException` and `BankConflictException` —
+thirteen in all, beside the exchange's own `ExchangeProblemException` — extend the sealed `exception.AppException`, exposing `status()`,
 `code()`, `titleKey()`, `detailKey()`, `typeSuffix()` and `logLabel()` on the type itself instead of
 leaving that identity scattered across `GlobalExceptionHandler`'s `CODE_*` constants and per-type
 `@ExceptionHandler` methods. A single `handleAppException` dispatch handler reads those accessors
 for every subtype except `NotFoundException`, whose handler stays dedicated because it also covers
 three non-`AppException` JPA/JDK "not found" flavors (`EntityNotFoundException`,
 `NoSuchElementException`, `NoResourceFoundException`) that cannot be sealed under this hierarchy.
-Ten of the eleven subtypes never override an accessor: they pass their fixed
+Every subtype but `BankConflictException` passes its fixed
 `exception.AppExceptionKind` constant to the `AppException(AppExceptionKind, String)` /
 `AppException(AppExceptionKind, String, Throwable)` superclass constructor and inherit every
-accessor from `AppException`, which delegates to that stored kind. `BankConflictException` is the
+accessor from `AppException`, which delegates to that stored kind; the one addition is
+`RateLimitExceededException`, which also overrides `responseHeaders()` so the dispatch handler sends
+its `Retry-After`. `BankConflictException` is the
 one exception that overrides every accessor directly, computing them per-instance from its own
 `code` field (it has no single fixed identity — each throw site picks one of its `CODE_BANK_*`
 constants) via the legacy kind-less `AppException(String)` / `AppException(String, Throwable)`
@@ -213,9 +241,10 @@ hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) foll
 - **`exception.ProblemCode`** — a code's wire value (`code()`) and its HTTP status (`status()`). The
   code string is the contract; the Java name is not.
 - **`exception.CoreProblemCode`** — one kernel enum listing every code the backend emits outside the
-  exchange: the handler's, the eleven `AppExceptionKind` codes, the 18 bank codes, the filters'
+  exchange: the handler's, the twelve `AppExceptionKind` codes, the 18 bank codes, the filters'
   (`TERMS_NOT_ACCEPTED`, `PENDING_APPROVAL`, `NO_ROLE`, `ACTING_MEMBER_REFUSED`,
-  `SERVICE_UNAVAILABLE`, `RATE_LIMIT_EXCEEDED`, `REQUEST_BODY_TOO_LARGE`) — 49 in all. Three are
+  `SERVICE_UNAVAILABLE`, `RATE_LIMIT_EXCEEDED`, `REQUEST_BODY_TOO_LARGE`) and `NOT_ACCEPTABLE`
+  (`406`) — 50 in all. Three are
   **reserved**, registered but not emitted: `BANK_HOLDER_OVERDRAFT` (ADR-0039),
   `BANK_CARTEL_APPROVAL_REQUIRED` (ADR-0109) and `APP_UPDATE_REQUIRED`, which retired paths will
   answer (ADR-0234, D-11; registered with `410`). Every producer references the enum; no code is a
@@ -242,12 +271,21 @@ hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) foll
   anonymous read, a wrong verb, an unreadable body, a path no controller serves — answer
   registered codes (`ProblemCodeRuntimeProbeTest`).
 - [x] A planted enum repeating `NOT_FOUND` is caught.
+- [x] Every registered code has a non-blank title and detail in every backend bundle
+  (`messages`, `messages_de`, `messages_en`) under `problem.<code in lower case>`, or under the
+  key its producer reads (`problem.data_integrity`, `problem.external_service`), and so has every key
+  an `AppExceptionKind` or a `BankConflictException` reads; a planted bundle missing or blanking a
+  key is caught (`ProblemCodeRegistryTest`).
+- [x] Spring MVC's client-error exceptions answer their registered 4xx code, one test per type
+  (`GlobalExceptionHandlerClientErrorTest`), and a missing parameter and an unacceptable media type
+  do so through the real chain (`ProblemCodeRuntimeProbeTest`).
 - [x] The committed document's `ProblemDetail` lists exactly the registered codes, keeps `code`
   optional and not an enum.
 - [ ] One `ProblemCode` enum per module and the app generating its constants from the document —
   **open**, plan Phase 1 (ADR-0235) and the app.
 
-**Enforced by:** `ProblemCodeRegistryTest`, `ProblemCodeRuntimeProbeTest` (backend) ·
+**Enforced by:** `ProblemCodeRegistryTest`, `ProblemCodeRuntimeProbeTest`,
+`GlobalExceptionHandlerClientErrorTest` (backend) ·
 **Related:** REQ-API-004, REQ-API-007, REQ-API-009, ADR-0234, ADR-0235
 
 ### REQ-API-005 — Pagination & sorting

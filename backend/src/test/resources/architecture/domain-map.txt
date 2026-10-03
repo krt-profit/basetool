@@ -168,6 +168,7 @@ class AppExceptionKind kernel RFC 7807 identities of AppException
 class BadRequestException kernel generic domain exception
 class BusinessConflictException kernel generic domain exception
 class DuplicateEntityException kernel generic domain exception
+class RateLimitExceededException kernel generic domain exception
 class Entities kernel fetch-or-404 helper
 class EntityInUseException kernel generic domain exception
 class NotFoundException kernel generic domain exception

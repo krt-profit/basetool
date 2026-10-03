@@ -125,4 +125,16 @@ class BasetoolErrorControllerTest {
     assertNotNull(body);
     assertEquals("METHOD_NOT_ALLOWED", body.getProperties().get("code"));
   }
+
+  @Test
+  void tooManyRequests_mapsToTheRateLimitCode() {
+    ResponseEntity<ProblemDetail> response =
+        controller.handleError(errorDispatch(429, "/api/v1/missions"));
+
+    assertEquals(HttpStatus.TOO_MANY_REQUESTS, response.getStatusCode());
+    ProblemDetail body = response.getBody();
+    assertNotNull(body);
+    assertEquals("RATE_LIMIT_EXCEEDED", body.getProperties().get("code"));
+    assertTrue(body.getType().toString().endsWith("/rate-limit-exceeded"));
+  }
 }
