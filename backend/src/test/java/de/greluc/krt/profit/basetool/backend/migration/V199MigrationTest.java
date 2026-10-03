@@ -30,7 +30,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Migration test for {@code V199__add_mission_objectives.sql}: the {@code mission_objective} table,
@@ -38,7 +37,6 @@ import org.springframework.test.context.ActiveProfiles;
  * gone, and the mapping validates.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class V199MigrationTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;

@@ -30,7 +30,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Migration test for {@code V219__add_job_order_item_manufactured_amount.sql} (REQ-ORDERS-025): the
@@ -38,7 +37,6 @@ import org.springframework.test.context.ActiveProfiles;
  * delivered_amount <= manufactured_amount <= amount}.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class V219MigrationTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;

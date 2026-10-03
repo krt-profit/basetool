@@ -19,7 +19,8 @@
 
 package de.greluc.krt.profit.basetool.ingest.web;
 
-import de.greluc.krt.profit.basetool.ingest.service.ExchangeDocuments;
+import de.greluc.krt.profit.basetool.ingest.contract.ExchangeDocuments;
+import de.greluc.krt.profit.basetool.ingest.problem.NotFoundException;
 import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;

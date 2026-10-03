@@ -27,7 +27,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Migration test for {@code V106__add_scwiki_columns_to_material.sql}: every added column exists on
@@ -35,7 +34,6 @@ import org.springframework.test.context.ActiveProfiles;
  * UEX-sourced materials visible.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class V106MigrationTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;

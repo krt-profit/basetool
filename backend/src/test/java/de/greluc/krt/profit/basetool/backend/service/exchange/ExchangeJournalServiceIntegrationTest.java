@@ -41,7 +41,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -51,7 +50,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * a window, lists what an undo walks, and purges past its retention (REQ-XCH-021, REQ-XCH-022).
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class ExchangeJournalServiceIntegrationTest {
 
   private static final String KEY = "Kx9_" + "j".repeat(39);

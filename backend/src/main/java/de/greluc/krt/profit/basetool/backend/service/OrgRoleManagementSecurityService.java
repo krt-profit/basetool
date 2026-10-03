@@ -50,7 +50,7 @@ import org.springframework.transaction.annotation.Transactional;
  * delegated write never targets the caller's own seat ({@link #targetsAnotherUser}). Admin access
  * is decided at the endpoint, never here.
  */
-@Service
+@Service("orgRoleManagementSecurityService")
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)

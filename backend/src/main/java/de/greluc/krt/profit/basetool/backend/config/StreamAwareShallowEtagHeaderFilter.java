@@ -41,7 +41,7 @@ import org.springframework.web.util.pattern.PathPatternParser;
  */
 public class StreamAwareShallowEtagHeaderFilter extends ShallowEtagHeaderFilter {
 
-  /** The only surface the no-store question can be about, checked before the fourteen patterns. */
+  /** The only surface the no-store question can be about, checked before the family scan. */
   private static final PathPattern API_SCOPE = PathPatternParser.defaultInstance.parse("/api/**");
 
   /**

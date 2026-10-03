@@ -52,7 +52,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -61,7 +60,6 @@ import org.springframework.transaction.annotation.Transactional;
  * cascade away (REQ-MARKET-013, REQ-AUDIT-001).
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @Transactional
 @WithMockUser(roles = "ADMIN")
 class MaterialExchangeOfferRatchetDataTest {

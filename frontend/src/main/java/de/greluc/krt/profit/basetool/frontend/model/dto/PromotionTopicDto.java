@@ -21,13 +21,26 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 import java.time.Instant;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
-/** Frontend DTO for a promotion topic, mirroring the backend response. */
+/**
+ * Frontend DTO for a promotion topic, mirroring the backend {@code PromotionTopicResponse}.
+ *
+ * @param id topic id
+ * @param version optimistic-lock version
+ * @param name display name
+ * @param description optional description
+ * @param sortOrder position among the topics
+ * @param owningSquadron the owning squadron, or {@code null} when the topic has none
+ * @param createdAt creation time
+ * @param updatedAt last modification time
+ */
 public record PromotionTopicDto(
     UUID id,
     Long version,
     String name,
     String description,
     int sortOrder,
+    @Nullable SquadronReferenceDto owningSquadron,
     Instant createdAt,
     Instant updatedAt) {}

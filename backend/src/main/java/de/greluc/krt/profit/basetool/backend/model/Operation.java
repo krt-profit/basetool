@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
+import de.greluc.krt.profit.basetool.backend.annotation.TenantScoped;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -41,6 +42,7 @@ import lombok.Setter;
 import lombok.ToString;
 
 /** Operation JPA entity. */
+@TenantScoped("owningOrgUnit")
 @Entity
 @Getter
 @Setter

@@ -284,6 +284,13 @@ configuration time (use `providers.exec`). Check a build-script change with
 Repositories are declared only in `settings.gradle.kts`; a module script that
 declares one fails the build (`FAIL_ON_PROJECT_REPOS`).
 
+**Each module declares its own quality settings** in `<module>/build-settings.properties`:
+`test.maxHeap`, the JaCoCo floors `coverage.instruction` / `coverage.branch` and the PIT
+patterns `mutation.targetClasses` / `mutation.targetTests`, each required as soon as the
+module applies the plugin that reads it. Nothing has a default — a new module without the
+file fails configuration (REQ-OPS-037), and the Dockerfiles copy the file beside each
+module's `build.gradle.kts`.
+
 **Dependency updates** are surfaced by the weekly
 [refresh-versions workflow](.github/workflows/refresh-versions.yml), which runs
 `./gradlew refreshVersions -PrefreshVersions`. The flag is what applies the
@@ -839,6 +846,13 @@ you touch these areas.
   [`ArchitectureTest`](backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java)). Every `@RestController` carries at least one
   `@PreAuthorize`. Controllers do not return JPA entities. The frontend
   module does not depend on Spring Data JPA.
+- In the frontend every handler carries a gate of its own or its class's,
+  and the route table with its gates is a committed snapshot
+  (`frontend/src/test/resources/security/route-gate-snapshot.txt`), as is
+  the list of session-bound types (`session/session-bound-types.txt`).
+  An intended change rewrites both with
+  `./gradlew :frontend:test -PupdateSnapshots`; commit the diff with the
+  change so the reviewer sees it (REQ-FE-025, REQ-FE-027).
 - Full role / permission matrix:
   [`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md).
 

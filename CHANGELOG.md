@@ -2,7 +2,164 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Keycloak-Provider: Registrierungen und Keycloak-Version werden beim Bauen geprüft.** Ein Test lädt
+  alle sechs Service-Registrierungen samt Provider-ID, und `repo-lint` schlägt fehl, wenn die
+  Keycloak-Version im Katalog und das Keycloak-Image in Compose, Quadlet und Sandbox verschiedene
+  Minor-Versionen nennen (REQ-OPS-040). Die Klassen liegen jetzt in `discord`, `gate` und `exchange`;
+  das Verhalten bleibt unverändert.
+
+- **Datenaustausch: der eingefrorene Vertrag wird beim Bauen geprüft.** Backend-Antworten werden gegen die
+  veröffentlichten Schemas und Fixtures geprüft, jede Gateway-Route hat eine festgeschriebene Antwort, die
+  gemeinsamen Bezeichner von Backend, Gateway und Frontend stehen an einer Stelle, und ein PR am Austauschpfad
+  braucht das Label `e2e` (REQ-XCH-036…-038). Die Refinery-Entwurfsroute hat einen eigenen Request-Typ mit
+  identischem JSON; das Verhalten bleibt unverändert.
+
+- **Ingest-Gateway: nach Zuständigkeit paketiert, mit Strukturregeln.** Die Klassen liegen jetzt in 15
+  Paketen nach Aufgabe (`edge`, `auth`, `gate`, `relay`, …) statt nach Art; ein ArchUnit-Test verbietet
+  Paketzyklen, ausgehende HTTP-Aufrufe außerhalb von `relay` und Redis außerhalb von `registry`, `store`
+  und `handoff` (REQ-INGEST-013/-014). Reine Verschiebung, das Verhalten bleibt unverändert.
+
+- **Backend-Wächter für Daten und Transaktionen (Modularisierung, Phase 0).** Tests prüfen jetzt, dass
+  jede Tabelle genau einem Modul gehört, Trigger und natives SQL fremde Tabellen nur über gelistete
+  Ausnahmen erreichen, jede Mitgliedsreferenz in Löschung, Datenauskunft und Kontozusammenführung
+  geregelt ist, Audit nie nach dem Commit geschrieben wird und Mutatoren keine gecachte Instanz
+  verändern (REQ-DATA-020…022, REQ-AUDIT-007). Keine Verhaltensänderung.
+
+- **Sicherheitsausdrücke werden beim Build geprüft.** Jede Bean-Referenz in `@PreAuthorize` muss im
+  Kontext mit Namen und Parameterzahl auflösbar sein, die Sicherheits-Beans tragen feste Namen, und
+  kein Gate darf über `this` umgangen werden (REQ-SEC-075, REQ-SEC-076).
+
+- **Metrik und Alarm für nicht auswertbare Sicherheitsausdrücke.** Ein solcher Fehler bleibt ein
+  `400 ILLEGAL_ARGUMENT`, wird aber als `basetool_security_expression_failures_total` gezählt und
+  löst `SecurityExpressionEvaluationFailed` aus (REQ-OBS-020).
+
+- **Berechtigungsmatrix des Backends als geprüfte Datei.** `authorization-matrix.txt` hält für jede
+  Operation die entscheidende URL-Regel und das wirksame `@PreAuthorize` fest, dazu die
+  Service-Gates; `AuthorizationMatrixTest` schlägt bei jeder Abweichung fehl (REQ-SEC-074).
+
+- **Backend: Modulkarte und eingefrorene Modulkopplung (Guard G-09).** Eine Domain-Map ordnet jede
+  Backend-Klasse einem der 26 Zielmodule zu; ein ArchUnit-`modules()`-Test friert die heutigen 138
+  Kanten gegen die Rangordnung ein, neue scheitern. Spring Modulith 2.1.1 läuft nur im Testumfang
+  (REQ-MOD-001…005).
+
+- **Frontend: Routen, Rechte und Sitzungstypen sind gegen Verschiebungen gesichert.** Eine
+  committete Routen-/Rechte-Tabelle, eine Pflicht-`@PreAuthorize` pro Handler, die statische Prüfung
+  aller `T(…)`-Verweise und View-Namen in Templates und eine aus dem Code abgeleitete Liste der
+  Sitzungstypen lassen den Build scheitern, statt dass ein verschobener Controller oder ein Formular
+  still ein Recht oder Flash-Werte verliert (REQ-FE-025…027). Organigramm, Schiffsdaten und
+  „Ankündigung gelesen" tragen ihr `isAuthenticated()` jetzt selbst; das Verhalten ist unverändert.
+
 ### Changed
+
+- **Tests: Testklassen teilen sich ihre Spring-Kontexte.** Das Backend startet 34 statt 46
+  Anwendungskontexte, das Frontend 19 statt 21: ungenutzte Mocks sind entfernt, acht Klassen nutzen
+  den gemeinsamen Mock-Satz `@LeafServiceMockTest`, Sicherheits-Beans bleiben echt. Ein Budget-Test
+  je Anwendung verhindert, dass der Cache wieder zerfällt (REQ-OPS-041).
+
+- **Tests: das Test-Profil setzt nur noch der Build.** 237 überflüssige `@ActiveProfiles("test")`
+  sind entfernt; sie teilten Springs Test-Context-Cache, ohne etwas zu ändern. Ein Test je Anwendung
+  verhindert, dass sie wiederkommen (REQ-OPS-039).
+
+- **Datenaustausch: ein Refinery-Entwurf verlangt laut Schema mindestens einen Auftrag.**
+  `refinery-draft.schema.json` setzt `minItems: 1` auf `orders`, wie das Backend es schon immer verlangt; eine
+  leere Liste lehnt jetzt das Gateway selbst mit `400 SCHEMA_INVALID` und `errors[]` ab statt des weitergereichten
+  Backend-Fehlers. Dasselbe gilt für `goods` und `sourceImages` jedes Auftrags, die ebenfalls mindestens
+  einen Eintrag verlangen. Keine Vertragsänderung im Sinne von v2 (REQ-XCH-026).
+
+- **Build: Qualitätsschwellen pro Modul ausdrücklich.** Testheap, JaCoCo-Schwellen und PIT-Ziele
+  stehen in `<modul>/build-settings.properties`; fehlt ein Wert, bricht die Konfiguration ab, statt
+  still auf 0.50/0.40 zu fallen (REQ-OPS-037). Die Werte sind unverändert.
+
+- **Build: Prüfungen, die an Pfaden hängen, schlagen fehl statt still zu schrumpfen.** Neue Prüfung,
+  dass jeder Eingabepfad der Build-Skripte existiert; i18n- und Seiten-CSS-Scans lesen Unterordner;
+  ein Frontend-DTO ohne Backend-Gegenstück fällt durch; ein `ContextShapeTest` je Anwendung zählt
+  geplante Jobs, Transaktions-Listener, Controller und Filterketten (REQ-OPS-038).
+
+- **API: mehr Bereiche werden nie zwischengespeichert.** Admin, Audit, Verbundene Anwendungen,
+  Datenaustausch, Leitung, Live-Sync, Materialbörse, Benachrichtigungsregeln, Aufträge, Organigramm,
+  SK-/Staffel-Mitglieder und der eigene Nutzungsbedingungs-Status antworten jetzt mit
+  `private, no-store` statt `no-cache, must-revalidate` (REQ-SEC-031); ein Test schlägt fehl, wenn
+  eine neue API-Familie nicht eingeordnet ist.
+
+- **API: höchstens 1 000 Einträge pro Seite.** Nur Preismatrix, Preisübersicht, Materialpreise,
+  Terminals und die UEX-Ortskataloge erlauben weiter 100 000 (REQ-API-005); Frontend und App fordern
+  sonst nirgends größere Seiten an.
+
+- **Architekturtests schlagen bei verschobenen Klassen an.** Die ArchUnit-Regeln des Backends wählen
+  Klassen nach Rolle (`@RestController`, `@Service`, Repository, `@Mapper`, `@Entity`) und Klassenliteral
+  statt nach Paket- und Namensstrings, jede Regel prüft eine Mindestauswahl, und ein Metatest prüft, dass
+  jeder verbliebene Klassenname auflösbar ist (REQ-SEC-073). Eine Verschiebung lässt den Build scheitern,
+  statt eine Regel still leerlaufen zu lassen.
+
+- **Modularisierung: die Entscheidungen sind festgehalten.** ADR-0231 bis ADR-0239 (Modulschnitt,
+  Zusammenspiel der Module, Prüfwerkzeuge, harter API-Schnitt mit erzwungenem App-Update, Fehlermodell,
+  Zugriffsregeln je Fachbereich, NullAway, `switch` ohne `default`, Browser-Baseline 2025), dazu
+  REQ-API-001/009/010 und REQ-FE-018. Checkstyle akzeptiert `_` als Namen eines leeren `catch`.
+
+- **CI: Mutationstests auch für den Ingest-Gateway.** Der wöchentliche PIT-Lauf (`pitest.yml`) prüft
+  jetzt auch `ingest`, mit eigenem Timeout und demselben Abschluss-Gate; mutiert werden alle
+  Zuständigkeitspakete mit Gates und ihrem Zustand statt nur der früheren `service`-Klassen (MB-07).
+
+### Fixed
+
+- **Datenexport (Art. 15/20 DSGVO) vollständig.** Der Export enthält jetzt auch deine zugewiesenen
+  Rollen, eine Ernennung zum Grand Admiral, Einsätze mit dir als Partyleiter, Einsatzeinheiten in
+  deiner Verantwortung, Interessensbekundungen zu Gesuchen der Materialbörse, Buchungsberechtigungen
+  und persönliche Freigabe-Limits auf Bankkonten sowie Buchungsanträge mit dir als Gegenpartei; andere
+  Personen bleiben dabei ausgeblendet. Im PDF tragen außerdem die vier Abschnitte der verbundenen
+  Anwendungen jetzt einen lesbaren Namen statt ihres internen Schlüssels.
+
+- **Build: die Node-Skripte unter `frontend/scripts/` werden gelintet und auf Formatierung geprüft.**
+  `:frontend:lintJs` und `:frontend:prettierCheck` lasen `scripts/**/*.mjs` entgegen ADR-0130 nicht; jetzt
+  tun sie es, und die fünf Skripte sind ohne Verhaltensänderung nach Prettier formatiert. ADR-0222 nennt
+  die zwei lokalen Änderungen an `google_checks.xml`, statt es „verbatim" zu nennen.
+
+- **E2E: nach einem Formular-Submit wartet die Suite, bis die Zielseite geladen ist.** Die nächste
+  Navigation überholte sonst die noch ladende Seite; in WebKit verlor der Browser dabei vereinzelt alle
+  Cookies, und `JobOrderProductionE2eTest` landete abgemeldet auf `/?error`. Kein Fehler der App.
+
+- **Admin: Bearbeiten und Löschen im persönlichen Inventar eines Mitglieds funktionieren wieder.** Das
+  Frontend rief `/api/v1/admin/personal-inventory/{id}` statt `…/items/{id}` auf, das Backend lehnte ab.
+  Ein neuer Test prüft jetzt jeden Backend-Aufruf des Frontends gegen die `openapi.json` (REQ-FE-028).
+
+- **Parallel geladene Seitenabschnitte senden die Sprache des Nutzers ans Backend.** Einsätze, Operationen,
+  Aufträge, Lager, Hangar, Raffinerie, Org-Bank und Einsatzdaten luden Abschnitte ohne `Accept-Language`; der
+  `ParallelPageLoader` übernimmt jetzt den ganzen Anfragekontext aus dem `ContextRegistry` (REQ-FE-030).
+
+### Security
+
+- **Pfadgebundene Schutzregeln prüfen sich selbst.** Tests über die echten Endpunkte stellen sicher,
+  dass jeder schreibende Endpunkt in der CSRF-Ausnahme liegt, jede Ratenlimit-Regel einen Endpunkt
+  trifft und die Ausnahmen der Freigabe-, Nutzungsbedingungs- und Datenaustausch-Filter exakte
+  Pfadlisten sind (REQ-SEC-078…080).
+
+- **Backend: Prüfregeln für Mandantentrennung und Massenzuweisung.** Org-Einheiten-gebundene Aggregate
+  tragen `@TenantScoped`; ein Test verlangt für jeden Controller, der solche Daten schreibt, den
+  Scope-Gate, und für Request-Bodies `@Valid`, keine Antwort-DTOs und keine servergeführten Felder
+  (REQ-ORG-028, REQ-SEC-077, REQ-API-015). 13 Admin-/SPI-Endpunkte validieren ihren Body jetzt;
+  gültige Anfragen ändern sich nicht.
+
+- **Die Backend-Clients des Frontends senden nur noch an das Backend.** Jeder `WebClient` lehnt eine Anfrage an
+  einen anderen Host als `app.backend-url` ab, bevor das Bearer-Token angehängt wird; ArchUnit hält die Clients im
+  Backend-Kern (REQ-FE-029).
+
+## [v1.13.7](https://github.com/krt-profit/basetool/releases/tag/v1.13.7) - 2026-10-03
+
+### Added
+
+- **Schnellzugriff (Strg K / ⌘ K).** Ein Suchfeld in der Kopfzeile findet jede Seite, die man sehen darf,
+  dazu „Zuletzt besucht" und Aktionen wie „Neuen Auftrag anlegen" oder „Abmelden"; bedienbar per Tastatur.
+
+- **Tab-Leiste auf dem Smartphone.** Einsätze, Lager, Aufträge, Meldungen und „Menü" sitzen unten fest; das
+  Menü öffnet als Sheet, die Suche als Vollbild. Die Fußzeilen-Links stehen dort am Ende des Menüs.
+
+### Changed
+
+- **Neues Navigationsmenü.** Das Menü hat einen Menüfilter, Gruppen mit Icons und unten eine Nutzerzeile mit
+  „Persönlich", Sprache und Abmelden. „Administration" ist ein eigener Modus (auf Admin-Seiten automatisch),
+  „Rechtliches" steht nur noch in der Fußzeile, die Glocke sitzt in der Kopfzeile.
 
 - **Lager einbuchen: „Mit vorhandenem Bestand zusammenführen" erscheint nur noch, wenn es etwas zum
   Zusammenführen gibt.** Das Formular fragt beim Backend (`GET /api/v1/inventory/merge-candidates`), ob
@@ -21,10 +178,6 @@
   ist.
 
 ### Fixed
-
-- **Parallel geladene Seitenabschnitte senden die Sprache des Nutzers ans Backend.** Einsätze, Operationen,
-  Aufträge, Lager, Hangar, Raffinerie, Org-Bank und Einsatzdaten luden Abschnitte ohne `Accept-Language`; der
-  `ParallelPageLoader` übernimmt jetzt den ganzen Anfragekontext aus dem `ContextRegistry` (REQ-FE-030).
 
 - **Deploy: die Edge startet vor den Anwendungen.** Ändert ein Release die Edge-Unit, stoppte das eine
   Neustartfenster sie mit und startete sie zuletzt; Backend und Frontend holen die OIDC-Konfiguration

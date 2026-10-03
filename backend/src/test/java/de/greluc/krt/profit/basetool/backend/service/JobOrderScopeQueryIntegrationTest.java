@@ -41,7 +41,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -51,7 +50,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * freshly created ids, since the container is shared.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class JobOrderScopeQueryIntegrationTest {
 
   @Autowired private JobOrderRepository jobOrderRepository;

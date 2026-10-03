@@ -64,7 +64,7 @@ class WebClientCborNegotiationTest {
 
     buildBackendClient(AppHttpProperties.BackendCodec.CBOR)
         .get()
-        .uri(server.url("/api/v1/job-types").uri())
+        .uri("/api/v1/job-types")
         .retrieve()
         .bodyToMono(String.class)
         .block(Duration.ofSeconds(10));
@@ -81,7 +81,7 @@ class WebClientCborNegotiationTest {
 
     buildBackendClient(AppHttpProperties.BackendCodec.JSON)
         .get()
-        .uri(server.url("/api/v1/job-types").uri())
+        .uri("/api/v1/job-types")
         .retrieve()
         .bodyToMono(String.class)
         .block(Duration.ofSeconds(10));
@@ -96,7 +96,7 @@ class WebClientCborNegotiationTest {
 
     buildBackendClient(AppHttpProperties.BackendCodec.CBOR)
         .post()
-        .uri(server.url("/api/v1/missions").uri())
+        .uri("/api/v1/missions")
         .bodyValue(Map.of("name", "probe"))
         .retrieve()
         .bodyToMono(String.class)
@@ -109,13 +109,15 @@ class WebClientCborNegotiationTest {
   }
 
   /**
-   * Builds the real {@code webClient} bean for a given codec, with real Resilience4j registries.
+   * Builds the real {@code webClient} bean for a given codec, addressed to the test server, with
+   * real Resilience4j registries.
    *
    * @param codec the setting under test
    * @return the built client
    */
-  private static WebClient buildBackendClient(AppHttpProperties.BackendCodec codec) {
-    return WebClientTestSupport.config(AppHttpProperties.BackendProtocol.H2, codec)
+  private WebClient buildBackendClient(AppHttpProperties.BackendCodec codec) {
+    return WebClientTestSupport.config(
+            AppHttpProperties.BackendProtocol.H2, codec, server.url("/").toString())
         .webClient(
             mock(OAuth2AuthorizedClientManager.class),
             CircuitBreakerRegistry.ofDefaults(),

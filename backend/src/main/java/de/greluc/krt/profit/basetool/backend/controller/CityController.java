@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.CityService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
+import de.greluc.krt.profit.basetool.backend.web.PaginationUtil.PageCeiling;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -72,7 +73,7 @@ public class CityController {
       @RequestParam(required = false) String sort) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
-            page, size, sort, Set.of("name", "id", "starSystemName"), "name");
+            page, size, sort, Set.of("name", "id", "starSystemName"), "name", PageCeiling.LOAD_ALL);
     Page<City> p = cityService.getAllCities(pageable);
     return PageResponse.of(p.map(cityMapper::toDto));
   }

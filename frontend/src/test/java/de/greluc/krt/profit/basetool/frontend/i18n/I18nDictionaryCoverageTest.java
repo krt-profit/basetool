@@ -34,13 +34,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Tests that every literal i18n key a browser script reads through {@code window.krtI18nText} or a
  * {@code krtFetch.sectionWrite} config is provided by some template, as a {@code data-*} attribute
  * or a bootstrap object property.
  *
- * <p>Keys built at run time are not covered.
+ * <p>Scripts are read from every subfolder of {@code static/js} (REQ-OPS-038). Keys built at run
+ * time are not covered.
  */
 class I18nDictionaryCoverageTest {
 
@@ -59,34 +61,95 @@ class I18nDictionaryCoverageTest {
   /** A {@code sectionWrite} config's {@code …Key: 'message.key'} entry. */
   private static final Pattern CONFIG_KEY = Pattern.compile("\\w+Key:\\s*'([\\w.]+)'");
 
+  /** A literal user-visible fallback after {@code ||}. */
+  private static final Pattern FALLBACK =
+      Pattern.compile("\\|\\|\\s*'([^'\\n]*[A-ZÄÖÜ ][^'\\n]*)'|\\|\\|\\s*'([A-Za-zäöüß][^'\\n]*)'");
+
+  /**
+   * Lists every script below a root, in subfolders too, so a per-domain folder stays covered.
+   *
+   * @param root the scripts root
+   * @return every {@code .js} file under {@code root}, sorted
+   * @throws IOException if the tree cannot be walked
+   */
+  static List<Path> scripts(Path root) throws IOException {
+    try (Stream<Path> files = Files.walk(root)) {
+      return files
+          .filter(Files::isRegularFile)
+          .filter(f -> f.toString().endsWith(".js"))
+          .sorted()
+          .toList();
+    }
+  }
+
+  /**
+   * Names a script by its path below the root, with {@code /} separators.
+   *
+   * @param root the scripts root
+   * @param file a script under {@code root}
+   * @return the relative name
+   */
+  private static String nameOf(Path root, Path file) {
+    return root.relativize(file).toString().replace('\\', '/');
+  }
+
   /**
    * Collects every checked key with the script it came from.
    *
+   * @param root the scripts root, walked recursively
    * @return key to the first script that reads it
    * @throws IOException if a script cannot be read
    */
-  private static Map<String, String> readKeys() throws IOException {
+  static Map<String, String> readKeys(Path root) throws IOException {
     Map<String, String> keys = new LinkedHashMap<>();
-    try (Stream<Path> files = Files.list(JS)) {
-      for (Path file : files.filter(f -> f.toString().endsWith(".js")).sorted().toList()) {
-        String js = Files.readString(file, StandardCharsets.UTF_8);
-        Matcher call = CALL_KEY.matcher(js);
-        while (call.find()) {
-          keys.putIfAbsent(call.group(1), file.getFileName().toString());
-        }
-        Matcher dictName = DICT_NAME.matcher(js);
-        while (dictName.find()) {
-          int end = js.indexOf("sections:", dictName.end());
-          Matcher configKey =
-              CONFIG_KEY.matcher(js.substring(dictName.end(), end < 0 ? js.length() : end));
-          while (configKey.find()) {
-            keys.putIfAbsent(
-                dictName.group(1) + "[" + configKey.group(1) + "]", file.getFileName().toString());
-          }
+    for (Path file : scripts(root)) {
+      String name = nameOf(root, file);
+      String js = Files.readString(file, StandardCharsets.UTF_8);
+      Matcher call = CALL_KEY.matcher(js);
+      while (call.find()) {
+        keys.putIfAbsent(call.group(1), name);
+      }
+      Matcher dictName = DICT_NAME.matcher(js);
+      while (dictName.find()) {
+        int end = js.indexOf("sections:", dictName.end());
+        Matcher configKey =
+            CONFIG_KEY.matcher(js.substring(dictName.end(), end < 0 ? js.length() : end));
+        while (configKey.find()) {
+          keys.putIfAbsent(dictName.group(1) + "[" + configKey.group(1) + "]", name);
         }
       }
     }
     return keys;
+  }
+
+  /**
+   * Collects every literal user-visible fallback after {@code ||} in the scripts below a root.
+   *
+   * @param root the scripts root, walked recursively
+   * @return one {@code script: 'literal'} entry per hit
+   * @throws IOException if a script cannot be read
+   */
+  static TreeSet<String> literalFallbacks(Path root) throws IOException {
+    TreeSet<String> hits = new TreeSet<>();
+    for (Path file : scripts(root)) {
+      String js =
+          Files.readString(file, StandardCharsets.UTF_8)
+              .replaceAll("(?s)/\\*.*?\\*/", "")
+              .replaceAll("(?m)^\\s*//.*$", "");
+      Matcher m = FALLBACK.matcher(js);
+      while (m.find()) {
+        String literal = m.group(1) != null ? m.group(1) : m.group(2);
+        if (literal.matches("[a-z][\\w\\-]*")
+            || literal.matches("[A-Z][A-Z_]*")
+            || literal.matches("accountId|application/json")
+            || literal.matches("var\\(--[\\w-]+\\)")
+            || literal.matches("[\\w\\-]+\\.pdf")) {
+          continue;
+        }
+        hits.add(nameOf(root, file) + ": '" + literal + "'");
+      }
+    }
+    return hits;
   }
 
   /**
@@ -176,7 +239,7 @@ class I18nDictionaryCoverageTest {
    */
   @Test
   void everyLocalizedStringAScriptReadsIsProvidedByItsPages() throws IOException {
-    Map<String, String> keys = readKeys();
+    Map<String, String> keys = readKeys(JS);
     Map<Path, String> templates = readTemplates();
 
     TreeSet<String> problems = new TreeSet<>();
@@ -199,30 +262,31 @@ class I18nDictionaryCoverageTest {
    */
   @Test
   void noScriptFallsBackToALiteralDefault() throws IOException {
-    Pattern fallback =
-        Pattern.compile(
-            "\\|\\|\\s*'([^'\\n]*[A-ZÄÖÜ ][^'\\n]*)'|\\|\\|\\s*'([A-Za-zäöüß][^'\\n]*)'");
-    TreeSet<String> hits = new TreeSet<>();
-    try (Stream<Path> files = Files.list(JS)) {
-      for (Path file : files.filter(f -> f.toString().endsWith(".js")).sorted().toList()) {
-        String js =
-            Files.readString(file, StandardCharsets.UTF_8)
-                .replaceAll("(?s)/\\*.*?\\*/", "")
-                .replaceAll("(?m)^\\s*//.*$", "");
-        Matcher m = fallback.matcher(js);
-        while (m.find()) {
-          String literal = m.group(1) != null ? m.group(1) : m.group(2);
-          if (literal.matches("[a-z][\\w\\-]*")
-              || literal.matches("[A-Z][A-Z_]*")
-              || literal.matches("accountId|application/json")
-              || literal.matches("var\\(--[\\w-]+\\)")
-              || literal.matches("[\\w\\-]+\\.pdf")) {
-            continue;
-          }
-          hits.add(file.getFileName() + ": '" + literal + "'");
-        }
-      }
-    }
-    assertThat(hits).as("literal UI-text fallbacks; use window.krtI18nText").isEmpty();
+    assertThat(scripts(JS)).as("the scan must see every script").hasSizeGreaterThanOrEqualTo(100);
+    assertThat(literalFallbacks(JS))
+        .as("literal UI-text fallbacks; use window.krtI18nText")
+        .isEmpty();
+  }
+
+  /**
+   * A script in a per-domain subfolder is scanned for keys and for literal fallbacks alike.
+   *
+   * @param root a temporary scripts root
+   * @throws IOException if the fixture cannot be written or read
+   */
+  @Test
+  void scriptsInSubfoldersAreScanned(@TempDir Path root) throws IOException {
+    Path script = root.resolve("mission").resolve("detail").resolve("mission-panel.js");
+    Files.createDirectories(script.getParent());
+    Files.writeString(
+        script,
+        "const t = window.krtI18nText(el, 'missionPanel.title');\nconst f = x || 'Hallo Welt';\n",
+        StandardCharsets.UTF_8);
+
+    assertThat(scripts(root)).containsExactly(script);
+    assertThat(readKeys(root))
+        .containsEntry("missionPanel.title", "mission/detail/mission-panel.js");
+    assertThat(literalFallbacks(root))
+        .containsExactly("mission/detail/mission-panel.js: 'Hallo Welt'");
   }
 }

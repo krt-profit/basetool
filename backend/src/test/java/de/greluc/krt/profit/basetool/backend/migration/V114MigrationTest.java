@@ -28,7 +28,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * TestContainers-backed migration test for {@code V114__create_blueprint_tables.sql}. Asserts the
@@ -37,7 +36,6 @@ import org.springframework.test.context.ActiveProfiles;
  * unresolved null FK), and the FK indexes.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class V114MigrationTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;
