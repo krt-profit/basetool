@@ -60,6 +60,15 @@ dependencies {
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
+pitest {
+  targetClasses.set(
+    listOf("service", "exchange", "filter", "ratelimit").map {
+      "de.greluc.krt.profit.basetool.ingest.$it.*"
+    }
+  )
+  targetTests.set(listOf("de.greluc.krt.profit.basetool.ingest.*Test"))
+}
+
 tasks.javadoc {
   options { (this as CoreJavadocOptions).addStringOption("Xdoclint:none", "-quiet") }
   destinationDir = project.file("docs/javadoc")

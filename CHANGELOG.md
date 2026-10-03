@@ -4,6 +4,10 @@
 
 ### Changed
 
+- **CI: Mutationstests auch für den Ingest-Gateway.** Der wöchentliche PIT-Lauf (`pitest.yml`) prüft
+  jetzt auch `ingest`, mit eigenem Timeout und demselben Abschluss-Gate; mutiert werden die Pakete mit
+  den Gates (`exchange`, `filter`, `ratelimit`, `service`) statt nur `service` (MB-07).
+
 - **Lager einbuchen: „Mit vorhandenem Bestand zusammenführen" erscheint nur noch, wenn es etwas zum
   Zusammenführen gibt.** Das Formular fragt beim Backend (`GET /api/v1/inventory/merge-candidates`), ob
   dasselbe Material in derselben Qualität am selben Ort mit demselben Besitzer und derselben Einheit schon
