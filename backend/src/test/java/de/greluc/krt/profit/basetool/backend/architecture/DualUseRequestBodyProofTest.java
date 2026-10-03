@@ -680,8 +680,12 @@ class DualUseRequestBodyProofTest {
   }
 
   private static Map<String, Object> body(Object... keysAndValues) {
+    if (keysAndValues.length % 2 != 0) {
+      throw new IllegalArgumentException(
+          "body needs key-value pairs, got " + keysAndValues.length + " arguments");
+    }
     Map<String, Object> body = new HashMap<>();
-    for (int i = 0; i < keysAndValues.length; i += 2) {
+    for (int i = 0; i + 1 < keysAndValues.length; i += 2) {
       body.put((String) keysAndValues[i], keysAndValues[i + 1]);
     }
     return body;

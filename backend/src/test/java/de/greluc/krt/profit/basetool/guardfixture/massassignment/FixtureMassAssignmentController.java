@@ -65,25 +65,35 @@ public class FixtureMassAssignmentController {
    *
    * @param id the row id
    * @param request the transition
+   * @return the row id and the requested status
    */
   @PutMapping("/{id}/status")
-  public void transition(@PathVariable UUID id, @RequestBody @Valid FixtureStatusRequest request) {}
+  public String transition(
+      @PathVariable UUID id, @RequestBody @Valid FixtureStatusRequest request) {
+    return id + ":" + request.status();
+  }
 
   /**
    * Planted violation: a status bound outside a transition path.
    *
    * @param request the body
+   * @return the number of rows the request names
    */
   @PutMapping("/bulk")
-  public void bulk(@RequestBody @Valid BulkStatusRequest request) {}
+  public int bulk(@RequestBody @Valid BulkStatusRequest request) {
+    return request.ids().size();
+  }
 
   /**
    * Planted violation: a nested line carries a server-managed org unit.
    *
    * @param request the body
+   * @return the number of lines in the request
    */
   @PostMapping("/nested")
-  public void nested(@RequestBody @Valid FixtureNestedRequest request) {}
+  public int nested(@RequestBody @Valid FixtureNestedRequest request) {
+    return request.lines().size();
+  }
 
   /**
    * A bulk status change bound outside a transition path.
