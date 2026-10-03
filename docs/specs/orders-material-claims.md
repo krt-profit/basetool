@@ -18,8 +18,8 @@ particular, makes the **no-overclaim** rule a concurrency-safe requirement after
 was not enforced across squadrons under concurrent first claims.
 
 The invariants live in `MaterialClaimService`; the row is `material_claim` (V131) with a unique index
-`uq_material_claim_bucket_org_unit` on `(job_order_id, material_id, quality_requirement,
-claiming_org_unit_id)`.
+`uq_material_claim_tier_bucket_org_unit` on `(job_order_id, material_id, quality_tier_id,
+claiming_org_unit_id)` (V264, REQ-ORDERS-036).
 
 ## Requirements
 
