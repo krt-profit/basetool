@@ -1346,6 +1346,8 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
 - **The drawer (≥ 769 px)** is a 320 px overlay in three zones; only the middle one scrolls:
   - *Head* — logo, `appTitle`, close.
   - *Context* — the active-org-unit switcher (only with more than one org unit) and the menu filter.
+    Up to 1024 px the switcher keeps the 44 px touch floor of REQ-UI-009; the hand-off's 40 px
+    applies above it.
   - *List* — „Startseite" and „Benachrichtigungen" (with the unread count) on top, then the groups
     Einsatzplanung · Flotte & Logistik · Handel · Organisation · Beförderung (only with the
     promotion feature) · Kartellbank · Ressourcen, each with its icon. Group headings are
@@ -1383,7 +1385,9 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
   accordion with the current page's group open, the legal links, the handbook and the version at the
   end of the list, the same foot with 44–48 px rows. The fixed footer is hidden while the tab bar
   shows; `main` reserves the tab bar, `--krt-footer-height` stays `0px`, and bars pinned to the
-  bottom of the viewport sit above the tab bar (`--krt-tabbar-height`). The quick access opens full
+  bottom of the viewport sit above the tab bar (`--krt-tabbar-height`). Pointer drags that scroll at
+  the viewport's bottom edge measure that edge from the top of the tab bar, and a drop released over
+  the tab bar is cancelled (the crew board, REQ-MISSION-005). The quick access opens full
   screen with „Abbrechen". A signed-out visitor of a legal page has no tab bar and keeps the
   hamburger and the footer.
 - **Accessibility.** The closed drawer is `inert`; opening it focuses the filter (desktop) and
