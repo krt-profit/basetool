@@ -520,7 +520,9 @@ measured sweep of the touch classes found both:
   fix would be silently inert — the same trap this requirement already records for `.btn.btn-xs`.
 - **`.master-row` IS exempt**, at 32px. The blueprint list rows on `/personal-inventory/blueprints`
   measured 33px; they are a scan-and-tap list where density is the point, and were ruled equivalent
-  to a repeated row action rather than a standalone control.
+  to a repeated row action rather than a standalone control. Since 2026-10-03 those rows declare
+  `min-height: 44px` themselves (`.krt-bp-md .master-row`, website overhaul phase 3); the exemption
+  stays for other master lists.
 
 **A third round of amendments, 2026-09-13**, after the guard first ran with *seeded* data. The
 first sweep could only measure what a fresh stack renders, and a fresh stack has empty lists: no

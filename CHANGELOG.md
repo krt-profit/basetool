@@ -18,6 +18,14 @@
   Admin-Listen haben einen Seitenkopf mit Zähler, eine Werkzeugleiste mit Suche, Segment-Schalter und
   Filter-Popover, entfernbare Filter-Chips und Tabellen, deren Zeile der Link ist und die auf dem
   Smartphone stapeln; Status sind übersetzt, leere Listen zeigen einen Leerzustand (REQ-UI-027).
+- **Mein Inventar: Blueprints mit Dialog und Craft-Status.** „Blueprints hinzufügen" öffnet einen
+  Dialog, „SC Extractor laden" und „Alle löschen …" liegen im ⋯-Menü; die Seite hat eine Suche,
+  „Alle · Craftbar" und „Raffinerie einrechnen". Jede Zeile zeigt Status-Punkt und „3×", das Detail
+  eine Kennzahl und die Zutaten mit Bedarf, Vorrat und Qualität (REQ-INV-008/048).
+- **Blueprint-Verfügbarkeit: Besitzer als Chips, Suche nach Personen.** Die ersten vier Besitzer
+  stehen direkt in der Zeile, „+ n weitere" klappt den Rest auf; die Suche findet auch Besitzer
+  innerhalb der eigenen Einheiten (REQ-INV-012/013).
+
 - **Einsätze und Operationen: Zeitraum „Kommend · Vergangen · Alle".** Ersetzt die Checkbox
   „Vergangene anzeigen"; die gespeicherte Auswahl wird übernommen.
 - **Benachrichtigungen: „Ungelesen · Alle" und Links.** Die Seite zeigt zunächst nur Ungelesenes;

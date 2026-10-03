@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintBulkDel
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintRecipeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.StringNormalization;
@@ -112,6 +113,13 @@ public class PersonalInventoryBlueprintsPageController {
   private static final ParameterizedTypeReference<PageResponse<PersonalBlueprintDto>>
       PERSONAL_BLUEPRINT_PAGE = new ParameterizedTypeReference<>() {};
 
+  /**
+   * Response type for one page of the caller's personal-inventory items ({@code
+   * /api/v1/personal-inventory}), read only for its total.
+   */
+  private static final ParameterizedTypeReference<PageResponse<PersonalInventoryItemDto>>
+      PERSONAL_INVENTORY_ITEM_PAGE = new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -129,12 +137,14 @@ public class PersonalInventoryBlueprintsPageController {
   }
 
   /**
-   * Renders the owned-blueprint list with the multi-select add bar and the edit / remove modals.
+   * Renders the owned-blueprint master-detail with the add dialog and the edit / remove modals. The
+   * full page also carries the item count of the sibling „Items" tab.
    *
    * @param q optional case-insensitive product-name filter, echoed into the search input
    * @param fragment when {@code "list"}, only the collection card fragment is rendered for an
    *     in-place AJAX swap (REQ-FE-005); otherwise the full page
-   * @param model Thymeleaf model populated with the blueprint list and the filter query
+   * @param model Thymeleaf model populated with the blueprint list, the filter query and, for the
+   *     full page, {@code itemCount}
    * @return the {@code personal-inventory-blueprints} view name, or its {@code blueprintList}
    *     fragment selector
    */
@@ -149,7 +159,25 @@ public class PersonalInventoryBlueprintsPageController {
     if (fragment != null && "list".equalsIgnoreCase(fragment)) {
       return "personal-inventory-blueprints :: blueprintList";
     }
+    model.addAttribute("itemCount", countItems());
     return "personal-inventory-blueprints";
+  }
+
+  /**
+   * Reads how many personal-inventory items the caller keeps, for the „Items" tab's count.
+   *
+   * @return the caller's item total, or {@code null} when the backend cannot answer
+   */
+  @Nullable
+  private Long countItems() {
+    try {
+      PageResponse<PersonalInventoryItemDto> page =
+          backendApiClient.get("/api/v1/personal-inventory?size=1", PERSONAL_INVENTORY_ITEM_PAGE);
+      return page == null ? null : page.totalElements();
+    } catch (Exception e) {
+      log.debug("Failed to count personal inventory items: {}", e.getMessage());
+      return null;
+    }
   }
 
   /**

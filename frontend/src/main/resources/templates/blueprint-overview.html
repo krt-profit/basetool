@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{blueprintOverview.title} + ' - ' + ${appTitle}">Blueprint Availability - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/pages/blueprint-overview.css}">
+    </th:block>
 </head>
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
@@ -9,79 +12,67 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box flex-between">
-        <h1 th:text="#{blueprintOverview.title}">Blueprint Availability</h1>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{blueprintOverview.title},
+        count=${overviewPage != null ? overviewPage.totalElements() : null}, countId='bp-overview-count', countFor='bp-overview-results')}"></th:block>
 
-    <div class="hud-box mt-2">
-        <div th:if="${error}" class="hud-box hud-box-error">
-            <p th:text="#{__${error}__}">Error</p>
+    <div th:if="${error}" class="alert alert-danger" th:text="#{__${error}__}">Error</div>
+
+    <div th:if="${isAllSquadronsMode}" class="alert alert-info" data-testid="bp-overview-all-units"
+         th:text="#{blueprintOverview.all_orgunits_notice}">Aggregation across all org units.</div>
+
+    <form id="bp-overview-filter-form" class="bpo-filter-form no-track" method="get" th:action="@{/blueprint-overview}"
+          th:if="${overviewPage != null and (overviewPage.totalElements() > 0 or search != null)}">
+        <div class="toolbar">
+            <th:block th:replace="~{fragments/components :: toolbarSearch('bp-overview-filter', 'search', ${search}, 'blueprintOverview.filter.placeholderPeople')}"></th:block>
         </div>
+        <input type="hidden" name="size" th:value="${overviewPage.size()}">
+    </form>
 
-        <link rel="stylesheet" th:href="@{/css/pages/blueprint-overview.css}">
-
-        <div th:if="${isAllSquadronsMode}" class="squadron-badge squadron-badge-muted krtm-display-block-padding-0-6rem-0-9rem-margin-b-3373"
-             th:text="#{blueprintOverview.all_orgunits_notice}">
-            Aggregation across all org units.
-        </div>
-
-        <form class="bp-filter" method="get" th:action="@{/blueprint-overview}"
-              th:if="${overviewPage != null and (overviewPage.totalElements() > 0 or search != null)}">
-            <span class="bp-filter-icon" aria-hidden="true">
-                <svg class="krt-icon"><use href="#krt-icon-search"/></svg>
-            </span>
-            <input type="search" id="bp-overview-filter" name="search" th:value="${search}" autocomplete="off"
-                   th:attr="placeholder=#{blueprintOverview.filter.placeholder},aria-label=#{blueprintOverview.filter.placeholder}">
-            <input type="hidden" name="size" th:value="${overviewPage.size()}">
-        </form>
-
-        <div id="bp-overview-results">
-        <th:block th:fragment="results">
-        <div class="table-responsive">
-        <table class="data-table">
+    <div id="bp-overview-results" class="card card--flush">
+    <th:block th:fragment="results">
+        <table th:if="${!#lists.isEmpty(overview)}" class="data-table data-table--stack bpo-table">
             <thead>
             <tr>
                 <th th:text="#{blueprintOverview.column.blueprint}">Blueprint</th>
-                <th th:text="#{blueprintOverview.column.owners}">Available from</th>
-                <th th:text="#{general.actions}" class="nowrap">Actions</th>
+                <th class="num" th:text="#{blueprintOverview.column.count}">Anzahl</th>
+                <th th:text="#{blueprintOverview.column.canCraft}">Kann craften</th>
             </tr>
             </thead>
             <tbody>
-            <th:block th:each="item : ${overview}">
-            <tr class="bp-row">
-                <td th:text="${item.productName}" class="krtm-vertical-align-top-padding-top-1rem-7058">Blueprint</td>
-                <td class="krtm-vertical-align-top-padding-top-1rem-7058">
-                    <span class="bp-owner-count" th:text="${item.ownerCount}">0</span>
+            <th:block th:each="item, iter : ${overview}">
+            <tr class="bpo-row" data-testid="bp-overview-row"
+                th:attr="data-product-key=${item.productKey},data-owner-count=${item.ownerCount}">
+                <td><span class="cell-title" th:text="${item.productName}">Blueprint</span></td>
+                <td class="num" th:attr="data-label=#{blueprintOverview.column.count}">
+                    <span class="bpo-count" th:text="${item.ownerCount}">0</span>
                 </td>
-                <td class="krtm-vertical-align-top-padding-top-0-5rem-8539">
-                    <details th:attr="data-product-key=${item.productKey}">
-                        <summary class="btn btn-ghost krtm-cursor-pointer-display-inline-flex-align-ite-c175" th:text="#{general.details}">Details</summary>
-                    </details>
+                <td class="bpo-owners-cell" th:attr="data-label=#{blueprintOverview.column.canCraft}">
+                    <div class="bpo-chips" data-loaded="false"
+                         th:attr="data-more-for=${'bpo-more-' + iter.index}"></div>
                 </td>
             </tr>
-            <tr class="details-row">
+            <tr class="details-row" th:id="${'bpo-more-' + iter.index}">
                 <td colspan="3" class="p-0">
-                    <div class="bp-owners-panel" data-loaded="false"></div>
+                    <div class="bp-owners-panel"></div>
                 </td>
             </tr>
             </th:block>
-            <tr th:if="${#lists.isEmpty(overview) and search == null}">
-                <td colspan="3" class="text-center" th:text="#{blueprintOverview.empty}">No blueprints recorded.</td>
-            </tr>
-            <tr th:if="${#lists.isEmpty(overview) and search != null}">
-                <td colspan="3" class="text-center" th:text="#{blueprintOverview.filter.no_results}">No results for this search.</td>
-            </tr>
             </tbody>
         </table>
-        </div>
 
-        <div class="pagination-controls" th:if="${overviewPage != null}"
-             th:with="bpBase=${search != null ? '/blueprint-overview?search=' + #uris.escapeQueryParam(search) : '/blueprint-overview'}">
-            <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${overviewPage}, baseUrl=${bpBase}, sizes=${pageSizes})}"></nav>
-            <nav th:replace="~{fragments/pagination :: pagination(pageResponse=${overviewPage}, baseUrl=${bpBase})}"></nav>
-        </div>
+        <th:block th:if="${#lists.isEmpty(overview) and search == null}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='blueprintOverview.empty.title', textKey='blueprintOverview.empty')}"></th:block>
         </th:block>
-        </div>
+        <th:block th:if="${#lists.isEmpty(overview) and search != null}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='blueprintOverview.filter.no_results.title', textKey='blueprintOverview.filter.no_results')}"></th:block>
+        </th:block>
+
+        <th:block th:if="${overviewPage != null}"
+                  th:with="bpBase=${search != null ? '/blueprint-overview?search=' + #uris.escapeQueryParam(search) : '/blueprint-overview'}">
+            <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${overviewPage}, baseUrl=${bpBase})}"></th:block>
+            <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${overviewPage}, baseUrl=${bpBase}, sizes=${pageSizes})}"></nav>
+        </th:block>
+    </th:block>
     </div>
 </main>
 
@@ -93,10 +84,11 @@
             empty: /*[[#{blueprintOverview.owners.empty}]]*/ 'No owners.',
             error: /*[[#{blueprintOverview.owners.error}]]*/ 'Could not load owners.',
             notMember: /*[[#{blueprintOverview.owners.notMember}]]*/ 'not a unit member',
-            notMemberHint: /*[[#{blueprintOverview.owners.notMember.hint}]]*/ 'Visible via global blueprint sharing.'
+            notMemberHint: /*[[#{blueprintOverview.owners.notMember.hint}]]*/ 'Visible via global blueprint sharing.',
+            more: /*[[#{blueprintOverview.owners.more}]]*/ '+{0} more',
+            less: /*[[#{blueprintOverview.owners.less}]]*/ 'Show less'
         }
     };
-    /*]]*/
 </script>
 <script th:src="@{/js/blueprint-overview.js}" defer th:attr="nonce=${cspNonce}"></script>
 

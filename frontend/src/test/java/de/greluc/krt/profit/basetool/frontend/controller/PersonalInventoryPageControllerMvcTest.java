@@ -23,9 +23,12 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -37,8 +40,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryLocationType;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -141,8 +147,60 @@ class PersonalInventoryPageControllerMvcTest {
         .andExpect(status().isOk());
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef());
-    assertEquals("/api/v1/personal-inventory?size=50", uriCaptor.getValue());
+    verify(backendApiClient, atLeastOnce()).get(uriCaptor.capture(), anyTypeRef());
+    assertEquals("/api/v1/personal-inventory?size=50", uriCaptor.getAllValues().getFirst());
+  }
+
+  /**
+   * The Items tab follows the list pattern: the „Mein Inventar" page head with the „Persönlich"
+   * eyebrow and one primary action, both tab counts, one live search without a „Filtern" button,
+   * the stacked data table and no HUD box or greeting.
+   */
+  @Test
+  @WithMockUser
+  void view_rendersTheListPatternWithBothTabCounts() throws Exception {
+    PersonalInventoryItemDto item =
+        new PersonalInventoryItemDto(
+            UUID.randomUUID(),
+            "Medpen",
+            "note",
+            1001,
+            PersonalInventoryLocationType.CITY,
+            "Lorville",
+            3,
+            0L,
+            null,
+            null);
+    PageResponse<PersonalInventoryItemDto> items =
+        new PageResponse<>(List.of(item), 0, 50, 1, 1, List.of());
+    PageResponse<PersonalInventoryItemDto> blueprints =
+        new PageResponse<>(List.of(), 0, 1, 42, 42, List.of());
+    when(backendApiClient.get(startsWith("/api/v1/personal-inventory?"), anyTypeRef()))
+        .thenReturn(items);
+    when(backendApiClient.get(startsWith("/api/v1/personal-blueprints?"), anyTypeRef()))
+        .thenReturn(blueprints);
+
+    String html =
+        mockMvc
+            .perform(get("/personal-inventory").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertTrue(html.contains("data-testid=\"page-head\""), html);
+    assertTrue(html.contains("data-testid=\"page-eyebrow\""), html);
+    assertTrue(html.contains("Mein Inventar"), html);
+    assertEquals(1, html.split("btn--cta krt-pi-create", -1).length - 1, "one primary action");
+    assertTrue(html.contains("data-testid=\"toolbar-search\""), html);
+    assertTrue(html.contains("data-table data-table--stack krt-pi-table"), html);
+    assertTrue(html.contains("<span class=\"tab-count\">42</span>"), html);
+    assertTrue(html.contains("data-item-id="), html);
+    String main = html.substring(html.indexOf("<main"), html.indexOf("</main>"));
+    assertFalse(main.contains("hud-box"), "no HUD box");
+    assertFalse(main.contains("class=\"greeting"), "no greeting");
+    assertFalse(main.contains("krtm-"), "no migrated inline classes");
+    assertFalse(main.contains("type=\"submit\""), "the search filters live, without a button");
   }
 
   @Test
