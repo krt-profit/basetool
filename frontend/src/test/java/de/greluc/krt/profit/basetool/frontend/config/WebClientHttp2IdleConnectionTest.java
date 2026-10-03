@@ -25,13 +25,15 @@ import java.net.SocketAddress;
 import java.time.Duration;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -56,37 +58,66 @@ class WebClientHttp2IdleConnectionTest {
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
 
   /** Every distinct peer the server saw. One entry means one socket served both requests. */
-  private final Set<SocketAddress> peers = ConcurrentHashMap.newKeySet();
+  private static final Set<SocketAddress> peers = ConcurrentHashMap.newKeySet();
 
-  private DisposableServer server;
+  private static DisposableServer server;
 
-  @BeforeEach
-  void startServer() {
-    peers.clear();
-    server =
-        HttpServer.create()
-            .host("127.0.0.1")
-            .port(0)
-            .protocol(HttpProtocol.H2, HttpProtocol.HTTP11)
-            .secure(
-                spec ->
-                    spec.sslContext(
-                        (reactor.netty.tcp.SslProvider.GenericSslContextSpec<?>)
-                            Http2SslContextSpec.forServer(TestTls.serverKeyManagerFactory())))
-            .handle(
-                (request, response) -> {
-                  request.withConnection(
-                      connection -> peers.add(connection.channel().remoteAddress()));
-                  return response.header("Content-Type", "text/plain").sendString(Mono.just("ok"));
-                })
-            .bindNow();
+  /**
+   * Addresses the clients to the local server, the only origin they send to.
+   *
+   * @param registry the dynamic property registry
+   */
+  @DynamicPropertySource
+  static void backendUrl(DynamicPropertyRegistry registry) {
+    registry.add("app.backend-url", () -> "https://127.0.0.1:" + server().port());
   }
 
-  @AfterEach
-  void stopServer() {
+  @BeforeEach
+  void resetPeers() {
+    peers.clear();
+  }
+
+  @AfterAll
+  static void stopServer() {
     if (server != null) {
       server.disposeNow(Duration.ofSeconds(10));
+      server = null;
     }
+  }
+
+  /**
+   * Binds the TLS server on first use, so the context can read its port.
+   *
+   * @return the bound server
+   */
+  private static synchronized DisposableServer server() {
+    if (server == null) {
+      server = bind();
+    }
+    return server;
+  }
+
+  /**
+   * Binds a TLS server offering h2 and HTTP/1.1 that records the peer of every call.
+   *
+   * @return the bound server
+   */
+  private static DisposableServer bind() {
+    return HttpServer.create()
+        .host("127.0.0.1")
+        .port(0)
+        .protocol(HttpProtocol.H2, HttpProtocol.HTTP11)
+        .secure(
+            spec ->
+                spec.sslContext(
+                    (reactor.netty.tcp.SslProvider.GenericSslContextSpec<?>)
+                        Http2SslContextSpec.forServer(TestTls.serverKeyManagerFactory())))
+        .handle(
+            (request, response) -> {
+              request.withConnection(connection -> peers.add(connection.channel().remoteAddress()));
+              return response.header("Content-Type", "text/plain").sendString(Mono.just("ok"));
+            })
+        .bindNow();
   }
 
   @Test
@@ -114,7 +145,7 @@ class WebClientHttp2IdleConnectionTest {
   private String get() {
     return liveSyncAuthWebClient
         .get()
-        .uri(java.net.URI.create("https://127.0.0.1:" + server.port() + "/probe"))
+        .uri("/probe")
         .retrieve()
         .bodyToMono(String.class)
         .block(Duration.ofSeconds(20));

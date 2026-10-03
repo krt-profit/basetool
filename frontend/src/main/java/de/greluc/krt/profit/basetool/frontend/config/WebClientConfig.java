@@ -451,7 +451,9 @@ public class WebClientConfig {
    * Authenticated WebClient against the backend: {@value #MAX_IN_MEMORY_BYTES}-byte max in-memory
    * codec, Resilience4j chain (timeout, retry, circuit breaker, bulkhead), correlation-id
    * propagation, OAuth2 bearer relay, and the {@code Accept} list {@link #backendAcceptTypes()}
-   * derives from {@code app.http.codec} — CBOR first and JSON second by default (REQ-API-011).
+   * derives from {@code app.http.codec} — CBOR first and JSON second by default (REQ-API-011). Like
+   * every backend client it refuses any origin but the backend's before its first other filter
+   * (REQ-FE-029).
    */
   @Bean
   public WebClient webClient(
@@ -485,7 +487,19 @@ public class WebClientConfig {
                 "backendApi", cbRegistry, retryRegistry, timeLimiterRegistry, bulkheadRegistry))
         .defaultHeaders(headers -> headers.setAccept(backendAcceptTypes()))
         .baseUrl(backendProperties.backendUrl())
+        .filters(this::guardOriginFirst)
         .build();
+  }
+
+  /**
+   * Puts the {@link BackendOriginGuard} for {@code app.backend-url} in front of every other filter
+   * of a backend client, so a request to another origin fails before the OAuth2 filter can attach a
+   * bearer and before a relay or the resilience chain runs (REQ-FE-029).
+   *
+   * @param filters the builder's filter list, outermost first
+   */
+  private void guardOriginFirst(@NotNull java.util.List<ExchangeFilterFunction> filters) {
+    filters.addFirst(BackendOriginGuard.forBaseUrl(backendProperties.backendUrl()).filter());
   }
 
   /**
@@ -531,6 +545,7 @@ public class WebClientConfig {
                 "backendApi", cbRegistry, retryRegistry, timeLimiterRegistry, bulkheadRegistry))
         .defaultHeaders(headers -> headers.setAccept(backendAcceptTypes()))
         .baseUrl(backendProperties.backendUrl())
+        .filters(this::guardOriginFirst)
         .build();
   }
 
@@ -555,6 +570,7 @@ public class WebClientConfig {
         .defaultHeaders(
             headers -> headers.setAccept(java.util.List.of(MediaType.TEXT_EVENT_STREAM)))
         .baseUrl(backendProperties.backendUrl())
+        .filters(this::guardOriginFirst)
         .build();
   }
 
@@ -575,6 +591,7 @@ public class WebClientConfig {
         .filter(clientIpRelayFilter.relayClientIp())
         .defaultHeaders(headers -> headers.setAccept(backendAcceptTypes()))
         .baseUrl(backendProperties.backendUrl())
+        .filters(this::guardOriginFirst)
         .build();
   }
 }

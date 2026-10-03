@@ -27,7 +27,9 @@ read/write is isolated to the calling user unless the caller is privileged.
 ### REQ-SEC-001 — OIDC topology
 
 The backend is a **resource server** (validates the JWT); the frontend is an **OAuth2
-client** (browser SSO + bearer-token relay to the backend).
+client** (browser SSO + bearer-token relay to the backend). The relay sends the bearer to the
+backend's own origin only: every backend client refuses any other host before the OAuth2 filter
+runs (REQ-FE-029).
 
 ### REQ-SEC-002 — Centralised authorization
 

@@ -221,6 +221,18 @@ a matching log line. The per-domain typed clients the frontend gets are built ov
 `webClient` bean, never beside it, so the one filter chain stays the single pass
 ([ADR-0032](../adr/0032-frontend-single-resilience-pass-at-webclient-filter.md) amendment).
 
+**The backend clients stay in the kernel and address only the backend** (REQ-FE-029, 2026-10-03).
+`WebClientConfig` builds four clients: `webClient` and the anonymous `termsDocumentClient` carry the
+Resilience4j chain, the SSE relay's `sseWebClient` and the live-sync probe's
+`liveSyncAuthWebClient` deliberately do not. Only `WebClientConfig` builds a client, and only
+`BackendApiClient`, the SSE relay and the probe hold one (`WebClientConfinementTest`); every other
+class calls `BackendApiClient`. The first filter of all four refuses any request whose scheme, host
+and port differ from `app.backend-url`, before the OAuth2 filter can attach the member's bearer —
+an absolute URL handed to a client would otherwise carry the token to that host. Future
+HTTP-interface clients are created over the same `webClient` bean and take no `URI`,
+`UriBuilderFactory` or `@CookieValue` parameter, name no absolute URL and carry no cache
+annotation.
+
 **Reactor context propagation is mandatory** for anything that must be visible inside an exchange
 filter: `WebClient.exchange()` runs on a Reactor-Netty worker thread and a plain `ThreadLocal` is
 not copied there. The accessors that exist cover the active-OrgUnit pin and the correlation id.

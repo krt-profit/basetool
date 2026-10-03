@@ -2237,6 +2237,52 @@ this rule is what notices.
 `AdminPersonalInventoryPageControllerMvcTest` · **Code:** `contract/BackendCallScanner`,
 `contract/BackendOperations` (tests) · **Related:** REQ-FE-015, REQ-API-001, ADR-0032
 
+### REQ-FE-029 — The backend clients stay in the kernel and send only to the backend
+
+The frontend reaches the backend through four `WebClient` beans, all built in `WebClientConfig`:
+`webClient` (OAuth2 bearer relay, correlation, org-unit, locale and client-IP relays, Resilience4j),
+the anonymous `termsDocumentClient`, the SSE relay's `sseWebClient` and the live-sync probe's
+`liveSyncAuthWebClient` (the last two without Resilience4j and without the OAuth2 filter, by
+design). Whatever a client does not carry, a call through it loses: the bearer, the tenancy header,
+the breaker, the error mapping.
+
+- **Only `WebClientConfig` builds a client** — calls `WebClient.builder()`, `create` or `mutate`,
+  or uses `WebClient.Builder`.
+- **Only the kernel and two named exceptions hold one**: a `WebClient` field, constructor parameter
+  or `@Bean` exists only in `WebClientConfig`, `BackendApiClient`, the SSE relay
+  `NotificationPageController` and the live-sync probe `LiveSyncSubscriptionAuthorizer`. Everything
+  else calls `BackendApiClient`.
+- **HTTP-interface clients** (Spring `@HttpExchange`, none yet) are created only by the kernel,
+  over the `webClient` bean (`HttpServiceProxyFactory`/`WebClientAdapter` used nowhere else), and
+  never take a `java.net.URI` or `UriBuilderFactory` parameter (it replaces the whole request URL),
+  never take a `@CookieValue`, never name an absolute URL in an exchange annotation, and never carry
+  `@Cacheable`, `@CachePut` or `@CacheEvict` (a response depends on the implicit bearer and org
+  unit).
+- **Every backend client refuses any origin but the backend's.** Its first filter compares scheme,
+  host and port of the request URL with `app.backend-url` (a missing port is the scheme's default)
+  and fails a mismatch with `BackendOriginViolationException` before any other filter runs. The
+  OAuth2 filter attaches the member's bearer without looking at the host, so without this an
+  absolute URL handed to `webClient` — a value from a request, a redirect target, a typed client's
+  `URI` argument — would carry the token to that host. A refused call through `BackendApiClient`
+  surfaces as a `BackendServiceException` (500) and counts as `reason="unknown"` in
+  `basetool_backend_client_errors_total`; the exception message names the method and the refused
+  origin, never the path or query.
+
+**Acceptance**
+
+- [x] Through the real `webClient` bean a backend call carries `Authorization`,
+  `X-Correlation-Id`, `X-Active-Org-Unit-Id`, `Accept-Language` and `X-Forwarded-For` and is
+  counted by the `backendApi` breaker; a forced-open breaker stops it before the backend.
+- [x] An absolute URL to another server, as a string or a `URI`, fails on all four clients; the
+  other server sees no request and the authorized-client manager is never asked for a token. With
+  the guard placed last instead of first the token is resolved, and the test fails.
+- [x] A planted class that holds, builds and wraps its own `WebClient` and a planted HTTP interface
+  breaking each client rule are reported.
+
+**Enforced by:** `WebClientConfinementTest`, `WebClientBackendSeamTest`, `BackendOriginGuardTest` ·
+**Code:** `config/WebClientConfig`, `config/BackendOriginGuard` · **Related:** REQ-SEC-012,
+REQ-FE-028, ADR-0032
+
 ## Out of scope
 
 - The per-area conversions themselves (one issue per area, #573–#582) — this spec is the contract
