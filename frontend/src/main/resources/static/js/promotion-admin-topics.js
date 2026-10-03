@@ -33,17 +33,87 @@ function openModal(id) {
     window.krtModal.open(id);
 }
 
+let paSelectedTopicId = null;
+
+function paTopicsUrl() {
+    return (
+        '/promotion/admin/topics' +
+        (paSelectedTopicId ? '?topic=' + encodeURIComponent(paSelectedTopicId) : '')
+    );
+}
+
 function paRefreshTopics() {
     if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
         window.location.reload();
         return Promise.resolve(false);
     }
     return window.krtFetch.swap({
-        url: '/promotion/admin/topics',
+        url: paTopicsUrl(),
         container: '#pa-topics-results',
         fragmentValue: 'topicsResults',
         errorMessage: MSG_REFRESH_FAILED,
     });
+}
+
+/**
+ * Shows the detail pane of one topic, marks its master row as selected and records the choice in
+ * the address bar so a reload or a shared link reopens the same topic.
+ *
+ * @param {string | null} topicId id of the topic to show; null keeps the first one
+ * @param {boolean} focusRow whether the selected master row takes the focus
+ */
+function paSelectTopic(topicId, focusRow) {
+    const rows = Array.from(document.querySelectorAll('.pa-topic-row'));
+    if (rows.length === 0) {
+        paSelectedTopicId = null;
+        return;
+    }
+    let target = rows.find(function (r) {
+        return r.getAttribute('data-pa-select-topic') === topicId;
+    });
+    if (!target) target = rows[0];
+    const id = target.getAttribute('data-pa-select-topic');
+    rows.forEach(function (r) {
+        const on = r === target;
+        r.classList.toggle('is-active', on);
+        r.setAttribute('aria-selected', String(on));
+        r.setAttribute('tabindex', on ? '0' : '-1');
+    });
+    document.querySelectorAll('.pa-topic-pane').forEach(function (pane) {
+        pane.hidden = pane.getAttribute('data-pa-topic-id') !== id;
+    });
+    paSelectedTopicId = id;
+    if (focusRow) target.focus();
+    try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('topic', id);
+        window.history.replaceState(window.history.state, '', url.pathname + url.search);
+    } catch (_e) {}
+}
+
+function paSyncSelectionFromDom() {
+    const active = document.querySelector('.pa-topic-row[aria-selected="true"]');
+    paSelectTopic(active ? active.getAttribute('data-pa-select-topic') : null, false);
+}
+
+function paOnTopicListKeydown(e) {
+    const list = e.target && e.target.closest ? e.target.closest('#pa-topic-list') : null;
+    if (!list) return;
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') {
+        return;
+    }
+    const rows = Array.from(list.querySelectorAll('.pa-topic-row'));
+    if (rows.length === 0) return;
+    e.preventDefault();
+    const current = rows.findIndex(function (r) {
+        return r.getAttribute('aria-selected') === 'true';
+    });
+    let idx;
+    if (e.key === 'ArrowDown') idx = Math.min(rows.length - 1, current + 1);
+    else if (e.key === 'ArrowUp') idx = Math.max(0, current - 1);
+    else if (e.key === 'Home') idx = 0;
+    else idx = rows.length - 1;
+    paSelectTopic(rows[idx].getAttribute('data-pa-select-topic'), true);
 }
 
 function apiCall(url, method, body) {
@@ -101,6 +171,7 @@ function createTopic() {
     };
     apiCall('/api/proxy/promotion/topics', 'POST', body).then(function (data) {
         if (!data) return;
+        if (data.id) paSelectedTopicId = String(data.id);
         toastSuccess(MSG_SAVED);
         closeModal('modal-create-topic');
         paRefreshTopics();
@@ -135,6 +206,7 @@ function deleteTopic(btn) {
         if (!ok) return;
         apiCall('/api/proxy/promotion/topics/' + id, 'DELETE', null).then(function (data) {
             if (!data) return;
+            if (paSelectedTopicId === id) paSelectedTopicId = null;
             toastSuccess(MSG_DELETED);
             paRefreshTopics();
         });
@@ -258,7 +330,7 @@ function findAdjacentSibling(card, direction) {
     return target || null;
 }
 function moveTopic(btn, direction) {
-    const card = btn.closest('.admin-topic-card');
+    const card = btn.closest('.pa-topic-pane');
     const other = findAdjacentSibling(card, direction);
     if (!other) return;
     swapSort(card, other, '/api/proxy/promotion/topics', 'topic').then(function (r) {
@@ -369,12 +441,6 @@ function paDiscardAll() {
     });
 }
 
-function paToggleAllTopics(open) {
-    document.querySelectorAll('.admin-topic-card').forEach(function (d) {
-        d.open = open;
-    });
-}
-
 window.addEventListener('beforeunload', function (e) {
     if (paDirtyTextareas.size > 0) {
         e.preventDefault();
@@ -420,18 +486,19 @@ document.addEventListener('DOMContentLoaded', function () {
         window.krtEvents.on('click', 'pa-save-all', paSaveAll);
         window.krtEvents.on('click', 'pa-discard-all', paDiscardAll);
 
-        window.krtEvents.on('click', 'pa-expand-all-topics', function () {
-            paToggleAllTopics(true);
-        });
-        window.krtEvents.on('click', 'pa-collapse-all-topics', function () {
-            paToggleAllTopics(false);
+        window.krtEvents.on('click', 'pa-select-topic', function (row) {
+            paSelectTopic(row.getAttribute('data-pa-select-topic'), false);
         });
     }
+
+    document.addEventListener('keydown', paOnTopicListKeydown);
+    paSyncSelectionFromDom();
 
     document.addEventListener('krt:swapped', function (e) {
         if (e.detail && e.detail.container && e.detail.container.id === 'pa-topics-results') {
             paDirtyTextareas.clear();
             paUpdateSaveAllBanner();
+            paSyncSelectionFromDom();
         }
     });
 });
