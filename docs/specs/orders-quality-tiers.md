@@ -112,11 +112,67 @@ lists under each bucket only the rows it counts, with their counted share.
 `JobOrderQueryService`, `ExchangeDemandService`, `static/js/orders-detail.js`
 (`_loadStockAttribution`)
 
+### REQ-ORDERS-038 — The member chooses which tier a handover counts toward
+
+In the game a member decides which grade goes into which delivery; the tool follows that choice
+and only suggests one. Each position of a **material** handover MAY name a tier code
+(`JobOrderHandoverItemCreateDto.qualityRequirement`).
+
+- **The suggestion:** when the order asks the material in more than one tier, the handover dialog
+  shows a tier choice per position, offering only the tiers the chosen entry's quality meets and
+  pre-selecting the tier the quality-bucket allocation currently counts the entry toward
+  (REQ-ORDERS-037). One entry can be split across tiers by adding it twice.
+- **With a code**, the amount is booked against that line first. A code the order does not use for
+  the material, or one whose floor the entry's quality does not meet, is a 400
+  (`error.job_order.quality_tier_not_on_order`, `error.job_order.quality_below_floor`).
+- **Without a code** (a client that does not know the field, or a material with one tier), the
+  amount goes to the line with the highest floor the entry's quality meets.
+- **Spill-over:** what the first line cannot take goes to the other lines the quality meets,
+  highest floor first; anything beyond every line is dropped, as an over-delivery always was.
+- **Quality is checked:** stock below every floor of the material on the order is refused with a
+  400 instead of silently reducing a line it does not satisfy.
+- **Unlinking:** the order's remaining allocations of a material are released only when **every**
+  line of that material is fulfilled, never when the first one is.
+- The `INVENTORY_HANDED_OVER` audit details carry the tier code (`quality=`).
+
+**Acceptance**
+
+- [x] A named tier is booked against its line; codes are case-insensitive.
+- [x] Without a code, high-grade stock serves the highest tier first and the rest spills over;
+  low-grade stock serves only the tiers it meets.
+- [x] A tier above the entry's quality, a tier the order does not use, and stock below every floor
+  are each a 400 with no write.
+- [x] One entry split across GOOD and NONE fulfils both lines and completes the order; fulfilling
+  one tier keeps the material's allocations for the other.
+
+**Enforced by:** `JobOrderHandoverQualityTierTest`, `JobOrderHandoverServiceTest`, the handover
+integration tests · **Code:** `JobOrderHandoverService#bookAgainstLines`,
+`JobOrderHandoverItemCreateDto`, `static/js/orders-detail.js` (`_refreshHandoverTierChoice`,
+`_loadHandoverTierSuggestions`)
+
+### REQ-ORDERS-039 — A production run consumes only stock that meets the line's tier
+
+An item line asks each material at one tier. Every consumed entry of a production run MUST reach
+that tier's floor; an entry below it is a 400 (`error.job_order.quality_below_floor`) and nothing is
+written.
+
+- The production dialog lists the material's earmarked entries **lowest qualifying grade first**,
+  pre-fills the consumption from them up to the demand of the chosen amount, and shows entries
+  below the floor disabled and marked „Unter Mindestqualität". The member may change every figure.
+- An entry the quality-bucket allocation currently counts toward a **higher** tier of the order is
+  marked „Wird für <Stufe> angerechnet" — a warning, not a block: the member may still use it.
+
+**Acceptance**
+
+- [x] An entry at quality 649 for a GOOD line is refused; at 650 it is consumed.
+- [x] The dialog disables below-floor entries and pre-fills lowest qualifying grade first.
+
+**Enforced by:** `JobOrderItemProductionServiceTest` · **Code:**
+`JobOrderItemProductionService#bookProduction`, `static/js/orders-detail.js` (`_prodPrefill`,
+`_prodLoadHigherAttribution`)
+
 ## Out of scope
 
-- **Choosing the bucket at a handover or a production run.** Which stock a member hands over or
-  consumes for which bucket is the member's choice, as it is in the game. That, the quality check
-  of the production run and the handover's per-bucket booking are the follow-up change.
 - **Dropping the superseded columns.** `job_order_material.min_quality` and the two
   `quality_requirement` columns are no longer written and are dropped one release later (two-phase
   drop, `db/migration/README.md`).
