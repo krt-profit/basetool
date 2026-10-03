@@ -25,53 +25,55 @@
 
     <div id="qt-results" class="card card--flush">
         <th:block th:fragment="results">
-        <table id="qt-table" class="data-table data-table--stack" th:if="${!#lists.isEmpty(tiers)}"
-               th:data-list-total="${#lists.size(tiers)}">
-            <thead>
-                <tr>
-                    <th th:text="#{admin.qualityTiers.column.code}">Code</th>
-                    <th class="num" th:text="#{admin.qualityTiers.column.minQuality}">Mindestqualität</th>
-                    <th th:text="#{admin.qualityTiers.column.labelDe}">Bezeichnung (DE)</th>
-                    <th th:text="#{admin.qualityTiers.column.labelEn}">Bezeichnung (EN)</th>
-                    <th class="num" th:text="#{admin.qualityTiers.column.sortOrder}">Sortierung</th>
-                    <th class="cell-status" th:text="#{admin.qualityTiers.column.status}">Status</th>
-                    <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.qualityTiers.column.actions}">Aktion</span></th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr th:each="t : ${tiers}" th:data-tier-id="${t.id()}" data-testid="qt-row" th:classappend="${t.active()} ? '' : 'qt-row--inactive'">
-                    <td><span class="cell-title data-value" th:text="${t.code()}">GOOD</span></td>
-                    <td class="num" th:attr="data-label=#{admin.qualityTiers.column.minQuality}" th:text="${t.minQuality()}">650</td>
-                    <td th:attr="data-label=#{admin.qualityTiers.column.labelDe}" th:text="${t.labelDe()}">Gut</td>
-                    <td th:attr="data-label=#{admin.qualityTiers.column.labelEn}" th:text="${t.labelEn()}">Good</td>
-                    <td class="num" th:attr="data-label=#{admin.qualityTiers.column.sortOrder}" th:text="${t.sortOrder()}">10</td>
-                    <td class="cell-status">
-                        <span class="cluster gap-1">
-                            <span th:if="${t.active()}" class="chip chip--success" th:text="#{admin.qualityTiers.status.active}">aktiv</span>
-                            <span th:unless="${t.active()}" class="chip chip--muted" th:text="#{admin.qualityTiers.status.inactive}">inaktiv</span>
-                            <span th:if="${t.minQuality() == 0}" class="chip chip--primary" th:text="#{admin.qualityTiers.status.base}">Grundstufe</span>
-                        </span>
-                    </td>
-                    <td class="cell-actions">
-                        <button type="button" class="btn btn-ghost btn-icon" data-qt-edit
-                                th:data-id="${t.id()}"
-                                th:data-code="${t.code()}"
-                                th:data-min-quality="${t.minQuality()}"
-                                th:data-label-de="${t.labelDe()}"
-                                th:data-label-en="${t.labelEn()}"
-                                th:data-sort-order="${t.sortOrder()}"
-                                th:data-active="${t.active()}"
-                                th:data-tier-version="${t.version()}"
-                                th:data-base="${t.minQuality() == 0}"
-                                th:title="#{admin.qualityTiers.action.edit}" th:aria-label="#{admin.qualityTiers.action.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
-                        <button th:if="${t.minQuality() != 0}" type="button" class="btn btn-quiet-danger btn-icon" data-qt-delete
-                                th:data-id="${t.id()}"
-                                th:data-code="${t.code()}"
-                                th:title="#{admin.qualityTiers.action.delete}" th:aria-label="#{admin.qualityTiers.action.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+        <div class="table-responsive" th:if="${!#lists.isEmpty(tiers)}">
+            <table id="qt-table" class="data-table data-table--stack"
+                   th:data-list-total="${#lists.size(tiers)}">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.qualityTiers.column.code}">Code</th>
+                        <th class="num" th:text="#{admin.qualityTiers.column.minQuality}">Mindestqualität</th>
+                        <th th:text="#{admin.qualityTiers.column.labelDe}">Bezeichnung (DE)</th>
+                        <th th:text="#{admin.qualityTiers.column.labelEn}">Bezeichnung (EN)</th>
+                        <th class="num" th:text="#{admin.qualityTiers.column.sortOrder}">Sortierung</th>
+                        <th class="cell-status" th:text="#{admin.qualityTiers.column.status}">Status</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.qualityTiers.column.actions}">Aktion</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="t : ${tiers}" th:data-tier-id="${t.id()}" data-testid="qt-row" th:classappend="${t.active()} ? '' : 'qt-row--inactive'">
+                        <td><span class="cell-title data-value" th:text="${t.code()}">GOOD</span></td>
+                        <td class="num" th:attr="data-label=#{admin.qualityTiers.column.minQuality}" th:text="${t.minQuality()}">650</td>
+                        <td th:attr="data-label=#{admin.qualityTiers.column.labelDe}" th:text="${t.labelDe()}">Gut</td>
+                        <td th:attr="data-label=#{admin.qualityTiers.column.labelEn}" th:text="${t.labelEn()}">Good</td>
+                        <td class="num" th:attr="data-label=#{admin.qualityTiers.column.sortOrder}" th:text="${t.sortOrder()}">10</td>
+                        <td class="cell-status">
+                            <span class="cluster gap-1">
+                                <span th:if="${t.active()}" class="chip chip--success" th:text="#{admin.qualityTiers.status.active}">aktiv</span>
+                                <span th:unless="${t.active()}" class="chip chip--muted" th:text="#{admin.qualityTiers.status.inactive}">inaktiv</span>
+                                <span th:if="${t.minQuality() == 0}" class="chip chip--primary" th:text="#{admin.qualityTiers.status.base}">Grundstufe</span>
+                            </span>
+                        </td>
+                        <td class="cell-actions">
+                            <button type="button" class="btn btn-ghost btn-icon" data-qt-edit
+                                    th:data-id="${t.id()}"
+                                    th:data-code="${t.code()}"
+                                    th:data-min-quality="${t.minQuality()}"
+                                    th:data-label-de="${t.labelDe()}"
+                                    th:data-label-en="${t.labelEn()}"
+                                    th:data-sort-order="${t.sortOrder()}"
+                                    th:data-active="${t.active()}"
+                                    th:data-tier-version="${t.version()}"
+                                    th:data-base="${t.minQuality() == 0}"
+                                    th:title="#{admin.qualityTiers.action.edit}" th:aria-label="#{admin.qualityTiers.action.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                            <button th:if="${t.minQuality() != 0}" type="button" class="btn btn-quiet-danger btn-icon" data-qt-delete
+                                    th:data-id="${t.id()}"
+                                    th:data-code="${t.code()}"
+                                    th:title="#{admin.qualityTiers.action.delete}" th:aria-label="#{admin.qualityTiers.action.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
         <th:block th:if="${#lists.isEmpty(tiers)}">
             <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.qualityTiers.empty.title', textKey='admin.qualityTiers.empty')}"></th:block>
         </th:block>
