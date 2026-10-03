@@ -38,6 +38,8 @@ Dockerfile text eol=lf
 
 *.ftl text eol=lf
 
+backend/src/test/resources/api/*.txt text eol=lf
+
 docker/edge/** text eol=lf
 
 docker/maintenance/** text eol=lf
@@ -53,3 +55,4 @@ docker/maintenance/** text eol=lf
 docker/sandbox/** text eol=lf
 
 *.golden text eol=lf
+backend/src/test/resources/architecture/** text eol=lf

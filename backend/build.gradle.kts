@@ -72,6 +72,8 @@ dependencies {
   testImplementation(libs.testcontainers.junit)
   testImplementation(libs.testcontainers.postgresql)
   testImplementation(libs.archunit.core)
+  testImplementation(libs.spring.modulith.core)
+  testImplementation(libs.spring.modulith.docs)
   testImplementation(libs.okhttp3.mockwebserver)
   testImplementation(libs.json.schema.validator) {
     exclude(group = "tools.jackson.dataformat", module = "jackson-dataformat-yaml")
@@ -152,4 +154,10 @@ tasks.named<Test>("test") {
     .file(rootProject.file("quadlet/env.d/backend.env.tmpl"))
     .withPropertyName("backendQuadletEnvTemplate")
     .withPathSensitivity(PathSensitivity.RELATIVE)
+
+  val authzMatrixUpdate = providers.systemProperty("authz.matrix.update").orElse("false")
+  inputs.property("authzMatrixUpdate", authzMatrixUpdate)
+  jvmArgumentProviders.add(
+    CommandLineArgumentProvider { listOf("-Dauthz.matrix.update=" + authzMatrixUpdate.get()) }
+  )
 }

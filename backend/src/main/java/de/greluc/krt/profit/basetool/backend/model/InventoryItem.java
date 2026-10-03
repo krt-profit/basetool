@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
+import de.greluc.krt.profit.basetool.backend.annotation.TenantScoped;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -53,6 +54,7 @@ import org.jetbrains.annotations.Nullable;
  * item row ({@link #gameItem}, no quality, whole units) (REQ-INV-029, ADR-0101). Exactly one
  * catalog reference is set.
  */
+@TenantScoped("owningOrgUnit")
 @Entity
 @Getter
 @Setter
