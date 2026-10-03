@@ -329,6 +329,12 @@ repeats it with `@ActiveProfiles("test")`: the annotation is part of Spring's te
 so it only splits contexts that are otherwise identical (REQ-OPS-039, guarded by a
 `TestProfileConventionTest` per application).
 
+**Test classes share their application contexts.** A test reuses a plain `@SpringBootTest` or, in
+the backend, `@LeafServiceMockTest` with its one agreed set of leaf-service mocks, rather than
+declaring a mock set or property of its own; security beans stay real in a shared context
+(`LeafServiceMockSecurityTest`). `TestContextBudgetTest` computes every class's context-cache key
+without starting a context and holds each application to a budget (REQ-OPS-041).
+
 ## 8.13 The external client exchange
 
 Three rules hold for every exchange route, and each new resource or capability inherits them:

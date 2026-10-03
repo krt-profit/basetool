@@ -60,7 +60,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -97,12 +96,6 @@ class UserDeletionForeignKeyIntegrityTest {
    * {@code userExists = false} is the precondition every deletion test relies on.
    */
   @MockitoBean private KeycloakService keycloakService;
-
-  /**
-   * Unused, but declared so this class shares its Spring test context with {@code
-   * UserManagementTest}, which mocks the same pair of beans.
-   */
-  @MockitoBean private JwtDecoder jwtDecoder;
 
   @Test
   void

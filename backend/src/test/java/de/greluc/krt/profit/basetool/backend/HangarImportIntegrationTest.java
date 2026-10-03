@@ -45,8 +45,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
@@ -72,8 +70,6 @@ class HangarImportIntegrationTest {
   @Autowired private UserRepository userRepository;
 
   @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
-
-  @MockitoBean private JwtDecoder jwtDecoder;
 
   private final JsonMapper objectMapper = JsonMapper.builder().build();
 

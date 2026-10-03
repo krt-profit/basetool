@@ -53,9 +53,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -90,8 +88,6 @@ class MaterialClaimConcurrencyTest {
   @Autowired private SpecialCommandRepository specialCommandRepository;
   @Autowired private MaterialRepository materialRepository;
   @Autowired private TransactionTemplate transactionTemplate;
-
-  @MockitoBean private JwtDecoder jwtDecoder;
 
   /**
    * Seeded fixture ids of one test run, deleted in {@code @AfterEach}.

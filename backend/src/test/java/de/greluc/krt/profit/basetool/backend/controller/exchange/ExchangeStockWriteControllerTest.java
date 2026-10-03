@@ -78,11 +78,7 @@ import org.springframework.web.context.WebApplicationContext;
  * the mass-change guard (REQ-XCH-014, REQ-XCH-016, REQ-XCH-021). Writes commit.
  */
 @SpringBootTest
-@TestPropertySource(
-    properties = {
-      "app.security.ingest-gateway.client-ids=test-ingest-gateway",
-      "app.inventory.stolen-marking-enabled=true"
-    })
+@TestPropertySource(properties = "app.inventory.stolen-marking-enabled=true")
 class ExchangeStockWriteControllerTest {
 
   private static final String PATH = "/api/v1/exchange/me/stock/changes";

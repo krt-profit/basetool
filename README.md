@@ -149,7 +149,7 @@ For developing an Exchange API client, the **local sandbox** runs that test stac
 
 ### Tests
 
-Tests force `spring.profiles.active=test`, so no test class repeats it with `@ActiveProfiles("test")` (REQ-OPS-039). Both `Test` and `BootRun` set `--enable-native-access=ALL-UNNAMED`; `Test` additionally attaches the Mockito agent.
+Tests force `spring.profiles.active=test`, so no test class repeats it with `@ActiveProfiles("test")` (REQ-OPS-039). Test classes reuse an existing context configuration — a plain `@SpringBootTest` or, in the backend, `@LeafServiceMockTest` — and `TestContextBudgetTest` holds each application to a budget of distinct Spring contexts (REQ-OPS-041). Both `Test` and `BootRun` set `--enable-native-access=ALL-UNNAMED`; `Test` additionally attaches the Mockito agent.
 
 ```bash
 ./gradlew test                                              # all tests

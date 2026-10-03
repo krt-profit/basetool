@@ -42,8 +42,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -78,8 +76,6 @@ class DataSubjectRightsAuditIntegrationTest {
   @Autowired private UserRepository userRepository;
   @Autowired private AuditEventRepository auditEventRepository;
   @Autowired private TransactionTemplate transactionTemplate;
-
-  @MockitoBean private JwtDecoder jwtDecoder;
 
   private final Set<UUID> seededUsers = new HashSet<>();
 

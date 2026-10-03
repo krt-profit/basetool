@@ -84,7 +84,6 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.web.FilterChainProxy;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -103,7 +102,6 @@ import tools.jackson.databind.node.ObjectNode;
  * SCHEMA_INVALID} for a body the contract allows.
  */
 @SpringBootTest
-@TestPropertySource(properties = "app.security.ingest-gateway.client-ids=test-ingest-gateway")
 class ExchangeWireContractTest {
 
   private static final String BASE = "https://ingest.profit-base.online/exchange/v1/schemas/";

@@ -44,8 +44,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -62,8 +60,6 @@ class UserRsiHandleIntegrationTest {
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository userRepository;
   @Autowired private DataSource dataSource;
-
-  @MockitoBean private JwtDecoder jwtDecoder;
 
   private MockMvc mockMvc;
   private JdbcTemplate jdbc;

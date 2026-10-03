@@ -32,11 +32,10 @@ import de.greluc.krt.profit.basetool.backend.model.Terminal;
 import de.greluc.krt.profit.basetool.backend.repository.CityRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpaceStationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
+import de.greluc.krt.profit.basetool.backend.testcontext.LeafServiceMockTest;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -44,11 +43,11 @@ import org.springframework.transaction.annotation.Transactional;
  * has_refinery_terminal} on cities and space stations from the live {@code type = 'refinery'}
  * terminals, overriding UEX's {@code has_refinery} claim in both directions (REQ-REFINERY-020).
  */
-@SpringBootTest
+@LeafServiceMockTest
 @Transactional
 class UexUniverseSyncRefineryFlagTest {
 
-  @MockitoBean private UexClient uexClient;
+  @Autowired private UexClient uexClient;
 
   @Autowired private UexUniverseSyncService service;
 

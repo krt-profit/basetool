@@ -30,16 +30,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.backend.service.DataExportReportService;
 import de.greluc.krt.profit.basetool.backend.service.DataExportService;
+import de.greluc.krt.profit.basetool.backend.testcontext.LeafServiceMockTest;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -54,15 +52,14 @@ import org.springframework.web.context.WebApplicationContext;
  *       method gate.
  * </ul>
  */
-@SpringBootTest
+@LeafServiceMockTest
 class DataExportControllerSecurityTest {
 
   @Autowired private WebApplicationContext context;
   private MockMvc mockMvc;
 
-  @MockitoBean private DataExportService dataExportService;
-  @MockitoBean private DataExportReportService dataExportReportService;
-  @MockitoBean private JwtDecoder jwtDecoder;
+  @Autowired private DataExportService dataExportService;
+  @Autowired private DataExportReportService dataExportReportService;
 
   @BeforeEach
   void setUp() {
