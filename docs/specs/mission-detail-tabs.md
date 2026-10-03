@@ -111,9 +111,13 @@ assignment. Releasing a drag **outside every `.drop-zone`** (over no unit and no
 also removes the unit assignment — the participant falls back into "Ohne Einheit", so a row deep in
 a long board can be unassigned by dragging into empty space without scrolling to the pool; a pool
 row dragged into empty space is a no-op. While a crew row is being dragged, holding the pointer
-near the **top or bottom viewport edge auto-scrolls the page** (speed eases with depth into the
-edge band) so units scrolled out of view stay reachable as drop targets; the scroll stops on drop /
-drag-end.
+near the **top or bottom edge of the visible page auto-scrolls the page** (speed eases with depth
+into the edge band) so units scrolled out of view stay reachable as drop targets; the scroll stops
+on drop / drag-end. The bottom edge is the **top of the pinned bottom bar** — the phone tab bar
+(REQ-UI-026) or the fixed footer — when one is shown, not the viewport's bottom, so the whole
+72 px band lies over page content and a zone the bar covers scrolls out from under it. A touch drag
+**released over that bar is cancelled**: it neither assigns nor unassigns, because the bar hides
+whatever lies beneath it.
 
 **The board's labels name the click path first, because the drag path does not exist on touch**
 (#1936). Mobile browsers do not synthesise HTML5 drag events from touch input — a long press on a
