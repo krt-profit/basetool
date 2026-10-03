@@ -78,3 +78,16 @@ be passed to the test JVM yet and an unexercisable flag is not worth adding. **W
 moves to JDK 26 or later, arm it** — `jvmArgs("--illegal-final-field-mutation=deny")` on the `Test`
 tasks turns this rule into a gate, and doing it as part of that bump is how the conversion above
 stays done.
+
+## Spring test contexts — reuse one, do not open one (REQ-OPS-041)
+
+Every distinct `@MockitoBean` set, mock field name or inlined property boots another full
+application context, and `TestContextBudgetTest` fails the build above the budget (34) with the full
+grouping. Before declaring a mock or property on a `@SpringBootTest`:
+
+- Use a plain `@SpringBootTest` when the test does not need a mock. `jwt()` and `@WithMockUser`
+  never call the `JwtDecoder`, so do not mock it.
+- Use `@LeafServiceMockTest` when the test mocks a leaf service in its set, and `@Autowired` the
+  mock. A bean joins that set only when no security bean reaches it — `LeafServiceMockSecurityTest`
+  enforces it; a test that must mock a security bean keeps its own context.
+- Mock a bean under the field name the other classes already use; the field name is part of the key.

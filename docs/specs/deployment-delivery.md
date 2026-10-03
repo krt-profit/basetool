@@ -2465,7 +2465,7 @@ limit of 32, evictions included:
 | ingest | 13 → 13 (had none) | 13 → 13 | — |
 
 The backend gain is small because its remaining contexts differ by their `@MockitoBean` sets and
-properties, not by the profile; sharing one mock set is the next step (BLD-PERF-03, plan §7.2).
+properties, not by the profile; sharing them is REQ-OPS-041.
 
 **Acceptance**
 
@@ -2478,6 +2478,73 @@ properties, not by the profile; sharing one mock set is the next step (BLD-PERF-
 **Enforced by:** `*/…/architecture/TestProfileConventionTest` ·
 `test-support/…/profile/TestProfileScan` · root `build.gradle.kts` (`systemProperty
 ("spring.profiles.active", "test")`)
+
+### REQ-OPS-041 — Test classes share their application contexts, and a budget keeps it so
+
+Spring's test-context cache keys a context by its merged configuration: the configuration classes,
+the inlined properties, the profiles and the context customizers — among them every `@MockitoBean`
+and `@MockitoSpyBean`. A mock declared on a field is keyed by its bean type **and its field name**,
+so the same mock under two field names, a redundant mock, or a property one class sets and another
+does not each boot a further full context (BLD-PERF-03, plan §7.2 step 0.6).
+
+- **A test reuses an existing context configuration** instead of opening a new one: a plain
+  `@SpringBootTest`, or `@LeafServiceMockTest` in the backend, which boots the application with one
+  agreed set of mocked leaf services that a test obtains with `@Autowired`. A mock that the test
+  never stubs, verifies or needs is not declared; the same bean is mocked under the same field name
+  everywhere.
+- **Security beans stay real in a shared context.** A bean joins `@LeafServiceMockTest`'s set only if
+  no security bean reaches it — no `SecurityFilterChain`, servlet filter, `JwtDecoder`, converter,
+  argument resolver, interceptor, MVC configurer, `PermissionEvaluator`, and no bean a
+  `@PreAuthorize` / `@PostAuthorize` / `@PreFilter` / `@PostFilter` expression names, directly or
+  through the beans it depends on. A test that must mock a security bean keeps its own context.
+- **The backend test profile names the ingest gateway client** (`app.security.ingest-gateway.
+  client-ids: test-ingest-gateway` in `application-test.yml`) instead of repeating it on each test
+  class. Only a token whose `azp` is that value is affected, and only the tests that act as the
+  gateway use it.
+- **Each application holds a budget of distinct contexts**, computed without starting any of them:
+  `TestContextBudgetTest` builds the `MergedContextConfiguration` Spring's own bootstrapper builds for
+  every Spring test class (`test-support`'s `TestContextKeys`), groups them, and fails above the
+  budget with the full grouping. Budgets: backend 34, frontend 19, ingest 13. A selection floor fails
+  the test when it stops seeing the test classes. A budget is raised only with a reason in the PR.
+- **`LeafServiceMockSecurityTest`** runs inside the `@LeafServiceMockTest` context and fails when a
+  security root reaches one of its mocks, naming the dependency chain.
+
+Measured on the full backend suite, same workstation, two runs each, with the context-cache
+statistics (`LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_TEST_CONTEXT_CACHE=DEBUG`); "loads" is the cache's
+miss count under the default limit of 32:
+
+| Backend | Distinct contexts | Loads | `:backend:test` wall time |
+| --- | --- | --- | --- |
+| before (REQ-OPS-039) | 46 | 47 | 287 s, 281 s |
+| after | 34 | 34 | 253 s, 250 s |
+
+Each context now boots exactly once; in the suite's class order no evicted context is needed again.
+
+The backend reached 34 by dropping 80 unused `JwtDecoder` mocks (the auto-configured decoder is lazy
+and `jwt()` never calls it) and one unused `OrgUnitMembershipService` mock, moving the ingest
+gateway client id into the test profile, and moving eight classes onto `@LeafServiceMockTest`. The
+frontend reached 19 by giving two mocks the field name the other classes use. Of the 32 other
+backend contexts, 16 pin a property or configuration under test (rate limiting, CSRF, management
+port, scrape credentials, tracing, query timeout, the exchange mirror, stolen-stock marking, change
+retention, a statement inspector, a test-only controller), 14 mock a bean that a security bean
+reaches (`OwnerScopeService`, `MissionSecurityService`, `UserService`, `KeycloakService`, the role
+and squadron repositories, …) and 2 spy on exchange beans for their own scenario. Sharing the
+security-mock ones would put a mock under security, so the backend stays two above the cache limit
+of 32.
+
+**Acceptance**
+
+- [x] `TestContextKeysTest` shows that the same mock fields share a key, while another mock set,
+  another field name for the same mock, or an inlined property each split it.
+- [x] A planted `@SpringBootTest` class with a `@MockitoBean JwtDecoder` failed the backend
+  `TestContextBudgetTest` (35 > 34) with the grouping.
+- [x] `UserService` planted into `@LeafServiceMockTest`'s set failed `LeafServiceMockSecurityTest`
+  with `userService <- missionSecurityService`; `BeanReachTest` covers the walk.
+- [x] The full backend, frontend and ingest suites are green.
+
+**Enforced by:** `*/…/architecture/TestContextBudgetTest` ·
+`test-support/…/context/TestContextKeys` · `backend/…/testcontext/LeafServiceMockTest` ·
+`backend/…/testcontext/LeafServiceMockSecurityTest` · **Related:** REQ-OPS-039
 
 ## Open questions
 

@@ -4,6 +4,11 @@
 
 ### Changed
 
+- **Tests: Testklassen teilen sich ihre Spring-Kontexte.** Das Backend startet 34 statt 46
+  Anwendungskontexte, das Frontend 19 statt 21: ungenutzte Mocks sind entfernt, acht Klassen nutzen
+  den gemeinsamen Mock-Satz `@LeafServiceMockTest`, Sicherheits-Beans bleiben echt. Ein Budget-Test
+  je Anwendung verhindert, dass der Cache wieder zerfällt (REQ-OPS-041).
+
 - **Tests: das Test-Profil setzt nur noch der Build.** 237 überflüssige `@ActiveProfiles("test")`
   sind entfernt; sie teilten Springs Test-Context-Cache, ohne etwas zu ändern. Ein Test je Anwendung
   verhindert, dass sie wiederkommen (REQ-OPS-039).
