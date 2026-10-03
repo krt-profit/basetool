@@ -1309,8 +1309,15 @@ client ──► haproxy :80/:443 (host, v4+v6) ──send-proxy-v2──► edg
   labels, JSON, problem+json, the manifest, SVG, plain text), `gzip_vary on`, from 1 KB. The event
   streams are deliberately not in the list, because gzip would buffer them. Until 2026-09-23 the
   list was missing and only HTML left the edge compressed; `check-edge-nginx.sh` now asserts it.
-- **The API vhost's allow-list** is `docker/edge/include/api-allowlist.conf`, the source of truth
-  (ADR-0135). `edge-deny-probe.yml` probes the public deny rules from outside every day.
+- **The API vhost's admission** is the map `docker/edge/include/api-admission.conf`, generated from
+  the frozen contract set together with the server-level refusal `include/api-allowlist.conf` and
+  the API table of `edge-deny-probe.yml` (REQ-API-021, REQ-OPS-042). Never edit the three by hand:
+  change the frozen set, the declared-break ledger or the retired list, run
+  `./gradlew :backend:generateEdgeAdmission`, and review the diff; the backend tests fail when a
+  committed copy differs. It arrives like every edge change — with the promotion, applied by
+  `reconcile_edge`. `edge-deny-probe.yml` asserts the generated table from outside every day; after
+  an admission change is merged and before it is promoted, the rows that changed fail, which reports
+  the pending deploy, not drift.
 
 ### The edge verifies Grafana
 

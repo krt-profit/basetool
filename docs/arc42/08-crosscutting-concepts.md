@@ -150,7 +150,10 @@ cover the call list each app release publishes (committed under
 of the declared-break ledger, checked against the previous release's document, which CI must fetch
 (REQ-API-016, REQ-API-017). Every operation of the document carries one domain tag (`x-domain`,
 22 domains) and one contract tier (`x-contract-tier`: T0 never breaks, T1 the Android contract,
-T2 web-only), and every schema name belongs to one Java type (REQ-API-018).
+T2 web-only), and every schema name belongs to one Java type (REQ-API-018). The public API vhost
+admits exactly the frozen set, by verb and path, through a map generated from it, plus the two
+anonymous reads and the retired operations; everything else stops at the edge with `404`
+(REQ-API-021).
 
 Authority: [`api-conventions.md`](../specs/api-conventions.md) (`REQ-API-*`).
 

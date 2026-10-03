@@ -37,9 +37,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.function.Predicate;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
@@ -125,52 +122,6 @@ class ExternalContractTest {
       return new ContractOperation(path, method, responseFields, requiredRequestFields, frozen);
     }
   }
-
-  /**
-   * The nginx include that decides what the internet can reach through the API vhost (ADR-0162).
-   */
-  private static final String ALLOW_LIST = "docker/edge/include/api-allowlist.conf";
-
-  /**
-   * One admission rule: {@code if ($uri = "…")}, {@code if ($uri ~ "…")} or {@code if ($uri ~*
-   * "…")}, followed by {@code { set $krt_api_allowed 1; }}; group 1 is the operator, group 2 the
-   * operand.
-   */
-  private static final Pattern ADMISSION_RULE =
-      Pattern.compile(
-          "^\\s*if\\s*\\(\\s*\\$uri\\s*(=|~\\*?)\\s*\"([^\"]+)\"\\s*\\)"
-              + "\\s*\\{\\s*set\\s+\\$krt_api_allowed\\s+1\\s*;\\s*}\\s*$");
-
-  /** {@code set $krt_api_allowed 0;}, the default every request starts from. */
-  private static final Pattern DEFAULT_DENY =
-      Pattern.compile("^\\s*set\\s+\\$krt_api_allowed\\s+0\\s*;\\s*$");
-
-  /** {@code if ($krt_api_allowed = 0) { return 404; }}, the refusal of every unadmitted URI. */
-  private static final Pattern UNADMITTED_REFUSAL =
-      Pattern.compile(
-          "^\\s*if\\s*\\(\\s*\\$krt_api_allowed\\s*=\\s*0\\s*\\)\\s*\\{\\s*return\\s+404\\s*;\\s*}\\s*$");
-
-  /** A {@code {name}} segment in a contract path. */
-  private static final Pattern PLACEHOLDER = Pattern.compile("\\{[a-zA-Z]+}");
-
-  /** Any uuid; the rules match the shape, not the value. */
-  private static final String SAMPLE_UUID = "00000000-0000-4000-8000-000000000000";
-
-  /**
-   * Placeholders that are not uuids, and what they stand for.
-   *
-   * <p>Only one exists today: the bank account's all-members visibility toggle, whose rule matches
-   * {@code (true|false)} rather than a uuid class. A new entry here is cheaper than a test that
-   * quietly substitutes the wrong shape and reports a gap that is not there.
-   */
-  private static final java.util.Map<String, String> PLACEHOLDERS =
-      java.util.Map.of(
-          "{enabled}",
-          "true",
-          "{roleCode}",
-          "KOMMANDOLEITER",
-          "{key}",
-          "job_order.age_yellow_days");
 
   /**
    * Response fields promised by all seven operations that answer with an org-unit bank account's
@@ -307,8 +258,8 @@ class ExternalContractTest {
           "frequencies");
 
   /**
-   * The contract set: every operation the Android app consumes, matching the paths the API vhost
-   * allow-lists, recorded from the generated document.
+   * The contract set: every operation the Android app consumes, recorded from the generated
+   * document; the API vhost admits it through the map {@link EdgeAdmission} renders from it.
    */
   private static final List<ContractOperation> CONTRACT =
       List.of(
@@ -2745,214 +2696,14 @@ class ExternalContractTest {
   }
 
   /**
-   * Verifies that no exchange or connected-apps path is admitted by the API vhost allow-list: the
-   * exchange layer answers only the gateway and the member controls only the browser (REQ-XCH-001,
-   * ADR-0216). Probes every such path the committed {@code openapi.json} documents, plus paths no
-   * controller serves yet, so a broad rule is caught before the endpoint it would expose exists.
+   * Lists the frozen operations for the edge admission generator (REQ-API-021).
    *
-   * @throws IOException if the allow-list or the document cannot be read
+   * @return every frozen operation as {@code VERB path}, verb upper case, in declaration order
    */
-  @Test
-  @DisplayName("no exchange or connected-apps path is admitted by the API vhost allow-list")
-  void theExchangeStaysOffTheApiVhost() throws IOException {
-    List<Predicate<String>> rules = allowListRules();
-    List<String> documented =
-        openapi().get("paths").propertyNames().stream()
-            .filter(ExternalContractTest::isExchangeOrConnectionPath)
-            .map(ExternalContractTest::probePath)
-            .toList();
-    assertThat(documented)
-        .as("openapi.json documents no exchange path — has the document or its prefixes moved?")
-        .contains("/api/v1/exchange/me/blueprints", "/api/v1/connected-apps");
-
-    Set<String> probes = new TreeSet<>(documented);
-    probes.addAll(
-        List.of(
-            "/api/v1/exchange",
-            "/api/v1/exchange/",
-            "/api/v1/exchange/me/a-resource-not-built-yet",
-            "/api/v1/exchange/v2/me/blueprints",
-            "/api/v1/connected-apps/",
-            "/api/v1/connected-apps/versekit/undo",
-            "/api/v1/connected-apps/a-control-not-built-yet",
-            "/api/v1/admin/exchange-a-page-not-built-yet"));
-    List<String> admitted =
-        probes.stream().filter(path -> rules.stream().anyMatch(rule -> rule.test(path))).toList();
-
-    assertThat(admitted)
-        .as(
-            "%s must never admit the exchange layer or the member's connection controls",
-            ALLOW_LIST)
-        .isEmpty();
-  }
-
-  /**
-   * Tells whether a path belongs to the exchange layer, the member's connection controls or the
-   * admin registry of connected applications.
-   *
-   * @param path a documented path
-   * @return {@code true} for {@code /api/v1/exchange/**}, {@code /api/v1/connected-apps/**} and
-   *     {@code /api/v1/admin/exchange-*}
-   */
-  private static boolean isExchangeOrConnectionPath(String path) {
-    return path.equals("/api/v1/exchange")
-        || path.startsWith("/api/v1/exchange/")
-        || path.equals("/api/v1/connected-apps")
-        || path.startsWith("/api/v1/connected-apps/")
-        || path.startsWith("/api/v1/admin/exchange-");
-  }
-
-  /**
-   * Verifies that every frozen operation is admitted by the API vhost allow-list, parsed from the
-   * nginx include.
-   *
-   * @throws IOException if the allow-list cannot be read
-   */
-  @Test
-  @DisplayName("every frozen operation is admitted by the API vhost allow-list")
-  void theFrozenSetIsReachableThroughTheEdge() throws IOException {
-    List<Predicate<String>> rules = allowListRules();
-    assertThat(rules)
-        .as("no allow-list rules were parsed from %s — has its format changed?", ALLOW_LIST)
-        .hasSizeGreaterThan(50);
-
-    List<String> unreachable =
-        CONTRACT.stream()
-            .map(ContractOperation::path)
-            .distinct()
-            .filter(path -> rules.stream().noneMatch(rule -> rule.test(probePath(path))))
-            .sorted()
-            .toList();
-
-    assertThat(unreachable)
-        .as(
-            "these operations are frozen as a promise to a shipped client but no rule in %s admits "
-                + "them, so the edge answers 404 and the promise cannot be called. Add the rule in "
-                + "the same change that freezes the operation — and if one of these merely uses a "
-                + "path placeholder this test does not know how to fill, extend PLACEHOLDERS",
-            ALLOW_LIST)
-        .isEmpty();
-  }
-
-  /**
-   * Verifies that a line touching the admission flag in a form the parser does not know fails the
-   * parse instead of being skipped, so no rule can admit a URI the exchange guard never probes.
-   */
-  @Test
-  @DisplayName("an allow-list line the parser cannot read fails instead of being skipped")
-  void anAllowListLineTheParserCannotReadFails() {
-    List<String> unreadable =
-        List.of(
-            "if ($request_uri ~ \"^/api/v1/exchange/\") { set $krt_api_allowed 1; }",
-            "if ($uri !~ \"^/api/v1/users/\") { set $krt_api_allowed 1; }",
-            "if ($uri ~ ^/api/v1/exchange/) { set $krt_api_allowed 1; }",
-            "if ($uri ~ \"^/api/v1/exchange/\") { set $krt_api_allowed \"1\"; }",
-            "set $krt_api_allowed 1;",
-            "    set $krt_api_allowed 1;");
-
-    for (String line : unreadable) {
-      assertThatThrownBy(() -> parseAllowList(List.of("set $krt_api_allowed 0;", line)))
-          .as(line)
-          .isInstanceOf(AssertionError.class)
-          .hasMessageContaining("line 2");
-    }
-  }
-
-  /**
-   * Verifies that a {@code ~*} rule is parsed as the case-insensitive regular expression nginx
-   * evaluates, so a rule written in upper case still counts as admitting the lower-case path.
-   */
-  @Test
-  @DisplayName("a ~* allow-list rule is parsed as a case-insensitive regular expression")
-  void aCaseInsensitiveRuleIsParsedCaseInsensitively() {
-    List<Predicate<String>> rules =
-        parseAllowList(
-            List.of(
-                "set $krt_api_allowed 0;",
-                "if ($uri ~* \"^/API/V1/EXCHANGE/\") { set $krt_api_allowed 1; }",
-                "if ($uri ~ \"^/API/V1/CONNECTED-APPS\") { set $krt_api_allowed 1; }",
-                "if ($krt_api_allowed = 0) { return 404; }"));
-
-    assertThat(rules).hasSize(2);
-    assertThat(rules.get(0).test("/api/v1/exchange/me/blueprints")).isTrue();
-    assertThat(rules.get(1).test("/api/v1/connected-apps")).isFalse();
-  }
-
-  /**
-   * Reads the committed allow-list and parses it with {@link #parseAllowList(List)}.
-   *
-   * @return one predicate per admission rule
-   * @throws IOException if the allow-list cannot be read
-   */
-  private static List<Predicate<String>> allowListRules() throws IOException {
-    Path allowList = findRepoRoot().resolve(ALLOW_LIST);
-    assertThat(Files.exists(allowList)).as("%s must exist", allowList).isTrue();
-    return parseAllowList(Files.readAllLines(allowList));
-  }
-
-  /**
-   * Parses allow-list lines into predicates over a concrete URI: {@code $uri = "…"} as an exact
-   * match, {@code $uri ~ "…"} as a regular expression and {@code $uri ~* "…"} as a case-insensitive
-   * one. Lines that do not mention {@code krt_api_allowed} are ignored.
-   *
-   * @param lines the lines of the nginx include
-   * @return one predicate per admission rule, in file order
-   * @throws AssertionError if a line mentioning {@code krt_api_allowed} is neither an admission
-   *     rule, the default nor the refusal
-   */
-  private static List<Predicate<String>> parseAllowList(List<String> lines) {
-    List<Predicate<String>> rules = new java.util.ArrayList<>();
-    for (int index = 0; index < lines.size(); index++) {
-      String line = lines.get(index);
-      if (!line.contains("krt_api_allowed")) {
-        continue;
-      }
-      Matcher rule = ADMISSION_RULE.matcher(line);
-      if (rule.matches()) {
-        String operand = rule.group(2);
-        switch (rule.group(1)) {
-          case "=" -> rules.add(operand::equals);
-          case "~" -> rules.add(regexRule(Pattern.compile(operand)));
-          default -> rules.add(regexRule(Pattern.compile(operand, Pattern.CASE_INSENSITIVE)));
-        }
-        continue;
-      }
-      if (!DEFAULT_DENY.matcher(line).matches() && !UNADMITTED_REFUSAL.matcher(line).matches()) {
-        throw new AssertionError(
-            String.format(
-                "%s line %d touches krt_api_allowed in a form this test cannot evaluate, so it "
-                    + "cannot prove the rule keeps the exchange off the API vhost: %s — write it "
-                    + "as a one-line if ($uri = \"…\"), if ($uri ~ \"…\") or if ($uri ~* \"…\") "
-                    + "rule, or teach parseAllowList the new form",
-                ALLOW_LIST, index + 1, line.strip()));
-      }
-    }
-    return rules;
-  }
-
-  /**
-   * Wraps a compiled nginx regular expression as a predicate with nginx's unanchored semantics.
-   *
-   * @param compiled the rule's regular expression
-   * @return a predicate that is true when the expression is found anywhere in the URI
-   */
-  private static Predicate<String> regexRule(Pattern compiled) {
-    return uri -> compiled.matcher(uri).find();
-  }
-
-  /**
-   * Replaces each placeholder in a contract path with a representative value: a UUID by default, or
-   * the value named in {@link #PLACEHOLDERS}.
-   *
-   * @param path the contract path, possibly containing {@code {name}} segments
-   * @return the path with every placeholder replaced
-   */
-  private static String probePath(String path) {
-    String probe = path;
-    for (var entry : PLACEHOLDERS.entrySet()) {
-      probe = probe.replace(entry.getKey(), entry.getValue());
-    }
-    return PLACEHOLDER.matcher(probe).replaceAll(SAMPLE_UUID);
+  static List<String> frozenOperations() {
+    return CONTRACT.stream()
+        .map(operation -> operation.method().toUpperCase(Locale.ROOT) + " " + operation.path())
+        .toList();
   }
 
   /**

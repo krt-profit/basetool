@@ -50,7 +50,7 @@ because a quality goal nobody measures is a preference, and a gate that cannot f
   monitoring image pins, Grafana dashboards, Prometheus rules, the Prometheus, Alertmanager, Alloy
   and Loki configuration files (each checked by its own tool in the pinned image), log masking, the Keycloak issuer,
   Quadlet drift (which also checks the edge's trusted-address pins), the container runtime, the
-  logging facade, PID-1 reaping, build-script input paths, probes against the API allow-list, ansible-lint, shellcheck,
+  logging facade, PID-1 reaping, build-script input paths, the generated API vhost admission (driven through the edge's own nginx image), ansible-lint, shellcheck,
   actionlint, zizmor, hadolint, gitleaks, SBOM coverage and freshness (each BOM proved against the resolved runtime classpath), the E2E device matrix, the sandbox and E2E Keycloak realms against their generator and the production provisioner (ADR-0225), and the cosign
   signer identity (every copy anchored and identical).
 - **A conformance suite** ([`check-conformance.py`](../../scripts/check-conformance.py)) that

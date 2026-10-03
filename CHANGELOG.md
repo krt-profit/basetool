@@ -135,6 +135,12 @@
   `CoreProblemCode` und in `problem-codes.txt`; `openapi.json` dokumentiert `code` mit seinen Werten,
   `correlationId`, `fieldErrors` und 429 auf allen `/api/**`-Operationen (REQ-API-019).
 
+- **API-Edge: Die öffentliche API lässt genau die eingefrorenen Operationen durch, nach Verb und Pfad.**
+  Die Freigabe ist eine aus dem Vertrag generierte nginx-Map statt Pfad- und Präfixregeln; alles andere
+  beantwortet die Edge mit 404 (auch die bisherigen 405). `GET /api/v1/me/layout`, `POST /api/v1/job-types`
+  und Pfade unter `/api/v1/me/` und `/api/v1/terms/`, die die App nicht aufruft, sind dort nicht mehr
+  erreichbar; die App selbst ändert sich nicht (REQ-API-021, REQ-OPS-042).
+
 ### Fixed
 
 - **Crew-Board auf dem Smartphone: Ziehen unter die Tab-Leiste.** Beim Ziehen eines Teilnehmers scrollt die

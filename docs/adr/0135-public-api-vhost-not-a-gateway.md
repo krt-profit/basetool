@@ -133,3 +133,13 @@ wave:
 - It is built only after the frozen set has been completed from the app's call list (ADR-0234), because
   the app calls admitted operations the frozen set does not list, and an include generated from
   today's set would refuse them.
+
+**Implemented 2026-10-03** (REQ-API-021, REQ-OPS-042), after the frozen set was completed from the
+app's call list (REQ-API-016). The generated map is `docker/edge/include/api-admission.conf`: one
+`map` on `"$request_method:$uri"` with an anchored, case-sensitive regex per admitted operation,
+included at `http` level; `include/api-allowlist.conf` keeps only `if ($krt_api_admitted = 0) {
+return 404; }`. `EdgeAdmission` (backend test scope) renders the map, the include and the nightly
+probe table from one model, `./gradlew :backend:generateEdgeAdmission` writes them, and they stay
+committed and reviewed. The admitted set is the frozen set plus the two anonymous reads plus the
+retired operations of `retired-operations.txt` (REQ-API-020), so a retired path reaches the
+backend's `410 APP_UPDATE_REQUIRED`. Every refusal is `404`, never `405`.

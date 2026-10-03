@@ -1,3 +1,5 @@
+include /etc/nginx/edge/include/api-admission.conf;
+
 server {
   listen 8443 ssl ${EDGE_LISTEN_OPTS};
   listen [::]:8443 ssl ${EDGE_LISTEN_OPTS};

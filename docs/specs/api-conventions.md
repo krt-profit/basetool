@@ -629,7 +629,7 @@ constraint for nothing and record a guess about which fields matter.
 | `GET /api/v1/personal-blueprints/overview/owners`                                                          | `ownerName`, `orgUnitMember` — addressed by `productKey`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `POST /api/v1/hangar/import/fleetview`                                                                     | `importedCount`, `skippedCount`, `duplicateCount` — the three counters the screen reports; lose one and a successful import reads as one that did nothing. **request** requires the `file` part                                                                                                                                                                                                                                                                                                                                                                                       |
 | `POST /api/v1/hangar/ships/home-location`                                                                  | *(answer discarded)* — **request** requires `locationId`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `GET /api/v1/settings/{key}`                                                                               | `value` — **401** since 2026-09-06 (REQ-SEC-052); two integers that were anonymous by design in the same `permitAll` block as `/locations`. The app parses it as a number and falls back to a built-in default when the read fails, which is exactly why the failure went unnoticed. The `PUT` on the same path stays refused by the edge's read-only family                                                                                                                                                                                                                          |
+| `GET /api/v1/settings/{key}`                                                                               | `value` — **401** since 2026-09-06 (REQ-SEC-052); two integers that were anonymous by design in the same `permitAll` block as `/locations`. The app parses it as a number and falls back to a built-in default when the read fails, which is exactly why the failure went unnoticed. The `PUT` on the same path is not admitted on the API vhost (`404`, REQ-API-021)                                                                                                                                                                                                                 |
 | `PATCH /api/v1/inventory/{id}/delivered`                                                                   | *(response unread)* — **request** requires `delivered`, `jobOrderId`, `version`; the version is the **row's**, and the gate is `canEditInventoryItem`, not the order's                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `PUT /api/v1/orders/{id}/status`                                                                           | `id`, `status`, `version` — **request** requires `status`, `version`; `status` is `OPEN` / `IN_PROGRESS` / `REJECTED` / `COMPLETED`, and the operation needs `LOGISTICIAN` + per-order scope                                                                                                                                                                                                                                                                                                                                                                                          |
 | `PUT /api/v1/orders/{id}`                                                                                  | as the detail read, through the **same** mapper — **request** requires `materials`. Its carve-out is method-scoped: the backend serves `DELETE` on this path too, the app sends none, and the edge keeps that at `405`                                                                                                                                                                                                                                                                                                                                                                |
@@ -949,11 +949,11 @@ parallel `/api/v2` path and no sunset window. It ships together with:
 > them to be. Whether a field is frozen is now decided in one place — the table — rather than by
 > whichever sentence a reader reaches first.
 
-**The spec and the test are the source of truth for what is frozen; the allow-list decides what is
-reachable.** The API vhost's allow-list is the nginx include
-[`docker/edge/include/api-allowlist.conf`](../../docker/edge/include/api-allowlist.conf), reviewed
-in the same PR as the contract change. Every frozen operation must be admitted by it, and the two
-move together.
+**The spec and the test are the source of truth for what is frozen, and what is frozen is what the
+API vhost admits.** Since 2026-10-03 the vhost's admission is a map generated from the frozen set
+([`docker/edge/include/api-admission.conf`](../../docker/edge/include/api-admission.conf),
+REQ-API-021), committed and reviewed in the same PR as the contract change; the two cannot drift,
+because the build fails when they differ.
 
 **Acceptance**
 
@@ -962,20 +962,20 @@ move together.
 - [x] The set cannot be emptied to make the guard pass — its floor is asserted, since 2026-10-03 at
   the exact count (246 operations, each named once) instead of 5, and the app's own call list must
   be covered by it (REQ-API-016).
-- [x] **Every frozen operation is reachable through the edge** — the guard parses the allow-list
-  include (`docker/edge/include/api-allowlist.conf`; until 2026-09-22 its copy inside the now
-  archived API vhost rollout runbook) and asserts the rule above, rather than leaving it to a reader
-  (`theFrozenSetIsReachableThroughTheEdge`). And it **re-runs when the allow-list changes**: the file
-  is neither a source nor a resource, so until 2026-09-06 Gradle considered `:backend:test`
-  up-to-date after an allow-list-only edit and the guard silently did not execute — a false green on
-  precisely the assertion that connects the two halves. It is now a declared task input
-  (`backend/build.gradle.kts`, `apiVhostAllowList`).
-- [x] **The edge's method gating is tested against a live nginx** — `scripts/check-edge-allowlist-behaviour.sh`
-  (repo-lint) drives the allow-list include and asserts, among other rows, that `POST /api/v1/operations`
-  is admitted while `GET`/`PUT`/`DELETE` on it and the near-miss paths `/api/v1/operations/` and
-  `/api/v1/operationsX` answer `404` (2026-10-01), and that `PUT /api/v1/orders/<uuid>/requested` is
-  admitted while every other verb, `/requested/`, `/requestedX`, a non-uuid id and
-  `/orders/<uuid>/items/requested` answer `404` (2026-10-03).
+- [x] **Every frozen operation is reachable through the edge, and nothing else is** — since
+  2026-10-03 the admission map is generated from this set and the build fails when the committed map
+  admits more or less than the frozen set plus the two anonymous reads plus the retired operations
+  (REQ-API-021, `EdgeAdmissionTest`). Before that, `theFrozenSetIsReachableThroughTheEdge` parsed the
+  hand-written include and checked only one direction. The files are declared inputs of
+  `:backend:test` (`backend/build.gradle.kts`, `apiVhostAdmission`), so an edit to them alone re-runs
+  the guard — until 2026-09-06 an allow-list-only edit left `:backend:test` up-to-date and the guard
+  silently did not execute.
+- [x] **The edge's verb gating is tested against a live nginx** — `EdgeAdmissionNginxTest` drives the
+  committed map through the edge's own image: every admitted operation passes, every other verb on
+  every admitted path, near-miss spellings and non-uuid ids answer `404`. It replaced
+  `scripts/check-edge-allowlist-behaviour.sh`, which had asserted the same for
+  `POST /api/v1/operations` (2026-10-01) and `PUT /api/v1/orders/<uuid>/requested` (2026-10-03)
+  alone.
 - [x] An entry freezes every level a client parses: the guard descends **one level** into every
   referenced schema — an array's items and a plain nested object alike. That covers a page's
   `content` rows, an embedded list such as an operation's `payouts`, and a nested object such as a
@@ -1020,8 +1020,8 @@ move together.
   list per released build follows with the app release.
 - [x] **A retired path answers `APP_UPDATE_REQUIRED`.** **Closed by REQ-API-020** (2026-10-03):
   `RetiredOperationFilter` answers every operation of `retired-operations.txt` with `410
-  APP_UPDATE_REQUIRED` ahead of authentication; on the public API vhost once the edge admits the
-  ledger's retired paths (plan guard G-08).
+  APP_UPDATE_REQUIRED` ahead of authentication, and the API vhost's generated admission admits
+  every retired operation so the answer reaches the app there (REQ-API-021).
 
 **Enforced by:** `ExternalContractTest` (backend) · the *Fail if a committed openapi.json is stale*
 step in `ci.yml` (since 2026-09-23), which is what keeps the document `ExternalContractTest` reads
@@ -1238,8 +1238,14 @@ consumer instead of reusing the heaviest projection that happens to contain the 
   the capabilities stays the client's.
 
 Neither endpoint is on the API vhost: both serve the web frontend over the internal hop. Offering them
-to the Android app is an allow-list change (REQ-SEC-037) in the same change as the app starts using
+to the Android app is an admission change (REQ-API-021) in the same change as the app starts using
 them, per REQ-API-009.
+
+> [!note] Corrected 2026-10-03 — `/me/layout` *was* on the API vhost until now
+> The sentence above was not true when it was written: the edge's `^/api/v1/me/` prefix rule admitted
+> `GET /api/v1/me/layout` (and every other verb under `/me/`). The generated, verb-aware admission of
+> REQ-API-021 removed the prefix rule, and since then the sentence holds; the nightly probe and
+> `EdgeAdmissionNginxTest` assert the `404`.
 
 **Acceptance**
 
@@ -1467,10 +1473,10 @@ skipped for every request.
   (`<VERB> <path> - <versionCode>`) of the ledger `backend/src/test/resources/api/declared-breaks.txt`
   (REQ-API-017, plan guard G-23); the build fails on an entry the ledger does not declare that way —
   a field-level line does not retire its operation — and when the ledger is missing.
-- **The edge comes first.** On the public API vhost the edge allow-list refuses a path it does not
-  admit with a bare `404` before the backend sees it. Until the generated edge include (plan guard
-  G-08) also admits the ledger's retired paths, an app on the API vhost meets that `404` — which the
-  app answers by re-reading the policy — and not this answer.
+- **The edge comes first.** On the public API vhost the edge refuses an operation it does not admit
+  with a bare `404` before the backend sees it. Its generated admission (REQ-API-021) admits every
+  operation of `retired-operations.txt`, so an app on the API vhost meets this answer and not the
+  edge's `404`.
 
 **A wave's pull request** therefore carries, together: the re-cut operations; one ledger line per
 break; one line here per retired operation; and the release floor and newest build raised to the
@@ -1492,13 +1498,114 @@ and retired answers at once, and a rollback takes all three back.
 - [x] The list refuses wildcards, T0 operations and duplicates, is dormant while empty, never shadows
   a documented operation, and is tied to the ledger (`RetiredOperationsTest`,
   `RetiredOperationsContractTest`).
-- [ ] The edge admits the ledger's retired paths, so the answer reaches the app on the API vhost.
-  **Open** — plan guard G-08.
+- [x] The edge admits the retired operations, so the answer reaches the app on the API vhost —
+  closed by REQ-API-021 (2026-10-03): `EdgeAdmission` reads `retired-operations.txt` into the
+  generated map.
 
 **Enforced by:** `AndroidClientPropertiesTest`, `AppVersionPolicyDeploySeamTest`,
 `AndroidVersionPolicyReportTest`, `AppVersionPolicyControllerTest`, `RetiredOperationsTest`,
 `RetiredOperationFilterTest`, `RetiredOperationsContractTest`, `RetiredOperationChainTest` (backend) ·
 `scripts/render-env-d.test.sh` · `monitoring/prometheus/tests/android_version_policy_override_test.yml` ·
 **Related:** REQ-API-009, REQ-API-010, REQ-SEC-037, REQ-SEC-052, REQ-OBS-011, ADR-0135, ADR-0234
+
+---
+
+### REQ-API-021 — The API vhost admits exactly the frozen operations, by verb and path, from a generated map
+
+The public API vhost admits **exactly** these operations, each by its verb and its whole path:
+
+- every operation of the frozen set (`ExternalContractTest`, REQ-API-009) — T1 plus the T0 members
+  the app uses, which covers the app's own call list (REQ-API-016);
+- the two anonymous reads, `GET /api/v1/app/version-policy` and `GET /api/v1/terms/document`
+  (REQ-SEC-037), whether or not the frozen set lists them;
+- every retired operation in `backend/src/main/resources/api/retired-operations.txt` (REQ-API-020),
+  so that its `410 APP_UPDATE_REQUIRED` reaches the app instead of the edge's `404`. A retired
+  operation that is still frozen fails the generator.
+
+**Everything else is refused by the edge with `404`**: another verb on an admitted path (`HEAD` and
+`OPTIONS` included), a trailing slash, another case, a non-uuid where a uuid stands, an extra
+segment, and every path no operation names.
+
+**The shape.** One nginx `map` on `"$request_method:$uri"` with one anchored, case-sensitive regular
+expression per operation, `docker/edge/include/api-admission.conf`, included at `http` level by
+`conf.d/50-api.conf.template`. The vhost's only admission statement is
+`if ($krt_api_admitted = 0) { return 404; }` in `include/api-allowlist.conf`. There is no prefix
+rule, no read-only family, no method-scoping variable and no per-path reset: a verb is admitted or
+it is not. A path placeholder takes the shape its parameter has in `openapi.json` — a uuid the uuid
+class, a boolean `(true|false)` — and any other placeholder only a shape reviewed in
+`EdgeAdmission.NAMED_SHAPES` (`{roleCode}`, and `{key}` as exactly the two readable settings keys);
+a placeholder without one fails the generator. A retired operation's placeholders, which the
+document no longer describes, take the reviewed shape of the same name, else the uuid class for
+`id` and every `…Id`.
+
+**Generated, committed, reviewed (ADR-0135).** `EdgeAdmission` (backend test scope) renders the map,
+the include and the API vhost table of the nightly probe from one model; `./gradlew
+:backend:generateEdgeAdmission` writes all three. The files stay committed and an admission change
+is reviewed as their diff — opening an operation to the app and freezing it remain one decision
+(ADR-0136): the only way to admit something is to freeze it, retire it, or name it here as
+anonymous.
+
+**Why every refusal is `404`, never `405`** (decided 2026-10-03, against the plan's sketch of `405`
+where a sibling verb is admitted). An operation the vhost does not admit is not on the vhost,
+whether or not its path has an admitted sibling. A `405` must carry an `Allow` header (RFC 9110
+§15.5.6), which the old read-only family never sent. One refusal shape needs one map, where `405`
+would need a second per-path table. And the old include already answered `404` for every other verb
+on its two method-scoped admissions (`POST /api/v1/operations`, `PUT /api/v1/orders/{id}/requested`)
+while answering `405` elsewhere — two semantics for one question.
+
+**What the cut changed (2026-10-03),** simulated over all 573 documented operations and checked by
+the live-nginx test:
+
+- four documented operations the old include admitted are refused: `GET /api/v1/me/layout` (through
+  the `^/api/v1/me/` prefix — REQ-API-012 said it was not on the vhost, which was wrong until now),
+  `POST /api/v1/job-types` (an admin write outside the read-only family), `GET /api/v1/hangar/ships`
+  and `GET /api/v1/material-requests/{id}` (the app calls only other verbs on both paths);
+- every undocumented path under the two prefix rules `^/api/v1/me/` and `^/api/v1/terms/` — which
+  would have admitted `/terms/admin` the day wave 1 moved it there — and every `HEAD` and `OPTIONS`;
+- eleven `405` answers of the read-only family are `404` now (`PUT`/`DELETE` on missions, operations
+  and orders, `PUT /settings/{key}`, `POST /refining-methods`, among them);
+- nothing is admitted that was refused before.
+
+**Cost.** One `map` lookup per request on the API vhost, evaluated in order until an entry matches;
+a refused request evaluates all 246 expressions. Measured on 2026-10-03 with the edge's own image
+(`pcre_jit on`, one worker, 30,000 keep-alive requests per case, two runs, worker CPU time per
+request): a configuration without any admission costs about 52 µs, the old include 61–74 µs on every
+request, the map 51–52 µs for an operation early in the list and 68–72 µs for the last entry and for
+any refusal, which scans the whole list. The worst case of the map is therefore the old include's
+ordinary case, about 18 µs of CPU, invisible against the 0.5 ms the client waited per request and
+the backend's own milliseconds. `nginx -t` took 6–14 ms with the map, 9–12 ms with the old include
+and 4–5 ms without either, within the noise of `docker exec`.
+
+**Acceptance**
+
+- [x] The committed map, the include and the probe table are the generator's output
+  (`EdgeAdmissionTest`).
+- [x] Admitted equals frozen plus the two anonymous reads plus retired, in both directions: the
+  model's operations equal the union exactly, and every committed map entry admits exactly one
+  operation's samples while every operation is admitted by exactly one entry
+  (`theAdmittedSetIsExactlyTheFrozenSetTheAnonymousReadsAndTheRetired`). Proven able to fail: a
+  frozen operation dropped from the model, an entry dropped from the map, and a planted
+  `GET /api/v1/me/layout` entry are each reported (`aDroppedFrozenOperationOrAnUnfrozenAdmissionIsReported`).
+- [x] The map parser is strict: an unanchored, prefix, case-insensitive, exact-string, `if` or
+  widened-default line fails instead of being skipped (`aMapLineTheParserCannotReadFails`).
+- [x] Every call of every committed app call list is admitted
+  (`everyCallOfEveryServedAppBuildIsAdmitted`).
+- [x] No exchange or connected-apps path is admitted under any verb (`theExchangeStaysOffTheApiVhost`).
+- [x] The real nginx image runs the committed files: every sample of every admitted operation, bare
+  and with a query string, reaches the upstream, and the refusal matrix — every other verb on every
+  admitted path, near-miss spellings, non-uuid ids, `/me/layout`, `/terms/admin`, the exchange — is
+  refused with `404` (`EdgeAdmissionNginxTest`, Testcontainers); a planted wrong expectation is
+  reported.
+- [x] The backend answers every admitted probe row as the table says — `200` for the two anonymous
+  reads, `401` for every frozen operation (`EdgeProbeBackendStatusTest`).
+- [x] The per-request cost was measured against the old include and against no admission at all
+  (2026-10-03): see *Cost*.
+
+**Enforced by:** `EdgeAdmissionTest`, `EdgeAdmissionNginxTest`, `EdgeProbeBackendStatusTest`
+(backend tests, guard G-08) · `scripts/check-edge-nginx.sh` (the whole edge renders and starts) ·
+`edge-deny-probe.yml` (nightly, against production) · **Code:** `EdgeAdmission`,
+`docker/edge/include/api-admission.conf`, `docker/edge/include/api-allowlist.conf`,
+`docker/edge/conf.d/50-api.conf.template` · **Related:** REQ-API-009, REQ-API-016, REQ-API-020,
+REQ-OPS-042, REQ-SEC-037, ADR-0135, ADR-0136
 
 ---
