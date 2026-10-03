@@ -337,10 +337,11 @@ public final class DataExportSections {
               "Signed up for by the member.",
               """
               SELECT o.display_id AS job_order, m.name AS material, c.amount,
-                     c.quality_requirement, c.created_at
+                     t.code AS quality_requirement, c.created_at
               FROM material_claim c
                 LEFT JOIN job_order o ON o.id = c.job_order_id
                 LEFT JOIN material m ON m.id = c.material_id
+                LEFT JOIN quality_tier t ON t.id = c.quality_tier_id
               WHERE c.claimed_by_user_id = :userId ORDER BY c.created_at
               """),
           new Section(
