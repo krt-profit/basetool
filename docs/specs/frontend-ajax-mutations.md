@@ -455,7 +455,9 @@ writes for in-place fragment swaps. The two admin pages re-render their list reg
 mutation: **topics/categories** create / edit / delete and the up/down **reorder** swap
 `promotion-admin-topics :: topicsResults` into `#pa-topics-results`, and the **rank-requirements**
 create / edit / delete + group-delete swap `promotion-admin-rank-requirements :: ranksResults` into
-`#ar-results`. A full server re-render is exactly what re-syncs every card's `@Version`, sort order
+`#ar-results`. The topics swap requests `?topic=<selected id>` (2026-10-03, REQ-PROMO-003), so the
+master-detail keeps the selected topic open across every write and a freshly created topic opens
+selected. A full server re-render is exactly what re-syncs every card's `@Version`, sort order
 and first/last arrow state, so a second reorder can no longer 409 — and the reorder no longer relies
 on a non-existent GET-by-id proxy route (it now reads the full DTO each PUT needs straight from the
 card's edit-button data attributes). The **manage** matrix already saved grades in place through its
@@ -505,6 +507,10 @@ same `?fragment=…` fragment the include-inactive filters already swap, plus a 
 `special-command-detail :: membersResults` fragment for the member roster. A full server re-render is
 exactly what re-syncs every row's `@Version`, the active / role / lead badges and the frequency
 ordering, so a second action can no longer 409, and the reorder drops its `location.reload()`.
+Since 2026-10-03 mission-data is a master-detail over its three data kinds (Staffeln · Aufgaben ·
+Frequenztypen): the selected kind is the `?kind=squadrons|jobtypes|freqtypes` deep link, rewritten
+in place on every selection, sent along with the include-inactive swaps, and a validation
+re-render opens the kind whose dialog failed.
 **announcement** (update / delete), **material-aliases** (create / update / delete), **material
 categories** (create / delete) and **admin-settings** (the five-version save) patch their own
 row / version inputs in place; settings validation failures and material-category conflicts come back

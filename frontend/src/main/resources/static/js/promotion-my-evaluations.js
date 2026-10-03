@@ -18,87 +18,92 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-function meFillProgressBars() {
-    const cards = document.querySelectorAll('.eligibility-card');
-    cards.forEach(function (card) {
-        const fractions = card.querySelectorAll(
-            '.checks-table tbody tr .check-status-ok, .checks-table tbody tr .check-status-missing',
+(function () {
+    'use strict';
+
+    const ME_FILTER_PREF_KEY = 'promotion_my_evaluations_filter';
+
+    /**
+     * Returns the radios of the "Alle · Offen" segment.
+     *
+     * @returns {HTMLInputElement[]} the segment's radios, empty when the page has no requirements
+     */
+    function filterRadios() {
+        return /** @type {HTMLInputElement[]} */ (
+            Array.from(document.querySelectorAll('input[name="meOpen"]'))
         );
-        let achieved = 0,
-            required = 0;
-        fractions.forEach(function (span) {
-            const parts = (span.textContent || '').split('/');
-            if (parts.length === 2) {
-                const a = parseInt(parts[0].trim(), 10);
-                const r = parseInt(parts[1].trim(), 10);
-                if (Number.isFinite(a) && Number.isFinite(r)) {
-                    achieved += a;
-                    required += r;
-                }
-            }
+    }
+
+    /**
+     * Tells whether the segment shows only the open requirements.
+     *
+     * @returns {boolean} true when "Offen" is selected
+     */
+    function onlyOpen() {
+        const checked = filterRadios().find(function (r) {
+            return r.checked;
         });
-        const pct = required > 0 ? Math.min(100, Math.round((achieved / required) * 100)) : 0;
-        const fill = card.querySelector('.eligibility-progress-fill');
-        const text = card.querySelector('.me-progress-text');
-        const bar = card.querySelector('.eligibility-progress');
-        if (fill) /** @type {HTMLElement} */ (fill).style.width = pct + '%';
-        if (text) text.textContent = achieved + ' / ' + required + ' (' + pct + '%)';
-        if (bar) bar.setAttribute('aria-valuenow', String(pct));
+        return !!checked && checked.value === 'OPEN';
+    }
+
+    /**
+     * Reads the stored filter preference.
+     *
+     * @returns {{ onlyOpen?: unknown } | null} the stored object, or null when absent or unreadable
+     */
+    function readPref() {
+        try {
+            const raw = localStorage.getItem(ME_FILTER_PREF_KEY);
+            const parsed = raw === null ? null : JSON.parse(raw);
+            return parsed && typeof parsed === 'object' ? parsed : null;
+        } catch (_e) {
+            return null;
+        }
+    }
+
+    /** Stores the current filter choice (REQ-UI-017). */
+    function writePref() {
+        try {
+            localStorage.setItem(ME_FILTER_PREF_KEY, JSON.stringify({ onlyOpen: onlyOpen() }));
+        } catch (_e) {}
+    }
+
+    /** Hides met requirements, and steps left without a visible row, while "Offen" is selected. */
+    function applyFilter() {
+        const open = onlyOpen();
+        let visible = 0;
+        document.querySelectorAll('#me-requirements tbody.me-step').forEach(function (step) {
+            let stepVisible = 0;
+            step.querySelectorAll('tr[data-me-satisfied]').forEach(function (row) {
+                const hide = open && row.getAttribute('data-me-satisfied') === 'true';
+                /** @type {HTMLElement} */ (row).hidden = hide;
+                if (!hide) stepVisible++;
+            });
+            /** @type {HTMLElement} */ (step).hidden = open && stepVisible === 0;
+            visible += stepVisible;
+        });
+        const empty = document.getElementById('me-open-empty');
+        if (empty) empty.hidden = !(open && visible === 0 && filterRadios().length > 0);
+    }
+
+    /** Restores the stored choice onto the segment before the first filter pass. */
+    function restore() {
+        const saved = readPref();
+        if (!saved || typeof saved.onlyOpen !== 'boolean') return;
+        const want = saved.onlyOpen ? 'OPEN' : 'ALL';
+        filterRadios().forEach(function (r) {
+            r.checked = r.value === want;
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        restore();
+        applyFilter();
+        filterRadios().forEach(function (r) {
+            r.addEventListener('change', function () {
+                writePref();
+                applyFilter();
+            });
+        });
     });
-}
-
-function meApplyOpenFilter() {
-    const input = document.getElementById('me-filter-open');
-    const onlyOpen = !!(input && /** @type {HTMLInputElement} */ (input).checked);
-    const rows = document.querySelectorAll('.checks-table tbody tr[data-me-satisfied]');
-    rows.forEach(function (row) {
-        const satisfied = row.getAttribute('data-me-satisfied') === 'true';
-        row.classList.toggle('checks-row-hidden', onlyOpen && satisfied);
-    });
-}
-
-const ME_FILTER_PREF_KEY = 'promotion_my_evaluations_filter';
-
-function meReadFilterPref() {
-    try {
-        const raw = localStorage.getItem(ME_FILTER_PREF_KEY);
-        return raw === null ? null : JSON.parse(raw);
-    } catch (_e) {
-        return null;
-    }
-}
-
-function meWriteFilterPref(value) {
-    try {
-        localStorage.setItem(ME_FILTER_PREF_KEY, JSON.stringify(value));
-    } catch (_e) {}
-}
-
-function mePersistOpenFilter() {
-    const input = document.getElementById('me-filter-open');
-    if (input) {
-        meWriteFilterPref({ onlyOpen: /** @type {HTMLInputElement} */ (input).checked });
-    }
-}
-
-function meRestoreOpenFilter() {
-    const input = document.getElementById('me-filter-open');
-    const saved = meReadFilterPref();
-    if (input && saved && typeof saved.onlyOpen === 'boolean') {
-        /** @type {HTMLInputElement} */ (input).checked = saved.onlyOpen;
-    }
-}
-
-function meOnOpenFilterChange() {
-    mePersistOpenFilter();
-    meApplyOpenFilter();
-}
-
-document.addEventListener('DOMContentLoaded', function () {
-    meFillProgressBars();
-    meRestoreOpenFilter();
-    meApplyOpenFilter();
-    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('change', 'me-filter-open', meOnOpenFilterChange);
-    }
-});
+})();
