@@ -126,6 +126,10 @@
   Personen bleiben dabei ausgeblendet. Im PDF tragen außerdem die vier Abschnitte der verbundenen
   Anwendungen jetzt einen lesbaren Namen statt ihres internen Schlüssels.
 
+- **Admin: Bearbeiten und Löschen im persönlichen Inventar eines Mitglieds funktionieren wieder.** Das
+  Frontend rief `/api/v1/admin/personal-inventory/{id}` statt `…/items/{id}` auf, das Backend lehnte ab.
+  Ein neuer Test prüft jetzt jeden Backend-Aufruf des Frontends gegen die `openapi.json` (REQ-FE-028).
+
 ### Security
 
 - **Backend: Prüfregeln für Mandantentrennung und Massenzuweisung.** Org-Einheiten-gebundene Aggregate
