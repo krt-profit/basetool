@@ -125,11 +125,16 @@ const ORG_CHART_UNITS_SECTION = 'units';
                 return;
             }
             if (inert) {
+                if (el.hasAttribute('inert')) {
+                    return;
+                }
                 el.setAttribute('inert', '');
                 el.setAttribute('aria-hidden', 'true');
-            } else {
+                el.setAttribute('data-oc-inert', '');
+            } else if (el.hasAttribute('data-oc-inert')) {
                 el.removeAttribute('inert');
                 el.removeAttribute('aria-hidden');
+                el.removeAttribute('data-oc-inert');
             }
         });
     }

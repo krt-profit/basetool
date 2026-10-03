@@ -615,7 +615,7 @@ ENV_RENDERER="${IRI_ENV_RENDERER:-${IRI_SCRIPT_DIR}/render-env-d.py}"
 
 rt_detect
 export RT_HEALTH_TIMEOUT="${HEALTH_TIMEOUT}"
-export RT_STACK_SERVICES="db-backend db-keycloak redis keycloak backend ingest frontend edge acme"
+export RT_STACK_SERVICES="db-backend db-keycloak redis keycloak edge backend ingest frontend acme"
 log "container runtime: ${RT_BACKEND}"
 
 command -v skopeo >/dev/null 2>&1 \

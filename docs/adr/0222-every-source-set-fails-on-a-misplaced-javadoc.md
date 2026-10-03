@@ -1,6 +1,6 @@
 # ADR-0222 — Every source set fails on a misplaced Javadoc
 
-- **Status:** Accepted
+- **Status:** Accepted — amended 2026-10-03 (the vendored file is not verbatim, see below)
 - **Date:** 2026-09-26
 - **Deciders:** @greluc (owner)
 - **Related:** [ADR-0214](0214-code-carries-no-comments-besides-javadoc.md) (no comments besides
@@ -55,3 +55,22 @@ includes the rule.
 - **Adding the rule to `google_checks.xml` with a suppression for everything else in tests** —
   rejected. It edits the vendored file, and the suppression list would grow with every rule a
   Checkstyle release adds.
+
+## Amendment — 2026-10-03: `google_checks.xml` is not vendored verbatim
+
+**Correction.** The *Related* line above says the vendored Checkstyle file "stays verbatim". It
+does not, and did not when this ADR was accepted. `config/checkstyle/google_checks.xml` is the
+`google_checks.xml` of the Checkstyle release tag that `gradle/libs.versions.toml` pins
+(`checkstyle-14.3.0` at the time of this amendment) with exactly two local edits, both from
+ADR-0214:
+
+- all XML comments are removed;
+- `EmptyCatchBlock` takes an `exceptionVariableName` pattern, the names an empty `catch` may give
+  its variable, instead of upstream's `commentFormat` of `\w+`.
+
+Nothing else differs: the file was compared with the `checkstyle-14.3.0` release file after
+stripping that file's comments. `AvoidModuleImport` and the `MatchXpath` check with the id
+`CompactSourceFileNotAllowed` are upstream rules, not local ones. The authoritative list of the
+edits and the upgrade procedure is the `checkstyle` row of
+[`docs/dependency-pins.md`](../dependency-pins.md). The decision is unchanged: this ADR adds no edit
+to the file.

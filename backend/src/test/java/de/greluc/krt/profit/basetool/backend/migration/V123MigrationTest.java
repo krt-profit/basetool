@@ -29,7 +29,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Migration test for {@code V123__add_item_job_orders.sql}: the {@code job_order.type}
@@ -37,7 +36,6 @@ import org.springframework.test.context.ActiveProfiles;
  * the schema.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class V123MigrationTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;

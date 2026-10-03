@@ -44,9 +44,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,7 +51,6 @@ import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.json.JsonMapper;
 
 @SpringBootTest
-@ActiveProfiles("test")
 @Transactional
 class ShipInsuranceTest {
 
@@ -73,8 +69,6 @@ class ShipInsuranceTest {
   @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
 
   private final JsonMapper objectMapper = JsonMapper.builder().build();
-
-  @MockitoBean private JwtDecoder jwtDecoder;
 
   private User user;
   private ShipType shipType;

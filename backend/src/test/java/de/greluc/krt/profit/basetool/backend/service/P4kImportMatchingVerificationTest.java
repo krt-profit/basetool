@@ -38,9 +38,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -48,10 +45,9 @@ import org.springframework.transaction.annotation.Transactional;
  * with canonical UUIDs are stripped of them, re-imported, and must re-match by name, class name,
  * code or key, backfill the UUID and re-resolve a blueprint ingredient without creating rows.
  *
- * <p>Runs in one rolled-back transaction; {@link JwtDecoder} is mocked.
+ * <p>Runs in one rolled-back transaction.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @Transactional
 class P4kImportMatchingVerificationTest {
 
@@ -68,8 +64,6 @@ class P4kImportMatchingVerificationTest {
   @Autowired private ShipTypeRepository shipTypeRepository;
   @Autowired private MaterialRepository materialRepository;
   @Autowired private BlueprintRepository blueprintRepository;
-
-  @MockitoBean private JwtDecoder jwtDecoder;
 
   /**
    * Compact catalog built from real DataForge identifiers; the descriptions/mass are enrichment.

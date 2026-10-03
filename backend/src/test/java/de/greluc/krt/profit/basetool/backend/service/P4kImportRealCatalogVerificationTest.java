@@ -29,27 +29,21 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * Opt-in check that {@link P4kImportService#previewImport(byte[])} processes a real P4K catalog
  * without error, against Postgres.
  *
  * <p>Runs only when {@code backend/build/p4k-catalog-verify.json} exists and otherwise skips via
- * {@link Assumptions}. {@link JwtDecoder} is mocked.
+ * {@link Assumptions}.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class P4kImportRealCatalogVerificationTest {
 
   /** Working-directory-relative, gitignored location an operator drops a real catalog into. */
   private static final Path CATALOG = Path.of("build", "p4k-catalog-verify.json");
 
   @Autowired private P4kImportService service;
-
-  @MockitoBean private JwtDecoder jwtDecoder;
 
   @Test
   void preview_realCatalog_parsesAndReconcilesEntireFileWithoutError() throws Exception {

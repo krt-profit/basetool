@@ -48,9 +48,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * Verifies that {@code N} users can sign up to the same mission in parallel without any {@link
@@ -62,7 +59,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * runs in its own session.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class MissionParticipantConcurrencyTest {
 
   private static final int THREADS = 5;
@@ -74,8 +70,6 @@ class MissionParticipantConcurrencyTest {
   @Autowired private MissionParticipantRepository missionParticipantRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private MissionService missionService;
-
-  @MockitoBean private JwtDecoder jwtDecoder;
 
   private UUID seedMissionId;
   private final List<UUID> seedUserIds = new ArrayList<>();

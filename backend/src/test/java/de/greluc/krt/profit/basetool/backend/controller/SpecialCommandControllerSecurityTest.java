@@ -40,8 +40,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -55,7 +53,6 @@ import org.springframework.web.context.WebApplicationContext;
  * SK's lead and a plain member are forbidden, and a lead is still refused an update.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class SpecialCommandControllerSecurityTest {
 
   @Autowired private WebApplicationContext context;
@@ -63,7 +60,6 @@ class SpecialCommandControllerSecurityTest {
 
   @MockitoBean private SpecialCommandService specialCommandService;
   @MockitoSpyBean private SpecialCommandSecurityService specialCommandSecurityService;
-  @MockitoBean private JwtDecoder jwtDecoder;
 
   private final UUID skId = UUID.randomUUID();
   private final UUID otherSkId = UUID.randomUUID();

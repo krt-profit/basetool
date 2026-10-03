@@ -57,7 +57,6 @@ import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -70,7 +69,6 @@ import org.springframework.web.context.WebApplicationContext;
  * the other needs.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class RefineryOrderDetailFragmentMvcTest {
 
   /** Marker text of the section-sized inline error fragment (the EN bundle is not active here). */
