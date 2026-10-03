@@ -66,6 +66,10 @@
   tun sie es, und die fünf Skripte sind ohne Verhaltensänderung nach Prettier formatiert. ADR-0222 nennt
   die zwei lokalen Änderungen an `google_checks.xml`, statt es „verbatim" zu nennen.
 
+- **E2E: nach einem Formular-Submit wartet die Suite, bis die Zielseite geladen ist.** Die nächste
+  Navigation überholte sonst die noch ladende Seite; in WebKit verlor der Browser dabei vereinzelt alle
+  Cookies, und `JobOrderProductionE2eTest` landete abgemeldet auf `/?error`. Kein Fehler der App.
+
 - **Deploy: die Edge startet vor den Anwendungen.** Ändert ein Release die Edge-Unit, stoppte das eine
   Neustartfenster sie mit und startete sie zuletzt; Backend und Frontend holen die OIDC-Konfiguration
   aber über den öffentlichen Namen, also über die Edge, und kamen nicht hoch. Gilt auch für `backup.sh`.
