@@ -11,6 +11,12 @@
 
 ### Fixed
 
+- **Crew-Board auf dem Smartphone: Ziehen unter die Tab-Leiste.** Beim Ziehen eines Teilnehmers scrollt die
+  Seite jetzt schon oberhalb der Tab-Leiste, sodass eine verdeckte Einheit erreichbar wird; Loslassen über
+  der Tab-Leiste bricht ab, statt die Zuweisung zu entfernen.
+
+- **Org-Einheiten-Auswahl im Menü auf Tablets wieder 44 px hoch** (Touch-Mindestgröße, REQ-UI-009).
+
 - **E2E: nach einem Formular-Submit wartet die Suite, bis die Zielseite geladen ist.** Die nächste
   Navigation überholte sonst die noch ladende Seite; in WebKit verlor der Browser dabei vereinzelt alle
   Cookies, und `JobOrderProductionE2eTest` landete abgemeldet auf `/?error`. Kein Fehler der App.
