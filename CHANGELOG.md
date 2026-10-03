@@ -4,16 +4,21 @@
 
 ### Added
 
-- **Berechtigungsmatrix des Backends als geprüfte Datei.** `authorization-matrix.txt` hält für jede
-  Operation die entscheidende URL-Regel und das wirksame `@PreAuthorize` fest, dazu die
-  Service-Gates; `AuthorizationMatrixTest` schlägt bei jeder Abweichung fehl (REQ-SEC-074).
-
 - **Backend: Modulkarte und eingefrorene Modulkopplung (Guard G-09).** Eine Domain-Map ordnet jede
   Backend-Klasse einem der 26 Zielmodule zu; ein ArchUnit-`modules()`-Test friert die heutigen 138
   Kanten gegen die Rangordnung ein, neue scheitern. Spring Modulith 2.1.1 läuft nur im Testumfang
   (REQ-MOD-001…005).
 
+- **Berechtigungsmatrix des Backends als geprüfte Datei.** `authorization-matrix.txt` hält für jede
+  Operation die entscheidende URL-Regel und das wirksame `@PreAuthorize` fest, dazu die
+  Service-Gates; `AuthorizationMatrixTest` schlägt bei jeder Abweichung fehl (REQ-SEC-074).
+
 ### Changed
+
+- **Modularisierung: die Entscheidungen sind festgehalten.** ADR-0231 bis ADR-0239 (Modulschnitt,
+  Zusammenspiel der Module, Prüfwerkzeuge, harter API-Schnitt mit erzwungenem App-Update, Fehlermodell,
+  Zugriffsregeln je Fachbereich, NullAway, `switch` ohne `default`, Browser-Baseline 2025), dazu
+  REQ-API-001/009/010 und REQ-FE-018. Checkstyle akzeptiert `_` als Namen eines leeren `catch`.
 
 - **Architekturtests schlagen bei verschobenen Klassen an.** Die ArchUnit-Regeln des Backends wählen
   Klassen nach Rolle (`@RestController`, `@Service`, Repository, `@Mapper`, `@Entity`) und Klassenliteral
@@ -21,21 +26,22 @@
   jeder verbliebene Klassenname auflösbar ist (REQ-SEC-073). Eine Verschiebung lässt den Build scheitern,
   statt eine Regel still leerlaufen zu lassen.
 
-- **Modularisierung: die Entscheidungen sind festgehalten.** ADR-0231 bis ADR-0239 (Modulschnitt,
-  Zusammenspiel der Module, Prüfwerkzeuge, harter API-Schnitt mit erzwungenem App-Update, Fehlermodell,
-  Zugriffsregeln je Fachbereich, NullAway, `switch` ohne `default`, Browser-Baseline 2025), dazu
-  REQ-API-001/009/010 und REQ-FE-018. Checkstyle akzeptiert `_` als Namen eines leeren `catch`.
-
 ### Fixed
+
+- **Crew-Board auf dem Smartphone: Ziehen unter die Tab-Leiste.** Beim Ziehen eines Teilnehmers scrollt die
+  Seite jetzt schon oberhalb der Tab-Leiste, sodass eine verdeckte Einheit erreichbar wird; Loslassen über
+  der Tab-Leiste bricht ab, statt die Zuweisung zu entfernen.
+
+- **Org-Einheiten-Auswahl im Menü auf Tablets wieder 44 px hoch** (Touch-Mindestgröße, REQ-UI-009).
+
+- **E2E: nach einem Formular-Submit wartet die Suite, bis die Zielseite geladen ist.** Die nächste
+  Navigation überholte sonst die noch ladende Seite; in WebKit verlor der Browser dabei vereinzelt alle
+  Cookies, und `JobOrderProductionE2eTest` landete abgemeldet auf `/?error`. Kein Fehler der App.
 
 - **Build: die Node-Skripte unter `frontend/scripts/` werden gelintet und auf Formatierung geprüft.**
   `:frontend:lintJs` und `:frontend:prettierCheck` lasen `scripts/**/*.mjs` entgegen ADR-0130 nicht; jetzt
   tun sie es, und die fünf Skripte sind ohne Verhaltensänderung nach Prettier formatiert. ADR-0222 nennt
   die zwei lokalen Änderungen an `google_checks.xml`, statt es „verbatim" zu nennen.
-
-- **E2E: nach einem Formular-Submit wartet die Suite, bis die Zielseite geladen ist.** Die nächste
-  Navigation überholte sonst die noch ladende Seite; in WebKit verlor der Browser dabei vereinzelt alle
-  Cookies, und `JobOrderProductionE2eTest` landete abgemeldet auf `/?error`. Kein Fehler der App.
 
 ## [v1.13.7](https://github.com/krt-profit/basetool/releases/tag/v1.13.7) - 2026-10-03
 
