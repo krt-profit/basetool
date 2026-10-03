@@ -142,4 +142,10 @@ tasks.named<Test>("test") {
     .file(rootProject.file("quadlet/env.d/backend.env.tmpl"))
     .withPropertyName("backendQuadletEnvTemplate")
     .withPathSensitivity(PathSensitivity.RELATIVE)
+
+  val authzMatrixUpdate = providers.systemProperty("authz.matrix.update").orElse("false")
+  inputs.property("authzMatrixUpdate", authzMatrixUpdate)
+  jvmArgumentProviders.add(
+    CommandLineArgumentProvider { listOf("-Dauthz.matrix.update=" + authzMatrixUpdate.get()) }
+  )
 }

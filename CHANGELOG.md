@@ -9,6 +9,10 @@
   Kanten gegen die Rangordnung ein, neue scheitern. Spring Modulith 2.1.1 läuft nur im Testumfang
   (REQ-MOD-001…005).
 
+- **Berechtigungsmatrix des Backends als geprüfte Datei.** `authorization-matrix.txt` hält für jede
+  Operation die entscheidende URL-Regel und das wirksame `@PreAuthorize` fest, dazu die
+  Service-Gates; `AuthorizationMatrixTest` schlägt bei jeder Abweichung fehl (REQ-SEC-074).
+
 ### Changed
 
 - **Modularisierung: die Entscheidungen sind festgehalten.** ADR-0231 bis ADR-0239 (Modulschnitt,

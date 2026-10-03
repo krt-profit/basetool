@@ -11,6 +11,9 @@ an OAuth2 **resource server**, the frontend an OAuth2 **client**. Authorisation 
 invariants that keep it that way. Those tests select by role and class literal rather than by
 package or name, assert a selection floor and are each proven able to fail on a planted fixture,
 so moving or renaming a class fails the build instead of quietly leaving a gate (REQ-SEC-073).
+Where a gate can still live in more than one place — a `SecurityConfig` URL rule, a controller
+annotation, a service annotation — the backend's authorization matrix pins all three for every
+operation in one reviewed file, so a move that drops one shows up as a diff (REQ-SEC-074).
 
 Beyond roles there are three mechanisms that are easy to miss:
 
