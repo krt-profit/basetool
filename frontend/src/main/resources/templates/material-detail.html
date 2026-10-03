@@ -3,7 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="${material != null ? material.name : 'Material'} + ' - ' + ${appTitle}">Material Detail - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<link rel="stylesheet" th:href="@{/css/pages/material-detail.css}">
+        <link rel="stylesheet" th:href="@{/css/pages/material-detail.css}">
     </th:block>
 </head>
 <body>
@@ -12,79 +12,106 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box flex-between">
-        <h1 th:if="${material != null}" th:text="${material.name}">Material Name</h1>
-        <h1 th:if="${material == null}" th:text="#{materials.detail.notFound}">Material nicht gefunden</h1>
-        <a th:href="@{/materials}" class="btn btn-ghost" th:text="#{orders.detail.back}">Zurück zur Übersicht</a>
-    </div>
-
-    <div class="hud-box mt-2">
-        <div th:if="${error}" class="hud-box hud-box-error">
-            <p th:text="#{__${error}__}">Fehler</p>
-        </div>
-
-        <div th:if="${material != null}">
-            <div class="krtm-margin-bottom-2rem-color-var-color-gray-1-fo-c8dd">
-                <p th:if="${material.description != null && !material.description.isEmpty()}" th:text="${material.description}">Beschreibung...</p>
-            </div>
-
-            <div class="data-section">
-                <div class="flex-between-mb">
-                    <h2 class="krtm-color-var-color-primary-font-family-var-font-1e8a" th:text="#{materials.detail.pricesTitle}">Preise und Terminals</h2>
-                    <div class="form-group krtm-margin-0-position-relative-9ca0">
-                        <label for="terminalFilter" class="visually-hidden" th:text="#{materials.detail.filterPlaceholder}">Terminal suchen</label>
-                        <input type="text" id="terminalFilter" th:placeholder="#{materials.detail.filterPlaceholder}" placeholder="Terminal suchen..." data-trigger="material-detail-filter-terminals" autocomplete="off">
-                        <datalist id="terminalNames-data" class="krtm-display-none-5790">
-                            <option th:if="${prices != null}" th:each="p : ${prices}" th:value="${p.terminalName}"></option>
-                        </datalist>
-                    </div>
-                </div>
-                
-                <div class="table-responsive">
-                <table class="data-table" id="priceTable">
-                    <thead>
-                        <tr>
-                            <th class="sortable-header krtm-cursor-pointer-user-select-none-5942" data-trigger="material-detail-sort" data-sort-column="0" title="Klicken zum Sortieren">
-                                <div class="krtm-display-flex-align-items-center-justify-cont-43da">
-                                    <span th:text="#{materials.detail.th.terminal}">Terminal</span>
-                                    <span class="sort-icon krtm-margin-left-0-5rem-color-var-color-gray-2-fo-60ed" id="sort-icon-0">↕</span>
-                                </div>
-                            </th>
-                            <th class="sortable-header krtm-cursor-pointer-user-select-none-5942" data-trigger="material-detail-sort" data-sort-column="1" title="Klicken zum Sortieren">
-                                <div class="flex-end">
-                                    <span th:text="#{materials.detail.th.priceBuy}">Einkaufspreis</span>
-                                    <span class="sort-icon krtm-margin-left-0-5rem-color-var-color-gray-2-fo-60ed" id="sort-icon-1">↕</span>
-                                </div>
-                            </th>
-                            <th class="sortable-header krtm-cursor-pointer-user-select-none-5942" data-trigger="material-detail-sort" data-sort-column="2" title="Klicken zum Sortieren">
-                                <div class="flex-end">
-                                    <span th:text="#{materials.detail.th.priceSell}">Verkaufspreis</span>
-                                    <span class="sort-icon krtm-margin-left-0-5rem-color-var-color-gray-2-fo-60ed" id="sort-icon-2">↕</span>
-                                </div>
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr th:each="price : ${prices}">
-                            <td class="terminal-name" th:text="${price.terminalName}">Area18</td>
-                            <td class="number-cell" th:text="${price.priceBuy != null && price.priceBuy > 0 ? #numbers.formatInteger(price.priceBuy, 1, 'POINT') + ' aUEC' : '-'}">-</td>
-                            <td class="number-cell" th:text="${price.priceSell != null && price.priceSell > 0 ? #numbers.formatInteger(price.priceSell, 1, 'POINT') + ' aUEC' : '-'}">-</td>
-                        </tr>
-                        <tr id="noDataRow" th:if="${prices == null || prices.isEmpty()}">
-                            <td colspan="3" class="krtm-text-align-center-font-style-italic-d125" th:text="#{materials.detail.noData}">Keine Preisdaten verfügbar.</td>
-                        </tr>
-                        <tr id="noResultsRow" class="krtm-display-none-5790" th:unless="${prices == null || prices.isEmpty()}">
-                            <td colspan="3" class="krtm-text-align-center-font-style-italic-color-va-46f9" th:text="#{materials.detail.noResults}">Keine Terminals gefunden.</td>
-                        </tr>
-                    </tbody>
-                </table>
-                </div>
+    <div class="page-head" data-testid="page-head">
+        <div class="page-head__main">
+            <a class="page-eyebrow" th:href="@{/materials}" data-testid="page-eyebrow"
+              ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"/></svg
+              ><span th:text="#{nav.materials.list}">Material-Übersicht</span></a>
+            <div class="page-title">
+                <h1 th:text="${material != null ? material.name : #messages.msg('materials.detail.notFound')}">Material</h1>
+                <th:block th:if="${material != null}">
+                    <span th:if="${material.category != null and material.category.name != null}" class="chip"
+                          data-testid="material-category" th:text="${material.category.name}">Mineral</span>
+                    <span th:if="${material.isIllegal}" class="chip chip--danger" data-testid="material-flag-illegal"
+                          th:text="#{material.is_illegal}">Illegal</span>
+                    <span th:if="${material.isVolatileQt}" class="chip chip--warning" data-testid="material-flag-volatile-qt"
+                          th:text="#{material.is_volatile_qt}">Flüchtig · Quantum Travel</span>
+                    <span th:if="${material.isVolatileTime}" class="chip chip--warning" data-testid="material-flag-volatile-time"
+                          th:text="#{material.is_volatile_time}">Flüchtig · Zeit</span>
+                </th:block>
             </div>
         </div>
     </div>
+
+    <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
+
+    <th:block th:if="${material != null}">
+        <p th:if="${material.description != null && !material.description.isEmpty()}" class="md-description"
+           th:text="${material.description}">Beschreibung...</p>
+
+        <div class="kpi-grid md-kpis" data-testid="material-kpis">
+            <div class="kpi-total md-kpi--sell" data-testid="kpi-best-sell">
+                <div class="kpi-label" th:text="#{materials.detail.kpi.bestSell}">Bester Verkauf</div>
+                <div class="kpi-value" th:text="${priceSummary.bestSellText()}">89,6</div>
+                <div class="kpi-sub" th:text="${priceSummary.bestSellTerminal() != null} ? ${priceSummary.bestSellTerminal() + ' · ' + #messages.msg('materials.detail.kpi.unit')} : #{materials.detail.kpi.noSellTerminal}">Area18 TDD · aUEC/SCU</div>
+            </div>
+            <div class="kpi-total md-kpi--buy" data-testid="kpi-best-buy">
+                <div class="kpi-label" th:text="#{materials.detail.kpi.bestBuy}">Bester Einkauf</div>
+                <div class="kpi-value" th:text="${priceSummary.bestBuyText()}">–</div>
+                <div class="kpi-sub" th:text="${priceSummary.bestBuyTerminal() != null} ? ${priceSummary.bestBuyTerminal() + ' · ' + #messages.msg('materials.detail.kpi.unit')} : #{materials.detail.kpi.noBuyTerminal}">Kein Terminal verkauft es</div>
+            </div>
+            <div class="kpi-total md-kpi--neutral" data-testid="kpi-average-sell">
+                <div class="kpi-label" th:text="#{materials.detail.kpi.averageSell}">Ø Verkauf</div>
+                <div class="kpi-value" th:text="${priceSummary.averageSellText()}">87,5</div>
+                <div class="kpi-sub" th:text="#{materials.detail.kpi.terminals(${priceSummary.sellTerminals()})}">7 Terminals</div>
+            </div>
+            <div class="kpi-total md-kpi--neutral" data-testid="kpi-updated">
+                <div class="kpi-label" th:text="#{materials.detail.kpi.updated}">Aktualisiert</div>
+                <div class="kpi-value" th:if="${uexAge != null}" th:title="${uexAge.syncedAt}"
+                     th:text="#{${'materials.detail.kpi.age.' + uexAge.unit}(${uexAge.amount})}">14 min</div>
+                <div class="kpi-value" th:if="${uexAge == null}">–</div>
+                <div class="kpi-sub" th:text="#{materials.detail.kpi.uexSync}">UEX-Sync</div>
+            </div>
+        </div>
+
+        <h2 class="md-section-title" th:text="#{materials.detail.pricesTitle}">Preise und Terminals</h2>
+
+        <div class="toolbar" th:unless="${terminalRows == null || terminalRows.isEmpty()}">
+            <th:block th:replace="~{fragments/components :: toolbarSearch(id='terminalFilter', name='terminal', value=null, placeholderKey='materials.detail.filterPlaceholder')}"></th:block>
+            <th:block th:replace="~{fragments/components :: segmented(name='terminalSort', labelKey='materials.detail.sort.label', selected='sell',
+                options=${ {{value: 'sell', labelKey: 'materials.detail.sort.sell'}, {value: 'buy', labelKey: 'materials.detail.sort.buy'}} })}"></th:block>
+        </div>
+
+        <div class="card card--flush" th:unless="${terminalRows == null || terminalRows.isEmpty()}">
+            <table class="data-table data-table--stack md-terminals" id="priceTable" data-sort="sell">
+                <thead>
+                    <tr>
+                        <th scope="col" th:text="#{materials.detail.th.terminal}">Terminal</th>
+                        <th scope="col" th:text="#{materials.detail.th.location}">Ort</th>
+                        <th scope="col" class="num" aria-sort="descending" data-sort-col="sell">
+                            <span th:text="#{materials.detail.sort.sell}">Verkauf</span><span class="md-sort-mark" aria-hidden="true">↓</span>
+                        </th>
+                        <th scope="col" class="num" aria-sort="none" data-sort-col="buy">
+                            <span th:text="#{materials.detail.sort.buy}">Einkauf</span><span class="md-sort-mark" aria-hidden="true">↑</span>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="row : ${terminalRows}" class="md-terminal-row" th:classappend="${row.planetCssClass()}"
+                        th:data-terminal="${row.terminalName()}"
+                        th:data-sell="${row.priceSell()}" th:data-buy="${row.priceBuy()}">
+                        <td>
+                            <span class="cell-title" th:text="${row.terminalName()}">Area18 TDD</span>
+                        </td>
+                        <td th:text="${row.location() != null ? row.location() : '–'}">ArcCorp · Area18</td>
+                        <td class="num md-price-sell" th:attr="data-label=#{materials.detail.sort.sell}"
+                            th:classappend="${row.priceSell() == null} ? 'md-price--none'" th:text="${row.sellText()}">89,6</td>
+                        <td class="num md-price-buy" th:attr="data-label=#{materials.detail.sort.buy}"
+                            th:classappend="${row.priceBuy() == null} ? 'md-price--none'" th:text="${row.buyText()}">–</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div id="noResultsRow" hidden>
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='materials.detail.noResults', textKey='materials.detail.noResults.text')}"></th:block>
+            </div>
+        </div>
+
+        <div id="noDataRow" class="card card--flush" th:if="${terminalRows == null || terminalRows.isEmpty()}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='materials.detail.noData', textKey='materials.detail.noData.text')}"></th:block>
+        </div>
+    </th:block>
 </main>
 
-<script th:src="@{/js/autocomplete.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/material-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

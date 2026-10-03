@@ -39,8 +39,11 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -211,49 +214,16 @@ class MaterialsPageControllerMvcTest {
   }
 
   /**
-   * Same as {@link #listMaterials_rendersCategoryToggleBindingAndCompletesScript()} for the detail
-   * page: the terminal filter binding is present and the page renders completely.
+   * The detail page renders completely with its script, the terminal search and sort controls, and
+   * the planet-stripe stylesheet.
    */
   @Test
   @WithMockUser
-  void getMaterialDetail_ShouldRenderFilterBinding_AfterDatalist() throws Exception {
+  void getMaterialDetail_ShouldRenderSearchAndSortControls() throws Exception {
     UUID id = UUID.randomUUID();
-    MaterialDto material =
-        new MaterialDto(
-            id,
-            "Aluminum",
-            "RAW",
-            "SCU",
-            "Aluminum description",
-            null,
-            null,
-            false,
-            false,
-            false,
-            false,
-            false,
-            false,
-            true,
-            0L);
-    MaterialPriceDto priceDto =
-        new MaterialPriceDto(
-            UUID.randomUUID(),
-            "Area18",
-            new BigDecimal("5.0"),
-            new BigDecimal("7.0"),
-            100,
-            200,
-            true,
-            true);
-    PageResponse<MaterialPriceDto> pricesPage =
-        new PageResponse<>(List.of(priceDto), 0, 10000, 1, 1, List.of());
-
-    when(backendApiClient.get(eq("/api/v1/materials/" + id), eq(MaterialDto.class)))
-        .thenReturn(material);
-    when(backendApiClient.get(
-            eq("/api/v1/materials/" + id + "/prices?size=10000&sort=terminal.name,asc&page=0"),
-            anyTypeRef()))
-        .thenReturn(pricesPage);
+    stubDetail(
+        material(id, null, false, false),
+        List.of(price("Area18", new BigDecimal("5.0"), new BigDecimal("7.0"))));
 
     mockMvc
         .perform(get("/materials/" + id))
@@ -261,11 +231,246 @@ class MaterialsPageControllerMvcTest {
         .andExpect(content().string(containsString("src=\"/js/material-detail.js\"")))
         .andExpect(content().string(containsString("</body>")))
         .andExpect(content().string(containsString("</html>")))
-        .andExpect(content().string(containsString("id=\"terminalNames-data\"")))
-        .andExpect(content().string(containsString("value=\"Area18\"")))
-        .andExpect(
-            PageStylesheets.content(
-                containsString(
-                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+        .andExpect(content().string(containsString("id=\"terminalFilter\"")))
+        .andExpect(content().string(containsString("name=\"terminalSort\"")))
+        .andExpect(content().string(containsString("data-terminal=\"Area18\"")))
+        .andExpect(PageStylesheets.content(containsString(".md-terminal-row.planet-hurston")));
+  }
+
+  /**
+   * The detail page sits on the detail pattern: back-link eyebrow, category and flag chips, four
+   * price figures and the terminal table sorted by sale price, with a planet tint per row.
+   */
+  @Test
+  @WithMockUser
+  void getMaterialDetail_rendersHeadChipsFiguresAndSortedTable() throws Exception {
+    UUID id = UUID.randomUUID();
+    stubDetail(
+        material(id, new MaterialCategoryDto(UUID.randomUUID(), "Mineral", 0L), true, true),
+        List.of(
+            price("Lorville CBD", null, new BigDecimal("88.2")),
+            price("Area18 TDD", new BigDecimal("80"), new BigDecimal("89.6"))));
+    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef()))
+        .thenReturn(
+            new PageResponse<>(
+                List.of(matrixItem(id, "Area18 TDD", "ArcCorp", "Area18")),
+                0,
+                100000,
+                1,
+                1,
+                List.of()));
+
+    String html =
+        mockMvc
+            .perform(get("/materials/" + id).locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("class=\"page-head\"")
+        .containsPattern("<a class=\"page-eyebrow\" href=\"/materials\"")
+        .containsPattern("<h1>Aluminum</h1>")
+        .containsPattern("class=\"chip\"\\s+data-testid=\"material-category\">Mineral<")
+        .contains("class=\"chip chip--danger\" data-testid=\"material-flag-illegal\"")
+        .contains("class=\"chip chip--warning\" data-testid=\"material-flag-volatile-qt\"")
+        .doesNotContain("material-flag-volatile-time")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box")
+        .doesNotContain("krtm-")
+        .doesNotContain("colspan")
+        .contains("data-testid=\"kpi-best-sell\"")
+        .contains("data-testid=\"kpi-best-buy\"")
+        .contains("data-testid=\"kpi-average-sell\"")
+        .contains("data-testid=\"kpi-updated\"")
+        .containsPattern("class=\"kpi-value\">89,6<")
+        .containsPattern("class=\"kpi-value\">80<")
+        .containsPattern("class=\"kpi-value\">88,9<")
+        .contains("data-table data-table--stack")
+        .containsPattern("md-terminal-row planet-arccorp\"\\s+data-terminal=\"Area18 TDD\"")
+        .contains(">ArcCorp · Area18<");
+    assertThat(html.indexOf("data-terminal=\"Area18 TDD\""))
+        .isLessThan(html.indexOf("data-terminal=\"Lorville CBD\""));
+  }
+
+  /** A material without prices shows the empty state instead of a table. */
+  @Test
+  @WithMockUser
+  void getMaterialDetail_withoutPrices_showsTheEmptyState() throws Exception {
+    UUID id = UUID.randomUUID();
+    stubDetail(material(id, null, false, false), List.of());
+
+    String html =
+        mockMvc
+            .perform(get("/materials/" + id).locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("id=\"noDataRow\" class=\"card card--flush\"")
+        .contains("data-testid=\"empty-state\"")
+        .contains("Keine Preisdaten verfügbar.")
+        .doesNotContain("id=\"priceTable\"");
+  }
+
+  /**
+   * The price overview renders on the data-view pattern: page head with the UEX freshness chip, the
+   * dropdown filters with their summaries, the add-filter popover with the boolean filters, the
+   * grouping switch, the legend and the hidden matrix card.
+   */
+  @Test
+  @WithMockUser
+  void getMatrixOverview_rendersTheDataViewPattern() throws Exception {
+    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef()))
+        .thenReturn(
+            new PageResponse<>(
+                List.of(matrixItem(UUID.randomUUID(), "Area18 TDD", "ArcCorp", "Area18")),
+                0,
+                100000,
+                1,
+                1,
+                List.of()));
+    when(backendApiClient.getCached(eq(CachedCatalog.TERMINALS), anyTypeRef()))
+        .thenReturn(
+            new PageResponse<>(
+                List.of(
+                    Map.<String, Object>of(
+                        "uexSyncedAt", Instant.now().minus(Duration.ofMinutes(14)).toString())),
+                0,
+                10000,
+                1,
+                1,
+                List.of()));
+
+    String html =
+        mockMvc
+            .perform(get("/materials/overview").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("class=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Handel<")
+        .containsPattern("<h1>Preis-Übersicht</h1>")
+        .containsPattern("data-testid=\"uex-age\"[^>]*>UEX · vor 1[34] min<")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box")
+        .doesNotContain("krtm-")
+        .doesNotContain("btn--cta")
+        .containsPattern("id=\"materialHeader\"[^>]*aria-controls=\"materialOptions\"")
+        .containsPattern("id=\"systemHeader\"[^>]*aria-controls=\"systemOptions\"")
+        .containsPattern("id=\"materialOptions\"[^>]*data-filter-transient")
+        .containsPattern(
+            "class=\"filter-add filter-toggle\" data-testid=\"materials-filter-toggle\"")
+        .containsPattern(
+            "class=\"filter-panel filter-popover__panel\" id=\"materials-filter-panel\"")
+        .contains("id=\"filterLoadingDock\"")
+        .contains("id=\"filterAutoLoad\"")
+        .containsPattern(
+            "<label class=\"switch\"[^>]*>\\s*<input type=\"checkbox\""
+                + " id=\"filterGroupByCategory\"")
+        .contains("data-testid=\"materials-matrix-legend\"")
+        .contains(">bester Verkauf<")
+        .contains(">bester Einkauf<")
+        .containsPattern("id=\"tableContainer\" hidden")
+        .containsPattern("id=\"matrixEmpty\" class=\"card card--flush\" hidden")
+        .contains("data-label-selection-of=\"{0} von {1}\"");
+  }
+
+  /**
+   * Stubs the detail page's material and price list.
+   *
+   * @param material the material the backend returns
+   * @param prices the price list the backend returns
+   */
+  private void stubDetail(MaterialDto material, List<MaterialPriceDto> prices) {
+    when(backendApiClient.get(eq("/api/v1/materials/" + material.id()), eq(MaterialDto.class)))
+        .thenReturn(material);
+    when(backendApiClient.get(
+            eq(
+                "/api/v1/materials/"
+                    + material.id()
+                    + "/prices?size=10000&sort=terminal.name,asc&page=0"),
+            anyTypeRef()))
+        .thenReturn(new PageResponse<>(prices, 0, 10000, prices.size(), 1, List.of()));
+  }
+
+  /**
+   * A catalogue material named Aluminum.
+   *
+   * @param id the material id
+   * @param category the category, or {@code null}
+   * @param illegal whether it is flagged illegal
+   * @param volatileQt whether it is flagged volatile in quantum travel
+   * @return the material
+   */
+  private static MaterialDto material(
+      UUID id, MaterialCategoryDto category, boolean illegal, boolean volatileQt) {
+    return new MaterialDto(
+        id,
+        "Aluminum",
+        "RAW",
+        "SCU",
+        "Aluminum description",
+        null,
+        category,
+        illegal,
+        volatileQt,
+        false,
+        false,
+        false,
+        false,
+        true,
+        0L);
+  }
+
+  /**
+   * One terminal price.
+   *
+   * @param terminal the terminal name
+   * @param buy the purchase price, or {@code null}
+   * @param sell the sale price, or {@code null}
+   * @return the price
+   */
+  private static MaterialPriceDto price(String terminal, BigDecimal buy, BigDecimal sell) {
+    return new MaterialPriceDto(UUID.randomUUID(), terminal, buy, sell, 100, 200, true, true);
+  }
+
+  /**
+   * One price-matrix row placing a terminal of the material on a planet and in a city.
+   *
+   * @param materialId the material
+   * @param terminal the terminal name
+   * @param planet the planet
+   * @param city the city
+   * @return the matrix row
+   */
+  private static MaterialMatrixItemDto matrixItem(
+      UUID materialId, String terminal, String planet, String city) {
+    return new MaterialMatrixItemDto(
+        materialId,
+        "Aluminum",
+        false,
+        false,
+        false,
+        null,
+        UUID.randomUUID(),
+        terminal,
+        terminal,
+        "Stanton",
+        new BigDecimal("80"),
+        new BigDecimal("89.6"),
+        city,
+        null,
+        null,
+        planet,
+        false,
+        true,
+        true);
   }
 }

@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -43,6 +44,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -172,6 +174,10 @@ public class MaterialsPageController {
   private static final ParameterizedTypeReference<PageResponse<MaterialPriceDto>>
       MATERIAL_PRICE_PAGE_TYPE = new ParameterizedTypeReference<>() {};
 
+  /** Response type for the cached terminal catalogue, read for the last UEX sweep. */
+  private static final ParameterizedTypeReference<PageResponse<Map<String, Object>>>
+      TERMINAL_PAGE_TYPE = new ParameterizedTypeReference<>() {};
+
   /**
    * Renders the materials overview ({@code /materials}), grouped by category; uncategorised
    * materials appear under "Unsortiert".
@@ -228,12 +234,13 @@ public class MaterialsPageController {
    * star-system filter lists; the grid itself comes from {@link #getMatrixData}.
    *
    * @param model Thymeleaf model populated with the {@code materialNames} and {@code starSystems}
-   *     filter source lists
+   *     filter source lists and the {@code uexAge} freshness hint
    * @return the {@code materials-overview} view name
    */
   @NotNull
   @GetMapping("/overview")
   public String getMatrixOverview(Model model) {
+    model.addAttribute("uexAge", uexAge());
     try {
       List<MaterialMatrixItemDto> items = fetchMatrixItems();
       model.addAttribute(
@@ -506,15 +513,18 @@ public class MaterialsPageController {
 
   /**
    * Renders the material detail page ({@code /materials/{id}}) with the complete price list across
-   * all backend pages (REQ-UI-015). On backend failure the model stays empty.
+   * all backend pages (REQ-UI-015), the terminal rows sorted by sale price and the four price
+   * figures. On backend failure the model stays empty.
    *
    * @param id material id
-   * @param model Thymeleaf model populated with {@code material} and {@code prices}
+   * @param model Thymeleaf model populated with {@code material}, {@code prices}, {@code
+   *     terminalRows}, {@code priceSummary} and {@code uexAge}
    * @return the {@code material-detail} view name
    */
   @NotNull
   @GetMapping("/{id}")
   public String getMaterialDetail(@PathVariable @NotNull UUID id, Model model) {
+    model.addAttribute("uexAge", uexAge());
     try {
       MaterialDto material = backendApiClient.get("/api/v1/materials/" + id, MaterialDto.class);
       model.addAttribute("material", material);
@@ -535,14 +545,54 @@ public class MaterialsPageController {
             id,
             CatalogPages.MAX_CATALOG_PAGES);
       }
-      model.addAttribute("prices", new ArrayList<>(prices.items()));
-
+      List<MaterialPriceDto> priceList = new ArrayList<>(prices.items());
+      model.addAttribute("prices", priceList);
+      List<MaterialTerminalPrices.Row> rows =
+          MaterialTerminalPrices.rows(priceList, matrixItemsOf(id));
+      model.addAttribute("terminalRows", rows);
+      model.addAttribute("priceSummary", MaterialTerminalPrices.summarize(rows));
     } catch (Exception e) {
       log.error("Error loading material detail for id {}", id, e);
       model.addAttribute("error", "error.material.details.load");
       model.addAttribute("material", null);
       model.addAttribute("prices", new ArrayList<>());
+      model.addAttribute("terminalRows", List.of());
+      model.addAttribute("priceSummary", MaterialTerminalPrices.summarize(List.of()));
     }
     return "material-detail";
+  }
+
+  /**
+   * The cached price-matrix rows of one material, which carry each terminal's location; a failure
+   * yields no rows, so the detail table only loses its locations.
+   *
+   * @param id the material
+   * @return the material's matrix rows, never {@code null}
+   */
+  @NotNull
+  private List<MaterialMatrixItemDto> matrixItemsOf(@NotNull UUID id) {
+    try {
+      return MaterialTerminalPrices.forMaterial(fetchMatrixItems(), id);
+    } catch (Exception e) {
+      log.warn("Price matrix unavailable for the locations of material {}", id, e);
+      return List.of();
+    }
+  }
+
+  /**
+   * How long ago the last UEX sweep ran, read from the cached terminal catalogue.
+   *
+   * @return the age, or {@code null} when the catalogue is unavailable or carries no sweep time
+   */
+  @Nullable
+  private UexAge uexAge() {
+    try {
+      PageResponse<Map<String, Object>> terminals =
+          backendApiClient.getCached(CachedCatalog.TERMINALS, TERMINAL_PAGE_TYPE);
+      return UexAge.of(UexAge.latestSync(terminals), Instant.now());
+    } catch (Exception e) {
+      log.warn("Terminal catalogue unavailable for the UEX freshness hint", e);
+      return null;
+    }
   }
 }

@@ -45,6 +45,11 @@
   und deutscher/englischer Bezeichnung unter „Qualitätsstufen“ an; neue Stufen brauchen kein Release.
   „Keine“ und „Gut (650+)“ bleiben unverändert (REQ-ORDERS-036, ADR-0241, Migration V261–V264).
 
+- **Handel im neuen Muster.** Die Preis-Übersicht zeigt, wie alt die UEX-Preise sind, markiert je
+  Material den besten Verkauf (grün) und Einkauf (blau) und die Spanne; die Material-Detailseite hat
+  vier Kennzahlen und eine nach Verkaufspreis sortierte Terminal-Tabelle mit Ort; die
+  Profitberechnung ist nach Max Profit sortiert und nummeriert.
+
 - **Backend: Modulkarte und eingefrorene Modulkopplung (Guard G-09).** Eine Domain-Map ordnet jede
   Backend-Klasse einem der 26 Zielmodule zu; ein ArchUnit-`modules()`-Test friert die heutigen 138
   Kanten gegen die Rangordnung ein, neue scheitern. Spring Modulith 2.1.1 läuft nur im Testumfang
