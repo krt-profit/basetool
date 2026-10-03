@@ -91,13 +91,9 @@ class ContextShapeTest {
     @Scheduled(fixedDelay = 1000)
     void third() {}
 
-    /**
-     * A fixture listener.
-     *
-     * @param event the event
-     */
-    @TransactionalEventListener
-    void onEvent(Object event) {}
+    /** A fixture listener that declares its event type instead of taking it as a parameter. */
+    @TransactionalEventListener(classes = Object.class)
+    void onEvent() {}
   }
 
   /** A fixture page controller. */
