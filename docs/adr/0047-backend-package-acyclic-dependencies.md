@@ -1,9 +1,9 @@
 # ADR-0047 — Backend packages form an acyclic dependency graph
 
-- **Status:** Accepted — amended 2026-10-02 (module cycles in a frozen baseline, layer cycles per module, see below)
+- **Status:** Accepted — amended 2026-10-02 (see below)
 - **Date:** 2026-06-27
 - **Deciders:** @greluc
-- **Amended:** 2026-10-02 — `support` is an allow-list leaf, the layer rules select by role, and the layers inside each module are acyclic (REQ-SEC-073, see the Amendment section below)
+- **Amended:** 2026-10-02 — `support` is an allow-list leaf, the layer rules select by role, the layers inside each module are acyclic, and module cycles sit in a frozen baseline (REQ-SEC-073, see the Amendment section below)
 - **Related:** [`ArchitectureTest`](../../backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java) (`backendPackagesShouldBeFreeOfDependencyCycles`, `supportPackageMustStayADependencyLeaf`, `mapperLayerShouldNotReachIntoSecurityContext`) · ADR-0012 (layering)
 
 ## Context
@@ -114,10 +114,12 @@ removals are routine relocations.
 - **Backend-wide `beFreeOfCycles` left unenforced (a one-off cleanup)** — rejected: without
   the gate the graph would re-acquire cycles within a few PRs.
 
-## Amendment (2026-10-02) — role selection, an allow-list leaf, and layer cycles per module
+## Amendment — 2026-10-02: role selection, an allow-list leaf, layer cycles per module, module cycles frozen
 
-Part of guard G-01 of the domain modularisation plan (REQ-SEC-073), so that moving classes into
-domain packages cannot disarm these rules silently:
+Domain modularisation plan §5.7, guards G-01 and G-09 (REQ-SEC-073; ADR-0231, ADR-0233), so that
+moving classes into domain packages cannot disarm these rules silently, and so that the domain
+modules — a second level of slices whose graph is not acyclic today (21 of 23 domains in one
+strongly connected component) — get a cycle gate of their own:
 
 - **The layer rules select by role** (`@Service`, MapStruct `@Mapper`, Spring Data repositories,
   JPA entities, Bean Validation constraints and validators) plus the package tree of one class of
@@ -129,25 +131,16 @@ domain packages cannot disarm these rules silently:
   layer packages that a domain package would not match. `support` holds domain-free helpers; logic
   that a mapper and a service share belongs to the domain that owns it, inverted through an SPI
   there. The "obvious home" for shared helpers named above is narrowed accordingly.
-- **The layers inside each module are acyclic** (`layersInsideEachModuleShouldBeFreeOfDependencyCycles`):
-  a top-level package named like one of today's 21 layers is a layer of the root module, any other
-  top-level package is a domain module whose sub-packages are its layers. Cycles between modules
-  are not this rule's subject. Today only the root module exists, so it checks exactly the slices
-  of `backendPackagesShouldBeFreeOfDependencyCycles`, which stays.
-
-## Amendment — 2026-10-02: module cycles frozen, layer cycles per module
-
-Domain modularisation plan §5.7, guards G-01 and G-09; ADR-0231, ADR-0233. The backend gets a
-second level of slices — the domain modules — whose graph is not acyclic today (21 of 23 domains in
-one strongly connected component). Two rules follow:
-
+- **The layers inside each module are acyclic** (`layersInsideEachModuleShouldBeFreeOfDependencyCycles`,
+  never frozen): a top-level package named like one of today's 21 layers is a layer of the root
+  module, any other top-level package is a domain module whose sub-packages are its layers. Cycles
+  between modules are not this rule's subject. Today only the root module exists, so it checks
+  exactly the slices of `backendPackagesShouldBeFreeOfDependencyCycles`, which stays and keeps
+  guarding the layer packages while they exist.
 - **Module cycles are frozen in a baseline.** The ArchUnit `modules()` rule over the domain map,
   wrapped in `FreezingArchRule`, records today's violating edges, cycles included, in a committed
   store that may only shrink. This is the alternative the decision above rejected for the layers;
   it is accepted for the modules because their cycles cannot be removed before the gate is needed,
   and the store makes every removal visible.
-- **Layer cycles are checked per module.** `backendPackagesShouldBeFreeOfDependencyCycles` keeps
-  guarding the layer packages while they exist, and a second cycle rule checks the layers inside
-  each module (`api`, `internal`, `web`), never frozen.
 
 The leaf-SPI inversion of the decision above is also how an upward module edge is broken (ADR-0232).

@@ -103,23 +103,16 @@ non-`Bank*` class, already the seam's collaborator) and the seam consumes it; `B
 the ledger and the grant model stay org-unit-blind. The asymmetry from the base decision holds: the
 special-account view, like the subordinate drill-down, is view-only.
 
-## Amendment (2026-10-02) — the pins no longer rely on the `Bank*` name
-
-The "deliberately non-`Bank*` name" above was what kept the seam out of
-`bankClassesMustNotConsultOrgUnitScope`. Since 2026-10-02 both pins select the bank domain by class
-literal and module package instead (ADR-0020's amendment of the same date, REQ-SEC-073): a new
-bridge is refused by `orgUnitAwareBankSeamIsContainedToOneClass` whatever its name, and a new class
-named after the bank must be listed as a bank class or on the org-unit side before the build passes.
-The decision of this ADR is unchanged.
-
-## Amendment — 2026-10-02: the seam rules are re-keyed
+## Amendment — 2026-10-02: the pins no longer rely on the `Bank*` name
 
 Owner-approved on 2026-10-02, the same change as the ADR-0020 amendment (domain modularisation plan
-§5.4, guard G-01). `bankClassesMustNotConsultOrgUnitScope` and
-`orgUnitAwareBankSeamIsContainedToOneClass` select and name their classes by package or module
-membership and class literals instead of the `Bank` name prefix and FQCN strings. The rejected
+§5.4, guard G-01, REQ-SEC-073). The "deliberately non-`Bank*` name" above was what kept the seam out
+of `bankClassesMustNotConsultOrgUnitScope`. Both pins now select the bank domain by class literal
+and module package instead of the `Bank` name prefix and FQCN strings: a new bridge is refused by
+`orgUnitAwareBankSeamIsContainedToOneClass` whatever its name, and a new class named after the bank
+must be listed as a bank class or on the org-unit side before the build passes. The rejected
 alternative above ("any new bridge must be non-`Bank*`") becomes: any new bridge is a new decision
 and a new class literal in the containment rule. The bridge set stays exactly
 `OrgUnitBankAccessService`, and its collaborators `OrgUnitBankVisibilityService` and
 `OrgUnitBankApprovalLimitService` (ADR-0065) still depend on neither `OwnerScopeService` nor, for
-the first, `BankAccountRepository`.
+the first, `BankAccountRepository`. The decision of this ADR is unchanged.

@@ -55,11 +55,11 @@ bank role.
 - **Several bridging classes** — rejected: the containment pin keeps the blast radius to one
   auditable seam.
 
-## Amendment (2026-10-02) — the pins are keyed by class literal, not by name prefix
+## Amendment — 2026-10-02: the seam rules are keyed by class literal, not by name prefix
 
-Approved by @greluc on 2026-10-02 (domain modularisation plan §5.4, guard G-01; REQ-SEC-073). The
-two pins no longer select by the `Bank` name prefix or name their targets by a fully qualified
-string, because a rename or a move would have made either one pass while checking nothing:
+Owner-approved on 2026-10-02 (domain modularisation plan §5.4, guard G-01, ADR-0231/0233;
+REQ-SEC-073). Both ArchUnit pins stop depending on names that a rename or a package move changes,
+because either one would otherwise pass while checking nothing:
 
 - **"A bank class" is the bank domain**: the classes listed by class literal in
   `ArchitectureTest.BANK_CLASSES` (the `Bank*` classes and the bank request records whose names do
@@ -67,28 +67,14 @@ string, because a rename or a move would have made either one pass while checkin
   mappers, and every class of a `bank` module package once the bank has one.
   `everyBankNamedClassIsClassified` puts every class named after the bank either into that list or
   into the reviewed org-unit side (`ORG_UNIT_BANK_SIDE`), so a new one cannot slip past.
-- **`OwnerScopeService` and `OrgUnitBankAccessService` are class literals**, and each pin asserts a
-  selection floor, so a shrinking selection fails the build.
+- **`OwnerScopeService` and `OrgUnitBankAccessService` are class literals** instead of FQCN strings:
+  `OrgUnitBankAccessService` is the one class `bankClassesMustNotConsultOrgUnitScope` exempts and the
+  one bridge `orgUnitAwareBankSeamIsContainedToOneClass` permits.
 - **The containment pin is stricter**: a bridge is any class that depends on `OwnerScopeService`
-  and on *any* bank-domain class, not only on `BankAccountRepository`. The bridge set is unchanged —
-  exactly `OrgUnitBankAccessService`.
+  and on *any* bank-domain class, not only on `BankAccountRepository`.
 - What keeps the seam out of the org-unit-blindness pin is now its absence from `BANK_CLASSES` (and
   its place in `ORG_UNIT_BANK_SIDE`), not its name. The non-`Bank*` name stays as a readable signal.
 
-## Amendment — 2026-10-02: the seam rules are re-keyed
-
-Owner-approved on 2026-10-02 (domain modularisation plan §5.4, guard G-01, ADR-0231/0233). Both
-ArchUnit rules stop depending on names that a package move changes:
-
-- `bankClassesMustNotConsultOrgUnitScope` selects the bank's classes by package and module
-  membership — the domain map's `bank` module, and its package once the bank has moved — instead of
-  the `Bank` simple-name prefix, and names `OwnerScopeService` by class literal instead of an FQCN
-  string. `OrgUnitBankAccessService` is the one class it exempts, named by class literal.
-- `orgUnitAwareBankSeamIsContainedToOneClass` names `OwnerScopeService` and
-  `BankAccountRepository` by class literal and the permitted bridge as
-  `OrgUnitBankAccessService.class`.
-
-Each rule asserts a selection floor and is proven able to fail once. The bridge set stays exactly
-`OrgUnitBankAccessService`; a second bridge still needs its own decision. The seam's non-`Bank*`
-name is no longer what keeps it outside the first rule; the explicit exemption is, and a class
-literal follows the seam through a move or a rename where a string would silently stop matching.
+Each pin asserts a selection floor, so a shrinking selection fails the build, and each is proven
+able to fail once. The bridge set stays exactly `OrgUnitBankAccessService`; a second bridge still
+needs its own decision.
