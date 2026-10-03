@@ -1,6 +1,6 @@
 # ADR-0233 — Module boundaries are enforced by ArchUnit and by Spring Modulith in test scope
 
-- **Status:** Accepted — implementation pending (plan Phase 0 steps 0.2 and 0.3)
+- **Status:** Accepted — enforcement in place (Phase 0: re-keyed ArchUnit rules with selection floors, the domain map and the frozen module baseline, Spring Modulith 2.1.1 in test scope); the verified module set grows as domains move (Phase 1 on)
 - **Date:** 2026-09-29
 - **Deciders:** @greluc (owner decision D-02)
 - **Related:** [domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) §5.7, §6, §10 ·
