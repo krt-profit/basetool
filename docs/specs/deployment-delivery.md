@@ -2473,7 +2473,7 @@ Values at introduction, identical to the name-keyed maps they replace:
 | --- | --- | --- | --- |
 | `backend` | 3072m | 0.82 / 0.65 | `…backend.service.*` |
 | `frontend` | 2048m | 0.60 / 0.46 | `…frontend.service.*` |
-| `ingest` | 1024m | 0.93 / 0.85 | `…ingest.service.*` |
+| `ingest` | 1024m | 0.93 / 0.85 | the three former `…ingest.service` classes, by name in their concern packages (`contract`, `handoff`, `relay`) |
 | `keycloak-spi` | 1024m | 0.66 / 0.60 | — |
 | `logging-support` | 1024m | 0.50 / 0.40 | — |
 | `test-support` | 1024m | — | — |
