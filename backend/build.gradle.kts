@@ -115,10 +115,10 @@ tasks.named<Test>("test") {
   inputs
     .files(
       rootProject.file(
-        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/exchange/ExchangeRelay.java"
+        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/relay/ExchangeRelay.java"
       ),
       rootProject.file(
-        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/config/ObservationPrivacyFilter.java"
+        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/observability/ObservationPrivacyFilter.java"
       ),
       rootProject.file(
         "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/ObservationPrivacyFilter.java"

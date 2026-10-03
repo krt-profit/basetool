@@ -1151,8 +1151,9 @@ logs. All of them obey REQ-OBS-006: **only bounded, enumerable labels** (applica
 fixed local literal set) — never a username, `sub`, IP, id, path, URI or amount — and bank
 figures are exposed as **counts only**, never balances or transaction amounts.
 
-**Mechanics.** Meter names live in a per-module `metrics.MetricNames` constants holder (the
-single source of truth for names, tag keys and the non-enum label values). The backend
+**Mechanics.** Meter names live in a per-module `MetricNames` constants holder (package `metrics`
+in the backend and frontend, `observability` in the ingest; the single source of truth for names,
+tag keys and the non-enum label values). The backend
 `metrics` package is a dependency leaf (Micrometer only) so `service` / `task` / `filter` /
 `exception` reuse it without a package cycle (ADR-0047). Scheduled-job health flows through the
 shared `metrics.TaskMetrics` wrapper; queue depth is sampled by the `task.BusinessMetricsCollector`
@@ -3043,7 +3044,7 @@ or free-text values.
 
 **Enforced by:** `AlertedMeterPresenceTest` (dead-alert guard: a meter an alert rule names must be
 registered) · `frontend/.../config/Resilience4jMetricsConfig` (publishes the three meters Boot 4
-silently stopped publishing) · `ingest/.../config/Resilience4jMetricsConfig` (the gateway's breaker
+silently stopped publishing) · `ingest/.../observability/Resilience4jMetricsConfig` (the gateway's breaker
 and bulkhead meters, which had no series at all until then; `Resilience4jMetricsConfigTest`) · `monitoring/prometheus/alerts/meta.yml` (`meta-self-health` + `meta-log-pipeline`
 groups, incl. `MonitoringReconcileDisabled`) · `monitoring/prometheus/alerts/infrastructure.yml`
 (container guards, incl. `ContainerPidsHigh` + the `changes()`-based `ContainerRestartLoop`) ·
@@ -3121,7 +3122,7 @@ curl -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer ${ADM
   https://backend:11271/actuator/loggers/de.greluc.krt.profit.basetool.backend.integration.scwiki
 
 # frontend / ingest, in prod: read only — the write operation is not registered
-curl https://localhost:11272/actuator/loggers/de.greluc.krt.profit.basetool.ingest.filter
+curl https://localhost:11272/actuator/loggers/de.greluc.krt.profit.basetool.ingest.edge
 ```
 
 Without it, every DEBUG diagnosis costs a config edit, a redeploy and — because each config is a

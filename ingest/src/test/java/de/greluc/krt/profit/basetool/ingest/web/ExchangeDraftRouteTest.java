@@ -35,17 +35,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.nimbusds.jose.jwk.ECKey;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeBudget;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeIdempotency;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeQuotas;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeRegistryReader;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeRelay;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeRevocationReader;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeTestSupport;
-import de.greluc.krt.profit.basetool.ingest.exchange.ExchangeUnavailableException;
-import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.ingest.model.dto.HandoffKind;
-import de.greluc.krt.profit.basetool.ingest.service.HandoffStagingService;
+import de.greluc.krt.profit.basetool.ingest.handoff.HandoffKind;
+import de.greluc.krt.profit.basetool.ingest.handoff.HandoffStagingService;
+import de.greluc.krt.profit.basetool.ingest.observability.MetricNames;
+import de.greluc.krt.profit.basetool.ingest.registry.ExchangeRegistryReader;
+import de.greluc.krt.profit.basetool.ingest.registry.ExchangeRevocationReader;
+import de.greluc.krt.profit.basetool.ingest.registry.ExchangeUnavailableException;
+import de.greluc.krt.profit.basetool.ingest.relay.ExchangeRelay;
+import de.greluc.krt.profit.basetool.ingest.store.ExchangeBudget;
+import de.greluc.krt.profit.basetool.ingest.store.ExchangeIdempotency;
+import de.greluc.krt.profit.basetool.ingest.store.ExchangeQuotas;
+import de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.nio.file.Files;
 import java.nio.file.Path;
