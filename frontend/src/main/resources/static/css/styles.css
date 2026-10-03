@@ -4805,6 +4805,7 @@
     }
 
     .table-responsive {
+        position: relative;
         width: 100%;
         overflow-x: auto;
         display: block;
@@ -7017,6 +7018,7 @@
             height: auto;
             padding: 0;
             border: 0;
+            overflow-wrap: anywhere;
         }
         .data-table--stack td:first-child {
             flex: 1 1 0;
@@ -7030,7 +7032,6 @@
             order: 3;
             flex: 0 1 auto;
             min-width: 0;
-            overflow-wrap: anywhere;
             margin-right: -0.75rem;
             font-size: 0.85rem;
             text-align: left;

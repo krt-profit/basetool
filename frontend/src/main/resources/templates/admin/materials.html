@@ -42,76 +42,78 @@
     <div id="materials-results" class="card card--flush">
         <div data-materials-table th:hidden="${materials == null or materials.isEmpty()}"
              th:data-list-total="${materials != null ? materials.size() : 0}">
-            <table id="materialsTable" class="data-table data-table--stack admin-materials-table">
-                <thead>
-                    <tr>
-                        <th th:text="#{admin.material.name}">Name</th>
-                        <th th:text="#{admin.material.type}">MaterialType</th>
-                        <th th:text="#{admin.materials.quantityType}">Mengentyp</th>
-                        <th th:text="#{admin.materials.categories.name}">Kategorie</th>
-                        <th th:text="#{admin.material.refined}">Veredeltes Material</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="mat : ${materials}" th:data-mat-id="${mat.id}" th:data-version="${mat.version}" data-testid="material-row">
-                        <td>
-                            <span class="cell-title" th:text="${mat?.name}">Name</span>
-                            <div class="cluster gap-1 admin-material-flags"
-                                 th:if="${mat?.isManualEntry == true or mat?.isVisible == false or mat?.isIllegal == true or mat?.isVolatileQt == true or mat?.isVolatileTime == true}">
-                                <span th:if="${mat?.isManualEntry == true}" class="material-manual-badge" th:title="#{admin.material.manual_entry.tooltip}" th:text="#{admin.material.manual_entry}">Manuell</span>
-                                <span th:if="${mat?.isVisible == false}" class="material-hidden-badge" th:title="#{admin.material.hidden.tooltip}" th:text="#{admin.material.hidden}">Versteckt</span>
-                                <span th:if="${mat?.isIllegal == true}" class="text-danger admin-material-flag" th:title="#{material.is_illegal}">&#9888;</span>
-                                <span th:if="${mat?.isVolatileQt == true}" class="text-warning admin-material-flag" th:title="#{material.is_volatile_qt}">&#9888;</span>
-                                <span th:if="${mat?.isVolatileTime == true}" class="text-warning admin-material-flag" th:title="#{material.is_volatile_time}">&#9888;</span>
-                            </div>
-                        </td>
-                        <td th:attr="data-label=#{admin.material.type}">
-                            <span class="nowrap" th:text="${mat?.type != null ? #messages.msg('material.type.' + mat.type) : '-'}">Type</span>
-                            <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" class="stack gap-1 admin-material-toggles">
-                                <label class="admin-material-toggle">
-                                    <input type="checkbox" name="isManualRawMaterial" data-update-type="MANUAL_RAW" th:checked="${mat.isManualRawMaterial == true}" data-trigger="admin-materials-update" />
-                                    <span th:text="#{admin.material.manual_raw}">Manuelles Rohmaterial</span>
-                                </label>
-                                <label class="admin-material-toggle">
-                                    <input type="checkbox" name="isJobOrder" data-update-type="JOB_ORDER" th:checked="${mat.isJobOrder == true}" data-trigger="admin-materials-update" />
-                                    <span th:text="#{admin.material.job_order}">Auftrag</span>
-                                </label>
-                                <label class="admin-material-toggle">
-                                    <input type="checkbox" name="isVisible" data-update-type="VISIBILITY" th:checked="${mat.isVisible != false}" data-trigger="admin-materials-update" />
-                                    <span th:text="#{admin.material.visible}">Sichtbar</span>
-                                </label>
-                            </div>
-                        </td>
-                        <td th:attr="data-label=#{admin.materials.quantityType}">
-                            <select name="quantityType" data-update-type="QUANTITY_TYPE" data-trigger="admin-materials-update" class="w-full"
-                                    th:attr="aria-label=#{admin.materials.quantityType}">
-                                <option value="SCU" th:text="#{admin.materials.quantityType.scu}" th:selected="${mat.quantityType == 'SCU' || mat.quantityType == null}">SCU</option>
-                                <option value="PIECE" th:text="#{admin.materials.quantityType.piece}" th:selected="${mat.quantityType == 'PIECE'}">Stück</option>
-                            </select>
-                        </td>
-                        <td th:attr="data-label=#{admin.materials.categories.name}">
-                            <select name="categoryId" data-update-type="CATEGORY" data-trigger="admin-materials-update" class="w-full"
-                                    th:attr="aria-label=#{admin.materials.categories.name}">
-                                <option value="" th:text="#{admin.materials.categories.unsorted}">Unsortiert</option>
-                                <option th:each="cat : ${categories}" th:value="${cat.id}" th:text="${cat.name}" th:selected="${mat.category != null and mat.category.id == cat.id}">Category</option>
-                            </select>
-                        </td>
-                        <td th:attr="data-label=#{admin.material.refined}">
-                            <th:block th:if="${mat?.type == 'RAW' or mat?.isManualRawMaterial == true}">
-                                <select sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" name="refinedMaterialId" data-update-type="REFINED" data-trigger="admin-materials-update" class="w-full"
-                                        th:attr="aria-label=#{admin.material.refined}">
-                                    <option value="" th:text="#{general.please_select}">Bitte wählen...</option>
-                                    <option th:each="rm : ${refinedMaterials}" th:value="${rm.id}" th:text="${rm.name}" th:selected="${mat.refinedMaterial != null and mat.refinedMaterial.id == rm.id}">Refined Material</option>
+            <div class="table-responsive">
+                <table id="materialsTable" class="data-table data-table--stack admin-materials-table">
+                    <thead>
+                        <tr>
+                            <th th:text="#{admin.material.name}">Name</th>
+                            <th th:text="#{admin.material.type}">MaterialType</th>
+                            <th th:text="#{admin.materials.quantityType}">Mengentyp</th>
+                            <th th:text="#{admin.materials.categories.name}">Kategorie</th>
+                            <th th:text="#{admin.material.refined}">Veredeltes Material</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="mat : ${materials}" th:data-mat-id="${mat.id}" th:data-version="${mat.version}" data-testid="material-row">
+                            <td>
+                                <span class="cell-title" th:text="${mat?.name}">Name</span>
+                                <div class="cluster gap-1 admin-material-flags"
+                                     th:if="${mat?.isManualEntry == true or mat?.isVisible == false or mat?.isIllegal == true or mat?.isVolatileQt == true or mat?.isVolatileTime == true}">
+                                    <span th:if="${mat?.isManualEntry == true}" class="material-manual-badge" th:title="#{admin.material.manual_entry.tooltip}" th:text="#{admin.material.manual_entry}">Manuell</span>
+                                    <span th:if="${mat?.isVisible == false}" class="material-hidden-badge" th:title="#{admin.material.hidden.tooltip}" th:text="#{admin.material.hidden}">Versteckt</span>
+                                    <span th:if="${mat?.isIllegal == true}" class="text-danger admin-material-flag" th:title="#{material.is_illegal}">&#9888;</span>
+                                    <span th:if="${mat?.isVolatileQt == true}" class="text-warning admin-material-flag" th:title="#{material.is_volatile_qt}">&#9888;</span>
+                                    <span th:if="${mat?.isVolatileTime == true}" class="text-warning admin-material-flag" th:title="#{material.is_volatile_time}">&#9888;</span>
+                                </div>
+                            </td>
+                            <td th:attr="data-label=#{admin.material.type}">
+                                <span class="nowrap" th:text="${mat?.type != null ? #messages.msg('material.type.' + mat.type) : '-'}">Type</span>
+                                <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" class="stack gap-1 admin-material-toggles">
+                                    <label class="admin-material-toggle">
+                                        <input type="checkbox" name="isManualRawMaterial" data-update-type="MANUAL_RAW" th:checked="${mat.isManualRawMaterial == true}" data-trigger="admin-materials-update" />
+                                        <span th:text="#{admin.material.manual_raw}">Manuelles Rohmaterial</span>
+                                    </label>
+                                    <label class="admin-material-toggle">
+                                        <input type="checkbox" name="isJobOrder" data-update-type="JOB_ORDER" th:checked="${mat.isJobOrder == true}" data-trigger="admin-materials-update" />
+                                        <span th:text="#{admin.material.job_order}">Auftrag</span>
+                                    </label>
+                                    <label class="admin-material-toggle">
+                                        <input type="checkbox" name="isVisible" data-update-type="VISIBILITY" th:checked="${mat.isVisible != false}" data-trigger="admin-materials-update" />
+                                        <span th:text="#{admin.material.visible}">Sichtbar</span>
+                                    </label>
+                                </div>
+                            </td>
+                            <td th:attr="data-label=#{admin.materials.quantityType}">
+                                <select name="quantityType" data-update-type="QUANTITY_TYPE" data-trigger="admin-materials-update" class="w-full"
+                                        th:attr="aria-label=#{admin.materials.quantityType}">
+                                    <option value="SCU" th:text="#{admin.materials.quantityType.scu}" th:selected="${mat.quantityType == 'SCU' || mat.quantityType == null}">SCU</option>
+                                    <option value="PIECE" th:text="#{admin.materials.quantityType.piece}" th:selected="${mat.quantityType == 'PIECE'}">Stück</option>
                                 </select>
-                                <span sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:text="${mat.refinedMaterial != null ? mat.refinedMaterial.name : '-'}">-</span>
-                            </th:block>
-                            <th:block th:if="${mat?.type != 'RAW' and mat?.isManualRawMaterial != true}">
-                                <span>-</span>
-                            </th:block>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+                            </td>
+                            <td th:attr="data-label=#{admin.materials.categories.name}">
+                                <select name="categoryId" data-update-type="CATEGORY" data-trigger="admin-materials-update" class="w-full"
+                                        th:attr="aria-label=#{admin.materials.categories.name}">
+                                    <option value="" th:text="#{admin.materials.categories.unsorted}">Unsortiert</option>
+                                    <option th:each="cat : ${categories}" th:value="${cat.id}" th:text="${cat.name}" th:selected="${mat.category != null and mat.category.id == cat.id}">Category</option>
+                                </select>
+                            </td>
+                            <td th:attr="data-label=#{admin.material.refined}">
+                                <th:block th:if="${mat?.type == 'RAW' or mat?.isManualRawMaterial == true}">
+                                    <select sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" name="refinedMaterialId" data-update-type="REFINED" data-trigger="admin-materials-update" class="w-full"
+                                            th:attr="aria-label=#{admin.material.refined}">
+                                        <option value="" th:text="#{general.please_select}">Bitte wählen...</option>
+                                        <option th:each="rm : ${refinedMaterials}" th:value="${rm.id}" th:text="${rm.name}" th:selected="${mat.refinedMaterial != null and mat.refinedMaterial.id == rm.id}">Refined Material</option>
+                                    </select>
+                                    <span sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:text="${mat.refinedMaterial != null ? mat.refinedMaterial.name : '-'}">-</span>
+                                </th:block>
+                                <th:block th:if="${mat?.type != 'RAW' and mat?.isManualRawMaterial != true}">
+                                    <span>-</span>
+                                </th:block>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
         <th:block th:if="${materials == null or materials.isEmpty()}">
             <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.materials.empty', textKey='admin.materials.empty.text')}"></th:block>
