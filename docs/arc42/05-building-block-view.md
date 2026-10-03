@@ -73,6 +73,13 @@ Layered, with the direction enforced by ArchUnit rather than by convention:
 | `metrics` / `health` / `logging` | `basetool_*` business metrics, health indicators, MDC enrichment |
 | `filter` / `interceptor` / `annotation` / `validation` / `util` / `web` / `exception` / `config` | The usual Spring surface |
 
+These layer packages are being cut into domain modules (the
+[domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md), §5.1). Until a class has moved, the
+**domain map** [`backend/src/test/resources/architecture/domain-map.txt`](../../backend/src/test/resources/architecture/domain-map.txt)
+is the source of truth for its target module and that module's rank: every class is assigned there
+by the first matching rule, and a class no rule assigns fails the build
+([`module-boundaries.md`](../specs/module-boundaries.md), REQ-MOD-001/002).
+
 ## 5.3 Level 2 — inside `frontend`
 
 | Package | What lives there |

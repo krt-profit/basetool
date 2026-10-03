@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.MaterialService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
+import de.greluc.krt.profit.basetool.backend.web.PaginationUtil.PageCeiling;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -177,7 +178,12 @@ public class MaterialController {
       @RequestParam(required = false) String sort) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
-            page, size, sort, Set.of("name", "id", "minPriceBuy", "maxPriceSell"), "name");
+            page,
+            size,
+            sort,
+            Set.of("name", "id", "minPriceBuy", "maxPriceSell"),
+            "name",
+            PageCeiling.LOAD_ALL);
     Page<MaterialPriceOverviewDto> p = materialService.getMaterialPriceOverview(name, pageable);
     return PageResponse.of(p);
   }
@@ -206,7 +212,12 @@ public class MaterialController {
       @RequestParam(required = false) Boolean isAutoLoad) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
-            page, size, sort, Set.of("material.name", "terminal.name", "id"), "material.name");
+            page,
+            size,
+            sort,
+            Set.of("material.name", "terminal.name", "id"),
+            "material.name",
+            PageCeiling.LOAD_ALL);
     Page<MaterialMatrixItemDto> p =
         materialService.getMatrixItems(
             materialNames, starSystems, hasLoadingDock, isAutoLoad, pageable);
@@ -242,7 +253,8 @@ public class MaterialController {
             size,
             sort,
             Set.of("terminal.name", "priceBuy", "priceSell", "id"),
-            "terminal.name");
+            "terminal.name",
+            PageCeiling.LOAD_ALL);
     Page<MaterialPriceDto> p = materialService.getMaterialPrices(id, pageable);
     return PageResponse.of(p);
   }

@@ -76,8 +76,8 @@ common case, cap-hit banner), `CatalogPagesTest` (the shared walk + `truncated` 
 - A server-side pagination UI for the matrix. The load-all + client-side-filter interaction model
   is deliberate and shared with the admin catalog pages (ADR-0102 records why page-walking was
   chosen over a pagination UI).
-- The backend `size` clamp itself (`PaginationUtil.MAX_PAGE_SIZE`, SEC-03 rationale in its
-  Javadoc).
+- The backend `size` clamp itself (`PaginationUtil`, the kernel page policy of
+  [`api-conventions.md`](api-conventions.md) REQ-API-005).
 - The single-member eligibility re-render (`fragment=eligibilityCell`) and the rank-requirement /
   category admin pages — those fetch bounded per-entity or already-complete lists, not the matrix.
 
