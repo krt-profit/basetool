@@ -31,7 +31,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -246,7 +245,7 @@ public class BotProtectionFilter extends OncePerRequestFilter {
             "Bad request",
             CODE_SCHEMA_INVALID,
             "The query names a parameter without a name.");
-    problem.setProperty("errors", List.of(Map.of("pointer", "/", "message", "has no name")));
+    problem.setProperty("errors", List.of(new Problems.FieldError("/", "has no name")));
     response.setStatus(HttpStatus.BAD_REQUEST.value());
     response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
     response.setCharacterEncoding(StandardCharsets.UTF_8.name());

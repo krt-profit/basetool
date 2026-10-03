@@ -69,4 +69,13 @@ public final class Problems {
     }
     return problem;
   }
+
+  /**
+   * One entry of a problem's {@code errors[]}, serialized with its members in the order {@code
+   * pointer}, {@code message}.
+   *
+   * @param pointer the JSON Pointer of the refused value
+   * @param message what the value violates
+   */
+  public record FieldError(@NotNull String pointer, @NotNull String message) {}
 }
