@@ -745,9 +745,9 @@ parallel `/api/v2` path and no sunset window. It ships together with:
 
 > [!note] Amended 2026-10-02 — retirement by hard cut (owner decisions D-03, D-04, D-11; ADR-0234)
 > This used to read: retirement goes through `/api/v2` + `@ApiDeprecation` with a sunset rather
-> than a deletion. **Decided, implementation pending:** the ledger, the committed app call list and
-> the `APP_UPDATE_REQUIRED` answer do not exist yet (plan guard G-23, Phase 0 step 0.7); no frozen
-> operation may be retired before they do.
+> than a deletion. **Decided; partly implemented:** the `APP_UPDATE_REQUIRED` answer exists since
+> 2026-10-03 (REQ-API-020); the ledger and the committed app call list do not exist yet (plan guard
+> G-23, Phase 0 step 0.7), and no frozen operation may be retired before they do.
 
 > [!warning] Amended 2026-09-02 (owner-approved) — this sentence used to say every field it had
 > The wording was stricter than the rest of its own requirement and stricter than the gate that
@@ -831,7 +831,10 @@ move together.
 - [ ] **The frozen set covers what the app calls** — the app's call list committed per release and
   asserted against the set. **Open** (same decision; the app calls operations the set does not list
   yet).
-- [ ] **A retired path answers `APP_UPDATE_REQUIRED`.** **Open** (same decision).
+- [x] **A retired path answers `APP_UPDATE_REQUIRED`.** **Closed by REQ-API-020** (2026-10-03):
+  `RetiredOperationFilter` answers every operation of `retired-operations.txt` with `410
+  APP_UPDATE_REQUIRED` ahead of authentication; on the public API vhost once the edge admits the
+  ledger's retired paths (plan guard G-08).
 
 **Enforced by:** `ExternalContractTest` (backend) · the *Fail if a committed openapi.json is stale*
 step in `ci.yml` (since 2026-09-23), which is what keeps the document `ExternalContractTest` reads
@@ -885,14 +888,21 @@ and the old backend then walls old apps while new apps find their paths gone. Co
 - **Retired paths answer `APP_UPDATE_REQUIRED`**, which app versions that know it map to the wall.
 - **Cuts are announced and made at low usage.**
 
-> [!note] Amended 2026-10-02 — the release-bound floor (owner decision D-11; ADR-0234)
+> [!note] Amended 2026-10-02, implemented 2026-10-03 — the release-bound floor (owner decision D-11;
+> ADR-0234; REQ-API-020)
 > This used to read: configuration, not a table, because raising the floor has to work without a
-> migration, an admin screen or a deploy. **Decided, implementation pending:** today the floor is
-> still bound at backend start from `APP_ANDROID_MINIMUM_VERSION_CODE` (default `0`), which lives
-> only in the host `.env`, and is raised by runbook step S8 of
-> [`EXCHANGE_GO_LIVE_RUNBOOK.md`](../EXCHANGE_GO_LIVE_RUNBOOK.md) — after the re-cut release is
-> verified healthy, never with it, and reverted first on a rollback. That sequence holds until the
-> release-bound default ships. The app's re-read and `APP_UPDATE_REQUIRED` are not implemented yet.
+> migration, an admin screen or a deploy. Until 2026-10-03 the floor was bound at backend start from
+> `APP_ANDROID_MINIMUM_VERSION_CODE` (default `0`) in the host `.env` and raised by runbook step S8
+> of [`EXCHANGE_GO_LIVE_RUNBOOK.md`](../EXCHANGE_GO_LIVE_RUNBOOK.md), after the re-cut release was
+> verified healthy and reverted first on a rollback. Now the floor and the newest build are reviewed
+> literals in the backend's `application.yml` (`app.android.version-policy.release.*`), so they
+> deploy and roll back with the release; the host keeps only an emergency override under new names
+> (`APP_ANDROID_*_OVERRIDE`), and the retired `APP_ANDROID_MINIMUM_VERSION_CODE` /
+> `…_LATEST_VERSION_CODE` / `…_RELEASES_URL` reach no container. A raised floor is a change to that
+> literal in the wave's pull request, not runbook step S8. The code-level default stays `0`, so the
+> third property above still holds for a context without the committed block. Retired paths answer
+> `APP_UPDATE_REQUIRED`. The app's re-read on resume and after an unexpected 404 is not released yet
+> (basetool-android#209).
 
 The operation is itself in the frozen set, for an inverted reason worth stating — every other entry
 is frozen so a shipped app keeps working, this one so a shipped app can be told to stop. A renamed
@@ -902,16 +912,6 @@ reading "no floor" and carrying on against a contract that no longer exists.
 **The CTA is a deviation from the design.** Chapter 14 points its button at a store listing;
 distribution is GitHub Releases plus Obtainium (plan Q1), so `releasesUrl` names the release page
 instead. Recorded here rather than left as a silent difference between design and build.
-
-> [!note] Implemented 2026-10-03 — the floor rides the release (owner decision D-11, ADR-0234)
-> The paragraph above that calls the floor "configuration … without a deploy" is superseded. The
-> floor and the newest build are now reviewed literals in the backend's `application.yml`
-> (`app.android.version-policy.release.*`), so they deploy and roll back with the release; the host
-> keeps only an emergency override under new names (`APP_ANDROID_*_OVERRIDE`), and the retired
-> `APP_ANDROID_MINIMUM_VERSION_CODE` / `…_LATEST_VERSION_CODE` / `…_RELEASES_URL` reach no container.
-> A raised floor is a change to that literal in the wave's pull request, not runbook step S8. The
-> code-level default stays `0`, so the third property above still holds for a context without the
-> committed block. Retired paths answer `APP_UPDATE_REQUIRED`. Both are REQ-API-020.
 
 **Enforced by:** `AppVersionPolicyControllerTest`, `ExternalContractTest`,
 `ApiVhostAnonymousSurfaceTest` (backend) ·
