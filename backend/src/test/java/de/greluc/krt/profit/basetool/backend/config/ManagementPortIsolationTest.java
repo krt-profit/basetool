@@ -79,6 +79,28 @@ class ManagementPortIsolationTest {
   }
 
   /**
+   * Scrapes the management port until the latency timer has recorded a request, for at most five
+   * seconds, and returns the last scrape.
+   *
+   * <p>Tomcat stops the {@code http.server.requests} timer after the response has been sent, so a
+   * scrape issued right after the client received it can precede the recording.
+   *
+   * @return the last scrape body.
+   * @throws IOException if a scrape fails to send.
+   * @throws InterruptedException if a scrape or the wait between scrapes is interrupted.
+   */
+  private String scrapeOnceTheLatencyTimerRecorded() throws IOException, InterruptedException {
+    long deadline = System.nanoTime() + 5_000_000_000L;
+    String scrape = get(managementPort, "/actuator/prometheus").body();
+    while (!scrape.contains("http_server_requests_seconds_bucket{")
+        && System.nanoTime() < deadline) {
+      Thread.sleep(50);
+      scrape = get(managementPort, "/actuator/prometheus").body();
+    }
+    return scrape;
+  }
+
+  /**
    * Issues an unauthenticated POST against a local port and path.
    *
    * @param port the local port to target.
@@ -187,7 +209,7 @@ class ManagementPortIsolationTest {
   void theInFlightTimerCarriesNoHistogramWhileTheLatencyTimerKeepsIt() throws Exception {
     get(appPort, "/actuator/health");
 
-    String scrape = get(managementPort, "/actuator/prometheus").body();
+    String scrape = scrapeOnceTheLatencyTimerRecorded();
 
     assertThat(scrape)
         .as("no bucket series for the in-flight long-task timer")
