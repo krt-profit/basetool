@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
 > **Owner area:** ORDERS/UI · **Related ADRs:** [ADR-0104](../adr/0104-no-silent-caps-on-complete-list-surfaces.md),
 > [ADR-0120](../adr/0120-per-browser-filter-selection-persistence.md)
 
@@ -46,22 +46,24 @@ and an `ITEM` order's aggregation already scales each line by its not-yet-manufa
 (`JobOrder.responsibleOrgUnit`, REQ-ORDERS-022 / REQ-ORG-003) — the unit that has to procure the
 material, and the side the job-order visibility scope keys on. Grouping on the *requesting* unit
 would answer a different question and is explicitly not what this page does. Within a section there
-is one row per `(material, qualityRequirement)` bucket — the same bucket key the rest of the order
-domain uses, so a `MATERIAL` line with a stored 650-floor and an `ITEM` requirement of `GOOD` land in
-the *same* row rather than appearing as two materials. Each row carries four amounts, formatted per
+is one row per `(material, quality tier)` bucket — the same bucket key the rest of the order
+domain uses ([`orders-quality-tiers.md`](orders-quality-tiers.md), REQ-ORDERS-036), so a `MATERIAL`
+line at the `GOOD` tier and an `ITEM` requirement of `GOOD` land in the *same* row rather than
+appearing as two materials. Each row carries four amounts, formatted per
 the material's `quantityType` (whole units for `PIECE`, three decimals for SCU — REQ-ORDERS-001/002),
 rounded on the **sum** rather than per contribution:
 
 |    Column    |                                                           Meaning                                                           |
 |--------------|-----------------------------------------------------------------------------------------------------------------------------|
 | Bedarf       | summed outstanding required amount across the section's orders                                                              |
-| Bestand      | summed inventory **linked to those orders** for the bucket, at or above its quality floor (`GOOD` → 650, `NONE` → no floor) |
+| Bestand      | summed inventory **linked to those orders** that the quality-bucket allocation counts toward this bucket (REQ-ORDERS-037)    |
 | Eintragungen | summed material claims lodged on those orders' buckets; `0` when no contributing order is a public SK order                 |
 | Offen        | `Bedarf − Bestand`, floored at 0                                                                                            |
 
-`Bestand` is the same per-bucket sum the order's own material list shows, resolved through the same
-batched index (`JobOrderStockProjectionService.loadOrderLinkedStockIndex`), so a row always
-reconciles with the orders behind it. **`Offen` MUST ignore `Eintragungen`**: a claim (REQ-ORDERS-024)
+`Bestand` is the same per-bucket figure the order's own material list shows, resolved through the
+same batched index and the same allocation (`JobOrderStockProjectionService.loadOrderLinkedStockIndex`,
+`OrderLinkedStockIndex#bookedFor`), so a row always reconciles with the orders behind it and a stock
+row that meets two floors of one order counts toward only one of them (REQ-ORDERS-037). **`Offen` MUST ignore `Eintragungen`**: a claim (REQ-ORDERS-024)
 is a signal-only promise that has moved no inventory, so subtracting it would understate what a
 gathering run still has to collect. For the same reason the two are separate columns and are never
 summed. Note this `Offen` is deliberately *not* the per-order `openAmount` of `AggregatedMaterialDto`,
@@ -92,7 +94,8 @@ collapsed by the client, so a JS-less caller keeps every row. Three filters:
 
 - **Material** — a multi-select of the materials the page actually shows, with an in-dropdown text
   search. The search is presentation only: hiding an option never changes what the table shows.
-- **Quality** — the `GOOD` / `NONE` buckets.
+- **Quality** — one checkbox per quality tier: every active tier plus any inactive tier a shown row
+  still uses, highest floor first, labelled from the catalogue (REQ-ORDERS-036).
 - **Hide covered** — hides every row whose `Offen` is 0. Defined on **stock**, not on claims: a
   bucket that is only *claimed* still has to be gathered and MUST stay visible, the same reason
   `Offen` itself ignores `Eintragungen`.
@@ -107,8 +110,8 @@ click ascending, second descending, third back to the server's own order, with `
 direction indicator on the active column. One selection drives **every** group table so the units
 stay comparable side by side, and each bucket's two rows — the figures and its drill-down — move as
 a pair. Sorting reads the raw values from `data-*` attributes, never the rendered cell text, which
-is localised (`1000,000 SCU`) and would sort as a string. Quality is not sortable: it is a two-value
-bucket the filter already narrows.
+is localised (`1000,000 SCU`) and would sort as a string. Quality is not sortable: it is a handful of
+tiers the filter already narrows.
 
 Filter and sort state persists per browser in one JSON object under `orders_demand_filters`
 (REQ-UI-017 / ADR-0120), alongside the drill-down's own `orders_demand_expanded`, and — like the
@@ -185,7 +188,8 @@ localStorage restore across a reload, the nav entry, the collapsible panel + act
 count, hide-covered, the material filter and its search, and the sort cycle) ·
 **Code:** `JobOrderMaterialDemandService`, `JobOrderController` `GET
 /api/v1/orders/material-demand`, `JobOrderRepository.findScopedOrdersWithMaterialRequirements`,
-`JobOrderStockProjectionService.loadOrderLinkedStockIndex` / `qualityFloorFor`,
+`JobOrderStockProjectionService.loadOrderLinkedStockIndex` / `OrderLinkedStockIndex#bookedFor`,
+`QualityBucketAllocator`, `QualityTierCatalog`,
 `MaterialDemandOverviewDto` / `MaterialDemandGroupDto` / `MaterialDemandRowDto` /
 `MaterialDemandOrderShareDto`, `JobOrderMaterialDemandPageController`,
 `templates/orders-material-demand.html`, `templates/fragments/material-amount.html`,

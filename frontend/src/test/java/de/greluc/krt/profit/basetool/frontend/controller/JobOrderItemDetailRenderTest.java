@@ -51,6 +51,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
+import de.greluc.krt.profit.basetool.frontend.support.QualityTierTestData;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
@@ -147,8 +148,20 @@ class JobOrderItemDetailRenderTest {
             1,
             null,
             List.of(
-                new JobOrderItemMaterialDto(UUID.randomUUID(), acryliPlex, 7.5, "GOOD", 1L),
-                new JobOrderItemMaterialDto(UUID.randomUUID(), agricium, 12.0, "NONE", 1L)),
+                new JobOrderItemMaterialDto(
+                    UUID.randomUUID(),
+                    acryliPlex,
+                    7.5,
+                    "GOOD",
+                    QualityTierTestData.forCode("GOOD"),
+                    1L),
+                new JobOrderItemMaterialDto(
+                    UUID.randomUUID(),
+                    agricium,
+                    12.0,
+                    "NONE",
+                    QualityTierTestData.forCode("NONE"),
+                    1L)),
             false,
             1L);
     JobOrderItemDto subItem =
@@ -179,8 +192,22 @@ class JobOrderItemDetailRenderTest {
             List.of(),
             List.of(topItem, subItem),
             List.of(
-                new AggregatedMaterialDto(acryliPlex, "GOOD", 7.5, 3.0, List.of(), null),
-                new AggregatedMaterialDto(agricium, "NONE", 12.0, 12.0, List.of(), null)),
+                new AggregatedMaterialDto(
+                    acryliPlex,
+                    "GOOD",
+                    QualityTierTestData.forCode("GOOD"),
+                    7.5,
+                    3.0,
+                    List.of(),
+                    null),
+                new AggregatedMaterialDto(
+                    agricium,
+                    "NONE",
+                    QualityTierTestData.forCode("NONE"),
+                    12.0,
+                    12.0,
+                    List.of(),
+                    null)),
             List.of(),
             List.of(),
             List.of(),
@@ -264,7 +291,14 @@ class JobOrderItemDetailRenderTest {
             0,
             0,
             null,
-            List.of(new JobOrderItemMaterialDto(UUID.randomUUID(), agricium, 12.0, "NONE", 1L)),
+            List.of(
+                new JobOrderItemMaterialDto(
+                    UUID.randomUUID(),
+                    agricium,
+                    12.0,
+                    "NONE",
+                    QualityTierTestData.forCode("NONE"),
+                    1L)),
             false,
             1L);
     JobOrderDto order =
@@ -281,7 +315,15 @@ class JobOrderItemDetailRenderTest {
             true,
             List.of(),
             List.of(line),
-            List.of(new AggregatedMaterialDto(agricium, "NONE", 12.0, 4.0, List.of(claim), 6.0)),
+            List.of(
+                new AggregatedMaterialDto(
+                    agricium,
+                    "NONE",
+                    QualityTierTestData.forCode("NONE"),
+                    12.0,
+                    4.0,
+                    List.of(claim),
+                    6.0)),
             List.of(),
             List.of(),
             List.of(),
@@ -330,7 +372,12 @@ class JobOrderItemDetailRenderTest {
             null,
             List.of(
                 new JobOrderItemMaterialDto(
-                    UUID.randomUUID(), material("Agricium", "SCU"), 12.0, "NONE", 1L)),
+                    UUID.randomUUID(),
+                    material("Agricium", "SCU"),
+                    12.0,
+                    "NONE",
+                    QualityTierTestData.forCode("NONE"),
+                    1L)),
             false,
             1L);
     JobOrderDto order =
@@ -349,7 +396,13 @@ class JobOrderItemDetailRenderTest {
             List.of(line),
             List.of(
                 new AggregatedMaterialDto(
-                    material("Agricium", "SCU"), "NONE", 12.0, 12.0, List.of(), null)),
+                    material("Agricium", "SCU"),
+                    "NONE",
+                    QualityTierTestData.forCode("NONE"),
+                    12.0,
+                    12.0,
+                    List.of(),
+                    null)),
             List.of(),
             List.of(),
             List.of(),
@@ -402,7 +455,12 @@ class JobOrderItemDetailRenderTest {
             null,
             List.of(
                 new JobOrderItemMaterialDto(
-                    UUID.randomUUID(), material("Agricium", "SCU"), 12.0, "NONE", 1L)),
+                    UUID.randomUUID(),
+                    material("Agricium", "SCU"),
+                    12.0,
+                    "NONE",
+                    QualityTierTestData.forCode("NONE"),
+                    1L)),
             false,
             1L);
     JobOrderDto order =
@@ -421,7 +479,13 @@ class JobOrderItemDetailRenderTest {
             List.of(line),
             List.of(
                 new AggregatedMaterialDto(
-                    material("Agricium", "SCU"), "NONE", 12.0, 12.0, List.of(), null)),
+                    material("Agricium", "SCU"),
+                    "NONE",
+                    QualityTierTestData.forCode("NONE"),
+                    12.0,
+                    12.0,
+                    List.of(),
+                    null)),
             List.of(),
             List.of(),
             List.of(),
@@ -476,7 +540,12 @@ class JobOrderItemDetailRenderTest {
             null,
             List.of(
                 new JobOrderItemMaterialDto(
-                    UUID.randomUUID(), material("Agricium", "SCU"), 12.0, "NONE", 1L)),
+                    UUID.randomUUID(),
+                    material("Agricium", "SCU"),
+                    12.0,
+                    "NONE",
+                    QualityTierTestData.forCode("NONE"),
+                    1L)),
             false,
             1L);
     JobOrderItemHandoverDto handover =
@@ -511,7 +580,13 @@ class JobOrderItemDetailRenderTest {
             List.of(line),
             List.of(
                 new AggregatedMaterialDto(
-                    material("Agricium", "SCU"), "NONE", 12.0, 12.0, List.of(), null)),
+                    material("Agricium", "SCU"),
+                    "NONE",
+                    QualityTierTestData.forCode("NONE"),
+                    12.0,
+                    12.0,
+                    List.of(),
+                    null)),
             List.of(),
             List.of(),
             List.of(handover),
@@ -563,6 +638,7 @@ class JobOrderItemDetailRenderTest {
             UUID.randomUUID(),
             material("Agricium", "SCU"),
             null,
+            QualityTierTestData.forFloor(null),
             10.0,
             0.0,
             List.of(claim),
@@ -616,7 +692,15 @@ class JobOrderItemDetailRenderTest {
     UUID userId = UUID.randomUUID();
     JobOrderMaterialDto mat =
         new JobOrderMaterialDto(
-            UUID.randomUUID(), material("Agricium", "SCU"), null, 10.0, 0.0, List.of(), null, 1L);
+            UUID.randomUUID(),
+            material("Agricium", "SCU"),
+            null,
+            QualityTierTestData.forFloor(null),
+            10.0,
+            0.0,
+            List.of(),
+            null,
+            1L);
     JobOrderDto order =
         new JobOrderDto(
             orderId,
@@ -663,12 +747,21 @@ class JobOrderItemDetailRenderTest {
     UUID userId = UUID.randomUUID();
     JobOrderMaterialDto scuMat =
         new JobOrderMaterialDto(
-            UUID.randomUUID(), material("Agricium", "SCU"), null, 10.0, 2.5, List.of(), null, 1L);
+            UUID.randomUUID(),
+            material("Agricium", "SCU"),
+            null,
+            QualityTierTestData.forFloor(null),
+            10.0,
+            2.5,
+            List.of(),
+            null,
+            1L);
     JobOrderMaterialDto pieceMat =
         new JobOrderMaterialDto(
             UUID.randomUUID(),
             material("Power Plant", "PIECE"),
             null,
+            QualityTierTestData.forFloor(null),
             5.0,
             1.0,
             List.of(),
@@ -742,7 +835,12 @@ class JobOrderItemDetailRenderTest {
             null,
             List.of(
                 new JobOrderItemMaterialDto(
-                    UUID.randomUUID(), material("Agricium", "SCU"), 12.0, "NONE", 1L)),
+                    UUID.randomUUID(),
+                    material("Agricium", "SCU"),
+                    12.0,
+                    "NONE",
+                    QualityTierTestData.forCode("NONE"),
+                    1L)),
             false,
             1L);
     return new JobOrderDto(
@@ -1156,7 +1254,15 @@ class JobOrderItemDetailRenderTest {
     UUID userId = UUID.randomUUID();
     JobOrderMaterialDto mat =
         new JobOrderMaterialDto(
-            UUID.randomUUID(), material("Agricium", "SCU"), null, 10.0, 0.0, List.of(), null, 1L);
+            UUID.randomUUID(),
+            material("Agricium", "SCU"),
+            null,
+            QualityTierTestData.forFloor(null),
+            10.0,
+            0.0,
+            List.of(),
+            null,
+            1L);
     JobOrderDto order =
         new JobOrderDto(
             orderId,
@@ -1211,7 +1317,14 @@ class JobOrderItemDetailRenderTest {
             2,
             0,
             null,
-            List.of(new JobOrderItemMaterialDto(UUID.randomUUID(), agricium, 12.0, "NONE", 1L)),
+            List.of(
+                new JobOrderItemMaterialDto(
+                    UUID.randomUUID(),
+                    agricium,
+                    12.0,
+                    "NONE",
+                    QualityTierTestData.forCode("NONE"),
+                    1L)),
             false,
             1L);
     JobOrderDto order =
@@ -1228,7 +1341,15 @@ class JobOrderItemDetailRenderTest {
             true,
             List.of(),
             List.of(line),
-            List.of(new AggregatedMaterialDto(agricium, "NONE", 6.0, 0.0, List.of(), 12.0)),
+            List.of(
+                new AggregatedMaterialDto(
+                    agricium,
+                    "NONE",
+                    QualityTierTestData.forCode("NONE"),
+                    6.0,
+                    0.0,
+                    List.of(),
+                    12.0)),
             List.of(),
             List.of(),
             List.of(),

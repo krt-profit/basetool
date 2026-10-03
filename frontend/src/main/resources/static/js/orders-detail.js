@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, labelPiece, labelScu, scuHintText, labelMenge, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_QUALITY_GOOD, MSG_QUALITY_NONE, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_OWNER, MSG_LOCATION, MSG_STOLEN, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, PRODUCTION_I18N, ORDER_HANDOVER_I18N */
+/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, labelPiece, labelScu, scuHintText, labelMenge, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_OWNER, MSG_LOCATION, MSG_STOLEN, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_BELOW_FLOOR, MSG_INVENTORY_PART_OF, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, PRODUCTION_I18N, ORDER_HANDOVER_I18N */
 
 let cachedInventoryItems = [];
 let isInventoryCached = false;
@@ -888,7 +888,7 @@ function _openClaimModal(opts) {
     const sel = document.getElementById('claim-squadron');
     const amountInput = document.getElementById('claim-amount');
     const open = parseFloat(opts.open || '0') || 0;
-    const qualityLabel = opts.quality === 'GOOD' ? MSG_QUALITY_GOOD : MSG_QUALITY_NONE;
+    const qualityLabel = opts.qualityLabel || opts.quality || '';
     document.getElementById('claim-modal-bucket').textContent =
         (opts.materialName || '') + ' — ' + qualityLabel;
     if (opts.edit) {
@@ -918,6 +918,7 @@ function openClaimCreate(el) {
     _openClaimModal({
         materialId: el.dataset.materialId,
         quality: el.dataset.quality,
+        qualityLabel: el.dataset.qualityLabel,
         materialName: el.dataset.materialName,
         quantityType: el.dataset.quantityType,
         open: el.dataset.open,
@@ -929,6 +930,7 @@ function openClaimEdit(el) {
     _openClaimModal({
         materialId: el.dataset.materialId,
         quality: el.dataset.quality,
+        qualityLabel: el.dataset.qualityLabel,
         materialName: el.dataset.materialName,
         quantityType: el.dataset.quantityType,
         open: el.dataset.open,
@@ -1361,6 +1363,46 @@ async function previewHandoverReport(btn) {
     }
 }
 
+/**
+ * Loads how much of each linked row counts toward the given quality bucket (REQ-ORDERS-037).
+ *
+ * @param {string | null} orderId the order
+ * @param {string | null} materialId the material
+ * @param {string | null} tierId the bucket's quality tier; without one, nothing is filtered
+ * @returns {Promise<{here: Map<string, number>, unattributed: Set<string>} | null>} the rows
+ *     counted toward the bucket with their amounts and the rows no bucket accepts, or null
+ */
+async function _loadStockAttribution(orderId, materialId, tierId) {
+    if (!tierId || !orderId || !materialId) return null;
+    try {
+        const res = await fetch(
+            '/orders/' + orderId + '/materials/' + materialId + '/attribution',
+            {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            },
+        );
+        if (!res.ok) return null;
+        const list = await res.json();
+        /** @type {Map<string, number>} */
+        const here = new Map();
+        /** @type {Set<string>} */
+        const unattributed = new Set();
+        for (const entry of list) {
+            if (entry.qualityTierId === tierId) {
+                here.set(
+                    entry.inventoryItemId,
+                    (here.get(entry.inventoryItemId) || 0) + entry.amount,
+                );
+            } else if (entry.qualityTierId == null) {
+                unattributed.add(entry.inventoryItemId);
+            }
+        }
+        return { here, unattributed };
+    } catch (_e) {
+        return null;
+    }
+}
+
 async function toggleInventory(row) {
     const orderId = row.getAttribute('data-order-id');
     const materialId = row.getAttribute('data-material-id');
@@ -1395,7 +1437,18 @@ async function toggleInventory(row) {
             '/orders/' + orderId + '/materials/' + materialId + '/inventory',
         );
         if (!response.ok) throw new Error('Network response was not ok');
-        const items = await response.json();
+        const allItems = await response.json();
+        const attribution = await _loadStockAttribution(
+            orderId,
+            materialId,
+            row.getAttribute('data-quality-tier-id'),
+        );
+        const items = attribution
+            ? allItems.filter(
+                  (/** @type {any} */ it) =>
+                      attribution.here.has(it.id) || attribution.unattributed.has(it.id),
+              )
+            : allItems;
 
         if (items.length === 0) {
             detailsRow.innerHTML = `
@@ -1435,10 +1488,19 @@ async function toggleInventory(row) {
                 stolenChip = ` <span class="chip chip--danger chip-xs" data-testid="stolen-chip">${escapeHtml(MSG_STOLEN)}</span>`;
             }
             const quality = item.quality !== null ? item.quality : '-';
-            const quantity =
-                (item.amount !== null ? item.amount.toFixed(3) : '0.000') +
-                ' ' +
-                (amountType ? amountType : '');
+            const unit = amountType ? amountType : '';
+            const counted = attribution ? attribution.here.get(item.id) : undefined;
+            const total = item.amount !== null ? item.amount.toFixed(3) : '0.000';
+            let quantity = total + ' ' + unit;
+            if (counted !== undefined && Math.abs(counted - (item.amount || 0)) > 0.0005) {
+                quantity = MSG_INVENTORY_PART_OF.replace(
+                    '{0}',
+                    counted.toFixed(3) + ' ' + unit,
+                ).replace('{1}', total + ' ' + unit);
+            }
+            if (attribution && counted === undefined && attribution.unattributed.has(item.id)) {
+                stolenChip += ` <span class="chip chip-xs" data-testid="below-floor-chip">${escapeHtml(MSG_INVENTORY_BELOW_FLOOR)}</span>`;
+            }
             const itemSquadron = item.owningSquadron || null;
             const itemSquadronId = itemSquadron ? itemSquadron.id : null;
             const itemSquadronShorthand = itemSquadron ? itemSquadron.shorthand : null;

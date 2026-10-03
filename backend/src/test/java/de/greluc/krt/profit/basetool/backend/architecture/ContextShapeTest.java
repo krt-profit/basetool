@@ -48,7 +48,7 @@ import org.springframework.web.bind.annotation.RestController;
 class ContextShapeTest {
 
   /** The backend's shape under the test profile. */
-  static final ContextShape EXPECTED = new ContextShape(6, 4, 99, 2);
+  static final ContextShape EXPECTED = new ContextShape(6, 4, 101, 2);
 
   @Autowired private ApplicationContext context;
 

@@ -28,7 +28,8 @@ import java.util.List;
  * <p>{@code outstandingAmount} subtracts booked stock but not claims, which are only promises.
  *
  * @param material the bucket's material (carries {@code quantityType} for unit-aware display)
- * @param qualityRequirement the quality bucket name ({@code GOOD} or {@code NONE})
+ * @param qualityRequirement the code of the bucket's quality tier
+ * @param qualityTier the bucket's quality tier, with its labels and floor
  * @param requiredAmount the summed outstanding demand across the group's orders
  * @param bookedAmount the summed inventory linked to those orders for this bucket
  * @param claimedAmount the summed claims lodged on those orders' buckets
@@ -38,7 +39,8 @@ import java.util.List;
  */
 public record MaterialDemandRowDto(
     MaterialDto material,
-    @BackendEnumAsString String qualityRequirement,
+    String qualityRequirement,
+    QualityTierDto qualityTier,
     Double requiredAmount,
     Double bookedAmount,
     Double claimedAmount,

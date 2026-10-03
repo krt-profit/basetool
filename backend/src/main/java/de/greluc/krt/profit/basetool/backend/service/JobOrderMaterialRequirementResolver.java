@@ -20,12 +20,13 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.QualityTierMapper;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.QualityTierDto;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +51,9 @@ public class JobOrderMaterialRequirementResolver {
   /** Maps a {@code MATERIAL} line's material entity to its DTO. */
   private final MaterialMapper materialMapper;
 
+  /** Maps a {@code MATERIAL} line's quality tier to its DTO. */
+  private final QualityTierMapper qualityTierMapper;
+
   /**
    * Normalises one order into its material buckets: a {@code MATERIAL} order's lines as they are,
    * an {@code ITEM} order's blueprint-derived outstanding aggregation.
@@ -68,7 +72,7 @@ public class JobOrderMaterialRequirementResolver {
         requirements.add(
             new MaterialRequirement(
                 aggregated.material(),
-                aggregated.qualityRequirement(),
+                aggregated.qualityTier(),
                 aggregated.totalQuantity() == null ? 0.0 : aggregated.totalQuantity()));
       }
       return requirements;
@@ -78,12 +82,10 @@ public class JobOrderMaterialRequirementResolver {
       if (line.getMaterial() == null) {
         continue;
       }
-      QualityRequirement quality =
-          line.getMinQuality() != null ? QualityRequirement.GOOD : QualityRequirement.NONE;
       requirements.add(
           new MaterialRequirement(
               materialMapper.toDto(line.getMaterial()),
-              quality,
+              qualityTierMapper.toDto(line.getQualityTier()),
               line.getAmount() == null ? 0.0 : line.getAmount()));
     }
     return requirements;
@@ -94,9 +96,9 @@ public class JobOrderMaterialRequirementResolver {
    * are aggregated or projected.
    *
    * @param material the bucket's material
-   * @param quality the bucket's quality requirement
+   * @param tier the bucket's quality tier
    * @param requiredAmount the order's outstanding requirement for the bucket
    */
   public record MaterialRequirement(
-      MaterialDto material, QualityRequirement quality, double requiredAmount) {}
+      MaterialDto material, QualityTierDto tier, double requiredAmount) {}
 }

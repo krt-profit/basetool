@@ -220,12 +220,12 @@
                 th:data-order-id="${order.id}"
                 th:data-material-id="${mat.material.id}"
                 th:data-amount-type="${mat.material.quantityType}"
+                th:data-quality-tier-id="${mat.qualityTier != null ? mat.qualityTier.id : ''}"
                 data-trigger="od-toggle-inventory"
                >
                 <td th:text="${mat.material.name}"></td>
                 <td>
-                    <span th:if="${mat.minQuality != null}" th:text="${mat.minQuality}"></span>
-                    <span th:if="${mat.minQuality == null}" th:text="#{orders.material.minQuality.none}">Keine</span>
+                    <th:block th:replace="~{fragments/quality-tier :: badge(${mat.qualityTier})}"></th:block>
                 </td>
                 <td th:switch="${mat.material.quantityType}">
                     <span th:case="'PIECE'" th:text="|${mat.amount != null ? #numbers.formatInteger(mat.amount, 1) : '0'} #{material.quantity.piece}|"></span>
@@ -248,7 +248,8 @@
                                 th:title="#{orders.claim.edit}"
                                 th:aria-label="#{orders.claim.edit}"
                                 th:data-material-id="${mat.material.id}"
-                                th:data-quality="${mat.minQuality != null ? 'GOOD' : 'NONE'}"
+                                th:data-quality="${mat.qualityTier != null ? mat.qualityTier.code : 'NONE'}"
+                                th:data-quality-label="${mat.qualityTier != null ? mat.qualityTier.label(#locale) : ''}"
                                 th:data-material-name="${mat.material.name}"
                                 th:data-quantity-type="${mat.material.quantityType}"
                                 th:data-open="${mat.openAmount}"
@@ -267,7 +268,8 @@
                         <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-claim-add krtm-padding-0-2rem-0-5rem-min-height-auto-font-s-ae33" data-claim-control data-trigger="claim-add"
                                
                                 th:data-material-id="${mat.material.id}"
-                                th:data-quality="${mat.minQuality != null ? 'GOOD' : 'NONE'}"
+                                th:data-quality="${mat.qualityTier != null ? mat.qualityTier.code : 'NONE'}"
+                                th:data-quality-label="${mat.qualityTier != null ? mat.qualityTier.label(#locale) : ''}"
                                 th:data-material-name="${mat.material.name}"
                                 th:data-quantity-type="${mat.material.quantityType}"
                                 th:data-open="${mat.openAmount}"
@@ -437,12 +439,12 @@
                 th:data-order-id="${order.id}"
                 th:data-material-id="${agg.material != null ? agg.material.id() : ''}"
                 th:data-amount-type="${agg.material != null ? agg.material.quantityType() : 'SCU'}"
+                th:data-quality-tier-id="${agg.qualityTier != null ? agg.qualityTier.id : ''}"
                 data-trigger="od-toggle-inventory"
                >
                 <td th:text="${agg.material != null ? agg.material.name() : '-'}"></td>
                 <td>
-                    <span th:if="${agg.qualityRequirement == 'GOOD'}" class="quality-badge quality-good" th:text="#{orders.detail.quality.good}">Gut (650+)</span>
-                    <span th:unless="${agg.qualityRequirement == 'GOOD'}" class="quality-badge quality-none" th:text="#{orders.detail.quality.none}">Keine</span>
+                    <th:block th:replace="~{fragments/quality-tier :: badge(${agg.qualityTier})}"></th:block>
                 </td>
                 <td th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
                     <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(agg.totalQuantity, 1)} #{material.quantity.piece}|"></span>
@@ -468,6 +470,7 @@
                                         th:aria-label="#{orders.claim.edit}"
                                         th:data-material-id="${agg.material != null ? agg.material.id() : ''}"
                                         th:data-quality="${agg.qualityRequirement}"
+                                        th:data-quality-label="${agg.qualityTier != null ? agg.qualityTier.label(#locale) : ''}"
                                         th:data-material-name="${agg.material != null ? agg.material.name() : ''}"
                                         th:data-quantity-type="${agg.material != null ? agg.material.quantityType() : 'SCU'}"
                                         th:data-open="${agg.openAmount}"
@@ -480,6 +483,7 @@
                         <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-claim-add krtm-padding-0-2rem-0-5rem-min-height-auto-font-s-ae33" data-claim-control data-trigger="claim-add"
                                 th:data-material-id="${agg.material != null ? agg.material.id() : ''}"
                                 th:data-quality="${agg.qualityRequirement}"
+                                        th:data-quality-label="${agg.qualityTier != null ? agg.qualityTier.label(#locale) : ''}"
                                 th:data-material-name="${agg.material != null ? agg.material.name() : ''}"
                                 th:data-quantity-type="${agg.material != null ? agg.material.quantityType() : 'SCU'}"
                                 th:data-open="${agg.openAmount}"
@@ -863,8 +867,7 @@
                     <div>
                         <label th:text="#{orders.material.minQuality}" class="form-label-sm">Min. Qualität</label>
                         <select class="krtm-width-100-padding-0-5rem-background-var-colo-11f1" th:field="*{materials[__${stat.index}__].minQuality}">
-                            <option th:value="650" th:text="650">650</option>
-                            <option value="" th:text="#{orders.material.minQuality.none}">Keine</option>
+                            <th:block th:replace="~{fragments/quality-tier :: floorOptions(${qualityTiers}, ${jobOrderForm.materials[__${stat.index}__].minQuality})}"></th:block>
                         </select>
                     </div>
                     <div>
@@ -892,8 +895,7 @@
                     <div>
                         <label th:text="#{orders.material.minQuality}" class="form-label-sm">Min. Qualität</label>
                         <select class="krtm-width-100-padding-0-5rem-background-var-colo-11f1" name="materials[0].minQuality">
-                            <option value="650" selected>650</option>
-                            <option value="" th:text="#{orders.material.minQuality.none}">Keine</option>
+                            <th:block th:replace="~{fragments/quality-tier :: floorOptionsSelected(${qualityTiers}, ${qualityTiers.?[active() and minQuality() == 650].isEmpty() ? null : 650})}"></th:block>
                         </select>
                     </div>
                     <div>
@@ -1192,8 +1194,6 @@
     const MSG_CLAIM_TITLE_ADD = /*[[#{orders.claim.modal.title.add}]]*/ 'Material eintragen';
     const MSG_CLAIM_TITLE_EDIT = /*[[#{orders.claim.modal.title.edit}]]*/ 'Eintragung bearbeiten';
     const MSG_CLAIM_MAX_HINT = /*[[#{orders.claim.max}]]*/ 'Maximal verf\u00fcgbar:';
-    const MSG_QUALITY_GOOD = /*[[#{orders.detail.quality.good}]]*/ 'Gut (650+)';
-    const MSG_QUALITY_NONE = /*[[#{orders.detail.quality.none}]]*/ 'Keine';
     const MSG_CLAIM_SUCCESS = /*[[#{orders.claim.success}]]*/ 'Eintragung gespeichert.';
     const MSG_CLAIM_WITHDRAW_SUCCESS = /*[[#{orders.claim.withdraw.success}]]*/ 'Eintragung zur\u00fcckgezogen.';
     const MSG_CLAIM_ERROR = /*[[#{orders.claim.error}]]*/ 'Eintragung fehlgeschlagen.';
@@ -1232,6 +1232,8 @@
     const MSG_SQUADRON = /*[[#{orders.detail.inventory.squadron}]]*/ 'Staffel';
     const MSG_LOADING_INVENTORY = /*[[#{orders.detail.inventory.loading}]]*/ 'Lade Lagereintr\u00e4ge...';
     const MSG_EMPTY_INVENTORY = /*[[#{orders.detail.inventory.empty}]]*/ 'Keine Lagereintr\u00e4ge verkn\u00fcpft.';
+    const MSG_INVENTORY_BELOW_FLOOR = /*[[#{orders.detail.inventory.belowFloor}]]*/ 'Unter Mindestqualit\u00e4t';
+    const MSG_INVENTORY_PART_OF = /*[[#{orders.detail.inventory.partOf}]]*/ '{0} von {1} angerechnet';
     const MSG_INVENTORY_UNLINK_TOOLTIP = /*[[#{orders.detail.inventory.unlink.tooltip}]]*/ 'Lagereintrag vom Auftrag entlinken';
     const MSG_INVENTORY_UNLINK_SUCCESS = /*[[#{orders.detail.inventory.unlink.success}]]*/ 'Lagereintrag erfolgreich entlinkt';
     const MSG_INVENTORY_UNLINK_ERROR = /*[[#{orders.detail.inventory.unlink.error}]]*/ 'Fehler beim Entlinken des Lagereintrags';

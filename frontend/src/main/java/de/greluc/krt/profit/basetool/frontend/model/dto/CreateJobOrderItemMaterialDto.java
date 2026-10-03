@@ -27,6 +27,6 @@ import java.util.UUID;
  * name ({@code GOOD} or {@code NONE}) sent as a string.
  *
  * @param materialId the material the choice applies to
- * @param quality the requested quality ({@code GOOD} = 650+, {@code NONE} = no floor)
+ * @param quality the code of the requested quality tier
  */
-public record CreateJobOrderItemMaterialDto(UUID materialId, @BackendEnumAsString String quality) {}
+public record CreateJobOrderItemMaterialDto(UUID materialId, String quality) {}

@@ -284,7 +284,15 @@ class JobOrderControllerTest {
     UUID matLineId = UUID.randomUUID();
     de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto matLine =
         new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto(
-            matLineId, null, 650, 50.0, 999.0, java.util.Collections.singletonList(null), 12.0, 7L);
+            matLineId,
+            null,
+            650,
+            de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures.goodDto(),
+            50.0,
+            999.0,
+            java.util.Collections.singletonList(null),
+            12.0,
+            7L);
     JobOrderDto full =
         new JobOrderDto(
             id,

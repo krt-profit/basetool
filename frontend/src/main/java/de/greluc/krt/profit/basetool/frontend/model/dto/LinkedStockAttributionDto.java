@@ -17,18 +17,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model;
+package de.greluc.krt.profit.basetool.frontend.model.dto;
+
+import java.util.UUID;
 
 /**
- * Quality floor a derived material requirement of an item order must meet: the refining-grade
- * threshold or no floor. Chosen per material at order creation, defaulting from the blueprint
- * ingredient's {@code minQuality}.
+ * How much of one linked stock row counts toward one quality bucket of an order (REQ-ORDERS-037).
+ *
+ * @param inventoryItemId the linked stock row
+ * @param qualityTierId the bucket's quality tier, or {@code null} for the part no bucket accepts
+ * @param amount the attributed amount, in the material's unit
  */
-public enum QualityRequirement {
-
-  /** Requires refining-grade quality (650+); only inventory at or above that tier satisfies it. */
-  GOOD,
-
-  /** No quality floor ("Keine"); inventory of any quality satisfies the requirement. */
-  NONE
-}
+public record LinkedStockAttributionDto(UUID inventoryItemId, UUID qualityTierId, double amount) {}

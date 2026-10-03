@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemHandoverFor
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.service.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
@@ -92,6 +93,7 @@ public class JobOrderPageController {
   private final BackendApiClient backendApiClient;
   private final RoleHierarchy roleHierarchy;
   private final ParallelPageLoader parallelPageLoader;
+  private final QualityTierCatalog qualityTierCatalog;
 
   private static final List<String> VALID_STATUSES =
       List.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED");
@@ -340,6 +342,9 @@ public class JobOrderPageController {
 
       boolean canAssign = !requesterView && isLogistician(principal);
       model.addAttribute("isLogistician", canAssign);
+      if (requesterView || canAssign) {
+        model.addAttribute("qualityTiers", qualityTierCatalog.all());
+      }
       if (requesterView) {
         model.addAttribute("materials", fetchMaterials());
         if (!model.containsAttribute("jobOrderForm")) {
@@ -544,6 +549,7 @@ public class JobOrderPageController {
     model.addAttribute("materials", fetchMaterials());
     model.addAttribute("hasOrderableItems", hasOrderableItems());
     model.addAttribute("squadrons", fetchSquadrons());
+    model.addAttribute("qualityTiers", qualityTierCatalog.all());
     addOwnerPickerOptions(model);
     return "orders-create";
   }
@@ -600,6 +606,7 @@ public class JobOrderPageController {
     model.addAttribute("materials", fetchMaterials());
     model.addAttribute("hasOrderableItems", hasOrderableItems());
     model.addAttribute("squadrons", fetchSquadrons());
+    model.addAttribute("qualityTiers", qualityTierCatalog.all());
     addOwnerPickerOptions(model);
     return "orders-create";
   }

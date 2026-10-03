@@ -109,6 +109,7 @@ public final class FrontendPageRoutes {
           "/admin/announcement",
           "/admin/personal-inventory",
           "/admin/personal-blueprints",
+          "/admin/quality-tiers",
           "/admin/special-commands",
           "/admin/uex-data",
           "/organisation/leitung",
@@ -228,7 +229,8 @@ public final class FrontendPageRoutes {
           "/admin/org-structure",
           "/admin/blueprints",
           "/admin/personal-inventory",
-          "/admin/personal-blueprints");
+          "/admin/personal-blueprints",
+          "/admin/quality-tiers");
 
   /**
    * The routes {@code AccessibilitySmokeE2eTest} scans with axe for WCAG A+AA; a small subset of

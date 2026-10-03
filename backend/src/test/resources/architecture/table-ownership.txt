@@ -98,6 +98,7 @@ poi catalogue
 promotion_category promotion
 promotion_level_content promotion
 promotion_topic promotion
+quality_tier catalogue
 rank_requirement promotion
 refinery_good refinery
 refinery_order refinery

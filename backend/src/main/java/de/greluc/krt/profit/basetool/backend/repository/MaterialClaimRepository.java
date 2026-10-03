@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.MaterialClaim;
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -43,7 +42,7 @@ public interface MaterialClaimRepository extends JpaRepository<MaterialClaim, UU
    * @param jobOrderId the order whose claims to load.
    * @return claims on the order, never {@code null}.
    */
-  @EntityGraph(attributePaths = {"material", "claimingOrgUnit", "claimedByUser"})
+  @EntityGraph(attributePaths = {"material", "qualityTier", "claimingOrgUnit", "claimedByUser"})
   List<MaterialClaim> findByJobOrderIdOrderByCreatedAtDesc(UUID jobOrderId);
 
   /**
@@ -54,7 +53,7 @@ public interface MaterialClaimRepository extends JpaRepository<MaterialClaim, UU
    * @param jobOrderIds the orders whose claims to load; an empty collection yields an empty list.
    * @return claims across the given orders, never {@code null}.
    */
-  @EntityGraph(attributePaths = {"material", "claimingOrgUnit", "claimedByUser"})
+  @EntityGraph(attributePaths = {"material", "qualityTier", "claimingOrgUnit", "claimedByUser"})
   List<MaterialClaim> findByJobOrderIdInOrderByCreatedAtDesc(Collection<UUID> jobOrderIds);
 
   /**
@@ -64,15 +63,12 @@ public interface MaterialClaimRepository extends JpaRepository<MaterialClaim, UU
    *
    * @param jobOrderId the order.
    * @param materialId the material.
-   * @param qualityRequirement the quality bucket.
+   * @param qualityTierId the bucket's quality tier.
    * @param claimingOrgUnitId the claiming squadron.
    * @return the existing claim, or empty.
    */
-  Optional<MaterialClaim> findByJobOrderIdAndMaterialIdAndQualityRequirementAndClaimingOrgUnitId(
-      UUID jobOrderId,
-      UUID materialId,
-      QualityRequirement qualityRequirement,
-      UUID claimingOrgUnitId);
+  Optional<MaterialClaim> findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
+      UUID jobOrderId, UUID materialId, UUID qualityTierId, UUID claimingOrgUnitId);
 
   /**
    * Returns every claim on one bucket across all squadrons — used to sum the already-claimed amount
@@ -80,11 +76,11 @@ public interface MaterialClaimRepository extends JpaRepository<MaterialClaim, UU
    *
    * @param jobOrderId the order.
    * @param materialId the material.
-   * @param qualityRequirement the quality bucket.
+   * @param qualityTierId the bucket's quality tier.
    * @return claims on the bucket, never {@code null}.
    */
-  List<MaterialClaim> findByJobOrderIdAndMaterialIdAndQualityRequirement(
-      UUID jobOrderId, UUID materialId, QualityRequirement qualityRequirement);
+  List<MaterialClaim> findByJobOrderIdAndMaterialIdAndQualityTierId(
+      UUID jobOrderId, UUID materialId, UUID qualityTierId);
 
   /**
    * Clears the {@code claimedByUser} audit reference on every claim stamped by the given user, so

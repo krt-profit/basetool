@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
+import de.greluc.krt.profit.basetool.backend.validation.QualityValue;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -40,6 +41,6 @@ public record HandoverReportPreviewRequestDto(
       @NotBlank String materialName,
       String locationName,
       @NotNull Double amount,
-      @NotNull Integer quality,
+      @NotNull @QualityValue Integer quality,
       String quantityType) {}
 }

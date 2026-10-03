@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
+import de.greluc.krt.profit.basetool.backend.validation.QualityValue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -39,6 +40,6 @@ import jakarta.validation.constraints.Size;
  */
 public record MaterialItemRequestCreateRequest(
     @NotBlank @Size(max = 255) String productKey,
-    @Min(0) @Max(1000) Integer minQuality,
+    @QualityValue Integer minQuality,
     @NotNull @Min(1) @Max(1_000_000) Integer quantity,
     @Size(max = 20000) String remark) {}

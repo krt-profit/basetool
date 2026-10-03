@@ -24,13 +24,13 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
 import de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDemandGroupDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDemandOrderShareDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDemandOverviewDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDemandRowDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.QualityTierDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialRequirementResolver.MaterialRequirement;
@@ -126,8 +126,10 @@ public class JobOrderMaterialDemandService {
           groups.computeIfAbsent(
               groupKey(order),
               key -> new GroupAccumulator(referenceOf(order.getResponsibleOrgUnit())));
-      for (MaterialRequirement requirement : materialRequirementResolver.requirementsOf(order)) {
-        accumulate(group, order, requirement, stockIndex, claimByBucket);
+      List<MaterialRequirement> requirements = materialRequirementResolver.requirementsOf(order);
+      double[] booked = stockIndex.bookedFor(order.getId(), requirements);
+      for (int i = 0; i < requirements.size(); i++) {
+        accumulate(group, order, requirements.get(i), booked[i], claimByBucket);
       }
     }
 
@@ -150,22 +152,17 @@ public class JobOrderMaterialDemandService {
    *
    * @param group the accumulator of the order's responsible org unit.
    * @param order the contributing order.
-   * @param requirement the order's bucket (material, quality and outstanding required amount).
-   * @param stockIndex the batched order-linked stock lookup.
+   * @param requirement the order's bucket (material, quality tier and outstanding amount).
+   * @param booked the order-linked stock the allocator attributed to this bucket.
    * @param claimByBucket the order's claim view, keyed by bucket; empty for a non-SK order.
    */
   private void accumulate(
       @NotNull GroupAccumulator group,
       @NotNull JobOrder order,
       @NotNull MaterialRequirement requirement,
-      @NotNull OrderLinkedStockIndex stockIndex,
+      double booked,
       @NotNull Map<BucketKey, ClaimBucketDto> claimByBucket) {
-    BucketKey key = new BucketKey(requirement.material().id(), requirement.quality());
-    double booked =
-        stockIndex.stockFor(
-            order.getId(),
-            requirement.material().id(),
-            JobOrderStockProjectionService.qualityFloorFor(requirement.quality()));
+    BucketKey key = new BucketKey(requirement.material().id(), requirement.tier().id());
     ClaimBucketDto claimBucket = claimByBucket.get(key);
     double claimed =
         claimBucket == null || claimBucket.claimedAmount() == null
@@ -174,7 +171,7 @@ public class JobOrderMaterialDemandService {
 
     BucketAccumulator bucket =
         group.buckets.computeIfAbsent(
-            key, unused -> new BucketAccumulator(requirement.material(), requirement.quality()));
+            key, unused -> new BucketAccumulator(requirement.material(), requirement.tier()));
     bucket.requiredAmount += requirement.requiredAmount();
     bucket.bookedAmount += booked;
     bucket.claimedAmount += claimed;
@@ -201,8 +198,8 @@ public class JobOrderMaterialDemandService {
       @NotNull List<ClaimBucketDto> claimBuckets) {
     Map<BucketKey, ClaimBucketDto> index = new LinkedHashMap<>();
     for (ClaimBucketDto bucket : claimBuckets) {
-      if (bucket.material() != null) {
-        index.put(new BucketKey(bucket.material().id(), bucket.qualityRequirement()), bucket);
+      if (bucket.material() != null && bucket.qualityTier() != null) {
+        index.put(new BucketKey(bucket.material().id(), bucket.qualityTier().id()), bucket);
       }
     }
     return index;
@@ -278,8 +275,8 @@ public class JobOrderMaterialDemandService {
 
   /**
    * Row ordering within a group: SCU materials first, then by material name (case-insensitive),
-   * then {@code GOOD} before {@code NONE} — the same ordering the order detail's material tables
-   * use, so a user finds a material in the same place on both surfaces.
+   * then by descending tier floor — the same ordering the order detail's material tables use, so a
+   * user finds a material in the same place on both surfaces.
    */
   private static final Comparator<MaterialDemandRowDto> ROW_ORDER =
       Comparator.<MaterialDemandRowDto, Integer>comparing(
@@ -290,15 +287,15 @@ public class JobOrderMaterialDemandService {
           .thenComparing(
               r -> r.material() != null && r.material().name() != null ? r.material().name() : "",
               String.CASE_INSENSITIVE_ORDER)
-          .thenComparing(r -> r.qualityRequirement().name());
+          .thenComparing(r -> -r.qualityTier().minQuality());
 
   /**
-   * The aggregation key inside one org-unit group: a material at one quality level.
+   * The aggregation key inside one org-unit group: a material at one quality tier.
    *
    * @param materialId the material's id
-   * @param quality the quality requirement
+   * @param tierId the quality tier's id
    */
-  private record BucketKey(UUID materialId, QualityRequirement quality) {}
+  private record BucketKey(UUID materialId, UUID tierId) {}
 
   /** Running totals of one responsible org unit while the orders are folded in. */
   private static final class GroupAccumulator {
@@ -337,8 +334,8 @@ public class JobOrderMaterialDemandService {
     /** The bucket's material. */
     private final MaterialDto material;
 
-    /** The bucket's quality requirement. */
-    private final QualityRequirement quality;
+    /** The bucket's quality tier. */
+    private final QualityTierDto quality;
 
     /** The contributing orders' shares, in {@code displayId} order. */
     private final List<MaterialDemandOrderShareDto> shares = new ArrayList<>();
@@ -356,9 +353,9 @@ public class JobOrderMaterialDemandService {
      * Starts a bucket for one material at one quality level.
      *
      * @param material the bucket's material.
-     * @param quality the bucket's quality requirement.
+     * @param quality the bucket's quality tier.
      */
-    private BucketAccumulator(MaterialDto material, QualityRequirement quality) {
+    private BucketAccumulator(MaterialDto material, QualityTierDto quality) {
       this.material = material;
       this.quality = quality;
     }
@@ -375,6 +372,7 @@ public class JobOrderMaterialDemandService {
       double booked = round(bookedAmount, material);
       return new MaterialDemandRowDto(
           material,
+          quality.code(),
           quality,
           required,
           booked,

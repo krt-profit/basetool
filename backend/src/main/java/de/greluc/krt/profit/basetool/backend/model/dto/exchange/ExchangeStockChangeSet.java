@@ -19,12 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto.exchange;
 
+import de.greluc.krt.profit.basetool.backend.validation.QualityValue;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -61,7 +60,7 @@ public record ExchangeStockChangeSet(
       @NotNull @Pattern(regexp = "^set-quantity$") String op,
       @NotNull @Valid ExchangeItemRef material,
       @NotNull @Valid ExchangeLocationRef location,
-      @NotNull @Min(0) @Max(1000) Integer quality,
+      @NotNull @QualityValue Integer quality,
       @NotNull Boolean stolen,
       @NotNull @Valid Quantity quantity,
       @NotNull @Valid Quantity expectedQuantity,

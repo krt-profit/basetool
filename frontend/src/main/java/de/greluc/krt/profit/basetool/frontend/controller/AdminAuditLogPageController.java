@@ -195,6 +195,10 @@ public class AdminAuditLogPageController {
                   "JOB_ORDER_PRODUCTION_BOOKED",
                   "JOB_ORDER_CLAIM_UPSERTED",
                   "JOB_ORDER_CLAIM_WITHDRAWN",
+                  "QUALITY_TIER_CREATED",
+                  "QUALITY_TIER_UPDATED",
+                  "QUALITY_TIER_DEACTIVATED",
+                  "QUALITY_TIER_DELETED",
                   "JOB_ORDER_AUDIT_EXPORTED",
                   "JOB_ORDER_AUDIT_PURGED")),
           Map.entry(

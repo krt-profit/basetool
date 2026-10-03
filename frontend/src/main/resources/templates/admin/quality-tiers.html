@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{admin.qualityTiers.title} + ' - ' + ${appTitle}">Qualitätsstufen - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+<link rel="stylesheet" th:href="@{/css/pages/admin-quality-tiers.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<th:block th:replace="~{fragments/header :: header}" />
+
+<main>
+    <div class="greeting hud-box">
+        <h1 th:text="#{admin.qualityTiers.title}">Qualitätsstufen</h1>
+        <p th:text="#{admin.qualityTiers.subtitle}">Die Qualitätsstufen, die Aufträge als Mindestqualität für Material verlangen können.</p>
+    </div>
+
+    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${error}, extraClass='mt-2')}"></th:block>
+
+    <div class="hud-box data-section mt-2">
+        <div class="flex-between-mb">
+            <h2 class="m-0" th:text="#{admin.qualityTiers.section.list}">Stufen</h2>
+            <button type="button" id="qt-add-btn" class="btn btn--cta" data-testid="qt-add" th:text="#{admin.qualityTiers.action.create}">Neue Stufe</button>
+        </div>
+        <p class="form-hint" th:text="#{admin.qualityTiers.hint.inUse}">Die Mindestqualität einer Stufe, die bereits von Aufträgen verwendet wird, kann nicht mehr geändert werden. Eine verwendete Stufe kann nur deaktiviert, nicht gelöscht werden.</p>
+
+        <div id="qt-results">
+            <th:block th:fragment="results">
+            <div class="table-responsive">
+                <table id="qt-table">
+                    <thead>
+                        <tr>
+                            <th th:text="#{admin.qualityTiers.column.code}">Code</th>
+                            <th th:text="#{admin.qualityTiers.column.minQuality}">Mindestqualität</th>
+                            <th th:text="#{admin.qualityTiers.column.labelDe}">Bezeichnung (DE)</th>
+                            <th th:text="#{admin.qualityTiers.column.labelEn}">Bezeichnung (EN)</th>
+                            <th th:text="#{admin.qualityTiers.column.sortOrder}">Sortierung</th>
+                            <th th:text="#{admin.qualityTiers.column.status}">Status</th>
+                            <th th:text="#{admin.qualityTiers.column.actions}">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="t : ${tiers}" th:data-tier-id="${t.id()}" th:classappend="${t.active()} ? '' : 'qt-row--inactive'">
+                            <td><span class="data-value" th:text="${t.code()}">GOOD</span></td>
+                            <td th:text="${t.minQuality()}">650</td>
+                            <td th:text="${t.labelDe()}">Gut</td>
+                            <td th:text="${t.labelEn()}">Good</td>
+                            <td th:text="${t.sortOrder()}">10</td>
+                            <td>
+                                <span th:if="${t.active()}" class="chip chip--success" th:text="#{admin.qualityTiers.status.active}">aktiv</span>
+                                <span th:unless="${t.active()}" class="chip chip--muted" th:text="#{admin.qualityTiers.status.inactive}">inaktiv</span>
+                                <span th:if="${t.minQuality() == 0}" class="chip chip--primary" th:text="#{admin.qualityTiers.status.base}">Grundstufe</span>
+                            </td>
+                            <td>
+                                <div class="flex-gap-xs">
+                                    <button type="button" class="btn btn-ghost btn-icon" data-qt-edit
+                                            th:data-id="${t.id()}"
+                                            th:data-code="${t.code()}"
+                                            th:data-min-quality="${t.minQuality()}"
+                                            th:data-label-de="${t.labelDe()}"
+                                            th:data-label-en="${t.labelEn()}"
+                                            th:data-sort-order="${t.sortOrder()}"
+                                            th:data-active="${t.active()}"
+                                            th:data-tier-version="${t.version()}"
+                                            th:data-base="${t.minQuality() == 0}"
+                                            th:title="#{admin.qualityTiers.action.edit}" th:aria-label="#{admin.qualityTiers.action.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                                    <button th:if="${t.minQuality() != 0}" type="button" class="btn btn-quiet-danger btn-icon" data-qt-delete
+                                            th:data-id="${t.id()}"
+                                            th:data-code="${t.code()}"
+                                            th:title="#{admin.qualityTiers.action.delete}" th:aria-label="#{admin.qualityTiers.action.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(tiers)}">
+                            <td colspan="7" th:text="#{admin.qualityTiers.empty}">Noch keine Qualitätsstufen vorhanden.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            </th:block>
+        </div>
+    </div>
+</main>
+
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='qt-modal', titleKey='admin.qualityTiers.dialog.createTitle', titleId='qt-modal-title', body=~{::qt-modal-body})}">
+    <th:block th:ref="qt-modal-body">
+        <form id="qt-form" method="post" th:action="@{/admin/quality-tiers}">
+            <input type="hidden" id="qt-id" name="id" value="">
+            <input type="hidden" id="qt-version" name="version" value="">
+            <div class="krt-modal-body">
+                <div class="qt-form-grid">
+                    <div class="form-group">
+                        <label for="qt-code" th:text="#{admin.qualityTiers.column.code}">Code</label>
+                        <input type="text" id="qt-code" name="code" required maxlength="32" pattern="[A-Z][A-Z0-9_]{0,31}" autocomplete="off">
+                        <p class="form-hint" th:text="#{admin.qualityTiers.hint.code}">Großbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="qt-min-quality" th:text="#{admin.qualityTiers.column.minQuality}">Mindestqualität</label>
+                        <input type="number" id="qt-min-quality" name="minQuality" required min="0" max="1000" step="1">
+                        <p class="form-hint" th:text="#{admin.qualityTiers.hint.floor}">0 bis 1000. Bei einer Stufe, die bereits von Aufträgen verwendet wird, bleibt sie unverändert.</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="qt-label-de" th:text="#{admin.qualityTiers.column.labelDe}">Bezeichnung (DE)</label>
+                        <input type="text" id="qt-label-de" name="labelDe" required maxlength="64">
+                    </div>
+                    <div class="form-group">
+                        <label for="qt-label-en" th:text="#{admin.qualityTiers.column.labelEn}">Bezeichnung (EN)</label>
+                        <input type="text" id="qt-label-en" name="labelEn" required maxlength="64">
+                    </div>
+                    <div class="form-group">
+                        <label for="qt-sort-order" th:text="#{admin.qualityTiers.column.sortOrder}">Sortierung</label>
+                        <input type="number" id="qt-sort-order" name="sortOrder" required step="1">
+                    </div>
+                    <div class="form-group check-row">
+                        <input type="checkbox" id="qt-active" name="active" checked>
+                        <div>
+                            <label for="qt-active" th:text="#{admin.qualityTiers.field.active}">Aktiv</label>
+                            <p class="form-hint" th:text="#{admin.qualityTiers.hint.active}">Eine inaktive Stufe wird für neue Aufträge nicht mehr angeboten.</p>
+                            <p id="qt-base-hint" class="form-hint" hidden th:text="#{admin.qualityTiers.hint.base}">Die Grundstufe bleibt aktiv und behält die Mindestqualität 0.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="krt-modal-foot">
+                <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                        data-modal-id="qt-modal" th:text="#{general.cancel}">Abbrechen</button>
+                <button type="submit" id="qt-submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Speichern</span></button>
+            </div>
+        </form>
+    </th:block>
+</th:block>
+
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='qt-delete-modal', titleKey='admin.qualityTiers.dialog.deleteTitle', variant='krt-modal--danger', body=~{::qt-delete-modal-body})}">
+    <th:block th:ref="qt-delete-modal-body">
+        <div class="krt-modal-body">
+            <p class="mb-2" th:text="#{admin.qualityTiers.delete.confirm}">Diese Qualitätsstufe endgültig löschen?</p>
+            <p class="m-0"><strong id="qt-delete-code" class="data-value"></strong></p>
+            <p class="form-hint" th:text="#{admin.qualityTiers.delete.hint}">Eine Stufe, die von Aufträgen verwendet wird, kann nicht gelöscht werden. Deaktiviere sie stattdessen.</p>
+        </div>
+        <div class="krt-modal-foot">
+            <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                    data-modal-id="qt-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
+            <button type="button" id="qt-delete-confirm" class="btn btn-danger" th:text="#{admin.qualityTiers.action.delete}">Löschen</button>
+        </div>
+    </th:block>
+</th:block>
+
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    const QT_MSG = {
+        createTitle: /*[[#{admin.qualityTiers.dialog.createTitle}]]*/ 'Neue Qualitätsstufe',
+        editTitle:   /*[[#{admin.qualityTiers.dialog.editTitle}]]*/ 'Qualitätsstufe bearbeiten',
+        created:     /*[[#{admin.qualityTiers.toast.created}]]*/ 'Qualitätsstufe angelegt.',
+        updated:     /*[[#{admin.qualityTiers.toast.updated}]]*/ 'Qualitätsstufe gespeichert.',
+        deleted:     /*[[#{admin.qualityTiers.toast.deleted}]]*/ 'Qualitätsstufe gelöscht.',
+        conflict:    /*[[#{admin.qualityTiers.toast.conflict}]]*/ 'Code oder Mindestqualität ist bereits vergeben.',
+        floorLocked: /*[[#{admin.qualityTiers.toast.floorLocked}]]*/ 'Die Mindestqualität dieser Stufe kann nicht geändert werden.',
+        inUse:       /*[[#{admin.qualityTiers.toast.inUse}]]*/ 'Die Stufe wird verwendet. Deaktiviere sie stattdessen.',
+        error:       /*[[#{admin.qualityTiers.toast.error}]]*/ 'Die Qualitätsstufe konnte nicht gespeichert werden.',
+        deleteError: /*[[#{admin.qualityTiers.toast.deleteError}]]*/ 'Die Qualitätsstufe konnte nicht gelöscht werden.'
+    };
+    const QT_CONFLICT = {
+        title:                /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
+        reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Bitte neu laden.',
+        reloadLabel:          /*[[#{frontend.ajax.conflict.reload}]]*/ 'Aktuelle Werte laden',
+        dismissLabel:         /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
+        reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
+    };
+</script>
+<script th:src="@{/js/admin-quality-tiers.js}" defer th:attr="nonce=${cspNonce}"></script>
+</body>
+</html>

@@ -19,9 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
-import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 /**
@@ -29,12 +30,13 @@ import java.util.UUID;
  * qualityRequirement, claimingOrgUnitId)} again updates the squadron's existing claim.
  *
  * @param materialId the material being claimed; must match a bucket on the order
- * @param qualityRequirement the quality bucket ({@code GOOD} or {@code NONE})
+ * @param qualityRequirement the code of the bucket's quality tier, e.g. {@code GOOD} or {@code
+ *     NONE} (REQ-ORDERS-036)
  * @param claimingOrgUnitId the squadron making the claim; one the caller may act for
  * @param amount the claimed quantity; positive and at most the bucket's open remainder
  */
 public record CreateClaimDto(
     @NotNull UUID materialId,
-    @NotNull QualityRequirement qualityRequirement,
+    @NotBlank @Size(max = 32) String qualityRequirement,
     @NotNull UUID claimingOrgUnitId,
     @NotNull @Positive Double amount) {}

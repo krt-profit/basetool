@@ -8,9 +8,10 @@
 A **material claim** ("Eintragung") records that a profit squadron signs up to deliver a partial
 quantity of one material bucket on a **public Spezialkommando (SK) job order** (Job-Order rework
 #340, Phase 4 / #344). A claim is keyed on the aggregated bucket
-`(job_order, material, qualityRequirement)` so the same flow serves both order kinds (a `MATERIAL`
-order buckets its material lines by `minQuality`, an `ITEM` order sums its per-item material
-requirements per quality). Claims are **signal-only** — they record intent and never move inventory.
+`(job_order, material, quality tier)` so the same flow serves both order kinds (a `MATERIAL`
+order buckets its material lines by their tier, an `ITEM` order sums its per-item material
+requirements per tier; tiers: REQ-ORDERS-036). The payload names the tier by its code in
+`qualityRequirement`, case-insensitively; a code the order does not use is a 400. Claims are **signal-only** — they record intent and never move inventory.
 
 The claim domain shipped code-only; this spec captures its load-bearing invariants and, in
 particular, makes the **no-overclaim** rule a concurrency-safe requirement after an audit found it

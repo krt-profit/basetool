@@ -2058,7 +2058,7 @@ family decides, so a sub-family can differ from its parent.
 Revalidatable: `announcement`, `app`, `blueprints`, `cities`, `frequency-types`, `job-types`,
 `kommando-groups`, `locations`, `manufacturers`, `material-categories`,
 `material-external-aliases`, `materials`, `missions`, `org-hierarchy`, `org-units`, `outposts`,
-`pois`, `refining-methods`, `settings`, `ship-types`, `space-stations`, `special-commands`,
+`pois`, `quality-tiers`, `refining-methods`, `settings`, `ship-types`, `space-stations`, `special-commands`,
 `squadrons`, `star-systems`, `sync-reports`, `system` (v1 and v2), `terminals`, `uex`, and three
 catalogue sub-families inside a `no-store` parent: `/api/v1/exchange/catalog/**`,
 `/api/v1/orders/item-catalog/**` and `/api/v1/terms/document`.

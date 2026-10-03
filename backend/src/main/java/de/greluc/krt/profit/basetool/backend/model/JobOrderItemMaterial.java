@@ -21,8 +21,6 @@ package de.greluc.krt.profit.basetool.backend.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -42,7 +40,7 @@ import lombok.Setter;
  * order creation.
  *
  * <p>{@link #requiredQuantity}'s unit comes from {@link Material#getQuantityType()} (SCU or PIECE);
- * {@link #qualityRequirement} holds the requester's Gut/Keine choice.
+ * {@link #qualityTier} holds the requester's quality choice.
  */
 @Entity
 @Getter
@@ -76,8 +74,8 @@ public class JobOrderItemMaterial extends AbstractEntity<UUID> {
   @Column(name = "required_quantity", nullable = false)
   private Double requiredQuantity;
 
-  /** Whether this material is needed in Gut (650+) or Keine quality for this order. */
-  @Enumerated(EnumType.STRING)
-  @Column(name = "quality_requirement", nullable = false, length = 8)
-  private QualityRequirement qualityRequirement;
+  /** The quality tier the requester asked this material in. */
+  @ManyToOne(optional = false, fetch = FetchType.LAZY)
+  @JoinColumn(name = "quality_tier_id", nullable = false)
+  private QualityTier qualityTier;
 }

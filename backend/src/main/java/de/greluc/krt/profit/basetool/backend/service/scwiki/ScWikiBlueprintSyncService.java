@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.service.MaterialExternalAliasService;
 import de.greluc.krt.profit.basetool.backend.service.SyncReportService;
+import de.greluc.krt.profit.basetool.backend.support.Quality;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -359,8 +360,10 @@ public class ScWikiBlueprintSyncService {
           modifier.setLabel(m.label());
           modifier.setBetterWhen(m.betterWhen());
           if (m.qualityRange() != null) {
-            modifier.setQualityMin(m.qualityRange().min());
-            modifier.setQualityMax(m.qualityRange().max());
+            modifier.setQualityMin(
+                Quality.clampImported(m.qualityRange().min(), "blueprint modifier quality_min"));
+            modifier.setQualityMax(
+                Quality.clampImported(m.qualityRange().max(), "blueprint modifier quality_max"));
           }
           if (m.modifierRange() != null) {
             modifier.setModifierAtMinQuality(m.modifierRange().atMinQuality());
@@ -372,8 +375,12 @@ public class ScWikiBlueprintSyncService {
             for (ScWikiBlueprintModifierSegmentDto seg : m.valueSegments()) {
               BlueprintModifierSegment segment = new BlueprintModifierSegment();
               segment.setOrderIndex(segmentOrder++);
-              segment.setQualityMin(seg.qualityMin());
-              segment.setQualityMax(seg.qualityMax());
+              segment.setQualityMin(
+                  Quality.clampImported(
+                      seg.qualityMin(), "blueprint modifier segment quality_min"));
+              segment.setQualityMax(
+                  Quality.clampImported(
+                      seg.qualityMax(), "blueprint modifier segment quality_max"));
               segment.setModifierAtStart(seg.modifierAtStart());
               segment.setModifierAtEnd(seg.modifierAtEnd());
               modifier.addSegment(segment);
@@ -430,7 +437,8 @@ public class ScWikiBlueprintSyncService {
     line.setOrderIndex(orderIndex);
     line.setRequirementGroup(group);
     line.setWikiNameSnapshot(child.name());
-    line.setMinQuality(child.minQuality());
+    line.setMinQuality(
+        Quality.clampImported(child.minQuality(), "blueprint ingredient min_quality"));
 
     boolean unresolved;
     if ("item".equalsIgnoreCase(child.kind())) {

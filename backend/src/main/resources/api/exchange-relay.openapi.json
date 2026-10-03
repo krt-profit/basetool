@@ -3049,7 +3049,9 @@
           },
           "quality" : {
             "type" : "integer",
-            "format" : "int32"
+            "format" : "int32",
+            "maximum" : 1000,
+            "minimum" : 0
           },
           "yieldBonusPercent" : {
             "type" : "integer",

@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.service.scwiki.BlueprintOutputNameOverrides;
+import de.greluc.krt.profit.basetool.backend.support.Quality;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.time.Instant;
 import java.util.HashMap;
@@ -955,7 +956,7 @@ public class P4kImportService {
     BlueprintIngredient line = new BlueprintIngredient();
     line.setOrderIndex(orderIndex);
     line.setWikiNameSnapshot(StringNormalization.blankToNull(ing.slot()));
-    line.setMinQuality(ing.minQuality());
+    line.setMinQuality(Quality.clampImported(ing.minQuality(), "P4K ingredient min_quality"));
     UUID resourceGuid = parseUuid(ing.resourceGuid());
     if (resourceGuid != null) {
       line.setKind(BlueprintIngredientKind.RESOURCE);
