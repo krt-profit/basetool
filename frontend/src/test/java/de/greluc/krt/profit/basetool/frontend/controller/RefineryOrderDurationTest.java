@@ -206,7 +206,7 @@ class RefineryOrderDurationTest {
         .andExpect(status().isOk())
         .andExpect(model().attribute("onlyMine", true));
 
-    verify(backendApiClient)
+    verify(backendApiClient, org.mockito.Mockito.atLeastOnce())
         .get(
             org.mockito.ArgumentMatchers.contains("/api/v1/refinery-orders/my-orders"),
             anyTypeRef());
@@ -219,8 +219,12 @@ class RefineryOrderDurationTest {
         .andExpect(status().isOk())
         .andExpect(model().attribute("onlyMine", false));
 
-    verify(backendApiClient)
+    verify(backendApiClient, org.mockito.Mockito.atLeastOnce())
         .get(org.mockito.ArgumentMatchers.contains("/api/v1/refinery-orders/all"), anyTypeRef());
+    verify(backendApiClient, org.mockito.Mockito.never())
+        .get(
+            org.mockito.ArgumentMatchers.contains("/api/v1/refinery-orders/my-orders"),
+            anyTypeRef());
   }
 
   @Test

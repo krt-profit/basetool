@@ -840,7 +840,7 @@ The mechanics follow the established idiom (REQ-ORDERS-027, REQ-UI-016):
   `null` = "no filter", so options added later stay included; on restore, stale values are dropped
   and an entirely stale subset falls back to the page's rendered no-filter default (all checked on
   the matrix/profit pages, all unchecked on the Lager views — semantically identical). Status
-  queues whose server default is a **subset** (orders, refinery: OPEN+IN_PROGRESS) store the
+  queues whose server default is a **subset** (orders: OPEN+IN_PROGRESS) store the
   checked list verbatim and collapse only zero-checked to `null`, so an explicit "show everything"
   choice survives (REQ-ORDERS-027 precedent).
 - The selection is persisted immediately on every change (never debounced with the re-fetch).

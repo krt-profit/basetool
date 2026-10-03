@@ -46,6 +46,11 @@
   Kanten gegen die Rangordnung ein, neue scheitern. Spring Modulith 2.1.1 läuft nur im Testumfang
   (REQ-MOD-001…005).
 
+- **Raffinerie im neuen Muster.** Die Liste teilt sich in „Läuft · Abholbereit · Abgeschlossen ·
+  Alle" mit Zählern; Suche nach Besitzer, Ort, Methode oder Material und das Blättern laufen
+  serverseitig über alle Seiten. Anlegen und Detail sind ein nummeriertes Formular mit Statuskarte
+  und „Ausbeute einlagern" als Hauptaktion (REQ-REFINERY-019).
+
 - **Berechtigungsmatrix des Backends als geprüfte Datei.** `authorization-matrix.txt` hält für jede
   Operation die entscheidende URL-Regel und das wirksame `@PreAuthorize` fest, dazu die
   Service-Gates; `AuthorizationMatrixTest` schlägt bei jeder Abweichung fehl (REQ-SEC-074).

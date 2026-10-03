@@ -23,7 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -31,14 +33,18 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.mapper.RefineryOrderMapper;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
+import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -48,6 +54,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.oauth2.jwt.Jwt;
 
@@ -374,6 +383,62 @@ class RefineryOrderControllerTest {
 
       assertSame(expected, result);
       verify(service).getYieldBonusByMaterialForLocationId(locationId);
+    }
+  }
+
+  @Nested
+  class ListFilterTests {
+
+    @Test
+    void getAllRefineryOrders_passesStatusesReadyQueryAndEndsAtSortToTheService() {
+      List<RefineryOrderStatus> statuses =
+          List.of(RefineryOrderStatus.OPEN, RefineryOrderStatus.IN_PROGRESS);
+      when(service.getAllRefineryOrders(eq(statuses), eq(true), eq("laranite"), any()))
+          .thenReturn(new PageImpl<>(List.of()));
+
+      PageResponse<RefineryOrderListDto> result =
+          controller.getAllRefineryOrders(statuses, true, "laranite", 2, 10, "endsAt,asc");
+
+      ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+      verify(service)
+          .getAllRefineryOrders(eq(statuses), eq(true), eq("laranite"), pageable.capture());
+      assertEquals(2, pageable.getValue().getPageNumber());
+      assertEquals(10, pageable.getValue().getPageSize());
+      assertEquals(
+          Sort.by(Sort.Order.asc("endsAt"), Sort.Order.asc("id")), pageable.getValue().getSort());
+      assertEquals(0, result.totalElements());
+    }
+
+    @Test
+    void getAllRefineryOrders_absentReady_isFalseAndTheDefaultSortStaysStartedAt() {
+      when(service.getAllRefineryOrders(any(), eq(false), any(), any()))
+          .thenReturn(new PageImpl<>(List.of()));
+
+      controller.getAllRefineryOrders(null, null, null, null, null, null);
+
+      ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+      verify(service).getAllRefineryOrders(isNull(), eq(false), isNull(), pageable.capture());
+      assertEquals(
+          Sort.by(Sort.Order.asc("startedAt"), Sort.Order.asc("id")),
+          pageable.getValue().getSort());
+    }
+
+    @Test
+    void getMyRefineryOrders_passesTheCallerReadyAndQueryToTheService() {
+      when(service.getMyRefineryOrders(eq(CALLER_ID), any(), eq(true), eq("ARC"), any()))
+          .thenReturn(new PageImpl<>(List.of()));
+
+      controller.getMyRefineryOrders(jwt, null, true, "ARC", 0, 50, "endsAt,asc");
+
+      verify(service).getMyRefineryOrders(eq(CALLER_ID), isNull(), eq(true), eq("ARC"), any());
+    }
+
+    @Test
+    void getMyRefineryOrders_unknownSortKey_isRejected() {
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> controller.getMyRefineryOrders(jwt, null, null, null, 0, 50, "owner,asc"));
+      verify(service, never()).getMyRefineryOrders(any(), any(), anyBoolean(), any(), any());
     }
   }
 
