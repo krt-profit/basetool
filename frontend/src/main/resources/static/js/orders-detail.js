@@ -17,10 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, labelPiece, labelScu, scuHintText, labelMenge, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_OWNER, MSG_LOCATION, MSG_STOLEN, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_BELOW_FLOOR, MSG_INVENTORY_PART_OF, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, PRODUCTION_I18N, ORDER_HANDOVER_I18N */
+/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, labelPiece, labelScu, scuHintText, labelMenge, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_OWNER, MSG_LOCATION, MSG_STOLEN, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_BELOW_FLOOR, MSG_INVENTORY_PART_OF, MSG_PRODUCTION_COUNTED_HIGHER, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, PRODUCTION_I18N, ORDER_HANDOVER_I18N */
 
 let cachedInventoryItems = [];
 let isInventoryCached = false;
+/** @type {Map<string, string>} */
+let handoverTierSuggestion = new Map();
 
 const ORDER_SECTIONS = {
     header: { container: '#order-header-results', fragmentValue: 'header' },
@@ -117,10 +119,22 @@ function _serializeHandoverForm() {
                       ? parseFloat(amtInput.value)
                       : NaN;
             if (!inventoryItemId || !(amount > 0)) return;
+            const tierSel = /** @type {HTMLSelectElement | null} */ (
+                row.querySelector('select[data-role="handover-tier"]')
+            );
+            const tierHolder = row.querySelector('[data-role="handover-tier-holder"]');
+            const qualityRequirement =
+                tierSel &&
+                tierHolder &&
+                !tierHolder.classList.contains('krtm-hidden') &&
+                tierSel.value
+                    ? tierSel.value
+                    : null;
             items.push({
                 inventoryItemId,
                 amount,
                 missionReductions: _collectHandoverMissionReductions(row),
+                qualityRequirement,
             });
         });
     return {
@@ -164,11 +178,115 @@ function _handoverRowIsPiece(row) {
     return !!(inv && inv.material && inv.material.quantityType === 'PIECE');
 }
 
+/**
+ * Lists the quality tiers the order asks the material in, highest floor first, read from the
+ * material table (REQ-ORDERS-038).
+ *
+ * @param {string} materialId the material
+ * @returns {Array<{id: string, code: string, label: string, floor: number}>} the tiers
+ */
+function _orderTiersForMaterial(materialId) {
+    /** @type {Array<{id: string, code: string, label: string, floor: number}>} */
+    const tiers = [];
+    document.querySelectorAll('.material-row[data-material-id]').forEach((el) => {
+        const row = /** @type {HTMLElement} */ (el);
+        if (row.dataset.materialId !== materialId || !row.dataset.qualityCode) return;
+        if (tiers.some((t) => t.code === row.dataset.qualityCode)) return;
+        tiers.push({
+            id: row.dataset.qualityTierId || '',
+            code: row.dataset.qualityCode || '',
+            label: row.dataset.qualityLabel || row.dataset.qualityCode || '',
+            floor: parseInt(row.dataset.qualityFloor || '0', 10) || 0,
+        });
+    });
+    tiers.sort((a, b) => b.floor - a.floor);
+    return tiers;
+}
+
+/**
+ * Loads the bucket each linked row currently counts toward, as the pre-filled suggestion of the
+ * handover's tier choice (REQ-ORDERS-037/038).
+ *
+ * @param {string[]} materialIds the order's materials
+ * @param {string} orderId the order
+ * @returns {Promise<Map<string, string>>} row id to suggested tier code
+ */
+async function _loadHandoverTierSuggestions(materialIds, orderId) {
+    /** @type {Map<string, string>} */
+    const suggestion = new Map();
+    for (const materialId of materialIds) {
+        const tiers = _orderTiersForMaterial(materialId);
+        if (tiers.length < 2) continue;
+        try {
+            const res = await fetch(
+                '/orders/' + orderId + '/materials/' + materialId + '/attribution',
+                { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } },
+            );
+            if (!res.ok) continue;
+            /** @type {Map<string, {code: string, amount: number}>} */
+            const best = new Map();
+            for (const entry of await res.json()) {
+                const tier = tiers.find((t) => t.id === entry.qualityTierId);
+                if (!tier) continue;
+                const current = best.get(entry.inventoryItemId);
+                if (!current || entry.amount > current.amount) {
+                    best.set(entry.inventoryItemId, { code: tier.code, amount: entry.amount });
+                }
+            }
+            best.forEach((v, k) => suggestion.set(k, v.code));
+        } catch (_e) {
+            continue;
+        }
+    }
+    return suggestion;
+}
+
+/**
+ * Fills a handover row's tier choice with the tiers the chosen entry's quality meets; the choice
+ * is shown only when the order asks the material in more than one tier (REQ-ORDERS-038).
+ *
+ * @param {HTMLElement} row the handover row
+ * @param {any} inv the chosen inventory entry, or null
+ */
+function _refreshHandoverTierChoice(row, inv) {
+    const holder = row.querySelector('[data-role="handover-tier-holder"]');
+    const select = /** @type {HTMLSelectElement | null} */ (
+        row.querySelector('select[data-role="handover-tier"]')
+    );
+    if (!holder || !select) return;
+    select.textContent = '';
+    const materialId = inv && inv.material ? inv.material.id : null;
+    const tiers = materialId ? _orderTiersForMaterial(materialId) : [];
+    if (tiers.length < 2) {
+        holder.classList.add('krtm-hidden');
+        return;
+    }
+    const quality = inv && typeof inv.quality === 'number' ? inv.quality : 0;
+    const eligible = tiers.filter((t) => quality >= t.floor);
+    const suggested = handoverTierSuggestion.get(inv.id);
+    eligible.forEach((t, i) => {
+        const option = document.createElement('option');
+        option.value = t.code;
+        option.textContent = t.label;
+        option.selected = suggested ? t.code === suggested : i === 0;
+        select.appendChild(option);
+    });
+    holder.classList.toggle('krtm-hidden', eligible.length === 0);
+}
+
 async function openHandoverModal() {
     window.krtModal.open(document.getElementById('handover-modal'));
     if (!isInventoryCached) {
         try {
-            const materials = document.querySelectorAll('.material-row[data-material-id]');
+            /** @type {Map<string, HTMLElement>} */
+            const byMaterial = new Map();
+            document.querySelectorAll('.material-row[data-material-id]').forEach((el) => {
+                const row = /** @type {HTMLElement} */ (el);
+                if (row.dataset.materialId && !byMaterial.has(row.dataset.materialId)) {
+                    byMaterial.set(row.dataset.materialId, row);
+                }
+            });
+            const materials = Array.from(byMaterial.values());
             const promises = Array.from(materials).map((row) => {
                 const orderId = row.dataset.orderId;
                 const matId = row.dataset.materialId;
@@ -185,6 +303,13 @@ async function openHandoverModal() {
                     cachedInventoryItems.push(...arr);
                 }
             });
+            const firstRow = materials[0];
+            handoverTierSuggestion = firstRow
+                ? await _loadHandoverTierSuggestions(
+                      Array.from(byMaterial.keys()),
+                      firstRow.dataset.orderId || '',
+                  )
+                : new Map();
             isInventoryCached = true;
         } catch (e) {
             console.error('Failed to load inventory items for handover', e);
@@ -212,7 +337,7 @@ function addHandoverItemRow() {
     const row = document.createElement('div');
     row.className = 'handover-item-row';
     row.style.display = 'grid';
-    row.style.gridTemplateColumns = '2fr 1fr auto';
+    row.style.gridTemplateColumns = '2fr 1fr 1fr auto';
     row.style.gap = '1rem';
     row.style.alignItems = 'end';
     row.style.marginBottom = '1rem';
@@ -249,6 +374,10 @@ function addHandoverItemRow() {
                 <label class="form-label-sm">${escapeHtml(labelMenge)} <span data-role="amount-unit"></span> <span class="scu-hint krtm-hidden" data-role="scu-hint" tabindex="0" role="img" aria-label="${escapeAttr(scuHintText)}"><span aria-hidden="true">?</span><span class="scu-hint__bubble" aria-hidden="true">${escapeHtml(scuHintText)}</span></span></label>
                 <input type="text" inputmode="decimal" data-scu-decimal step="0.001" name="items[${escapeAttr(index)}].amount" min="0.001" required class="w-full">
             </div>
+            <div data-role="handover-tier-holder" class="krtm-hidden">
+                <label class="form-label-sm">${escapeHtml(ORDER_HANDOVER_I18N.tier)}</label>
+                <select data-role="handover-tier" class="w-full" data-testid="handover-tier"></select>
+            </div>
             <div>
                 <button type="button" class="btn btn-quiet-danger btn-icon od-remove-btn" data-trigger="od-remove-handover-row" title="${escapeAttr(ORDER_HANDOVER_I18N.remove)}" aria-label="${escapeAttr(ORDER_HANDOVER_I18N.remove)}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
             </div>
@@ -283,6 +412,7 @@ function addHandoverItemRow() {
                 if (rowScuHint) rowScuHint.classList.add('krtm-hidden');
             }
             _refreshHandoverMissionPicker(row);
+            _refreshHandoverTierChoice(row, inv);
         });
         amtInput.addEventListener('input', () => _refreshHandoverMissionPicker(row));
     }
@@ -497,6 +627,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (modal) window.krtModal.close(modal);
                     isInventoryCached = false;
                     cachedInventoryItems = [];
+                    handoverTierSuggestion = new Map();
                     const itemsContainer = document.getElementById('handover-items-container');
                     if (itemsContainer) itemsContainer.innerHTML = '';
                     showFrontendSuccessToast(MSG_HANDOVER_SUCCESS);
@@ -1743,9 +1874,14 @@ function openProductionModal(button) {
             return;
         }
         const requiredTotal = parseFloat(li.getAttribute('data-required-total')) || 0;
+        const floor = parseInt(li.getAttribute('data-quality-floor') || '0', 10) || 0;
         const existing = byMaterialId.get(materialId);
         if (existing) {
             existing.requiredTotals.push(requiredTotal);
+            if (floor > existing.floor) {
+                existing.floor = floor;
+                existing.qualityLabel = li.getAttribute('data-quality-label') || '';
+            }
             return;
         }
         byMaterialId.set(materialId, {
@@ -1753,6 +1889,8 @@ function openProductionModal(button) {
             materialName: li.getAttribute('data-material-name') || '',
             quantityType: li.getAttribute('data-quantity-type') || 'SCU',
             requiredTotals: [requiredTotal],
+            floor,
+            qualityLabel: li.getAttribute('data-quality-label') || '',
             entries: [],
         });
     });
@@ -1773,6 +1911,13 @@ function openProductionModal(button) {
             '<div data-prod-entries><p class="text-muted">' +
             escapeHtml(PRODUCTION_I18N.loadingStock) +
             '</p></div>';
+        const title = card.querySelector('.card-title');
+        if (mat.floor > 0 && title) {
+            const badge = document.createElement('span');
+            badge.className = 'quality-badge quality-good';
+            badge.textContent = mat.qualityLabel;
+            title.append(' ', badge);
+        }
         if (container) {
             container.appendChild(card);
         }
@@ -1780,11 +1925,17 @@ function openProductionModal(button) {
         if (skipCb) {
             skipCb.addEventListener('change', _prodReconcile);
         }
-        fetch('/orders/' + orderId + '/materials/' + mat.materialId + '/inventory')
-            .then(function (r) {
-                return r.ok ? r.json() : [];
-            })
-            .then(function (items) {
+        Promise.all([
+            fetch('/orders/' + orderId + '/materials/' + mat.materialId + '/inventory').then(
+                function (r) {
+                    return r.ok ? r.json() : [];
+                },
+            ),
+            _prodLoadHigherAttribution(orderId, mat),
+        ])
+            .then(function (results) {
+                const items = results[0];
+                mat.countedHigher = results[1];
                 mat.entries = (items || [])
                     .map(function (it) {
                         const alloc = (it.jobOrderAllocations || []).find(function (a) {
@@ -1804,8 +1955,19 @@ function openProductionModal(button) {
                     })
                     .filter(function (e) {
                         return e.slice > 0;
+                    })
+                    .map(function (e) {
+                        const q = typeof e.quality === 'number' ? e.quality : 0;
+                        return Object.assign(e, { belowFloor: q < mat.floor });
+                    })
+                    .sort(function (a, b) {
+                        if (a.belowFloor !== b.belowFloor) return a.belowFloor ? 1 : -1;
+                        const qa = typeof a.quality === 'number' ? a.quality : 0;
+                        const qb = typeof b.quality === 'number' ? b.quality : 0;
+                        return qa - qb;
                     });
                 _renderProdMaterialEntries(card, mat);
+                _prodPrefill(card, mat);
                 _prodReconcile();
             })
             .catch(function () {
@@ -1834,6 +1996,19 @@ function _renderProdMaterialEntries(card, mat) {
             stolenChip =
                 ' <span class="chip chip--danger chip-xs">' + escapeHtml(MSG_STOLEN) + '</span>';
         }
+        const higher = mat.countedHigher ? mat.countedHigher.get(e.inventoryItemId) : null;
+        if (higher && !e.belowFloor) {
+            stolenChip +=
+                ' <span class="chip chip--warning chip-xs" data-testid="prod-counted-higher">' +
+                escapeHtml(MSG_PRODUCTION_COUNTED_HIGHER.replace('{0}', higher)) +
+                '</span>';
+        }
+        if (e.belowFloor) {
+            stolenChip +=
+                ' <span class="chip chip-xs" data-testid="prod-below-floor">' +
+                escapeHtml(MSG_INVENTORY_BELOW_FLOOR) +
+                '</span>';
+        }
         html +=
             '<div class="od-prod-entry"><div class="od-prod-src">' +
             escapeHtml(e.ownerName) +
@@ -1856,7 +2031,77 @@ function _renderProdMaterialEntries(card, mat) {
     });
     entriesEl.innerHTML = html;
     entriesEl.querySelectorAll('[data-prod-alloc]').forEach(function (inp) {
+        const entry = mat.entries[Number(inp.getAttribute('data-prod-idx'))];
+        if (entry && entry.belowFloor) {
+            inp.disabled = true;
+            inp.setAttribute('data-below-floor', 'true');
+        }
         inp.addEventListener('input', _prodReconcile);
+    });
+}
+
+/**
+ * Finds the linked rows of a material the quality-bucket allocation currently counts toward a
+ * tier with a higher floor than this line needs, so consuming them here is flagged (REQ-ORDERS-039).
+ *
+ * @param {string | null} orderId the order
+ * @param {any} mat the material with its floor
+ * @returns {Promise<Map<string, string>>} row id to the label of the higher tier
+ */
+async function _prodLoadHigherAttribution(orderId, mat) {
+    /** @type {Map<string, string>} */
+    const higher = new Map();
+    /** @type {Map<string, {floor: number, label: string}>} */
+    const tiers = new Map();
+    document.querySelectorAll('.aggregated-material-row').forEach((el) => {
+        const row = /** @type {HTMLElement} */ (el);
+        if (row.dataset.materialId !== mat.materialId || !row.dataset.qualityTierId) return;
+        tiers.set(row.dataset.qualityTierId, {
+            floor: parseInt(row.dataset.qualityFloor || '0', 10) || 0,
+            label: row.dataset.qualityLabel || '',
+        });
+    });
+    if (tiers.size < 2 || !orderId) return higher;
+    try {
+        const res = await fetch(
+            '/orders/' + orderId + '/materials/' + mat.materialId + '/attribution',
+            { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } },
+        );
+        if (!res.ok) return higher;
+        for (const entry of await res.json()) {
+            const tier = tiers.get(entry.qualityTierId);
+            if (tier && tier.floor > mat.floor && entry.amount > 0) {
+                higher.set(entry.inventoryItemId, tier.label);
+            }
+        }
+    } catch (_e) {
+        return higher;
+    }
+    return higher;
+}
+
+/**
+ * Pre-fills a material's consumption with the lowest qualifying grades first, up to the demand of
+ * the current amount; the member may change every figure (REQ-ORDERS-039).
+ *
+ * @param {Element} card the material card
+ * @param {any} mat the material with its sorted entries
+ */
+function _prodPrefill(card, mat) {
+    const amtInput = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('production-amount')
+    );
+    const k = parseInt(amtInput ? amtInput.value : '0', 10);
+    if (!isFinite(k) || k < 1) return;
+    let left = _prodDemand(mat, k);
+    card.querySelectorAll('[data-prod-alloc]').forEach(function (el) {
+        const inp = /** @type {HTMLInputElement} */ (el);
+        const e = mat.entries[parseInt(inp.getAttribute('data-prod-idx') || '0', 10)];
+        if (!e || e.belowFloor || left <= 1e-4) return;
+        const cap = Math.min(e.slice, e.stock);
+        const take = Math.min(left, cap);
+        inp.value = String(mat.quantityType === 'PIECE' ? Math.floor(take) : _prodRound3(take));
+        left -= parseFloat(inp.value) || 0;
     });
 }
 
@@ -2014,7 +2259,7 @@ function _prodReconcile() {
         const chip = card.querySelector('[data-prod-chip]');
         card.classList.toggle('od-prod-skipped', skipped);
         card.querySelectorAll('[data-prod-alloc]').forEach(function (inp) {
-            inp.disabled = skipped;
+            inp.disabled = skipped || inp.getAttribute('data-below-floor') === 'true';
         });
         if (skipped) {
             if (chip) {
