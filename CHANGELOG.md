@@ -156,6 +156,10 @@
 
 ### Fixed
 
+- **Systemeinstellungen: Auftragsbearbeitung pro Spezialkommando wieder schaltbar.** Der Abschnitt
+  zeigte seit dem Wegfall des anonymen Auftragsformulars immer „Keine Spezialkommandos gefunden.";
+  jetzt listet er alle aktiven SKs mit ihrem Schalter (Frontend-Controller, REQ-ADMIN-001).
+
 - **Datenauskunft: Qualität der Eintragungen.** Der Export zeigt die Qualitätsstufe einer
   Material-Eintragung wieder an; seit dem Stufen-Katalog blieb sie bei neuen Eintragungen leer.
 - **Sandbox: Seed läuft wieder.** Die Beispielaufträge des Exchange-Sandbox-Seeds nennen ihre
