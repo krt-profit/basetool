@@ -13,6 +13,11 @@
 - **Hangar: Versicherung als „Keine · Monate · LTI".** Statt einer Liste mit 122 Einträgen; Monate
   als Zahl von 1 bis 120.
 
+- **Hangar: eine Seite mit Tabs „Meine Schiffe" · „Org-Einheit".** Die Org-Einheitsübersicht ist
+  jetzt der zweite Tab (Schiffstypen als Baumzeilen mit Einsatzbereitschafts-Balken); „Meine
+  Schiffe" filtert mit „Alle · Bereit · Nicht bereit" und zeigt „n von m einsatzbereit". Import,
+  Home-Location und „Hangar leeren …" sitzen im Seitenkopf (REQ-HANGAR-001/002).
+
 - **Listenseiten im neuen Muster (Phase 1).** Einsätze, Operationen, Benachrichtigungen, Aufträge,
   Materialbedarf, Lager, Sammelübersichten, Materialien, Mitglieder, Beförderung und alle
   Admin-Listen haben einen Seitenkopf mit Zähler, eine Werkzeugleiste mit Suche, Segment-Schalter und

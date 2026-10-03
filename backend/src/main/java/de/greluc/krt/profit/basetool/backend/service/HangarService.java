@@ -184,19 +184,23 @@ public class HangarService {
 
   /**
    * Returns one page of the user's own ships in the personal-hangar order, optionally filtered by
-   * ship-type or manufacturer name (REQ-HANGAR-002). Ordering and filtering run in the repository
-   * across the whole fleet.
+   * ship-type or manufacturer name and by the fitted flag (REQ-HANGAR-002). Ordering and filtering
+   * run in the repository across the whole fleet.
    *
    * @param userId owner id; only this user's ships are returned
    * @param search optional ship-type/manufacturer name filter; {@code null}/blank means no filter
+   * @param fitted optional fitted filter; {@code null} means fitted and unfitted ships
    * @param pageable page request, unsorted (the query defines the order)
    * @return one ordered, optionally filtered page of the user's ships
    */
   public Page<Ship> getMyShipsFiltered(
-      @NotNull UUID userId, String search, @NotNull Pageable pageable) {
+      @NotNull UUID userId,
+      @Nullable String search,
+      @Nullable Boolean fitted,
+      @NotNull Pageable pageable) {
     String normalizedSearch =
         search == null || search.isBlank() ? null : LikePatterns.escape(search.trim());
-    return shipRepository.findByOwnerIdFiltered(userId, normalizedSearch, pageable);
+    return shipRepository.findByOwnerIdFiltered(userId, normalizedSearch, fitted, pageable);
   }
 
   /**
