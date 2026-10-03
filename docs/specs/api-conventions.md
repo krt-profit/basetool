@@ -752,9 +752,9 @@ parallel `/api/v2` path and no sunset window. It ships together with:
 
 > [!note] Amended 2026-10-02 — retirement by hard cut (owner decisions D-03, D-04, D-11; ADR-0234)
 > This used to read: retirement goes through `/api/v2` + `@ApiDeprecation` with a sunset rather
-> than a deletion. **Decided; partly implemented:** the `APP_UPDATE_REQUIRED` answer exists since
-> 2026-10-03 (REQ-API-020); the ledger and the committed app call list do not exist yet (plan guard
-> G-23, Phase 0 step 0.7), and no frozen operation may be retired before they do.
+> than a deletion. **Implemented 2026-10-03:** the declared-break ledger (REQ-API-017), the committed
+> app call list (REQ-API-016) and the `APP_UPDATE_REQUIRED` answer (REQ-API-020) exist (plan guard
+> G-23, Phase 0 step 0.7); a frozen operation is retired only through them.
 
 > [!warning] Amended 2026-09-02 (owner-approved) — this sentence used to say every field it had
 > The wording was stricter than the rest of its own requirement and stricter than the gate that
@@ -839,11 +839,11 @@ move together.
   below it. What that unblocks is narrower than "old builds are gone", and the difference matters
   when planning a sunset — the floor stops a build from *running*, it does not remove it from
   anyone's phone, and a member who never opens the app never learns of it.
-- [ ] **A break is declared before it ships** — the declared-break ledger, accepted exactly by the
-  previous-release comparison. **Open** (decided 2026-10-02, ADR-0234; plan guard G-23).
-- [ ] **The frozen set covers what the app calls** — the app's call list committed per release and
-  asserted against the set. **Open** (same decision; the app calls operations the set does not list
-  yet).
+- [x] **A break is declared before it ships** — the declared-break ledger, accepted exactly by the
+  previous-release comparison. **Closed by REQ-API-017** (2026-10-03).
+- [x] **The frozen set covers what the app calls** — the app's call list committed per release and
+  asserted against the set. **Closed by REQ-API-016** (2026-10-03) for the app's next build; the
+  list per released build follows with the app release.
 - [x] **A retired path answers `APP_UPDATE_REQUIRED`.** **Closed by REQ-API-020** (2026-10-03):
   `RetiredOperationFilter` answers every operation of `retired-operations.txt` with `410
   APP_UPDATE_REQUIRED` ahead of authentication; on the public API vhost once the edge admits the
@@ -1289,9 +1289,10 @@ skipped for every request.
 - **No oracle.** The answer is the same for every value of a placeholder, reads nothing and names no
   resource; all it says is that the operation was once part of the published API, which the public
   repository's ledger already says.
-- **Only previously admitted paths.** Every entry is a declared break of the ledger
-  `backend/src/test/resources/api/declared-breaks.txt` (REQ-API-009, plan guard G-23); the build
-  fails on an entry the ledger does not declare, and on a non-empty list without a ledger.
+- **Only previously admitted paths.** Every entry is a whole-operation break
+  (`<VERB> <path> - <versionCode>`) of the ledger `backend/src/test/resources/api/declared-breaks.txt`
+  (REQ-API-017, plan guard G-23); the build fails on an entry the ledger does not declare that way —
+  a field-level line does not retire its operation — and when the ledger is missing.
 - **The edge comes first.** On the public API vhost the edge allow-list refuses a path it does not
   admit with a bare `404` before the backend sees it. Until the generated edge include (plan guard
   G-08) also admits the ledger's retired paths, an app on the API vhost meets that `404` — which the
