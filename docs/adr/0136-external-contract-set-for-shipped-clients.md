@@ -4,7 +4,9 @@
 - **Date:** 2026-08-18
 - **Amended:** 2026-09-02 (owner-approved) — "keeps every field it had" narrowed to "keeps every
   **recorded** field", matching `ExternalContractTest` and REQ-API-009's acceptance criteria (see
-  the Amendment note in the Decision section)
+  the Amendment note in the Decision section); 2026-10-02 — the retirement clause (decision bullet
+  4) is superseded by [ADR-0234](0234-the-api-is-re-cut-by-hard-cut-with-a-forced-app-update.md):
+  retirement is a declared hard cut with a forced update (see the last Amendment section)
 - **Related:** [ADR-0135](0135-public-api-vhost-not-a-gateway.md) ·
   [ADR-0003](0003-inventory-append-only-group-on-read.md) (the carve-out this narrows) ·
   specs `REQ-API-001`, `REQ-API-007`, `REQ-API-009`, `REQ-SEC-027` ·
@@ -115,3 +117,16 @@ disappearing — is not a field-level concern.
 *Nothing formal; fix forward when a break appears.* This is the status quo, and its cost lands
 entirely on people who cannot redeploy. It also has no mechanism: without a recorded contract there
 is nothing for a test or a reviewer to notice.
+
+## Amendment — 2026-10-02: retirement by hard cut
+
+Owner decisions D-03, D-04 and D-11 of the domain modularisation plan;
+[ADR-0234](0234-the-api-is-re-cut-by-hard-cut-with-a-forced-app-update.md). The fourth bullet of
+*Frozen means* — "retiring it goes through `/api/v2` plus `@ApiDeprecation` with a sunset, not a
+deletion" — is superseded. A frozen operation is retired or changed only in a declared hard-cut
+wave: a line in the declared-break ledger naming the operation and field and the app `versionCode`
+that absorbs it, a new app release published first, and the minimum app version raised for it
+(REQ-API-010); once retired, its path answers `APP_UPDATE_REQUIRED`. There is no parallel `/api/v2`
+path and no sunset window. The other three bullets, the set itself and its growth one app phase at
+a time are unchanged. *Retirement needs A5* is answered: the floor of REQ-API-010 is that gate, and
+ADR-0234 binds it to the release.

@@ -100,6 +100,12 @@ Jakarta validation), `@Valid` on every write, RFC 7807 `problem+json` for every 
 `OpenApiGeneratorTest`, and CI fails a pull request whose committed document differs from the one
 its build generated.
 
+A breaking change is a **hard cut**, not a second version: every operation carries a contract tier
+(T0 never breaks, T1 is what a released app calls and breaks only in a declared wave with a forced
+update, T2 is web-only), and the minimum app version is to be bound to the release
+([ADR-0234](../adr/0234-the-api-is-re-cut-by-hard-cut-with-a-forced-app-update.md), REQ-API-001,
+-009, -010; decided 2026-10-02, implementation pending).
+
 Authority: [`api-conventions.md`](../specs/api-conventions.md) (`REQ-API-*`).
 
 ## 8.6 Frontend behaviour
@@ -164,7 +170,9 @@ ADR-0012/0013/0031/0094.
 
 One centrally-configured WebClient, wrapped by Resilience4j (Timeout, Retry, CircuitBreaker,
 Bulkhead), with state transitions logged so a `SERVICE_UNAVAILABLE` or `BACKEND_TIMEOUT` always has
-a matching log line.
+a matching log line. The per-domain typed clients the frontend gets are built over that same
+`webClient` bean, never beside it, so the one filter chain stays the single pass
+([ADR-0032](../adr/0032-frontend-single-resilience-pass-at-webclient-filter.md) amendment).
 
 **Reactor context propagation is mandatory** for anything that must be visible inside an exchange
 filter: `WebClient.exchange()` runs on a Reactor-Netty worker thread and a plain `ThreadLocal` is
@@ -282,3 +290,35 @@ Three rules hold for every exchange route, and each new resource or capability i
 
 Authority: [`external-exchange.md`](../specs/external-exchange.md) (`REQ-XCH-*`), ADR-0216 …
 ADR-0221, ADR-0224 … ADR-0228; the third-party view is published from `docs/exchange/`.
+
+## 8.14 Domain modules — decided, being built
+
+The backend is being cut into domain modules inside its one Gradle module (plan
+[`DOMAIN_MODULARISATION_PLAN.md`](../DOMAIN_MODULARISATION_PLAN.md); nothing has moved yet). Five
+rules hold for every module as it lands:
+
+- **One package per domain, with a rank.** A module depends only on lower ranks or on what its
+  declaration allows; `kernel` and `platform` carry no domain meaning; inside a module, `api` is the
+  only thing another module may use, `internal` holds the rest, and `web` holds controllers and REST
+  DTOs without transactions, repositories or entities
+  ([ADR-0231](../adr/0231-the-backend-becomes-a-modular-monolith-one-package-per-domain.md)).
+- **Three ways to interact.** A command or query API whose writes are `MANDATORY`; an observer SPI
+  owned by the lower module and called in the same transaction; an after-commit event only where the
+  reaction may happen later or fail on its own. Only the owner writes its aggregate, and audit is
+  always a direct synchronous call, never an event
+  ([ADR-0232](../adr/0232-modules-interact-through-commands-observers-and-after-commit-events.md)).
+- **Enforced by tests, not review.** ArchUnit keeps the security rules, re-keyed so a move cannot
+  disarm them, and a frozen module baseline that may only shrink; security rules are never frozen;
+  Spring Modulith verifies the modules in test scope only
+  ([ADR-0233](../adr/0233-module-boundaries-are-enforced-by-archunit-and-spring-modulith-in-test-scope.md)).
+- **Access is a policy per domain** that owns both the per-row gate and the JPQL scope fragment
+  ([ADR-0236](../adr/0236-each-domain-owns-an-access-policy-over-the-scope-kernel.md)); errors are a
+  sealed kernel of kinds plus per-module problem codes
+  ([ADR-0235](../adr/0235-errors-are-a-sealed-kernel-of-kinds-and-per-module-problem-codes.md)).
+- **Guards before moves.** No class, controller, template, script or path moves before the Phase 0
+  guards are green and each is proven able to fail once; a move pull request is mechanical and
+  keeps the authorization matrix byte-identical (plan §6).
+
+The REST API follows the modules by hard cut with a forced app update
+([ADR-0234](../adr/0234-the-api-is-re-cut-by-hard-cut-with-a-forced-app-update.md), §8.5). Only the
+exchange and the bank later become Gradle modules of their own. The debt this closes is §11.9.

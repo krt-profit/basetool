@@ -1,6 +1,6 @@
 # ADR-0047 — Backend packages form an acyclic dependency graph
 
-- **Status:** Accepted
+- **Status:** Accepted — amended 2026-10-02 (module cycles in a frozen baseline, layer cycles per module, see below)
 - **Date:** 2026-06-27
 - **Deciders:** @greluc
 - **Related:** [`ArchitectureTest`](../../backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java) (`backendPackagesShouldBeFreeOfDependencyCycles`, `supportPackageMustStayADependencyLeaf`, `mapperLayerShouldNotReachIntoSecurityContext`) · ADR-0012 (layering)
@@ -112,3 +112,20 @@ removals are routine relocations.
   breaks it.
 - **Backend-wide `beFreeOfCycles` left unenforced (a one-off cleanup)** — rejected: without
   the gate the graph would re-acquire cycles within a few PRs.
+
+## Amendment — 2026-10-02: module cycles frozen, layer cycles per module
+
+Domain modularisation plan §5.7, guards G-01 and G-09; ADR-0231, ADR-0233. The backend gets a
+second level of slices — the domain modules — whose graph is not acyclic today (21 of 23 domains in
+one strongly connected component). Two rules follow:
+
+- **Module cycles are frozen in a baseline.** The ArchUnit `modules()` rule over the domain map,
+  wrapped in `FreezingArchRule`, records today's violating edges, cycles included, in a committed
+  store that may only shrink. This is the alternative the decision above rejected for the layers;
+  it is accepted for the modules because their cycles cannot be removed before the gate is needed,
+  and the store makes every removal visible.
+- **Layer cycles are checked per module.** `backendPackagesShouldBeFreeOfDependencyCycles` keeps
+  guarding the layer packages while they exist, and a second cycle rule checks the layers inside
+  each module (`api`, `internal`, `web`), never frozen.
+
+The leaf-SPI inversion of the decision above is also how an upward module edge is broken (ADR-0232).
