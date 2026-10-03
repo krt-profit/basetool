@@ -36,7 +36,6 @@ import org.springframework.cache.CacheManager;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -45,7 +44,6 @@ import org.springframework.transaction.annotation.Transactional;
  * write evicts both.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @Transactional
 class MaterialServiceCachingTest {
 

@@ -49,10 +49,11 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *
  * <ol>
  *   <li>the document does not scroll sideways;
- *   <li>header and pinned footer stay under {@value #MAX_CHROME_SHARE_PERCENT}% of the viewport
- *       height;
- *   <li>the footer is {@code static} with {@code --krt-footer-height: 0px} on phones, and {@code
- *       fixed} with matching {@code main} bottom padding above;
+ *   <li>header, pinned footer and tab bar stay under {@value #MAX_CHROME_SHARE_PERCENT}% of the
+ *       viewport height;
+ *   <li>the footer is {@code static} with {@code --krt-footer-height: 0px} on phones, where {@code
+ *       main} reserves the fixed tab bar, and {@code fixed} with matching {@code main} bottom
+ *       padding above;
  *   <li>no element is cut off beyond the viewport outside a fitting scroll container;
  *   <li>wide tables scroll inside their own container;
  *   <li>form controls fit the viewport and reach the 44px touch floor by their effective hit area
@@ -666,6 +667,7 @@ class TouchClassLayoutE2eTest {
     String footerPosition = String.valueOf(probe.get("footerPosition"));
     double headerH = number(probe.get("headerHeight"));
     double footerH = number(probe.get("footerHeight"));
+    double tabbarH = number(probe.get("tabbarHeight"));
     double reserved = number(probe.get("mainPaddingBottom"));
     String heightVar = String.valueOf(probe.get("footerHeightVar"));
     boolean phone = width <= PHONE_MAX_WIDTH;
@@ -686,6 +688,13 @@ class TouchClassLayoutE2eTest {
                 + " it (main's reserve, the max-height calcs, the org-chart scrollbar) would"
                 + " reserve space twice.");
       }
+      if (tabbarH > reserved + SLACK_PX) {
+        findings.add(
+            String.format(
+                "%s: the tab bar is %.0fpx tall but main reserves only %.0fpx — the bottom of a"
+                    + " long page stays covered (REQ-UI-026).",
+                where, tabbarH, reserved));
+      }
     } else {
       if (!"fixed".equals(footerPosition)) {
         findings.add(
@@ -702,14 +711,14 @@ class TouchClassLayoutE2eTest {
       }
     }
 
-    double chrome = headerH + ("fixed".equals(footerPosition) ? footerH : 0);
+    double chrome = headerH + ("fixed".equals(footerPosition) ? footerH : 0) + tabbarH;
     double sharePercent = chrome * 100.0 / height;
     if (sharePercent > MAX_CHROME_SHARE_PERCENT) {
       findings.add(
           String.format(
-              "%s: header (%.0fpx) + pinned footer (%.0fpx) take %.0f%% of the %dpx viewport"
-                  + " (ceiling %d%%).",
-              where, headerH, footerH, sharePercent, height, MAX_CHROME_SHARE_PERCENT));
+              "%s: header (%.0fpx) + pinned footer (%.0fpx) + tab bar (%.0fpx) take %.0f%% of the"
+                  + " %dpx viewport (ceiling %d%%).",
+              where, headerH, footerH, tabbarH, sharePercent, height, MAX_CHROME_SHARE_PERCENT));
     }
 
     if (phone && headerH > MAX_PHONE_HEADER_HEIGHT_PX) {
@@ -877,6 +886,9 @@ class TouchClassLayoutE2eTest {
         const main = document.querySelector('main') || document.querySelector('.page-wrapper');
         const headerHeight = header ? header.getBoundingClientRect().height : 0;
         const footerHeight = footer ? footer.getBoundingClientRect().height : 0;
+        const tabbar = document.querySelector('.mobile-tabbar');
+        const tabbarHeight = tabbar && getComputedStyle(tabbar).position === 'fixed'
+          ? tabbar.getBoundingClientRect().height : 0;
         let mainPaddingBottom = 0;
         for (let n = main; n && n !== document.body; n = n.parentElement) {
           mainPaddingBottom += parseFloat(getComputedStyle(n).paddingBottom) || 0;
@@ -1010,7 +1022,7 @@ class TouchClassLayoutE2eTest {
                  overflowXHtml: getComputedStyle(document.documentElement).overflowX,
                  overflowXBody: getComputedStyle(document.body).overflowX,
                  footerPosition: footer ? getComputedStyle(footer).position : '(no footer)',
-                 headerHeight, footerHeight, mainPaddingBottom, footerHeightVar,
+                 headerHeight, footerHeight, tabbarHeight, mainPaddingBottom, footerHeightVar,
                  cutOff, unscrollableTables, badControls, modalIssues, overlaps,
                  modalCount: document.querySelectorAll('%s').length };
       }

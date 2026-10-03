@@ -89,7 +89,7 @@ public class AdminController {
    */
   @PutMapping("/roles/{name}/permissions")
   public RoleDto updatePermissions(
-      @PathVariable @NotNull String name, @RequestBody @NotNull Set<String> permissions) {
+      @PathVariable @NotNull String name, @RequestBody @Valid @NotNull Set<String> permissions) {
     return roleMapper.toDto(roleService.updatePermissions(name, permissions));
   }
 
@@ -102,7 +102,7 @@ public class AdminController {
    */
   @PutMapping("/roles/{name}/description")
   public RoleDto updateRoleDescription(
-      @PathVariable @NotNull String name, @RequestBody @NotNull String description) {
+      @PathVariable @NotNull String name, @RequestBody @Valid @NotNull String description) {
     return roleMapper.toDto(roleService.updateRoleDescription(name, description));
   }
 

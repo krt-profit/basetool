@@ -66,7 +66,7 @@ class PromotionPageControllerTest {
   @InjectMocks private PromotionPageController controller;
 
   private static PromotionTopicDto topic(UUID id, String name, int sortOrder) {
-    return new PromotionTopicDto(id, 0L, name, null, sortOrder, null, null);
+    return new PromotionTopicDto(id, 0L, name, null, sortOrder, null, null, null);
   }
 
   private static PromotionCategoryDto category(

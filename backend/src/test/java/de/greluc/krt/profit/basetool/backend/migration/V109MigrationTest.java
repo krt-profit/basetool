@@ -28,7 +28,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * TestContainers-backed migration test for {@code V109__create_uex_category.sql}. Asserts the
@@ -36,7 +35,6 @@ import org.springframework.test.context.ActiveProfiles;
  * constraint, and section / type indexes.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class V109MigrationTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;

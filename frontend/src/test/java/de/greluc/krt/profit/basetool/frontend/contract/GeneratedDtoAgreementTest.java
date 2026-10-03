@@ -99,14 +99,10 @@ class GeneratedDtoAgreementTest {
    * <ul>
    *   <li>{@code RefineryOrderListDto} / {@code endsAt} — sent by the backend, recomputed by the
    *       mirror as {@code startedAt + durationMinutes}.
-   *   <li>{@code PromotionTopicDto} / {@code owningSquadron} — sent by the backend, not declared by
-   *       the mirror.
    * </ul>
    */
   private static final Map<String, Set<String>> KNOWN_DRIFT =
-      Map.of(
-          "RefineryOrderListDto", Set.of("endsAt"),
-          "PromotionTopicDto", Set.of("owningSquadron"));
+      Map.of("RefineryOrderListDto", Set.of("endsAt"));
 
   @Test
   @DisplayName("every mirrored DTO carries exactly the fields the contract declares")
@@ -172,8 +168,8 @@ class GeneratedDtoAgreementTest {
     assertThat(KNOWN_DRIFT)
         .as(
             "pre-existing drifts, frozen with their reasons. This number goes DOWN when one is"
-                + " fixed; it goes up only with the same justification the two entries carry")
-        .hasSize(2);
+                + " fixed; it goes up only with the same justification the entry carries")
+        .hasSize(1);
   }
 
   /**

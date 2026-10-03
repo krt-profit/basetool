@@ -207,6 +207,15 @@ class TermsAcceptanceAccessFilterTest {
     assertThat(invoke("/api/v1/terms-export").getStatus()).isEqualTo(403);
   }
 
+  /** A path below the consent endpoints that is not in the exact set stays gated (REQ-SEC-080). */
+  @Test
+  void doesNotExemptAnUnlistedPathBelowTheConsentEndpoints() throws Exception {
+    when(termsConsentCheck.hasAcceptedCurrentTerms(USER_ID)).thenReturn(false);
+
+    assertThat(invoke("/api/v1/terms/admin").getStatus()).isEqualTo(403);
+    assertThat(invoke("/api/v1/terms").getStatus()).isEqualTo(403);
+  }
+
   /** Non-API paths are none of this filter's business. */
   @Test
   void ignoresNonApiPaths() throws Exception {

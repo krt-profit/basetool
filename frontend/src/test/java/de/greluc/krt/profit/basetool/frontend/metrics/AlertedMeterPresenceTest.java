@@ -29,7 +29,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
@@ -38,7 +37,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * {@code resilience4j_*} family, whose absence means they are not published at all.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 class AlertedMeterPresenceTest {
 
   /** The OAuth2 client registry needs a live Keycloak to build; mocked like the sibling tests. */

@@ -84,7 +84,7 @@ class ConnectedAppsConfirmControllerMvcTest {
 
   @MockitoBean private BackendApiClient backendApiClient;
 
-  @MockitoBean private IngestHandoffService handoffService;
+  @MockitoBean private IngestHandoffService ingestHandoffService;
 
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
 
@@ -105,7 +105,7 @@ class ConnectedAppsConfirmControllerMvcTest {
         .andExpect(model().attribute("pendingHandoffId", HANDOFF))
         .andExpect(content().string(containsString("data-handoff-id=\"" + HANDOFF + "\"")));
 
-    verify(handoffService, never()).consume(anyString(), anyString(), any(), any());
+    verify(ingestHandoffService, never()).consume(anyString(), anyString(), any(), any());
   }
 
   @Test
@@ -212,7 +212,7 @@ class ConnectedAppsConfirmControllerMvcTest {
 
   @Test
   void anExpiredHandoffIsNotFound() throws Exception {
-    when(handoffService.consume(eq(SUB), eq(HANDOFF), eq(HandoffKind.MASS_CHANGE), any()))
+    when(ingestHandoffService.consume(eq(SUB), eq(HANDOFF), eq(HandoffKind.MASS_CHANGE), any()))
         .thenReturn(Optional.empty());
 
     step("load", new MockHttpSession()).andExpect(status().isNotFound());
@@ -285,7 +285,7 @@ class ConnectedAppsConfirmControllerMvcTest {
    * @param stagedAt when the gateway staged it, or {@code null} for a document without the time
    */
   private void stubStaged(@Nullable Instant stagedAt) {
-    when(handoffService.consume(
+    when(ingestHandoffService.consume(
             eq(SUB),
             eq(HANDOFF),
             eq(HandoffKind.MASS_CHANGE),

@@ -51,7 +51,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -63,7 +62,6 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * <p>Runs in one rolled-back read-only transaction with a bound servlet request, as in production.
  */
 @SpringBootTest
-@ActiveProfiles("test")
 @Transactional
 class UserMappingNoNPlusOneTest {
 
