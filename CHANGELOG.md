@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Modularisierung: die Entscheidungen sind festgehalten.** ADR-0231 bis ADR-0239 (Modulschnitt,
+  Zusammenspiel der Module, Prüfwerkzeuge, harter API-Schnitt mit erzwungenem App-Update, Fehlermodell,
+  Zugriffsregeln je Fachbereich, NullAway, `switch` ohne `default`, Browser-Baseline 2025), dazu
+  REQ-API-001/009/010 und REQ-FE-018. Checkstyle akzeptiert `_` als Namen eines leeren `catch`.
+
 ### Fixed
 
 - **Crew-Board auf dem Smartphone: Ziehen unter die Tab-Leiste.** Beim Ziehen eines Teilnehmers scrollt die
@@ -9,6 +16,10 @@
   der Tab-Leiste bricht ab, statt die Zuweisung zu entfernen.
 
 - **Org-Einheiten-Auswahl im Menü auf Tablets wieder 44 px hoch** (Touch-Mindestgröße, REQ-UI-009).
+
+- **E2E: nach einem Formular-Submit wartet die Suite, bis die Zielseite geladen ist.** Die nächste
+  Navigation überholte sonst die noch ladende Seite; in WebKit verlor der Browser dabei vereinzelt alle
+  Cookies, und `JobOrderProductionE2eTest` landete abgemeldet auf `/?error`. Kein Fehler der App.
 
 ## [v1.13.7](https://github.com/krt-profit/basetool/releases/tag/v1.13.7) - 2026-10-03
 

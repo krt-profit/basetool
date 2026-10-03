@@ -1,6 +1,7 @@
 # ADR-0229 — Exchange stock writes take an advisory lock per lot, in key order
 
-- **Status:** Accepted — owner decision 2026-09-28 (option (a) of the load test's finding 7).
+- **Status:** Accepted — owner decision 2026-09-28 (option (a) of the load test's finding 7);
+  amended 2026-10-02 (the protocol moves into inventory, see below).
 - **Date:** 2026-09-28
 - **Deciders:** @greluc
 - **Related:** spec [`external-exchange.md`](../specs/external-exchange.md) (`REQ-XCH-016`,
@@ -79,3 +80,16 @@ Row locks cannot express "this lot", because a lot is a set of rows that grows a
   concurrent write in the transaction, not just the stock lots.
 - **Re-reading the rows after the lock** — covers rows booked in by the writer that was waited for,
   but not the empty lot, where nothing is waited for.
+
+## Amendment — 2026-10-02: the lot-lock protocol moves into inventory
+
+Domain modularisation plan §7.5 (Phase 3, the inventory command API);
+[ADR-0231](0231-the-backend-becomes-a-modular-monolith-one-package-per-domain.md),
+[ADR-0232](0232-modules-interact-through-commands-observers-and-after-commit-events.md). Lots are
+inventory's aggregate, so the protocol becomes inventory's: with `inventory.api.StockCommands`, the
+advisory lock per lot, its key derivation, the ascending key order and the row-lock order move from
+`ExchangeStockWriteService.lockLots` into the inventory module, and the exchange and the undo call it
+through the command API in their own transaction (`MANDATORY`). The protocol itself — key, prefix,
+order, transaction scope — is unchanged, so the move changes no lock and no deadlock property; the
+ADR-0229 load-test cases and the inventory concurrency tests guard it. Whether the Lager's web and
+app paths also take the lock stays the separate decision the consequences name.

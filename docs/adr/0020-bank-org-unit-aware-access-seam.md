@@ -1,6 +1,6 @@
 # ADR-0020 — Org-unit officer/lead bank access via a single non-`Bank*` seam
 
-- **Status:** Accepted
+- **Status:** Accepted — amended 2026-10-02 (the two seam rules re-keyed, see below)
 - **Date:** 2026-06-17
 - **Deciders:** @greluc, Claude
 - **Related:** spec REQ-BANK-021 · REQ-BANK-022 · REQ-BANK-008 (amended) · ADR-0011 · issue #666
@@ -52,3 +52,21 @@ bank role.
   already in `OwnerScopeService` and drift from it.
 - **Several bridging classes** — rejected: the containment pin keeps the blast radius to one
   auditable seam.
+
+## Amendment — 2026-10-02: the seam rules are re-keyed
+
+Owner-approved on 2026-10-02 (domain modularisation plan §5.4, guard G-01, ADR-0231/0233). Both
+ArchUnit rules stop depending on names that a package move changes:
+
+- `bankClassesMustNotConsultOrgUnitScope` selects the bank's classes by package and module
+  membership — the domain map's `bank` module, and its package once the bank has moved — instead of
+  the `Bank` simple-name prefix, and names `OwnerScopeService` by class literal instead of an FQCN
+  string. `OrgUnitBankAccessService` is the one class it exempts, named by class literal.
+- `orgUnitAwareBankSeamIsContainedToOneClass` names `OwnerScopeService` and
+  `BankAccountRepository` by class literal and the permitted bridge as
+  `OrgUnitBankAccessService.class`.
+
+Each rule asserts a selection floor and is proven able to fail once. The bridge set stays exactly
+`OrgUnitBankAccessService`; a second bridge still needs its own decision. The seam's non-`Bank*`
+name is no longer what keeps it outside the first rule; the explicit exemption is, and a class
+literal follows the seam through a move or a rename where a string would silently stop matching.

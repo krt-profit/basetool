@@ -1,4 +1,4 @@
-> **Doc type:** Living plan — a costed option, not scheduled; only Phase 0 is done. Last reviewed: 2026-09-23.
+> **Doc type:** Living plan — a costed option, not scheduled; only Phase 0 is done. Last reviewed: 2026-10-02.
 > **Owner area:** FE/UI · **Related ADRs:** ADR-0125 (the current decision), ADR-0130 (its DTO emitter + TypeScript 7), ADR-0069, ADR-0012/0013 · **Spec:** REQ-FE-018
 
 # TypeScript migration plan
@@ -18,24 +18,26 @@ Three properties of the codebase, all measured rather than assumed (recounted 20
 
 |                                            |                              |
 |--------------------------------------------|------------------------------|
-| Hand-written JS                            | 44 078 lines in 95 files     |
-| Still inline in Thymeleaf templates        | ~2 480 lines in 60 templates |
-| `<script th:src>` tags                     | 114                          |
+| Hand-written JS                            | 39 620 lines in 100 files    |
+| Still inline in Thymeleaf templates        | ~1 930 lines in 58 templates |
+| `<script th:src>` tags                     | 121, 120 of them `defer`     |
 | JS build step today                        | none                         |
-| Files under `// @ts-check`                 | 40 of 96 (2026-09-23)        |
+| Files under `// @ts-check`                 | 44 of 100 (2026-10-02)       |
 | Backend DTO schemas available from OpenAPI | 417                          |
 
 The blocking constraint is **ADR-0069**. The static scripts are classic non-module `<script>` tags
-that share one global lexical environment, and that was fixed deliberately: no IIFE wrapping,
+that share one global lexical environment, and that was fixed deliberately for the extracted page
+modules (50 of the 100 scripts are IIFE-wrapped, ADR-0069 amendment): no IIFE wrapping,
 cross-block consumption of bare identifiers, `typeof` self-references, and a preserved end-of-body
 load position so parse-time DOM lookups and the ordering against `event-delegation.js` /
 `krt-fetch.js` stay unchanged.
 
 TypeScript's value is concentrated in modules. Getting it means `type="module"`, which implies
-`defer`, which changes execution order across all 114 script tags — the exact invariant ADR-0069
-preserved. Avoiding that means compiling to classic scripts (`module: "none"`), which pays for a
+`defer`. Since the ADR-0125 amendment of 2026-09-23, 120 of the 121 script tags already carry
+`defer`, so the execution order barely moves; what a module changes is the scope — the shared
+global lexical environment ADR-0069 relies on ends. Avoiding that means compiling to classic scripts (`module: "none"`), which pays for a
 build step while forfeiting imports, encapsulation and tree-shaking. Neither variant reaches the
-~2 480 inline template lines.
+~1 930 inline template lines.
 
 Meanwhile the single highest-value gap — untyped backend DTOs — is **already closed** by ADR-0125
 without any of that cost, via build-time generation from `openapi.json`.
@@ -142,7 +144,8 @@ the ADR-0069 invariant is finally traded away, so it needs its own ADR and its o
   most of `globals.d.ts`.
 - The Thymeleaf bootstrap constants become a typed `window.__KRT_BOOTSTRAP__` payload read once at
   entry, rather than ~200 loose globals.
-- **The ordering hazard is the whole risk.** `type="module"` defers execution, so every parse-time
+- **The ordering hazard is the whole risk.** `type="module"` defers execution (as `defer` on 120 of
+  the 121 tags already does) and gives each file its own scope, so every parse-time
   DOM lookup and every ordering assumption against `event-delegation.js` / `krt-fetch.js` must be
   re-verified. The `event-delegation.js` bootstrap stub in `fragments/head.html` exists precisely
   because load-order races were a real, repeated defect here.
