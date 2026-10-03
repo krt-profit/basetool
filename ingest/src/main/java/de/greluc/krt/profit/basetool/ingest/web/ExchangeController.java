@@ -39,7 +39,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -1026,10 +1025,7 @@ public class ExchangeController {
     problem.setProperty(
         "errors",
         violations.stream()
-            .map(
-                v ->
-                    Map.of(
-                        "pointer", ExchangeSchemas.reportable(v.pointer()), "message", v.message()))
+            .map(v -> new Problems.FieldError(ExchangeSchemas.reportable(v.pointer()), v.message()))
             .toList());
     return ResponseEntity.badRequest()
         .contentType(MediaType.APPLICATION_PROBLEM_JSON)
