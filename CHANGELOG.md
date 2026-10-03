@@ -156,6 +156,11 @@
 
 ### Fixed
 
+- **Datenauskunft: Qualität der Eintragungen.** Der Export zeigt die Qualitätsstufe einer
+  Material-Eintragung wieder an; seit dem Stufen-Katalog blieb sie bei neuen Eintragungen leer.
+- **Sandbox: Seed läuft wieder.** Die Beispielaufträge des Exchange-Sandbox-Seeds nennen ihre
+  Qualitätsstufe; seit V262/V263 brach der Seed an der fehlenden Stufe ab.
+
 - **Aufträge: Übergaben buchen auf die richtige Zeile.** Eine Übergabe verringerte bisher immer die
   erste Zeile eines Materials und löste alle Zuordnungen, sobald diese erfüllt war — auch wenn eine
   zweite Qualitätsstufe noch offen war. Bestand unter der Mindestqualität wird jetzt abgelehnt; die
