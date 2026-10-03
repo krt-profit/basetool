@@ -9,6 +9,12 @@
   Zugriffsregeln je Fachbereich, NullAway, `switch` ohne `default`, Browser-Baseline 2025), dazu
   REQ-API-001/009/010 und REQ-FE-018. Checkstyle akzeptiert `_` als Namen eines leeren `catch`.
 
+- **Architekturtests schlagen bei verschobenen Klassen an.** Die ArchUnit-Regeln des Backends wählen
+  Klassen nach Rolle (`@RestController`, `@Service`, Repository, `@Mapper`, `@Entity`) und Klassenliteral
+  statt nach Paket- und Namensstrings, jede Regel prüft eine Mindestauswahl, und ein Metatest prüft, dass
+  jeder verbliebene Klassenname auflösbar ist (REQ-SEC-073). Eine Verschiebung lässt den Build scheitern,
+  statt eine Regel still leerlaufen zu lassen.
+
 ### Fixed
 
 - **Crew-Board auf dem Smartphone: Ziehen unter die Tab-Leiste.** Beim Ziehen eines Teilnehmers scrollt die
