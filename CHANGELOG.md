@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Crew-Board auf dem Smartphone: Ziehen unter die Tab-Leiste.** Beim Ziehen eines Teilnehmers scrollt die
+  Seite jetzt schon oberhalb der Tab-Leiste, sodass eine verdeckte Einheit erreichbar wird; Loslassen über
+  der Tab-Leiste bricht ab, statt die Zuweisung zu entfernen.
+
+- **Org-Einheiten-Auswahl im Menü auf Tablets wieder 44 px hoch** (Touch-Mindestgröße, REQ-UI-009).
+
 ## [v1.13.7](https://github.com/krt-profit/basetool/releases/tag/v1.13.7) - 2026-10-03
 
 ### Added
