@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorRespons
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingUpdateDto;
@@ -60,7 +61,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 /**
  * Controller for the admin system-settings page ({@code /admin/settings}): job-order age
  * thresholds, refinery rounding mode and the in-game transfer-fee rate, each with its own
- * optimistic-lock version.
+ * optimistic-lock version, plus the per-Staffel and per-Spezialkommando toggles.
  *
  * <p>The transfer fee is stored as a fraction ({@code 0.005}) and shown as a percentage ({@code
  * 0.5}).
@@ -86,6 +87,10 @@ public class AdminSettingsPageController {
   /** Response type for the active-squadron list backing the promotion-toggle section. */
   private static final ParameterizedTypeReference<PageResponse<SquadronDto>> SQUADRON_PAGE_TYPE =
       new ParameterizedTypeReference<>() {};
+
+  /** Response type for the active-Spezialkommando list backing the SK profit-toggle section. */
+  private static final ParameterizedTypeReference<PageResponse<SpecialCommandDto>>
+      SPECIAL_COMMAND_PAGE_TYPE = new ParameterizedTypeReference<>() {};
 
   private final BackendApiClient backendApiClient;
   private final MessageSource messageSource;
@@ -169,8 +174,12 @@ public class AdminSettingsPageController {
     model.addAttribute("transferFeeVersion", transferFeeVersion);
     CompleteCatalog<SquadronDto> squadronCatalog = fetchSquadronsForPromotionToggle();
     model.addAttribute("squadrons", squadronCatalog.items());
+    CompleteCatalog<SpecialCommandDto> specialCommandCatalog =
+        fetchSpecialCommandsForProfitToggle();
+    model.addAttribute("specialCommands", specialCommandCatalog.items());
 
-    model.addAttribute("catalogTruncated", squadronCatalog.truncated());
+    model.addAttribute(
+        "catalogTruncated", squadronCatalog.truncated() || specialCommandCatalog.truncated());
 
     return "admin-settings";
   }
@@ -198,6 +207,34 @@ public class AdminSettingsPageController {
       return new CompleteCatalog<>(sorted, catalog.totalElements(), catalog.truncated());
     } catch (Exception e) {
       log.warn("Could not fetch squadrons for admin-settings promotion toggle: {}", e.getMessage());
+      return CompleteCatalog.empty();
+    }
+  }
+
+  /**
+   * Loads every active Spezialkommando, sorted by name, for the per-SK profit-eligibility toggle
+   * (REQ-ADMIN-001). A backend failure yields an empty catalogue.
+   *
+   * @return active Spezialkommandos sorted by name plus the truncation flag, never {@code null}.
+   */
+  private CompleteCatalog<SpecialCommandDto> fetchSpecialCommandsForProfitToggle() {
+    try {
+      CompleteCatalog<SpecialCommandDto> catalog =
+          CatalogPages.fetchAll(
+              page ->
+                  backendApiClient.get(
+                      "/api/v1/special-commands?size=1000&sort=name,asc&page=" + page,
+                      SPECIAL_COMMAND_PAGE_TYPE));
+      List<SpecialCommandDto> sorted =
+          catalog.items().stream()
+              .sorted(
+                  Comparator.comparing(
+                      s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER))
+              .toList();
+      return new CompleteCatalog<>(sorted, catalog.totalElements(), catalog.truncated());
+    } catch (Exception e) {
+      log.warn(
+          "Could not fetch special commands for admin-settings profit toggle: {}", e.getMessage());
       return CompleteCatalog.empty();
     }
   }
