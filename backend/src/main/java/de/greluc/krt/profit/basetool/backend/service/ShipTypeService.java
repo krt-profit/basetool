@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.CachedEntityGraphs;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
-import de.greluc.krt.profit.basetool.backend.support.CachedEntityGraphs;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;

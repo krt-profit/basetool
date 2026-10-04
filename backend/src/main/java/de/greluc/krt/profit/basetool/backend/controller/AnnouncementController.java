@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.AnnouncementMapper;
 import de.greluc.krt.profit.basetool.backend.model.dto.AnnouncementDto;
 import de.greluc.krt.profit.basetool.backend.service.AnnouncementService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;

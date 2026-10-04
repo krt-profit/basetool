@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferS
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeQueryParams;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Location;
@@ -33,7 +34,6 @@ import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferKind;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.support.MaterialExchangeQueryParams;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;

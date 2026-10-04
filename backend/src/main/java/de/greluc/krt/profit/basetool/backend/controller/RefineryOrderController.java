@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.RefineryOrderMapper;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
@@ -30,7 +31,6 @@ import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
 import java.util.List;

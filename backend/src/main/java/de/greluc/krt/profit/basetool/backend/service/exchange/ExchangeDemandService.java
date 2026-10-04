@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service.exchange;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
@@ -42,7 +43,6 @@ import de.greluc.krt.profit.basetool.backend.service.BlueprintVariantFamilyResol
 import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialRequirementResolver;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.support.QuantityTypeRounding;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Comparator;

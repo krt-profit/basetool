@@ -1,0 +1,105 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.catalogue.internal;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Unit tests for {@link StalePriceSweep}: pins that it clears the right rows and keeps the
+ * per-statement bind-parameter count bounded however large the price matrix grows (REQ-DATA-014).
+ */
+class StalePriceSweepTest {
+
+  @Test
+  @DisplayName("clears exactly the priced rows the run did not see")
+  void clearsTheComplementOfTheSeenSet() {
+    UUID seen = UUID.randomUUID();
+    UUID stale = UUID.randomUUID();
+    UUID alsoStale = UUID.randomUUID();
+    List<List<UUID>> chunks = new ArrayList<>();
+
+    int cleared =
+        StalePriceSweep.clearStale(
+            List.of(seen, stale, alsoStale),
+            Set.of(seen),
+            chunk -> {
+              chunks.add(List.copyOf(chunk));
+              return chunk.size();
+            });
+
+    assertEquals(2, cleared);
+    assertEquals(List.of(List.of(stale, alsoStale)), chunks, "the seen row must be spared");
+  }
+
+  @Test
+  @DisplayName("a run that saw every priced row clears nothing and issues no statement")
+  void steadyStateIssuesNoStatement() {
+    UUID a = UUID.randomUUID();
+    UUID b = UUID.randomUUID();
+    List<List<UUID>> chunks = new ArrayList<>();
+
+    int cleared =
+        StalePriceSweep.clearStale(
+            List.of(a, b),
+            Set.of(a, b),
+            chunk -> {
+              chunks.add(List.copyOf(chunk));
+              return chunk.size();
+            });
+
+    assertEquals(0, cleared);
+    assertTrue(chunks.isEmpty(), "nothing stale must mean no round trip at all");
+  }
+
+  @Test
+  @DisplayName("the per-statement id count stays bounded no matter how large the matrix is")
+  void splitsIntoBoundedChunks() {
+    int staleCount = StalePriceSweep.CHUNK_SIZE * 2 + 500;
+    Set<UUID> priced = new LinkedHashSet<>();
+    for (int i = 0; i < staleCount; i++) {
+      priced.add(UUID.randomUUID());
+    }
+    List<Integer> chunkSizes = new ArrayList<>();
+
+    int cleared =
+        StalePriceSweep.clearStale(
+            priced,
+            Set.of(),
+            chunk -> {
+              chunkSizes.add(chunk.size());
+              return chunk.size();
+            });
+
+    assertEquals(staleCount, cleared, "every stale row is still cleared");
+    assertEquals(
+        List.of(StalePriceSweep.CHUNK_SIZE, StalePriceSweep.CHUNK_SIZE, 500),
+        chunkSizes,
+        "the ids must arrive in bounded batches, not as one statement");
+  }
+}

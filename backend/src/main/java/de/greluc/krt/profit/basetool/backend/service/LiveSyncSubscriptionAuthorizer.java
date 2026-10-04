@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncAuthorization;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.support.LiveSyncAuthorization;
-import de.greluc.krt.profit.basetool.backend.support.LiveSyncTopic;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.EnumMap;
 import java.util.List;

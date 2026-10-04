@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
@@ -58,7 +59,6 @@ import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerOrgUnitRequiredException;
-import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.List;
@@ -1856,7 +1856,7 @@ class OwnerScopeServiceTest {
       UUID orgUnit = UUID.randomUUID();
       when(authHelper.isAdmin()).thenReturn(false);
       org.springframework.security.core.GrantedAuthority granted =
-          new de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority(
+          new de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority(
               "LOGISTICIAN", orgUnit);
       withAuthorities(java.util.List.of(granted));
       assertTrue(service.hasRoleInOrgUnit(orgUnit, "LOGISTICIAN"));
@@ -1868,7 +1868,7 @@ class OwnerScopeServiceTest {
       UUID orgUnitB = UUID.randomUUID();
       when(authHelper.isAdmin()).thenReturn(false);
       org.springframework.security.core.GrantedAuthority granted =
-          new de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority(
+          new de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority(
               "LOGISTICIAN", orgUnitA);
       withAuthorities(java.util.List.of(granted));
       assertFalse(service.hasRoleInOrgUnit(orgUnitB, "LOGISTICIAN"));
@@ -1879,7 +1879,7 @@ class OwnerScopeServiceTest {
       UUID orgUnit = UUID.randomUUID();
       when(authHelper.isAdmin()).thenReturn(false);
       org.springframework.security.core.GrantedAuthority granted =
-          new de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority(
+          new de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority(
               "MISSION_MANAGER", orgUnit);
       withAuthorities(java.util.List.of(granted));
       assertFalse(service.hasRoleInOrgUnit(orgUnit, "LOGISTICIAN"));

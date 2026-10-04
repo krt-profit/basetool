@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ClaimDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateClaimDto;
 import de.greluc.krt.profit.basetool.backend.service.MaterialClaimService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

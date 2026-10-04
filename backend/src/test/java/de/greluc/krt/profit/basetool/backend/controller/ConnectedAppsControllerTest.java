@@ -36,6 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDomain;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exchange.api.events.ExchangeInstallationConnectedEvent;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeClient;
@@ -54,7 +55,6 @@ import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.service.NotificationCreationService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.HashSet;

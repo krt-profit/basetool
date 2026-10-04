@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.livesync.internal.LiveSyncFanoutProperties;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.support.LiveSyncFanoutProperties;
-import de.greluc.krt.profit.basetool.backend.support.ResilientRedisMessageListenerContainer;
+import de.greluc.krt.profit.basetool.backend.platform.api.ResilientRedisMessageListenerContainer;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.UUID;

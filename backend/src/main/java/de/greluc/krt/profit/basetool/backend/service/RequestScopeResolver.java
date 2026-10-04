@@ -19,16 +19,16 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.kernel.RequestMemo;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.support.RequestMemo;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
-import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashSet;
 import java.util.List;

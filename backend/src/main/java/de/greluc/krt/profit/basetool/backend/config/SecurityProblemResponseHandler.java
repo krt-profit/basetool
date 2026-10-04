@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.config;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

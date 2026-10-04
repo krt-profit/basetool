@@ -26,6 +26,7 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
@@ -49,7 +50,6 @@ import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.time.Instant;
 import java.util.ArrayList;

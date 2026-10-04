@@ -243,7 +243,7 @@ the modules its row allows; a dependency upward is inverted through an SPI or an
 
 | Rank | Modules | Role |
 | --- | --- | --- |
-| 0 | `kernel`, `platform` | `kernel`: `AbstractEntity`, `PageResponse`, `Entities`, `OptimisticLock`, `StringNormalization`, `LikePatterns`, validation constraints, the error-model base (§5.5), handle anonymisation, `UserRef`/`OrgUnitRef` value types (`OrgUnitRef` only once `OrgUnitKind` is a kernel type, §7.3), SCU rounding. `platform`: web, logging, metrics infrastructure and the access core (`AuthHelperService`, `AuthenticatedSubject`, `Roles`, `Permissions`). Closed to domain meaning, like `logging-support` (ADR-0205). |
+| 0 | `kernel`, `platform` | `kernel`: `AbstractEntity`, `PageResponse`, `Entities`, `OptimisticLock`, `StringNormalization`, `LikePatterns`, validation constraints, the error-model base (§5.5), handle anonymisation, `UserRef`/`OrgUnitRef` value types (`OrgUnitRef` only once `OrgUnitKind` is a kernel type, §7.3), SCU rounding. `platform`: web, logging, metrics infrastructure and the access core (`AuthHelperService`, `AuthenticatedSubject`, `ClientAttribution`); `Roles`, `Permissions`, `RequestMemo` and `ProblemResponseFactory` are kernel types (corrected 2026-10-04, P1-9). Closed to domain meaning, like `logging-support` (ADR-0205). |
 | 1 | `audit`, `notification`, `livesync` | Platform services every domain may call; they depend upward only through SPIs. |
 | 2 | `catalogue` | Materials, items, locations, ship types, refining methods, job and frequency types, and the UEX, SC Wiki and P4K imports — including the recipe graph (`model.scwiki.Blueprint`). |
 | 3 | `identity` | Users, registration, profile, terms consent, and the GDPR orchestration, which calls the other modules through identity-owned SPIs. |
@@ -710,6 +710,37 @@ Cheap moves that break many cycles without changing behaviour:
 - `support` split into the kernel (`RequestMemo`, `StringNormalization`, `OptimisticLock`,
   `LikePatterns`, `ProblemResponseFactory`, `Roles`, `Permissions`) and per-domain internal packages;
   the ArchUnit leaf rule's message stops sending shared logic there.
+  **Done 2026-10-04** (P1-9). All 61 classes left `support`; the package is gone (two test-only
+  fixtures, `BoundProperties` and `QualityTierFixtures`, keep the test package `support`). The
+  kernel took the seven named classes plus `Quality` (already kernel in the domain map) and
+  `AppProblemProperties`, which `ProblemResponseFactory` reads — without it the factory would
+  have added a `kernel -> platform` edge. A new `platform` module package took the access core
+  and the request settings (`platform.api`: `AuthenticatedSubject`, `SubjectAuthentication`,
+  `OrgUnitContextualAuthority`, `ClientAttribution`, `RefusedSubjectWindow`,
+  `ResilientRedisMessageListenerContainer`, `AuthoritiesCacheProperties`,
+  `PartialRoleScopeProperties`, `RateLimitProperties`; `platform.internal`:
+  `ApiClientMetricsProperties`, `RequestBodyLimitProperties`). Every other class went to
+  `<module>.internal`, or to `<module>.api` when another module uses it (inventory, livesync,
+  identity, joborder, orgunit, exchange, catalogue). Two more module packages followed:
+  `catalogue` (`api.QuantityTypeRounding`, internal UEX helpers) and `mission` (section versions,
+  peer redaction, viewer-access SPI — all internal). Seventeen modules are declared now.
+  `ClientAttribution`'s two `platform -> exchange` edges were inverted through a platform SPI,
+  `platform.api.ClientDirectory`, implemented by `exchange.internal.ExchangeClientDirectory`,
+  because a declared `platform` module may not reach the exchange: the module baseline shrank
+  from **112 to 110 edges** and from 30 to 29 module pairs. No other class changed its module,
+  so no other line moved. The ArchUnit leaf rule is re-keyed by class literal
+  (`ArchitectureTest.LEAF_HELPER_CLASSES`, floor 63 = the 61 moved classes and the two SPI
+  types) with the same allow-list (the helpers, the entity model, the repositories); arrays of a
+  helper count as the helper, which the package-keyed rule had matched implicitly.
+  **Corrections:** (1) §5.1 places `Roles`, `Permissions` and the request memo in `platform`,
+  this step in the kernel; the code follows this step — they are constants and a
+  request-attribute memo with no domain meaning, and every module may depend on either rank-0
+  module, so the choice moved no edge. (2) `mission` has no module API yet, so it is the first
+  module that publishes nothing: `ModularityTest` requires every type below its base package and
+  outside an `api` package and keeps it out of every `allowedDependencies`, instead of demanding
+  an empty `api` package. (3) `catalogue`, `mission` and `platform` had no package before; each
+  enters the allowed dependencies of every module above it (`platform::api` everywhere,
+  `catalogue::api` from rank 3 up).
 - `audit.api` created (enum and recorder moved, names unchanged); event records moved into their
   publishers' `api.events` packages; the error model of §5.5 — **done 2026-10-04** (P1-12, see
   §5.5).

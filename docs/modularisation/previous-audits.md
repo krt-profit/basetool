@@ -990,7 +990,9 @@ is listed with where the plan adopts it.
 - **PRV-08 — A shared page policy.** A kernel policy with a lower default ceiling and explicit,
   tested opt-outs replaces the 100,000 ceiling and the module-local caps. *Adopted* as D-18.
 - **PRV-09 — Split `support` into a shared kernel and domain-internal code.** *Adopted* in Phase 1
-  (§7.3); the leaf rule's message stops sending shared logic there.
+  (§7.3); the leaf rule's message stops sending shared logic there. **Done 2026-10-04** (P1-9):
+  `support` is gone — kernel, a `platform` module and the modules' `api`/`internal` packages;
+  the leaf rule is keyed by class literal.
 - **PRV-10 — Make PII leaks unrepresentable.** A reflective test that fills every nested `UserDto`
   in `MissionDto` with sentinel values and asserts that peer redaction removes them; a user summary
   without an `email` component. *Partly adopted*: the kernel's `UserRef` (§5.1) carries cross-domain

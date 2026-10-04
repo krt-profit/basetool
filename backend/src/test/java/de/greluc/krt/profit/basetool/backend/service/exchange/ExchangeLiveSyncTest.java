@@ -26,8 +26,8 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.service.LiveSyncRelayService;
-import de.greluc.krt.profit.basetool.backend.support.LiveSyncTopic;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;

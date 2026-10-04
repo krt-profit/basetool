@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MaterialExchangeInterestRegisteredEvent;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeInterest;
@@ -41,7 +42,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeInterest
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
-import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.model.Announcement;
 import de.greluc.krt.profit.basetool.backend.repository.AnnouncementRepository;
-import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.Comparator;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;

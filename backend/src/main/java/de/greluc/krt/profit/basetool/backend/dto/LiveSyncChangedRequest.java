@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.dto;
 
-import de.greluc.krt.profit.basetool.backend.support.LiveSyncTopic;
-import de.greluc.krt.profit.basetool.backend.support.LiveSyncTopicClass;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;

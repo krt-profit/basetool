@@ -27,9 +27,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
-import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import jakarta.servlet.RequestDispatcher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

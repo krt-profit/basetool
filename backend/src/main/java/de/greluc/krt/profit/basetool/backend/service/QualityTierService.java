@@ -27,13 +27,13 @@ import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.EntityInUseException;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.Quality;
 import de.greluc.krt.profit.basetool.backend.mapper.QualityTierMapper;
 import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.dto.QualityTierDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.QualityTierWriteDto;
 import de.greluc.krt.profit.basetool.backend.repository.QualityTierRepository;
-import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.support.Quality;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;

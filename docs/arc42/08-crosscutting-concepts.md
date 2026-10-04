@@ -123,7 +123,7 @@ models, and the entity-returning ones are a list that may only shrink (`REQ-DATA
 ## 8.4 Concurrency — the landmine field
 
 Optimistic locking with `@Version`, surfaced as HTTP 409, with the **finest granularity the data
-allows** (§4.5, §6.3). The specific traps — the `support.OptimisticLock` helper family, Mission's
+allows** (§4.5, §6.3). The specific traps — the `kernel.OptimisticLock` helper family, Mission's
 manual per-section counters and their DB-enforced atomic bump, pessimistic locking for bulk
 reorders, the `…WithinTransaction` pattern, bulk updates inside loops, and the find-or-create retry
 — are enumerated in [`backend/CLAUDE.md`](../../backend/CLAUDE.md). **Read that before touching any

@@ -1994,7 +1994,7 @@ registry: the admin area is web-only permanently, so a room there would have no 
 > `LiveSyncRelayService`, `LiveSyncSubscriptionAuthorizer`, `backend/…/livesync/api/LiveSyncTopicAuthorizer`
 > and its `*LiveSyncTopicAuthorizer` implementations, `RedisLiveSyncFanout`,
 > `LocalLiveSyncFanout`, `LiveSyncRedisConfig`, `NotificationRedisConfig`,
-> `backend/…/support/ResilientRedisMessageListenerContainer`, `backend/…/support/LiveSyncTopic`,
+> `backend/…/platform/api/ResilientRedisMessageListenerContainer`, `backend/…/livesync/api/LiveSyncTopic`,
 > `LiveSyncTopicClass`, `LiveSyncAuthorization` · **ADR:** ADR-0143 (ADR-0094 unchanged) ·
 > **App side:** `basetool-android` `REQ-APP-SYNC-*`
 

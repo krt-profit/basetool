@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
