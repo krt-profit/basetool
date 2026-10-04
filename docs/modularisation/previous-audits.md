@@ -863,13 +863,13 @@ the September audit (OPS-MON-01, OPS-REL-01).
 
 | ID | Item | Status | Verdict | Why and evidence |
 | --- | --- | --- | --- | --- |
-| D1981-ADR | 29 ADRs flipped from Proposed to Accepted, pending the owner's ratification | — | UNKNOWN | ADR-0020, -0032, -0047 and -0205, on which the plan leans, read "Accepted"; the owner settles the rest. |
-| D1981-TERMS | The terms still mention guests and list five areas | OPEN | CONFIRMED | `backend/src/main/resources/messages_de.properties:234,236,238`; a change forces re-consent (ADR-0127), so it is the owner's call. |
+| D1981-ADR | 29 ADRs flipped from Proposed to Accepted, pending the owner's ratification | DONE | CONFIRMED | Ratified by the owner on 2026-10-04 (D-27). |
+| D1981-TERMS | The terms still mention guests and list five areas | DONE | DROPPED | The owner keeps the text (D-25, 2026-10-04), because a change forces re-consent (ADR-0127). |
 | D1981-PRIVACY | `privacy.p_3_8_1` describes IP logging | — | UNKNOWN | Whether it was revisited is not recorded (`frontend/src/main/resources/messages_de.properties:1411`). |
 | D1981-INGEST007 | REQ-INGEST-007 promises a "remember me" opt-in the extractor lacks | — | UNKNOWN | The spec is unchanged (`docs/specs/desktop-ingest.md:515-522`); to be settled in the extractor repository. |
 | D1981-REQIDS | Duplicated requirement ids | DONE | DROPPED | 18 ids renumbered (`d9a7d53bb3`). |
 | D1981-RESTORE | The restore-drill alert used a 35-day window | DONE | DROPPED | Eight days (`monitoring/prometheus/alerts/ops-automation.yml:56`). |
-| D1981-KCHARDEN | Keycloak hardening steps 2 (SMTP, forgotten password), 11 (OTP for admins) and 12 (session windows) | OPEN | CONFIRMED | `docs/KEYCLOAK_HARDENING_RUNBOOK.md`; independent of the domain split — step 11 matters most, as admin accounts have no second factor. |
+| D1981-KCHARDEN | Keycloak hardening steps 2 (SMTP, forgotten password), 11 (OTP for admins) and 12 (session windows) | OPEN | CONFIRMED | Adopted on 2026-10-04 (D-26); each realm write needs the owner's yes. `docs/KEYCLOAK_HARDENING_RUNBOOK.md`; independent of the domain split — step 11 matters most, as admin accounts have no second factor. |
 | D1981-OAUTH | The confidential frontend OAuth2 client not yet migrated | DONE | DROPPED | Live in production since 2026-09-25. |
 | D1981-TS | TypeScript migration plan | — | REJECTION-HOLDS | Deliberately unscheduled (ADR-0125); per-domain script folders work with `checkJs`. |
 

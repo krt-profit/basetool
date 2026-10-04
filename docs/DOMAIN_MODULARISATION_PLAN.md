@@ -1,10 +1,11 @@
 > **Doc type:** Living plan — the direction was decided by the owner on 2026-09-29, every
-> open decision on 2026-10-01. **Status:** Phase −1 done (merged 2026-10-01, PRs #2299–#2312);
-> Phase 0 done (2026-10-03, merged as one chain of pull requests, #2350 … #2353): the decision
-> records (ADR-0231 … ADR-0239 and the amendments of §14) and every guard of §6.1 that Phase 0 owns;
-> the app's re-read of the version policy waits for the app release (basetool-android#209).
-> Phase 1: the error model (P1-12) is done (2026-10-04) — the first classes moved into module
-> packages. Last reviewed: 2026-10-04.
+> open decision on 2026-10-01, the delivery of the remaining phases on 2026-10-04 (D-23 … D-27).
+> **Status:** Phase −1 done (merged 2026-10-01, PRs #2299–#2312); Phase 0 done (2026-10-03,
+> merged as one chain of pull requests, #2350 … #2353): the decision records (ADR-0231 … ADR-0239
+> and the amendments of §14) and every guard of §6.1 that Phase 0 owns; the app's re-read of the
+> version policy shipped with app v0.5.0 (basetool-android#209, published 2026-10-03). Phase 1:
+> the error model (P1-12) is done (2026-10-04) — the first classes moved into module packages.
+> Last reviewed: 2026-10-04.
 > **Owner area:** BE · FE · API · SEC · **Related ADRs:** ADR-0020, ADR-0028, ADR-0032, ADR-0047,
 > ADR-0060, ADR-0065, ADR-0069, ADR-0130, ADR-0135, ADR-0136, ADR-0205, ADR-0206, ADR-0212,
 > ADR-0214, ADR-0216, ADR-0219, ADR-0223, ADR-0229, ADR-0231 … ADR-0239 · **Specs:**
@@ -72,6 +73,11 @@ refuses code that reaches past that API. It is the report of a whole-repository 
 | D-20 | **`MissionParticipant.orgUnits` becomes lazy** (was O-11, decided 2026-10-01) | Loaded through an entity graph where it is needed, the load paths pinned by N+1 tests. |
 | D-21 | **CI reuses the configuration cache** (was O-12, decided 2026-10-01) | The owner adds the encryption key as a repository secret; pull requests read the cache, `main` writes it; the workflow change follows the secret. |
 | D-22 | **The raw evidence is kept** (was O-13, decided 2026-10-01) | Reports, finding data and scripts, sanitised, in [`docs/archive/domain-modularisation-audit-2026-09/`](archive/domain-modularisation-audit-2026-09/README.md). |
+| D-23 | **No soak before Phase 5** (decided 2026-10-04) | `exchange` and `bank` become Gradle modules right after Phases 2–4, without waiting for their package boundary to stay green for some releases; the Phase 0 guards and the frozen module baseline hold the boundary meanwhile (§7.7). |
+| D-24 | **One combined API cut** (decided 2026-10-04) | The REST waves of §7.9 land on `main` together and ship as one backend release with one app release that uses every new path, so members take one forced update instead of one per wave; the release-bound floor (D-11) rises with that release. |
+| D-25 | **The terms text stays** (decided 2026-10-04) | The terms keep their wording (they still mention guests and list five areas), because any change forces every member to consent again (ADR-0127); D1981-TERMS is closed as kept. |
+| D-26 | **Keycloak hardening steps 2, 11 and 12 are in scope** (decided 2026-10-04) | SMTP and forgotten password, OTP for admins, session windows (`docs/KEYCLOAK_HARDENING_RUNBOOK.md`); each realm write still needs the owner's yes per action. Production and repository-settings work (CI-SEC-16, OPS-SEC-08, the S-09 restore drill) is built in code and executed per approved action. |
+| D-27 | **The 29 ADRs accepted in #1981 are ratified** (decided 2026-10-04) | The owner confirms the status changes of the documentation audit; D1981-ADR is closed. |
 
 ## 3 Summary
 
@@ -613,8 +619,9 @@ step is its own pull request or a short series, independently shippable and reve
 
 ### 7.1 Phase −1 — the defects of §9, fixed separately
 
-**Done** — merged 2026-10-01 in PRs #2299–#2312 (released with v1.13.5). C-03 is a
-repository-settings change for the owner and is not part of those pull requests.
+**Done** — merged 2026-10-01 in PRs #2299–#2312 (released with v1.13.5). C-03, a
+repository-settings change, is done too: `Self-tests` and `Container checks` are required checks
+on `main` (*corrected 2026-10-04*).
 
 Small, independent pull requests before anything else (D-07). They remove traps the refactor would
 otherwise trigger (the URL-rule-only gates, the dual-use refinery DTO) and close the defects the
@@ -630,7 +637,7 @@ audit found.
 | 0.4 Frontend guards — **done 2026-10-03** | G-13 … G-17; `ParallelPageLoader` on `ContextSnapshotFactory` (fixes the missing locale relay); the three kernel shapes (byte download with headers and per-call timeout, multipart upload, `Flux`) so the eleven bypassing controllers return to the kernel | Typed clients and the package move inherit whatever the kernel does |
 | 0.5 Exchange guards — **done 2026-10-03** | G-18; ingest re-package by concern (§5.11); keycloak-spi registrations test | The only contract that must not move |
 | 0.6 Build and CI guards — **done 2026-10-03** | G-20, G-21; `@SpringBootTest` profile unification (BLD-PERF-03, 191 of 231 classes carry `@ActiveProfiles("test")` although Gradle forces it) | Test-context count and coverage floors decide how painful every later step is |
-| 0.7 API machinery — **done 2026-10-03** except the app's re-read, which ships with basetool-android#209 | G-23 (the app's call list first, then the declared-break ledger), then G-08; one OpenAPI tag per domain; unique schema names; generator assertions; error-code registry; mandatory contract baseline on `main`; the exchange fence (the relay surface in its own internal OpenAPI document, REQ-XCH-039); the app re-reads the version policy on resume and after an unexpected 404, shipped **before** the first cut (D-11) | The first hard-cut wave depends on all of it |
+| 0.7 API machinery — **done 2026-10-03**; the app's re-read shipped with app v0.5.0 (basetool-android#209, published 2026-10-03) | G-23 (the app's call list first, then the declared-break ledger), then G-08; one OpenAPI tag per domain; unique schema names; generator assertions; error-code registry; mandatory contract baseline on `main`; the exchange fence (the relay surface in its own internal OpenAPI document, REQ-XCH-039); the app re-reads the version policy on resume and after an unexpected 404, shipped **before** the first cut (D-11) | The first hard-cut wave depends on all of it |
 
 ### 7.3 Phase 1 — behaviour-free inversions and re-homings
 
@@ -687,7 +694,7 @@ surface sheds the six domains it hosts today.
 
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 
-When the package boundary of each has been green for some releases: `build-logic` convention
+Right after Phases 2–4 (D-23, which drops the soak of some releases): `build-logic` convention
 plugins, typed per-module settings, then `backend-exchange` and `backend-bank` (§5.8). Every other
 domain stays a package.
 
@@ -704,7 +711,9 @@ domain stays a package.
 
 ### 7.9 REST API track
 
-Each wave is one domain's cut ([appendix](modularisation/rest-api-cut.md)), shipped together with the
+**Delivery decided 2026-10-04 (D-24):** the waves below are built and merged one by one, but ship
+together as one backend release and one app release, so the paragraph's per-wave release cadence
+is replaced by a single cut. Each wave is one domain's cut ([appendix](modularisation/rest-api-cut.md)), shipped together with the
 backend and frontend change of that domain in one release (frontend and backend deploy in one
 restart window), with a new app release published first and the minimum version raised once the
 re-cut release is verified healthy — or, once the floor is release-bound (D-11), by the release itself.
@@ -834,7 +843,7 @@ They are fixed before the refactor starts (D-07), independently of this plan.
 | --- | --- | --- | --- |
 | C-01 | Production promotion re-tags each of the five artefacts to `:stable` in its own fail-fast matrix job without rollback, and `deploy.sh` resolves each tag separately every five minutes — a partial or in-progress promotion can deploy a mixed release; per-image signatures do not catch mixing | Medium (operational) — severe once APIs are re-cut | G-21 |
 | C-02 | The scheduled mutation-testing run lets its gate pass on a partial report when the backend leg is cancelled at the job timeout | Low (CI signal) | Gate on PIT's completion line; raise the timeout |
-| C-03 | The repo-lint jobs `Self-tests` and `Container checks` (Prometheus rule unit tests, monitoring configuration checks, deploy-seam self-tests) are not required status checks | Low–medium | Add both to the ruleset — a repository-settings write by the owner |
+| C-03 | The repo-lint jobs `Self-tests` and `Container checks` (Prometheus rule unit tests, monitoring configuration checks, deploy-seam self-tests) are not required status checks | Low–medium | Add both to the ruleset — a repository-settings write by the owner; **done** (both required on `main`, checked 2026-10-04) |
 | C-04 | The only crash-loop alert has no absence guard for its Podman series | Low | An `absent()` rule or a conformance entry |
 
 ### 9.4 To investigate
