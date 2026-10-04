@@ -1580,7 +1580,7 @@ detail with category/flag chips, four figures and the terminal table sorted by s
 by max. profit with a two-line route (prices only — the calculation names no terminals).
 Auftragsdetail: page head with kind and status badges and the admin overflow „Auftrag löschen", the
 progress tile „Geliefert / benötigt" leading the KPI grid, tabs filtered per kind (Material: Bedarf
-· Übergaben · Bearbeiter · Verknüpft; Item: Items · Materialien · Herstellung · Übergaben ·
+· Übergaben · Bearbeiter · Verknüpft; Item: Items · Materialien · Hersteller · Übergaben ·
 Bearbeiter · Verknüpft) with empty tabs hidden, and „Übergabe erfassen" as the one action of the
 handover tab (REQ-ORDERS-026). Einsatz and Operation detail: both heads are page heads with the back
 link, the title and a translated `.status-badge`. The Einsatz page keeps three tabs (Übersicht ·

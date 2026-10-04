@@ -163,6 +163,12 @@
 
 ### Changed
 
+- **Blueprints: Fehlmenge wieder sichtbar.** Ist der Vorrat einer Zutat zu knapp, steht unter dem
+  Vorrat wieder „fehlt n“ (REQ-INV-048).
+- **Auftragsdetail: Reiter „Hersteller“.** Der Reiter, der zeigt, wer ein Item craften kann, hieß
+  „Herstellung“ wie das Buchen der Herstellung im Reiter „Items“; er heißt jetzt „Hersteller“
+  (REQ-ORDERS-026).
+
 - **Build: Configuration-Cache auch für lokale Builds.** `gradle.properties` schaltet ihn ein;
   `--no-configuration-cache` schaltet ihn für einen Lauf ab (BLD-PERF-04).
 - **CI: Cache-Janitor behält je Gradle-Job nur den neuesten Cache** und warnt, wenn der Actions-Cache

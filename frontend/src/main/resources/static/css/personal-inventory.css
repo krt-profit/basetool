@@ -806,6 +806,12 @@
         color: var(--color-danger-text);
     }
 
+    .krt-bp-ing-missing {
+        display: block;
+        font-size: var(--fs-xs);
+        font-weight: var(--fw-regular);
+    }
+
     .krt-bp-ing-quality {
         width: 40%;
     }
