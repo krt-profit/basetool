@@ -442,7 +442,7 @@ Hard invariants:
   only ever enlarges.
 
 > **Amended by [ADR-0048](../adr/0048-ol-sees-every-ship-in-the-unit-overview.md) (REQ-HANGAR-003):**
-> the hangar **unit overview** (`/hangar/squadron`, "Org-Einheitsübersicht") is the single, deliberate
+> the hangar **unit overview** (`/hangar/squadron`, the hangar tab „Org-Einheit", until 2026-10-03 the page "Org-Einheitsübersicht") is the single, deliberate
 > exception to the first hard invariant above. A non-pinned **OL member** is upgraded to
 > `adminAllScope=true` **for that one aggregation read alone** (`OwnerScopeService.currentUnitOverviewScope()`),
 > so the OL's fleet view also includes ownerless personal ships (`owningOrgUnit == null`) of

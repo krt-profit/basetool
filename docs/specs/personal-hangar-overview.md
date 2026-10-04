@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-26.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
 > **Owner area:** HANGAR/UI · **Related ADRs:** none
 
 # Personal hangar overview — pagination & server-side sort/filter
@@ -27,7 +27,7 @@ URL) is unchanged; see [`security-and-access.md`](security-and-access.md) and `H
 ### REQ-HANGAR-002 — Personal hangar paginates with server-side sort & search
 
 The personal hangar MUST fetch one **server-side page** of the caller's ships from
-`/api/v1/hangar/my-ships` (`page`/`size`/`search`) instead of the former unbounded `size=1000` pull,
+`/api/v1/hangar/my-ships` (`page`/`size`/`search`/`fitted`) instead of the former unbounded `size=1000` pull,
 and render the shared pagination component — the `.pagination` page-nav plus the square `.page-btn`
 size picker from `fragments/pagination.html`. It adopts the shared page-size contract
 (REQ-INV-013 / REQ-API-005): **page sizes {10, 50, 100} with a default of 50**; a client-supplied
@@ -47,6 +47,12 @@ already in the DOM:
 - The optional `search` term filters case-insensitively on ship-type *or* manufacturer name (parity
   with the former client-side filter and the squadron overview, REQ-HANGAR-001); types without a
   manufacturer still match on their own name (LEFT-JOIN semantics). Blank input means "no filter".
+- The optional `fitted` flag (`true` / `false`) narrows the page and its count to fitted or unfitted
+  ships; absent means both. The page offers it as the segment „Alle · Bereit · Nicht bereit" and shows
+  „n von m einsatzbereit" for the current search, read with one extra single-entry page request — the
+  fitted count when the segment stands on „Alle", the unsegmented total otherwise (for „Nicht bereit"
+  the fitted count is that total minus the listed one) — never by counting rendered rows. A value
+  other than `true` / `false` in the page's `fitted` query lists every ship instead of failing.
 - `/my-ships` is per-user data and MUST stay **uncached** (never routed through the shared
   `getCached`); only the reference catalogs (ship types, locations, manufacturers) are cached.
 
@@ -68,24 +74,34 @@ without a reload.
   (`totalElements`/`totalPages`); the order matches the rich comparator across page boundaries.
 - [ ] The optional `search` parameter filters case-insensitively on ship-type or manufacturer name;
   blank means "no filter". The filter spans the whole fleet, not the rows currently rendered.
+- [ ] The optional `fitted` parameter narrows the page and `totalElements` to fitted or unfitted
+  ships; the readiness counter and the „Meine Schiffe" tab count follow the search, not the fitted
+  segment, and update in place after every swap.
 - [ ] The frontend offers exactly the page sizes 10 / 50 / 100 (shared `pageSizePicker` fragment,
   default 50); any other client-supplied `size` snaps back to the default before the backend call;
   a negative `page` clamps to 0. The size picker hides while the total fits the smallest size.
 - [ ] Changing the page size re-enters at page 0, and pagination/page-size links preserve an active
-  search term — switching the size never silently drops the filter. The pagination controls live
-  **inside** the `hangarResults` AJAX-swap fragment.
+  search term and fitted segment — switching the size never silently drops the filter. The
+  pagination controls live **inside** the `hangarResults` AJAX-swap fragment.
 - [ ] The page renders distinct empty states for "no ships in hangar" vs. "no match for this search",
   and the filter stays clearable when a search yields nothing.
 - [ ] An add / edit / delete / import / home-location write re-renders the table in place keeping the
   active page/size/search; the home-location modal's ship count reflects `totalElements`.
 
-**Enforced by:** `HangarPaginationMvcTest`, `HangarPageControllerMvcTest`,
-`ShipRepositoryPersonalHangarTest`, `HangarPaginationE2eTest` · **Code:**
+**Enforced by:** `HangarPaginationMvcTest`, `HangarPageControllerMvcTest`, `HangarPagePatternRenderTest`,
+`ShipRepositoryPersonalHangarTest`, `HangarControllerTest`, `HangarPaginationE2eTest` · **Code:**
 `HangarController#getMyShips`, `HangarService#getMyShipsFiltered`,
 `ShipRepository#findByOwnerIdFiltered`, `PaginationUtil#createUnsortedPageRequest`,
 `HangarPageController#viewHangar`, `frontend/src/main/resources/templates/hangar.html`,
 `frontend/src/main/resources/templates/fragments/pagination.html` · **Issues:** #773 (performance
 audit item 10), #772 (orders/refinery pagination).
+
+*Amended 2026-10-03 (website overhaul phase 3):* `/my-ships` takes the optional `fitted` filter, the
+page offers it as the segment „Alle · Bereit · Nicht bereit" beside the search with the readiness
+counter „n von m einsatzbereit", and the list is the first tab „Meine Schiffe (n)" of the one hangar
+page whose second tab is the unit overview (REQ-HANGAR-001). The import, „Home-Location für alle
+setzen" and „Hangar leeren …" moved from the box under the table into the page head (import as a ghost
+button, the other two in the ⋯ menu).
 
 ### REQ-HANGAR-004 — Every hangar mutation is audited
 
