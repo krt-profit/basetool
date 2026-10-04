@@ -280,7 +280,10 @@ build runs with the cache switched on and strict: `gradle.properties` sets
 `org.gradle.configuration-cache=true` for local builds too, and CI passes
 `--configuration-cache` as well. `--no-configuration-cache` turns it off for one
 run; a task a plugin marks incompatible (the OWASP `dependencyCheckAggregate`)
-makes Gradle skip the cache for that run on its own. The usual mistakes are a task
+makes Gradle skip the cache for that run on its own. The image builds in
+`docker/app/Dockerfile` and `docker/sandbox/keycloak/Dockerfile` pass
+`--no-configuration-cache`: their context has no git checkout, and the
+frontend's `git describe` version probe is a cache problem there. The usual mistakes are a task
 action (`doLast`, a `CommandLineArgumentProvider`, a `rename {}`) that reads a
 script-level `val` or `project` at execution time — copy the value into a
 local inside the task's configuration block first — and a process started at
