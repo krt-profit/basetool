@@ -127,17 +127,17 @@ ENTRYPOINT ["java", "-XX:AOTCache=/app/app.aot", "-jar", "/app/app.jar"]
 FROM runtime AS runtime-backend
 EXPOSE 11261
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --start-interval=5s --retries=3 \
-    CMD wget -q --no-check-certificate -O /dev/null https://localhost:11261/actuator/health/readiness || exit 1
+    CMD ["sh", "-c", "wget -q --no-check-certificate -O /dev/null https://localhost:11261/actuator/health/readiness || exit 1"]
 
 FROM runtime AS runtime-frontend
 EXPOSE 18081
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --start-interval=5s --retries=3 \
-    CMD wget -q --no-check-certificate -O /dev/null https://localhost:18081/actuator/health/readiness || exit 1
+    CMD ["sh", "-c", "wget -q --no-check-certificate -O /dev/null https://localhost:18081/actuator/health/readiness || exit 1"]
 
 FROM runtime AS runtime-ingest
 EXPOSE 11262
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --start-interval=5s --retries=3 \
-    CMD wget -q --no-check-certificate -O /dev/null https://localhost:11262/actuator/health/readiness || exit 1
+    CMD ["sh", "-c", "wget -q --no-check-certificate -O /dev/null https://localhost:11262/actuator/health/readiness || exit 1"]
 
 # hadolint ignore=DL3006
 FROM runtime-${MODULE}
