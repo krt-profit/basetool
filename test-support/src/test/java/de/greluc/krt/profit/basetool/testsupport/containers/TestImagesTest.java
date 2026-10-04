@@ -30,8 +30,8 @@ import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
 /**
- * Verifies that {@link TestImages#REDIS} equals the {@code x-redis} image in {@code
- * docker-compose.yml}, which production runs.
+ * Verifies that the {@link TestImages} constants equal the images {@code docker-compose.yml} and
+ * the Quadlet units run in production, and that the backend's JDBC URL names the pinned tag.
  */
 class TestImagesTest {
 
@@ -69,6 +69,59 @@ class TestImagesTest {
   @Test
   void theRedisConstantIsPinnedByDigest() {
     assertThat(TestImages.REDIS).startsWith("redis:8-alpine@sha256:").hasSize(86);
+  }
+
+  /**
+   * Both database anchors of the compose file name exactly the PostgreSQL constant's image
+   * reference.
+   *
+   * @throws IOException if {@code docker-compose.yml} cannot be read
+   */
+  @Test
+  void thePostgresConstantIsTheComposeFilesImage() throws IOException {
+    assertThat(imageLines(repositoryRoot().resolve("docker-compose.yml"), "image: postgres:"))
+        .as("docker-compose.yml must pin exactly the PostgreSQL image TestImages.POSTGRES names")
+        .containsExactly("image: " + TestImages.POSTGRES, "image: " + TestImages.POSTGRES);
+  }
+
+  /**
+   * The generated backend-database Quadlet unit names the PostgreSQL constant's image reference,
+   * qualified with the registry the host pulls from.
+   *
+   * @throws IOException if the Quadlet unit cannot be read
+   */
+  @Test
+  void thePostgresConstantIsTheQuadletUnitsImage() throws IOException {
+    assertThat(
+            imageLines(
+                repositoryRoot().resolve("quadlet/systemd/db-backend.container"),
+                "Image=docker.io/postgres:"))
+        .as("quadlet/systemd/db-backend.container must pin exactly TestImages.POSTGRES")
+        .containsExactly("Image=docker.io/" + TestImages.POSTGRES);
+  }
+
+  /** The PostgreSQL constant is digest-pinned. */
+  @Test
+  void thePostgresConstantIsPinnedByDigest() {
+    assertThat(TestImages.POSTGRES).startsWith("postgres:18-alpine@sha256:").hasSize(90);
+  }
+
+  /**
+   * The backend's Testcontainers JDBC URL names exactly the tag of the PostgreSQL constant, the one
+   * reference the backend's image-name substitutor replaces with the pinned image.
+   *
+   * @throws IOException if the backend's test configuration cannot be read
+   */
+  @Test
+  void theBackendJdbcUrlNamesThePinnedTag() throws IOException {
+    String tag =
+        TestImages.POSTGRES.substring("postgres:".length(), TestImages.POSTGRES.indexOf('@'));
+    assertThat(
+            imageLines(
+                repositoryRoot().resolve("backend/src/test/resources/application-test.yml"),
+                "url: jdbc:tc:"))
+        .as("the backend's JDBC URL must name the tag TestImages.POSTGRES pins")
+        .containsExactly("url: jdbc:tc:postgresql:" + tag + ":///testdb?TC_DAEMON=true");
   }
 
   /**

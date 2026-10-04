@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
-import de.greluc.krt.profit.basetool.backend.model.AuditDomain;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDomain;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.dto.AuditEventDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.AuditPurgeResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;

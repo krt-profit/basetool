@@ -360,7 +360,7 @@ class MissionFinanceEntryServiceTest {
       verify(auditService, times(1))
           .record(
               eq(
-                  de.greluc.krt.profit.basetool.backend.model.AuditEventType
+                  de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType
                       .MISSION_FINANCE_ENTRY_CREATED),
               any(),
               any(),

@@ -19,10 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.PromotionLevelContentMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
 import de.greluc.krt.profit.basetool.backend.model.PromotionLevelContent;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentResponse;
@@ -59,7 +60,7 @@ public class PromotionLevelContentService {
   private final PromotionCategoryRepository categoryRepository;
   private final PromotionLevelContentMapper mapper;
   private final OwnerScopeService ownerScopeService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Pages every level content across all categories; the sort is validated against {@link
@@ -131,7 +132,7 @@ public class PromotionLevelContentService {
     PromotionLevelContent entity = mapper.toEntity(request);
     entity.setCategory(category);
     PromotionLevelContent saved = repository.save(entity);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.PROMOTION_LEVEL_CONTENT_CREATED,
         saved.getId(),
         category.getName() + " / " + saved.getLevel(),
@@ -166,7 +167,7 @@ public class PromotionLevelContentService {
     mapper.updateEntity(entity, request);
     entity.setCategory(category);
     PromotionLevelContent saved = repository.saveAndFlush(entity);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.PROMOTION_LEVEL_CONTENT_UPDATED,
         saved.getId(),
         category.getName() + " / " + saved.getLevel(),
@@ -192,7 +193,7 @@ public class PromotionLevelContentService {
     PromotionCategory category = entity.getCategory();
     String label = (category != null ? category.getName() + " / " : "") + entity.getLevel();
     repository.delete(entity);
-    auditService.record(AuditEventType.PROMOTION_LEVEL_CONTENT_DELETED, id, label, null, null);
+    auditRecorder.record(AuditEventType.PROMOTION_LEVEL_CONTENT_DELETED, id, label, null, null);
     log.info("Deleted PromotionLevelContent id={}", id);
   }
 
