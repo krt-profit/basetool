@@ -372,6 +372,10 @@
 
 ### Security
 
+- **Basis-Images auf den aktuellen Stand der Tags gehoben (nur Digests, keine neuen Versionen).**
+  Temurin JRE/JDK 25.0.4.1+1 (sicherheitsbedingter Sonderrelease), `nginx-unprivileged:1.31.6-alpine`
+  mit neuen Alpine-Schichten und der BuildKit-Builder `buildx-stable-1`. Die Log-Signaturen von
+  `JvmNativeThreadExhaustion` und `JvmStartupCacheRejected` wurden auf dem neuen JRE erneut geprüft.
 - **Ingest prüft den Hostnamen des Backends standardmäßig.** Der Jar-Default von
   `app.ingest.verify-backend-hostname` ist jetzt `true`; nur das `dev`-Profil schaltet ihn ab.
   Compose und Quadlet setzten bereits `true` (ING-SEC-04).
