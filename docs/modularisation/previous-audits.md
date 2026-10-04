@@ -71,7 +71,8 @@ section. Every implementing pull request is on `main`.
 The remaining work carries priority P1 in 8 findings, P2 in 16 and P3 in 9; 123 findings are closed.
 The tables are the 2026-09-29 snapshot; since then #2387 closed BLD-PERF-04 and CI-SEC-12 and the
 leftovers of CI-01, SEC-16, TST-18, ING-SEC-04 and OPS-SEC-08 (PSB-11, PSB-12, PSB-14), and moved
-CI-SEC-16 (PSB-13) as far as a workflow change can.
+CI-SEC-16 (PSB-13) as far as a workflow change could; PRNUM closed CI-SEC-16 (PSB-13) in code, with
+the owner's environment step and secret deletion left.
 Ten DONE findings have a production half that only a host or Prometheus read could confirm —
 APPSEC-04, APPSEC-05, APPSEC-07, CI-SEC-01, ING-SEC-03, ING-SEC-04, OPS-PRIV-01, OPS-SEC-01,
 OPS-SEC-05 and OPS-SIMP-03; the knowledge base records the state of their rollout. "Operations" is
@@ -216,7 +217,7 @@ Ordered by area, then by the audit's priority.
 | CI-08 | CI | P2 → closed | The promote job exists twice, almost identical | DONE | CONFIRMED | One `retag-verified-digest` composite. | `.github/actions/retag-verified-digest/action.yml` |
 | CI-SEC-04 | CI | P2 → closed | Release and promote workflows give every job all permissions | DONE | CONFIRMED | Per-job permissions; the SPI is compiled without `id-token`. | `.github/workflows/release-images.yml:13` |
 | CI-SEC-13 | CI | P2 → closed | BuildKit builder floats on a tag and may come from a mirror | DONE | CONFIRMED | Pinned by digest through a carrier Dockerfile. | `.github/actions/setup-buildx/Dockerfile:1` |
-| CI-SEC-16 | CI | P2 → P2 | Long-lived PATs as repository-wide secrets | PARTIAL | ADJUSTED | App tokens replace the PATs; the App key is not confined to a `main`-only environment. **2026-10-04 (#2387):** `release-prepare` and `refresh-versions` run in the `release` environment (owner creates it); `release-publish` cannot until its `pull_request` trigger changes (ADR-0201 amendment 3). | `.github/workflows/release-publish.yml:3-6` |
+| CI-SEC-16 | CI | P2 → P2 | Long-lived PATs as repository-wide secrets | DONE (2026-10-04) | ADJUSTED | App tokens replace the PATs; the App key is not confined to a `main`-only environment. **2026-10-04 (#2387):** `release-prepare` and `refresh-versions` run in the `release` environment (owner creates it); `release-publish` cannot until its `pull_request` trigger changes (ADR-0201 amendment 3). **Closed 2026-10-04 (PRNUM):** `release-publish` runs on the `main` push, recognises the release merge itself and publishes in `release` (ADR-0201 amendment 4). Owner step: create `release` (branch rule `main`) with the secret, then delete the repository secret. | `.github/workflows/release-publish.yml` |
 | CI-07 | CI | P3 → P3 | release-images rebuilds everything on 19 of 30 main commits without an image change | DONE | ADJUSTED | Per-module reuse (ADR-0210); its input derivation must change before any Gradle extraction. | #2031, #2033, #2046; `.github/scripts/image_reuse_plan.py:44-112` |
 | OPS-MON-01 | Operations | P0 → P1 | Critical alert ContainerRestartLoop cannot fire | PARTIAL | ADJUSTED | The alert reads the podman series now, but nothing notices when those series vanish. | #1984; `monitoring/prometheus/alerts/infrastructure.yml:60-61`; `scripts/check-conformance.py:74-81` |
 | OPS-PERF-01 | Operations | P0 → closed | Podman kills every container after 10 s | DONE | CONFIRMED | `StopTimeout` and `TimeoutStopSec` for the nine units with a grace period. | `scripts/generate-quadlet.py:783-787` |
@@ -429,7 +430,9 @@ Every finding that is not DONE or not CONFIRMED, grouped by the priority of the 
   secret, because no `release` environment restricted to `main` exists. The key moves into one and
   the three token-minting jobs declare it — after one dry run shows whether a `main`-only policy
   admits the `pull_request: closed` trigger of `release-publish.yml`, or publishing moves to a push
-  on `main` (PSB-13).
+  on `main` (PSB-13). **Closed in code 2026-10-04 (#2387, PRNUM):** all three jobs declare
+  `environment: release`, `release-publish` now on the `main` push; the owner's environment step and
+  the deletion of the repository secret remain.
 
 #### Remaining priority P3
 
@@ -566,6 +569,10 @@ Every finding that is not DONE or not CONFIRMED, grouped by the priority of the 
   question. Partly done (#2387): the trigger question is answered by GitHub's documentation — a
   `pull_request` run is evaluated as `refs/pull/<n>/merge`, which a `main`-only rule refuses — so
   only the `main`-ref jobs moved; `release-publish` needs a trigger decision (ADR-0201 amendment 3).
+  Done in code (PRNUM) after the owner decided on 2026-10-04 for a push to `main`: a `detect` job
+  recognises the release merge through `commits/{sha}/pulls`, and only the `publish` job enters the
+  `release` environment (ADR-0201 amendment 4). The owner creates `release` (branch rule `main`)
+  with the secret, then deletes the repository secret.
 - **PSB-14 — Optional sudo wrapper for `deploy`** (OPS-SEC-08, now P3); every new `rt_*` call would
   have to be added to it. Done in code (#2387), as a sudoers `Cmnd_Alias` rather than a wrapper
   script; repo-lint fails when a new call is missing from it. The host rollout is the owner's.
