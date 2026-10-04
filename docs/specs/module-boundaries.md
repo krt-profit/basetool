@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-02.
-> **Owner area:** MOD · **Related ADRs:** none yet (plan step 0.1 records the module ADRs)
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-04.
+> **Owner area:** MOD · **Related ADRs:** ADR-0231, ADR-0233
 
 # Backend module boundaries
 
@@ -135,12 +135,14 @@ Spring Modulith 2.1.1 (`spring-modulith-core` and `spring-modulith-docs`, Apache
 which it was not compiled (it declares 1.4.2). Module detection is `explicitly-annotated`
 (`spring.modulith.detection-strategy` in the backend's `application-test.yml`): only a package whose
 `package-info` carries `@ApplicationModule` is a Modulith module. `ModularityTest` asserts that the
-detected module set equals the declared list — empty today, because no domain package exists yet —
-and that `ApplicationModules.verify()` passes. The `Documenter` output is written to
-`backend/build/spring-modulith-docs` and is not committed while no module is declared.
+detected module set equals its declared list (REQ-MOD-006) and that `ApplicationModules.verify()`
+passes. The `Documenter` output is written to `backend/build/spring-modulith-docs` and is not
+committed.
 
-Nothing of Spring Modulith reaches the backend's `runtimeClasspath`, its image or its SBOM. Its
-event publication registry is not used (plan §10).
+The annotation types come from `spring-modulith-api`, a `compileOnly` dependency of the backend's
+main source set (ADR-0233 amendment 1); the engine (`core`, `docs`) stays `testImplementation`.
+Nothing of Spring Modulith reaches the backend's `runtimeClasspath`, its boot jar, its image or its
+SBOM. Its event publication registry is not used (plan §10).
 
 **Acceptance**
 
@@ -149,14 +151,47 @@ event publication registry is not used (plan §10).
       `internal` package, is reported by `detectViolations()` and fails `verify()`; an unannotated
       sibling package is not detected as a module.
 - [x] `:backend:dependencies --configuration runtimeClasspath` lists no Spring Modulith, Structurizr
-      or ArchUnit artefact.
+      or ArchUnit artefact, and the boot jar holds no `spring-modulith-*` jar.
 
 **Enforced by:** `ModularityTest`
 
+### REQ-MOD-006 — Every module package declares itself, its `api` and its allowed dependencies
+
+A first-level backend package named after a module of the domain map is a module package, and it is
+declared in the same pull request that creates it (plan §5.2, §5.7, step P1-13):
+
+- its `package-info` carries `@ApplicationModule` — closed, never `OPEN`;
+- its `api` package and **every package below `api`** carry `@NamedInterface("api")`; Spring
+  Modulith merges them into the module's one named interface, because a package-level
+  `@NamedInterface` covers its own package only. Everything outside `api` is internal to the
+  module;
+- its `allowedDependencies` lists exactly the `<module>::api` of every **declared** module the domain
+  map lets it depend on (lower rank, or an `allow` row): `audit` and `notification` (rank 1) allow
+  nothing. The list is derived, not chosen: a module that becomes declared enters the lists of the
+  modules above it in the same pull request, since Spring Modulith rejects an allowed dependency on
+  an undeclared module.
+
+Declared on `main`: `audit`, `bank`, `exchange`, `identity`, `inventory`, `joborder`,
+`materialexchange`, `notification`, `privacy`, `refinery`, `scope` (floor 11).
+
+**Acceptance**
+
+- [x] The module packages found in the compiled backend equal `ModularityTest.DECLARED_MODULES`,
+      which equals the detected Modulith modules, with a floor of 11.
+- [x] Each declared module's only named interface is `api`, and it contains every top-level type
+      of the module's `api` package tree and nothing outside it.
+- [x] Each declaration's `allowedDependencies` equals the set the domain map derives.
+- [x] A planted fixture shaped like a backend module proves that a module reaching past another's
+      `api` into its `internal` package, and a module depending on an `api` its declaration does not
+      allow, are both reported and fail `verify()`, while a module using the `api` and a
+      sub-package of it annotated into the same interface is not reported.
+
+**Enforced by:** `ModularityTest` · **Fixture:** `architecturefixture.modulithapi`
+
 ## Out of scope
 
-- Moving classes into module packages, named interfaces and `@ApplicationModule(allowedDependencies
-  = …)` declarations — the later phases of the plan.
+- Moving classes into module packages — the later phases of the plan; each move adds its module's
+  declarations under REQ-MOD-006.
 - The re-keyed security and structural ArchUnit rules (G-01) and the other guards of plan §6.1.
 - Table ownership and native SQL across modules (G-10).
 

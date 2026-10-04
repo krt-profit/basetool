@@ -18,10 +18,10 @@
  */
 
 /**
- * The Materialbörse module's published events: an interest registered and a request's fulfilment
- * signalled, fanned out as notifications after commit (plan §5.3).
+ * The audit module: the unified trail of every audited area's state-mutating activity, recorded in
+ * the business transaction (REQ-AUDIT-001).
  */
-@NamedInterface("api")
-package de.greluc.krt.profit.basetool.backend.materialexchange.api.events;
+@ApplicationModule(allowedDependencies = {})
+package de.greluc.krt.profit.basetool.backend.audit;
 
-import org.springframework.modulith.NamedInterface;
+import org.springframework.modulith.ApplicationModule;

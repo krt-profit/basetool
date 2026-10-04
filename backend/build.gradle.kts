@@ -58,6 +58,7 @@ dependencies {
   implementation(libs.flyway.postgresql)
 
   implementation(libs.openpdf.core)
+  compileOnly(libs.spring.modulith.api)
   annotationProcessor(libs.lombok.mapstruct.binding)
 
   developmentOnly("org.springframework.boot:spring-boot-devtools")

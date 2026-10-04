@@ -18,10 +18,10 @@
  */
 
 /**
- * The Materialbörse module's published events: an interest registered and a request's fulfilment
- * signalled, fanned out as notifications after commit (plan §5.3).
+ * The GDPR module's published API: in {@code events}, the account-deletion request events (plan
+ * §5.2, §7.6).
  */
 @NamedInterface("api")
-package de.greluc.krt.profit.basetool.backend.materialexchange.api.events;
+package de.greluc.krt.profit.basetool.backend.privacy.api;
 
 import org.springframework.modulith.NamedInterface;

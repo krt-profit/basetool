@@ -21,4 +21,7 @@
  * The GDPR module's published events: an account deletion requested, declined or resolved, fanned
  * out as notifications after commit (plan §5.3, §7.6).
  */
+@NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.privacy.api.events;
+
+import org.springframework.modulith.NamedInterface;
