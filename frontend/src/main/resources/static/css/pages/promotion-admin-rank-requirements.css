@@ -106,7 +106,7 @@
 
     @keyframes ar-flash {
         from {
-            background: rgb(231 126 35 / 25%);
+            background: color-mix(in srgb, var(--color-primary) 25%, transparent);
         }
 
         to {

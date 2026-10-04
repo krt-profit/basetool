@@ -4,11 +4,11 @@
     .krt-confirm-overlay {
         position: fixed;
         inset: 0;
-        background: rgba(0, 0, 0, 0.75);
+        background: color-mix(in srgb, var(--color-bg-black) 75%, transparent);
         display: flex;
         align-items: center;
         justify-content: center;
-        z-index: 10000;
+        z-index: var(--z-confirm);
         padding: 1rem;
     }
     .krt-confirm-dialog {
@@ -20,18 +20,18 @@
         padding: 1.5rem;
         color: var(--color-gray-1);
         font-family: var(--font-body);
-        box-shadow: 0 0 24px rgba(231, 126, 35, 0.35);
+        box-shadow: 0 0 24px color-mix(in srgb, var(--color-primary) 35%, transparent);
     }
     .krt-confirm-title {
         font-family: var(--font-headline);
         text-transform: uppercase;
         letter-spacing: 0.08em;
         color: var(--color-primary);
-        margin: 0 0 0.75rem 0;
+        margin: 0 0 0.75rem;
         font-size: 1.05rem;
     }
     .krt-confirm-message {
-        margin: 0 0 1.25rem 0;
+        margin: 0 0 1.25rem;
         line-height: 1.4;
         font-weight: 300;
     }

@@ -23,7 +23,7 @@
 
     .material-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(231, 126, 35, 0.2);
+        box-shadow: 0 4px 8px color-mix(in srgb, var(--color-primary) 20%, transparent);
     }
 
     .material-title {
@@ -61,7 +61,7 @@
         font-family: var(--font-body);
         font-size: 0.8rem;
     }
-    .form-group input:where(:not([type='checkbox']):not([type='radio'])) {
+    .form-group input:where(:not([type='checkbox'], [type='radio'])) {
         width: 100%;
         padding: 0.5rem;
         background-color: var(--color-surface-input);
@@ -72,9 +72,9 @@
     }
 
     :is(
-        #materialsGrouped,
-        #materialsFlat,
-        #noResultsMsg,
+        [id='materialsGrouped'],
+        [id='materialsFlat'],
+        [id='noResultsMsg'],
         .kind-group,
         .materialsGrid,
         .material-card
