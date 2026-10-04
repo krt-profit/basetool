@@ -173,6 +173,10 @@
 
 ### Changed
 
+- **Monitoring-Images aktualisiert.** Alloy v1.20.1, Tempo 3.1.0 (neue Blöcke im Format vParquet5) und
+  redis_exporter v1.93.0, jeweils per Digest gepinnt. Konfiguration und Dashboards bleiben unverändert;
+  Compose und Quadlet-Units sind nachgezogen.
+
 - **Kartellbank: „Bestätigen" nur, wo du bestätigen darfst.** Die Antragswarteschlange zeigt die
   Bestätigen-Aktion nur noch bei Anträgen, für die dir die passende Konto-Berechtigung zusteht; sonst
   steht dort „wartet auf berechtigte Bankmitarbeiter". Die Queue-API liefert dafür pro Antrag
