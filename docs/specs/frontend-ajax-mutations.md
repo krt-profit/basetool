@@ -1992,8 +1992,9 @@ a collapsible panel: the block gets `data-filter-panel="<page>"`, and the shared
 page's primary action. `krt-filter-panel.js` wires the two through `aria-controls` alone and is
 loaded globally; a page adds no script of its own.
 
-**A single search field is explicitly out of scope.** Hangar, Staffel-Hangar and Mein Inventar
-filter through one input; putting that behind a toggle costs a tap and saves one row of height,
+**A single search field is explicitly out of scope.** The Hangar (both tabs; „Meine Schiffe" adds
+the readiness segment „Alle · Bereit · Nicht bereit" beside it) and Mein Inventar filter through one
+input; putting that behind a toggle costs a tap and saves one row of height,
 which is a worse screen, not a tidier one. The rule is about blocks that push the list itself off a
 phone — the Einsatz, Operationen, Auftrags, Raffinerie, Mitglieder and Materialübersicht filters
 each fill a viewport on their own.

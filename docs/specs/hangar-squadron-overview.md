@@ -1,16 +1,19 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
 > **Owner area:** HANGAR/UI · **Related ADRs:** [ADR-0048](../adr/0048-ol-sees-every-ship-in-the-unit-overview.md)
 
 # Unit hangar overview (Org-Einheitsübersicht) — pagination, scope & server-side filter
 
-> The page lives at `/hangar/squadron` (route unchanged) but is titled **"Org-Einheitsübersicht"** in
-> the UI (`hangar.squadron.title`), because it spans every org unit the caller can see — not a single
-> Staffel. The "Org-" prefix deliberately sets these organisational units apart from the dynamic
-> units created inside a mission (Einsatz).
+> The overview lives at `/hangar/squadron` (route unchanged). Since 2026-10-03 it is the second tab
+> **„Org-Einheit <Kürzel>"** of the one hangar page (`hangar.html`, `hangar.tab.unit`; the active
+> unit's shorthand, or „Org-Einheit" alone when no unit is active); `/hangar` is the first tab
+> „Meine Schiffe" and both routes render the same template with their tab active. Until then it was a
+> page of its own titled „Org-Einheitsübersicht". It spans every org unit the caller can see — not a
+> single Staffel. The "Org-" prefix deliberately sets these organisational units apart from the
+> dynamic units created inside a mission (Einsatz).
 
 ## Context & goal
 
-The unit hangar page (`/hangar/squadron`, "Org-Einheitsübersicht") aggregates the scoped fleet into one
+The unit hangar tab (`/hangar/squadron`, formerly the page „Org-Einheitsübersicht") aggregates the scoped fleet into one
 row per ship type (count + fitted count, with an ADMIN/OFFICER-only per-ship drill-down). The page
 originally fetched up to 1000 rows in one request and filtered them client-side, which stops scaling
 once a fleet grows past a screenful and silently truncates beyond the fetch cap. This spec pins the
@@ -51,9 +54,14 @@ writes; the overview does not tell them apart.
   where switching could never change anything.
 - [ ] Changing the page size re-enters at page 0, and pagination/page-size links preserve
   an active search term — switching the size never silently drops the filter.
-- [ ] The filter input submits to the server (GET form); the page renders distinct empty
-  states for "no ships in scope" vs. "no match for this search", and the filter stays
-  clearable when a search yields nothing.
+- [ ] The filter input filters server-side as you type (GET form, swapped in place); the page renders
+  distinct empty states for "no ships in scope" vs. "no match for this search", and the filter
+  stays clearable when a search yields nothing.
+- [ ] Each ship type is one tree row — chevron, type and manufacturer, count, a readiness bar
+  „fitted of total"; for ADMIN/OFFICER the chevron opens indented owner rows (owner, readiness,
+  location) without a table head of their own. The tab count is the number of ship types in scope
+  (`totalElements`; on this tab narrowed by an active search, on „Meine Schiffe" unsearched), because
+  a ship total in scope has no backend read.
 - [ ] The scope rules and the role-shaped owner drill-down of
   [`org-unit-tenancy.md`](org-unit-tenancy.md) are unaffected: filtered and paginated
   results pass through the same `ScopePredicate` as before.
@@ -61,7 +69,13 @@ writes; the overview does not tell them apart.
 **Enforced by:** `HangarIntegrationTest`, `HangarControllerTest`, `HangarServiceTest`,
 `HangarPageControllerMvcTest` · **Code:** `HangarController`, `HangarService`,
 `ShipRepository#countShipsByType`, `HangarPageController`,
-`frontend/src/main/resources/templates/hangar-squadron.html` · **Issues:** —
+`frontend/src/main/resources/templates/hangar.html` · **Issues:** —
+
+*Amended 2026-10-03 (website overhaul phase 3):* the overview became the tab „Org-Einheit <Kürzel>" of
+`hangar.html` (`hangar-squadron.html` is gone, `/hangar/squadron` renders `hangar` and swaps its
+`squadronResults` fragment), its rows became a tree with a readiness bar „n von m", and the
+„Details" disclosure and the „Zurück zum Hangar" link are gone (the chevron and the tab bar replace
+them).
 
 ### REQ-HANGAR-003 — Unit overview spans every unit the caller can see, OL sees all ships
 
@@ -112,8 +126,8 @@ these scopes like a ship created in the web.
 - The personal hangar (`/hangar`) — its own server-side pagination/sort/filter contract is
   [`personal-hangar-overview.md`](personal-hangar-overview.md) (REQ-HANGAR-002) — and the admin
   per-user hangar, which keeps its own listing behaviour.
-- The drill-down rendering mechanics (details-row class toggle) — a UI implementation
-  detail, kept consistent with the blueprint overview's REQ-INV-012 fix.
+- The drill-down rendering mechanics (a hidden owner `tbody` per type, toggled by the chevron's
+  `aria-expanded`) — a UI implementation detail.
 - The shared pagination fragment's look — governed by the design system
   ([`ui-design-system.md`](ui-design-system.md)).
 
