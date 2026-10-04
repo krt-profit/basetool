@@ -39,35 +39,37 @@
     <div id="inventory-results" class="card card--flush">
         <th:block th:fragment="inventoryResults">
         <th:block th:if="${view != 'items'}">
-        <table th:if="${!#lists.isEmpty(aggregated)}" class="data-table data-table--stack">
-            <thead>
-                <tr>
-                    <th th:text="#{inventory.aggregated.col.material}">Material</th>
-                    <th class="num" th:text="#{inventory.aggregated.col.avgQuality}">Ø Qualität</th>
-                    <th class="num" th:text="#{inventory.aggregated.col.maxQuality}">Max. Qualität</th>
-                    <th class="num" th:text="#{inventory.aggregated.col.totalAmount}">Gesamtmenge</th>
-                    <th class="cell-actions"><span class="visually-hidden" th:text="#{general.open}">Open</span></th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr th:each="item : ${aggregated}" data-testid="inventory-aggregate-row">
-                    <td>
-                        <a class="row-link" data-testid="row-link" th:href="@{/inventory/all(materialIds=${item.material.id})}">
-                            <span class="cell-title" th:text="${item.material.name}">Material</span>
-                        </a>
-                    </td>
-                    <td class="num" th:attr="data-label=#{inventory.aggregated.col.avgQuality}"
-                        th:text="${item.quality != null ? #numbers.formatDecimal(item.quality, 1, 'NONE', 2, 'DEFAULT') : '0.00'}">100.00</td>
-                    <td class="num" th:attr="data-label=#{inventory.aggregated.col.maxQuality}"
-                        th:text="${item.maxQuality != null ? #numbers.formatDecimal(item.maxQuality, 1, 'NONE', 2, 'DEFAULT') : '0.00'}">100.00</td>
-                    <td class="num" th:switch="${item.material.quantityType}">
-                        <span th:case="'PIECE'" th:text="|${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'} #{material.quantity.piece}|">10 Stück</span>
-                        <span th:case="*" th:text="|${item.amount != null ? #numbers.formatDecimal(item.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|">10.500 SCU</span>
-                    </td>
-                    <td class="cell-actions"><svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg></td>
-                </tr>
-            </tbody>
-        </table>
+        <div class="table-responsive" th:if="${!#lists.isEmpty(aggregated)}">
+            <table class="data-table data-table--stack">
+                <thead>
+                    <tr>
+                        <th th:text="#{inventory.aggregated.col.material}">Material</th>
+                        <th class="num" th:text="#{inventory.aggregated.col.avgQuality}">Ø Qualität</th>
+                        <th class="num" th:text="#{inventory.aggregated.col.maxQuality}">Max. Qualität</th>
+                        <th class="num" th:text="#{inventory.aggregated.col.totalAmount}">Gesamtmenge</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{general.open}">Open</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="item : ${aggregated}" data-testid="inventory-aggregate-row">
+                        <td>
+                            <a class="row-link" data-testid="row-link" th:href="@{/inventory/all(materialIds=${item.material.id})}">
+                                <span class="cell-title" th:text="${item.material.name}">Material</span>
+                            </a>
+                        </td>
+                        <td class="num" th:attr="data-label=#{inventory.aggregated.col.avgQuality}"
+                            th:text="${item.quality != null ? #numbers.formatDecimal(item.quality, 1, 'NONE', 2, 'DEFAULT') : '0.00'}">100.00</td>
+                        <td class="num" th:attr="data-label=#{inventory.aggregated.col.maxQuality}"
+                            th:text="${item.maxQuality != null ? #numbers.formatDecimal(item.maxQuality, 1, 'NONE', 2, 'DEFAULT') : '0.00'}">100.00</td>
+                        <td class="num" th:switch="${item.material.quantityType}">
+                            <span th:case="'PIECE'" th:text="|${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'} #{material.quantity.piece}|">10 Stück</span>
+                            <span th:case="*" th:text="|${item.amount != null ? #numbers.formatDecimal(item.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|">10.500 SCU</span>
+                        </td>
+                        <td class="cell-actions"><svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
 
         <th:block th:if="${#lists.isEmpty(aggregated)}">
             <th:block th:replace="~{fragments/components :: emptyState(titleKey='inventory.aggregated.empty', textKey='inventory.aggregated.empty.text',
@@ -77,33 +79,35 @@
         <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${inventoryPage}, baseUrl='/inventory')}"></th:block>
         </th:block>
         <th:block th:if="${view == 'items'}">
-        <table th:if="${!#lists.isEmpty(aggregated)}" class="data-table data-table--stack">
-            <thead>
-                <tr>
-                    <th th:text="#{inventory.items.aggregated.col.item}">Item</th>
-                    <th th:text="#{inventory.items.aggregated.col.kind}">Art</th>
-                    <th class="num" th:text="#{inventory.aggregated.col.totalAmount}">Gesamtmenge</th>
-                    <th class="cell-actions"><span class="visually-hidden" th:text="#{general.open}">Open</span></th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr th:each="item : ${aggregated}" data-testid="inventory-aggregate-row">
-                    <td>
-                        <a class="row-link" data-testid="row-link" th:href="@{/inventory/all(view='items', gameItemIds=${item.gameItem.id})}">
-                            <span class="cell-title" th:text="${item.gameItem.name}">Item</span>
-                            <span class="cell-sub" th:text="${item.gameItem.manufacturer} ?: '&mdash;'">Hersteller</span>
-                        </a>
-                    </td>
-                    <td>
-                        <span th:if="${item.gameItem.kind != null}"
-                              th:with="kindKey=|inventory.items.kind.${item.gameItem.kind}|"
-                              th:text="${#messages.msgOrNull(kindKey)} ?: ${item.gameItem.kind}">Art</span>
-                    </td>
-                    <td class="num" th:text="|${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'} #{material.quantity.piece}|">10 Stück</td>
-                    <td class="cell-actions"><svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg></td>
-                </tr>
-            </tbody>
-        </table>
+        <div class="table-responsive" th:if="${!#lists.isEmpty(aggregated)}">
+            <table class="data-table data-table--stack">
+                <thead>
+                    <tr>
+                        <th th:text="#{inventory.items.aggregated.col.item}">Item</th>
+                        <th th:text="#{inventory.items.aggregated.col.kind}">Art</th>
+                        <th class="num" th:text="#{inventory.aggregated.col.totalAmount}">Gesamtmenge</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{general.open}">Open</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="item : ${aggregated}" data-testid="inventory-aggregate-row">
+                        <td>
+                            <a class="row-link" data-testid="row-link" th:href="@{/inventory/all(view='items', gameItemIds=${item.gameItem.id})}">
+                                <span class="cell-title" th:text="${item.gameItem.name}">Item</span>
+                                <span class="cell-sub" th:text="${item.gameItem.manufacturer} ?: '&mdash;'">Hersteller</span>
+                            </a>
+                        </td>
+                        <td>
+                            <span th:if="${item.gameItem.kind != null}"
+                                  th:with="kindKey=|inventory.items.kind.${item.gameItem.kind}|"
+                                  th:text="${#messages.msgOrNull(kindKey)} ?: ${item.gameItem.kind}">Art</span>
+                        </td>
+                        <td class="num" th:text="|${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'} #{material.quantity.piece}|">10 Stück</td>
+                        <td class="cell-actions"><svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
 
         <th:block th:if="${#lists.isEmpty(aggregated)}">
             <th:block th:replace="~{fragments/components :: emptyState(titleKey='inventory.items.aggregated.empty', textKey='inventory.items.aggregated.empty.text',

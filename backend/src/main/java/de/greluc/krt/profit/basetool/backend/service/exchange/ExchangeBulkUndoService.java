@@ -19,11 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.service.exchange;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeBulkUndoRun;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeBulkUndoSkip;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeBulkUndoStatus;
@@ -44,9 +46,7 @@ import de.greluc.krt.profit.basetool.backend.repository.ExchangeClientRepository
 import de.greluc.krt.profit.basetool.backend.repository.ExchangeInstallationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ExchangeJournalRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.ExchangeChangeRetentionProperties;
 import java.time.Clock;
 import java.time.Instant;
@@ -97,7 +97,7 @@ public class ExchangeBulkUndoService {
   private final ExchangeBulkUndoStep step;
   private final ExchangeEntryLabels entryLabels;
   private final UserRepository userRepository;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final AuthHelperService authHelperService;
   private final ExchangeChangeRetentionProperties retention;
   private final PlatformTransactionManager transactionManager;
@@ -346,7 +346,7 @@ public class ExchangeBulkUndoService {
                 .membersTotal(members)
                 .startedAt(clock.instant())
                 .build());
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.EXCHANGE_BULK_UNDO_STARTED,
         client.getId(),
         client.getClientId(),

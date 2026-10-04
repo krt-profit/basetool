@@ -19,16 +19,17 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.mapper.MemberEvaluationMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.MemberEvaluation;
 import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
 import de.greluc.krt.profit.basetool.backend.model.dto.MemberEvaluationResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.MemberEvaluationUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.repository.MemberEvaluationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.List;
@@ -68,7 +69,7 @@ public class MemberEvaluationService {
   private final OwnerScopeService ownerScopeService;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   private final AuthHelperService authHelperService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Returns all evaluations for the given user (JWT-sub filtered – data isolation), additionally
@@ -139,7 +140,7 @@ public class MemberEvaluationService {
     boolean isNew = entity.getId() == null;
     entity.setAssignedLevel(request.assignedLevel());
     MemberEvaluation saved = repository.save(entity);
-    auditService.record(
+    auditRecorder.record(
         isNew
             ? AuditEventType.PROMOTION_EVALUATION_CREATED
             : AuditEventType.PROMOTION_EVALUATION_UPDATED,
@@ -169,7 +170,7 @@ public class MemberEvaluationService {
     String label = categoryLabel(category);
     UUID targetUserId = entity.getUserId();
     repository.delete(entity);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.PROMOTION_EVALUATION_DELETED, subjectId, label, targetUserId, null);
     log.info("Deleted MemberEvaluation id={}", id);
   }

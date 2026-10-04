@@ -19,12 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MissionMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
@@ -38,7 +40,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepos
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -68,7 +69,7 @@ public class MissionFinanceEntryService {
   private final MissionRepository missionRepository;
   private final RefineryOrderRepository refineryOrderRepository;
   private final MissionMapper missionMapper;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Returns paged finance entries for the mission.
@@ -163,7 +164,7 @@ public class MissionFinanceEntryService {
             .build();
 
     MissionFinanceEntry saved = financeEntryRepository.save(entry);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_FINANCE_ENTRY_CREATED,
         mission.getId(),
         mission.getName(),
@@ -197,7 +198,7 @@ public class MissionFinanceEntryService {
     entry.setNote(dto.note());
     entry.setType(dto.type());
     entry.setAmount(dto.amount());
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_FINANCE_ENTRY_UPDATED,
         entry.getMission() != null ? entry.getMission().getId() : null,
         entry.getMission() != null ? entry.getMission().getName() : null,
@@ -223,7 +224,7 @@ public class MissionFinanceEntryService {
     UUID auditMissionId = entry.getMission() != null ? entry.getMission().getId() : null;
     String auditMissionName = entry.getMission() != null ? entry.getMission().getName() : null;
     financeEntryRepository.delete(entry);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_FINANCE_ENTRY_DELETED,
         auditMissionId,
         auditMissionName,

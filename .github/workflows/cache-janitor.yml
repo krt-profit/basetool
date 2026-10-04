@@ -24,8 +24,17 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       actions: write
+      contents: read
 
     steps:
+      - name: Checkout the selection script from the default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts/prune_gradle_caches.py
+          sparse-checkout-cone-mode: false
+
       - name: Delete superseded CodeQL dependency caches
         env:
           GH_TOKEN: ${{ github.token }}
@@ -53,34 +62,28 @@ jobs:
           done < <(jq -r '.[] | [.id, .sizeInBytes, .ref, .key] | @tsv' <<<"$caches")
           echo "Deleted $count CodeQL dependency caches, $((freed / 1048576)) MiB." | tee -a "$GITHUB_STEP_SUMMARY"
 
-      - name: Delete superseded Gradle dependency caches on main
+      - name: Delete superseded Gradle caches on main
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          caches="$(gh cache list --key gradle-dependencies- --ref refs/heads/main --limit 100 \
-            --sort created_at --order desc --json id,key,sizeInBytes,lastAccessedAt)"
-          cutoff="$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)"
+          listing="$(mktemp)"
+          gh cache list --key gradle- --ref refs/heads/main --limit 1000 \
+            --json id,key,sizeInBytes,createdAt,lastAccessedAt > "$listing"
           freed=0
           count=0
-          first=1
-          while IFS=$'\t' read -r id size accessed key; do
+          while IFS=$'\t' read -r id size key; do
             [ -n "$id" ] || continue
-            if [ "$first" = 1 ] || [[ "$accessed" > "$cutoff" ]]; then
-              first=0
-              echo "keep   $key  (last used $accessed)"
-              continue
-            fi
             if gh cache delete "$id"; then
-              echo "delete $key  ($((size / 1048576)) MiB, last used $accessed)"
+              echo "delete $key  ($((size / 1048576)) MiB)"
               freed=$((freed + size))
               count=$((count + 1))
             else
               echo "::warning::could not delete cache $id ($key)"
             fi
-          done < <(jq -r '.[] | [.id, .sizeInBytes, .lastAccessedAt, .key] | @tsv' <<<"$caches")
-          echo "Deleted $count superseded Gradle dependency caches on main, $((freed / 1048576)) MiB." | tee -a "$GITHUB_STEP_SUMMARY"
+          done < <(python3 .github/scripts/prune_gradle_caches.py "$listing")
+          echo "Deleted $count superseded Gradle caches on main, $((freed / 1048576)) MiB." | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Delete the closed pull request's caches
         if: github.event_name == 'pull_request'
@@ -111,3 +114,6 @@ jobs:
           set -euo pipefail
           usage="$(gh api "repos/${GH_REPO}/actions/cache/usage" --jq '.active_caches_size_in_bytes')"
           echo "Cache usage after pruning: $((usage / 1048576)) MiB of 10240 MiB." | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$usage" -gt $((8 * 1024 * 1024 * 1024)) ]; then
+            echo "::warning::Actions cache usage $((usage / 1048576)) MiB is above the 8192 MiB budget; GitHub evicts the least recently used caches at 10240 MiB, the NVD dataset among them"
+          fi

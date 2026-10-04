@@ -19,12 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.Permissions;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -63,7 +64,7 @@ public class RoleService {
   private static final String NONE = "-";
 
   private final RoleRepository roleRepository;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final AuthHelperService authHelperService;
 
   /**
@@ -102,7 +103,7 @@ public class RoleService {
 
     PermissionDifference added = difference(permissions, previous);
     PermissionDifference removed = difference(previous, permissions);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.ROLE_PERMISSIONS_CHANGED,
         null,
         role.getCode(),

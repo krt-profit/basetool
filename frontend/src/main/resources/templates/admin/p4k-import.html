@@ -35,19 +35,21 @@
         <h2 id="krt-p4k-jobs-title" class="p4k-section-title" th:text="#{admin.p4kImport.jobs.title}">Importe</h2>
         <div class="card card--flush">
             <div data-p4k-jobs-table>
-                <table class="data-table data-table--stack">
-                    <thead>
-                    <tr>
-                        <th th:text="#{admin.p4kImport.jobs.col.file}">Datei</th>
-                        <th th:text="#{admin.p4kImport.jobs.col.kind}">Typ</th>
-                        <th class="cell-status" th:text="#{admin.p4kImport.jobs.col.status}">Status</th>
-                        <th th:text="#{admin.p4kImport.jobs.col.summary}">Zusammenfassung</th>
-                        <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.p4kImport.jobs.col.actions}">Aktionen</span></th>
-                    </tr>
-                    </thead>
-                    <tbody id="krt-p4k-jobs">
-                    </tbody>
-                </table>
+                <div class="table-responsive">
+                    <table class="data-table data-table--stack">
+                        <thead>
+                        <tr>
+                            <th th:text="#{admin.p4kImport.jobs.col.file}">Datei</th>
+                            <th th:text="#{admin.p4kImport.jobs.col.kind}">Typ</th>
+                            <th class="cell-status" th:text="#{admin.p4kImport.jobs.col.status}">Status</th>
+                            <th th:text="#{admin.p4kImport.jobs.col.summary}">Zusammenfassung</th>
+                            <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.p4kImport.jobs.col.actions}">Aktionen</span></th>
+                        </tr>
+                        </thead>
+                        <tbody id="krt-p4k-jobs">
+                        </tbody>
+                    </table>
+                </div>
             </div>
             <div id="krt-p4k-jobs-empty" class="empty-state" data-testid="empty-state" hidden>
                 <th:block th:replace="~{fragments/components :: emptyStateBody('admin.p4kImport.jobs.empty.title', 'admin.p4kImport.jobs.empty', null)}"></th:block>

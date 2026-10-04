@@ -19,13 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.QualityTierMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItemMaterial;
@@ -44,7 +46,6 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.JobOrderAuditLabel;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -87,7 +88,7 @@ public class MaterialClaimService {
   private final UserRepository userRepository;
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final MaterialMapper materialMapper;
   private final SquadronMapper squadronMapper;
   private final QualityTierMapper qualityTierMapper;
@@ -334,7 +335,7 @@ public class MaterialClaimService {
         tier.getCode(),
         dto.claimingOrgUnitId(),
         amount);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.JOB_ORDER_CLAIM_UPSERTED,
         order.getId(),
         orderLabel(order),
@@ -374,7 +375,7 @@ public class MaterialClaimService {
     final String claimQuality = claim.getQualityTier().getCode();
     final UUID claimingOrgUnitId = claim.getClaimingOrgUnit().getId();
     materialClaimRepository.delete(claim);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.JOB_ORDER_CLAIM_WITHDRAWN,
         order.getId(),
         orderLabel(order),

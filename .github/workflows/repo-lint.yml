@@ -105,7 +105,7 @@ jobs:
         run: |
           set -eu
           if ! python3 -c "import yaml" >/dev/null 2>&1; then
-            pip3 install --disable-pip-version-check 'pyyaml==6.0.3'
+            pip3 install --disable-pip-version-check --require-hashes -r .github/requirements/pyyaml.txt
           fi
           python3 -c "import yaml; print('PyYAML', yaml.__version__)"
 
@@ -152,6 +152,10 @@ jobs:
       - name: quadlet-drift / Self-test the Dependabot compose follow-up
         if: ${{ !cancelled() }}
         run: python3 .github/scripts/dependabot_compose_followup.py --selftest
+
+      - name: cache-janitor / Self-test the Gradle cache selection
+        if: ${{ !cancelled() }}
+        run: python3 .github/scripts/prune_gradle_caches.py --selftest
 
       - name: ingest-audience / Self-test the ingest audience checker
         if: ${{ !cancelled() }}
@@ -285,13 +289,10 @@ jobs:
 
       - name: ansible-lint / Install ansible-core, ansible-lint and the pinned collections
         if: ${{ !cancelled() }}
-        env:
-          ANSIBLE_CORE_VERSION: 2.21.4
-          ANSIBLE_LINT_VERSION: 26.9.0
         run: |
           set -euo pipefail
           pip install --disable-pip-version-check --quiet \
-            "ansible-core==${ANSIBLE_CORE_VERSION}" "ansible-lint==${ANSIBLE_LINT_VERSION}"
+            --require-hashes -r .github/requirements/ansible-lint.txt
           ansible --version | head -n 1
           ansible-lint --version
           attempts=3
@@ -414,7 +415,7 @@ jobs:
         run: |
           set -eu
           if ! python3 -c "import yaml" >/dev/null 2>&1; then
-            pip3 install --disable-pip-version-check 'pyyaml==6.0.3'
+            pip3 install --disable-pip-version-check --require-hashes -r .github/requirements/pyyaml.txt
           fi
           python3 -c "import yaml; print('PyYAML', yaml.__version__)"
 
