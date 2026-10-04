@@ -81,8 +81,9 @@ import org.springframework.security.oauth2.jwt.Jwt;
  * <ul>
  *   <li>{@code /my-inventory*} takes the owner id from the JWT via {@link
  *       UserService#getUserIdFromJwt}, never from the URL.
- *   <li>{@code create}, {@code book-out}, {@code update-delivered} and {@code update-note} pass the
- *       boundary's {@code isLogisticianOrAbove()} result to the service.
+ *   <li>{@code create}, {@code book-out}, {@code update-delivered}, {@code update-note}, {@code
+ *       stolen} and the three {@code allocation} writes pass the boundary's {@code
+ *       isLogisticianOrAbove()} result to the service.
  *   <li>{@code POST /{id}/book-out} answers {@code 200} with a DTO and {@code 204} when the row was
  *       removed.
  *   <li>{@code POST /bulk-checkout} and {@code POST /bulk-rebook} (REQ-INV-036) forward only the
@@ -1277,16 +1278,31 @@ class InventoryItemControllerTest {
   }
 
   @Test
-  void markStolen_passesTheCallerToTheService() {
+  void markStolen_passesTheCallerAndTheLogisticianFlagToTheService() {
     Jwt jwt = jwt("alice-sub");
     UUID ownerId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     InventoryItemStolenMarkDto dto = new InventoryItemStolenMarkDto(1L, true, 2.0);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
 
     controller.markStolen(jwt, itemId, dto);
 
-    verify(inventoryStolenMarkService).mark(itemId, dto, ownerId);
+    verify(inventoryStolenMarkService).mark(itemId, dto, ownerId, true);
+  }
+
+  @Test
+  void markStolen_nonLogisticianBranch_passesFalseToTheService() {
+    Jwt jwt = jwt("alice-sub");
+    UUID ownerId = UUID.randomUUID();
+    UUID itemId = UUID.randomUUID();
+    InventoryItemStolenMarkDto dto = new InventoryItemStolenMarkDto(1L, false, null);
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+
+    controller.markStolen(jwt, itemId, dto);
+
+    verify(inventoryStolenMarkService).mark(itemId, dto, ownerId, false);
   }
 
   @Test
@@ -1347,51 +1363,60 @@ class InventoryItemControllerTest {
   }
 
   @Test
-  void addAllocation_delegatesIdAndDto_withoutJwtOrRoleHelper() {
+  void addAllocation_passesTheCallerAndTheLogisticianFlagToTheService() {
+    Jwt jwt = jwt("alice-sub");
+    UUID callerId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     InventoryAllocationWriteDto dto =
         new InventoryAllocationWriteDto(
             InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 4.0, 1L);
     InventoryItemDto persisted = inventoryItem(itemId);
-    when(inventoryItemService.addAllocation(itemId, dto)).thenReturn(persisted);
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(inventoryItemService.addAllocation(itemId, dto, callerId, true)).thenReturn(persisted);
 
-    InventoryItemDto result = controller.addAllocation(itemId, dto);
+    InventoryItemDto result = controller.addAllocation(jwt, itemId, dto);
 
     assertThat(result).isSameAs(persisted);
-    verify(inventoryItemService).addAllocation(itemId, dto);
-    verifyNoInteractions(userService, authHelperService);
+    verify(inventoryItemService).addAllocation(itemId, dto, callerId, true);
   }
 
   @Test
-  void changeAllocation_delegatesIdAndDto() {
+  void changeAllocation_nonLogisticianBranch_passesFalseToTheService() {
+    Jwt jwt = jwt("alice-sub");
+    UUID callerId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     InventoryAllocationWriteDto dto =
         new InventoryAllocationWriteDto(
             InventoryAllocationDimension.MISSION, UUID.randomUUID(), 6.0, 2L);
     InventoryItemDto persisted = inventoryItem(itemId);
-    when(inventoryItemService.changeAllocation(itemId, dto)).thenReturn(persisted);
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    when(inventoryItemService.changeAllocation(itemId, dto, callerId, false)).thenReturn(persisted);
 
-    InventoryItemDto result = controller.changeAllocation(itemId, dto);
+    InventoryItemDto result = controller.changeAllocation(jwt, itemId, dto);
 
     assertThat(result).isSameAs(persisted);
-    verify(inventoryItemService).changeAllocation(itemId, dto);
-    verifyNoInteractions(userService, authHelperService);
+    verify(inventoryItemService).changeAllocation(itemId, dto, callerId, false);
   }
 
   @Test
-  void removeAllocation_delegatesIdAndDto() {
+  void removeAllocation_passesTheCallerAndTheLogisticianFlagToTheService() {
+    Jwt jwt = jwt("alice-sub");
+    UUID callerId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     InventoryAllocationWriteDto dto =
         new InventoryAllocationWriteDto(
             InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), null, 3L);
     InventoryItemDto persisted = inventoryItem(itemId);
-    when(inventoryItemService.removeAllocation(itemId, dto)).thenReturn(persisted);
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    when(inventoryItemService.removeAllocation(itemId, dto, callerId, false)).thenReturn(persisted);
 
-    InventoryItemDto result = controller.removeAllocation(itemId, dto);
+    InventoryItemDto result = controller.removeAllocation(jwt, itemId, dto);
 
     assertThat(result).isSameAs(persisted);
-    verify(inventoryItemService).removeAllocation(itemId, dto);
-    verifyNoInteractions(userService, authHelperService);
+    verify(inventoryItemService).removeAllocation(itemId, dto, callerId, false);
   }
 
   @Test
