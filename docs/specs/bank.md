@@ -931,6 +931,20 @@ raised against a `CLOSED` account.
 > checkbox of REQ-BANK-041) and „Ablehnen"; for a decided one, the decider. Only Notiz and Notiz
 > Bankmitarbeiter remain in the expandable sub-row. The page-level direct-booking button reads
 > „Kontobewegung erfassen" (outline).
+>
+> **Amended 2026-10-04 — the confirm action follows the caller's capability:** every row of
+> `GET /api/v1/bank/requests` carries **`callerMayConfirm`** (`BankBookingRequestDto`, `null` on every
+> other read of that DTO): `true` exactly when the request is `PENDING` and the caller passes the same
+> capability check the confirm endpoint enforces — `BankSecurityService#canConfirm`, i.e. management,
+> or a grant on the request's account with `can_deposit` / `can_withdraw` / `can_transfer` matching
+> its type. The queue evaluates it through `BankSecurityService#confirmCheck`, one read of the
+> caller's grants per page, so the read stays statement-bounded (REQ-DATA-003). The over-limit
+> attestation stays a confirm-time input and is not part of the flag. The page offers „Bestätigen"
+> (and the attested „Bestätigen, Freigabe liegt vor …") **only where `callerMayConfirm` is true**; a
+> ready row the caller may not confirm says **„wartet auf berechtigte Bankmitarbeiter"** and keeps
+> only „Ablehnen" in its ⋯ menu (rejection still needs visibility alone), loses the accent edge, and
+> no longer counts toward „n warten auf dich" (`BankRequestQueuePageController#awaitsTheCaller`). The
+> confirm endpoint itself is unchanged and still answers 403 when the capability is missing.
 
 A **bank employee** confirms or rejects a `PENDING` request under
 `/api/v1/bank/requests/**` (`BANK_EMPLOYEE` URL+method gate). **Confirmation** records the
@@ -964,6 +978,11 @@ row is pessimistically locked and `@Version`-guarded so two decisions cannot dou
 - [x] „n warten auf dich" counts the pending requests without an open owner approval; such a row
   offers „Bestätigen" / „Ablehnen", a row waiting on an approval names the approver and keeps the
   attested confirm in its ⋯ menu.
+- [x] Each queue row carries `callerMayConfirm`, decided by the confirm endpoint's own capability
+  check with one grant read per page; the confirm actions render only where it is true, and such a
+  row neither counts as waiting for the caller nor carries the accent edge (`BankSecurityServiceTest`,
+  `BankBookingRequestServiceTest`, `BankRequestControllerTest`, `BankReadNoNPlusOneTest`,
+  `BankRequestsPatternRenderTest`, `BankRequestQueueSegmentTest`).
 - [x] The queue header carries a page-level **Kontobewegung** CTA (when an active account exists) that
   opens the shared unified movement modal with a source-account selector and books directly via the
   existing endpoints — no new endpoint/audit/metric (frontend

@@ -26,6 +26,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -40,10 +41,27 @@ class BankRequestQueueSegmentTest {
    * @param status the lifecycle state
    * @param requiresApproval whether the owner approval is required
    * @param granted whether it was granted in-app
-   * @return the request
+   * @return the request, confirmable by the caller
    */
   private static @NotNull BankBookingRequestDto request(
       @NotNull String status, boolean requiresApproval, boolean granted) {
+    return request(status, requiresApproval, granted, true);
+  }
+
+  /**
+   * A request in the given state with the backend's confirm answer.
+   *
+   * @param status the lifecycle state
+   * @param requiresApproval whether the owner approval is required
+   * @param granted whether it was granted in-app
+   * @param callerMayConfirm the backend's per-row confirm answer, or {@code null} when unjudged
+   * @return the request
+   */
+  private static @NotNull BankBookingRequestDto request(
+      @NotNull String status,
+      boolean requiresApproval,
+      boolean granted,
+      @Nullable Boolean callerMayConfirm) {
     return new BankBookingRequestDto(
         UUID.randomUUID(),
         UUID.randomUUID(),
@@ -79,7 +97,8 @@ class BankRequestQueueSegmentTest {
         null,
         null,
         null,
-        0L);
+        0L,
+        callerMayConfirm);
   }
 
   /** Absent, blank and unknown values open the pending segment. */
@@ -105,16 +124,27 @@ class BankRequestQueueSegmentTest {
     assertThat(BankRequestQueuePageController.resolveSegment("CANCELLED")).isEqualTo("ALL");
   }
 
+  /** A ready request the caller may not confirm, or one nobody judged, does not wait for them. */
+  @Test
+  void awaitsTheCallerOnlyWhenTheBackendLetsThemConfirm() {
+    assertThat(
+            BankRequestQueuePageController.awaitsTheCaller(request("PENDING", false, false, false)))
+        .isFalse();
+    assertThat(
+            BankRequestQueuePageController.awaitsTheCaller(request("PENDING", false, false, null)))
+        .isFalse();
+  }
+
   /** Only a pending request without an outstanding owner approval waits for the bank. */
   @Test
-  void awaitsTheBankOnlyWithoutAnOutstandingApproval() {
-    assertThat(BankRequestQueuePageController.awaitsTheBank(request("PENDING", false, false)))
+  void awaitsTheCallerOnlyWithoutAnOutstandingApproval() {
+    assertThat(BankRequestQueuePageController.awaitsTheCaller(request("PENDING", false, false)))
         .isTrue();
-    assertThat(BankRequestQueuePageController.awaitsTheBank(request("PENDING", true, true)))
+    assertThat(BankRequestQueuePageController.awaitsTheCaller(request("PENDING", true, true)))
         .isTrue();
-    assertThat(BankRequestQueuePageController.awaitsTheBank(request("PENDING", true, false)))
+    assertThat(BankRequestQueuePageController.awaitsTheCaller(request("PENDING", true, false)))
         .isFalse();
-    assertThat(BankRequestQueuePageController.awaitsTheBank(request("CONFIRMED", false, false)))
+    assertThat(BankRequestQueuePageController.awaitsTheCaller(request("CONFIRMED", false, false)))
         .isFalse();
   }
 }

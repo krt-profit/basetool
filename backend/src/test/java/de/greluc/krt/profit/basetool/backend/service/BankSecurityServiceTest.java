@@ -30,12 +30,15 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.model.BankAccountGrant;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountGrantId;
+import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.model.BankHolder;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountGrantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BiPredicate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -123,6 +126,77 @@ class BankSecurityServiceTest {
     assertTrue(bankSecurityService.canDeposit(accountId, authentication));
     assertTrue(bankSecurityService.canWithdraw(accountId, authentication));
     assertTrue(bankSecurityService.canTransfer(accountId, authentication));
+  }
+
+  @Test
+  void canConfirm_needsTheFlagOfTheRequestType() {
+    employeeWithGrant(false, true, false);
+
+    assertFalse(
+        bankSecurityService.canConfirm(BankBookingRequestType.DEPOSIT, accountId, authentication));
+    assertTrue(
+        bankSecurityService.canConfirm(
+            BankBookingRequestType.WITHDRAWAL, accountId, authentication));
+    assertFalse(
+        bankSecurityService.canConfirm(BankBookingRequestType.TRANSFER, accountId, authentication));
+  }
+
+  @Test
+  void canConfirm_deniesEmployeeWithoutGrantRow() {
+    employeeWithoutGrant();
+
+    assertFalse(
+        bankSecurityService.canConfirm(BankBookingRequestType.DEPOSIT, accountId, authentication));
+  }
+
+  /**
+   * The batch check decides as {@code canConfirm} does, per type and account, from one read of the
+   * caller's grants and no per-account lookup (REQ-BANK-023, REQ-DATA-003).
+   */
+  @Test
+  void confirmCheck_matchesCanConfirmWithOneGrantRead() {
+    UUID otherAccount = UUID.randomUUID();
+    when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
+    when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(false);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
+    BankAccountGrant grant = new BankAccountGrant();
+    grant.setId(new BankAccountGrantId(userId, accountId));
+    grant.setCanDeposit(true);
+    when(grantRepository.findByUserId(userId)).thenReturn(List.of(grant));
+
+    BiPredicate<BankBookingRequestType, UUID> check =
+        bankSecurityService.confirmCheck(authentication);
+
+    assertTrue(check.test(BankBookingRequestType.DEPOSIT, accountId));
+    assertFalse(check.test(BankBookingRequestType.WITHDRAWAL, accountId));
+    assertFalse(check.test(BankBookingRequestType.TRANSFER, accountId));
+    assertFalse(check.test(BankBookingRequestType.DEPOSIT, otherAccount));
+    verify(grantRepository).findByUserId(userId);
+    verify(grantRepository, never()).findById(any(BankAccountGrantId.class));
+  }
+
+  @Test
+  void confirmCheck_allowsManagementWithoutReadingGrants() {
+    when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
+    when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(true);
+
+    BiPredicate<BankBookingRequestType, UUID> check =
+        bankSecurityService.confirmCheck(authentication);
+
+    assertTrue(check.test(BankBookingRequestType.TRANSFER, accountId));
+    verifyNoInteractions(grantRepository);
+  }
+
+  @Test
+  void confirmCheck_deniesUnauthenticatedCaller() {
+    when(authentication.isAuthenticated()).thenReturn(false);
+
+    assertFalse(
+        bankSecurityService
+            .confirmCheck(authentication)
+            .test(BankBookingRequestType.DEPOSIT, accountId));
+    assertFalse(
+        bankSecurityService.confirmCheck(null).test(BankBookingRequestType.DEPOSIT, accountId));
   }
 
   @Test

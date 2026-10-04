@@ -71952,6 +71952,9 @@
           "applicableLimit" : {
             "type" : "number"
           },
+          "callerMayConfirm" : {
+            "type" : "boolean"
+          },
           "counterpartyHandle" : {
             "type" : "string"
           },

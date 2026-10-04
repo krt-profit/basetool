@@ -144,7 +144,7 @@ public class BankRequestQueuePageController {
         pending == null
             ? 0L
             : pending.content().stream()
-                .filter(BankRequestQueuePageController::awaitsTheBank)
+                .filter(BankRequestQueuePageController::awaitsTheCaller)
                 .count();
     List<BankHolderDto> holders = backendApiClient.get("/api/v1/bank/holders", BANK_HOLDER_LIST);
     model.addAttribute("requests", requests);
@@ -173,15 +173,17 @@ public class BankRequestQueuePageController {
   }
 
   /**
-   * Whether a pending request is ready for the bank's decision: it needs no owner approval, or the
-   * approval has been granted in-app (REQ-BANK-041).
+   * Whether a pending request waits for this caller: no approval step is outstanding (no owner
+   * approval needed, or granted in-app, REQ-BANK-041) and the backend says the caller may confirm
+   * it (REQ-BANK-023).
    *
    * @param request the request to check
-   * @return {@code true} when the request is pending and no approval step is outstanding
+   * @return {@code true} when the request is pending, ready and confirmable by the caller
    */
-  static boolean awaitsTheBank(@NotNull BankBookingRequestDto request) {
+  static boolean awaitsTheCaller(@NotNull BankBookingRequestDto request) {
     return "PENDING".equals(request.status())
-        && (!request.requiresOwnerApproval() || request.ownerApprovalGranted());
+        && (!request.requiresOwnerApproval() || request.ownerApprovalGranted())
+        && request.mayConfirm();
   }
 
   /**

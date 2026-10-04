@@ -173,6 +173,11 @@
 
 ### Changed
 
+- **Kartellbank: „Bestätigen" nur, wo du bestätigen darfst.** Die Antragswarteschlange zeigt die
+  Bestätigen-Aktion nur noch bei Anträgen, für die dir die passende Konto-Berechtigung zusteht; sonst
+  steht dort „wartet auf berechtigte Bankmitarbeiter". Die Queue-API liefert dafür pro Antrag
+  `callerMayConfirm` (REQ-BANK-023).
+
 - **Blueprints: Fehlmenge wieder sichtbar.** Ist der Vorrat einer Zutat zu knapp, steht unter dem
   Vorrat wieder „fehlt n“ (REQ-INV-048).
 - **Auftragsdetail: Reiter „Hersteller“.** Der Reiter, der zeigt, wer ein Item craften kann, hieß

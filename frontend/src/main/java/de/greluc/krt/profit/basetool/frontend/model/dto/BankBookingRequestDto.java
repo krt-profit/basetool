@@ -74,6 +74,8 @@ import org.jetbrains.annotations.Nullable;
  * @param counterpartyOrgUnitId the Empf&auml;nger's chosen org unit, or {@code null}
  * @param counterpartyOrgUnitName name snapshot of that org unit, or {@code null}
  * @param version the optimistic-locking version echoed on cancel/confirm/reject
+ * @param callerMayConfirm on the staff queue, whether the caller may confirm this request now;
+ *     {@code null} on every other read (REQ-BANK-023)
  */
 public record BankBookingRequestDto(
     UUID id,
@@ -110,4 +112,15 @@ public record BankBookingRequestDto(
     @Nullable String counterpartyHandle,
     @Nullable UUID counterpartyOrgUnitId,
     @Nullable String counterpartyOrgUnitName,
-    Long version) {}
+    Long version,
+    @Nullable Boolean callerMayConfirm) {
+
+  /**
+   * Whether the staff queue offers this caller the confirm action; an unjudged row offers none.
+   *
+   * @return {@code true} only when the backend answered {@code callerMayConfirm = true}
+   */
+  public boolean mayConfirm() {
+    return Boolean.TRUE.equals(callerMayConfirm);
+  }
+}
