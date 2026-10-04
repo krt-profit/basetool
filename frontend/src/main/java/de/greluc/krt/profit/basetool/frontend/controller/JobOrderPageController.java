@@ -25,6 +25,8 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ItemDerivationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderHandoverDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderHandoverItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockGroupDto;
@@ -914,16 +916,21 @@ public class JobOrderPageController {
   }
 
   /**
-   * Computes the KPI strip values from the loaded order (REQ-ORDERS-026): fulfilment or delivery
-   * progress, the open quantity split into SCU and pieces, and the claim and handover counts.
+   * Computes the KPI strip values from the loaded order (REQ-ORDERS-026): the delivered-against-
+   * required progress head, fulfilment, the open quantity split into SCU and pieces, and the claim
+   * and handover counts.
    *
-   * <p>Missing stock or claims in the redacted requester view count as zero.
+   * <p>A material order's requirement is the still-open line amount plus what its handovers
+   * delivered, per unit; the progress is withheld when the order is redacted for its requester,
+   * whose view carries no handovers. Missing stock or claims in that view count as zero.
    *
    * @param order the loaded order (any kind)
    * @return an insertion-ordered map of KPI values keyed for the fragment ({@code fulfilled},
    *     {@code total}, {@code fulfilledPct}, {@code delivered}, {@code amount}, {@code
-   *     deliveredPct}, {@code openAmountScu}, {@code openAmountPiece}, {@code hasScuMaterial},
-   *     {@code hasPieceMaterial}, {@code claims}, {@code handovers})
+   *     deliveredPct}, {@code deliveredScu}, {@code requiredScu}, {@code deliveredPiece}, {@code
+   *     requiredPiece}, {@code progressPct}, {@code showProgress}, {@code openAmountScu}, {@code
+   *     openAmountPiece}, {@code hasScuMaterial}, {@code hasPieceMaterial}, {@code claims}, {@code
+   *     handovers}, {@code supportsClaims})
    */
   @NotNull
   private Map<String, Object> computeKpi(JobOrderDto order) {
@@ -934,6 +941,12 @@ public class JobOrderPageController {
     kpi.put("delivered", 0);
     kpi.put("amount", 0);
     kpi.put("deliveredPct", 0);
+    kpi.put("deliveredScu", 0.0);
+    kpi.put("requiredScu", 0.0);
+    kpi.put("deliveredPiece", 0.0);
+    kpi.put("requiredPiece", 0.0);
+    kpi.put("progressPct", 0);
+    kpi.put("showProgress", false);
     kpi.put("openAmountScu", 0.0);
     kpi.put("openAmountPiece", 0.0);
     kpi.put("hasScuMaterial", false);
@@ -981,8 +994,11 @@ public class JobOrderPageController {
       kpi.put("delivered", delivered);
       kpi.put("amount", amount);
       kpi.put("deliveredPct", amount > 0 ? (delivered * 100 / amount) : 0);
+      kpi.put("progressPct", percentOf(delivered, amount));
+      kpi.put("showProgress", amount > 0);
       kpi.put("handovers", order.itemHandovers() != null ? order.itemHandovers().size() : 0);
     } else {
+      putMaterialProgress(kpi, order);
       int fulfilled = 0;
       int total = 0;
       if (order.materials() != null) {
@@ -1019,6 +1035,79 @@ public class JobOrderPageController {
     kpi.put("claims", claims);
     kpi.put("supportsClaims", supportsClaims);
     return kpi;
+  }
+
+  /**
+   * Puts a material order's delivered and required quantities per unit and its progress into the
+   * KPI map (REQ-ORDERS-026).
+   *
+   * <p>A handover lowers its line's amount, so the requirement is the open line amount plus the
+   * delivered amount. With both units present the progress is the mean of the two per-unit shares,
+   * because SCU and pieces are never summed.
+   *
+   * @param kpi the KPI map to fill
+   * @param order the loaded material order
+   */
+  private static void putMaterialProgress(
+      @NotNull Map<String, Object> kpi, @NotNull JobOrderDto order) {
+    double deliveredScu = 0.0;
+    double deliveredPiece = 0.0;
+    if (order.handovers() != null) {
+      for (JobOrderHandoverDto handover : order.handovers()) {
+        if (handover.items() == null) {
+          continue;
+        }
+        for (JobOrderHandoverItemDto line : handover.items()) {
+          double amount = line.amount() != null ? line.amount() : 0.0;
+          if (line.material() != null && "PIECE".equals(line.material().quantityType())) {
+            deliveredPiece += amount;
+          } else {
+            deliveredScu += amount;
+          }
+        }
+      }
+    }
+    double requiredScu = deliveredScu;
+    double requiredPiece = deliveredPiece;
+    if (order.materials() != null) {
+      for (JobOrderMaterialDto mat : order.materials()) {
+        double open = mat.amount() != null ? mat.amount() : 0.0;
+        if (mat.material() != null && "PIECE".equals(mat.material().quantityType())) {
+          requiredPiece += open;
+        } else {
+          requiredScu += open;
+        }
+      }
+    }
+    int progressPct;
+    if (requiredScu > 0 && requiredPiece > 0) {
+      progressPct =
+          (percentOf(deliveredScu, requiredScu) + percentOf(deliveredPiece, requiredPiece)) / 2;
+    } else if (requiredPiece > 0) {
+      progressPct = percentOf(deliveredPiece, requiredPiece);
+    } else {
+      progressPct = percentOf(deliveredScu, requiredScu);
+    }
+    kpi.put("deliveredScu", deliveredScu);
+    kpi.put("requiredScu", requiredScu);
+    kpi.put("deliveredPiece", deliveredPiece);
+    kpi.put("requiredPiece", requiredPiece);
+    kpi.put("progressPct", progressPct);
+    kpi.put("showProgress", !order.redacted() && (requiredScu > 0 || requiredPiece > 0));
+  }
+
+  /**
+   * Expresses a part of a whole as a whole-number percentage between 0 and 100.
+   *
+   * @param part the delivered quantity
+   * @param whole the required quantity
+   * @return the share in percent, floored and clamped; 0 when the whole is not positive
+   */
+  private static int percentOf(double part, double whole) {
+    if (whole <= 0) {
+      return 0;
+    }
+    return (int) Math.max(0, Math.min(100, Math.floor(part * 100.0 / whole + 1e-9)));
   }
 
   @NotNull
