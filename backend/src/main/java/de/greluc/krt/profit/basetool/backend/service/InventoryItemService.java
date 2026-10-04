@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.AppException;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
@@ -26,7 +29,6 @@ import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
@@ -62,7 +64,6 @@ import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.support.InventoryProperties;
@@ -105,7 +106,7 @@ public class InventoryItemService {
   private final InventoryItemMapper inventoryItemMapper;
   private final OwnerScopeService ownerScopeService;
   private final JobOrderItemService jobOrderItemService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final InventoryAggregationService inventoryAggregationService;
   private final InventoryCheckoutService inventoryCheckoutService;
   private final InventoryProperties inventoryProperties;
@@ -543,7 +544,7 @@ public class InventoryItemService {
     }
 
     InventoryItem saved = inventoryItemRepository.save(item);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.INVENTORY_ITEM_CREATED,
         item.getId(),
         InventoryAuditLabels.label(item),
@@ -963,7 +964,7 @@ public class InventoryItemService {
     if (amount != null) {
       details = details.with("qty", amount);
     }
-    auditService.record(
+    auditRecorder.record(
         type, item.getId(), InventoryAuditLabels.label(item), item.getUser().getId(), details);
   }
 
@@ -1083,7 +1084,7 @@ public class InventoryItemService {
     item.setNote(normalizedNote);
 
     InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.INVENTORY_ITEM_NOTE_UPDATED,
         item.getId(),
         InventoryAuditLabels.label(item),

@@ -19,11 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.KommandoGroupMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
@@ -33,7 +35,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.UpdateKommandoGroupReques
 import de.greluc.krt.profit.basetool.backend.repository.KommandoGroupRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.OrgUnitLabels;
 import java.util.List;
@@ -65,7 +66,7 @@ public class KommandoGroupService {
   private final KommandoGroupRepository kommandoGroupRepository;
   private final OrgUnitRepository orgUnitRepository;
   private final OrgUnitMembershipRepository membershipRepository;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final OrgChartService orgChartService;
   private final KommandoGroupMapper kommandoGroupMapper;
 
@@ -112,7 +113,7 @@ public class KommandoGroupService {
             .build();
     KommandoGroup saved = kommandoGroupRepository.saveAndFlush(group);
     orgChartService.mirrorCreateKommandoGroup(saved);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.KOMMANDO_GROUP_CREATED,
         saved.getId(),
         saved.getName(),
@@ -141,7 +142,7 @@ public class KommandoGroupService {
     group.setSortIndex(request.sortIndex());
     KommandoGroup saved = kommandoGroupRepository.saveAndFlush(group);
     orgChartService.mirrorUpdateKommandoGroup(saved);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.KOMMANDO_GROUP_UPDATED, saved.getId(), saved.getName(), null, null);
     return kommandoGroupMapper.toDto(saved);
   }
@@ -164,7 +165,7 @@ public class KommandoGroupService {
     String name = group.getName();
     orgChartService.mirrorDeleteKommandoGroup(groupId);
     kommandoGroupRepository.delete(group);
-    auditService.record(AuditEventType.KOMMANDO_GROUP_DELETED, groupId, name, null, null);
+    auditRecorder.record(AuditEventType.KOMMANDO_GROUP_DELETED, groupId, name, null, null);
   }
 
   /**

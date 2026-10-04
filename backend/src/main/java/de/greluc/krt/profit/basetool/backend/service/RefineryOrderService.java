@@ -19,9 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
@@ -49,7 +51,6 @@ import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryYieldRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
@@ -92,7 +93,7 @@ public class RefineryOrderService {
   private final JobOrderItemService jobOrderItemService;
   private final RefineryYieldRepository refineryYieldRepository;
   private final OwnerScopeService ownerScopeService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Owner-scoped paged list with optional status filter.
@@ -327,7 +328,7 @@ public class RefineryOrderService {
     order.setOreSales(zeroToNull(order.getOreSales()));
 
     RefineryOrder saved = refineryOrderRepository.save(order);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.REFINERY_ORDER_CREATED,
         saved.getId(),
         refineryLabel(saved),
@@ -456,7 +457,7 @@ public class RefineryOrderService {
     }
 
     RefineryOrder saved = refineryOrderRepository.save(order);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.REFINERY_ORDER_UPDATED,
         saved.getId(),
         refineryLabel(saved),
@@ -541,7 +542,7 @@ public class RefineryOrderService {
     final RefineryOrderStatus previousStatus = order.getStatus();
     order.setStatus(RefineryOrderStatus.CANCELED);
     refineryOrderRepository.save(order);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.REFINERY_ORDER_CANCELED,
         order.getId(),
         refineryLabel(order),
@@ -658,7 +659,7 @@ public class RefineryOrderService {
       }
 
       inventoryItemRepository.save(item);
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.INVENTORY_RECEIVED_FROM_REFINERY,
           item.getId(),
           mat.getName() + " @ " + loc.getName(),
@@ -677,7 +678,7 @@ public class RefineryOrderService {
     order.setStatus(RefineryOrderStatus.COMPLETED);
     order.setStoredAt(Instant.now());
     refineryOrderRepository.save(order);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.REFINERY_ORDER_STORED,
         order.getId(),
         refineryLabel(order),

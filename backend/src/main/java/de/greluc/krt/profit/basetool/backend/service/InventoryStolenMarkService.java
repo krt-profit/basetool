@@ -19,12 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
@@ -35,7 +37,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemStolenMarkDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.support.InventoryProperties;
@@ -72,7 +73,7 @@ public class InventoryStolenMarkService {
   private final InventoryCheckoutService inventoryCheckoutService;
   private final InventoryItemMapper inventoryItemMapper;
   private final InventoryProperties inventoryProperties;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Sets or removes the marker on a row or on part of it. A row that already carries the requested
@@ -157,7 +158,7 @@ public class InventoryStolenMarkService {
     }
     int skipped = rows.size() - changed;
     if (changed > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.INVENTORY_BULK_STOLEN_CHANGED,
           null,
           null,
@@ -186,7 +187,7 @@ public class InventoryStolenMarkService {
       @NotNull InventoryItem item, boolean target, @NotNull UUID callerId) {
     item.setStolen(target);
     InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
-    auditService.record(
+    auditRecorder.record(
         target ? AuditEventType.INVENTORY_STOLEN_MARKED : AuditEventType.INVENTORY_STOLEN_UNMARKED,
         saved.getId(),
         InventoryAuditLabels.label(saved),
@@ -241,7 +242,7 @@ public class InventoryStolenMarkService {
     }
     inventoryItemRepository.saveAndFlush(item);
 
-    auditService.record(
+    auditRecorder.record(
         target ? AuditEventType.INVENTORY_STOLEN_MARKED : AuditEventType.INVENTORY_STOLEN_UNMARKED,
         item.getId(),
         InventoryAuditLabels.label(item),

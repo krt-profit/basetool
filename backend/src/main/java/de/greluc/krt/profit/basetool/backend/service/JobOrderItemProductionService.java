@@ -19,11 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.joborder.api.ProductionAllocationException;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
@@ -41,7 +43,6 @@ import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.support.JobOrderAuditLabel;
@@ -89,7 +90,7 @@ public class JobOrderItemProductionService {
   private final InventoryItemRepository inventoryItemRepository;
   private final MaterialExchangeOfferRatchet offerRatchet;
   private final JobOrderItemService jobOrderItemService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final UserService userService;
   private final UserRepository userRepository;
   private final LocationRepository locationRepository;
@@ -283,7 +284,7 @@ public class JobOrderItemProductionService {
         offerRatchet.lower(
             ci.itemId(), ci.remaining(), MaterialExchangeOfferRatchet.Reason.PRODUCTION);
       }
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.INVENTORY_CONSUMED_BY_PRODUCTION,
           ci.itemId(),
           ci.label(),
@@ -295,7 +296,7 @@ public class JobOrderItemProductionService {
               .with("remaining", ci.remaining())
               .with("depleted", ci.depleted()));
     }
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.JOB_ORDER_PRODUCTION_BOOKED,
         jobOrderId,
         JobOrderAuditLabel.of(jobOrder.getDisplayId()),
@@ -401,7 +402,7 @@ public class JobOrderItemProductionService {
     }
     InventoryItem saved = inventoryItemRepository.save(stockRow);
     InventoryItem merged = inventoryCheckoutService.mergeStockIfRequested(saved, false);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.INVENTORY_RECEIVED_FROM_PRODUCTION,
         merged.getId(),
         InventoryAuditLabels.label(merged),

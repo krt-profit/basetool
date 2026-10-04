@@ -125,6 +125,15 @@ public class SyncChunkWriter {
   }
 
   /**
+   * Runs {@code work} in its own new transaction — for the audit row that closes a sync run.
+   *
+   * @param work the work to run
+   */
+  public void runInNewTransaction(@NotNull Runnable work) {
+    requiresNew.executeWithoutResult(status -> work.run());
+  }
+
+  /**
    * What {@link #write} produced.
    *
    * @param results one entry per row written, in chunk order; retried rows follow their chunk's
