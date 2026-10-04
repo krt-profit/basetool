@@ -163,6 +163,10 @@
 
 ### Changed
 
+- **Kartellbank: „Bestätigen" nur, wo du bestätigen darfst.** Die Antragswarteschlange zeigt die
+  Bestätigen-Aktion nur noch bei Anträgen, für die dir die passende Konto-Berechtigung zusteht; sonst
+  steht dort „wartet auf berechtigte Bankmitarbeiter". Die Queue-API liefert dafür pro Antrag
+  `callerMayConfirm` (REQ-BANK-023).
 - **Build: Configuration-Cache auch für lokale Builds.** `gradle.properties` schaltet ihn ein;
   `--no-configuration-cache` schaltet ihn für einen Lauf ab (BLD-PERF-04).
 - **CI: Cache-Janitor behält je Gradle-Job nur den neuesten Cache** und warnt, wenn der Actions-Cache

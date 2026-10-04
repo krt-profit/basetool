@@ -51,9 +51,9 @@
             </thead>
             <tbody>
             <th:block th:each="r : ${requests.content()}"
-                      th:with="hasDetail=${!#strings.isEmpty(r.note()) or !#strings.isEmpty(r.staffNote())},detailId='bank-req-' + ${r.id()},pending=${r.status() == 'PENDING'},approvalOpen=${r.requiresOwnerApproval() and !r.ownerApprovalGranted()},approverKey=${r.requiredApprover() != null ? r.requiredApprover() : 'RESPONSIBLE_HOLDER'},approverLabel=#{'bank.request.approver.' + ${approverKey}}">
+                      th:with="hasDetail=${!#strings.isEmpty(r.note()) or !#strings.isEmpty(r.staffNote())},detailId='bank-req-' + ${r.id()},pending=${r.status() == 'PENDING'},approvalOpen=${r.requiresOwnerApproval() and !r.ownerApprovalGranted()},approverKey=${r.requiredApprover() != null ? r.requiredApprover() : 'RESPONSIBLE_HOLDER'},approverLabel=#{'bank.request.approver.' + ${approverKey}},mayConfirm=${pending and r.mayConfirm()}">
             <tr data-testid="bank-request-row" class="bank-booking-row bank-req-row"
-                th:classappend="${(hasDetail ? ' is-expandable' : '') + (pending and !approvalOpen ? ' bank-req-row--ready' : '')}">
+                th:classappend="${(hasDetail ? ' is-expandable' : '') + (pending and !approvalOpen and mayConfirm ? ' bank-req-row--ready' : '')}">
                 <td>
                     <div class="bank-req-head">
                         <span class="chip"
@@ -98,7 +98,7 @@
                 </td>
                 <td class="cell-actions">
                     <div class="bank-req-actions">
-                        <th:block th:if="${pending and !approvalOpen}">
+                        <th:block th:if="${pending and !approvalOpen and mayConfirm}">
                             <button type="button" class="btn btn-success btn-xs"
                                     data-trigger="open-modal-display" data-modal-id="bank-confirm-request-modal"
                                     data-testid="bank-request-confirm-btn"
@@ -110,12 +110,15 @@
                                     th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()}"
                                     th:text="#{bank.request.action.reject}">Ablehnen</button>
                         </th:block>
-                        <th:block th:if="${pending and approvalOpen}">
-                            <span class="bank-req-waiting" data-testid="bank-request-waiting"
+                        <th:block th:if="${pending and (approvalOpen or !mayConfirm)}">
+                            <span class="bank-req-waiting" data-testid="bank-request-waiting" th:if="${approvalOpen}"
                                   th:text="#{bank.request.waitingFor(${approverLabel})}">wartet auf Bankleitung</span>
+                            <span class="bank-req-waiting" data-testid="bank-request-waiting" th:unless="${approvalOpen}"
+                                  data-waiting-for="authorized-staff" th:title="#{bank.request.authorizedStaff.hint}"
+                                  th:with="staffLabel=#{bank.request.authorizedStaff}" th:text="#{bank.request.waitingFor(${staffLabel})}">wartet auf berechtigte Bankmitarbeiter</span>
                             <th:block th:replace="~{fragments/components :: overflowMenu(id=${'bank-req-more-' + r.id()}, items=~{::bank-req-more-items})}">
                                 <th:block th:ref="bank-req-more-items">
-                                    <button type="button" class="overflow-menu__item" role="menuitem"
+                                    <button type="button" class="overflow-menu__item" role="menuitem" th:if="${mayConfirm}"
                                             data-trigger="open-modal-display" data-modal-id="bank-confirm-request-modal"
                                             data-testid="bank-request-confirm-btn"
                                             th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()},data-field-reqtype=${r.type()},data-field-reqamount=${r.amount()},data-field-requiresownerapproval=${r.requiresOwnerApproval()},data-field-ownerapprovalgranted=${r.ownerApprovalGranted()},data-field-splitenabled=${r.splitEnabled()},data-field-splitpercent=${r.splitPercent()},data-field-justification=${r.justification()},data-field-_livesyncaccount=${r.accountId()},data-field-_livesyncdestination=${r.targetAccountId() != null ? r.targetAccountId() : ''}"

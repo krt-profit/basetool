@@ -98,6 +98,7 @@ BankBookingRequestDto.accountName=string
 BankBookingRequestDto.accountNo=string
 BankBookingRequestDto.amount=number
 BankBookingRequestDto.applicableLimit=number
+BankBookingRequestDto.callerMayConfirm=boolean
 BankBookingRequestDto.counterpartyHandle=string
 BankBookingRequestDto.counterpartyOrgUnitId=string/uuid
 BankBookingRequestDto.counterpartyOrgUnitName=string

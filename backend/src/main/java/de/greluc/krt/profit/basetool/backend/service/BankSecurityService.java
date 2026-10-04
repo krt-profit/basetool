@@ -21,12 +21,17 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.model.BankAccountGrant;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountGrantId;
+import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountGrantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BiPredicate;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -145,6 +150,88 @@ public class BankSecurityService {
   }
 
   /**
+   * Checks whether the caller may confirm a booking request of the given type on the account: the
+   * capability the matching direct booking needs, {@code can_deposit}, {@code can_withdraw} or
+   * {@code can_transfer} on the request's account; management unrestricted (REQ-BANK-023).
+   *
+   * @param type the request's movement kind
+   * @param accountId the request's (source) account; never {@code null}
+   * @param authentication the current authentication
+   * @return {@code true} iff the caller may confirm such a request
+   */
+  public boolean canConfirm(
+      @NotNull BankBookingRequestType type,
+      @NotNull UUID accountId,
+      Authentication authentication) {
+    return hasCapability(accountId, authentication, confirmCapability(type), this::findCallerGrant);
+  }
+
+  /**
+   * Answers {@link #canConfirm} for any number of requests with at most one grant read, for a list
+   * that marks every row (REQ-BANK-023).
+   *
+   * @param authentication the current authentication
+   * @return a check taking a request's type and account id, deciding exactly as {@link #canConfirm}
+   */
+  @NotNull
+  public BiPredicate<BankBookingRequestType, UUID> confirmCheck(Authentication authentication) {
+    Map<UUID, BankAccountGrant> callerGrants = isManagement() ? Map.of() : loadCallerGrants();
+    return (type, accountId) ->
+        hasCapability(
+            accountId,
+            authentication,
+            confirmCapability(type),
+            id -> Optional.ofNullable(callerGrants.get(id)));
+  }
+
+  /**
+   * Maps a request type onto the grant flag its confirmation needs.
+   *
+   * @param type the request's movement kind
+   * @return the per-grant check for that kind
+   */
+  @NotNull
+  private static Predicate<BankAccountGrant> confirmCapability(
+      @NotNull BankBookingRequestType type) {
+    return switch (type) {
+      case DEPOSIT -> BankAccountGrant::isCanDeposit;
+      case WITHDRAWAL -> BankAccountGrant::isCanWithdraw;
+      case TRANSFER -> BankAccountGrant::isCanTransfer;
+    };
+  }
+
+  /**
+   * Loads every grant row of the caller, keyed by account id.
+   *
+   * @return the caller's grants; empty when there is no caller
+   */
+  @NotNull
+  private Map<UUID, BankAccountGrant> loadCallerGrants() {
+    return authHelperService
+        .currentUserId()
+        .map(
+            uid ->
+                grantRepository.findByUserId(uid).stream()
+                    .collect(
+                        Collectors.toUnmodifiableMap(
+                            grant -> grant.getId().getAccountId(), Function.identity())))
+        .orElseGet(Map::of);
+  }
+
+  /**
+   * Reads the caller's grant row on one account.
+   *
+   * @param accountId the account
+   * @return the caller's grant on it, or empty when there is none or no caller
+   */
+  @NotNull
+  private Optional<BankAccountGrant> findCallerGrant(@NotNull UUID accountId) {
+    return authHelperService
+        .currentUserId()
+        .flatMap(uid -> grantRepository.findById(new BankAccountGrantId(uid, accountId)));
+  }
+
+  /**
    * Passes authenticated bank staff that hold the management role or a grant row satisfying the
    * capability predicate.
    *
@@ -157,6 +244,24 @@ public class BankSecurityService {
       @NotNull UUID accountId,
       Authentication authentication,
       @NotNull Predicate<BankAccountGrant> capability) {
+    return hasCapability(accountId, authentication, capability, this::findCallerGrant);
+  }
+
+  /**
+   * Passes authenticated bank staff that hold the management role or a grant row, found through the
+   * given lookup, satisfying the capability predicate.
+   *
+   * @param accountId the account under decision
+   * @param authentication the current authentication, possibly {@code null}
+   * @param capability the per-grant check
+   * @param callerGrant resolves the caller's grant row on an account
+   * @return {@code true} iff the caller passes
+   */
+  private boolean hasCapability(
+      @NotNull UUID accountId,
+      Authentication authentication,
+      @NotNull Predicate<BankAccountGrant> capability,
+      @NotNull Function<UUID, Optional<BankAccountGrant>> callerGrant) {
     if (authentication == null || !authentication.isAuthenticated()) {
       return false;
     }
@@ -166,10 +271,6 @@ public class BankSecurityService {
     if (isManagement()) {
       return true;
     }
-    Optional<UUID> userId = authHelperService.currentUserId();
-    return userId
-        .flatMap(uid -> grantRepository.findById(new BankAccountGrantId(uid, accountId)))
-        .filter(capability)
-        .isPresent();
+    return callerGrant.apply(accountId).filter(capability).isPresent();
   }
 }

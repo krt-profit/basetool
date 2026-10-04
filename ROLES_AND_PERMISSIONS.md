@@ -879,6 +879,12 @@ open request cannot be closed
 (409 `BANK_ACCOUNT_HAS_PENDING_REQUESTS`). The audit log stays admin-only. The page shows
 exclusively **active** accounts (REQ-BANK-028).
 
+The staff queue (`/bank/requests`) shows the **confirm** action only on rows the caller may confirm
+by that rule — the queue API marks each row `callerMayConfirm` with the confirm endpoint's own
+capability check (`can_deposit` / `can_withdraw` / `can_transfer` on the account, management
+unrestricted). A Bank Empl. without the matching flag sees „wartet auf berechtigte Bankmitarbeiter"
+and can still **reject**, which needs only visibility of the account (REQ-BANK-023, 2026-10-04).
+
 #### 3.11.2 Account responsibility, visibility, target & read-only detail (REQ-BANK-034..038)
 
 Building on 3.11.1 and still solely via the seam `OrgUnitBankAccessService`

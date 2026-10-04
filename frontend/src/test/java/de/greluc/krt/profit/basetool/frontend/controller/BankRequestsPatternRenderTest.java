@@ -97,7 +97,7 @@ class BankRequestsPatternRenderTest {
    * @param granted whether the owner approval was granted in-app
    * @param approver the approver class, or {@code null}
    * @param justification the requester's justification, or {@code null}
-   * @return the request
+   * @return the request, confirmable by the caller
    */
   private static @NotNull BankBookingRequestDto request(
       @NotNull UUID id,
@@ -106,6 +106,29 @@ class BankRequestsPatternRenderTest {
       boolean granted,
       @Nullable String approver,
       @Nullable String justification) {
+    return request(id, type, requiresApproval, granted, approver, justification, true);
+  }
+
+  /**
+   * A pending booking request with the backend's per-row confirm answer.
+   *
+   * @param id the request id
+   * @param type the movement type
+   * @param requiresApproval whether the amount exceeds the requester's limit
+   * @param granted whether the owner approval was granted in-app
+   * @param approver the approver class, or {@code null}
+   * @param justification the requester's justification, or {@code null}
+   * @param callerMayConfirm whether the caller may confirm it
+   * @return the request
+   */
+  private static @NotNull BankBookingRequestDto request(
+      @NotNull UUID id,
+      @NotNull String type,
+      boolean requiresApproval,
+      boolean granted,
+      @Nullable String approver,
+      @Nullable String justification,
+      boolean callerMayConfirm) {
     return new BankBookingRequestDto(
         id,
         UUID.randomUUID(),
@@ -141,7 +164,44 @@ class BankRequestsPatternRenderTest {
         null,
         null,
         null,
-        3L);
+        3L,
+        callerMayConfirm);
+  }
+
+  /**
+   * REQ-BANK-023: a row the caller may not confirm offers no confirm action — a ready row says it
+   * waits for an authorised employee, an approval-bound row keeps its approver — and only reject
+   * stays, in the row menu; neither counts as waiting for the caller.
+   */
+  @Test
+  @WithMockUser(roles = "BANK_EMPLOYEE")
+  void offersConfirmOnlyWhereTheCallerMayConfirm() throws Exception {
+    UUID readyId = UUID.fromString("00000000-0000-0000-0000-0000000000b1");
+    UUID approvalId = UUID.fromString("00000000-0000-0000-0000-0000000000b2");
+    PageResponse<BankBookingRequestDto> page =
+        new PageResponse<>(
+            List.of(
+                request(readyId, "WITHDRAWAL", false, false, null, null, false),
+                request(approvalId, "WITHDRAWAL", true, false, "BANK_MANAGEMENT", null, false)),
+            0,
+            200,
+            2L,
+            1,
+            List.of());
+
+    String html = render(page, "");
+
+    assertThat(html)
+        .doesNotContain("data-testid=\"bank-request-confirm-btn\"")
+        .doesNotContain("bank-req-row--ready")
+        .containsPattern("data-testid=\"bank-requests-waiting\"[^>]*>0 warten auf dich<")
+        .containsPattern(
+            "data-testid=\"bank-request-waiting\"[^>]*data-waiting-for=\"authorized-staff\""
+                + "[^>]*>wartet auf berechtigte Bankmitarbeiter<")
+        .containsPattern("data-testid=\"bank-request-waiting\"[^>]*>wartet auf Bankleitung<")
+        .contains("id=\"bank-req-more-" + readyId + "\"")
+        .contains("id=\"bank-req-more-" + approvalId + "\"");
+    assertThat(html.split("data-testid=\"bank-request-reject-btn\"", -1)).hasSize(3);
   }
 
   /** The queue renders head, segment, counter and the per-row decision state. */
