@@ -19,9 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.service.exchange;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeChange;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeJournalAction;
@@ -48,11 +50,9 @@ import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryStolenMarkService;
 import de.greluc.krt.profit.basetool.backend.service.MaterialExchangeOfferRatchet;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.support.InventoryProperties;
@@ -147,7 +147,7 @@ public class ExchangeStockWriteService {
   private final InventoryStolenMarkService stolenMarkService;
   private final MaterialExchangeOfferRepository offerRepository;
   private final UserRepository userRepository;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final InventoryProperties inventoryProperties;
   private final ExchangeChangeRepository changeRepository;
   private final ExchangeJournalService journalService;
@@ -812,7 +812,7 @@ public class ExchangeStockWriteService {
     item.setPersonal(true);
     item.setStolen(lot.stolen());
     InventoryItem saved = inventoryRepository.save(item);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.INVENTORY_ITEM_CREATED,
         saved.getId(),
         InventoryAuditLabels.label(saved),

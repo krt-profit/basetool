@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.JobType;
 import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
@@ -39,7 +41,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.math.BigDecimal;
@@ -94,7 +95,7 @@ public class MissionStructureService {
   private final UserRepository userRepository;
 
   /** Records the state-mutating unit/crew activities into the audit log (REQ-AUDIT-001). */
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Adds a unit (top-level team grouping) to a mission.
@@ -157,7 +158,7 @@ public class MissionStructureService {
 
     mission.getAssignedUnits().add(missionUnit);
     missionUnitRepository.save(missionUnit);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_UNIT_ADDED,
         mission.getId(),
         mission.getName(),
@@ -295,7 +296,7 @@ public class MissionStructureService {
     }
 
     missionUnitRepository.save(missionUnit);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_UNIT_UPDATED,
         mission.getId(),
         mission.getName(),
@@ -370,7 +371,7 @@ public class MissionStructureService {
       throw new NotFoundException("MissionUnit not found in this mission");
     }
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_UNIT_REMOVED,
         mission.getId(),
         mission.getName(),
@@ -424,7 +425,7 @@ public class MissionStructureService {
 
     missionShip.getCrew().add(crew);
     missionCrewRepository.save(crew);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_CREW_ADDED,
         mission.getId(),
         mission.getName(),
@@ -473,7 +474,7 @@ public class MissionStructureService {
     crew.setJobTypes(jobTypes);
 
     missionCrewRepository.save(crew);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_CREW_UPDATED,
         mission.getId(),
         mission.getName(),
@@ -504,7 +505,7 @@ public class MissionStructureService {
       throw new NotFoundException("Crew member not found in this unit");
     }
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_CREW_REMOVED,
         mission.getId(),
         mission.getName(),

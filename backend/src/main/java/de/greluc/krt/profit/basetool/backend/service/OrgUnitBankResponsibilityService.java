@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
@@ -29,7 +30,6 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;

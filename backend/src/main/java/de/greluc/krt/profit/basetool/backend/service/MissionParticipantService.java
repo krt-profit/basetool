@@ -21,12 +21,14 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.enforceSectionVersion;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.JobType;
 import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
@@ -40,7 +42,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantReposi
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.MissionSection;
 import java.time.Instant;
 import java.util.HashMap;
@@ -90,7 +91,7 @@ public class MissionParticipantService {
   private final OrgUnitRepository orgUnitRepository;
 
   /** Records the state-mutating participant activities into the audit log (REQ-AUDIT-001). */
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   private final MissionSecurityService missionSecurityService;
 
@@ -197,7 +198,7 @@ public class MissionParticipantService {
 
     mission.getParticipants().add(participant);
     missionParticipantRepository.save(participant);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_PARTICIPANT_ADDED,
         mission.getId(),
         mission.getName(),
@@ -263,7 +264,7 @@ public class MissionParticipantService {
                       && crew.getParticipant().getId().equals(participantId));
     }
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_PARTICIPANT_REMOVED,
         mission.getId(),
         mission.getName(),
@@ -408,7 +409,7 @@ public class MissionParticipantService {
     participant.setEndTime(endTime);
 
     missionParticipantRepository.saveAndFlush(participant);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_PARTICIPANT_UPDATED,
         mission.getId(),
         mission.getName(),
@@ -433,7 +434,7 @@ public class MissionParticipantService {
     }
     participant.setStartTime(Instant.now());
     missionParticipantRepository.saveAndFlush(participant);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_PARTICIPANT_CHECKED_IN,
         mission.getId(),
         mission.getName(),
@@ -461,7 +462,7 @@ public class MissionParticipantService {
       participant.setEndTime(Instant.now());
     }
     missionParticipantRepository.saveAndFlush(participant);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_PARTICIPANT_CHECKED_OUT,
         mission.getId(),
         mission.getName(),
@@ -485,7 +486,7 @@ public class MissionParticipantService {
       participant.setPayoutPreference(preference);
       missionParticipantRepository.save(participant);
       missionParticipantRepository.flush();
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.MISSION_PARTICIPANT_UPDATED,
           mission.getId(),
           mission.getName(),
@@ -533,7 +534,7 @@ public class MissionParticipantService {
     }
 
     Mission saved = missionRepository.save(mission);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_PARTY_LEAD_CHANGED,
         mission.getId(),
         mission.getName(),
@@ -555,7 +556,7 @@ public class MissionParticipantService {
     Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     mission.getManagers().add(user);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_MANAGER_ADDED, mission.getId(), mission.getName(), userId, null);
     return mission;
   }
@@ -568,7 +569,7 @@ public class MissionParticipantService {
   public Mission removeManager(@NotNull UUID missionId, @NotNull UUID userId) {
     Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     mission.getManagers().removeIf(u -> u.getId().equals(userId));
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_MANAGER_REMOVED, mission.getId(), mission.getName(), userId, null);
     return mission;
   }

@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderHandoverMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
@@ -40,7 +42,6 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverReposito
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderMaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.support.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.support.Quality;
@@ -102,7 +103,7 @@ public class JobOrderHandoverService {
   private final UserService userService;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   private final OrgUnitRepository orgUnitRepository;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Snapshot of one handed-over inventory row, taken before it is decremented or deleted, for
@@ -378,7 +379,7 @@ public class JobOrderHandoverService {
       if (!h.depleted()) {
         offerRatchet.lower(h.itemId(), h.remaining(), MaterialExchangeOfferRatchet.Reason.HANDOVER);
       }
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.INVENTORY_HANDED_OVER,
           h.itemId(),
           h.label(),
@@ -391,7 +392,7 @@ public class JobOrderHandoverService {
               .with("depleted", h.depleted())
               .with("quality", h.quality()));
     }
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.JOB_ORDER_HANDOVER_CREATED,
         jobOrderId,
         JobOrderAuditLabel.of(managedJobOrder.getDisplayId()),

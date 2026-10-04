@@ -383,7 +383,7 @@ class JobOrderServiceTest {
     verify(jobOrderRepository).save(any(JobOrder.class));
     verify(auditService)
         .record(
-            eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.JOB_ORDER_CREATED),
+            eq(de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType.JOB_ORDER_CREATED),
             any(),
             any(),
             any(),
@@ -846,7 +846,7 @@ class JobOrderServiceTest {
             any(de.greluc.krt.profit.basetool.backend.event.JobOrderUpdatedByRequesterEvent.class));
     verify(auditService)
         .record(
-            eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.JOB_ORDER_UPDATED),
+            eq(de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType.JOB_ORDER_UPDATED),
             eq(orderId),
             any(),
             any(),
@@ -996,7 +996,9 @@ class JobOrderServiceTest {
             any(de.greluc.krt.profit.basetool.backend.event.JobOrderUpdatedByRequesterEvent.class));
     verify(auditService)
         .record(
-            eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.JOB_ORDER_ITEM_UPDATED),
+            eq(
+                de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType
+                    .JOB_ORDER_ITEM_UPDATED),
             eq(orderId),
             any(),
             any(),
@@ -1061,7 +1063,9 @@ class JobOrderServiceTest {
             any(de.greluc.krt.profit.basetool.backend.event.JobOrderUpdatedByRequesterEvent.class));
     verify(auditService)
         .record(
-            eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.JOB_ORDER_ITEM_UPDATED),
+            eq(
+                de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType
+                    .JOB_ORDER_ITEM_UPDATED),
             eq(orderId),
             any(),
             any(),
@@ -1512,14 +1516,16 @@ class JobOrderServiceTest {
 
     verify(auditService)
         .record(
-            eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.JOB_ORDER_COMPLETED),
+            eq(de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType.JOB_ORDER_COMPLETED),
             eq(orderId),
             any(),
             any(),
             argThat(d -> d != null && d.toString().equals("from=OPEN autoCompleted=false")));
     verify(auditService, never())
         .record(
-            eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.JOB_ORDER_STATUS_CHANGED),
+            eq(
+                de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType
+                    .JOB_ORDER_STATUS_CHANGED),
             any(),
             any(),
             any(),
@@ -1541,14 +1547,16 @@ class JobOrderServiceTest {
 
     verify(auditService)
         .record(
-            eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.JOB_ORDER_STATUS_CHANGED),
+            eq(
+                de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType
+                    .JOB_ORDER_STATUS_CHANGED),
             eq(orderId),
             any(),
             any(),
             argThat(d -> d != null && d.toString().equals("from=COMPLETED to=COMPLETED")));
     verify(auditService, never())
         .record(
-            eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.JOB_ORDER_COMPLETED),
+            eq(de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType.JOB_ORDER_COMPLETED),
             any(),
             any(),
             any(),
@@ -2028,7 +2036,7 @@ class JobOrderServiceTest {
       verify(auditService)
           .record(
               eq(
-                  de.greluc.krt.profit.basetool.backend.model.AuditEventType
+                  de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType
                       .JOB_ORDER_BLUEPRINT_COUNTING_CHANGED),
               eq(orderId),
               any(),
