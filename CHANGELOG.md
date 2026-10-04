@@ -183,6 +183,10 @@
 
 ### Changed
 
+- **Gewinnberechnung: Ort des Terminals in der Route.** Der Ort steht jetzt in Klammern hinter dem
+  Terminal („Kauf TDD (Hurston · Lorville) · 20") statt nur im Tooltip, damit er auch auf dem
+  Smartphone sichtbar ist (REQ-UI-027).
+
 - **Abhängigkeiten aktualisiert.** Flyway 13.9.0, Bucket4j 8.21.0, commons-lang3 3.21.0, Jackson 2.22.3
   und 3.2.3 sowie json-schema-validator 3.0.8. Lombok und google-java-format bleiben bewusst stehen.
 
