@@ -74,32 +74,34 @@
             <th:block th:if="${#lists.isEmpty(squadrons)}">
                 <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.settings.squadron.promotion.empty', textKey='admin.settings.squadron.empty.text')}"></th:block>
             </th:block>
-            <table th:unless="${#lists.isEmpty(squadrons)}" class="data-table data-table--stack">
-                <thead>
-                    <tr>
-                        <th th:text="#{admin.settings.squadron.column.shorthand}">Kürzel</th>
-                        <th th:text="#{admin.settings.squadron.column.name}">Name</th>
-                        <th class="cell-actions" th:text="#{admin.settings.squadron.column.promotion}">Beförderung aktiv</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="squadron : ${squadrons}" th:attr="data-squadron-id=${squadron.id}">
-                        <td><span class="cell-title" th:text="${squadron.shorthand}">IRI</span></td>
-                        <td th:attr="data-label=#{admin.settings.squadron.column.name}" th:text="${squadron.name}">IRIDIUM</td>
-                        <td class="cell-actions">
-                            <label class="switch">
-                                <input type="checkbox"
-                                       class="squadron-promotion-toggle"
-                                       th:attr="data-squadron-id=${squadron.id}"
-                                       th:aria-label="|#{admin.settings.squadron.column.promotion}: ${squadron.shorthand}|"
-                                       th:checked="${squadron.isPromotionEnabled}">
-                                <span class="switch__track" aria-hidden="true"></span>
-                                <span class="toggle-state-text" th:text="${squadron.isPromotionEnabled} ? #{admin.settings.squadron.promotion.enabled} : #{admin.settings.squadron.promotion.disabled}">aktiv</span>
-                            </label>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="table-responsive" th:unless="${#lists.isEmpty(squadrons)}">
+                <table class="data-table data-table--stack">
+                    <thead>
+                        <tr>
+                            <th th:text="#{admin.settings.squadron.column.shorthand}">Kürzel</th>
+                            <th th:text="#{admin.settings.squadron.column.name}">Name</th>
+                            <th class="cell-actions" th:text="#{admin.settings.squadron.column.promotion}">Beförderung aktiv</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="squadron : ${squadrons}" th:attr="data-squadron-id=${squadron.id}">
+                            <td><span class="cell-title" th:text="${squadron.shorthand}">IRI</span></td>
+                            <td th:attr="data-label=#{admin.settings.squadron.column.name}" th:text="${squadron.name}">IRIDIUM</td>
+                            <td class="cell-actions">
+                                <label class="switch">
+                                    <input type="checkbox"
+                                           class="squadron-promotion-toggle"
+                                           th:attr="data-squadron-id=${squadron.id}"
+                                           th:aria-label="|#{admin.settings.squadron.column.promotion}: ${squadron.shorthand}|"
+                                           th:checked="${squadron.isPromotionEnabled}">
+                                    <span class="switch__track" aria-hidden="true"></span>
+                                    <span class="toggle-state-text" th:text="${squadron.isPromotionEnabled} ? #{admin.settings.squadron.promotion.enabled} : #{admin.settings.squadron.promotion.disabled}">aktiv</span>
+                                </label>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </fieldset>
 
         <fieldset class="form-section" data-testid="settings-section-squadron-profit">
@@ -109,32 +111,34 @@
             <th:block th:if="${#lists.isEmpty(squadrons)}">
                 <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.settings.squadron.profit.empty', textKey='admin.settings.squadron.empty.text')}"></th:block>
             </th:block>
-            <table th:unless="${#lists.isEmpty(squadrons)}" class="data-table data-table--stack">
-                <thead>
-                    <tr>
-                        <th th:text="#{admin.settings.squadron.column.shorthand}">Kürzel</th>
-                        <th th:text="#{admin.settings.squadron.column.name}">Name</th>
-                        <th class="cell-actions" th:text="#{admin.settings.squadron.column.profit}">Auftragsbearbeitung</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="squadron : ${squadrons}" th:attr="data-squadron-id=${squadron.id}">
-                        <td><span class="cell-title" th:text="${squadron.shorthand}">IRI</span></td>
-                        <td th:attr="data-label=#{admin.settings.squadron.column.name}" th:text="${squadron.name}">IRIDIUM</td>
-                        <td class="cell-actions">
-                            <label class="switch">
-                                <input type="checkbox"
-                                       class="squadron-profit-toggle"
-                                       th:attr="data-squadron-id=${squadron.id}"
-                                       th:aria-label="|#{admin.settings.squadron.column.profit}: ${squadron.shorthand}|"
-                                       th:checked="${squadron.isProfitEligible}">
-                                <span class="switch__track" aria-hidden="true"></span>
-                                <span class="toggle-state-text" th:text="${squadron.isProfitEligible} ? #{admin.settings.squadron.profit.enabled} : #{admin.settings.squadron.profit.disabled}">berechtigt</span>
-                            </label>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="table-responsive" th:unless="${#lists.isEmpty(squadrons)}">
+                <table class="data-table data-table--stack">
+                    <thead>
+                        <tr>
+                            <th th:text="#{admin.settings.squadron.column.shorthand}">Kürzel</th>
+                            <th th:text="#{admin.settings.squadron.column.name}">Name</th>
+                            <th class="cell-actions" th:text="#{admin.settings.squadron.column.profit}">Auftragsbearbeitung</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="squadron : ${squadrons}" th:attr="data-squadron-id=${squadron.id}">
+                            <td><span class="cell-title" th:text="${squadron.shorthand}">IRI</span></td>
+                            <td th:attr="data-label=#{admin.settings.squadron.column.name}" th:text="${squadron.name}">IRIDIUM</td>
+                            <td class="cell-actions">
+                                <label class="switch">
+                                    <input type="checkbox"
+                                           class="squadron-profit-toggle"
+                                           th:attr="data-squadron-id=${squadron.id}"
+                                           th:aria-label="|#{admin.settings.squadron.column.profit}: ${squadron.shorthand}|"
+                                           th:checked="${squadron.isProfitEligible}">
+                                    <span class="switch__track" aria-hidden="true"></span>
+                                    <span class="toggle-state-text" th:text="${squadron.isProfitEligible} ? #{admin.settings.squadron.profit.enabled} : #{admin.settings.squadron.profit.disabled}">berechtigt</span>
+                                </label>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </fieldset>
 
         <fieldset class="form-section" data-testid="settings-section-sk-profit">
@@ -144,32 +148,34 @@
             <th:block th:if="${#lists.isEmpty(specialCommands)}">
                 <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.settings.sk.profit.empty', textKey='admin.settings.sk.empty.text')}"></th:block>
             </th:block>
-            <table th:unless="${#lists.isEmpty(specialCommands)}" class="data-table data-table--stack">
-                <thead>
-                    <tr>
-                        <th th:text="#{admin.settings.squadron.column.shorthand}">Kürzel</th>
-                        <th th:text="#{admin.settings.squadron.column.name}">Name</th>
-                        <th class="cell-actions" th:text="#{admin.settings.squadron.column.profit}">Auftragsbearbeitung</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="sk : ${specialCommands}" th:attr="data-sk-id=${sk.id}">
-                        <td><span class="cell-title" th:text="${sk.shorthand}">SK</span></td>
-                        <td th:attr="data-label=#{admin.settings.squadron.column.name}" th:text="${sk.name}">Spezialkommando</td>
-                        <td class="cell-actions">
-                            <label class="switch">
-                                <input type="checkbox"
-                                       class="sk-profit-toggle"
-                                       th:attr="data-sk-id=${sk.id}"
-                                       th:aria-label="|#{admin.settings.squadron.column.profit}: ${sk.shorthand}|"
-                                       th:checked="${sk.isProfitEligible}">
-                                <span class="switch__track" aria-hidden="true"></span>
-                                <span class="toggle-state-text" th:text="${sk.isProfitEligible} ? #{admin.settings.squadron.profit.enabled} : #{admin.settings.squadron.profit.disabled}">berechtigt</span>
-                            </label>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="table-responsive" th:unless="${#lists.isEmpty(specialCommands)}">
+                <table class="data-table data-table--stack">
+                    <thead>
+                        <tr>
+                            <th th:text="#{admin.settings.squadron.column.shorthand}">Kürzel</th>
+                            <th th:text="#{admin.settings.squadron.column.name}">Name</th>
+                            <th class="cell-actions" th:text="#{admin.settings.squadron.column.profit}">Auftragsbearbeitung</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="sk : ${specialCommands}" th:attr="data-sk-id=${sk.id}">
+                            <td><span class="cell-title" th:text="${sk.shorthand}">SK</span></td>
+                            <td th:attr="data-label=#{admin.settings.squadron.column.name}" th:text="${sk.name}">Spezialkommando</td>
+                            <td class="cell-actions">
+                                <label class="switch">
+                                    <input type="checkbox"
+                                           class="sk-profit-toggle"
+                                           th:attr="data-sk-id=${sk.id}"
+                                           th:aria-label="|#{admin.settings.squadron.column.profit}: ${sk.shorthand}|"
+                                           th:checked="${sk.isProfitEligible}">
+                                    <span class="switch__track" aria-hidden="true"></span>
+                                    <span class="toggle-state-text" th:text="${sk.isProfitEligible} ? #{admin.settings.squadron.profit.enabled} : #{admin.settings.squadron.profit.disabled}">berechtigt</span>
+                                </label>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </fieldset>
     </div>
 </main>

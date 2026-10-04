@@ -28,28 +28,30 @@
                 <th:block th:replace="~{fragments/components :: emptyState(titleKey='adminTerms.empty', textKey='adminTerms.empty.text')}"></th:block>
             </th:block>
 
-            <table th:if="${!#lists.isEmpty(termsRows)}" class="data-table data-table--stack">
-                <thead>
-                <tr>
-                    <th th:text="#{adminTerms.column.user}">Nutzer</th>
-                    <th class="cell-status" th:text="#{adminTerms.column.status}">Status</th>
-                    <th th:text="#{adminTerms.column.acceptedAt}">Zugestimmt am</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr th:each="row : ${termsRows}">
-                    <td>
-                        <span class="cell-title" th:text="${row.displayName() != null ? row.displayName() : row.username()}">Rufzeichen</span>
-                    </td>
-                    <td class="cell-status">
-                        <span th:if="${row.accepted()}" class="chip chip--success" th:text="#{adminTerms.status.accepted}">Zugestimmt</span>
-                        <span th:unless="${row.accepted()}" class="chip chip--warning" th:text="#{adminTerms.status.pending}">Offen</span>
-                    </td>
-                    <td th:attr="data-label=#{adminTerms.column.acceptedAt}"
-                        th:text="${row.acceptedAt() != null ? #temporals.format(row.acceptedAt(), 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '—'}">—</td>
-                </tr>
-                </tbody>
-            </table>
+            <div class="table-responsive" th:if="${!#lists.isEmpty(termsRows)}">
+                <table class="data-table data-table--stack">
+                    <thead>
+                    <tr>
+                        <th th:text="#{adminTerms.column.user}">Nutzer</th>
+                        <th class="cell-status" th:text="#{adminTerms.column.status}">Status</th>
+                        <th th:text="#{adminTerms.column.acceptedAt}">Zugestimmt am</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="row : ${termsRows}">
+                        <td>
+                            <span class="cell-title" th:text="${row.displayName() != null ? row.displayName() : row.username()}">Rufzeichen</span>
+                        </td>
+                        <td class="cell-status">
+                            <span th:if="${row.accepted()}" class="chip chip--success" th:text="#{adminTerms.status.accepted}">Zugestimmt</span>
+                            <span th:unless="${row.accepted()}" class="chip chip--warning" th:text="#{adminTerms.status.pending}">Offen</span>
+                        </td>
+                        <td th:attr="data-label=#{adminTerms.column.acceptedAt}"
+                            th:text="${row.acceptedAt() != null ? #temporals.format(row.acceptedAt(), 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '—'}">—</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
 
             <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${termsPage}, baseUrl=${'/admin/terms?filter=' + termsFilter})}"></th:block>
         </th:block>
