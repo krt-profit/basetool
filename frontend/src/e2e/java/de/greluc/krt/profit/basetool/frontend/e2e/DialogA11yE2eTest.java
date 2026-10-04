@@ -344,7 +344,8 @@ class DialogA11yE2eTest {
   /**
    * Plants one Trusted Types violation on the home page and waits for the collector to report it,
    * then forgets it, so the walk below cannot pass because the report-only policy or the collector
-   * went missing.
+   * went missing. A browser engine without Trusted Types reports nothing to collect; Chromium must
+   * have them.
    *
    * @param page the page
    * @param baseUrl the frontend origin
@@ -353,6 +354,17 @@ class DialogA11yE2eTest {
   private static void assertTheCollectorHearsAViolation(
       Page page, String baseUrl, List<String> violations) {
     E2eSupport.navigate(page, baseUrl + "/");
+    boolean supported =
+        Boolean.TRUE.equals(page.evaluate("() => typeof window.trustedTypes !== 'undefined'"));
+    if (!supported) {
+      assertThat(browser.browserType().name())
+          .as("Chromium ships Trusted Types; the collector must be proven there")
+          .isNotEqualTo("chromium");
+      System.out.printf(
+          "[E2E][dialogs] %s has no Trusted Types; the collector stays silent%n",
+          browser.browserType().name());
+      return;
+    }
     page.evaluate(TRUSTED_TYPES_CANARY);
     for (int i = 0; i < 50 && violations.isEmpty(); i++) {
       page.waitForTimeout(100);
