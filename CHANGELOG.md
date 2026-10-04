@@ -70,8 +70,10 @@
   Status-Checkboxen, „n warten auf dich" zählt die entscheidbaren Anträge; wartet ein Antrag auf
   eine Freigabe, steht „wartet auf …" in der Zeile. Die KRT-Freigaben sind eine Stufen-Leiste.
 
-- **Auftragsverwaltung: „Meine · Alle".** Wer beides sehen darf, wechselt zwischen eigenen und allen
-  Aufträgen (REQ-ORDERS-040).
+- **Auftragsverwaltung: „Meine · Zu bearbeiten · Alle".** Wer beides sehen darf, wechselt zwischen
+  eigenen und allen Aufträgen; „Zu bearbeiten" zeigt die Aufträge, für die die eigene Einheit als
+  bearbeitende Einheit zuständig ist. Dafür nimmt `GET /api/v1/orders` den neuen Parameter
+  `toProcess` an (REQ-ORDERS-040).
 
 - **Auftragsdetail im neuen Muster.** Oben zeigt „Geliefert / benötigt" mit Balken den Fortschritt;
   die Reiter richten sich nach der Auftragsart (Material: Bedarf · Übergaben · Bearbeiter ·

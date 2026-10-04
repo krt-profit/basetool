@@ -243,7 +243,7 @@ function applyOrdersFilter() {
         if (key === 'squadronId') continue;
         if (value !== '') params.append(key, value);
     }
-    const boxes = isOwnScope() ? [] : squadronBoxes();
+    const boxes = scopeHidesSquadronFilter() ? [] : squadronBoxes();
     if (boxes.length > 0) {
         const checked = boxes.filter((b) => b.checked);
         if (checked.length === 0) {
@@ -342,7 +342,7 @@ function restoreStatusFilter() {
 }
 
 const ORDERS_SCOPE_FILTER_KEY = 'orders_scope_filter';
-const ORDERS_SCOPES = ['MINE', 'ALL'];
+const ORDERS_SCOPES = ['MINE', 'TO_PROCESS', 'ALL'];
 
 function scopeInputs() {
     return Array.prototype.slice.call(
@@ -355,10 +355,10 @@ function currentScope() {
     return checked ? checked.value : null;
 }
 
-function isOwnScope() {
+function scopeHidesSquadronFilter() {
     const field = document.getElementById('ordersSquadronField');
     const scope = currentScope();
-    return scope === null ? field === null || field.hidden : scope === 'MINE';
+    return scope === null ? field === null || field.hidden : scope !== 'ALL';
 }
 
 function selectScope(value) {
@@ -371,7 +371,7 @@ function selectScope(value) {
 function syncSquadronFieldVisibility() {
     const field = document.getElementById('ordersSquadronField');
     const scope = currentScope();
-    if (field && scope !== null) field.hidden = scope === 'MINE';
+    if (field && scope !== null) field.hidden = scope !== 'ALL';
 }
 
 function persistScopeFilter() {
@@ -386,7 +386,8 @@ function readScopeFilter() {
     try {
         const raw = localStorage.getItem(ORDERS_SCOPE_FILTER_KEY);
         const saved = raw === null ? null : JSON.parse(raw);
-        return ORDERS_SCOPES.indexOf(saved) >= 0 ? saved : null;
+        const offered = scopeInputs().some((el) => el.value === saved);
+        return offered && ORDERS_SCOPES.indexOf(saved) >= 0 ? saved : null;
     } catch (_e) {
         return null;
     }
@@ -406,7 +407,7 @@ function restoreScopeFilter() {
 
 function countActiveOrdersFilters() {
     let active = statusBoxes().filter((b) => b.checked).length;
-    if (!isOwnScope()) {
+    if (!scopeHidesSquadronFilter()) {
         const boxes = squadronBoxes();
         if (boxes.some((b) => !b.checked)) active++;
     }

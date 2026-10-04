@@ -172,30 +172,33 @@ class JobOrderControllerTest {
             PageRequest.of(0, 20, org.springframework.data.domain.Sort.by("priority")),
             1);
     when(jobOrderQueryService.getAllJobOrders(
-            eq(List.of(JobOrderStatus.OPEN)), eq(null), any(Pageable.class)))
+            eq(List.of(JobOrderStatus.OPEN)), eq(null), eq(false), any(Pageable.class)))
         .thenReturn(page);
 
     PageResponse<JobOrderDto> result =
-        controller.getAllJobOrders(List.of(JobOrderStatus.OPEN), null, 0, 20, "priority,asc");
+        controller.getAllJobOrders(
+            List.of(JobOrderStatus.OPEN), null, false, 0, 20, "priority,asc");
 
     assertThat(result.content()).containsExactly(dto);
     assertThat(result.sort()).isNotEmpty();
     verify(jobOrderQueryService)
-        .getAllJobOrders(eq(List.of(JobOrderStatus.OPEN)), eq(null), any(Pageable.class));
+        .getAllJobOrders(
+            eq(List.of(JobOrderStatus.OPEN)), eq(null), eq(false), any(Pageable.class));
   }
 
   @Test
   void getAllJobOrders_nullStatusFilter_reachesServiceAsNullNotEmptyList() {
     JobOrderDto dto = jobOrderDto(UUID.randomUUID());
     Page<JobOrderDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
-    when(jobOrderQueryService.getAllJobOrders(eq(null), eq(null), any(Pageable.class)))
+    when(jobOrderQueryService.getAllJobOrders(eq(null), eq(null), eq(false), any(Pageable.class)))
         .thenReturn(page);
 
     PageResponse<JobOrderDto> result =
-        controller.getAllJobOrders(null, null, 0, 20, "priority,asc");
+        controller.getAllJobOrders(null, null, false, 0, 20, "priority,asc");
 
     assertThat(result.content()).containsExactly(dto);
-    verify(jobOrderQueryService).getAllJobOrders(eq(null), eq(null), any(Pageable.class));
+    verify(jobOrderQueryService)
+        .getAllJobOrders(eq(null), eq(null), eq(false), any(Pageable.class));
   }
 
   @Test
@@ -204,16 +207,33 @@ class JobOrderControllerTest {
     List<UUID> squadronIds = List.of(UUID.randomUUID(), UUID.randomUUID());
     Page<JobOrderDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
     when(jobOrderQueryService.getAllJobOrders(
-            eq(List.of(JobOrderStatus.OPEN)), eq(squadronIds), any(Pageable.class)))
+            eq(List.of(JobOrderStatus.OPEN)), eq(squadronIds), eq(false), any(Pageable.class)))
         .thenReturn(page);
 
     PageResponse<JobOrderDto> result =
         controller.getAllJobOrders(
-            List.of(JobOrderStatus.OPEN), squadronIds, 0, 20, "priority,asc");
+            List.of(JobOrderStatus.OPEN), squadronIds, false, 0, 20, "priority,asc");
 
     assertThat(result.content()).containsExactly(dto);
     verify(jobOrderQueryService)
-        .getAllJobOrders(eq(List.of(JobOrderStatus.OPEN)), eq(squadronIds), any(Pageable.class));
+        .getAllJobOrders(
+            eq(List.of(JobOrderStatus.OPEN)), eq(squadronIds), eq(false), any(Pageable.class));
+  }
+
+  @Test
+  void getAllJobOrders_forwardsToProcessFlag() {
+    JobOrderDto dto = jobOrderDto(UUID.randomUUID());
+    Page<JobOrderDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
+    when(jobOrderQueryService.getAllJobOrders(
+            eq(List.of(JobOrderStatus.OPEN)), eq(null), eq(true), any(Pageable.class)))
+        .thenReturn(page);
+
+    PageResponse<JobOrderDto> result =
+        controller.getAllJobOrders(List.of(JobOrderStatus.OPEN), null, true, 0, 20, "priority,asc");
+
+    assertThat(result.content()).containsExactly(dto);
+    verify(jobOrderQueryService)
+        .getAllJobOrders(eq(List.of(JobOrderStatus.OPEN)), eq(null), eq(true), any(Pageable.class));
   }
 
   @Test

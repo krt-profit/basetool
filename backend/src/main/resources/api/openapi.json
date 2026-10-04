@@ -39573,7 +39573,7 @@
     },
     "/api/v1/orders" : {
       "get" : {
-        "description" : "Returns a paginated list of job orders.",
+        "description" : "Returns a paginated list of job orders. toProcess=true keeps only the orders whose profit-eligible responsible unit is one of the caller's own units.",
         "operationId" : "getAllJobOrders",
         "parameters" : [ {
           "in" : "query",
@@ -39596,6 +39596,14 @@
               "type" : "string",
               "format" : "uuid"
             }
+          }
+        }, {
+          "in" : "query",
+          "name" : "toProcess",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
           }
         }, {
           "in" : "query",

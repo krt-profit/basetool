@@ -866,7 +866,7 @@ scope, and per view min quality, min amount, sort and „Ohne gestohlene"; key
 view), Raffinerie (the segment „Läuft · Abholbereit · Abgeschlossen · Alle" + only-mine, key
 `refinery_orders_filter`; a stored status list of the former checkboxes maps onto a segment),
 Profitberechnung (ship + systems), Missionen/Operationen (the period segment „Kommend · Vergangen ·
-Alle"; a stored `showPast` migrates), Aufträge scope „Meine · Alle" (`orders_scope_filter`,
+Alle"; a stored `showPast` migrates), Aufträge scope „Meine · Zu bearbeiten · Alle" (`orders_scope_filter`,
 REQ-ORDERS-040), Benachrichtigungen „Ungelesen · Alle" (`notifications_filter`, REQ-NOTIF-022),
 Meine Bewertungen
 (only-open), Persönliche Blueprints (refinery + craftable toggles), Beförderung verwalten
