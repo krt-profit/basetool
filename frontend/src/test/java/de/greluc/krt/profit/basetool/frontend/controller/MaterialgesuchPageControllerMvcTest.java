@@ -241,7 +241,7 @@ class MaterialgesuchPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void updateRequestProxy_backendConflict_relays409() throws Exception {
-    when(backendApiClient.put(contains("/material-requests/"), any(), eq(Object.class)))
+    when(backendApiClient.put(contains("/material-requests/"), any(), eq(Object.class), any()))
         .thenThrow(
             new BackendServiceException(
                 "conflict", null, 409, "OPTIMISTIC_LOCK", null, List.of(), "conflict"));
@@ -262,7 +262,10 @@ class MaterialgesuchPageControllerMvcTest {
   @WithMockUser(roles = "KRT_MEMBER")
   void deactivateRequestProxy_ok() throws Exception {
     when(backendApiClient.post(
-            contains("/material-requests/" + requestId + "/deactivate"), any(), eq(Object.class)))
+            eq("/api/v1/material-requests/{id}/deactivate"),
+            any(),
+            eq(Object.class),
+            eq(requestId)))
         .thenReturn(Map.of());
 
     mockMvc

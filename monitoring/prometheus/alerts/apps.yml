@@ -187,6 +187,18 @@ groups:
           summary: "Frontend->backend fan-out ratio high (read amplification)"
           description: "The frontend issued more than 10 backend calls per inbound request (5m avg) for 15 minutes — a per-render read-amplification regression (a page/fragment that lost its read-gating) inflates this well before HikariPoolPending / HttpLatencyP95High fire. Check recent frontend controller changes for an un-gated backend fan-out."
 
+      - alert: HttpUriTagCapNear
+        expr: |
+          label_replace(count by (application) (count by (application, uri) (http_server_requests_seconds_count{application=~"basetool-.+"})), "meter", "http.server.requests", "", "") >= 900
+            or
+          label_replace(count by (application) (count by (application, uri) (http_client_requests_seconds_count{application=~"basetool-.+"})), "meter", "http.client.requests", "", "") >= 900
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.meter }} uri tags near the cap ({{ $labels.application }})"
+          description: "{{ $labels.application }} reports {{ $value }} distinct uri values on {{ $labels.meter }}, 90% of the 1000 its max-uri-tags allows (REQ-OBS-006). Past the cap Micrometer drops every new uri silently — one WARN from MaximumAllowableTagsMeterFilter, no metric — so the routes first hit after it vanish from Http5xxRateHigh, HttpLatencyP95High and every dashboard. Either the route count grew (raise management.metrics.web.*.max-uri-tags in the module's application.yml together with UriTagCapacityTest) or raw paths are leaking into the tag (check ObservationPrivacyFilter's id collapsing)."
+
   - name: caches
     rules:
       - alert: CacheSizeEvictionsHigh

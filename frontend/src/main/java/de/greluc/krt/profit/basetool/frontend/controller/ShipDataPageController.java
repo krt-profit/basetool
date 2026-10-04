@@ -146,7 +146,7 @@ public class ShipDataPageController {
       RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.put(
-          "/api/v1/manufacturers/" + id + "/visibility?hidden=" + hidden, null, Void.class);
+          "/api/v1/manufacturers/{id}/visibility?hidden={hidden}", null, Void.class, id, hidden);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Update Manufacturer visibility failed", e);
@@ -173,7 +173,7 @@ public class ShipDataPageController {
       RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.put(
-          "/api/v1/ship-types/" + id + "/visibility?hidden=" + hidden, null, Void.class);
+          "/api/v1/ship-types/{id}/visibility?hidden={hidden}", null, Void.class, id, hidden);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Update ShipType visibility failed", e);
@@ -238,7 +238,7 @@ public class ShipDataPageController {
         "update ShipType visibility (ajax)",
         () -> {
           backendApiClient.put(
-              "/api/v1/ship-types/" + id + "/visibility?hidden=" + hidden, null, Void.class);
+              "/api/v1/ship-types/{id}/visibility?hidden={hidden}", null, Void.class, id, hidden);
           return ResponseEntity.noContent().build();
         });
   }
@@ -262,7 +262,11 @@ public class ShipDataPageController {
         "update Manufacturer visibility (ajax)",
         () -> {
           backendApiClient.put(
-              "/api/v1/manufacturers/" + id + "/visibility?hidden=" + hidden, null, Void.class);
+              "/api/v1/manufacturers/{id}/visibility?hidden={hidden}",
+              null,
+              Void.class,
+              id,
+              hidden);
           return ResponseEntity.noContent().build();
         });
   }

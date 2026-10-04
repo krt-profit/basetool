@@ -121,7 +121,7 @@ public class AdminExchangeClientsRelayController {
         "edit exchange client " + id + " (ajax)",
         () ->
             ResponseEntity.ok(
-                backendApiClient.put(CLIENTS + "/" + id, request, ExchangeClientDto.class)));
+                backendApiClient.put(CLIENTS + "/{id}", request, ExchangeClientDto.class, id)));
   }
 
   /**
@@ -140,7 +140,7 @@ public class AdminExchangeClientsRelayController {
         () ->
             ResponseEntity.ok(
                 backendApiClient.post(
-                    CLIENTS + "/" + id + "/suspend", request, ExchangeClientDto.class)));
+                    CLIENTS + "/{id}/suspend", request, ExchangeClientDto.class, id)));
   }
 
   /**
@@ -159,7 +159,7 @@ public class AdminExchangeClientsRelayController {
         () ->
             ResponseEntity.ok(
                 backendApiClient.post(
-                    CLIENTS + "/" + id + "/activate", request, ExchangeClientDto.class)));
+                    CLIENTS + "/{id}/activate", request, ExchangeClientDto.class, id)));
   }
 
   /**
@@ -194,9 +194,10 @@ public class AdminExchangeClientsRelayController {
         () ->
             ResponseEntity.ok(
                 backendApiClient.post(
-                    CLIENTS + "/" + id + "/undo/preview",
+                    CLIENTS + "/{id}/undo/preview",
                     request,
-                    ExchangeBulkUndoPreviewDto.class)));
+                    ExchangeBulkUndoPreviewDto.class,
+                    id)));
   }
 
   /**
@@ -215,7 +216,7 @@ public class AdminExchangeClientsRelayController {
         () ->
             ResponseEntity.ok(
                 backendApiClient.post(
-                    CLIENTS + "/" + id + "/undo", request, ExchangeBulkUndoRunDto.class)));
+                    CLIENTS + "/{id}/undo", request, ExchangeBulkUndoRunDto.class, id)));
   }
 
   /**

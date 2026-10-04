@@ -167,7 +167,10 @@ class RefineryOrderDurationTest {
     ArgumentCaptor<RefineryOrderDto> captor = ArgumentCaptor.forClass(RefineryOrderDto.class);
     verify(backendApiClient)
         .put(
-            eq("/api/v1/refinery-orders/" + orderId), captor.capture(), eq(RefineryOrderDto.class));
+            eq("/api/v1/refinery-orders/{id}"),
+            captor.capture(),
+            eq(RefineryOrderDto.class),
+            eq(orderId));
 
     assertEquals(65, captor.getValue().durationMinutes());
   }

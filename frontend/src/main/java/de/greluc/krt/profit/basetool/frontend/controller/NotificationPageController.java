@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationViewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.BackendSideChannels;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
@@ -74,7 +75,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.Disposable;
@@ -118,8 +118,6 @@ public class NotificationPageController {
       new ParameterizedTypeReference<>() {};
   private static final ParameterizedTypeReference<PageResponse<NotificationDto>> PAGE_TYPE =
       new ParameterizedTypeReference<>() {};
-  private static final ParameterizedTypeReference<ServerSentEvent<String>> SSE_TYPE =
-      new ParameterizedTypeReference<>() {};
   private static final long STREAM_TIMEOUT_MS = Duration.ofMinutes(30).toMillis();
   private static final String REGISTRATION_ID = "keycloak";
 
@@ -128,7 +126,7 @@ public class NotificationPageController {
 
   private final BackendApiClient backendApiClient;
   private final MessageSource messageSource;
-  private final WebClient sseWebClient;
+  private final BackendSideChannels backendSideChannels;
   private final OAuth2AuthorizedClientManager authorizedClientManager;
   private final MeterRegistry meterRegistry;
 
@@ -260,12 +258,8 @@ public class NotificationPageController {
     }
     relayConnections.incrementAndGet();
     Disposable subscription =
-        sseWebClient
-            .get()
-            .uri(BACKEND_BASE + "/stream")
-            .headers(headers -> headers.setBearerAuth(bearerToken))
-            .retrieve()
-            .bodyToFlux(SSE_TYPE)
+        backendSideChannels
+            .notificationStream(bearerToken)
             .doFinally(signal -> relayConnections.decrementAndGet())
             .subscribe(
                 event -> forward(emitter, event),
@@ -307,7 +301,7 @@ public class NotificationPageController {
   @PostMapping(value = "/{id}/read", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> markRead(@PathVariable @NotNull UUID id) {
     try {
-      backendApiClient.post(BACKEND_BASE + "/" + id + "/read", null, NotificationDto.class);
+      backendApiClient.post(BACKEND_BASE + "/{id}/read", null, NotificationDto.class, id);
       return ResponseEntity.ok(new NotificationCountResponse(currentUnreadCount()));
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
@@ -351,7 +345,7 @@ public class NotificationPageController {
   @DeleteMapping(value = "/{id}", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> delete(@PathVariable @NotNull UUID id) {
     try {
-      backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
+      backendApiClient.delete(BACKEND_BASE + "/{id}", Void.class, id);
       return ResponseEntity.ok(new NotificationCountResponse(currentUnreadCount()));
     } catch (BackendServiceException e) {
       return propagateBackendError(e);

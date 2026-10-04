@@ -170,14 +170,14 @@ class AdminDefaultBlueprintsPageControllerMvcTest {
                 .with(csrf()))
         .andExpect(status().isOk());
 
-    verify(backendApiClient).delete(BACKEND_BASE + "/" + id, Void.class);
+    verify(backendApiClient).delete("/api/v1/admin/default-blueprints/{id}", Void.class, id);
   }
 
   @Test
   @WithMockUser(roles = "ADMIN")
   void removeAjax_relaysBackendFailure() throws Exception {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class))
+    when(backendApiClient.delete("/api/v1/admin/default-blueprints/{id}", Void.class, id))
         .thenThrow(new BackendServiceException("not found", null, 404));
 
     mockMvc

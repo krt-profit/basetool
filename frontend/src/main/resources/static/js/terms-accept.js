@@ -16,7 +16,7 @@
         return;
     }
 
-    submitButton.addEventListener('click', async function () {
+    submitButton.addEventListener('click', async () => {
         if (errorMessage) {
             errorMessage.hidden = true;
         }

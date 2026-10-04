@@ -172,10 +172,14 @@ Two binding rules shape every UI change:
 - **Live update is binding** — every create/update/delete/toggle/reorder/filter/paginate updates
   the DOM in place via `krtFetch`, with no full-page reload on success, and on shared surfaces a
   peer's change propagates without a manual reload.
-- **Two browser-side safety rules are lint-enforced, not review-enforced** (2026-09-22): a `fetch`
-  write outside `krtFetch` fails `:frontend:lintJs` (REQ-FE-002), and so does an HTML sink that is
-  neither escaped through `escapeHtml` / `escapeAttr` nor a server fragment inserted through
-  `krtFetch.setTrustedHtml` (REQ-FE-022, `eslint-plugin-no-unsanitized`).
+- **Two browser-side safety rules are lint-enforced, not review-enforced** (2026-09-22): any
+  `fetch` or `XMLHttpRequest` outside the transport fails `:frontend:lintJs` — writes go through
+  `krtFetch.write` / `submitForm` (REQ-FE-002), reads through `krtFetch.get` / `getJson`, which
+  hand a lost session to the login and refuse a redirected answer (REQ-FE-031, since 2026-10-04) —
+  and so does an HTML sink that is neither escaped through `escapeHtml` / `escapeAttr` nor a server
+  fragment inserted through `krtFetch.setTrustedHtml` (REQ-FE-022, `eslint-plugin-no-unsanitized`).
+- **The browser baseline is "Baseline 2025"**: Chrome 122, Firefox 131, Safari / iOS 18.4; the type
+  check and ESLint run at ES2025 (ADR-0239, REQ-FE-018).
 - **An ETag only where it pays** (FE-PERF-03, 2026-09-22; assets out 2026-09-23). The frontend's
   `ShallowEtagHeaderFilter` covers the web app manifest and `assetlinks.json` — publicly
   cacheable and not content-hashed. The static assets are hashed, `immutable` and revalidate by
@@ -231,6 +235,11 @@ Two binding rules shape every UI change:
   phones, a sectioned form with a sticky action bar. The markup lives in `fragments/page-head` and
   `fragments/components`, driven by two global scripts; breakpoints are only 768, 1024 and 1440 px,
   enforced by Stylelint (REQ-UI-027, REQ-UI-009, ADR-0242, `PagePatternFragmentsRenderTest`).
+- **Colours and stacking layers go through tokens** (2026-10-04). A colour token's value is written
+  only in its declaration on `:root` — alpha variants are `color-mix()` of the token — and every
+  page-level `z-index` is a step of the ascending `--z-*` scale beside it; every `var()` must name a
+  declared property (REQ-UI-001, ADR-0243, `ColourTokenCopyTest`, `ZIndexScaleTest`,
+  `CustomPropertyExistenceTest`).
 
 Authority: [`ui-design-system.md`](../specs/ui-design-system.md),
 [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (`REQ-FE-*`),
@@ -247,9 +256,11 @@ a matching log line. The per-domain typed clients the frontend gets are built ov
 **The backend clients stay in the kernel and address only the backend** (REQ-FE-029, 2026-10-03).
 `WebClientConfig` builds four clients: `webClient` and the anonymous `termsDocumentClient` carry the
 Resilience4j chain, the SSE relay's `sseWebClient` and the live-sync probe's
-`liveSyncAuthWebClient` deliberately do not. Only `WebClientConfig` builds a client, and only
-`BackendApiClient`, the SSE relay and the probe hold one (`WebClientConfinementTest`); every other
-class calls `BackendApiClient`. The first filter of all four refuses any request whose scheme, host
+`liveSyncAuthWebClient` deliberately do not. Only `WebClientConfig` builds a client, and only the
+kernel holds one — `BackendApiClient`, and `BackendSideChannels` for the SSE relay and the probe
+(`WebClientConfinementTest`); every other class calls one of the two. `BackendErrorMapper` maps
+every failed `BackendApiClient` call in one exhaustive switch, and a runtime value enters a backend
+URI only as a template variable (REQ-SEC-051, `WriteUriTemplateTest` for the write verbs). The first filter of all four refuses any request whose scheme, host
 and port differ from `app.backend-url`, before the OAuth2 filter can attach the member's bearer —
 an absolute URL handed to a client would otherwise carry the token to that host. Future
 HTTP-interface clients are created over the same `webClient` bean and take no `URI`,

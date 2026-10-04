@@ -133,6 +133,11 @@ management:
   metrics:
     tags:
       application: basetool-frontend
+    web:
+      server:
+        max-uri-tags: 1000
+      client:
+        max-uri-tags: 1000
     distribution:
       percentiles-histogram:
         "[http.server.requests]": true

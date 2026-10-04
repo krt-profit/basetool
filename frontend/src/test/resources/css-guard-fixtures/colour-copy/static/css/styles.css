@@ -1,0 +1,5 @@
+:root {
+    --color-primary: #e77e23;
+    --color-white: #fff;
+    --glow: 0 0 5px color-mix(in srgb, var(--color-primary) 30%, transparent);
+}

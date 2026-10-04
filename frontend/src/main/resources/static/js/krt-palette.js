@@ -18,7 +18,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     const RECENT_KEY = 'krt.recent';
     const RECENT_MAX = 4;
     const PAGE_MAX = 8;
@@ -66,11 +66,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const sidebar = document.getElementById('sidebar');
         if (!sidebar) return out;
         const links = ['.nav-mode-main', '.nav-personal', '.nav-mode-admin', '.nav-legal'].flatMap(
-            function (zone) {
-                return Array.from(sidebar.querySelectorAll(zone + ' a[href]'));
+            (zone) => {
+                return Array.from(sidebar.querySelectorAll(`${zone} a[href]`));
             },
         );
-        links.forEach(function (a) {
+        links.forEach((a) => {
             if (a.hasAttribute('data-nav-skip') || a.closest('.nav-lang-menu')) return;
             const href = a.getAttribute('href') || '';
             if (href.charAt(0) !== '/' || href.indexOf('/oauth2/') === 0 || seen.has(href)) return;
@@ -147,7 +147,7 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             const raw = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
             return Array.isArray(raw)
-                ? raw.filter(function (e) {
+                ? raw.filter((e) => {
                       return e && typeof e.href === 'string' && e.href.charAt(0) === '/';
                   })
                 : [];
@@ -161,11 +161,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const active = sidebar ? sidebar.querySelector('a.is-active[href]') : null;
         const href = active ? active.getAttribute('href') : null;
         if (!href) return;
-        const entry = index.find(function (e) {
+        const entry = index.find((e) => {
             return e.href === href;
         });
         if (!entry) return;
-        const list = readRecent().filter(function (e) {
+        const list = readRecent().filter((e) => {
             return e.href !== href;
         });
         list.unshift({ href, label: entry.label, group: entry.crumb });
@@ -188,8 +188,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!q) {
             /** @type {PaletteItem[]} */
             const recent = [];
-            readRecent().forEach(function (e) {
-                const known = index.find(function (i) {
+            readRecent().forEach((e) => {
+                const known = index.find((i) => {
                     return i.href === e.href;
                 });
                 if (known && recent.length < RECENT_MAX) recent.push(known);
@@ -209,20 +209,20 @@ document.addEventListener('DOMContentLoaded', function () {
             return groups;
         }
         const pages = index
-            .filter(function (e) {
+            .filter((e) => {
                 return e.label.toLowerCase().includes(q) || e.crumb.toLowerCase().includes(q);
             })
-            .map(function (e, i) {
+            .map((e, i) => {
                 return { e, rank: e.label.toLowerCase().includes(q) ? 0 : 1, i };
             })
-            .sort(function (a, b) {
+            .sort((a, b) => {
                 return a.rank - b.rank || a.i - b.i;
             })
             .slice(0, PAGE_MAX)
-            .map(function (x) {
+            .map((x) => {
                 return x.e;
             });
-        const acts = actions.filter(function (a) {
+        const acts = actions.filter((a) => {
             return a.label.toLowerCase().includes(q);
         });
         if (pages.length) {
@@ -243,10 +243,10 @@ document.addEventListener('DOMContentLoaded', function () {
      */
     const icon = function (name, className) {
         const svg = document.createElementNS(SVG_NS, 'svg');
-        svg.setAttribute('class', 'krt-icon ' + className);
+        svg.setAttribute('class', `krt-icon ${className}`);
         svg.setAttribute('aria-hidden', 'true');
         const use = document.createElementNS(SVG_NS, 'use');
-        use.setAttribute('href', '#krt-icon-' + name);
+        use.setAttribute('href', `#krt-icon-${name}`);
         svg.appendChild(use);
         return svg;
     };
@@ -290,7 +290,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
         selected = Math.max(0, Math.min(rows.length - 1, next));
-        rows.forEach(function (r, i) {
+        rows.forEach((r, i) => {
             const on = i === selected;
             r.row.classList.toggle('is-selected', on);
             r.row.setAttribute('aria-selected', String(on));
@@ -318,7 +318,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const q = paletteInput.value.trim().toLowerCase();
         resultsEl.textContent = '';
         rows = [];
-        groupsFor(q).forEach(function (group) {
+        groupsFor(q).forEach((group) => {
             const wrap = document.createElement('div');
             wrap.setAttribute('role', 'group');
             wrap.setAttribute('aria-label', group.label);
@@ -327,11 +327,11 @@ document.addEventListener('DOMContentLoaded', function () {
             heading.setAttribute('aria-hidden', 'true');
             heading.textContent = group.label;
             wrap.appendChild(heading);
-            group.items.forEach(function (item) {
+            group.items.forEach((item) => {
                 const n = rows.length;
                 const row = document.createElement('div');
                 row.className = 'palette-row';
-                row.id = 'palette-opt-' + n;
+                row.id = `palette-opt-${n}`;
                 row.setAttribute('role', 'option');
                 row.setAttribute('aria-selected', 'false');
                 if (item.href) row.setAttribute('data-href', item.href);
@@ -350,10 +350,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 enter.textContent = '↵';
                 row.appendChild(enter);
                 row.appendChild(icon('chevron-right', 'palette-row-chevron'));
-                row.addEventListener('mousemove', function () {
+                row.addEventListener('mousemove', () => {
                     if (selected !== n) select(n);
                 });
-                row.addEventListener('click', function () {
+                row.addEventListener('click', () => {
                     choose(item);
                 });
                 wrap.appendChild(row);
@@ -381,7 +381,7 @@ document.addEventListener('DOMContentLoaded', function () {
     window.krtPalette = { open };
 
     paletteInput.addEventListener('input', render);
-    paletteInput.addEventListener('keydown', function (e) {
+    paletteInput.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowDown') {
             e.preventDefault();
             select(selected + 1);
@@ -395,25 +395,25 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    dialog.addEventListener('click', function (e) {
+    dialog.addEventListener('click', (e) => {
         const target = e.target instanceof Element ? e.target : null;
         if (target === dialog || (target && target.closest('.palette-cancel'))) {
             window.krtModal.close(dialog);
         }
     });
 
-    dialog.addEventListener('close', function () {
+    dialog.addEventListener('close', () => {
         paletteInput.value = '';
     });
 
-    document.querySelectorAll('[data-palette-open]').forEach(function (trigger) {
-        trigger.addEventListener('click', function () {
+    document.querySelectorAll('[data-palette-open]').forEach((trigger) => {
+        trigger.addEventListener('click', () => {
             if (window.krtNav) window.krtNav.close();
             open('');
         });
     });
 
-    document.addEventListener('keydown', function (e) {
+    document.addEventListener('keydown', (e) => {
         if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
         if (e.key !== 'k' && e.key !== 'K') return;
         const top = window.krtModal.topmost();
@@ -429,7 +429,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     if (/mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent)) {
-        document.querySelectorAll('[data-palette-kbd]').forEach(function (kbd) {
+        document.querySelectorAll('[data-palette-kbd]').forEach((kbd) => {
             kbd.textContent = '⌘ K';
         });
     }

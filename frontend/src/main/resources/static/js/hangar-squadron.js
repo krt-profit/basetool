@@ -38,7 +38,7 @@ function toggleSquadronOwners(toggle) {
     }
 }
 
-document.addEventListener('click', function (event) {
+document.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : null;
     const toggle = target ? target.closest('.hangar-tree__toggle') : null;
     if (toggle instanceof HTMLElement) {
@@ -46,7 +46,7 @@ document.addEventListener('click', function (event) {
     }
 });
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     const filterForm = /** @type {HTMLFormElement | null} */ (
         document.getElementById('squadron-filter-form')
     );
@@ -75,7 +75,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
             const query = params.toString();
-            target = '/hangar/squadron' + (query ? '?' + query : '');
+            target = `/hangar/squadron${query ? `?${query}` : ''}`;
         }
         if (!resultsContainer || !window.krtFetch) {
             window.location.assign(target);
@@ -85,22 +85,22 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (filterForm) {
-        filterForm.addEventListener('submit', function (event) {
+        filterForm.addEventListener('submit', (event) => {
             event.preventDefault();
             clearTimeout(squadronFilterTimer ?? undefined);
             applySquadronFilter(null);
         });
     }
     if (searchInput) {
-        searchInput.addEventListener('input', function () {
+        searchInput.addEventListener('input', () => {
             clearTimeout(squadronFilterTimer ?? undefined);
-            squadronFilterTimer = window.setTimeout(function () {
+            squadronFilterTimer = window.setTimeout(() => {
                 applySquadronFilter(null);
             }, 300);
         });
     }
     if (resultsContainer) {
-        resultsContainer.addEventListener('click', function (event) {
+        resultsContainer.addEventListener('click', (event) => {
             const target = event.target instanceof Element ? event.target : null;
             const clear = target ? target.closest('[data-testid="empty-state-action"]') : null;
             if (!clear || !resultsContainer.contains(clear)) {

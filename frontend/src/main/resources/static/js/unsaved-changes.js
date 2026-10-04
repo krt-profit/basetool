@@ -1,5 +1,5 @@
 // @ts-check
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     if (window.__unsavedChangesInitialized) return;
     window.__unsavedChangesInitialized = true;
 
@@ -48,11 +48,11 @@ document.addEventListener('DOMContentLoaded', function () {
         isDirty = false;
     };
 
-    document.addEventListener('submit', function () {
+    document.addEventListener('submit', () => {
         isDirty = false;
     });
 
-    document.addEventListener('click', function (event) {
+    document.addEventListener('click', (event) => {
         const a = /** @type {Element} */ (event.target).closest('a');
 
         if (!a || !a.href) return;
@@ -76,16 +76,16 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    [stayBtn, closeBtn].forEach(function (btn) {
+    [stayBtn, closeBtn].forEach((btn) => {
         if (!btn) return;
-        btn.addEventListener('click', function () {
+        btn.addEventListener('click', () => {
             if (modal) window.krtModal.close(modal);
             targetUrl = null;
         });
     });
 
     if (leaveBtn) {
-        leaveBtn.addEventListener('click', function () {
+        leaveBtn.addEventListener('click', () => {
             isDirty = false;
             window.removeEventListener('beforeunload', beforeUnloadHandler);
             if (targetUrl) {
@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (modal) {
-        window.addEventListener('click', function (event) {
+        window.addEventListener('click', (event) => {
             if (event.target === modal) {
                 window.krtModal.close(modal);
                 targetUrl = null;

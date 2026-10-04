@@ -33,6 +33,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendSideChannels;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -75,7 +76,7 @@ class NotificationPageControllerStreamTest {
         new NotificationPageController(
             backendApiClient,
             messageSource,
-            sseWebClient,
+            new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
             new SimpleMeterRegistry());
 
@@ -102,7 +103,7 @@ class NotificationPageControllerStreamTest {
         new NotificationPageController(
             backendApiClient,
             messageSource,
-            sseWebClient,
+            new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
             new SimpleMeterRegistry());
 
@@ -130,7 +131,7 @@ class NotificationPageControllerStreamTest {
         new NotificationPageController(
             backendApiClient,
             messageSource,
-            sseWebClient,
+            new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
             new SimpleMeterRegistry());
 
@@ -160,7 +161,7 @@ class NotificationPageControllerStreamTest {
         new NotificationPageController(
             backendApiClient,
             messageSource,
-            sseWebClient,
+            new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
             new SimpleMeterRegistry());
 
@@ -215,7 +216,11 @@ class NotificationPageControllerStreamTest {
     SimpleMeterRegistry registry = new SimpleMeterRegistry();
     NotificationPageController controller =
         new NotificationPageController(
-            backendApiClient, messageSource, sseWebClient, authorizedClientManager, registry);
+            backendApiClient,
+            messageSource,
+            new BackendSideChannels(sseWebClient, null),
+            authorizedClientManager,
+            registry);
     controller.registerRelayGauge();
 
     HttpServletRequest request = mock(HttpServletRequest.class);
@@ -258,7 +263,7 @@ class NotificationPageControllerStreamTest {
         new NotificationPageController(
             backendApiClient,
             messageSource,
-            sseWebClient,
+            new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
             new SimpleMeterRegistry()) {
           @Override

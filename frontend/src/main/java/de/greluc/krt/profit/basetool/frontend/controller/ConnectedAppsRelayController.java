@@ -74,7 +74,7 @@ public class ConnectedAppsRelayController {
         log,
         "disconnect exchange client (ajax)",
         () -> {
-          backendApiClient.delete(BACKEND + "/" + clientId, Void.class);
+          backendApiClient.delete(BACKEND + "/{clientId}", Void.class, clientId);
           return ResponseEntity.noContent().build();
         });
   }
@@ -94,7 +94,7 @@ public class ConnectedAppsRelayController {
         "mark exchange installation seen (ajax)",
         () -> {
           backendApiClient.post(
-              BACKEND + "/installations/" + installationId + "/seen", null, Void.class);
+              BACKEND + "/installations/{installationId}/seen", null, Void.class, installationId);
           return ResponseEntity.noContent().build();
         });
   }
@@ -120,7 +120,7 @@ public class ConnectedAppsRelayController {
         () ->
             ResponseEntity.ok(
                 backendApiClient.post(
-                    BACKEND + "/" + clientId + "/undo", request, ExchangeUndoResultDto.class)));
+                    BACKEND + "/{clientId}/undo", request, ExchangeUndoResultDto.class, clientId)));
   }
 
   /**
@@ -137,7 +137,8 @@ public class ConnectedAppsRelayController {
         log,
         "disconnect exchange installation (ajax)",
         () -> {
-          backendApiClient.delete(BACKEND + "/installations/" + installationId, Void.class);
+          backendApiClient.delete(
+              BACKEND + "/installations/{installationId}", Void.class, installationId);
           return ResponseEntity.noContent().build();
         });
   }

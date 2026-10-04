@@ -101,9 +101,10 @@ public class AdminQualityTiersRelayController {
         () -> {
           QualityTierDto updated =
               backendApiClient.put(
-                  BACKEND_BASE + "/" + id,
+                  BACKEND_BASE + "/{id}",
                   normalized(request, request.version()),
-                  QualityTierDto.class);
+                  QualityTierDto.class,
+                  id);
           backendApiClient.evict(CacheDomain.QUALITY_TIER);
           return ResponseEntity.ok(updated);
         });
@@ -122,7 +123,7 @@ public class AdminQualityTiersRelayController {
         log,
         "delete quality tier " + id,
         () -> {
-          backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
+          backendApiClient.delete(BACKEND_BASE + "/{id}", Void.class, id);
           backendApiClient.evict(CacheDomain.QUALITY_TIER);
           return ResponseEntity.ok().build();
         });

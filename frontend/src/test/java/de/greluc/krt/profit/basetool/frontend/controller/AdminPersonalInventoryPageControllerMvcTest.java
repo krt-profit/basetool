@@ -294,9 +294,10 @@ class AdminPersonalInventoryPageControllerMvcTest {
 
     verify(backendApiClient)
         .put(
-            eq("/api/v1/admin/personal-inventory/items/" + itemId),
+            eq("/api/v1/admin/personal-inventory/items/{id}"),
             any(),
-            eq(PersonalInventoryItemDto.class));
+            eq(PersonalInventoryItemDto.class),
+            eq(itemId));
   }
 
   /** Verifies that an admin delete targets the backend's {@code items/{id}} operation. */
@@ -312,6 +313,6 @@ class AdminPersonalInventoryPageControllerMvcTest {
         .andExpect(status().is3xxRedirection());
 
     verify(backendApiClient)
-        .delete(eq("/api/v1/admin/personal-inventory/items/" + itemId), eq(Void.class));
+        .delete(eq("/api/v1/admin/personal-inventory/items/{id}"), eq(Void.class), eq(itemId));
   }
 }

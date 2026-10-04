@@ -89,7 +89,9 @@ class MissionListLiveSyncPublishTest {
   @Test
   void deleteMission_onBackendFailure_doesNotPublish() {
     UUID id = UUID.randomUUID();
-    doThrow(new RuntimeException("backend down")).when(backendApiClient).delete(anyString(), any());
+    doThrow(new RuntimeException("backend down"))
+        .when(backendApiClient)
+        .delete(anyString(), any(), any(Object[].class));
 
     String view = controller.deleteMission(id, redirectAttributes);
 

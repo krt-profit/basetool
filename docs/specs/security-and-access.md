@@ -1845,15 +1845,16 @@ from this response blanks a legal document on a build nobody can redeploy.
   refused with a terminal close code the client stops reconnecting on.
 - [x] A gated background read navigates to the consent page and disarms its timer, instead of
   re-fetching the refusal on every tick or freezing on its last value.
-  *`HandRolledFetchGateContractTest`, `TermsAcceptanceGateFilterTest`.*
+  *`BackgroundReadGateContractTest`, `TermsAcceptanceGateFilterTest`.*
 
 **Enforced by:** `TermsAcceptanceAccessFilterTest` (refusal, both exemptions, non-UUID subjects),
 `TermsAcceptanceGateFilterTest` (redirect, the AJAX header, the SSE `terms-gate` handoff and that it
 fires only while the gate is closed, the WebSocket mark and that a plain request to the same
 path is still redirected, the readable-documents exemption, fail-open, cache bound),
-`HandRolledFetchGateContractTest` (the client half of every read that bypasses `krtFetch`: the XHR
-marker, the `krtTermsGate` handoff, no `res.ok` shortcut, self-disarm — pinned against the shipped
-JS), `TermsAcceptanceQueryDataTest` + `TermsAcceptanceServiceTest` (append-only history,
+`BackgroundReadGateContractTest` (the client half: every read goes through `krtFetch.get`, which
+sends the XHR marker, offers the answer to `krtTermsGate` and refuses a redirect; no raw request in
+any script or template; the polls disarm on a gated answer — pinned against the shipped JS and
+templates; REQ-FE-031), `TermsAcceptanceQueryDataTest` + `TermsAcceptanceServiceTest` (append-only history,
 version scoping, one-sided cache, sort translation), `TermsAcceptancePageControllerTest`, `TermsVersionParityTest`,
 `AdminTermsPageControllerTest`, `TermsDocumentStructureTest`,
 `LiveSyncSyncHandshakeInterceptorTest` + `LiveSyncWebSocketHandlerTest` +
@@ -3835,6 +3836,10 @@ proxy seam, it is a `400` from Spring's type conversion, handled by `GlobalExcep
   state; a catalogue name carrying `&` or `=` opens no second query parameter on the backend call.
 - [ ] The audit tab list has exactly one definition in the frontend, so the page and its
   export/purge proxy cannot disagree about which tabs exist.
+- [x] Every `BackendApiClient` write verb (`post`, `put`, `patch`, `delete`, with or without a
+  body) has a URI-template twin that encodes each variable, and every write call passes its runtime
+  values through it; the only reviewed concatenation is the UEX override's entity kind, narrowed to
+  its allow-list first (`WriteUriTemplateTest`, 2026-10-04).
 - [ ] The mission and operation list pages relay `search`, `start` and `end` as `WebClient`
   URI-template variables, never concatenated into the URI: a search carrying `&`, `#`, `+`, `{…}` or
   `%` reaches the backend as one decoded `query`, and a period reaches it decoded exactly once so it

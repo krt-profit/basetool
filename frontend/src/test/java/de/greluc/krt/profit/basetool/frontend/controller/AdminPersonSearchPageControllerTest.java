@@ -231,6 +231,10 @@ class AdminPersonSearchPageControllerTest {
     verify(client, never())
         .get(
             ArgumentMatchers.<String>any(),
+            ArgumentMatchers.<ParameterizedTypeReference<Object>>any());
+    verify(client, never())
+        .get(
+            ArgumentMatchers.<String>any(),
             ArgumentMatchers.<ParameterizedTypeReference<Object>>any(),
             any(Object[].class));
     verify(client, never()).get(ArgumentMatchers.<String>any(), ArgumentMatchers.<Class<?>>any());

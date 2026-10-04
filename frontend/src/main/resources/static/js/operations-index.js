@@ -21,15 +21,12 @@
 
 function openDeleteModal(id) {
     const deleteForm = document.getElementById('delete-operation-form');
-    deleteForm.action = window.safeSameOriginUrl(
-        '/operations/' + id + '/delete',
-        deleteForm.action,
-    );
+    deleteForm.action = window.safeSameOriginUrl(`/operations/${id}/delete`, deleteForm.action);
     window.krtModal.open(document.getElementById('delete-operation-modal'));
 }
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'operations-open-delete', function (el) {
+    window.krtEvents.on('click', 'operations-open-delete', (el) => {
         openDeleteModal(el.getAttribute('data-id'));
     });
 }
@@ -58,7 +55,7 @@ function reloadOperationsList() {
 
     const createForm = document.getElementById('create-operation-form');
     if (createForm) {
-        createForm.addEventListener('submit', function (event) {
+        createForm.addEventListener('submit', (event) => {
             event.preventDefault();
             const owner = createForm.querySelector('[name="owningOrgUnitId"]');
             const submitBtn = createForm.querySelector('button[type="submit"]');
@@ -82,7 +79,7 @@ function reloadOperationsList() {
                         reloadOperationsList();
                     },
                 })
-                .then(function () {
+                .then(() => {
                     if (submitBtn) submitBtn.disabled = false;
                 });
         });
@@ -90,7 +87,7 @@ function reloadOperationsList() {
 
     const deleteForm = document.getElementById('delete-operation-form');
     if (deleteForm) {
-        deleteForm.addEventListener('submit', function (event) {
+        deleteForm.addEventListener('submit', (event) => {
             event.preventDefault();
             const submitBtn = deleteForm.querySelector('button[type="submit"]');
             if (submitBtn) submitBtn.disabled = true;
@@ -106,7 +103,7 @@ function reloadOperationsList() {
                         reloadOperationsList();
                     },
                 })
-                .then(function () {
+                .then(() => {
                     if (submitBtn) submitBtn.disabled = false;
                 });
         });

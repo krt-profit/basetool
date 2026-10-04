@@ -318,10 +318,11 @@ public class PersonalInventoryBlueprintsPageController {
       RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.put(
-          "/api/v1/personal-blueprints/" + id,
+          "/api/v1/personal-blueprints/{id}",
           new PersonalBlueprintUpdateRequest(
               parseInstantOrNull(acquiredAt), StringNormalization.blankToNull(note), version),
-          PersonalBlueprintDto.class);
+          PersonalBlueprintDto.class,
+          id);
       redirectAttributes.addFlashAttribute(
           "successToast", "personalInventory.blueprints.toast.noteUpdated");
     } catch (Exception e) {
@@ -343,7 +344,7 @@ public class PersonalInventoryBlueprintsPageController {
   @PostMapping("/{id}/delete")
   public String delete(@PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/personal-blueprints/" + id, Void.class);
+      backendApiClient.delete("/api/v1/personal-blueprints/{id}", Void.class, id);
       redirectAttributes.addFlashAttribute(
           "successToast", "personalInventory.blueprints.toast.removed");
     } catch (Exception e) {
@@ -398,12 +399,13 @@ public class PersonalInventoryBlueprintsPageController {
         () -> {
           PersonalBlueprintDto dto =
               backendApiClient.put(
-                  "/api/v1/personal-blueprints/" + id,
+                  "/api/v1/personal-blueprints/{id}",
                   new PersonalBlueprintUpdateRequest(
                       request.acquiredAt(),
                       StringNormalization.blankToNull(request.note()),
                       request.version()),
-                  PersonalBlueprintDto.class);
+                  PersonalBlueprintDto.class,
+                  id);
           return ResponseEntity.ok(dto);
         });
   }
@@ -425,7 +427,7 @@ public class PersonalInventoryBlueprintsPageController {
         log,
         "remove blueprint " + id + " (ajax)",
         () -> {
-          backendApiClient.delete("/api/v1/personal-blueprints/" + id, Void.class);
+          backendApiClient.delete("/api/v1/personal-blueprints/{id}", Void.class, id);
           return ResponseEntity.noContent().build();
         });
   }

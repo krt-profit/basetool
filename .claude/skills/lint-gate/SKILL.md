@@ -19,14 +19,16 @@ the how-to behind that rule.
 
 | Task | Tool | Covers |
 | --- | --- | --- |
-| `:frontend:lintCss` | Stylelint | `static/css/**` — e.g. media-query *range* notation `(width <= Npx)` not `(max-width: Npx)`, modern `rgb(r g b / a%)` not `rgba(...)` |
-| `:frontend:lintCssInline` | Stylelint (+ postcss-html for templates) | the page stylesheets under `static/css/pages/` (the former inline `<style>` blocks, FE-PERF-02) and any `<style>` block that comes back — with the tiny `.stylelintrc.templates.json` rule set, not the strict one |
-| `:frontend:lintJs` | ESLint | `static/js/**` and the Node scripts `scripts/**/*.mjs` — `no-var` → `let`/`const`, `prefer-const`, `object-shorthand` (both autofixable, since 2026-09-23), unused caught errors `_`-prefixed, raw `fetch` writes (REQ-FE-002), unescaped HTML sinks (REQ-FE-022), … |
+| `:frontend:lintCss` | Stylelint | `static/css/**`, the page stylesheets under `static/css/pages/` included — e.g. media-query *range* notation `(width <= Npx)` not `(max-width: Npx)`, modern `rgb(r g b / a%)` not `rgba(...)`, complex `:not(a, b)`, kebab-case id selectors. A colour token's alpha variant is `color-mix()`, not `rgb()` — that and the `--z-*` scale are checked by `ColourTokenCopyTest` / `ZIndexScaleTest` in `:frontend:test`, not by Stylelint |
+| `:frontend:lintCssInline` | Stylelint (+ postcss-html for templates) | any `<style>` block that comes back into a template — with the tiny `.stylelintrc.templates.json` rule set, not the strict one |
+| `:frontend:lintJs` | ESLint | `static/js/**` and the Node scripts `scripts/**/*.mjs` at ES2025 — `no-var` → `let`/`const`, `prefer-const`, `object-shorthand`, `prefer-template`, `prefer-arrow-callback`, `prefer-object-has-own`, `logical-assignment-operators` (all autofixable), `radix`, unused caught errors `_`-prefixed, any raw `fetch` / `XMLHttpRequest` outside the transport (REQ-FE-002, REQ-FE-031), `Promise.try` / `RegExp.escape` / `Float16Array` (above the browser floor, ADR-0239), unescaped HTML sinks (REQ-FE-022), … |
 | `:frontend:lintProbeJs` | ESLint | the e2e probe script, extracted from its Java text block |
 | `:frontend:lintHtml` | HTMLHint | `templates/**` |
 | `:frontend:prettierCheck` | Prettier | CSS / JS / `types/**/*.d.ts` / `scripts/**/*.mjs` formatting |
 | `:frontend:typecheckJs` | `tsc --noEmit` | files carrying `// @ts-check` (REQ-FE-018, ADR-0125) |
 | `:frontend:testGenApiTypes` | Node | the self-test of the OpenAPI → `.d.ts` emitter |
+| `:frontend:testKrtFetchReadJs` | Node | the read path `krtFetch.get` / `getJson` (REQ-FE-031) |
+| `:frontend:testEslintBans` | Node + ESLint API | the transport and baseline bans fire on planted sources |
 
 Before pushing, run the whole sweep and get it to **zero findings**:
 

@@ -202,7 +202,7 @@ public class AdminDefaultBlueprintsPageController {
   @PostMapping("/{id}/delete")
   public String remove(@PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
+      backendApiClient.delete(BACKEND_BASE + "/{id}", Void.class, id);
       redirectAttributes.addFlashAttribute("successToast", "admin.defaultBlueprints.toast.removed");
     } catch (Exception e) {
       log.error("Failed to remove default blueprint {}", id, e);
@@ -226,7 +226,7 @@ public class AdminDefaultBlueprintsPageController {
         log,
         "remove default blueprint " + id + " (ajax)",
         () -> {
-          backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
+          backendApiClient.delete(BACKEND_BASE + "/{id}", Void.class, id);
           return ResponseEntity.ok().build();
         });
   }

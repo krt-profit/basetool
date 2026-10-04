@@ -10,7 +10,7 @@ function krtAutocomplete(inp, dataSource, options = {}) {
     let debounceTimer;
 
     const a = document.createElement('DIV');
-    a.setAttribute('id', inp.id + '-autocomplete-list');
+    a.setAttribute('id', `${inp.id}-autocomplete-list`);
     a.setAttribute('class', 'autocomplete-items');
 
     const parent = inp.parentNode;
@@ -46,8 +46,8 @@ function krtAutocomplete(inp, dataSource, options = {}) {
         }
     });
 
-    inp.addEventListener('keydown', function (e) {
-        let x = document.getElementById(inp.id + '-autocomplete-list');
+    inp.addEventListener('keydown', (e) => {
+        let x = document.getElementById(`${inp.id}-autocomplete-list`);
         if (x) x = x.getElementsByTagName('div');
         if (e.keyCode === 40) {
             currentFocus++;
@@ -73,7 +73,7 @@ function krtAutocomplete(inp, dataSource, options = {}) {
 
             const b = document.createElement('DIV');
             const escapedVal = val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const regex = new RegExp('(' + escapedVal + ')', 'gi');
+            const regex = new RegExp(`(${escapedVal})`, 'gi');
             const parts = itemStr.split(regex);
             parts.forEach((part, i) => {
                 if (i % 2 === 1) {
@@ -119,13 +119,13 @@ function krtAutocomplete(inp, dataSource, options = {}) {
     function closeAllLists(elmnt) {
         const x = document.getElementsByClassName('autocomplete-items');
         for (let i = 0; i < x.length; i++) {
-            if (elmnt !== x[i] && elmnt !== inp && x[i].id === inp.id + '-autocomplete-list') {
+            if (elmnt !== x[i] && elmnt !== inp && x[i].id === `${inp.id}-autocomplete-list`) {
                 x[i].innerHTML = '';
             }
         }
     }
 
-    document.addEventListener('click', function (e) {
+    document.addEventListener('click', (e) => {
         closeAllLists(e.target);
     });
 }

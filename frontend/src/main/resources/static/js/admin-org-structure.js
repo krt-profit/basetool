@@ -72,7 +72,7 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
                 }
                 return Array.prototype.some.call(
                     document.querySelectorAll('#ol-form input, #bereich-form input'),
-                    function (el) {
+                    (el) => {
                         return el.value.trim() !== '';
                     },
                 );
@@ -103,7 +103,7 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
         return;
     }
 
-    window.krtEvents.on('submit', 'os-create-ol', function (form, event) {
+    window.krtEvents.on('submit', 'os-create-ol', (form, event) => {
         event.preventDefault();
         window.krtFetch.write({
             method: 'POST',
@@ -120,7 +120,7 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
         });
     });
 
-    window.krtEvents.on('submit', 'os-create-bereich', function (form, event) {
+    window.krtEvents.on('submit', 'os-create-bereich', (form, event) => {
         event.preventDefault();
         window.krtFetch.write({
             method: 'POST',
@@ -139,7 +139,7 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
         });
     });
 
-    window.krtEvents.on('change', 'os-parent-select', function (select) {
+    window.krtEvents.on('change', 'os-parent-select', (select) => {
         const row = select.closest('[data-org-unit-id]');
         if (!row) {
             return;
@@ -147,8 +147,8 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
         const id = row.getAttribute('data-org-unit-id');
         window.krtFetch.write({
             method: 'PATCH',
-            url: '/admin/org-structure/org-units/' + encodeURIComponent(String(id)) + '/parent',
-            serialize: 'org-unit:' + id,
+            url: `/admin/org-structure/org-units/${encodeURIComponent(String(id))}/parent`,
+            serialize: `org-unit:${id}`,
             payload() {
                 const version = row.getAttribute('data-version');
                 return {

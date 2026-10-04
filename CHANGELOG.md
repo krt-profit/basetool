@@ -183,6 +183,13 @@
 
 ### Changed
 
+- **Auswahlfelder nach abgelaufener Sitzung führen zur Anmeldung.** Ist die Sitzung abgelaufen, zeigt
+  eine Mitglieder-, Material- oder Kontosuche nicht mehr stumm „keine Treffer", sondern leitet zur
+  Anmeldung weiter; dasselbe gilt für alle anderen nachgeladenen Listen und Downloads. Alle Lesezugriffe
+  laufen über `krtFetch.get` / `getJson` (REQ-FE-031).
+- **Unterstützte Browser: Chrome 122, Firefox 131, Safari/iOS 18.4 oder neuer** („Baseline 2025",
+  ADR-0239). Typprüfung und ESLint prüfen die Skripte jetzt auf ES2025 (REQ-FE-018).
+
 - **Gewinnberechnung: Ort des Terminals in der Route.** Der Ort steht jetzt in Klammern hinter dem
   Terminal („Kauf TDD (Hurston · Lorville) · 20") statt nur im Tooltip, damit er auch auf dem
   Smartphone sichtbar ist (REQ-UI-027).
@@ -316,6 +323,21 @@
 
 ### Fixed
 
+- **Request-Metriken fallen nicht mehr nach 100 Endpunkten weg.** Backend und Frontend durften nur
+  100 verschiedene `uri`-Werte in `http.server.requests` / `http.client.requests` führen; jeder
+  danach erstmals aufgerufene Endpunkt fehlte in 5xx- und Latenz-Alerts und Dashboards. Die Grenze
+  liegt jetzt bei 1000, ein Test hält sie über der Zahl der Routen, und `HttpUriTagCapNear` warnt
+  vor dem Erreichen (config, REQ-OBS-006).
+
+- **Herstellung: Mengen mit vierter Nachkommastelle werden nicht mehr abgelehnt.** Der Dialog rundet
+  jede Verbrauchsmenge auf die Genauigkeit des Materials, bevor er prüft und sendet; vorher ließ er
+  sie durch und das Backend antwortete mit „Materialzuweisung deckt den Bedarf nicht exakt"
+  (REQ-ORDERS-025).
+
+- **Umbuchen ohne neues Ziel wird im Dialog abgefangen.** Bleiben Nutzer und Ort wie vorbelegt,
+  meldet der Dialog das auf Deutsch bzw. Englisch, statt die Anfrage zu senden und den englischen
+  Backend-Text zu zeigen; das Backend liefert den Fehler jetzt ebenfalls lokalisiert (REQ-INV-025).
+
 - **Startseite und Buchungsanträge passen wieder auf Smartphone und Tablet.** Auf der Startseite
   brechen Status, „Angemeldet" und „Meine Einheit" am Smartphone in eine zweite Zeile um, statt die
   Seite zu verbreitern; die Antragsliste der Kartellbank stapelt am Tablet die Entscheidungsknöpfe,
@@ -399,6 +421,11 @@
   Cookie-Attribut tatsächlich, ein Test hält den gesendeten `Set-Cookie` fest.
 
 ### Security
+
+- **Lager: „gestohlen"-Markierung und Zuordnungen fremder Einträge nur noch für Logistiker.** Wie
+  Ausbuchen, Notiz und Geliefert verweigern jetzt auch `POST /inventory/{id}/stolen` und
+  `POST`/`PATCH`/`DELETE /inventory/{id}/allocation` einem Mitglied unterhalb von Logistiker den
+  Eintrag eines anderen Mitglieds mit `403`; bisher reichte die Einheit (REQ-INV-053, REQ-INV-027).
 
 - **Frontend: die Session liest nur noch die 21 Anwendungstypen, die wirklich dort landen.** Statt
   aller 325 Klassen unter `frontend.model` nennt die Session-Allow-List die aus dem Code abgeleiteten

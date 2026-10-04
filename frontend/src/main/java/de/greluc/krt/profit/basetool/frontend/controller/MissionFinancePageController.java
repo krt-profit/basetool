@@ -146,7 +146,7 @@ public class MissionFinancePageController {
       body.put("amount", form.getAmount());
       body.put("version", form.getVersion());
 
-      backendApiClient.put("/api/v1/finance-entries/" + entryId, body, Void.class);
+      backendApiClient.put("/api/v1/finance-entries/{entryId}", body, Void.class, entryId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "updateFinanceEntry", entryId, e);
@@ -175,7 +175,7 @@ public class MissionFinancePageController {
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/finance-entries/" + entryId, Void.class);
+      backendApiClient.delete("/api/v1/finance-entries/{entryId}", Void.class, entryId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "deleteFinanceEntry", entryId, e);
@@ -233,7 +233,8 @@ public class MissionFinancePageController {
         "update finance entry (ajax) for mission " + id + " entry " + entryId,
         () -> {
           Object result =
-              backendApiClient.put("/api/v1/finance-entries/" + entryId, body, Object.class);
+              backendApiClient.put(
+                  "/api/v1/finance-entries/{entryId}", body, Object.class, entryId);
           return ResponseEntity.ok(result);
         });
   }
@@ -254,7 +255,7 @@ public class MissionFinancePageController {
         log,
         "delete finance entry (ajax) for mission " + id + " entry " + entryId,
         () -> {
-          backendApiClient.delete("/api/v1/finance-entries/" + entryId, Void.class);
+          backendApiClient.delete("/api/v1/finance-entries/{entryId}", Void.class, entryId);
           return ResponseEntity.noContent().build();
         });
   }

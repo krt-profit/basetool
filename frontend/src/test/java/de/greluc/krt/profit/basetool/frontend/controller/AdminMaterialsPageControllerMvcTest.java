@@ -233,7 +233,7 @@ class AdminMaterialsPageControllerMvcTest {
         .andExpect(
             PageStylesheets.content(
                 containsString(
-                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+                    ".form-group input:where(:not([type='checkbox'], [type='radio']))")));
   }
 
   @Test
@@ -271,7 +271,7 @@ class AdminMaterialsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void deleteCategoryAjax_withHeader_returns200() throws Exception {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.delete(eq("/api/v1/material-categories/" + id), eq(Void.class)))
+    when(backendApiClient.delete(eq("/api/v1/material-categories/{id}"), eq(Void.class), eq(id)))
         .thenReturn(null);
 
     mockMvc

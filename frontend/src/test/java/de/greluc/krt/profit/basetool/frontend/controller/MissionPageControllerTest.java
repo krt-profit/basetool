@@ -128,7 +128,8 @@ class MissionPageControllerTest {
                 backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
             mock(LiveSyncLocalBus.class));
 
-    when(backendApiClient.post(anyString(), any(), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.post(anyString(), any(), eq(Void.class), any(Object[].class)))
+        .thenReturn(null);
 
     String view =
         controller.addParticipant(
@@ -141,7 +142,7 @@ class MissionPageControllerTest {
 
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
-        .post(eq("/api/v1/missions/" + id + "/participants/add"), any(), eq(Void.class));
+        .post(eq("/api/v1/missions/{id}/participants/add"), any(), eq(Void.class), eq(id));
   }
 
   @Test
@@ -157,7 +158,7 @@ class MissionPageControllerTest {
             mock(LiveSyncLocalBus.class));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
-    when(backendApiClient.post(anyString(), any(), eq(Void.class)))
+    when(backendApiClient.post(anyString(), any(), eq(Void.class), any(Object[].class)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "ambiguous", null, 409));
@@ -193,7 +194,8 @@ class MissionPageControllerTest {
             mock(LiveSyncLocalBus.class));
     OidcUser user = mock(OidcUser.class);
 
-    when(backendApiClient.post(anyString(), any(), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.post(anyString(), any(), eq(Void.class), any(Object[].class)))
+        .thenReturn(null);
 
     String view =
         controller.addParticipant(
@@ -206,7 +208,7 @@ class MissionPageControllerTest {
 
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
-        .post(eq("/api/v1/missions/" + id + "/participants/add"), any(), eq(Void.class));
+        .post(eq("/api/v1/missions/{id}/participants/add"), any(), eq(Void.class), eq(id));
   }
 
   @Test
@@ -223,13 +225,14 @@ class MissionPageControllerTest {
             mock(LiveSyncLocalBus.class));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
-    when(backendApiClient.put(anyString(), any(), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.put(anyString(), any(), eq(Void.class), any(Object[].class)))
+        .thenReturn(null);
 
     String view = controller.setPartyLead(id, userId, "Alice", 2L, redirectAttributes);
 
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
-        .put(eq("/api/v1/missions/" + id + "/party-lead"), any(), eq(Void.class));
+        .put(eq("/api/v1/missions/{id}/party-lead"), any(), eq(Void.class), eq(id));
     verify(redirectAttributes).addFlashAttribute("successToast", "notification.success.save");
   }
 
@@ -246,7 +249,7 @@ class MissionPageControllerTest {
             mock(LiveSyncLocalBus.class));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
-    when(backendApiClient.put(anyString(), any(), eq(Void.class)))
+    when(backendApiClient.put(anyString(), any(), eq(Void.class), any(Object[].class)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "conflict", null, 409));
@@ -273,7 +276,8 @@ class MissionPageControllerTest {
             mock(LiveSyncLocalBus.class));
     OidcUser user = mock(OidcUser.class);
 
-    when(backendApiClient.delete(anyString(), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.delete(anyString(), eq(Void.class), any(Object[].class)))
+        .thenReturn(null);
 
     String view =
         controller.deleteParticipant(id, participantId, user, mock(RedirectAttributes.class));
@@ -281,8 +285,10 @@ class MissionPageControllerTest {
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
         .delete(
-            eq("/api/v1/missions/" + id + "/participants/" + participantId + "/slim"),
-            eq(Void.class));
+            eq("/api/v1/missions/{id}/participants/{participantId}/slim"),
+            eq(Void.class),
+            eq(id),
+            eq(participantId));
   }
 
   @Test
@@ -298,7 +304,8 @@ class MissionPageControllerTest {
                 backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
             mock(LiveSyncLocalBus.class));
 
-    when(backendApiClient.delete(anyString(), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.delete(anyString(), eq(Void.class), any(Object[].class)))
+        .thenReturn(null);
 
     String view =
         controller.deleteParticipant(id, participantId, null, mock(RedirectAttributes.class));
@@ -306,8 +313,10 @@ class MissionPageControllerTest {
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
         .delete(
-            eq("/api/v1/missions/" + id + "/participants/" + participantId + "/slim"),
-            eq(Void.class));
+            eq("/api/v1/missions/{id}/participants/{participantId}/slim"),
+            eq(Void.class),
+            eq(id),
+            eq(participantId));
   }
 
   @Test
@@ -324,7 +333,8 @@ class MissionPageControllerTest {
             mock(LiveSyncLocalBus.class));
     OidcUser user = mock(OidcUser.class);
 
-    when(backendApiClient.put(anyString(), any(), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.put(anyString(), any(), eq(Void.class), any(Object[].class)))
+        .thenReturn(null);
 
     String view =
         controller.updateParticipant(
@@ -340,9 +350,11 @@ class MissionPageControllerTest {
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
         .put(
-            eq("/api/v1/missions/" + id + "/participants/" + participantId + "/slim"),
+            eq("/api/v1/missions/{id}/participants/{participantId}/slim"),
             any(),
-            eq(Void.class));
+            eq(Void.class),
+            eq(id),
+            eq(participantId));
   }
 
   @Test
@@ -358,7 +370,8 @@ class MissionPageControllerTest {
                 backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
             mock(LiveSyncLocalBus.class));
 
-    when(backendApiClient.put(anyString(), any(), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.put(anyString(), any(), eq(Void.class), any(Object[].class)))
+        .thenReturn(null);
 
     String view =
         controller.updateParticipant(
@@ -374,9 +387,11 @@ class MissionPageControllerTest {
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
         .put(
-            eq("/api/v1/missions/" + id + "/participants/" + participantId + "/slim"),
+            eq("/api/v1/missions/{id}/participants/{participantId}/slim"),
             any(),
-            eq(Void.class));
+            eq(Void.class),
+            eq(id),
+            eq(participantId));
   }
 
   @Test

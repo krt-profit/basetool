@@ -19,7 +19,7 @@
 
 /* global ANNOUNCE_MSG, ANNOUNCE_CONFLICT */
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     const deleteModal = document.getElementById('delete-confirm-modal');
     const triggerDeleteBtn = document.getElementById('trigger-delete-confirm');
     const closeDeleteBtns = document.querySelectorAll('.close-delete-modal');
@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }
 
-    closeDeleteBtns.forEach(function (btn) {
+    closeDeleteBtns.forEach((btn) => {
         btn.onclick = closeDeleteModal;
     });
 
@@ -65,7 +65,7 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     if (updateForm) {
-        updateForm.addEventListener('submit', function (event) {
+        updateForm.addEventListener('submit', (event) => {
             event.preventDefault();
             if (!window.krtFetch) {
                 updateForm.submit();
@@ -96,7 +96,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (deleteForm) {
-        deleteForm.addEventListener('submit', function (event) {
+        deleteForm.addEventListener('submit', (event) => {
             event.preventDefault();
             if (!window.krtFetch) {
                 deleteForm.submit();

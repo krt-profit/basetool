@@ -80,7 +80,7 @@ class MemberManagementControllerTest {
 
     String view = controller.deleteMember(userId, redirectAttributes);
 
-    verify(backendApiClient).delete("/api/v1/users/" + userId, Void.class);
+    verify(backendApiClient).delete("/api/v1/users/{id}", Void.class, userId);
     assertEquals("redirect:/members", view);
     assertEquals(
         "success.user.delete", redirectAttributes.getFlashAttributes().get("successToast"));
@@ -89,11 +89,13 @@ class MemberManagementControllerTest {
   @Test
   void deleteMember_OnFailure_ShouldRedirectAndAddErrorToast() {
     UUID userId = UUID.randomUUID();
-    doThrow(new RuntimeException("API Error")).when(backendApiClient).delete(anyString(), any());
+    doThrow(new RuntimeException("API Error"))
+        .when(backendApiClient)
+        .delete(anyString(), any(), any(Object[].class));
 
     String view = controller.deleteMember(userId, redirectAttributes);
 
-    verify(backendApiClient).delete("/api/v1/users/" + userId, Void.class);
+    verify(backendApiClient).delete("/api/v1/users/{id}", Void.class, userId);
     assertEquals("redirect:/members", view);
     assertEquals("error.user.delete", redirectAttributes.getFlashAttributes().get("errorToast"));
   }
@@ -143,7 +145,9 @@ class MemberManagementControllerTest {
 
     @Test
     void deleteMember_onBackendFailure_doesNotPublish() {
-      doThrow(new RuntimeException("API Error")).when(backendApiClient).delete(anyString(), any());
+      doThrow(new RuntimeException("API Error"))
+          .when(backendApiClient)
+          .delete(anyString(), any(), any(Object[].class));
 
       controller.deleteMember(UUID.randomUUID(), redirectAttributes);
 
@@ -152,7 +156,9 @@ class MemberManagementControllerTest {
 
     @Test
     void deleteMemberAjax_onBackendFailure_doesNotPublish() {
-      doThrow(new RuntimeException("API Error")).when(backendApiClient).delete(anyString(), any());
+      doThrow(new RuntimeException("API Error"))
+          .when(backendApiClient)
+          .delete(anyString(), any(), any(Object[].class));
 
       controller.deleteMemberAjax(UUID.randomUUID());
 
@@ -519,6 +525,7 @@ class MemberManagementControllerTest {
 
       assertEquals("member-edit", view, "validation errors must re-render directly, NOT redirect");
       verify(backendApiClient, never()).put(anyString(), any(), any());
+      verify(backendApiClient, never()).put(anyString(), any(), any(), any(Object[].class));
       assertTrue(
           redirectAttributes.getFlashAttributes().isEmpty(),
           "must NOT add any flash attribute (the BindingResult lives request-scoped)");
@@ -540,7 +547,7 @@ class MemberManagementControllerTest {
       ArgumentCaptor<UserAttributesUpdateDto> body =
           ArgumentCaptor.forClass(UserAttributesUpdateDto.class);
       verify(backendApiClient)
-          .put(eq("/api/v1/users/" + id + "/attributes"), body.capture(), eq(Void.class));
+          .put(eq("/api/v1/users/{id}/attributes"), body.capture(), eq(Void.class), eq(id));
       assertEquals(5, body.getValue().rank());
       assertEquals("desc", body.getValue().description());
       assertEquals("Alice", body.getValue().displayName());
@@ -578,7 +585,7 @@ class MemberManagementControllerTest {
       when(br.hasErrors()).thenReturn(false);
       doThrow(new RuntimeException("backend down"))
           .when(backendApiClient)
-          .put(anyString(), any(), any());
+          .put(anyString(), any(), any(), any(Object[].class));
 
       String view = controller.updateMember(id, form, br, model, redirectAttributes);
 
@@ -596,7 +603,9 @@ class MemberManagementControllerTest {
               5, "desc", "Alice", 1L, "profile", null, null, null, null, null, null, null);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
-      doThrow(new RuntimeException("nope")).when(backendApiClient).put(anyString(), any(), any());
+      doThrow(new RuntimeException("nope"))
+          .when(backendApiClient)
+          .put(anyString(), any(), any(), any(Object[].class));
 
       String view = controller.updateMember(id, form, br, model, redirectAttributes);
 
@@ -620,8 +629,9 @@ class MemberManagementControllerTest {
       controller.updateMember(id, form, br, model, redirectAttributes);
 
       verify(backendApiClient)
-          .put(eq("/api/v1/users/" + id + "/attributes"), any(), eq(Void.class));
+          .put(eq("/api/v1/users/{id}/attributes"), any(), eq(Void.class), eq(id));
       verify(backendApiClient, never()).patch(anyString(), any(), any());
+      verify(backendApiClient, never()).patch(anyString(), any(), any(), any(Object[].class));
     }
 
     @Test
@@ -637,8 +647,8 @@ class MemberManagementControllerTest {
       controller.updateMember(id, form, br, model, redirectAttributes);
 
       verify(backendApiClient)
-          .put(eq("/api/v1/users/" + id + "/attributes"), any(), eq(Void.class));
-      verify(backendApiClient).patch(eq("/api/v1/users/" + id + "/memberships"), any(), any());
+          .put(eq("/api/v1/users/{id}/attributes"), any(), eq(Void.class), eq(id));
+      verify(backendApiClient).patch(eq("/api/v1/users/{id}/memberships"), any(), any(), eq(id));
     }
   }
 
@@ -666,6 +676,7 @@ class MemberManagementControllerTest {
       assertEquals(
           "Description too long", ((java.util.Map<?, ?>) response.getBody()).get("description"));
       verify(backendApiClient, never()).put(anyString(), any(), any());
+      verify(backendApiClient, never()).put(anyString(), any(), any(), any(Object[].class));
     }
 
     @Test
@@ -686,7 +697,7 @@ class MemberManagementControllerTest {
       assertNotNull(response.getBody());
       assertEquals(1L, ((java.util.Map<?, ?>) response.getBody()).get("version"));
       verify(backendApiClient)
-          .put(eq("/api/v1/users/" + id + "/attributes"), any(), eq(Void.class));
+          .put(eq("/api/v1/users/{id}/attributes"), any(), eq(Void.class), eq(id));
     }
 
     @Test
@@ -701,7 +712,7 @@ class MemberManagementControllerTest {
               new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                   "conflict", null, 409, "OPTIMISTIC_LOCK", null, List.of(), "Stale data"))
           .when(backendApiClient)
-          .put(eq("/api/v1/users/" + id + "/attributes"), any(), eq(Void.class));
+          .put(eq("/api/v1/users/{id}/attributes"), any(), eq(Void.class), eq(id));
 
       org.springframework.http.ResponseEntity<Object> response =
           controller.updateMemberAjax(id, form, br, java.util.Locale.ENGLISH);
@@ -719,7 +730,7 @@ class MemberManagementControllerTest {
       org.springframework.http.ResponseEntity<Object> response = controller.deleteMemberAjax(id);
 
       assertEquals(200, response.getStatusCode().value());
-      verify(backendApiClient).delete("/api/v1/users/" + id, Void.class);
+      verify(backendApiClient).delete("/api/v1/users/{id}", Void.class, id);
     }
 
     @Test
@@ -729,7 +740,7 @@ class MemberManagementControllerTest {
               new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                   "nope", null, 409, "ENTITY_IN_USE", null, List.of(), "Still in Keycloak"))
           .when(backendApiClient)
-          .delete("/api/v1/users/" + id, Void.class);
+          .delete("/api/v1/users/{id}", Void.class, id);
 
       org.springframework.http.ResponseEntity<Object> response = controller.deleteMemberAjax(id);
 

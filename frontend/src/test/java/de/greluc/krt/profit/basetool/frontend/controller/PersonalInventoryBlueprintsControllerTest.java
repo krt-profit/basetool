@@ -129,7 +129,7 @@ class PersonalInventoryBlueprintsControllerTest {
     String view = controller.updateNote(id, "a note", "2026-03-01T00:00:00Z", 3L, flash);
 
     assertEquals("redirect:/personal-inventory/blueprints", view);
-    verify(backendApiClient).put(contains(id.toString()), any(), any());
+    verify(backendApiClient).put(eq("/api/v1/personal-blueprints/{id}"), any(), any(), eq(id));
     assertEquals(
         "personalInventory.blueprints.toast.noteUpdated",
         flash.getFlashAttributes().get("successToast"));
@@ -138,7 +138,7 @@ class PersonalInventoryBlueprintsControllerTest {
   @Test
   void updateNote_mapsConflictToOptimisticLockToast() {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.put(any(), any(), any()))
+    when(backendApiClient.put(any(), any(), any(), any(Object[].class)))
         .thenThrow(new BackendServiceException("conflict", null, 409));
     RedirectAttributesModelMap flash = new RedirectAttributesModelMap();
 
@@ -186,7 +186,7 @@ class PersonalInventoryBlueprintsControllerTest {
     String view = controller.delete(id, flash);
 
     assertEquals("redirect:/personal-inventory/blueprints", view);
-    verify(backendApiClient).delete(contains(id.toString()), eq(Void.class));
+    verify(backendApiClient).delete(eq("/api/v1/personal-blueprints/{id}"), eq(Void.class), eq(id));
     assertEquals(
         "personalInventory.blueprints.toast.removed",
         flash.getFlashAttributes().get("successToast"));

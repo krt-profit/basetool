@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.websocket;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronRelayFilter;
+import de.greluc.krt.profit.basetool.frontend.service.BackendSideChannels;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncSubscriptionAuthorizer.Decision;
 import java.util.Set;
 import java.util.UUID;
@@ -54,7 +55,7 @@ class LiveSyncSubscriptionAuthorizerTest {
     server = new MockWebServer();
     server.start();
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
-    authorizer = new LiveSyncSubscriptionAuthorizer(webClient);
+    authorizer = new LiveSyncSubscriptionAuthorizer(new BackendSideChannels(null, webClient));
     operationTopic = LiveSyncTopic.parse("operation:" + UUID.randomUUID());
   }
 

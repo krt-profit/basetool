@@ -67,7 +67,7 @@ class AdminUexPageControllerTest {
 
     assertEquals("redirect:/admin/uex-data", view);
     verify(client)
-        .patch(eq("/api/v1/cities/" + id + "/loading-dock?value=true"), any(), eq(Void.class));
+        .patch(eq("/api/v1/cities/{id}/loading-dock?value=true"), any(), eq(Void.class), eq(id));
   }
 
   @Test
@@ -81,9 +81,10 @@ class AdminUexPageControllerTest {
 
     verify(client)
         .patch(
-            eq("/api/v1/space-stations/" + id + "/loading-dock?value=false"),
+            eq("/api/v1/space-stations/{id}/loading-dock?value=false"),
             any(),
-            eq(Void.class));
+            eq(Void.class),
+            eq(id));
   }
 
   @Test
@@ -95,7 +96,7 @@ class AdminUexPageControllerTest {
 
     controller.updateLoadingDockOverride("outposts", id, "uex", attrs);
 
-    verify(client).delete("/api/v1/outposts/" + id + "/loading-dock-override", Void.class);
+    verify(client).delete("/api/v1/outposts/{id}/loading-dock-override", Void.class, id);
   }
 
   @Test
@@ -108,7 +109,7 @@ class AdminUexPageControllerTest {
     controller.updateLoadingDockOverride("pois", id, "yes", attrs);
 
     verify(client)
-        .patch(eq("/api/v1/pois/" + id + "/loading-dock?value=true"), any(), eq(Void.class));
+        .patch(eq("/api/v1/pois/{id}/loading-dock?value=true"), any(), eq(Void.class), eq(id));
   }
 
   @Test
@@ -121,7 +122,7 @@ class AdminUexPageControllerTest {
     controller.updateLoadingDockOverride("terminals", id, "yes", attrs);
 
     verify(client)
-        .patch(eq("/api/v1/terminals/" + id + "/loading-dock?value=true"), any(), eq(Void.class));
+        .patch(eq("/api/v1/terminals/{id}/loading-dock?value=true"), any(), eq(Void.class), eq(id));
   }
 
   @Test
@@ -138,6 +139,15 @@ class AdminUexPageControllerTest {
         .patch(ArgumentMatchers.<String>any(), any(), ArgumentMatchers.<Class<?>>any());
     verify(client, never())
         .delete(ArgumentMatchers.<String>any(), ArgumentMatchers.<Class<?>>any());
+    verify(client, never())
+        .patch(
+            ArgumentMatchers.<String>any(),
+            any(),
+            ArgumentMatchers.<Class<?>>any(),
+            any(Object[].class));
+    verify(client, never())
+        .delete(
+            ArgumentMatchers.<String>any(), ArgumentMatchers.<Class<?>>any(), any(Object[].class));
   }
 
   @Test
@@ -153,6 +163,15 @@ class AdminUexPageControllerTest {
         .patch(ArgumentMatchers.<String>any(), any(), ArgumentMatchers.<Class<?>>any());
     verify(client, never())
         .delete(ArgumentMatchers.<String>any(), ArgumentMatchers.<Class<?>>any());
+    verify(client, never())
+        .patch(
+            ArgumentMatchers.<String>any(),
+            any(),
+            ArgumentMatchers.<Class<?>>any(),
+            any(Object[].class));
+    verify(client, never())
+        .delete(
+            ArgumentMatchers.<String>any(), ArgumentMatchers.<Class<?>>any(), any(Object[].class));
   }
 
   @Test
@@ -165,7 +184,7 @@ class AdminUexPageControllerTest {
     controller.updateTerminalAutoLoadOverride(id, "yes", attrs);
 
     verify(client)
-        .patch(eq("/api/v1/terminals/" + id + "/auto-load?value=true"), any(), eq(Void.class));
+        .patch(eq("/api/v1/terminals/{id}/auto-load?value=true"), any(), eq(Void.class), eq(id));
   }
 
   @Test
@@ -177,7 +196,7 @@ class AdminUexPageControllerTest {
 
     controller.updateTerminalAutoLoadOverride(id, "uex", attrs);
 
-    verify(client).delete("/api/v1/terminals/" + id + "/auto-load-override", Void.class);
+    verify(client).delete("/api/v1/terminals/{id}/auto-load-override", Void.class, id);
   }
 
   @Test
@@ -192,7 +211,7 @@ class AdminUexPageControllerTest {
     String view = controller.toggleTerminalVisibility(id, true, attrs);
 
     assertEquals("redirect:/admin/uex-data", view);
-    verify(client).put(eq("/api/v1/terminals/" + id), any(), eq(Void.class));
+    verify(client).put(eq("/api/v1/terminals/{id}"), any(), eq(Void.class), eq(id));
     verify(client).evict(CacheDomain.TERMINAL);
   }
 
@@ -208,7 +227,7 @@ class AdminUexPageControllerTest {
 
     assertTrue(
         response.getStatusCode().is2xxSuccessful(), "ajax toggle must return 2xx on success");
-    verify(client).put(eq("/api/v1/terminals/" + id), any(), eq(Void.class));
+    verify(client).put(eq("/api/v1/terminals/{id}"), any(), eq(Void.class), eq(id));
     verify(client).evict(CacheDomain.TERMINAL);
   }
 

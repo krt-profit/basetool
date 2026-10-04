@@ -90,7 +90,7 @@ class PersonalBlueprintWriteAjaxControllerTest {
             null,
             null);
     when(backendApiClient.put(
-            eq("/api/v1/personal-blueprints/" + id), any(), eq(PersonalBlueprintDto.class)))
+            eq("/api/v1/personal-blueprints/{id}"), any(), eq(PersonalBlueprintDto.class), eq(id)))
         .thenReturn(fresh);
 
     mockMvc
@@ -110,7 +110,7 @@ class PersonalBlueprintWriteAjaxControllerTest {
   void updateNoteAjax_backendOptimisticLock_propagatesProblemJsonWithCode() throws Exception {
     UUID id = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/personal-blueprints/" + id), any(), eq(PersonalBlueprintDto.class)))
+            eq("/api/v1/personal-blueprints/{id}"), any(), eq(PersonalBlueprintDto.class), eq(id)))
         .thenThrow(
             new BackendServiceException(
                 "conflict", null, 409, "OPTIMISTIC_LOCK", null, Collections.emptyList(), null));
@@ -138,7 +138,7 @@ class PersonalBlueprintWriteAjaxControllerTest {
                 .with(csrf()))
         .andExpect(status().isNoContent());
 
-    verify(backendApiClient).delete(eq("/api/v1/personal-blueprints/" + id), eq(Void.class));
+    verify(backendApiClient).delete(eq("/api/v1/personal-blueprints/{id}"), eq(Void.class), eq(id));
   }
 
   @Test

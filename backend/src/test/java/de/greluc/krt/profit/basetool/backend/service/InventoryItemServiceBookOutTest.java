@@ -400,7 +400,7 @@ class InventoryItemServiceBookOutTest {
                       newDto(1.0, OWNER_ID, LOCATION_ID, CheckoutType.TRANSFER, null, null, 1L),
                       OWNER_ID,
                       false));
-      assert ex.getMessage().toLowerCase().contains("change");
+      assertEquals("error.inventory.transfer.unchanged", ex.getMessage());
     }
 
     @Test

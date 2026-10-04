@@ -83,7 +83,7 @@ class InventoryWriteControllerAllocationTest {
             InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 4.0, 1L);
     InventoryItemDto out = sentinel();
     when(backendApiClient.post(
-            "/api/v1/inventory/" + id + "/allocation", dto, InventoryItemDto.class))
+            "/api/v1/inventory/{id}/allocation", dto, InventoryItemDto.class, id))
         .thenReturn(out);
 
     ResponseEntity<Object> result = controller().addAllocation(id, dto);
@@ -91,7 +91,7 @@ class InventoryWriteControllerAllocationTest {
     assertEquals(200, result.getStatusCode().value());
     assertSame(out, result.getBody());
     verify(backendApiClient)
-        .post("/api/v1/inventory/" + id + "/allocation", dto, InventoryItemDto.class);
+        .post("/api/v1/inventory/{id}/allocation", dto, InventoryItemDto.class, id);
   }
 
   @Test
@@ -101,7 +101,7 @@ class InventoryWriteControllerAllocationTest {
         new InventoryAllocationWriteDto(
             InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 99.0, 1L);
     when(backendApiClient.post(
-            "/api/v1/inventory/" + id + "/allocation", dto, InventoryItemDto.class))
+            "/api/v1/inventory/{id}/allocation", dto, InventoryItemDto.class, id))
         .thenThrow(
             new BackendServiceException(
                 "over", null, 422, "OVER_ALLOCATION", "corr-422", List.of(), null));
@@ -119,7 +119,7 @@ class InventoryWriteControllerAllocationTest {
             InventoryAllocationDimension.MISSION, UUID.randomUUID(), 6.0, 2L);
     InventoryItemDto out = sentinel();
     when(backendApiClient.patch(
-            "/api/v1/inventory/" + id + "/allocation", dto, InventoryItemDto.class))
+            "/api/v1/inventory/{id}/allocation", dto, InventoryItemDto.class, id))
         .thenReturn(out);
 
     ResponseEntity<Object> result = controller().changeAllocation(id, dto);
@@ -127,7 +127,7 @@ class InventoryWriteControllerAllocationTest {
     assertEquals(200, result.getStatusCode().value());
     assertSame(out, result.getBody());
     verify(backendApiClient)
-        .patch("/api/v1/inventory/" + id + "/allocation", dto, InventoryItemDto.class);
+        .patch("/api/v1/inventory/{id}/allocation", dto, InventoryItemDto.class, id);
   }
 
   @Test
@@ -138,7 +138,7 @@ class InventoryWriteControllerAllocationTest {
             InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), null, 3L);
     InventoryItemDto out = sentinel();
     when(backendApiClient.delete(
-            eq("/api/v1/inventory/" + id + "/allocation"), eq(dto), eq(InventoryItemDto.class)))
+            eq("/api/v1/inventory/{id}/allocation"), eq(dto), eq(InventoryItemDto.class), eq(id)))
         .thenReturn(out);
 
     ResponseEntity<Object> result = controller().removeAllocation(id, dto);
@@ -146,6 +146,6 @@ class InventoryWriteControllerAllocationTest {
     assertEquals(200, result.getStatusCode().value());
     assertSame(out, result.getBody());
     verify(backendApiClient)
-        .delete("/api/v1/inventory/" + id + "/allocation", dto, InventoryItemDto.class);
+        .delete("/api/v1/inventory/{id}/allocation", dto, InventoryItemDto.class, id);
   }
 }

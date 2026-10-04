@@ -62,8 +62,13 @@ A rendered page carries no developer text and no inline page CSS (`REQ-UI-023`,
   The only `<!--/*/ … /*/-->` allowed is Thymeleaf's prototype-only markup, which is not a comment.
 - **Page CSS goes into `static/css/pages/<page>.css`**, linked with `<link rel="stylesheet">` where
   a `<style>` block would stand (in the `extraLinks` fragment for the head). No `<style>` element in
-  a template. It is linted by `:frontend:lintCssInline` with the tiny template rule set, and
-  formatted by Prettier.
+  a template. It is linted by `:frontend:lintCss` with the standard rule set, like every other
+  stylesheet, and formatted by Prettier.
+- **Colours and stacking go through tokens** (REQ-UI-001, ADR-0243): a colour token's value is
+  `var(--color-x)`, its alpha variant `color-mix(in srgb, var(--color-x) N%, transparent)` — never a
+  hand-written `rgb()`/hex copy (`ColourTokenCopyTest`). A `z-index` that competes across the page
+  is a `--z-*` token from the scale on `:root` in `styles.css`; a literal stays below 50 and orders
+  one component's parts only (`ZIndexScaleTest`).
 
 ### CSS: the layer decides, not the load order (binding)
 
@@ -152,6 +157,13 @@ its full `krtFetch`/fragment-swap contract and the live multi-user sync live in
 success, leaves a sibling/peer view stale, or hand-rolls a `fetch`/CSRF write outside `krtFetch` is
 incomplete — extend the standard to cover it, don't fall back to a reload.
 
+**Reads go through `krtFetch` too (REQ-FE-031).** `krtFetch.getJson(url)` for JSON,
+`krtFetch.get(url, {accept, headers, signal, key})` for a fragment, a blob or a status the caller
+reads itself. Both send the background marker, hand a lost session or the consent gate to the
+navigation, and refuse a redirected answer (`get` resolves null, `getJson` rejects). A raw `fetch`
+or `XMLHttpRequest` fails `:frontend:lintJs` outside `krt-fetch.js` and `krt-client-error.js`, and
+`BackgroundReadGateContractTest` fails one in an inline template script.
+
 **Live update and multi-user sync move with every feature — added, changed *or* removed.** Whenever
 you add, change or remove a frontend surface that participates in live update or live multi-user
 sync (a new editable section, a renamed/retired one, a new mutation on an existing section), you
@@ -208,6 +220,9 @@ is gone (ADR-0130). Two consequences you will actually trip over:
 implicit-any errors — and TS 5.9.3 reported the identical 514, so that is pre-existing annotation
 debt rather than anything TS 7 introduced.
 
+- **The language level is ES2025** (ADR-0239, REQ-FE-018): the floor is Chrome 122, Firefox 131,
+  Safari / iOS 18.4. `Promise.try`, `RegExp.escape` and `Float16Array` are in TypeScript's `ES2025`
+  lib but above the floor, so ESLint rejects them.
 - **Opt in per file** with a leading `// @ts-check`. A file that opts in **must** be error-free —
   there is no partial state. Prefer opting in any file you substantially touch.
 - **Declare shared contracts in the same change.** A new `window.krt*` API, a new custom DOM event
@@ -225,7 +240,7 @@ debt rather than anything TS 7 introduced.
 
 ## Backend calls: resilience & context propagation
 
-- **WebClient** is centrally configured (base URL, default headers, connect/read/write timeouts) in `WebClientConfig`, and **nowhere else** (REQ-FE-029, `WebClientConfinementTest`): only `WebClientConfig` builds a client, and only `BackendApiClient`, the SSE relay (`NotificationPageController`) and the live-sync probe (`LiveSyncSubscriptionAuthorizer`) hold one. A new backend call goes through `BackendApiClient` (`execute(…)` for an unusual shape). Paths are relative `/api/…`: every backend client refuses any origin but `app.backend-url`'s in its first filter, before the OAuth2 filter attaches the bearer — a test that wants a client to reach a local server sets the backend URL to that server instead of passing an absolute URI. A future HTTP-interface client is created over the `webClient` bean and takes no `URI`, `UriBuilderFactory` or `@CookieValue` parameter, names no absolute URL and carries no `@Cacheable`.
+- **WebClient** is centrally configured (base URL, default headers, connect/read/write timeouts) in `WebClientConfig`, and **nowhere else** (REQ-FE-029, `WebClientConfinementTest`): only `WebClientConfig` builds a client, and only the backend kernel holds one: `BackendApiClient`, and `BackendSideChannels` for the notification SSE relay and the live-sync probe, the two calls that deliberately skip the resilience pass. A new backend call goes through `BackendApiClient` (`execute(…)` for an unusual shape); every failure is mapped once, by `BackendErrorMapper`'s exhaustive switch over its sealed `Outcome`. A runtime value goes into a backend URI as a template variable of the verb's template overload (`post("/api/v1/x/{id}", body, T.class, id)`), never by concatenation (REQ-SEC-051, `WriteUriTemplateTest` for the write verbs). Paths are relative `/api/…`: every backend client refuses any origin but `app.backend-url`'s in its first filter, before the OAuth2 filter attaches the bearer — a test that wants a client to reach a local server sets the backend URL to that server instead of passing an absolute URI. A future HTTP-interface client is created over the `webClient` bean and takes no `URI`, `UriBuilderFactory` or `@CookieValue` parameter, names no absolute URL and carries no `@Cacheable`.
 - **Resilience4j** wraps every call through `webClient` and `termsDocumentClient` (Timeout, Retry, CircuitBreaker, Bulkhead); the SSE relay's `sseWebClient` and the live-sync probe's `liveSyncAuthWebClient` deliberately carry none. State transitions are logged via `ResilienceEventLogger` so `SERVICE_UNAVAILABLE` / `BACKEND_TIMEOUT` always have a matching log line.
 - **Reactor context propagation is mandatory for any new `ThreadLocal` you want to see inside `WebClient` exchange filters.** `WebClient.exchange()` runs on a Reactor-Netty worker thread, not the servlet thread; classic `ThreadLocal` values are not copied across threads. Register a `ThreadLocalAccessor` on `ContextRegistry.getInstance()` in [`ReactorContextPropagationConfig`](src/main/java/de/greluc/krt/profit/basetool/frontend/config/ReactorContextPropagationConfig.java) (which also enables `Hooks.enableAutomaticContextPropagation()` at startup). The existing accessors cover `ActiveSquadronContext` (active-OrgUnit pin → `X-Active-Org-Unit-Id` outbound header), `CorrelationContext` (correlation id propagation), Spring's `LocaleContextHolder` (user locale) and `ClientIpContext`. Forgetting the accessor means the holder is invisible on the worker thread and the outbound call silently drops whatever it carried. Register it inside `ReactorContextPropagationConfig#registerRelayAccessors`: `ParallelPageLoader` restores a `ContextSnapshot` of the same registry on its virtual threads, so the accessor reaches parallel page sections with no change to the loader (REQ-FE-030). Never hand-copy a holder in the loader again — that is how the locale went missing there.
 - Use `MockWebServer` / WireMock to test error paths.

@@ -64,7 +64,8 @@ class AdminLocationsPageControllerTest {
     String view = controller.toggleHomeLocation(id, true, new RedirectAttributesModelMap());
 
     ArgumentCaptor<LocationDto> body = ArgumentCaptor.forClass(LocationDto.class);
-    verify(backendApiClient).put(eq("/api/v1/locations/" + id), body.capture(), eq(Void.class));
+    verify(backendApiClient)
+        .put(eq("/api/v1/locations/{id}"), body.capture(), eq(Void.class), eq(id));
     assertTrue(body.getValue().homeLocation(), "the new home-location flag must be persisted");
     assertEquals("Lorville", body.getValue().name(), "name must be preserved");
     assertEquals("Hurston city", body.getValue().description(), "description must be preserved");
@@ -107,7 +108,7 @@ class AdminLocationsPageControllerTest {
     controller.toggleLocationVisibilityAjax(id);
 
     verify(backendApiClient)
-        .put(eq("/api/v1/locations/" + id), any(LocationDto.class), eq(Void.class));
+        .put(eq("/api/v1/locations/{id}"), any(LocationDto.class), eq(Void.class), eq(id));
     verify(backendApiClient).evict(CacheDomain.LOCATION);
   }
 }

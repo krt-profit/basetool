@@ -20,22 +20,16 @@
 package de.greluc.krt.profit.basetool.frontend.service;
 
 import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
-import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.TermsDocumentDto;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
-import io.github.resilience4j.bulkhead.BulkheadFullException;
-import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.MDC;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
@@ -43,15 +37,12 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientRequestException;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
- * WebClient wrapper for the backend REST API: parses RFC-7807 problem responses into {@link
- * BackendServiceException} and exposes typed overloads for every HTTP verb. {@code
+ * WebClient wrapper for the backend REST API: exposes typed overloads for every HTTP verb, each
+ * with a URI-template twin, and maps every failure through {@link BackendErrorMapper} into {@link
+ * BackendServiceException} or {@link ReauthenticationRequiredException}. {@code
  * getCached(CachedCatalog, ...)} adds Spring Cache, routing each {@link CachedCatalog} to its
  * domain cache via {@link CatalogCacheResolver}.
  *
@@ -65,10 +56,13 @@ import tools.jackson.databind.json.JsonMapper;
  * than catching {@link BackendServiceException}.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class BackendApiClient {
 
+  /** The path the wording lives at; the one URI {@link #termsDocumentClient} ever sees. */
+  private static final String TERMS_DOCUMENT_URI = "/api/v1/terms/document";
+
+  /** The filtered, resilient, bearer-relaying backend client. */
   private final WebClient webClient;
 
   /**
@@ -77,8 +71,30 @@ public class BackendApiClient {
    */
   private final WebClient termsDocumentClient;
 
-  /** The path the wording lives at; the one URI {@link #termsDocumentClient} ever sees. */
-  private static final String TERMS_DOCUMENT_URI = "/api/v1/terms/document";
+  /** Holds the catalogue caches {@link #evict(CacheDomain...)} clears. */
+  private final CacheManager cacheManager;
+
+  /** Maps every failed call; writes to this class's logger. */
+  private final BackendErrorMapper errorMapper;
+
+  /**
+   * Creates the client.
+   *
+   * @param webClient the filtered, resilient, bearer-relaying backend client
+   * @param termsDocumentClient the bearer-less client for the Terms-of-Use wording
+   * @param meterRegistry receives {@code basetool_backend_client_errors_total}
+   * @param cacheManager holds the catalogue caches
+   */
+  public BackendApiClient(
+      WebClient webClient,
+      WebClient termsDocumentClient,
+      MeterRegistry meterRegistry,
+      CacheManager cacheManager) {
+    this.webClient = webClient;
+    this.termsDocumentClient = termsDocumentClient;
+    this.cacheManager = cacheManager;
+    this.errorMapper = new BackendErrorMapper(meterRegistry, log);
+  }
 
   /**
    * Reads the Terms-of-Use wording in force without a bearer token, for the public {@code /terms}
@@ -90,53 +106,6 @@ public class BackendApiClient {
    */
   public TermsDocumentDto getTermsDocumentAnonymously() {
     return executeGet(termsDocumentClient, TERMS_DOCUMENT_URI, TermsDocumentDto.class);
-  }
-
-  private final MeterRegistry meterRegistry;
-  private final CacheManager cacheManager;
-
-  /**
-   * Dedicated ObjectMapper used exclusively to decode backend Problem+JSON bodies. Kept as an
-   * internal instance — not auto-wired — because some frontend test slices run without Spring
-   * Boot's JacksonAutoConfiguration and therefore without a shared ObjectMapper bean.
-   */
-  private final ObjectMapper objectMapper = JsonMapper.builder().build();
-
-  /**
-   * Increments {@code basetool_backend_client_errors_total} for a failed backend call
-   * (REQ-OBS-011). Both labels are bounded: {@code reason} is a fixed local enumeration (never the
-   * backend's response-body code, which could be arbitrary), and {@code method} is the HTTP verb.
-   * The request URI is deliberately never a label — it embeds ids/paths and is unbounded.
-   *
-   * @param reason the bounded failure reason ({@code MetricNames.REASON_*})
-   * @param method the HTTP verb of the failed call
-   */
-  private void countBackendError(String reason, String method) {
-    meterRegistry
-        .counter(
-            MetricNames.BACKEND_CLIENT_ERRORS,
-            MetricNames.TAG_REASON,
-            reason,
-            MetricNames.TAG_METHOD,
-            method)
-        .increment();
-  }
-
-  /**
-   * Whether a problem code is one of the access gates refusing an authenticated user (pending
-   * approval, unaccepted terms, no role) rather than a backend-call failure.
-   *
-   * <p>These refusals are expected, frequent and self-clearing (REQ-SEC-017, REQ-SEC-028,
-   * REQ-SEC-053), so they are not treated as backend failures in the logs or in {@code
-   * basetool_backend_client_errors_total}.
-   *
-   * @param problemCode the RFC 7807 {@code code} the backend returned, may be {@code null}
-   * @return {@code true} when the refusal is an expected access gate
-   */
-  private static boolean isExpectedAccessGateRefusal(String problemCode) {
-    return BackendServiceException.CODE_PENDING_APPROVAL.equals(problemCode)
-        || BackendServiceException.CODE_TERMS_NOT_ACCEPTED.equals(problemCode)
-        || BackendServiceException.CODE_NO_ROLE.equals(problemCode);
   }
 
   /** GET against the authenticated backend, decoded via a {@link ParameterizedTypeReference}. */
@@ -315,7 +284,14 @@ public class BackendApiClient {
   }
 
   /**
-   * POST against the authenticated backend; {@code body} may be {@code null} for empty payloads.
+   * POST against the authenticated backend.
+   *
+   * @param uri the backend path, sent as-is
+   * @param body the payload, or {@code null} for none
+   * @param responseType the decoded response class
+   * @param <T> the request-body type
+   * @param <R> the response body type
+   * @return the decoded response body, or {@code null} when the backend returned none
    */
   public <T, R> R post(String uri, T body, Class<R> responseType) {
     return exchange(
@@ -325,7 +301,36 @@ public class BackendApiClient {
         spec -> spec.bodyToMono(responseType));
   }
 
-  /** PUT against the authenticated backend; {@code body} may be {@code null} for empty payloads. */
+  /**
+   * POST against the authenticated backend, expanding {@code uriVariables} into {@code uriTemplate}
+   * so the WebClient encodes each value (REQ-SEC-051).
+   *
+   * @param uriTemplate the URI template containing {@code {name}} placeholders
+   * @param body the payload, or {@code null} for none
+   * @param responseType the decoded response class
+   * @param uriVariables the values expanded into the template, in order
+   * @param <T> the request-body type
+   * @param <R> the response body type
+   * @return the decoded response body, or {@code null} when the backend returned none
+   */
+  public <T, R> R post(String uriTemplate, T body, Class<R> responseType, Object... uriVariables) {
+    return exchange(
+        HttpMethod.POST,
+        uriTemplate,
+        () -> withOptionalBody(webClient.post().uri(uriTemplate, uriVariables), body),
+        spec -> spec.bodyToMono(responseType));
+  }
+
+  /**
+   * PUT against the authenticated backend.
+   *
+   * @param uri the backend path, sent as-is
+   * @param body the payload, or {@code null} for none
+   * @param responseType the decoded response class
+   * @param <T> the request-body type
+   * @param <R> the response body type
+   * @return the decoded response body, or {@code null} when the backend returned none
+   */
   public <T, R> R put(String uri, T body, Class<R> responseType) {
     return exchange(
         HttpMethod.PUT,
@@ -334,7 +339,34 @@ public class BackendApiClient {
         spec -> spec.bodyToMono(responseType));
   }
 
-  /** DELETE against the authenticated backend; pass {@code Void.class} for 204 responses. */
+  /**
+   * PUT against the authenticated backend, expanding {@code uriVariables} into {@code uriTemplate}
+   * so the WebClient encodes each value (REQ-SEC-051).
+   *
+   * @param uriTemplate the URI template containing {@code {name}} placeholders
+   * @param body the payload, or {@code null} for none
+   * @param responseType the decoded response class
+   * @param uriVariables the values expanded into the template, in order
+   * @param <T> the request-body type
+   * @param <R> the response body type
+   * @return the decoded response body, or {@code null} when the backend returned none
+   */
+  public <T, R> R put(String uriTemplate, T body, Class<R> responseType, Object... uriVariables) {
+    return exchange(
+        HttpMethod.PUT,
+        uriTemplate,
+        () -> withOptionalBody(webClient.put().uri(uriTemplate, uriVariables), body),
+        spec -> spec.bodyToMono(responseType));
+  }
+
+  /**
+   * DELETE against the authenticated backend.
+   *
+   * @param uri the backend path, sent as-is
+   * @param responseType the decoded response class; {@code Void.class} for a {@code 204}
+   * @param <R> the response body type
+   * @return the decoded response body, or {@code null} when the backend returned none
+   */
   public <R> R delete(String uri, Class<R> responseType) {
     return exchange(
         HttpMethod.DELETE,
@@ -344,18 +376,33 @@ public class BackendApiClient {
   }
 
   /**
-   * DELETE against the authenticated backend that carries a request body — needed by the inventory
-   * per-allocation remove endpoint, which identifies the slice to drop through a body (dimension +
-   * target + echoed version) rather than the URI. The body-less {@link #delete(String, Class)}
-   * stays the default for the common no-payload case.
+   * DELETE against the authenticated backend, expanding {@code uriVariables} into {@code
+   * uriTemplate} so the WebClient encodes each value (REQ-SEC-051).
    *
-   * @param uri the backend path.
-   * @param body the request payload; must not be {@code null} (use {@link #delete(String, Class)}
-   *     for a body-less DELETE).
-   * @param responseType the expected response type.
-   * @param <T> the request-body type.
-   * @param <R> the response type.
-   * @return the deserialized response body.
+   * @param uriTemplate the URI template containing {@code {name}} placeholders
+   * @param responseType the decoded response class; {@code Void.class} for a {@code 204}
+   * @param uriVariables the values expanded into the template, in order
+   * @param <R> the response body type
+   * @return the decoded response body, or {@code null} when the backend returned none
+   */
+  public <R> R delete(String uriTemplate, Class<R> responseType, Object... uriVariables) {
+    return exchange(
+        HttpMethod.DELETE,
+        uriTemplate,
+        () -> webClient.delete().uri(uriTemplate, uriVariables),
+        spec -> spec.bodyToMono(responseType));
+  }
+
+  /**
+   * DELETE against the authenticated backend that carries a request body, for an endpoint that
+   * identifies the slice to drop through the body rather than the URI.
+   *
+   * @param uri the backend path, sent as-is
+   * @param body the request payload; must not be {@code null}
+   * @param responseType the decoded response class
+   * @param <T> the request-body type
+   * @param <R> the response body type
+   * @return the decoded response body, or {@code null} when the backend returned none
    */
   public <T, R> R delete(String uri, T body, Class<R> responseType) {
     return exchange(
@@ -366,7 +413,35 @@ public class BackendApiClient {
   }
 
   /**
-   * PATCH against the authenticated backend; {@code body} may be {@code null} for empty payloads.
+   * DELETE with a request body, expanding {@code uriVariables} into {@code uriTemplate} so the
+   * WebClient encodes each value (REQ-SEC-051).
+   *
+   * @param uriTemplate the URI template containing {@code {name}} placeholders
+   * @param body the request payload; must not be {@code null}
+   * @param responseType the decoded response class
+   * @param uriVariables the values expanded into the template, in order
+   * @param <T> the request-body type
+   * @param <R> the response body type
+   * @return the decoded response body, or {@code null} when the backend returned none
+   */
+  public <T, R> R delete(
+      String uriTemplate, T body, Class<R> responseType, Object... uriVariables) {
+    return exchange(
+        HttpMethod.DELETE,
+        uriTemplate,
+        () -> webClient.method(HttpMethod.DELETE).uri(uriTemplate, uriVariables).bodyValue(body),
+        spec -> spec.bodyToMono(responseType));
+  }
+
+  /**
+   * PATCH against the authenticated backend.
+   *
+   * @param uri the backend path, sent as-is
+   * @param body the payload, or {@code null} for none
+   * @param responseType the decoded response class
+   * @param <T> the request-body type
+   * @param <R> the response body type
+   * @return the decoded response body, or {@code null} when the backend returned none
    */
   public <T, R> R patch(String uri, T body, Class<R> responseType) {
     return exchange(
@@ -377,12 +452,31 @@ public class BackendApiClient {
   }
 
   /**
+   * PATCH against the authenticated backend, expanding {@code uriVariables} into {@code
+   * uriTemplate} so the WebClient encodes each value (REQ-SEC-051).
+   *
+   * @param uriTemplate the URI template containing {@code {name}} placeholders
+   * @param body the payload, or {@code null} for none
+   * @param responseType the decoded response class
+   * @param uriVariables the values expanded into the template, in order
+   * @param <T> the request-body type
+   * @param <R> the response body type
+   * @return the decoded response body, or {@code null} when the backend returned none
+   */
+  public <T, R> R patch(String uriTemplate, T body, Class<R> responseType, Object... uriVariables) {
+    return exchange(
+        HttpMethod.PATCH,
+        uriTemplate,
+        () -> withOptionalBody(webClient.patch().uri(uriTemplate, uriVariables), body),
+        spec -> spec.bodyToMono(responseType));
+  }
+
+  /**
    * The single backend exchange every verb goes through: builds the request, retrieves, decodes and
    * blocks, mapping every failure the same way.
    *
-   * <p>A {@link WebClientResponseException} goes to {@link #handleWebClientException}; anything
-   * else, including a Resilience4j refusal and a malformed URI template, to {@link
-   * #handleException}. Either way the call returns the body or throws {@link
+   * <p>Every failure, including a Resilience4j refusal and a malformed URI template, goes through
+   * {@link BackendErrorMapper#map}, so the call returns the body or throws {@link
    * BackendServiceException} or {@link ReauthenticationRequiredException}.
    *
    * @param method the HTTP verb, used only as the log field and the {@code method} metric label
@@ -399,10 +493,8 @@ public class BackendApiClient {
       @NotNull Function<WebClient.ResponseSpec, Mono<R>> decode) {
     try {
       return decode.apply(request.get().retrieve()).block();
-    } catch (WebClientResponseException e) {
-      return handleWebClientException(e, method.name(), uri);
     } catch (Exception e) {
-      return handleException(e, method.name(), uri);
+      throw errorMapper.map(e, method.name(), uri);
     }
   }
 
@@ -414,7 +506,7 @@ public class BackendApiClient {
    *
    * <p>The caller builds the request on the supplied authenticated {@link WebClient} and chooses
    * how the response is decoded; every failure surfaces as {@link BackendServiceException} or
-   * {@link ReauthenticationRequiredException}, never as a raw {@link WebClientResponseException}.
+   * {@link ReauthenticationRequiredException}, never as a raw {@code WebClientResponseException}.
    *
    * @param method the HTTP verb, used only as the log field and the {@code method} metric label
    * @param uri the backend path, used only in log lines and exception messages
@@ -444,122 +536,5 @@ public class BackendApiClient {
   private static WebClient.RequestHeadersSpec<?> withOptionalBody(
       @NotNull WebClient.RequestBodySpec spec, @Nullable Object body) {
     return body != null ? spec.bodyValue(body) : spec;
-  }
-
-  private <T> T handleWebClientException(WebClientResponseException e, String method, String uri) {
-    if (!e.getStatusCode().isError()) {
-      return handleException(e, method, uri);
-    }
-    BackendServiceException parsed = BackendServiceException.fromProblem(e, objectMapper);
-    if (parsed.getStatusCode() >= 500) {
-      log.error(
-          "Backend error on {} {}: status={}, code={}, correlationId={}, detail={}, fieldErrors={}",
-          method,
-          uri,
-          parsed.getStatusCode(),
-          parsed.getProblemCode(),
-          parsed.getCorrelationId(),
-          parsed.getProblemDetail(),
-          parsed.getFieldErrors());
-    } else if (isExpectedAccessGateRefusal(parsed.getProblemCode())) {
-      log.debug(
-          "Backend client error on {} {}: status={}, code={}, correlationId={}",
-          method,
-          uri,
-          parsed.getStatusCode(),
-          parsed.getProblemCode(),
-          parsed.getCorrelationId());
-    } else {
-      log.warn(
-          "Backend client error on {} {}: status={}, code={}, correlationId={}, detail={},"
-              + " fieldErrors={}",
-          method,
-          uri,
-          parsed.getStatusCode(),
-          parsed.getProblemCode(),
-          parsed.getCorrelationId(),
-          parsed.getProblemDetail(),
-          parsed.getFieldErrors());
-    }
-    if (!isExpectedAccessGateRefusal(parsed.getProblemCode())) {
-      countBackendError(
-          parsed.getStatusCode() >= 500
-              ? MetricNames.REASON_BACKEND_5XX
-              : MetricNames.REASON_BACKEND_4XX,
-          method);
-    }
-    throw parsed;
-  }
-
-  private <T> T handleException(Exception e, String method, String uri) {
-    if (ReauthenticationRequiredException.isReauthSignal(e)) {
-      log.debug(
-          "Re-authentication required on {} {} (correlationId={})",
-          method,
-          uri,
-          MDC.get("correlationId"));
-      throw new ReauthenticationRequiredException(
-          "Re-authentication required for " + method + " " + uri, e);
-    }
-    Throwable root = unwrap(e);
-    if (root instanceof CallNotPermittedException) {
-      log.debug("Circuit breaker open for {} {}: {}", method, uri, root.getMessage());
-      countBackendError(MetricNames.REASON_CIRCUIT_OPEN, method);
-      throw new BackendServiceException(
-          "Backend circuit breaker open",
-          e,
-          503,
-          BackendServiceException.CODE_SERVICE_UNAVAILABLE,
-          null,
-          java.util.Collections.emptyList(),
-          null);
-    }
-    if (root instanceof BulkheadFullException) {
-      log.warn("Bulkhead saturated for {} {}: {}", method, uri, root.getMessage());
-      countBackendError(MetricNames.REASON_BULKHEAD_FULL, method);
-      throw new BackendServiceException(
-          "Backend bulkhead full",
-          e,
-          503,
-          BackendServiceException.CODE_SERVICE_UNAVAILABLE,
-          null,
-          java.util.Collections.emptyList(),
-          null);
-    }
-    if (root instanceof TimeoutException
-        || root instanceof WebClientRequestException
-        || root instanceof java.io.IOException) {
-      log.warn("Backend timeout / connection failure on {} {}: {}", method, uri, root.getMessage());
-      countBackendError(MetricNames.REASON_TIMEOUT, method);
-      throw new BackendServiceException(
-          "Backend timeout",
-          e,
-          504,
-          BackendServiceException.CODE_BACKEND_TIMEOUT,
-          null,
-          java.util.Collections.emptyList(),
-          null);
-    }
-    log.error("Unexpected backend error on {} {}: {}", method, uri, e.getMessage(), e);
-    countBackendError(MetricNames.REASON_UNKNOWN, method);
-    throw new BackendServiceException("Error on " + method + " data from backend", e, 500);
-  }
-
-  private static Throwable unwrap(Throwable t) {
-    Throwable current = t;
-    while (current != null) {
-      if (current instanceof CallNotPermittedException
-          || current instanceof BulkheadFullException
-          || current instanceof TimeoutException
-          || current instanceof WebClientRequestException
-          || current instanceof java.io.IOException) {
-        return current;
-      }
-      if (current.getCause() == current || current.getCause() == null) {
-        return t;
-      }
-      current = current.getCause();
-    }
-    return t;
   }
 }

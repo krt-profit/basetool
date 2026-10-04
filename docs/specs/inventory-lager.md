@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-04.
 > **Owner area:** INV · **Related ADRs:** ADR-0003, ADR-0097, ADR-0098, ADR-0101, ADR-0104,
 > ADR-0120, ADR-0124
 
@@ -367,8 +367,12 @@ Such a request is **rejected with HTTP 400** up front — before any decrement, 
 write. It must never fall through to the consume/discard tail: doing so would silently destroy the
 source stock and record it as `INVENTORY_ITEM_CONSUMED` with `type = TRANSFER`, an audit lie about
 a mutation the caller never requested. (The complementary no-op guard — a `TRANSFER` whose target
-resolves to the source's own user *and* location — likewise 400s; the append-only move of
-REQ-INV-001 is defined only for a target that actually differs.) A rejected book-out writes **no**
+resolves to the source's own user *and* location — likewise 400s with the localized
+`error.inventory.transfer.unchanged`; the append-only move of REQ-INV-001 is defined only for a
+target that actually differs.) Both Umbuchen dialogs (`/inventory/my`, `/inventory/all`) preset the
+target to the row's own user and location, so they refuse that no-op themselves: a submit whose
+target user and location both still equal the source shows `error.inventory.rebook.unchanged` as a
+toast, keeps the dialog open and sends nothing. A rejected book-out writes **no**
 audit event, consistent with the audit contract that only committed state mutations are logged
 (REQ-AUDIT-001).
 
@@ -386,10 +390,14 @@ and `ExternalContractTest` does not pin it.
   (REQ-INV-001).
 - [ ] An absent `type` with no target is still inferred as `DISCARD` (unchanged) and consumes the
   stock, logging `INVENTORY_ITEM_CONSUMED` with `type = DISCARD`.
+- [ ] An Umbuchen submit with the preset (unchanged) user and location sends no request and shows
+  the localized "unchanged" toast; the stack stays intact.
 
-**Enforced by:** `InventoryItemServiceBookOutTest` · **Code:**
+**Enforced by:** `InventoryItemServiceBookOutTest`,
+`InventoryOperationsE2eTest#edgeCaseTransferToSameLocationLeavesStockUnchanged` · **Code:**
 `InventoryCheckoutService#bookOutInventoryItem` (public façade
-`InventoryItemService#bookOutInventoryItem`) · **Issues:** —
+`InventoryItemService#bookOutInventoryItem`), `inventory-my.js` / `inventory-admin.js`
+`submitUmbuchen` · **Issues:** —
 
 ### REQ-INV-026 — Write-time stock merge for PIECE (auto) and SCU (per-action opt-in)
 
@@ -517,7 +525,10 @@ their hints — renders **whole (no decimals) for a `PIECE` material** and to th
 **Assignment writes.** The earmarks are edited through dedicated per-allocation endpoints `POST` /
 `PATCH` / `DELETE /api/v1/inventory/{id}/allocation` (add / change amount / remove), each gated by
 `isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)` — the same owner-scoped
-inventory-edit gate, **no new role**. They refuse a personal entry (personal stock carries no
+inventory-edit gate, **no new role** — and, like every other per-row write, the service then refuses
+a caller who neither owns the entry nor is Logistician or above (`403`,
+`AuthHelperService.isLogisticianOrAbove()`); until 2026-10-04 that second gate was missing, so any
+member whose scope covered the unit could earmark another member's row. They refuse a personal entry (personal stock carries no
 assignment), refuse a job-order target whose material the order does not require (REQ-ORDERS-018),
 reject a duplicate target, hold PIECE amounts whole, and enforce R5.
 
@@ -635,6 +646,9 @@ there is no separate income-attribution input.
   differing only in their earmarks stack together, and the earmarks render as leaf chips.
 - [ ] A personal entry rejects any allocation, and a job-order allocation whose material the order
   does not require is rejected (REQ-ORDERS-018).
+- [x] Adding, changing or removing an allocation on another member's entry is refused with `403`
+  for a caller below Logistician and changes nothing; the owner and a Logistician pass
+  (`InventoryItemServiceAllocationTest`, `InventoryItemControllerTest`).
 - [ ] `delivered` toggled for one order leaves the entry's other orders unchanged; the order
   material-collection shows the amount allocated to that order.
 - [ ] A stock merge sums the folded rows' allocations per target and OR-combines job-order delivered.
@@ -664,7 +678,7 @@ there is no separate income-attribution input.
   wins, and a blank-amount row still trips the personal-entry rejection.
 
 **Enforced by:** `InventoryItemServiceTest`, `InventoryItemServiceBookOutTest`,
-`InventoryCheckoutServiceAuditTest`, `InventoryStockMergeTest`, `JobOrderHandoverServiceTest`,
+`InventoryItemServiceAllocationTest`, `InventoryCheckoutServiceAuditTest`, `InventoryStockMergeTest`, `JobOrderHandoverServiceTest`,
 `InventoryAllocationSoakDataTest`, `InventoryItemControllerTest`, `InventoryPageControllerMvcTest`,
 `DatabaseIndexMigrationTest`, `InventoryInputAjaxControllerTest` (single-target shorthand),
 e2e `InventoryOperationsE2eTest` (Herkunft picker gate + deduct-from; re-picking an
@@ -1376,7 +1390,10 @@ Lager row — shared or personal, material or game item — carries a **„gesto
 - **Book in as stolen** (a checkbox in the book-in dialog) and **mark or unmark afterwards** — a
   whole row, or a **part** that is split off as a new row with the other marker and the rest of the
   identity unchanged (`POST /api/v1/inventory/{id}/stolen`, optimistic `version`), for **whoever may
-  edit the row** (no new permission). A selection of one's own rows is marked or unmarked whole
+  edit the row** (no new permission): the row's scope (`canEditInventoryItem`) and then, like every
+  other per-row write, the owner or a Logistician or above — a member marking another member's row
+  gets `403`. *Amended 2026-10-04:* the second gate was missing until then, so any member whose
+  scope covered the unit could mark or split another member's row. A selection of one's own rows is marked or unmarked whole
   (`POST /api/v1/inventory/bulk-stolen`, locked in sorted id order like REQ-INV-036). A split may
   not leave the row below the amount it offers on the Materialbörse (refused with a message naming
   the offer) or below its earmarks (`422`).
@@ -1407,6 +1424,8 @@ Lager row — shared or personal, material or game item — carries a **„gesto
   it; a split never undercuts an offer or the earmarks.
 - [x] The per-material overview and the craftability sum are unchanged by mixed stock.
 - [x] Booking in as stolen and every mark/unmark are refused while the switch is off.
+- [x] A member marking another member's row is refused with `403` before any write; the owner and a
+  Logistician may mark it.
 - [x] The web shows the chip, the filters and the actions in place (REQ-FE-001), and an E2E flow
   books in or marks a part, filters and unmarks. Mein Lager offers the row and bulk actions, the
   Org-Lager the row action on the rows its actions column serves (logisticians).

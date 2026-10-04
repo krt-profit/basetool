@@ -100,9 +100,10 @@ class JobOrderPageControllerClaimMvcTest {
     doReturn(created)
         .when(backendApiClient)
         .post(
-            eq("/api/v1/orders/" + orderId + "/claims"),
+            eq("/api/v1/orders/{id}/claims"),
             any(CreateClaimDto.class),
-            eq(ClaimDto.class));
+            eq(ClaimDto.class),
+            eq(orderId));
 
     mockMvc
         .perform(
@@ -116,9 +117,10 @@ class JobOrderPageControllerClaimMvcTest {
 
     verify(backendApiClient)
         .post(
-            eq("/api/v1/orders/" + orderId + "/claims"),
+            eq("/api/v1/orders/{id}/claims"),
             any(CreateClaimDto.class),
-            eq(ClaimDto.class));
+            eq(ClaimDto.class),
+            eq(orderId));
   }
 
   @Test
@@ -130,9 +132,10 @@ class JobOrderPageControllerClaimMvcTest {
     doThrow(new BackendServiceException("conflict", null, 409))
         .when(backendApiClient)
         .post(
-            eq("/api/v1/orders/" + orderId + "/claims"),
+            eq("/api/v1/orders/{id}/claims"),
             any(CreateClaimDto.class),
-            eq(ClaimDto.class));
+            eq(ClaimDto.class),
+            eq(orderId));
 
     mockMvc
         .perform(
@@ -160,9 +163,10 @@ class JobOrderPageControllerClaimMvcTest {
                 "The claim was modified concurrently."))
         .when(backendApiClient)
         .post(
-            eq("/api/v1/orders/" + orderId + "/claims"),
+            eq("/api/v1/orders/{id}/claims"),
             any(CreateClaimDto.class),
-            eq(ClaimDto.class));
+            eq(ClaimDto.class),
+            eq(orderId));
 
     mockMvc
         .perform(
@@ -184,9 +188,10 @@ class JobOrderPageControllerClaimMvcTest {
     doThrow(new BackendServiceException("overclaim", null, 400))
         .when(backendApiClient)
         .post(
-            eq("/api/v1/orders/" + orderId + "/claims"),
+            eq("/api/v1/orders/{id}/claims"),
             any(CreateClaimDto.class),
-            eq(ClaimDto.class));
+            eq(ClaimDto.class),
+            eq(orderId));
 
     mockMvc
         .perform(
@@ -223,14 +228,16 @@ class JobOrderPageControllerClaimMvcTest {
     UUID claimId = UUID.randomUUID();
     doReturn(null)
         .when(backendApiClient)
-        .delete(eq("/api/v1/orders/" + orderId + "/claims/" + claimId), eq(Void.class));
+        .delete(
+            eq("/api/v1/orders/{id}/claims/{claimId}"), eq(Void.class), eq(orderId), eq(claimId));
 
     mockMvc
         .perform(post("/orders/" + orderId + "/claims/" + claimId + "/withdraw").with(csrf()))
         .andExpect(status().isNoContent());
 
     verify(backendApiClient)
-        .delete(eq("/api/v1/orders/" + orderId + "/claims/" + claimId), eq(Void.class));
+        .delete(
+            eq("/api/v1/orders/{id}/claims/{claimId}"), eq(Void.class), eq(orderId), eq(claimId));
   }
 
   @Test
@@ -240,7 +247,8 @@ class JobOrderPageControllerClaimMvcTest {
     UUID claimId = UUID.randomUUID();
     doThrow(new BackendServiceException("conflict", null, 409))
         .when(backendApiClient)
-        .delete(eq("/api/v1/orders/" + orderId + "/claims/" + claimId), eq(Void.class));
+        .delete(
+            eq("/api/v1/orders/{id}/claims/{claimId}"), eq(Void.class), eq(orderId), eq(claimId));
 
     mockMvc
         .perform(post("/orders/" + orderId + "/claims/" + claimId + "/withdraw").with(csrf()))

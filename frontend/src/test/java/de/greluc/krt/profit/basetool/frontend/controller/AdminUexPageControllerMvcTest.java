@@ -126,7 +126,7 @@ class AdminUexPageControllerMvcTest {
         .andExpect(
             PageStylesheets.content(
                 containsString(
-                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+                    ".form-group input:where(:not([type='checkbox'], [type='radio']))")));
   }
 
   @Test
@@ -135,7 +135,7 @@ class AdminUexPageControllerMvcTest {
     UUID id = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/terminals/" + id), eq(TerminalDto.class)))
         .thenReturn(terminal(id));
-    when(backendApiClient.put(eq("/api/v1/terminals/" + id), any(), eq(Void.class)))
+    when(backendApiClient.put(eq("/api/v1/terminals/{id}"), any(), eq(Void.class), eq(id)))
         .thenReturn(null);
 
     mockMvc

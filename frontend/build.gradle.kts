@@ -506,8 +506,7 @@ val lintCss =
 val lintCssInline =
   tasks.register<NpxTask>("lintCssInline") {
     group = "verification"
-    description =
-      "Lints the page stylesheets (static/css/pages) and any Thymeleaf <style> block with Stylelint."
+    description = "Lints any Thymeleaf <style> block with Stylelint's template rule set."
     dependsOn(tasks.named("npmInstall"))
     command.set("stylelint")
     args.set(
@@ -515,12 +514,10 @@ val lintCssInline =
         "--config",
         ".stylelintrc.templates.json",
         "src/main/resources/templates/**/*.html",
-        "src/main/resources/static/css/pages/**/*.css",
       )
     )
     ignoreExitValue.set(false)
     inputs.files(fileTree("src/main/resources/templates") { include("**/*.html") })
-    inputs.files(fileTree("src/main/resources/static/css/pages") { include("**/*.css") })
     inputs.file("package.json")
     inputs.file(".stylelintrc.templates.json")
   }
@@ -716,8 +713,35 @@ val testPromotionCsvEscape =
     outputs.upToDateWhen { false }
   }
 
+val testKrtFetchReadJs =
+  tasks.register<NodeTask>("testKrtFetchReadJs") {
+    group = "verification"
+    description = "Regression tests for the one read path, krtFetch.get / getJson (REQ-FE-031)."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/krt-fetch-read.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/krt-fetch-read.test.mjs"))
+    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/krt-fetch.js"))
+    outputs.upToDateWhen { false }
+  }
+
+val testEslintBans =
+  tasks.register<NodeTask>("testEslintBans") {
+    group = "verification"
+    description = "Proves the ESLint transport and browser-baseline bans fire on planted sources."
+    dependsOn(tasks.named("npmInstall"))
+    script.set(layout.projectDirectory.file("scripts/eslint-bans.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/eslint-bans.test.mjs"))
+    inputs.file(layout.projectDirectory.file("eslint.config.mjs"))
+    inputs.file(layout.projectDirectory.file("package.json"))
+    outputs.upToDateWhen { false }
+  }
+
 tasks.named("check").configure {
   dependsOn(
+    testKrtFetchReadJs,
+    testEslintBans,
     testPromotionCsvEscape,
     lintCss,
     lintCssInline,

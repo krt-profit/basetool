@@ -10,7 +10,8 @@
     .event-detail {
         color: var(--color-gray-2-text);
         font-size: 0.85rem;
-        word-break: break-word;
+        word-break: normal;
+        overflow-wrap: anywhere;
         max-width: 36rem;
     }
     .purge-form .form-group {
