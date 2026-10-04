@@ -18,11 +18,24 @@
 - **Hangar: Versicherung als „Keine · Monate · LTI".** Statt einer Liste mit 122 Einträgen; Monate
   als Zahl von 1 bis 120.
 
+- **Hangar: eine Seite mit Tabs „Meine Schiffe" · „Org-Einheit".** Die Org-Einheitsübersicht ist
+  jetzt der zweite Tab (Schiffstypen als Baumzeilen mit Einsatzbereitschafts-Balken); „Meine
+  Schiffe" filtert mit „Alle · Bereit · Nicht bereit" und zeigt „n von m einsatzbereit". Import,
+  Home-Location und „Hangar leeren …" sitzen im Seitenkopf (REQ-HANGAR-001/002).
+
 - **Listenseiten im neuen Muster (Phase 1).** Einsätze, Operationen, Benachrichtigungen, Aufträge,
   Materialbedarf, Lager, Sammelübersichten, Materialien, Mitglieder, Beförderung und alle
   Admin-Listen haben einen Seitenkopf mit Zähler, eine Werkzeugleiste mit Suche, Segment-Schalter und
   Filter-Popover, entfernbare Filter-Chips und Tabellen, deren Zeile der Link ist und die auf dem
   Smartphone stapeln; Status sind übersetzt, leere Listen zeigen einen Leerzustand (REQ-UI-027).
+- **Mein Inventar: Blueprints mit Dialog und Craft-Status.** „Blueprints hinzufügen" öffnet einen
+  Dialog, „SC Extractor laden" und „Alle löschen …" liegen im ⋯-Menü; die Seite hat eine Suche,
+  „Alle · Craftbar" und „Raffinerie einrechnen". Jede Zeile zeigt Status-Punkt und „3×", das Detail
+  eine Kennzahl und die Zutaten mit Bedarf, Vorrat und Qualität (REQ-INV-008/048).
+- **Blueprint-Verfügbarkeit: Besitzer als Chips, Suche nach Personen.** Die ersten vier Besitzer
+  stehen direkt in der Zeile, „+ n weitere" klappt den Rest auf; die Suche findet auch Besitzer
+  innerhalb der eigenen Einheiten (REQ-INV-012/013).
+
 - **Einsätze und Operationen: Zeitraum „Kommend · Vergangen · Alle".** Ersetzt die Checkbox
   „Vergangene anzeigen"; die gespeicherte Auswahl wird übernommen.
 - **Benachrichtigungen: „Ungelesen · Alle" und Links.** Die Seite zeigt zunächst nur Ungelesenes;
@@ -105,6 +118,9 @@
   nach dem Aufräumen über 8 GiB liegt (CI-01).
 - **Tests: PostgreSQL-Testcontainer per Digest.** Die Backend-Tests starten genau das Produktions-Image
   (`TestImages.POSTGRES`, gegen Compose und Quadlet-Unit geprüft; TST-18).
+- **CI: Dependabot-Digest-Bumps von Redis und PostgreSQL ziehen `TestImages` mit.** Der Compose-Follow-up
+  setzt die Digest-Konstanten auf den Compose-Pin, statt `TestImagesTest` rot zu lassen (REQ-OPS-035,
+  ADR-0215).
 - **Doku: Verlängerung der OWASP-Suppressions beschrieben** (CONTRIBUTING, SEC-16).
 - **Modularisierung: die Entscheidungen sind festgehalten.** ADR-0231 bis ADR-0239 (Modulschnitt,
   Zusammenspiel der Module, Prüfwerkzeuge, harter API-Schnitt mit erzwungenem App-Update, Fehlermodell,
@@ -279,8 +295,10 @@
   auf dem Host (OPS-SEC-08).
 - **CI: Werkzeuge per Hash gepinnt.** PyYAML, ansible-core/ansible-lint aus `--require-hashes`-Dateien,
   markdownlint-cli2 aus einem Lockfile, Ansible-Collections exakt versioniert (CI-SEC-12).
-- **CI: Release-App-Schlüssel in der Umgebung `release`.** `release-prepare` und `refresh-versions`
-  lesen ihn dort; die Umgebung legt der Owner einmalig an (CI-SEC-16, ADR-0201).
+- **CI: Release-App-Schlüssel in der Umgebung `release`.** `release-prepare`, `refresh-versions` und
+  `release-publish` lesen ihn dort; `release-publish` läuft dafür auf dem Push nach `main` und erkennt
+  den Release-Merge selbst. Der Owner legt die Umgebung einmalig an und löscht danach das
+  Repository-Secret (CI-SEC-16, ADR-0201).
 - **Backend: Prüfregeln für Mandantentrennung und Massenzuweisung.** Org-Einheiten-gebundene Aggregate
   tragen `@TenantScoped`; ein Test verlangt für jeden Controller, der solche Daten schreibt, den
   Scope-Gate, und für Request-Bodies `@Valid`, keine Antwort-DTOs und keine servergeführten Felder

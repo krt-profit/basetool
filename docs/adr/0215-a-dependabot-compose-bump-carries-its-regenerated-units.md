@@ -99,3 +99,12 @@ completed head. That run finds nothing to change and ends there.
   self-hosted Renovate; a second dependency bot would also duplicate Dependabot's other ecosystems.
 - **A second App only for this.** A narrower blast radius, bought with another key to create, store and
   rotate. The scoped token already limits each use; revisit if the App's installation grows.
+
+## Amendment 1 (2026-10-04) — the test images follow the bump
+
+The test-support `TestImages` class pins the Redis and PostgreSQL images by digest, and
+`TestImagesTest` requires them to equal `docker-compose.yml`. A Dependabot digest bump of either image
+therefore failed the backend tests until the constant was edited by hand. After `refresh-digests`, the
+workflow now runs `dependabot_compose_followup.py sync-test-images`, which moves each constant to the
+single digest `docker-compose.yml` pins for its `name:tag`; the App's commit carries the change with
+the regenerated units. A `name:tag` pinned to more than one digest is left alone with a warning.

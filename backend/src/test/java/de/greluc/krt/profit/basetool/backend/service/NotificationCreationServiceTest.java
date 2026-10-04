@@ -26,13 +26,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestCancelledEvent;
-import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestConfirmedEvent;
-import de.greluc.krt.profit.basetool.backend.event.JobOrderCreatedEvent;
-import de.greluc.krt.profit.basetool.backend.event.OrgUnitRef;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCancelledEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestConfirmedEvent;
+import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.model.Notification;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.support.NotificationParamsCodec;
 import java.math.BigDecimal;
