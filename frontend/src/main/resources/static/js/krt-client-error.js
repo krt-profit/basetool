@@ -123,7 +123,7 @@
      * Reads a meta tag's content, or null when it is absent or the string 'undefined'.
      */
     function metaContent(name) {
-        const el = document.querySelector('meta[name="' + name + '"]');
+        const el = document.querySelector(`meta[name="${name}"]`);
         const content = el ? el.getAttribute('content') : null;
         return content && content !== 'undefined' ? content : null;
     }
@@ -204,7 +204,7 @@
 
     window.addEventListener(
         'error',
-        function (event) {
+        (event) => {
             try {
                 const target = event ? event.target : null;
                 if (target && target !== window && target.tagName) {
@@ -229,7 +229,7 @@
         true,
     );
 
-    document.addEventListener('securitypolicyviolation', function (event) {
+    document.addEventListener('securitypolicyviolation', (event) => {
         try {
             report(
                 KIND_CSP_VIOLATION,
@@ -241,7 +241,7 @@
         } catch (_reportFailed) {}
     });
 
-    window.addEventListener('unhandledrejection', function (event) {
+    window.addEventListener('unhandledrejection', (event) => {
         try {
             const reason = event ? event.reason : null;
             let message = null;

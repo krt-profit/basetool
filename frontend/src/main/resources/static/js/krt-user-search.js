@@ -29,21 +29,17 @@
     }
 
     function fetchUsers(path, query) {
-        return fetch(path + '?query=' + encodeURIComponent(query || ''), {
-            headers: { Accept: 'application/json' },
-        })
-            .then(function (response) {
-                return response.ok ? response.json() : [];
-            })
-            .then(function (list) {
+        return window.krtFetch
+            .getJson(`${path}?query=${encodeURIComponent(query || '')}`)
+            .then((list) => {
                 return (list || []).map(toOption);
             })
-            .catch(function () {
+            .catch(() => {
                 return [];
             });
     }
 
-    window.krtComboboxRemoteSources = window.krtComboboxRemoteSources || {};
+    window.krtComboboxRemoteSources ||= {};
     window.krtComboboxRemoteSources['remote-users'] = function (query) {
         return fetchUsers('/users/search', query);
     };

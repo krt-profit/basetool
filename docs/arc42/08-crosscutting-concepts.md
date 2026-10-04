@@ -172,10 +172,14 @@ Two binding rules shape every UI change:
 - **Live update is binding** — every create/update/delete/toggle/reorder/filter/paginate updates
   the DOM in place via `krtFetch`, with no full-page reload on success, and on shared surfaces a
   peer's change propagates without a manual reload.
-- **Two browser-side safety rules are lint-enforced, not review-enforced** (2026-09-22): a `fetch`
-  write outside `krtFetch` fails `:frontend:lintJs` (REQ-FE-002), and so does an HTML sink that is
-  neither escaped through `escapeHtml` / `escapeAttr` nor a server fragment inserted through
-  `krtFetch.setTrustedHtml` (REQ-FE-022, `eslint-plugin-no-unsanitized`).
+- **Two browser-side safety rules are lint-enforced, not review-enforced** (2026-09-22): any
+  `fetch` or `XMLHttpRequest` outside the transport fails `:frontend:lintJs` — writes go through
+  `krtFetch.write` / `submitForm` (REQ-FE-002), reads through `krtFetch.get` / `getJson`, which
+  hand a lost session to the login and refuse a redirected answer (REQ-FE-031, since 2026-10-04) —
+  and so does an HTML sink that is neither escaped through `escapeHtml` / `escapeAttr` nor a server
+  fragment inserted through `krtFetch.setTrustedHtml` (REQ-FE-022, `eslint-plugin-no-unsanitized`).
+- **The browser baseline is "Baseline 2025"**: Chrome 122, Firefox 131, Safari / iOS 18.4; the type
+  check and ESLint run at ES2025 (ADR-0239, REQ-FE-018).
 - **An ETag only where it pays** (FE-PERF-03, 2026-09-22; assets out 2026-09-23). The frontend's
   `ShallowEtagHeaderFilter` covers the web app manifest and `assetlinks.json` — publicly
   cacheable and not content-hashed. The static assets are hashed, `immutable` and revalidate by

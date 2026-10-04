@@ -22,7 +22,7 @@
     function loadResults() {
         const query = buildQueryString();
         window.krtFetch.swap({
-            url: '/operations' + (query ? '?' + query : ''),
+            url: `/operations${query ? `?${query}` : ''}`,
             container: resultsContainer,
             indicator: loadingIndicator,
             history: true,
@@ -49,7 +49,7 @@
     }
 
     function selectPeriod(value) {
-        periodInputs().forEach(function (el) {
+        periodInputs().forEach((el) => {
             el.checked = el.value === value;
         });
     }
@@ -93,20 +93,20 @@
         loadResults();
     }
 
-    form.querySelectorAll('input, select').forEach(function (el) {
+    form.querySelectorAll('input, select').forEach((el) => {
         el.addEventListener('input', onFilterChange);
         el.addEventListener('change', onFilterChange);
     });
 
-    periodInputs().forEach(function (el) {
+    periodInputs().forEach((el) => {
         el.addEventListener('change', persistFilters);
     });
 
     if (resetBtn) {
-        resetBtn.addEventListener('click', function () {
+        resetBtn.addEventListener('click', () => {
             form.querySelectorAll(
                 'input[type="search"], input[type="text"], input[type="hidden"], input[type="date"], input[type="time"]',
-            ).forEach(function (el) {
+            ).forEach((el) => {
                 el.value = '';
             });
             selectPeriod('UPCOMING');

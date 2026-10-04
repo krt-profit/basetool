@@ -124,7 +124,7 @@
     function trackedControls(form) {
         return /** @type {(HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement)[]} */ (
             Array.from(form.querySelectorAll('input, select, textarea'))
-        ).filter(function (el) {
+        ).filter((el) => {
             return !(el instanceof HTMLInputElement && el.type === 'hidden');
         });
     }
@@ -150,7 +150,7 @@
     function snapshot(form) {
         /** @type {Map<Element, string>} */
         const state = new Map();
-        trackedControls(form).forEach(function (el) {
+        trackedControls(form).forEach((el) => {
             state.set(el, stateOf(el));
         });
         baselines.set(form.id, state);
@@ -167,7 +167,7 @@
         if (!state) {
             return false;
         }
-        return trackedControls(form).some(function (el) {
+        return trackedControls(form).some((el) => {
             return state.get(el) !== stateOf(el);
         });
     }
@@ -180,7 +180,7 @@
     function presentSections() {
         /** @type {{ section: ProfileSection, form: HTMLFormElement }[]} */
         const found = [];
-        SECTIONS.forEach(function (section) {
+        SECTIONS.forEach((section) => {
             const form = document.getElementById(section.formId);
             if (form instanceof HTMLFormElement) {
                 found.push({ section, form });
@@ -194,7 +194,7 @@
         if (!bar) {
             return;
         }
-        const dirty = presentSections().filter(function (entry) {
+        const dirty = presentSections().filter((entry) => {
             return isDirty(entry.form);
         });
         bar.hidden = dirty.length === 0;
@@ -202,11 +202,11 @@
             window.resetUnsavedChanges();
         }
         if (summary) {
-            const names = dirty.map(function (entry) {
+            const names = dirty.map((entry) => {
                 return entry.form.getAttribute('data-section-name') || '';
             });
             const prefix = summary.getAttribute('data-prefix') || '';
-            summary.textContent = dirty.length ? prefix + ': ' + names.join(' · ') : '';
+            summary.textContent = dirty.length ? `${prefix}: ${names.join(' · ')}` : '';
         }
     }
 
@@ -219,11 +219,9 @@
         if (version == null) {
             return;
         }
-        document
-            .querySelectorAll('#profile-settings input[name="version"]')
-            .forEach(function (input) {
-                /** @type {HTMLInputElement} */ (input).value = String(version);
-            });
+        document.querySelectorAll('#profile-settings input[name="version"]').forEach((input) => {
+            /** @type {HTMLInputElement} */ (input).value = String(version);
+        });
     }
 
     /**
@@ -237,14 +235,14 @@
         if (saving) {
             return;
         }
-        const dirty = presentSections().filter(function (entry) {
+        const dirty = presentSections().filter((entry) => {
             return isDirty(entry.form);
         });
         if (!dirty.length) {
             refreshBar();
             return;
         }
-        const invalid = dirty.find(function (entry) {
+        const invalid = dirty.find((entry) => {
             return !entry.form.checkValidity();
         });
         if (invalid) {
@@ -313,17 +311,17 @@
         if (!description || !counter) {
             return;
         }
-        counter.textContent = description.value.length + ' / ' + (description.maxLength || 2000);
+        counter.textContent = `${description.value.length} / ${description.maxLength || 2000}`;
     }
 
     /** Restores every section to its baseline and hides the save bar. */
     function discardAll() {
-        presentSections().forEach(function (entry) {
+        presentSections().forEach((entry) => {
             const state = baselines.get(entry.form.id);
             if (!state) {
                 return;
             }
-            trackedControls(entry.form).forEach(function (el) {
+            trackedControls(entry.form).forEach((el) => {
                 const saved = state.get(el);
                 if (saved === undefined) {
                     return;
@@ -345,9 +343,9 @@
         refreshBar();
     }
 
-    presentSections().forEach(function (entry) {
+    presentSections().forEach((entry) => {
         snapshot(entry.form);
-        entry.form.addEventListener('submit', function (event) {
+        entry.form.addEventListener('submit', (event) => {
             event.preventDefault();
             saveAll();
         });
@@ -361,7 +359,7 @@
         description.addEventListener('input', updateCounter);
     }
     if (saveButton) {
-        saveButton.addEventListener('click', function () {
+        saveButton.addEventListener('click', () => {
             saveAll();
         });
     }
@@ -380,8 +378,8 @@
      * @param {string} id the id of the section in view
      */
     function markCurrent(id) {
-        navLinks.forEach(function (link) {
-            if (link.getAttribute('href') === '#' + id) {
+        navLinks.forEach((link) => {
+            if (link.getAttribute('href') === `#${id}`) {
                 link.setAttribute('aria-current', 'true');
             } else {
                 link.removeAttribute('aria-current');
@@ -391,12 +389,12 @@
 
     if (navLinks.length && 'IntersectionObserver' in window) {
         const observer = new IntersectionObserver(
-            function (entries) {
+            (entries) => {
                 const visible = entries
-                    .filter(function (entry) {
+                    .filter((entry) => {
                         return entry.isIntersecting;
                     })
-                    .sort(function (a, b) {
+                    .sort((a, b) => {
                         return a.boundingClientRect.top - b.boundingClientRect.top;
                     });
                 if (visible.length) {
@@ -405,7 +403,7 @@
             },
             { rootMargin: '-20% 0px -60% 0px' },
         );
-        navLinks.forEach(function (link) {
+        navLinks.forEach((link) => {
             const target = document.getElementById((link.getAttribute('href') || '').slice(1));
             if (target) {
                 observer.observe(target);
@@ -434,7 +432,7 @@
 
     const deletionSubmit = document.getElementById('profile-deletion-submit');
     if (deletionSubmit) {
-        deletionSubmit.addEventListener('click', function () {
+        deletionSubmit.addEventListener('click', () => {
             /** @type {HTMLInputElement | null} */
             const eraseHistory = document.querySelector('#profile-deletion-erase-history');
             krtFetch.write({
@@ -456,7 +454,7 @@
 
     const deletionHost = document.getElementById('profile-deletion-host');
     if (deletionHost) {
-        deletionHost.addEventListener('click', function (event) {
+        deletionHost.addEventListener('click', (event) => {
             const target = event.target;
             if (!(target instanceof Element)) {
                 return;

@@ -66,7 +66,7 @@
     function ownersUrl(productKey) {
         const base = config().ownersUrl || '';
         const sep = base.indexOf('?') === -1 ? '?' : '&';
-        const url = base + sep + 'productKey=' + encodeURIComponent(productKey);
+        const url = `${base + sep}productKey=${encodeURIComponent(productKey)}`;
         return window.safeSameOriginUrl ? window.safeSameOriginUrl(url, url) : url;
     }
 
@@ -88,12 +88,10 @@
                 el(
                     'span',
                     'visually-hidden',
-                    ' (' +
-                        window.krtI18nText(
-                            i18n().notMember,
-                            'krtBlueprintOverview.i18n.notMember',
-                        ) +
-                        ')',
+                    ` (${window.krtI18nText(
+                        i18n().notMember,
+                        'krtBlueprintOverview.i18n.notMember',
+                    )})`,
                 ),
             );
         }
@@ -131,7 +129,7 @@
             );
             return;
         }
-        owners.slice(0, CHIP_LIMIT).forEach(function (owner) {
+        owners.slice(0, CHIP_LIMIT).forEach((owner) => {
             cell.appendChild(ownerChip(owner));
         });
         const rest = owners.slice(CHIP_LIMIT);
@@ -143,7 +141,7 @@
         if (panel) {
             clear(panel);
             const list = el('div', 'bpo-chip-list');
-            rest.forEach(function (owner) {
+            rest.forEach((owner) => {
                 list.appendChild(ownerChip(owner));
             });
             panel.appendChild(list);
@@ -158,7 +156,7 @@
         toggle.setAttribute('aria-expanded', 'false');
         toggle.setAttribute('aria-controls', detailsRow.id);
         toggle.setAttribute('data-testid', 'bp-overview-more');
-        toggle.addEventListener('click', function () {
+        toggle.addEventListener('click', () => {
             const open = !detailsRow.classList.contains('bp-expanded');
             detailsRow.classList.toggle('bp-expanded', open);
             toggle.setAttribute('aria-expanded', String(open));
@@ -183,7 +181,7 @@
             el(
                 'span',
                 state === 'error' ? 'bpo-note bpo-note--error' : 'bpo-note',
-                window.krtI18nText(i18n()[state], 'krtBlueprintOverview.i18n.' + state),
+                window.krtI18nText(i18n()[state], `krtBlueprintOverview.i18n.${state}`),
             ),
         );
     }
@@ -220,14 +218,9 @@
             return;
         }
         running++;
-        fetch(ownersUrl(productKey), {
-            credentials: 'same-origin',
-            headers: { Accept: 'application/json' },
-        })
-            .then(function (resp) {
-                return resp.ok ? resp.json() : null;
-            })
-            .then(function (owners) {
+        window.krtFetch
+            .getJson(ownersUrl(productKey))
+            .then((owners) => {
                 if (!Array.isArray(owners)) {
                     renderState(cell, 'error');
                     return;
@@ -237,10 +230,10 @@
                     renderChips(cell, owners);
                 }
             })
-            .catch(function () {
+            .catch(() => {
                 renderState(cell, 'error');
             })
-            .finally(function () {
+            .finally(() => {
                 running--;
                 pump();
             });
@@ -277,8 +270,8 @@
         }
         if (!observer) {
             observer = new IntersectionObserver(
-                function (entries, obs) {
-                    entries.forEach(function (entry) {
+                (entries, obs) => {
+                    entries.forEach((entry) => {
                         if (entry.isIntersecting) {
                             obs.unobserve(entry.target);
                             enqueue(/** @type {HTMLElement} */ (entry.target));
@@ -289,7 +282,7 @@
             );
         }
         const obs = observer;
-        cells.forEach(function (cell) {
+        cells.forEach((cell) => {
             obs.observe(cell);
         });
     }
@@ -318,7 +311,7 @@
             params.set('size', size);
         }
         const query = params.toString();
-        return form.getAttribute('action') + (query ? '?' + query : '');
+        return form.getAttribute('action') + (query ? `?${query}` : '');
     }
 
     /**
@@ -332,7 +325,7 @@
             window.location.assign(url);
             return;
         }
-        window.krtFetch.swap({ url, container: '#' + RESULTS_ID, history: true });
+        window.krtFetch.swap({ url, container: `#${RESULTS_ID}`, history: true });
     }
 
     /**
@@ -349,7 +342,7 @@
         }
         /** @type {number | null} */
         let debounce = null;
-        form.addEventListener('submit', function (event) {
+        form.addEventListener('submit', (event) => {
             event.preventDefault();
             if (debounce) {
                 window.clearTimeout(debounce);
@@ -359,11 +352,11 @@
         });
         const input = form.querySelector('input[type="search"]');
         if (input) {
-            input.addEventListener('input', function () {
+            input.addEventListener('input', () => {
                 if (debounce) {
                     window.clearTimeout(debounce);
                 }
-                debounce = window.setTimeout(function () {
+                debounce = window.setTimeout(() => {
                     debounce = null;
                     swapResults(buildSearchUrl(form));
                 }, 300);
@@ -371,15 +364,15 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', () => {
         wireRows(document);
         wireFilter();
         if (window.krtFetch) {
-            window.krtFetch.bindSwap({ container: '#' + RESULTS_ID, history: true });
+            window.krtFetch.bindSwap({ container: `#${RESULTS_ID}`, history: true });
         }
     });
 
-    document.addEventListener('krt:swapped', function (event) {
+    document.addEventListener('krt:swapped', (event) => {
         const container = event.detail && event.detail.container;
         if (container && container.id === RESULTS_ID) {
             queue.length = 0;

@@ -19,7 +19,7 @@
 
 /* global hangarI18n, hangarConflict */
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('ship-modal');
     const closeBtn = document.querySelector('.close-ship-modal');
     const form = document.getElementById('ship-form');
@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function currentListUrl() {
         const query = new URLSearchParams(window.location.search).toString();
-        return '/hangar' + (query ? '?' + query : '');
+        return `/hangar${query ? `?${query}` : ''}`;
     }
 
     function reswapHangar() {
@@ -102,7 +102,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const count = total === null ? 0 : total;
-        ['set-home-location-btn', 'delete-all-ships-btn'].forEach(function (id) {
+        ['set-home-location-btn', 'delete-all-ships-btn'].forEach((id) => {
             const item = document.getElementById(id);
             if (!item) return;
             const empty = count === 0;
@@ -118,7 +118,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    document.addEventListener('krt:swapped', function (e) {
+    document.addEventListener('krt:swapped', (e) => {
         const container = e && e.detail ? e.detail.container : null;
         if (container && container.id === 'hangar-results') {
             syncHangarStats();
@@ -264,7 +264,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (deleteForm) {
-        deleteForm.addEventListener('submit', function (e) {
+        deleteForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const submitBtn = deleteForm.querySelector('button[type="submit"]');
             if (submitBtn) submitBtn.disabled = true;
@@ -284,7 +284,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         afterHangarWrite();
                     },
                 })
-                .then(function () {
+                .then(() => {
                     if (submitBtn) submitBtn.disabled = false;
                 });
         });
@@ -310,7 +310,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         function fillParagraphs(list, names) {
             list.replaceChildren(
-                ...names.map(function (n) {
+                ...names.map((n) => {
                     const p = document.createElement('p');
                     p.textContent = n == null ? '' : String(n);
                     return p;
@@ -342,9 +342,9 @@ document.addEventListener('DOMContentLoaded', function () {
             window.krtModal.open(resultModal);
         }
 
-        [closeResultBtn, closeResultX].forEach(function (btn) {
+        [closeResultBtn, closeResultX].forEach((btn) => {
             if (!btn) return;
-            btn.addEventListener('click', function () {
+            btn.addEventListener('click', () => {
                 window.krtModal.close(resultModal);
                 if (document.getElementById('import-res-imported').textContent !== '0') {
                     afterHangarWrite();
@@ -352,7 +352,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
 
-        window.addEventListener('click', function (e) {
+        window.addEventListener('click', (e) => {
             if (e.target === resultModal) {
                 window.krtModal.close(resultModal);
             }
@@ -372,8 +372,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             function showFailure(detail) {
                 showError(
-                    importBtn.getAttribute('data-error-failed') +
-                        (detail ? ' (' + detail + ')' : ''),
+                    importBtn.getAttribute('data-error-failed') + (detail ? ` (${detail})` : ''),
                 );
             }
 
@@ -397,17 +396,17 @@ document.addEventListener('DOMContentLoaded', function () {
                         return true;
                     },
                 })
-                .then(function () {
+                .then(() => {
                     importBtn.removeAttribute('aria-busy');
                     fileInput.value = '';
                 });
         }
 
         if (importBtn && fileInput) {
-            importBtn.addEventListener('click', function () {
+            importBtn.addEventListener('click', () => {
                 fileInput.click();
             });
-            fileInput.addEventListener('change', function () {
+            fileInput.addEventListener('change', () => {
                 const file = fileInput.files && fileInput.files[0];
                 if (file) {
                     upload(file);
@@ -424,22 +423,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (!deleteAllBtn || !deleteAllModal) return;
 
-        deleteAllBtn.addEventListener('click', function () {
+        deleteAllBtn.addEventListener('click', () => {
             if (deleteAllBtn.disabled) return;
             window.krtModal.open(deleteAllModal);
         });
 
-        deleteAllCancelBtn.addEventListener('click', function () {
+        deleteAllCancelBtn.addEventListener('click', () => {
             window.krtModal.close(deleteAllModal);
         });
 
-        window.addEventListener('click', function (e) {
+        window.addEventListener('click', (e) => {
             if (e.target === deleteAllModal) {
                 window.krtModal.close(deleteAllModal);
             }
         });
 
-        deleteAllConfirmBtn.addEventListener('click', function () {
+        deleteAllConfirmBtn.addEventListener('click', () => {
             deleteAllConfirmBtn.disabled = true;
             deleteAllCancelBtn.disabled = true;
 
@@ -460,7 +459,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         }
                     },
                 })
-                .then(function () {
+                .then(() => {
                     deleteAllConfirmBtn.disabled = false;
                     deleteAllCancelBtn.disabled = false;
                 });
@@ -485,17 +484,17 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-            window.krtEvents.on('click', 'hangar-open-home', function (btn) {
+            window.krtEvents.on('click', 'hangar-open-home', (btn) => {
                 if (btn && btn.disabled) return;
                 refreshHomeBody();
                 window.krtModal.open(homeModal);
             });
         }
 
-        homeModal.querySelectorAll('.close-home-cancel, .close-modal-home').forEach(function (el) {
+        homeModal.querySelectorAll('.close-home-cancel, .close-modal-home').forEach((el) => {
             el.addEventListener('click', closeHome);
         });
-        window.addEventListener('click', function (e) {
+        window.addEventListener('click', (e) => {
             if (e.target === homeModal) {
                 closeHome();
             }
@@ -503,7 +502,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const homeForm = document.getElementById('home-location-form');
         if (homeForm) {
-            homeForm.addEventListener('submit', function (e) {
+            homeForm.addEventListener('submit', (e) => {
                 e.preventDefault();
                 const submitBtn = homeForm.querySelector('button[type="submit"]');
                 const select = homeForm.querySelector('select[name="locationId"]');
@@ -528,14 +527,14 @@ document.addEventListener('DOMContentLoaded', function () {
                             afterHangarWrite();
                         },
                     })
-                    .then(function () {
+                    .then(() => {
                         if (submitBtn) submitBtn.disabled = false;
                     });
             });
         }
     })();
 
-    form.addEventListener('submit', function (e) {
+    form.addEventListener('submit', (e) => {
         e.preventDefault();
         const action = form.getAttribute('action') || form.action;
         const isUpdate = /\/update$/.test(action);
@@ -565,7 +564,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     afterHangarWrite();
                 },
             })
-            .then(function () {
+            .then(() => {
                 if (submitBtn) submitBtn.disabled = false;
             });
     });
@@ -605,7 +604,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
         const query = params.toString();
-        return '/hangar' + (query ? '?' + query : '');
+        return `/hangar${query ? `?${query}` : ''}`;
     }
 
     function applyHangarFilter(url) {
@@ -618,17 +617,17 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (filterForm) {
-        filterForm.addEventListener('input', function (e) {
+        filterForm.addEventListener('input', (e) => {
             if (!e.target || e.target.id !== 'hangar-ship-filter') {
                 return;
             }
             clearTimeout(hangarFilterTimer);
-            hangarFilterTimer = setTimeout(function () {
+            hangarFilterTimer = setTimeout(() => {
                 applyHangarFilter();
             }, 300);
         });
 
-        filterForm.addEventListener('change', function (e) {
+        filterForm.addEventListener('change', (e) => {
             if (!e.target || e.target.name !== 'fitted') {
                 return;
             }
@@ -636,7 +635,7 @@ document.addEventListener('DOMContentLoaded', function () {
             applyHangarFilter();
         });
 
-        filterForm.addEventListener('submit', function (e) {
+        filterForm.addEventListener('submit', (e) => {
             e.preventDefault();
             clearTimeout(hangarFilterTimer);
             applyHangarFilter();
@@ -644,7 +643,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (hangarResults) {
-        hangarResults.addEventListener('click', function (e) {
+        hangarResults.addEventListener('click', (e) => {
             const clear = e.target.closest
                 ? e.target.closest('[data-testid="empty-state-action"]')
                 : null;
@@ -657,7 +656,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 input.value = '';
             }
             if (filterForm) {
-                filterForm.querySelectorAll('input[name="fitted"]').forEach(function (radio) {
+                filterForm.querySelectorAll('input[name="fitted"]').forEach((radio) => {
                     radio.checked = radio.value === '';
                 });
             }

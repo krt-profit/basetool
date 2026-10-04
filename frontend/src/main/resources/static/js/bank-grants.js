@@ -26,14 +26,14 @@
     );
     if (!form) return;
 
-    form.addEventListener('submit', function (event) {
+    form.addEventListener('submit', (event) => {
         event.preventDefault();
     });
 
-    form.addEventListener('change', function (event) {
+    form.addEventListener('change', (event) => {
         const target = event.target;
         if (!(target instanceof HTMLInputElement) || target.name !== 'view') return;
         const view = target.value === 'employee' ? 'employee' : 'account';
-        window.location.assign('/bank/grants?view=' + view);
+        window.location.assign(`/bank/grants?view=${view}`);
     });
 })();

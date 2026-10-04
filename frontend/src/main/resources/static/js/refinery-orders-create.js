@@ -22,8 +22,8 @@
 window.krtRefineryYield.init(MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP);
 
 function calcScu(index) {
-    const unitInput = document.getElementById('outputQuantity_' + index);
-    const scuInput = document.getElementById('outputQuantityScu_' + index);
+    const unitInput = document.getElementById(`outputQuantity_${index}`);
+    const scuInput = document.getElementById(`outputQuantityScu_${index}`);
     if (unitInput && scuInput) {
         const valStr = unitInput.value.replace(/\./g, '').replace(',', '.');
         const val = parseFloat(valStr);
@@ -109,7 +109,7 @@ function addMaterialRow() {
 
     const title = template.querySelector('.material-entry-title');
     if (title) {
-        title.textContent = MATERIAL_ENTRY_TITLE_LABEL + ' #' + (count + 1);
+        title.textContent = `${MATERIAL_ENTRY_TITLE_LABEL} #${count + 1}`;
     }
 
     if (!template.querySelector('.remove-btn')) {
@@ -130,10 +130,10 @@ function addMaterialRow() {
     const inputs = template.querySelectorAll('input, select');
     inputs.forEach((input) => {
         if (input.id) {
-            input.id = input.id.replace(/_\d+$/, '_' + count);
+            input.id = input.id.replace(/_\d+$/, `_${count}`);
         }
         if (input.name) {
-            input.name = input.name.replace(/\[\d+\]/, '[' + count + ']');
+            input.name = input.name.replace(/\[\d+\]/, `[${count}]`);
         }
         if (input.hasAttribute('data-index')) {
             input.setAttribute('data-index', count);
@@ -147,7 +147,7 @@ function addMaterialRow() {
 
     const displaySpan = template.querySelector('span[id^="outputMaterialDisplay_"]');
     if (displaySpan) {
-        displaySpan.id = displaySpan.id.replace(/_\d+$/, '_' + count);
+        displaySpan.id = displaySpan.id.replace(/_\d+$/, `_${count}`);
         displaySpan.innerText = '-';
         displaySpan.style.opacity = '0.7';
     }
@@ -167,7 +167,7 @@ function addMaterialRow() {
     labels.forEach((label) => {
         const forAttr = label.getAttribute('for');
         if (forAttr) {
-            label.setAttribute('for', forAttr.replace(/_\d+$/, '_' + count));
+            label.setAttribute('for', forAttr.replace(/_\d+$/, `_${count}`));
         }
     });
 
@@ -187,10 +187,10 @@ function removeMaterialRow(button) {
         const inputs = entry.querySelectorAll('input, select');
         inputs.forEach((input) => {
             if (input.id) {
-                input.id = input.id.replace(/_\d+$/, '_' + index);
+                input.id = input.id.replace(/_\d+$/, `_${index}`);
             }
             if (input.name) {
-                input.name = input.name.replace(/\[\d+\]/, '[' + index + ']');
+                input.name = input.name.replace(/\[\d+\]/, `[${index}]`);
             }
             if (input.hasAttribute('data-index')) {
                 input.setAttribute('data-index', index);
@@ -198,21 +198,21 @@ function removeMaterialRow(button) {
         });
         const displaySpan = entry.querySelector('span[id^="outputMaterialDisplay_"]');
         if (displaySpan) {
-            displaySpan.id = displaySpan.id.replace(/_\d+$/, '_' + index);
+            displaySpan.id = displaySpan.id.replace(/_\d+$/, `_${index}`);
         }
         const yieldBadge = entry.querySelector('span[id^="yieldBonus_"]');
         if (yieldBadge) {
-            yieldBadge.id = 'yieldBonus_' + index;
+            yieldBadge.id = `yieldBonus_${index}`;
         }
         const title = entry.querySelector('.material-entry-title');
         if (title) {
-            title.textContent = MATERIAL_ENTRY_TITLE_LABEL + ' #' + (index + 1);
+            title.textContent = `${MATERIAL_ENTRY_TITLE_LABEL} #${index + 1}`;
         }
         const labels = entry.querySelectorAll('label');
         labels.forEach((label) => {
             const forAttr = label.getAttribute('for');
             if (forAttr) {
-                label.setAttribute('for', forAttr.replace(/_\d+$/, '_' + index));
+                label.setAttribute('for', forAttr.replace(/_\d+$/, `_${index}`));
             }
         });
     });
@@ -247,8 +247,8 @@ function updateEndsAt() {
     if (!startedAtInput || !durationHoursInput || !durationMinutesInput || !endsAtDisplay) return;
 
     const startedAt = startedAtInput.value;
-    const hours = parseInt(durationHoursInput.value) || 0;
-    const minutes = parseInt(durationMinutesInput.value) || 0;
+    const hours = parseInt(durationHoursInput.value, 10) || 0;
+    const minutes = parseInt(durationMinutesInput.value, 10) || 0;
 
     if (startedAt) {
         const startDate = new Date(startedAt);
@@ -279,7 +279,7 @@ function updateEndsAt() {
  * @returns {string} the filled message
  */
 function fillRefineryPattern(pattern, args) {
-    return pattern.replace(/\{(\d+)(?:,[^}]*)?\}/g, function (match, index) {
+    return pattern.replace(/\{(\d+)(?:,[^}]*)?\}/g, (match, index) => {
         const value = args[Number(index)];
         return value === undefined ? match : value;
     });
@@ -316,7 +316,7 @@ function updateProfitPreview() {
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('input', 'rfc-update-profit', updateProfitPreview);
-    window.krtEvents.on('focusout', 'rfc-update-profit', function (el) {
+    window.krtEvents.on('focusout', 'rfc-update-profit', (el) => {
         if (el.value.trim() === '') {
             el.value = '0';
             updateProfitPreview();
@@ -325,29 +325,29 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'rfc-set-started-now', setStartedAtNow);
     window.krtEvents.on('change', 'rfc-update-method', updateMethodRatings);
     window.krtEvents.on('click', 'rfc-add-material', addMaterialRow);
-    window.krtEvents.on('click', 'rfc-remove-material', function (el) {
+    window.krtEvents.on('click', 'rfc-remove-material', (el) => {
         removeMaterialRow(el);
     });
-    window.krtEvents.on('change', 'rfc-update-output', function (el) {
+    window.krtEvents.on('change', 'rfc-update-output', (el) => {
         updateOutputMaterial(el);
     });
-    window.krtEvents.on('change', 'rfc-location-change', function (el) {
+    window.krtEvents.on('change', 'rfc-location-change', (el) => {
         window.krtRefineryYield.onLocationChange(el);
     });
-    window.krtEvents.on('input', 'rfc-calc-scu', function (el) {
+    window.krtEvents.on('input', 'rfc-calc-scu', (el) => {
         calcScu(el.getAttribute('data-index'));
     });
-    window.krtEvents.on('click', 'rfc-import-pick', function () {
+    window.krtEvents.on('click', 'rfc-import-pick', () => {
         const fileInput = document.getElementById('refineryImportFile');
         if (fileInput) fileInput.click();
     });
-    window.krtEvents.on('change', 'rfc-import-file', function (el) {
+    window.krtEvents.on('change', 'rfc-import-file', (el) => {
         if (el.files && el.files.length > 0) {
             const importForm = document.getElementById('refineryImportForm');
             if (importForm) importForm.requestSubmit();
         }
     });
-    window.krtEvents.on('click', 'rfc-apply-suggestion', function (el) {
+    window.krtEvents.on('click', 'rfc-apply-suggestion', (el) => {
         const materialId = el.getAttribute('data-material-id');
         const materialName = el.getAttribute('data-material-name') || '';
         const entry = el.closest('.material-entry');
@@ -369,25 +369,21 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             }
             select.dispatchEvent(new Event('change', { bubbles: true }));
         }
-        fetch('/catalog/material-search?raw=true&q=' + encodeURIComponent(materialName), {
-            headers: { Accept: 'application/json' },
-        })
-            .then(function (r) {
-                return r.ok ? r.json() : [];
-            })
-            .then(function (list) {
+        window.krtFetch
+            .getJson(`/catalog/material-search?raw=true&q=${encodeURIComponent(materialName)}`)
+            .then((list) => {
                 const rows = Array.isArray(list) ? list : [];
                 const match =
-                    rows.find(function (m) {
+                    rows.find((m) => {
                         return m.id === materialId;
                     }) ||
-                    rows.find(function (m) {
+                    rows.find((m) => {
                         return m.name === materialName;
                     }) ||
                     null;
                 applySuggestion(match);
             })
-            .catch(function () {
+            .catch(() => {
                 applySuggestion(null);
             });
     });
@@ -470,16 +466,16 @@ function _reinitRefineryForm(fromSwap) {
     const createForm = document.querySelector('form[data-testid="refinery-form"]');
     if (createForm && !createForm._rfcSubmitBound) {
         createForm._rfcSubmitBound = true;
-        createForm.addEventListener('submit', function (e) {
+        createForm.addEventListener('submit', (e) => {
             e.preventDefault();
             _submitRefineryCreate(createForm, e.submitter);
         });
     }
 }
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     _reinitRefineryForm(false);
 });
-document.addEventListener('krt:swapped', function (e) {
+document.addEventListener('krt:swapped', (e) => {
     const c = e.detail && e.detail.container;
     if (c && c.id === 'refineryImportFormContainer') _reinitRefineryForm(true);
 });
@@ -527,7 +523,7 @@ function _submitRefineryImport(form) {
 }
 const _refineryImportForm = document.getElementById('refineryImportForm');
 if (_refineryImportForm) {
-    _refineryImportForm.addEventListener('submit', function (e) {
+    _refineryImportForm.addEventListener('submit', (e) => {
         e.preventDefault();
         _submitRefineryImport(_refineryImportForm);
     });
@@ -540,7 +536,7 @@ function _loadRefineryHandoff() {
         const params = new URLSearchParams(window.location.search);
         params.delete('handoff');
         const cleaned =
-            window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+            window.location.pathname + (params.toString() ? `?${params.toString()}` : '');
         if (window.history && window.history.replaceState) {
             window.history.replaceState(null, '', cleaned);
         }
@@ -549,7 +545,7 @@ function _loadRefineryHandoff() {
     window.krtFetch
         .write({
             method: 'POST',
-            url: '/refinery-orders/import-handoff?handoff=' + encodeURIComponent(id),
+            url: `/refinery-orders/import-handoff?handoff=${encodeURIComponent(id)}`,
             accept: 'text/html',
             toast: false,
             onError: _refineryImportFailed,

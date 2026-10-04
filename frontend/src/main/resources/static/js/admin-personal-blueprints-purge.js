@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    document.addEventListener('input', function (event) {
+    document.addEventListener('input', (event) => {
         const input = event.target.closest('input[data-confirm-token][data-confirm-submit]');
         if (!input) {
             return;
@@ -12,7 +12,7 @@
         }
     });
 
-    document.addEventListener('submit', function (event) {
+    document.addEventListener('submit', (event) => {
         const form = event.target.closest('form[data-bp-purge]');
         if (!form) {
             return;
@@ -58,7 +58,7 @@
                     }
                 },
             })
-            .finally(function () {
+            .finally(() => {
                 if (submitBtn && confirmInput) {
                     submitBtn.disabled =
                         confirmInput.value !== confirmInput.getAttribute('data-confirm-token');

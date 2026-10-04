@@ -67,7 +67,7 @@
     function valueText(control) {
         const value = control.value.trim();
         if (control.getAttribute('data-chip-format') !== 'datetime') return value;
-        const date = new Date(/Z$|[+-]\d{2}:?\d{2}$/.test(value) ? value : value + 'Z');
+        const date = new Date(/Z$|[+-]\d{2}:?\d{2}$/.test(value) ? value : `${value}Z`);
         if (isNaN(date.getTime())) return value;
         return new Intl.DateTimeFormat(undefined, {
             year: 'numeric',
@@ -116,7 +116,7 @@
                     active.push({
                         control,
                         option: control.multiple ? option : null,
-                        text: labelOf(control) + ': ' + (option.textContent || '').trim(),
+                        text: `${labelOf(control)}: ${(option.textContent || '').trim()}`,
                     });
                 }
                 continue;
@@ -136,7 +136,7 @@
                 active.push({
                     control,
                     option: null,
-                    text: labelOf(control) + ': ' + valueText(control),
+                    text: `${labelOf(control)}: ${valueText(control)}`,
                 });
             }
         }
@@ -195,7 +195,7 @@
         if (frames.get(bar)) return;
         frames.set(
             bar,
-            window.requestAnimationFrame(function () {
+            window.requestAnimationFrame(() => {
                 frames.delete(bar);
                 render(bar);
             }),
@@ -229,14 +229,14 @@
         }
         const active = collect(source);
         const removeLabel = bar.getAttribute('data-remove-label') || '';
-        active.forEach(function (filter) {
+        active.forEach((filter) => {
             const chip = document.createElement('button');
             chip.type = 'button';
             chip.className = 'chip chip--primary filter-chip';
-            chip.setAttribute('data-testid', 'filter-chip-' + filter.control.name);
+            chip.setAttribute('data-testid', `filter-chip-${filter.control.name}`);
             chip.setAttribute(
                 'aria-label',
-                removeLabel ? removeLabel + ': ' + filter.text : filter.text,
+                removeLabel ? `${removeLabel}: ${filter.text}` : filter.text,
             );
             const text = document.createElement('span');
             text.textContent = filter.text;
@@ -249,7 +249,7 @@
             use.setAttribute('href', '#krt-icon-close');
             icon.appendChild(use);
             chip.appendChild(icon);
-            chip.addEventListener('click', function () {
+            chip.addEventListener('click', () => {
                 const chips = Array.prototype.slice.call(bar.querySelectorAll('.filter-chip'));
                 const index = chips.indexOf(chip);
                 clear(filter);
@@ -278,19 +278,19 @@
             return;
         }
         bar.setAttribute('data-filter-chips-ready', '');
-        document.addEventListener('input', function (event) {
+        document.addEventListener('input', (event) => {
             const source = sourceOf(bar);
             if (source && event.target instanceof Node && source.contains(event.target))
                 schedule(bar);
         });
-        document.addEventListener('change', function (event) {
+        document.addEventListener('change', (event) => {
             const source = sourceOf(bar);
             if (source && event.target instanceof Node && source.contains(event.target))
                 schedule(bar);
         });
         const reset = bar.querySelector('[data-filter-chips-reset]');
         if (reset) {
-            reset.addEventListener('click', function () {
+            reset.addEventListener('click', () => {
                 const source = sourceOf(bar);
                 if (!source) return;
                 collect(source).forEach(clear);
@@ -327,7 +327,7 @@
     };
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('DOMContentLoaded', () => {
             initAll(document);
         });
     } else {

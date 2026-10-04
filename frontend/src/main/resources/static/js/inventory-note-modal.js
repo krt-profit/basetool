@@ -29,7 +29,7 @@ function openNoteModal(btn) {
     ta.value = note;
     updateNoteCounter();
     window.krtModal.open(modal);
-    setTimeout(function () {
+    setTimeout(() => {
         ta.focus();
     }, 0);
 }
@@ -43,7 +43,7 @@ function closeNoteModal() {
 function updateNoteCounter() {
     const ta = document.getElementById('noteModalTextarea');
     const counter = document.getElementById('noteModalCounter');
-    if (ta && counter) counter.textContent = (ta.value ? ta.value.length : 0) + ' / 1000';
+    if (ta && counter) counter.textContent = `${ta.value ? ta.value.length : 0} / 1000`;
 }
 
 function showInventoryToast(type, msg) {
@@ -68,11 +68,9 @@ function removeNote() {
         submitNoteUpdate('');
         return;
     }
-    window
-        .showKrtConfirm(noteI18n.confirmTitle, noteI18n.confirmMessage)
-        .then(function (confirmed) {
-            if (confirmed) submitNoteUpdate('');
-        });
+    window.showKrtConfirm(noteI18n.confirmTitle, noteI18n.confirmMessage).then((confirmed) => {
+        if (confirmed) submitNoteUpdate('');
+    });
 }
 
 function submitNoteUpdate(noteValue) {
@@ -80,7 +78,7 @@ function submitNoteUpdate(noteValue) {
     if (!btn) return;
     const id = btn.getAttribute('data-id');
     if (window.krtFetch && typeof window.krtFetch.serialize === 'function') {
-        return window.krtFetch.serialize('inv-note:' + id, function () {
+        return window.krtFetch.serialize(`inv-note:${id}`, () => {
             return runNoteUpdate(btn, id, noteValue);
         });
     }
@@ -98,7 +96,7 @@ function runNoteUpdate(btn, id, noteValue) {
             : { reloadDetailFallback: noteI18n.conflict };
     return window.krtFetch.write({
         method: 'PUT',
-        url: '/inventory/' + encodeURIComponent(id) + '/note',
+        url: `/inventory/${encodeURIComponent(id)}/note`,
         payload: {
             note: noteValue,
             version: version == null ? null : Number(version),
@@ -112,9 +110,9 @@ function runNoteUpdate(btn, id, noteValue) {
                 window.krtFetch.syncVersion(btn.closest('.tree-row--leaf'), updated.version);
             }
             const noteBtns = document.querySelectorAll(
-                'button.inventory-note-btn[data-id="' + id + '"]',
+                `button.inventory-note-btn[data-id="${id}"]`,
             );
-            noteBtns.forEach(function (b) {
+            noteBtns.forEach((b) => {
                 b.setAttribute(
                     'data-note',
                     isEmpty ? '' : updated && updated.note != null ? updated.note : trimmed,
@@ -125,8 +123,8 @@ function runNoteUpdate(btn, id, noteValue) {
                 b.classList.toggle('btn-outline', !isEmpty);
                 b.classList.toggle('btn-ghost', isEmpty);
             });
-            const previews = document.querySelectorAll('[data-note-for="' + id + '"]');
-            previews.forEach(function (p) {
+            const previews = document.querySelectorAll(`[data-note-for="${id}"]`);
+            previews.forEach((p) => {
                 if (isEmpty) {
                     p.remove();
                 } else {

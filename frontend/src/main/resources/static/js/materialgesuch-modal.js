@@ -112,7 +112,7 @@
      * @param doneOrOpts an onDone callback(body), or {onDone, onCancel}.
      */
     function open(mode, ctx, doneOrOpts) {
-        ctx = ctx || {};
+        ctx ||= {};
         let onDone = null;
         let onCancel = null;
         if (typeof doneOrOpts === 'function') {
@@ -191,7 +191,7 @@
     }
 
     function setKindRadio(kind) {
-        const radio = modal.querySelector('[data-mg-kind-radio][value="' + kind + '"]');
+        const radio = modal.querySelector(`[data-mg-kind-radio][value="${kind}"]`);
         if (radio) {
             radio.checked = true;
         }
@@ -240,23 +240,17 @@
 
     function loadMaterialPicker(query) {
         const seq = ++materialSeq;
-        const url =
-            '/materialboerse/request-materials' + (query ? '?q=' + encodeURIComponent(query) : '');
-        fetch(url, {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            credentials: 'same-origin',
-        })
-            .then(function (r) {
-                return r.ok ? r.json() : null;
-            })
-            .then(function (page) {
+        const url = `/materialboerse/request-materials${query ? `?q=${encodeURIComponent(query)}` : ''}`;
+        window.krtFetch
+            .getJson(url)
+            .then((page) => {
                 if (seq !== materialSeq) {
                     return;
                 }
                 materialItems = page && Array.isArray(page.content) ? page.content : [];
                 renderMaterialPicker();
             })
-            .catch(function () {
+            .catch(() => {
                 if (seq !== materialSeq) {
                     return;
                 }
@@ -269,7 +263,7 @@
         if (materialTimer) {
             clearTimeout(materialTimer);
         }
-        materialTimer = setTimeout(function () {
+        materialTimer = setTimeout(() => {
             loadMaterialPicker(query);
         }, PICKER_SEARCH_DEBOUNCE_MS);
     }
@@ -296,31 +290,23 @@
             return;
         }
         if (!materialItems.length) {
-            list.innerHTML =
-                '<li class="krt-combobox__notice">' +
-                escapeHtml(i18n.materialPickerEmpty || '') +
-                '</li>';
+            list.innerHTML = `<li class="krt-combobox__notice">${escapeHtml(
+                i18n.materialPickerEmpty || '',
+            )}</li>`;
             list.hidden = !materialListOpen;
             return;
         }
         let html = '';
-        materialItems.forEach(function (it) {
+        materialItems.forEach((it) => {
             const unit =
                 it.quantityType === 'PIECE'
                     ? window.krtI18nText(i18n.unitPiece, 'materialgesuchI18n.unitPiece')
                     : i18n.unitScu || 'SCU';
-            html +=
-                '<li class="krt-combobox__option" role="option" data-material-id="' +
-                escapeAttr(it.id) +
-                '" data-name="' +
-                escapeAttr(it.name) +
-                '" data-quantity-type="' +
-                escapeAttr(it.quantityType) +
-                '"><strong>' +
-                escapeHtml(it.name) +
-                '</strong> <small>' +
-                escapeHtml(unit) +
-                '</small></li>';
+            html += `<li class="krt-combobox__option" role="option" data-material-id="${escapeAttr(
+                it.id,
+            )}" data-name="${escapeAttr(it.name)}" data-quantity-type="${escapeAttr(
+                it.quantityType,
+            )}"><strong>${escapeHtml(it.name)}</strong> <small>${escapeHtml(unit)}</small></li>`;
         });
         list.innerHTML = html;
         list.hidden = !materialListOpen;
@@ -336,23 +322,17 @@
 
     function loadItemPicker(query) {
         const seq = ++itemSeq;
-        const url =
-            '/materialboerse/offerable-products' + (query ? '?q=' + encodeURIComponent(query) : '');
-        fetch(url, {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            credentials: 'same-origin',
-        })
-            .then(function (r) {
-                return r.ok ? r.json() : [];
-            })
-            .then(function (items) {
+        const url = `/materialboerse/offerable-products${query ? `?q=${encodeURIComponent(query)}` : ''}`;
+        window.krtFetch
+            .getJson(url)
+            .then((items) => {
                 if (seq !== itemSeq) {
                     return;
                 }
                 productItems = Array.isArray(items) ? items : [];
                 renderItemPicker();
             })
-            .catch(function () {
+            .catch(() => {
                 if (seq !== itemSeq) {
                     return;
                 }
@@ -365,7 +345,7 @@
         if (itemTimer) {
             clearTimeout(itemTimer);
         }
-        itemTimer = setTimeout(function () {
+        itemTimer = setTimeout(() => {
             loadItemPicker(query);
         }, PICKER_SEARCH_DEBOUNCE_MS);
     }
@@ -392,25 +372,19 @@
             return;
         }
         if (!productItems.length) {
-            list.innerHTML =
-                '<li class="krt-combobox__notice">' +
-                escapeHtml(i18n.itemPickerEmpty || '') +
-                '</li>';
+            list.innerHTML = `<li class="krt-combobox__notice">${escapeHtml(
+                i18n.itemPickerEmpty || '',
+            )}</li>`;
             list.hidden = !itemListOpen;
             return;
         }
         let html = '';
-        productItems.forEach(function (it) {
-            html +=
-                '<li class="krt-combobox__option" role="option" data-product-key="' +
-                escapeAttr(it.productKey) +
-                '" data-name="' +
-                escapeAttr(it.name) +
-                '"><strong>' +
-                escapeHtml(it.name) +
-                '</strong>';
+        productItems.forEach((it) => {
+            html += `<li class="krt-combobox__option" role="option" data-product-key="${escapeAttr(
+                it.productKey,
+            )}" data-name="${escapeAttr(it.name)}"><strong>${escapeHtml(it.name)}</strong>`;
             if (it.manufacturerName) {
-                html += ' <small>' + escapeHtml(it.manufacturerName) + '</small>';
+                html += ` <small>${escapeHtml(it.manufacturerName)}</small>`;
             }
             html += '</li>';
         });
@@ -474,7 +448,7 @@
         if (state.mode === 'edit') {
             window.krtFetch.write({
                 method: 'PUT',
-                url: '/materialboerse/requests/' + state.requestId + '/ajax',
+                url: `/materialboerse/requests/${state.requestId}/ajax`,
                 payload: {
                     desiredAmount: quantity,
                     minQuality: minQuality === undefined ? null : minQuality,
@@ -547,7 +521,7 @@
         }
     }
 
-    document.addEventListener('click', function (e) {
+    document.addEventListener('click', (e) => {
         if (!isModalOpen()) {
             if (
                 e.target.closest('[data-mg-picker-list] .krt-combobox__option') ||
@@ -590,7 +564,7 @@
         }
     });
 
-    document.addEventListener('input', function (e) {
+    document.addEventListener('input', (e) => {
         if (e.target.matches('[data-mg-remark]')) {
             updateCharCount();
         } else if (e.target.matches('[data-mg-picker-input]')) {
@@ -606,13 +580,13 @@
         }
     });
 
-    document.addEventListener('change', function (e) {
+    document.addEventListener('change', (e) => {
         if (e.target.matches('[data-mg-kind-radio]')) {
             setKind(e.target.value);
         }
     });
 
-    document.addEventListener('keydown', function (e) {
+    document.addEventListener('keydown', (e) => {
         if (!isModalOpen()) {
             return;
         }
@@ -633,7 +607,7 @@
         const focusable = modal.querySelectorAll(
             'button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])',
         );
-        const visible = Array.prototype.filter.call(focusable, function (el) {
+        const visible = Array.prototype.filter.call(focusable, (el) => {
             return el.offsetParent !== null && !el.hidden;
         });
         if (!visible.length) {

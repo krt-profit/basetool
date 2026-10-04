@@ -113,14 +113,12 @@ function writeExpandedOrderMaterials(values) {
 
 function applyOrderMaterialsState(orderId, expanded) {
     const body = document.querySelector(
-        '[data-order-materials="' +
-            (window.CSS && CSS.escape ? CSS.escape(orderId) : orderId) +
-            '"]',
+        `[data-order-materials="${window.CSS && CSS.escape ? CSS.escape(orderId) : orderId}"]`,
     );
     const btn = document.querySelector(
-        '[data-trigger="ord-toggle-materials"][data-order-id="' +
-            (window.CSS && CSS.escape ? CSS.escape(orderId) : orderId) +
-            '"]',
+        `[data-trigger="ord-toggle-materials"][data-order-id="${
+            window.CSS && CSS.escape ? CSS.escape(orderId) : orderId
+        }"]`,
     );
     if (body) {
         body.toggleAttribute('hidden', !expanded);
@@ -199,9 +197,9 @@ function updateSquadronHeaderText() {
     } else if (checked.length === 1) {
         const option = checked[0].closest('.multi-select-option');
         const label = option ? option.querySelector('span') : null;
-        textEl.textContent = label ? label.textContent.trim() : checked.length + ' ' + dataSelected;
+        textEl.textContent = label ? label.textContent.trim() : `${checked.length} ${dataSelected}`;
     } else {
-        textEl.textContent = checked.length + ' ' + dataSelected;
+        textEl.textContent = `${checked.length} ${dataSelected}`;
     }
 }
 
@@ -254,7 +252,7 @@ function applyOrdersFilter() {
     }
     const query = params.toString();
     window.krtFetch.swap({
-        url: '/orders' + (query ? '?' + query : ''),
+        url: `/orders${query ? `?${query}` : ''}`,
         container: resultsContainer,
         history: true,
     });
