@@ -128,7 +128,15 @@ class PagedFindersNoCollectionFetchTest {
           List<JobOrder> scoped =
               jobOrderRepository
                   .findScopedJobOrders(
-                      statuses, true, Set.of(new UUID(0L, 0L)), true, null, Set.of(), PAGE)
+                      statuses,
+                      true,
+                      Set.of(new UUID(0L, 0L)),
+                      false,
+                      Set.of(new UUID(0L, 0L)),
+                      true,
+                      null,
+                      Set.of(),
+                      PAGE)
                   .getContent();
           assertUnfetched(scoped, JobOrder::getMaterials);
           assertUnfetched(scoped, JobOrder::getAssignees);
