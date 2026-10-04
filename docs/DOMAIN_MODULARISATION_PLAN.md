@@ -240,7 +240,7 @@ the modules its row allows; a dependency upward is inverted through an SPI or an
 
 | Rank | Modules | Role |
 | --- | --- | --- |
-| 0 | `kernel`, `platform` | `kernel`: `AbstractEntity`, `PageResponse`, `Entities`, `OptimisticLock`, `StringNormalization`, `LikePatterns`, validation constraints, the error-model base (§5.5), handle anonymisation, `UserRef`/`OrgUnitRef` value types, SCU rounding. `platform`: web, logging, metrics infrastructure and the access core (`AuthHelperService`, `AuthenticatedSubject`, `Roles`, `Permissions`). Closed to domain meaning, like `logging-support` (ADR-0205). |
+| 0 | `kernel`, `platform` | `kernel`: `AbstractEntity`, `PageResponse`, `Entities`, `OptimisticLock`, `StringNormalization`, `LikePatterns`, validation constraints, the error-model base (§5.5), handle anonymisation, `UserRef`/`OrgUnitRef` value types (`OrgUnitRef` only once `OrgUnitKind` is a kernel type, §7.3), SCU rounding. `platform`: web, logging, metrics infrastructure and the access core (`AuthHelperService`, `AuthenticatedSubject`, `Roles`, `Permissions`). Closed to domain meaning, like `logging-support` (ADR-0205). |
 | 1 | `audit`, `notification`, `livesync` | Platform services every domain may call; they depend upward only through SPIs. |
 | 2 | `catalogue` | Materials, items, locations, ship types, refining methods, job and frequency types, and the UEX, SC Wiki and P4K imports — including the recipe graph (`model.scwiki.Blueprint`). |
 | 3 | `identity` | Users, registration, profile, terms consent, and the GDPR orchestration, which calls the other modules through identity-owned SPIs. |
@@ -669,6 +669,22 @@ Cheap moves that break many cycles without changing behaviour:
   edges sit in `AuditService` and `AuditRetentionService`. No `@ApplicationModule` yet (P1-13):
   Spring Modulith is test-scope only, so a `package-info` annotation needs `spring-modulith-api` as
   a `compileOnly` dependency first.
+  The event records are **done 2026-10-04** (P1-11): the 19 types of the central `event` package
+  moved, names unchanged, into the `api.events` package of the module of the service that publishes
+  them — `identity` (`DiscordRegistrationPendingEvent`, `UserApprovalDecidedEvent`,
+  `MemberDepartedEvent`), `privacy` (the three `AccountDeletionRequest…Event`s, published by
+  `DeletionRequestService`), `bank` (the booking-request interface and its four records),
+  `joborder`, `materialexchange` and `exchange` (two each), and `notification` (`NotificationEvent`
+  and `OrgUnitRef`). The `event` package is gone. **Correction to §5.1:** `OrgUnitRef` does not go
+  into the kernel yet: it carries `OrgUnitKind` (orgunit, rank 4), so a kernel `OrgUnitRef` would
+  replace the frozen `notification -> orgunit` edge with a new `kernel -> orgunit` one, and an
+  `orgunit.api` one would add two edges from `NotificationEvent` and `RuleEvaluationService`. It
+  stays with the notification contract until `OrgUnitKind` itself is a kernel type. The domain map
+  trades six class rules for one `package <module> <module>` rule per new module package; every
+  type keeps its module, so the baseline stays at 138 edges. The ArchUnit event-payload rule
+  (`eventLayerShouldNotDependOnServiceLayer`, floor 19) is re-keyed from the package tree of
+  `NotificationEvent` to every module's `api.events` tree — left on the anchor, it would have
+  selected two classes and failed its floor — and `event` left the layer-package names.
 
 **Pros** many cycles gone before any domain moves; each step is small. **Cons** broad, shallow
 churn. **Risks** SpEL bean names and FQCN references (guards G-01, G-04 catch them). **Effort** M.
@@ -810,7 +826,7 @@ JSpecify stays out for now (ADR-0192).
 
 Typed per-module build settings now; an included `build-logic` with convention plugins before the
 first Gradle extraction (it also prepares Gradle's isolated projects); `java-test-fixtures` for
-module-owned test fixtures; the configuration cache on for local builds; a decision whether CI reuses
+module-owned test fixtures; the configuration cache on for local builds (done 2026-10-04, #2387); a decision whether CI reuses
 configuration-cache entries (it never does today, because `setup-gradle` gets no encryption key).
 
 ## 9 Defects found along the way — fixed first, in separate pull requests
@@ -1015,9 +1031,9 @@ same session as this plan, and in the repository where this plan touches the doc
 | `docs/specs/security-and-access.md` REQ-SEC-031 | a member record is the only personal data the API serves | admin export, person search and registrations serve personal data and are not in the `no-store` families |
 | `docs/specs/frontend-ajax-mutations.md` REQ-FE-018, `docs/TYPESCRIPT_MIGRATION_PLAN.md` | 40 of 96 files type-checked; `type=module` would change the execution order | 44 of 100; 120 of 121 scripts are already `defer` — **corrected 2026-10-02** in both |
 | ADR-0223 | see §8.1 | **corrected 2026-10-02** (amendment) |
-| ADR-0069, ADR-0130, ADR-0212 | "no IIFE wrapping"; `scripts/**/*.mjs` in the lint globs; "with a comment naming what it beats" | half the scripts are IIFE-wrapped; the Gradle lint tasks do not read `scripts/`; ADR-0214 forbids the comment — **corrected 2026-10-02** (an amendment each; the `scripts/` lint gate itself is still open) |
+| ADR-0069, ADR-0130, ADR-0212 | "no IIFE wrapping"; `scripts/**/*.mjs` in the lint globs; "with a comment naming what it beats" | half the scripts are IIFE-wrapped; the Gradle lint tasks do not read `scripts/`; ADR-0214 forbids the comment — **corrected 2026-10-02** (an amendment each); the `scripts/` lint gate is done too — `lintJs` reads `scripts/**/*.mjs` (`frontend/build.gradle.kts`, checked 2026-10-04) |
 | backend `ArchitectureTest` messages | ask for "a code comment" in three places | ADR-0214 |
-| `config/owasp/dependency-check-suppressions.xml` | its header described how a suppression is renewed | the header went with the ADR-0214 sweep; no document describes the renewal now, and all nine suppressions expire on the same day |
+| `config/owasp/dependency-check-suppressions.xml` | its header described how a suppression is renewed | the header went with the ADR-0214 sweep; no document describes the renewal now, and all nine suppressions expire on the same day — **corrected 2026-10-04** (#2387): CONTRIBUTING → *OWASP suppressions expire* |
 
 ## 16 Method, sources and limits
 

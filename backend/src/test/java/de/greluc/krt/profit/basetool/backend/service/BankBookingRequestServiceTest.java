@@ -29,10 +29,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
-import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestCancelledEvent;
-import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestConfirmedEvent;
-import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestCreatedEvent;
-import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestRejectedEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCancelledEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestConfirmedEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCreatedEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestRejectedEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;

@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.AsyncConfig;
-import de.greluc.krt.profit.basetool.backend.event.NotificationEvent;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
