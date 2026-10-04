@@ -95,7 +95,7 @@ source aggregate (no second `@Version` bump).
   write on the order.
 
 **Enforced by:** `NotificationCreationServiceTest`, `NotificationRuleEngineIntegrationTest`,
-`JobOrderServiceTest` · **Code:** `event/NotificationEvent`, `service/NotificationEventListener`,
+`JobOrderServiceTest` · **Code:** `notification/api/events/NotificationEvent`, `service/NotificationEventListener`,
 `config/AsyncConfig`, `service/NotificationCreationService`
 
 ### REQ-NOTIF-003 — Extensibility without schema changes
@@ -232,7 +232,7 @@ manual sync) — an accepted eventual-consistency window. A login re-syncs the r
 
 **Enforced by:** `RuleEvaluationServiceTest`, `NotificationRuleEngineIntegrationTest`,
 `JobOrderServiceTest` · **Code:** `service/JobOrderService#publishJobOrderCreated`,
-`event/JobOrderCreatedEvent`, `service/RecipientResolutionService`
+`joborder/api/events/JobOrderCreatedEvent`, `service/RecipientResolutionService`
 
 ### REQ-NOTIF-009 — Retention
 
@@ -509,7 +509,7 @@ admin-editable at runtime.
   three bundles, named placeholders `{accountNo}`/`{amount}`/`{requester}`/`{reason}`).
 
 **Enforced by:** `RuleEvaluationServiceTest`, `BankBookingRequestServiceTest` · **Code:**
-`event/BankBookingRequest{Created,Confirmed,Rejected}Event`,
+`bank/api/events/BankBookingRequest{Created,Confirmed,Rejected}Event`,
 `service/RecipientResolutionService#resolveAccountGrantHolders`,
 `service/RuleEvaluationService#resolveEventRecipient`,
 `service/OrgUnitBankResponsibilityService#resolveResponsibleHolderUserIds`,
@@ -578,7 +578,7 @@ records the notification-engine consumer.
 
 **Enforced by:** `MaterialExchangeServiceTest`, `RuleEvaluationServiceTest`,
 `MessageBundleConsistencyTest` · **Code:**
-`event/MaterialExchangeInterestRegisteredEvent`,
+`materialexchange/api/events/MaterialExchangeInterestRegisteredEvent`,
 `service/MaterialExchangeService#registerInterestInNewTransaction`, `model/NotificationEventType`,
 `model/NotificationType`,
 `db/migration/V211__seed_material_exchange_interest_notification_rule.sql` · **Issues:** #1187
@@ -607,7 +607,7 @@ never the editing member's personal name (no PII in params).
   bundles, named placeholders `{displayId}`/`{orgUnit}`/`{requester}`).
 
 **Enforced by:** `JobOrderServiceTest`, `MessageBundleConsistencyTest` · **Code:**
-`event/JobOrderUpdatedByRequesterEvent`, `service/JobOrderService#publishJobOrderUpdatedByRequester`,
+`joborder/api/events/JobOrderUpdatedByRequesterEvent`, `service/JobOrderService#publishJobOrderUpdatedByRequester`,
 `model/NotificationEventType`, `model/NotificationType`,
 `db/migration/V214__seed_job_order_requester_update_notification_rule.sql` · **Issues:** #1186
 
@@ -650,11 +650,11 @@ request is closed.
   hook needs no schema migration (open enum; behaviour is code + event-driven).
 
 **Enforced by:** `NotificationCreationServiceTest`, `NotificationRepositoryIntegrationTest`,
-`BankBookingRequestServiceTest` · **Code:** `event/NotificationEvent#resolvesNotificationTypes`,
-`event/BankBookingRequest{Confirmed,Rejected,Cancelled}Event`,
+`BankBookingRequestServiceTest` · **Code:** `notification/api/events/NotificationEvent#resolvesNotificationTypes`,
+`bank/api/events/BankBookingRequest{Confirmed,Rejected,Cancelled}Event`,
 `service/NotificationCreationService#removeSupersededNotifications`,
 `repository/NotificationRepository#{findRecipientUserIdsByTypeInAndEntity,deleteByTypeInAndEntity}`,
-`service/BankBookingRequestService#cancelOwn`, `event/AccountDeletionRequest{Declined,Resolved}Event`,
+`service/BankBookingRequestService#cancelOwn`, `privacy/api/events/AccountDeletionRequest{Declined,Resolved}Event`,
 `model/NotificationEventType` · **Decision:**
 [ADR-0096](../adr/0096-notification-supersede-on-lifecycle-close.md) · **Issues:** #1252
 

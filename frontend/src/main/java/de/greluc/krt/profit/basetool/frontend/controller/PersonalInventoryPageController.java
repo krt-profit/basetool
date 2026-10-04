@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorRespons
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemUpdateRequest;
@@ -41,6 +42,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -86,6 +88,10 @@ public class PersonalInventoryPageController {
   private static final ParameterizedTypeReference<PageResponse<PersonalInventoryItemDto>>
       PERSONAL_INVENTORY_ITEM_PAGE_TYPE = new ParameterizedTypeReference<>() {};
 
+  /** Response type for the paged {@code /api/v1/personal-blueprints} read, used for its total. */
+  private static final ParameterizedTypeReference<PageResponse<PersonalBlueprintDto>>
+      PERSONAL_BLUEPRINT_PAGE_TYPE = new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -96,7 +102,8 @@ public class PersonalInventoryPageController {
    * @param size page size, defaults to 50
    * @param sort optional sort spec ({@code field,asc|desc}), whitelisted by the backend
    * @param fragment {@code "results"} renders only the item-list fragment (REQ-FE-002)
-   * @param model model populated with the form, filter, item list and page metadata
+   * @param model model populated with the form, filter, item list and page metadata, and for the
+   *     full page {@code blueprintCount}
    * @return the {@code personal-inventory} view name, or its {@code results} fragment
    */
   @NotNull
@@ -112,7 +119,28 @@ public class PersonalInventoryPageController {
       model.addAttribute("personalInventoryForm", new PersonalInventoryForm());
     }
     populateListing(model, q, page, size, sort);
-    return "results".equals(fragment) ? "personal-inventory :: results" : "personal-inventory";
+    if ("results".equals(fragment)) {
+      return "personal-inventory :: results";
+    }
+    model.addAttribute("blueprintCount", countBlueprints());
+    return "personal-inventory";
+  }
+
+  /**
+   * Reads how many blueprints the caller owns, for the „Blueprints" tab's count.
+   *
+   * @return the caller's blueprint total, or {@code null} when the backend cannot answer
+   */
+  @Nullable
+  private Long countBlueprints() {
+    try {
+      PageResponse<PersonalBlueprintDto> owned =
+          backendApiClient.get("/api/v1/personal-blueprints?size=1", PERSONAL_BLUEPRINT_PAGE_TYPE);
+      return owned == null ? null : owned.totalElements();
+    } catch (Exception e) {
+      log.debug("Failed to count owned blueprints: {}", e.getMessage());
+      return null;
+    }
   }
 
   /**

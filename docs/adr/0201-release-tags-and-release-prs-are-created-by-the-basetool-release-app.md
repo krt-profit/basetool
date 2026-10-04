@@ -125,3 +125,30 @@ working before and after the owner's one-time step:
   only that store.
 - A key rotation now updates up to three copies: the `release` environment, the repository secret
   while it exists, and the Dependabot secret.
+
+## Amendment 4 (2026-10-04) — publishing runs on the `main` push
+
+Decided by @greluc on 2026-10-04: **`release-publish.yml` is triggered by `push` to `main`**, not by
+`pull_request: closed` and not by `pull_request_target`. This supersedes the first bullet of
+Amendment 3.
+
+- A `detect` job (`contents: read`, `pull-requests: read`, no secret) asks the API which pull
+  requests belong to the pushed commit (`commits/{sha}/pulls`) and selects the one that is merged
+  into `main`, comes from this repository, has a `release/v…` head and whose `merge_commit_sha` is
+  the pushed commit. Any other push ends there, green. A malformed `release/…` branch name fails the
+  run, as before. The lookup retries briefly when GitHub has not associated the commit yet.
+- The `publish` job runs only on a match, in `environment: release`, with the tag and version from
+  `detect`. Its concurrency group is `release-publish-<tag>`, so two runs for one release still
+  serialise. Everything it did before is unchanged: the tag at the merge commit (skipped when it
+  exists), the release notes, the attestations of the eight SBOM assets, the release create-or-edit.
+- `GITHUB_REF` is now `refs/heads/main`, which the `main`-only branch rule admits. All three
+  token-minting release jobs read the key from the environment, so the **repository secret can be
+  deleted** once the environment holds it. A key rotation then updates two copies: the `release`
+  environment and the Dependabot secret.
+- The owner's one-time step, after this change merges: create the `release` environment with the
+  branch rule `main` and the secret, as in Amendment 3, then delete the repository secret
+  `RELEASE_APP_PRIVATE_KEY`. Until the environment exists, GitHub creates it unprotected on the
+  first job that names it and the jobs fall back to the repository secret, so nothing breaks in
+  between; an environment created that way still needs the branch rule added.
+- A re-run of a failed `publish` job re-runs on the same commit and the same `detect` output; the
+  manual recovery path (the owner creates the tag, then re-runs) is unchanged.

@@ -843,7 +843,9 @@ class JobOrderServiceTest {
 
     verify(eventPublisher)
         .publishEvent(
-            any(de.greluc.krt.profit.basetool.backend.event.JobOrderUpdatedByRequesterEvent.class));
+            any(
+                de.greluc.krt.profit.basetool.backend.joborder.api.events
+                    .JobOrderUpdatedByRequesterEvent.class));
     verify(auditService)
         .record(
             eq(de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType.JOB_ORDER_UPDATED),
@@ -993,7 +995,9 @@ class JobOrderServiceTest {
     verify(materialClaimService).withdrawOrphanedClaimsWithinTransaction(itemOrder);
     verify(eventPublisher)
         .publishEvent(
-            any(de.greluc.krt.profit.basetool.backend.event.JobOrderUpdatedByRequesterEvent.class));
+            any(
+                de.greluc.krt.profit.basetool.backend.joborder.api.events
+                    .JobOrderUpdatedByRequesterEvent.class));
     verify(auditService)
         .record(
             eq(
@@ -1060,7 +1064,9 @@ class JobOrderServiceTest {
     verify(materialClaimService).withdrawOrphanedClaimsWithinTransaction(itemOrder);
     verify(eventPublisher)
         .publishEvent(
-            any(de.greluc.krt.profit.basetool.backend.event.JobOrderUpdatedByRequesterEvent.class));
+            any(
+                de.greluc.krt.profit.basetool.backend.joborder.api.events
+                    .JobOrderUpdatedByRequesterEvent.class));
     verify(auditService)
         .record(
             eq(
