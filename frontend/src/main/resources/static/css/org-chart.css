@@ -29,7 +29,7 @@
         left: 0;
         right: 0;
         bottom: var(--krt-footer-height, 5rem);
-        z-index: 998;
+        z-index: var(--z-chart-scrollbar);
         display: none;
         height: 14px;
         overflow: auto hidden;
@@ -482,13 +482,13 @@
     .oc-icon-btn:hover {
         color: var(--color-primary);
         border-color: var(--color-primary);
-        background: rgb(231 126 35 / 7%);
+        background: color-mix(in srgb, var(--color-primary) 7%, transparent);
     }
 
     .oc-icon-btn.oc-icon-btn--danger:hover {
         color: var(--color-danger-text);
         border-color: var(--color-danger);
-        background: rgb(163 0 10 / 12%);
+        background: color-mix(in srgb, var(--color-danger) 12%, transparent);
     }
 
     .oc-add {
@@ -524,7 +524,7 @@
         max-width: var(--content-max);
         margin: 0 auto 1rem;
         padding: 0.6rem 0.9rem;
-        background: rgb(231 126 35 / 8%);
+        background: color-mix(in srgb, var(--color-primary) 8%, transparent);
         border: 1px solid var(--color-gray-3);
         border-left: 4px solid var(--color-primary);
         color: var(--color-gray-1);

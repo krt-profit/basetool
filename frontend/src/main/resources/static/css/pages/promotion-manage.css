@@ -41,7 +41,7 @@
         padding: 0.6rem 0.75rem;
         margin-bottom: 0.75rem;
         border: 1px solid var(--color-primary);
-        background-color: rgba(231, 126, 35, 0.06);
+        background-color: color-mix(in srgb, var(--color-primary) 6%, transparent);
     }
     .pm-bulk-panel.visible {
         display: flex;
@@ -93,12 +93,12 @@
         background-color: var(--color-surface-input);
     }
     .pm-matrix tbody tr.pm-row-selected td {
-        background-color: rgba(231, 126, 35, 0.06);
+        background-color: color-mix(in srgb, var(--color-primary) 6%, transparent);
     }
     .pm-matrix tbody tr.pm-row-selected .pm-checkbox-cell,
     .pm-matrix tbody tr.pm-row-selected .pm-member-cell,
     .pm-matrix tbody tr.pm-row-selected .pm-eligibility-cell {
-        background-color: rgba(231, 126, 35, 0.06);
+        background-color: color-mix(in srgb, var(--color-primary) 6%, transparent);
     }
 
     .pm-matrix thead tr.pm-row-topic th {

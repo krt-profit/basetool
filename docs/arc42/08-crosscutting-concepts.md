@@ -231,6 +231,11 @@ Two binding rules shape every UI change:
   phones, a sectioned form with a sticky action bar. The markup lives in `fragments/page-head` and
   `fragments/components`, driven by two global scripts; breakpoints are only 768, 1024 and 1440 px,
   enforced by Stylelint (REQ-UI-027, REQ-UI-009, ADR-0242, `PagePatternFragmentsRenderTest`).
+- **Colours and stacking layers go through tokens** (2026-10-04). A colour token's value is written
+  only in its declaration on `:root` — alpha variants are `color-mix()` of the token — and every
+  page-level `z-index` is a step of the ascending `--z-*` scale beside it; every `var()` must name a
+  declared property (REQ-UI-001, ADR-0243, `ColourTokenCopyTest`, `ZIndexScaleTest`,
+  `CustomPropertyExistenceTest`).
 
 Authority: [`ui-design-system.md`](../specs/ui-design-system.md),
 [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (`REQ-FE-*`),

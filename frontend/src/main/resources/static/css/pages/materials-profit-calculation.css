@@ -155,7 +155,7 @@
     }
 
     .profit-row--top {
-        background: rgb(231 126 35 / 6%);
+        background: color-mix(in srgb, var(--color-primary) 6%, transparent);
     }
 
     .profit-row--top .profit-rank {
