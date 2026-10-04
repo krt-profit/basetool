@@ -49,6 +49,11 @@
 
 - **Einsätze und Operationen: Zeitraum „Kommend · Vergangen · Alle".** Ersetzt die Checkbox
   „Vergangene anzeigen"; die gespeicherte Auswahl wird übernommen.
+- **Beförderung und Einsatzdaten im neuen Muster.** „Themenbereiche verwalten" und „Einsatzdaten
+  verwalten" sind Listen mit Detailbereich, deren Auswahl als Link erhalten bleibt; die
+  Rangvoraussetzungen stehen als Matrix Rangsprung × Themenbereich. „Beförderungssystem" zeigt den
+  Rangpfad als Stufen, „Meine Bewertungen" den Fortschritt zum nächsten Rang (REQ-PROMO-002/003).
+
 - **Benachrichtigungen: „Ungelesen · Alle" und Links.** Die Seite zeigt zunächst nur Ungelesenes;
   Benachrichtigungen zu Aufträgen, Materialbörse, verbundenen Anwendungen und Admin-Vorgängen
   führen direkt zur Seite (REQ-NOTIF-022).

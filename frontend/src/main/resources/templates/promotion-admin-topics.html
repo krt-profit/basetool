@@ -13,78 +13,83 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{promotion.admin.topics.title}">Themenbereiche verwalten</h1>
-        <p th:text="#{promotion.admin.topics.subtitle}">Themenbereiche und Kategorien</p>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.promotion', titleText=#{promotion.admin.topics.title},
+        count=${isAllSquadronsMode ? null : #lists.size(topics)}, countId='pa-count', countFor='pa-topics-results',
+        actions=~{::pa-actions})}">
+        <th:block th:ref="pa-actions">
+            <button th:unless="${isAllSquadronsMode}" type="button" class="btn btn--cta"
+                    data-trigger="pa-open-create-topic" data-testid="page-head-primary">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                <span th:text="#{promotion.admin.topics.new}">Neuer Themenbereich</span>
+            </button>
+        </th:block>
+    </th:block>
 
-    <div th:if="${isAllSquadronsMode}" class="hud-box mt-2">
-        <p th:text="#{promotion.select_squadron.hint}">Bitte wähle eine Staffel, um ihr Beförderungssystem zu sehen.</p>
-    </div>
+    <div th:if="${isAllSquadronsMode}" class="alert alert-info"
+         th:text="#{promotion.select_squadron.hint}">Bitte wähle eine Staffel, um ihr Beförderungssystem zu sehen.</div>
     <th:block th:unless="${isAllSquadronsMode}">
 
-    <div class="hud-box mt-2">
-        <div id="pa-save-all-banner" class="pa-save-all-banner" role="status">
-            <span>
-                <span class="pa-save-all-count" id="pa-save-all-count">0</span>
-                <span th:text="#{promotion.admin.topics.save.all.label}">ungespeicherte Änderungen</span>
-            </span>
-            <button type="button"
-                    class="btn btn--cta pa-btn-tiny"
-                    data-trigger="pa-save-all"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{promotion.admin.topics.save.all}">Alle speichern</span></button>
-            <button type="button"
-                    class="btn btn-ghost pa-btn-tiny"
-                    data-trigger="pa-discard-all"
-                    th:text="#{promotion.admin.topics.discard.all}">Verwerfen</button>
+    <div id="pa-topics-results">
+    <th:block th:fragment="topicsResults">
+    <div th:if="${#lists.isEmpty(topics)}" class="card card--flush">
+        <th:block th:replace="~{fragments/components :: emptyState(titleKey='promotion.admin.topics.no.topics', textKey='promotion.admin.topics.no.topics.text')}"></th:block>
+    </div>
+
+    <div th:unless="${#lists.isEmpty(topics)}" class="master-detail pa-md" id="pa-md"
+         th:data-list-total="${#lists.size(topics)}"
+         th:with="paSelected=${selectedTopicId != null ? selectedTopicId : topics[0].id.toString()}">
+        <div class="master-list pa-topic-list" id="pa-topic-list" role="listbox"
+             th:aria-label="#{promotion.admin.topics.list.aria}">
+            <button type="button" class="master-row pa-topic-row" role="option"
+                    th:each="topic : ${topics}"
+                    th:with="paCats=${topicCategoryMap[topic.id.toString()]}"
+                    th:classappend="${topic.id.toString() == paSelected} ? 'is-active' : ''"
+                    th:aria-selected="${topic.id.toString() == paSelected}"
+                    th:tabindex="${topic.id.toString() == paSelected ? 0 : -1}"
+                    data-trigger="pa-select-topic"
+                    th:attr="data-pa-select-topic=${topic.id},aria-controls=${'pa-topic-pane-' + topic.id}">
+                <span class="admin-topic-name" th:text="${topic.name}">Themenbereich</span>
+                <span class="chip chip--muted"
+                      th:text="${paCats != null ? #lists.size(paCats) : 0}"
+                      th:title="#{promotion.admin.topics.categories.title}">0</span>
+            </button>
         </div>
 
-        <div class="pa-toolbar">
-            <button type="button"
-                    class="btn btn--cta"
-                    data-trigger="pa-open-create-topic"
-                    th:text="#{promotion.admin.topics.new}">Neuer Themenbereich</button>
-            <div class="pa-spacer"></div>
-            <button type="button"
-                    class="btn btn-ghost pa-btn-tiny"
-                    data-trigger="pa-expand-all-topics"
-                    th:text="#{promotion.manage.expand.all}">Alle ausklappen</button>
-            <button type="button"
-                    class="btn btn-ghost pa-btn-tiny"
-                    data-trigger="pa-collapse-all-topics"
-                    th:text="#{promotion.manage.collapse.all}">Alle einklappen</button>
-        </div>
-
-        <div id="pa-topics-results">
-        <th:block th:fragment="topicsResults">
-        <div th:if="${#lists.isEmpty(topics)}">
-            <p th:text="#{promotion.admin.topics.no.topics}">Keine Themenbereiche vorhanden.</p>
-        </div>
-
-        <details th:each="topic,topicIter : ${topics}"
-                 class="admin-topic-card"
+        <div class="pa-topic-panes" id="pa-topic-panes">
+        <section th:each="topic,topicIter : ${topics}"
+                 class="detail-pane pa-topic-pane"
+                 th:id="${'pa-topic-pane-' + topic.id}"
+                 th:hidden="${topic.id.toString() != paSelected}"
+                 th:with="paCats=${topicCategoryMap[topic.id.toString()]}"
                  th:attr="data-pa-topic-id=${topic.id},
                           data-pa-topic-sort=${topic.sortOrder},
                           data-pa-topic-version=${topic.version},
                           data-pa-topic-index=${topicIter.index},
-                          data-pa-topic-last=${topicIter.last}">
-            <summary>
-                <span class="admin-topic-name">
-                    <span th:text="${topic.name}">Themenbereich</span>
+                          data-pa-topic-last=${topicIter.last},
+                          aria-label=${topic.name}">
+            <div class="pa-pane-head">
+                <div class="pa-pane-title">
                     <span class="pa-sort-controls" th:if="${#lists.size(topics) gt 1}">
                         <button type="button"
                                 class="pa-sort-btn"
                                 data-trigger="pa-move-topic-up"
                                 th:attr="data-pa-topic-id=${topic.id},aria-label=#{promotion.admin.topics.move.up}"
+                                th:title="#{promotion.admin.topics.move.up}"
                                 th:disabled="${topicIter.first}">&#x25B2;</button>
                         <button type="button"
                                 class="pa-sort-btn"
                                 data-trigger="pa-move-topic-down"
                                 th:attr="data-pa-topic-id=${topic.id},aria-label=#{promotion.admin.topics.move.down}"
+                                th:title="#{promotion.admin.topics.move.down}"
                                 th:disabled="${topicIter.last}">&#x25BC;</button>
                     </span>
-                </span>
-                <div class="admin-actions">
-                    <button class="btn btn-ghost pa-btn-tiny btn-icon"
+                    <div class="stack gap-1">
+                        <h2 class="pa-topic-title" th:text="${topic.name}">Themenbereich</h2>
+                        <p th:if="${topic.description}" class="pa-topic-description" th:text="${topic.description}"></p>
+                    </div>
+                </div>
+                <div class="cluster gap-2 pa-pane-actions">
+                    <button type="button" class="btn btn-ghost btn-icon"
                             data-trigger="pa-edit-topic"
                             th:attr="data-pa-id=${topic.id},
                                      data-pa-name=${topic.name},
@@ -93,125 +98,114 @@
                                      data-pa-version=${topic.version}"
                             th:title="#{promotion.admin.topics.edit}"
                             th:aria-label="#{promotion.admin.topics.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
-                    <button class="btn btn-quiet-danger pa-btn-tiny btn-icon"
+                    <button type="button" class="btn btn-quiet-danger btn-icon"
                             data-trigger="pa-delete-topic"
                             th:attr="data-pa-id=${topic.id},data-pa-name=${topic.name}"
                             th:title="#{promotion.admin.topics.delete}"
                             th:aria-label="#{promotion.admin.topics.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                    <button class="btn btn-ghost pa-btn-tiny"
+                    <button type="button" class="btn btn-ghost btn-xs"
                             data-trigger="pa-open-create-category"
-                            th:attr="data-pa-topic-id=${topic.id}"
-                            th:text="#{promotion.admin.topics.category.new}">Neue Kategorie</button>
-                </div>
-            </summary>
-            <div class="admin-topic-body">
-                <p th:if="${topic.description}"
-                   class="admin-topic-description"
-                   th:text="${topic.description}"></p>
-
-                <div class="category-list"
-                     th:if="${topicCategoryMap[topic.id.toString()] != null and not #lists.isEmpty(topicCategoryMap[topic.id.toString()])}">
-                    <details th:each="cat,catIter : ${topicCategoryMap[topic.id.toString()]}"
-                             class="pa-category-card"
-                             th:attr="data-pa-category-id=${cat.id},
-                                      data-pa-category-version=${cat.version},
-                                      data-pa-category-index=${catIter.index}">
-                        <summary>
-                            <span class="pa-sort-controls" th:if="${#lists.size(topicCategoryMap[topic.id.toString()]) gt 1}">
-                                <button type="button"
-                                        class="pa-sort-btn"
-                                        data-trigger="pa-move-cat-up"
-                                        th:attr="data-pa-category-id=${cat.id},data-pa-topic-id=${topic.id},aria-label=#{promotion.admin.topics.move.up}"
-                                        th:disabled="${catIter.first}">&#x25B2;</button>
-                                <button type="button"
-                                        class="pa-sort-btn"
-                                        data-trigger="pa-move-cat-down"
-                                        th:attr="data-pa-category-id=${cat.id},data-pa-topic-id=${topic.id},aria-label=#{promotion.admin.topics.move.down}"
-                                        th:disabled="${catIter.last}">&#x25BC;</button>
-                            </span>
-                            <span class="category-summary-name" th:text="${cat.name}">Kategorie</span>
-                            <div class="admin-actions">
-                                <button class="btn btn-ghost pa-btn-tiny btn-icon"
-                                        data-trigger="pa-edit-category"
-                                        th:attr="data-pa-id=${cat.id},
-                                                 data-pa-name=${cat.name},
-                                                 data-pa-description=${cat.description},
-                                                 data-pa-sort=${cat.sortOrder},
-                                                 data-pa-version=${cat.version},
-                                                 data-pa-topic-id=${topic.id}"
-                                        th:title="#{promotion.admin.topics.edit}"
-                                        th:aria-label="#{promotion.admin.topics.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
-                                <button class="btn btn-quiet-danger pa-btn-tiny btn-icon"
-                                        data-trigger="pa-delete-category"
-                                        th:attr="data-pa-id=${cat.id},data-pa-name=${cat.name}"
-                                        th:title="#{promotion.admin.topics.delete}"
-                                        th:aria-label="#{promotion.admin.topics.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                            </div>
-                        </summary>
-                        <div class="pa-category-body">
-                            <th:block th:with="contents=${categoryContentMap[cat.id.toString()]}">
-                                <div class="pa-level-row"
-                                     th:with="lc=${contents != null and !contents.?[level == 'LEVEL_A'].isEmpty() ? contents.?[level == 'LEVEL_A'][0] : null}">
-                                    <span class="pa-level-label" th:text="#{promotion.level.a}">Stufe A</span>
-                                    <textarea class="form-input pa-level-textarea lc-textarea"
-                                              data-trigger="pa-level-dirty"
-                                              th:attr="data-category-id=${cat.id},
-                                                       data-level='LEVEL_A',
-                                                       data-lc-id=${lc != null ? lc.id : ''},
-                                                       data-lc-version=${lc != null ? lc.version : ''},
-                                                       data-original=${lc != null ? lc.description : ''}"
-                                              th:text="${lc != null ? lc.description : ''}"
-                                              rows="2"
-                                              maxlength="2000"></textarea>
-                                    <button class="btn btn-ghost pa-level-save btn-icon"
-                                            data-trigger="pa-save-level-content"
-                                            th:title="#{promotion.admin.levelcontent.save}"
-                                            th:aria-label="#{promotion.admin.levelcontent.save}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg></button>
-                                </div>
-                                <div class="pa-level-row"
-                                     th:with="lc=${contents != null and !contents.?[level == 'LEVEL_B'].isEmpty() ? contents.?[level == 'LEVEL_B'][0] : null}">
-                                    <span class="pa-level-label" th:text="#{promotion.level.b}">Stufe B</span>
-                                    <textarea class="form-input pa-level-textarea lc-textarea"
-                                              data-trigger="pa-level-dirty"
-                                              th:attr="data-category-id=${cat.id},
-                                                       data-level='LEVEL_B',
-                                                       data-lc-id=${lc != null ? lc.id : ''},
-                                                       data-lc-version=${lc != null ? lc.version : ''},
-                                                       data-original=${lc != null ? lc.description : ''}"
-                                              th:text="${lc != null ? lc.description : ''}"
-                                              rows="2"
-                                              maxlength="2000"></textarea>
-                                    <button class="btn btn-ghost pa-level-save btn-icon"
-                                            data-trigger="pa-save-level-content"
-                                            th:title="#{promotion.admin.levelcontent.save}"
-                                            th:aria-label="#{promotion.admin.levelcontent.save}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg></button>
-                                </div>
-                                <div class="pa-level-row"
-                                     th:with="lc=${contents != null and !contents.?[level == 'LEVEL_C'].isEmpty() ? contents.?[level == 'LEVEL_C'][0] : null}">
-                                    <span class="pa-level-label" th:text="#{promotion.level.c}">Stufe C</span>
-                                    <textarea class="form-input pa-level-textarea lc-textarea"
-                                              data-trigger="pa-level-dirty"
-                                              th:attr="data-category-id=${cat.id},
-                                                       data-level='LEVEL_C',
-                                                       data-lc-id=${lc != null ? lc.id : ''},
-                                                       data-lc-version=${lc != null ? lc.version : ''},
-                                                       data-original=${lc != null ? lc.description : ''}"
-                                              th:text="${lc != null ? lc.description : ''}"
-                                              rows="2"
-                                              maxlength="2000"></textarea>
-                                    <button class="btn btn-ghost pa-level-save btn-icon"
-                                            data-trigger="pa-save-level-content"
-                                            th:title="#{promotion.admin.levelcontent.save}"
-                                            th:aria-label="#{promotion.admin.levelcontent.save}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg></button>
-                                </div>
-                            </th:block>
-                        </div>
-                    </details>
+                            th:attr="data-pa-topic-id=${topic.id}">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                        <span th:text="#{promotion.admin.topics.category.new}">Neue Kategorie</span>
+                    </button>
                 </div>
             </div>
-        </details>
-        </th:block>
+
+            <th:block th:if="${paCats == null or #lists.isEmpty(paCats)}">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='promotion.admin.topics.no.categories', textKey='promotion.admin.topics.no.categories.text')}"></th:block>
+            </th:block>
+
+            <div class="pa-category-list" th:unless="${paCats == null or #lists.isEmpty(paCats)}">
+                <article th:each="cat,catIter : ${paCats}"
+                         class="pa-category-card"
+                         th:attr="data-pa-category-id=${cat.id},
+                                  data-pa-category-version=${cat.version},
+                                  data-pa-category-index=${catIter.index}">
+                    <div class="pa-category-head">
+                        <span class="pa-sort-controls" th:if="${#lists.size(paCats) gt 1}">
+                            <button type="button"
+                                    class="pa-sort-btn"
+                                    data-trigger="pa-move-cat-up"
+                                    th:attr="data-pa-category-id=${cat.id},data-pa-topic-id=${topic.id},aria-label=#{promotion.admin.topics.move.up}"
+                                    th:title="#{promotion.admin.topics.move.up}"
+                                    th:disabled="${catIter.first}">&#x25B2;</button>
+                            <button type="button"
+                                    class="pa-sort-btn"
+                                    data-trigger="pa-move-cat-down"
+                                    th:attr="data-pa-category-id=${cat.id},data-pa-topic-id=${topic.id},aria-label=#{promotion.admin.topics.move.down}"
+                                    th:title="#{promotion.admin.topics.move.down}"
+                                    th:disabled="${catIter.last}">&#x25BC;</button>
+                        </span>
+                        <div class="pa-category-title">
+                            <h3 class="category-summary-name" th:text="${cat.name}">Kategorie</h3>
+                            <p th:if="${cat.description}" class="pa-category-description" th:text="${cat.description}"></p>
+                        </div>
+                        <div class="admin-actions">
+                            <button type="button" class="btn btn-ghost btn-icon"
+                                    data-trigger="pa-edit-category"
+                                    th:attr="data-pa-id=${cat.id},
+                                             data-pa-name=${cat.name},
+                                             data-pa-description=${cat.description},
+                                             data-pa-sort=${cat.sortOrder},
+                                             data-pa-version=${cat.version},
+                                             data-pa-topic-id=${topic.id}"
+                                    th:title="#{promotion.admin.topics.edit}"
+                                    th:aria-label="#{promotion.admin.topics.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                            <button type="button" class="btn btn-quiet-danger btn-icon"
+                                    data-trigger="pa-delete-category"
+                                    th:attr="data-pa-id=${cat.id},data-pa-name=${cat.name}"
+                                    th:title="#{promotion.admin.topics.delete}"
+                                    th:aria-label="#{promotion.admin.topics.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                        </div>
+                    </div>
+                    <div class="pa-category-body">
+                        <th:block th:with="contents=${categoryContentMap[cat.id.toString()]}">
+                            <div class="pa-level-row"
+                                 th:each="lvl : ${ {'LEVEL_A', 'LEVEL_B', 'LEVEL_C'} }"
+                                 th:with="lcs=${contents != null ? contents.?[level == '__${lvl}__'] : null},
+                                          lc=${lcs != null and !lcs.isEmpty() ? lcs[0] : null},
+                                          lvlLabel=${lvl == 'LEVEL_A' ? #messages.msg('promotion.level.a') : (lvl == 'LEVEL_B' ? #messages.msg('promotion.level.b') : #messages.msg('promotion.level.c'))}">
+                                <span class="pa-level-label" th:text="${lvlLabel}">Stufe A</span>
+                                <textarea class="form-input pa-level-textarea lc-textarea"
+                                          data-trigger="pa-level-dirty"
+                                          th:attr="data-category-id=${cat.id},
+                                                   data-level=${lvl},
+                                                   data-lc-id=${lc != null ? lc.id : ''},
+                                                   data-lc-version=${lc != null ? lc.version : ''},
+                                                   data-original=${lc != null ? lc.description : ''},
+                                                   aria-label=${cat.name + ' · ' + lvlLabel}"
+                                          th:text="${lc != null ? lc.description : ''}"
+                                          rows="2"
+                                          maxlength="2000"></textarea>
+                                <button type="button" class="btn btn-ghost pa-level-save btn-icon"
+                                        data-trigger="pa-save-level-content"
+                                        th:title="#{promotion.admin.levelcontent.save}"
+                                        th:aria-label="#{promotion.admin.levelcontent.save}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg></button>
+                            </div>
+                        </th:block>
+                    </div>
+                </article>
+            </div>
+        </section>
         </div>
+    </div>
+    </th:block>
+    </div>
+
+    <div id="pa-save-all-banner" class="pa-save-all-banner" role="status">
+        <span class="pa-save-all-text">
+            <span class="pa-save-all-count" id="pa-save-all-count">0</span>
+            <span th:text="#{promotion.admin.topics.save.all.label}">ungespeicherte Änderungen</span>
+        </span>
+        <span class="grow"></span>
+        <button type="button"
+                class="btn btn-ghost"
+                data-trigger="pa-discard-all"
+                th:text="#{promotion.admin.topics.discard.all}">Verwerfen</button>
+        <button type="button"
+                class="btn btn--cta"
+                data-trigger="pa-save-all"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{promotion.admin.topics.save.all}">Alle speichern</span></button>
     </div>
     </th:block>
 </main>
@@ -221,22 +215,22 @@
     <th:block th:ref="modal-create-topic-body">
         <div class="krt-modal-body">
         <div class="form-group">
-            <label class="form-label" th:text="#{promotion.admin.topics.name.label}">Name</label>
+            <label class="form-label" for="ct-name" th:text="#{promotion.admin.topics.name.label}">Name</label>
             <input id="ct-name" class="form-input" type="text" maxlength="120">
         </div>
         <div class="form-group">
-            <label class="form-label" th:text="#{promotion.admin.topics.description.label}">Beschreibung</label>
+            <label class="form-label" for="ct-desc" th:text="#{promotion.admin.topics.description.label}">Beschreibung</label>
             <textarea id="ct-desc" class="form-input" rows="3" maxlength="2000"></textarea>
         </div>
         <div class="form-group">
-            <label class="form-label" th:text="#{promotion.admin.topics.sort.label}">Sortierung</label>
+            <label class="form-label" for="ct-sort" th:text="#{promotion.admin.topics.sort.label}">Sortierung</label>
             <input id="ct-sort" class="form-input" type="number" value="0">
             <span class="form-hint" th:text="#{promotion.admin.topics.sort.hint}">Niedrigere Werte erscheinen weiter oben. Die Position kann später per Pfeiltasten in der Liste angepasst werden.</span>
         </div>
         </div>
         <div class="krt-modal-foot">
-            <button class="btn btn-ghost" data-trigger="pa-close-modal" data-pa-modal="modal-create-topic" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn btn--cta" data-trigger="pa-create-topic" th:text="#{promotion.admin.topics.new}">Anlegen</button>
+            <button type="button" class="btn btn-ghost" data-trigger="pa-close-modal" data-pa-modal="modal-create-topic" th:text="#{general.cancel}">Abbrechen</button>
+            <button type="button" class="btn btn--cta" data-trigger="pa-create-topic" th:text="#{promotion.admin.topics.new}">Anlegen</button>
         </div>
     </th:block>
 </th:block>
@@ -247,21 +241,21 @@
         <input id="et-id" type="hidden">
         <input id="et-version" type="hidden">
         <div class="form-group">
-            <label class="form-label" th:text="#{promotion.admin.topics.name.label}">Name</label>
+            <label class="form-label" for="et-name" th:text="#{promotion.admin.topics.name.label}">Name</label>
             <input id="et-name" class="form-input" type="text" maxlength="120">
         </div>
         <div class="form-group">
-            <label class="form-label" th:text="#{promotion.admin.topics.description.label}">Beschreibung</label>
+            <label class="form-label" for="et-desc" th:text="#{promotion.admin.topics.description.label}">Beschreibung</label>
             <textarea id="et-desc" class="form-input" rows="3" maxlength="2000"></textarea>
         </div>
         <div class="form-group">
-            <label class="form-label" th:text="#{promotion.admin.topics.sort.label}">Sortierung</label>
+            <label class="form-label" for="et-sort" th:text="#{promotion.admin.topics.sort.label}">Sortierung</label>
             <input id="et-sort" class="form-input" type="number">
         </div>
         </div>
         <div class="krt-modal-foot">
-            <button class="btn btn-ghost" data-trigger="pa-close-modal" data-pa-modal="modal-edit-topic" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn btn--cta" data-trigger="pa-update-topic"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{promotion.admin.topics.edit}">Speichern</span></button>
+            <button type="button" class="btn btn-ghost" data-trigger="pa-close-modal" data-pa-modal="modal-edit-topic" th:text="#{general.cancel}">Abbrechen</button>
+            <button type="button" class="btn btn--cta" data-trigger="pa-update-topic"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{promotion.admin.topics.edit}">Speichern</span></button>
         </div>
     </th:block>
 </th:block>
@@ -271,21 +265,21 @@
         <div class="krt-modal-body">
         <input id="cc-topic-id" type="hidden">
         <div class="form-group">
-            <label class="form-label" th:text="#{promotion.admin.topics.name.label}">Name</label>
+            <label class="form-label" for="cc-name" th:text="#{promotion.admin.topics.name.label}">Name</label>
             <input id="cc-name" class="form-input" type="text" maxlength="120">
         </div>
         <div class="form-group">
-            <label class="form-label" th:text="#{promotion.admin.topics.description.label}">Beschreibung</label>
+            <label class="form-label" for="cc-desc" th:text="#{promotion.admin.topics.description.label}">Beschreibung</label>
             <textarea id="cc-desc" class="form-input" rows="3" maxlength="2000"></textarea>
         </div>
         <div class="form-group">
-            <label class="form-label" th:text="#{promotion.admin.topics.sort.label}">Sortierung</label>
+            <label class="form-label" for="cc-sort" th:text="#{promotion.admin.topics.sort.label}">Sortierung</label>
             <input id="cc-sort" class="form-input" type="number" value="0">
         </div>
         </div>
         <div class="krt-modal-foot">
-            <button class="btn btn-ghost" data-trigger="pa-close-modal" data-pa-modal="modal-create-category" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn btn--cta" data-trigger="pa-create-category" th:text="#{promotion.admin.topics.category.new}">Anlegen</button>
+            <button type="button" class="btn btn-ghost" data-trigger="pa-close-modal" data-pa-modal="modal-create-category" th:text="#{general.cancel}">Abbrechen</button>
+            <button type="button" class="btn btn--cta" data-trigger="pa-create-category" th:text="#{promotion.admin.topics.category.new}">Anlegen</button>
         </div>
     </th:block>
 </th:block>
@@ -297,21 +291,21 @@
         <input id="ec-version" type="hidden">
         <input id="ec-topic-id" type="hidden">
         <div class="form-group">
-            <label class="form-label" th:text="#{promotion.admin.topics.name.label}">Name</label>
+            <label class="form-label" for="ec-name" th:text="#{promotion.admin.topics.name.label}">Name</label>
             <input id="ec-name" class="form-input" type="text" maxlength="120">
         </div>
         <div class="form-group">
-            <label class="form-label" th:text="#{promotion.admin.topics.description.label}">Beschreibung</label>
+            <label class="form-label" for="ec-desc" th:text="#{promotion.admin.topics.description.label}">Beschreibung</label>
             <textarea id="ec-desc" class="form-input" rows="3" maxlength="2000"></textarea>
         </div>
         <div class="form-group">
-            <label class="form-label" th:text="#{promotion.admin.topics.sort.label}">Sortierung</label>
+            <label class="form-label" for="ec-sort" th:text="#{promotion.admin.topics.sort.label}">Sortierung</label>
             <input id="ec-sort" class="form-input" type="number">
         </div>
         </div>
         <div class="krt-modal-foot">
-            <button class="btn btn-ghost" data-trigger="pa-close-modal" data-pa-modal="modal-edit-category" th:text="#{general.cancel}">Abbrechen</button>
-            <button class="btn btn--cta" data-trigger="pa-update-category"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{promotion.admin.topics.edit}">Speichern</span></button>
+            <button type="button" class="btn btn-ghost" data-trigger="pa-close-modal" data-pa-modal="modal-edit-category" th:text="#{general.cancel}">Abbrechen</button>
+            <button type="button" class="btn btn--cta" data-trigger="pa-update-category"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{promotion.admin.topics.edit}">Speichern</span></button>
         </div>
     </th:block>
 </th:block>
