@@ -1,0 +1,7 @@
+.planted:hover {
+    color: rgba(231, 126, 35, 0.2);
+    background: #FFF;
+    border-color: rgb(1 2 3 / 50%);
+    outline-color: #e77e24;
+    box-shadow: 0 0 5px color-mix(in srgb, var(--color-primary) 30%, transparent);
+}

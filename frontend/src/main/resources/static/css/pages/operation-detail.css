@@ -252,7 +252,7 @@
     }
     .payout-table tbody tr:has(.payout-paid-checkbox:checked),
     .payout-table tbody tr:has(.payout-paid-yes) {
-        background-color: rgb(35 158 51 / 6%);
+        background-color: color-mix(in srgb, var(--color-success) 6%, transparent);
     }
     @media (width <= 768px) {
         .payout-table tfoot {

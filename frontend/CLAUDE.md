@@ -62,8 +62,13 @@ A rendered page carries no developer text and no inline page CSS (`REQ-UI-023`,
   The only `<!--/*/ … /*/-->` allowed is Thymeleaf's prototype-only markup, which is not a comment.
 - **Page CSS goes into `static/css/pages/<page>.css`**, linked with `<link rel="stylesheet">` where
   a `<style>` block would stand (in the `extraLinks` fragment for the head). No `<style>` element in
-  a template. It is linted by `:frontend:lintCssInline` with the tiny template rule set, and
-  formatted by Prettier.
+  a template. It is linted by `:frontend:lintCss` with the standard rule set, like every other
+  stylesheet, and formatted by Prettier.
+- **Colours and stacking go through tokens** (REQ-UI-001, ADR-0243): a colour token's value is
+  `var(--color-x)`, its alpha variant `color-mix(in srgb, var(--color-x) N%, transparent)` — never a
+  hand-written `rgb()`/hex copy (`ColourTokenCopyTest`). A `z-index` that competes across the page
+  is a `--z-*` token from the scale on `:root` in `styles.css`; a literal stays below 50 and orders
+  one component's parts only (`ZIndexScaleTest`).
 
 ### CSS: the layer decides, not the load order (binding)
 

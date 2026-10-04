@@ -433,6 +433,11 @@
   blockiert. Neue Variable `APP_SECURITY_TRUSTED_TYPES` (`report` als Vorgabe, `enforce` erzwingt);
   das Umschalten der Produktion ist ein eigener, freizugebender Schritt (REQ-SEC-064, ADR-0239).
 
+- **Lager: „gestohlen"-Markierung und Zuordnungen fremder Einträge nur noch für Logistiker.** Wie
+  Ausbuchen, Notiz und Geliefert verweigern jetzt auch `POST /inventory/{id}/stolen` und
+  `POST`/`PATCH`/`DELETE /inventory/{id}/allocation` einem Mitglied unterhalb von Logistiker den
+  Eintrag eines anderen Mitglieds mit `403`; bisher reichte die Einheit (REQ-INV-053, REQ-INV-027).
+
 - **Frontend: die Session liest nur noch die 21 Anwendungstypen, die wirklich dort landen.** Statt
   aller 325 Klassen unter `frontend.model` nennt die Session-Allow-List die aus dem Code abgeleiteten
   Formulare und DTOs einzeln; ein neuer Session-Typ ohne Eintrag bricht den Build. Geht als eigenes

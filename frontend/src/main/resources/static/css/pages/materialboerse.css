@@ -45,7 +45,7 @@
         text-transform: uppercase;
         letter-spacing: 0.08em;
         color: var(--color-primary);
-        border: 1px solid rgb(231 126 35 / 45%);
+        border: 1px solid color-mix(in srgb, var(--color-primary) 45%, transparent);
         padding: 1px 5px;
         vertical-align: middle;
     }
@@ -113,7 +113,7 @@
         font-family: var(--font-body);
     }
     .mb-mrow.mb-mine {
-        border-left-color: rgb(231 126 35 / 40%);
+        border-left-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
     }
     .mb-mrow.mb-mine.is-active {
         border-left-color: var(--color-primary);

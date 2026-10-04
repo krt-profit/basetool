@@ -48,7 +48,7 @@
 
     .pa-dirty {
         border-color: var(--color-primary);
-        background: rgb(231 126 35 / 5%);
+        background: color-mix(in srgb, var(--color-primary) 5%, transparent);
     }
 
     .pa-sort-controls {
@@ -168,7 +168,7 @@
         padding: 0.5rem 0.75rem;
         margin-bottom: 0.75rem;
         border: 1px solid var(--color-primary);
-        background: rgb(231 126 35 / 6%);
+        background: color-mix(in srgb, var(--color-primary) 6%, transparent);
         color: var(--color-primary);
         font-family: var(--font-headline);
         font-weight: var(--fw-bold);

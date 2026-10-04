@@ -14,6 +14,7 @@
 > [0239](../adr/0239-the-browser-baseline-is-baseline-2025-and-trusted-types-follow.md) (supported browsers) ·
 > [0240](../adr/0240-navigation-is-a-structured-drawer-a-quick-access-and-a-phone-tab-bar.md) (REQ-UI-026) ·
 > [0242](../adr/0242-page-patterns-a-to-c-and-the-design-system-update-2026-10.md) (REQ-UI-027, REQ-UI-009) ·
+> [0243](../adr/0243-colours-and-stacking-layers-are-written-through-tokens.md) (REQ-UI-001, REQ-UI-023) ·
 > **Next free id:** `REQ-UI-028` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)).
@@ -63,16 +64,50 @@ components in `krt-components.css`.
   declares the same 48 tokens in `colors_and_type.css` (krt-profit/design-system#4, submodule at
   `06e47e5`); all 48 values were compared and are identical, case aside.
 
-- [x] Every fallback-free `var(--token)` in `static/css` names a custom property that a stylesheet,
-  a script or a template declares; an undefined one silently drops its declaration (the material
-  demand search header was transparent on `--color-black`, `bank.css` named `--color-text`).
-  `CustomPropertyExistenceTest` fails the build on one; its allow-list is empty.
+- [x] Every fallback-free `var(--token)` in the stylesheets, the templates (inline and `th:style`
+  values) and the scripts names a custom property that a stylesheet, a script or a template
+  declares; an undefined one silently drops its declaration (the material demand search header was
+  transparent on `--color-black`, `bank.css` named `--color-text`; both fixed, none left on
+  2026-10-04). `CustomPropertyExistenceTest` fails the build on one; its allow-list is empty.
+- [x] **A colour token's value appears only in its own declaration** (ADR-0243, 2026-10-04): an
+  opaque copy is `var(--color-x)`, an alpha variant is
+  `color-mix(in srgb, var(--color-x) N%, transparent)` — the token's colour at alpha N % — and a
+  fully transparent one is `transparent`. A colour that is not a token stays a literal. 120
+  hand-written copies were replaced with unchanged computed values.
+- [x] **Page-level stacking goes through the `--z-*` scale** on `:root` in `styles.css` (ADR-0243,
+  2026-10-04), bottom to top:
 
-**Enforced by:** design review, `CustomPropertyExistenceTest`, plus one lint rule: `declaration-property-value-disallowed-list`
-in `frontend/.stylelintrc.json` and `.stylelintrc.templates.json` fails `:frontend:lintCss` /
-`:frontend:lintCssInline` on a hex fallback inside `var()` (2026-09-22), and an override applies
-`color-no-hex` to `materials-overview.css` (2026-09-23). Otherwise the web-asset
-linters gate syntax and style only; no rule checks that a value uses a token.
+  | Token | Value | Used by |
+  | --- | --- | --- |
+  | `--z-popover` | 50 | overflow-menu and filter-popover panels |
+  | `--z-popover-raised` | 60 | the inventory allocation popover; an open row overflow menu on the bank pages |
+  | `--z-dropdown` | 99 | autocomplete list, searchable-select listbox |
+  | `--z-sticky-head` | 900 | the mission detail's sticky head |
+  | `--z-chart-scrollbar` | 998 | the org chart's fixed scrollbar |
+  | `--z-footer` | 999 | footer |
+  | `--z-header` | 1000 | header |
+  | `--z-header-control` | 1001 | hamburger button |
+  | `--z-floating` | 1100 | multi-select options, the phone filter sheet, inventory typeahead results |
+  | `--z-floating-raised` | 1200 | blueprint import results |
+  | `--z-drawer-scrim` | 1999 | drawer overlay |
+  | `--z-drawer` | 2000 | drawer |
+  | `--z-tabbar` | 2100 | phone tab bar |
+  | `--z-modal` | 3000 | dialog overlay |
+  | `--z-hint` | 4000 | SCU hint bubble |
+  | `--z-status-pill` | 9000 | live-sync pill |
+  | `--z-toast` | 9999 | notification toast |
+  | `--z-confirm` | 10000 | confirm dialog |
+
+  A literal `z-index` is allowed only below 50, where it orders the parts of one component (sticky
+  table cells, a lifted overflow menu); a new layer that competes across the page is a new token in
+  its place in the scale. `ZIndexScaleTest` pins the order and fails on a literal of 50 or more.
+
+**Enforced by:** design review, `CustomPropertyExistenceTest`, `ColourTokenCopyTest`,
+`ZIndexScaleTest` (each proven against a planted fixture), plus one lint rule:
+`declaration-property-value-disallowed-list` in `frontend/.stylelintrc.json` and
+`.stylelintrc.templates.json` fails `:frontend:lintCss` / `:frontend:lintCssInline` on a hex fallback
+inside `var()` (2026-09-22), and an override applies `color-no-hex` to `materials-overview.css`
+(2026-09-23). No gate checks that a colour which is not yet a token should become one.
 
 ### REQ-UI-002 — Brand colour & logo
 
@@ -1245,14 +1280,16 @@ content-hashed, `immutable` asset fetched once.
 - [x] Every moved stylesheet is equivalent to the block it replaced (whitespace, quotes and comments
   aside — checked once at the move); the render tests that pinned a page selector read the linked
   stylesheet instead of the response.
-- [x] The page stylesheets are linted: `:frontend:lintCssInline` reads `static/css/pages/**` with the
-  same rule set it applied to the inline blocks; `.stylelintrc.json` ignores the directory, and
-  Prettier formats it like every other stylesheet.
+- [x] The page stylesheets are linted with the standard configuration: `:frontend:lintCss` reads
+  `static/css/pages/**` like every other stylesheet, and Prettier formats them (2026-10-04,
+  ADR-0243; until then `.stylelintrc.json` ignored the directory and `:frontend:lintCssInline` read
+  it with the small template rule set, which let 66 findings of the standard set accumulate).
+  `:frontend:lintCssInline` keeps only the `<style>` blocks a template might bring back.
 
 **Enforced by:** `TemplateCommentHygieneTest` (all four rules), `PageStylesheets` in the render
 tests, `SingleModalShapeTest` (which now also reads the page stylesheets — and found three dead
-legacy `.modal` rules the inline blocks had hidden from it), `:frontend:lintCssInline`,
-`:frontend:prettierCheck` · **Related:** REQ-UI-009, REQ-UI-013, REQ-SEC-031 (`no-store` pages),
+legacy `.modal` rules the inline blocks had hidden from it), `:frontend:lintCss`,
+`:frontend:lintCssInline`, `:frontend:prettierCheck` · **Related:** REQ-UI-009, REQ-UI-013, REQ-SEC-031 (`no-store` pages),
 ADR-0093 (nonce-gated style blocks), ADR-0168 (asset trees)
 
 ### REQ-UI-024 — Every stylesheet sits in a cascade layer; the layer decides, not the load order

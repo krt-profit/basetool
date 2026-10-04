@@ -34,7 +34,7 @@
     textarea:focus {
         outline: none;
         border-color: var(--color-primary);
-        box-shadow: 0 0 5px rgba(231, 126, 35, 0.3);
+        box-shadow: 0 0 5px color-mix(in srgb, var(--color-primary) 30%, transparent);
     }
     .form-group[hidden] {
         display: none;
@@ -77,7 +77,7 @@
     .mission-head-sticky {
         position: sticky;
         top: 0;
-        z-index: 900;
+        z-index: var(--z-sticky-head);
         background-color: var(--color-bg-black);
     }
     .mission-head-sticky > .page-head {
@@ -610,11 +610,11 @@
     }
     .seg button.on-pos {
         background: var(--color-success);
-        color: #fff;
+        color: var(--color-white);
     }
     .seg button.on-neg {
         background: var(--color-danger);
-        color: #fff;
+        color: var(--color-white);
     }
 
     .krt-modal-body input[type='text'],
