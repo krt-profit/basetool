@@ -60,21 +60,22 @@ public class PersonalBlueprintOverviewController {
 
   /**
    * Lists the blueprints owned among the members of the caller's oversight org units, one row per
-   * product with the owner count. {@code search} filters by name (case-insensitive) before
-   * pagination.
+   * product with the owner count. {@code search} matches the product name or an in-scope owner's
+   * display name (case-insensitive) before pagination.
    *
    * @param page optional zero-based page index
    * @param size optional page size
    * @param sort optional sort expression over the whitelisted product-name field
-   * @param search optional case-insensitive product-name fragment
+   * @param search optional case-insensitive product-name or owner-name fragment
    * @return the paged availability list
    */
   @GetMapping
   @Operation(
       summary = "List blueprints available among the caller's oversight org-unit members.",
       description =
-          "Paginated; the optional product-name search filters before pagination so it spans"
-              + " every entry, not just the requested page.")
+          "Paginated; the optional search matches the product name or the display name of an"
+              + " in-scope owner and filters before pagination, so it spans every entry, not just"
+              + " the requested page.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Paginated list of available blueprints."),
     @ApiResponse(responseCode = "401", description = "Authentication required."),
