@@ -19,12 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.exception.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.BulkRebookMode;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.FinanceType;
@@ -53,7 +55,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRep
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
@@ -116,7 +117,7 @@ public class InventoryCheckoutService {
   private final MaterialExchangeOfferRatchet offerRatchet;
   private final InventoryItemMapper inventoryItemMapper;
   private final OwnerScopeService ownerScopeService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Discards, transfers or sells part of an inventory item, deleting the row when the remainder
@@ -379,7 +380,7 @@ public class InventoryCheckoutService {
           new MaterialExchangeOfferRatchet.Effects(
               offerRatchet.lower(sourceId, remainingAmount, offerReason), 0);
     }
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.INVENTORY_ITEM_TRANSFERRED,
         sourceId,
         sourceLabel,
@@ -515,7 +516,7 @@ public class InventoryCheckoutService {
       List<UUID> financeEntryIds) {
     boolean rowDepleted = remaining <= QUANTITY_EPSILON;
     if (type == CheckoutType.SELL) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.INVENTORY_ITEM_SOLD,
           sourceId,
           sourceLabel,
@@ -533,7 +534,7 @@ public class InventoryCheckoutService {
                       .orElse("-"))
               .with("depleted", rowDepleted));
     } else {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.INVENTORY_ITEM_CONSUMED,
           sourceId,
           sourceLabel,
@@ -634,7 +635,7 @@ public class InventoryCheckoutService {
       offerRatchet.lower(sourceId, remainingAmount, MaterialExchangeOfferRatchet.Reason.REBOOK);
     }
 
-    auditService.record(
+    auditRecorder.record(
         targetPersonal
             ? AuditEventType.INVENTORY_ITEM_PERSONALIZED
             : AuditEventType.INVENTORY_ITEM_DEPERSONALIZED,
@@ -724,7 +725,7 @@ public class InventoryCheckoutService {
     inventoryItemRepository.deleteAll(victims);
     inventoryItemRepository.saveAndFlush(row);
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.INVENTORY_ITEM_MERGED,
         row.getId(),
         InventoryAuditLabels.label(row),
@@ -829,7 +830,7 @@ public class InventoryCheckoutService {
         removed,
         scope.adminAllScope(),
         scope.activeOrgUnitId());
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.INVENTORY_WIPED,
         null,
         null,
@@ -877,7 +878,7 @@ public class InventoryCheckoutService {
     inventoryItemRepository.deleteAllById(toDelete);
     log.info(
         "Bulk checkout completed: {} items removed for user {}", toDelete.size(), currentUserId);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.INVENTORY_BULK_CHECKED_OUT,
         null,
         null,
@@ -929,7 +930,7 @@ public class InventoryCheckoutService {
         result.rebooked(),
         result.skipped());
     if (result.rebooked() > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.INVENTORY_BULK_REBOOKED,
           null,
           null,
@@ -1189,7 +1190,7 @@ public class InventoryCheckoutService {
             "Job-order allocation not found for this inventory item");
     slice.setDelivered(request.delivered());
     InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.INVENTORY_ITEM_DELIVERY_TOGGLED,
         item.getId(),
         InventoryAuditLabels.label(item),

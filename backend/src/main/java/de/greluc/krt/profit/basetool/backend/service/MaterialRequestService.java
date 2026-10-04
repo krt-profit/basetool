@@ -19,11 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.event.MaterialRequestFulfillmentSignalledEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeRequest;
@@ -40,7 +42,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeRequestR
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.time.Instant;
 import java.util.UUID;
@@ -73,7 +74,7 @@ public class MaterialRequestService {
   private final MaterialRepository materialRepository;
   private final UserRepository userRepository;
   private final AuthHelperService authHelperService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * The read half this service projects its mutation results through, so every write response is
@@ -144,7 +145,7 @@ public class MaterialRequestService {
     entity.setPostedAt(Instant.now());
     MaterialExchangeRequest saved = requestRepository.saveAndFlush(entity);
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MARKET_REQUEST_CREATED,
         saved.getId(),
         requestLabel(saved),
@@ -190,7 +191,7 @@ public class MaterialRequestService {
     entity.setPostedAt(Instant.now());
     MaterialExchangeRequest saved = requestRepository.saveAndFlush(entity);
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MARKET_REQUEST_CREATED,
         saved.getId(),
         requestLabel(saved),
@@ -240,7 +241,7 @@ public class MaterialRequestService {
     entity.setRemark(request.remark());
     MaterialExchangeRequest saved = requestRepository.saveAndFlush(entity);
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MARKET_REQUEST_UPDATED,
         requestId,
         requestLabel(entity),
@@ -269,7 +270,7 @@ public class MaterialRequestService {
     if (entity.getStatus() == MaterialExchangeRequestStatus.ACTIVE) {
       entity.setStatus(MaterialExchangeRequestStatus.DEACTIVATED);
       requestRepository.saveAndFlush(entity);
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.MARKET_REQUEST_DEACTIVATED,
           entity.getId(),
           requestLabel(entity),
@@ -330,7 +331,7 @@ public class MaterialRequestService {
     interest.setRequest(request);
     interest.setInterestedUser(viewer);
     interestRepository.save(interest);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MARKET_REQUEST_INTEREST_SIGNALLED,
         requestId,
         requestLabel(request),
@@ -363,7 +364,7 @@ public class MaterialRequestService {
             requestRepository.findById(requestId), () -> "Request not found: " + requestId);
     long removed = interestRepository.deleteByRequestIdAndInterestedUserId(requestId, viewerId);
     if (removed > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.MARKET_REQUEST_INTEREST_WITHDRAWN,
           requestId,
           requestLabel(request),

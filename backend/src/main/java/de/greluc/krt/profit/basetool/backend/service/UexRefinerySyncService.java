@@ -19,17 +19,18 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexRefineryYieldDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexRefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.RefineryYield;
 import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryYieldRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -63,7 +64,7 @@ public class UexRefinerySyncService {
   private final RefineryYieldRepository refineryYieldRepository;
   private final MaterialRepository materialRepository;
   private final TerminalRepository terminalRepository;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /** Writes the rows in short isolated transactions after the fetch. */
   private final SyncChunkWriter chunkWriter;
@@ -92,9 +93,9 @@ public class UexRefinerySyncService {
     int added = (int) outcome.results().stream().filter(Boolean::booleanValue).count();
     int updated = outcome.results().size() - added;
     log.info("Finished UEX Refining Methods sync: {} added, {} updated", added, updated);
-    chunkWriter.inNewTransaction(
+    chunkWriter.runInNewTransaction(
         () ->
-            auditService.record(
+            auditRecorder.record(
                 AuditEventType.REFINERY_METHODS_SYNCED,
                 null,
                 null,
@@ -163,9 +164,9 @@ public class UexRefinerySyncService {
             dto -> "(idCommodity=" + dto.idCommodity() + ", idTerminal=" + dto.idTerminal() + ")");
     int processed = outcome.results().size();
     log.info("Finished UEX Refinery Yields sync: Processed {} yields", processed);
-    chunkWriter.inNewTransaction(
+    chunkWriter.runInNewTransaction(
         () ->
-            auditService.record(
+            auditRecorder.record(
                 AuditEventType.REFINERY_YIELDS_SYNCED,
                 null,
                 null,

@@ -16,6 +16,7 @@ jobs:
   refresh-versions:
     name: refreshVersions
     runs-on: ubuntu-latest
+    environment: release
     timeout-minutes: 30
 
     steps:
@@ -38,7 +39,7 @@ jobs:
           HAS_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY != '' }}
         run: |
           if [ "${HAS_KEY}" != "true" ]; then
-            echo "::error::secret RELEASE_APP_PRIVATE_KEY is not set -- opening the refreshVersions PR needs the basetool-release GitHub App (ADR-0201); GITHUB_TOKEN may not open PRs in this organization"
+            echo "::error::secret RELEASE_APP_PRIVATE_KEY is not set in the release environment -- opening the refreshVersions PR needs the basetool-release GitHub App (ADR-0201); GITHUB_TOKEN may not open PRs in this organization"
             exit 1
           fi
 

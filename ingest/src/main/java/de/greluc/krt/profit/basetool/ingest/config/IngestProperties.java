@@ -46,7 +46,8 @@ import org.springframework.validation.annotation.Validated;
  * @param maxHandoffBytes upper bound on one staged handoff document, in bytes; kept small because
  *     the staging Redis also holds the frontend sessions
  * @param verifyBackendHostname whether the backend relay also verifies the certificate's host name
- *     on top of the pinned chain (REQ-SEC-070, ADR-0211); ignored under {@code dev}/{@code test}
+ *     on top of the pinned chain (REQ-SEC-070, ADR-0211); on by default, ignored under {@code
+ *     dev}/{@code test}
  */
 @Validated
 @ConfigurationProperties(prefix = "app.ingest")
@@ -59,7 +60,7 @@ public record IngestProperties(
     @NotNull @DefaultValue("PT30M") Duration handoffTtl,
     @Min(1024) @DefaultValue("2097152") long maxPayloadBytes,
     @Min(1024) @DefaultValue("262144") long maxHandoffBytes,
-    @DefaultValue("false") boolean verifyBackendHostname) {
+    @DefaultValue("true") boolean verifyBackendHostname) {
 
   /**
    * Normalises an absent public origin to empty, the documented "not configured" value, so {@link
