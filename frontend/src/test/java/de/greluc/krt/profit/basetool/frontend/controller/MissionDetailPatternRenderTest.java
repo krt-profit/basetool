@@ -31,10 +31,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -240,6 +242,46 @@ class MissionDetailPatternRenderTest {
         .doesNotContain("sumstrip")
         .doesNotContain("colspan");
     assertThat(count(finance, "btn--cta")).as("one primary action in the tab").isEqualTo(1);
+  }
+
+  /**
+   * The head's sign-up carries the {@code page-head-primary} test id and a refinery order of the
+   * mission links its whole row through a {@code row-link} (REQ-UI-027).
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void pinsTheHeadPrimaryAndTheRefineryRowLink() throws Exception {
+    stubMission(true);
+    UUID orderId = UUID.fromString("00000000-0000-0000-0000-000000001042");
+    when(backendApiClient.get(eq("/api/v1/refinery-orders/mission/" + MISSION_ID), anyTypeRef()))
+        .thenReturn(
+            List.of(
+                new RefineryOrderListDto(
+                    orderId,
+                    null,
+                    null,
+                    null,
+                    Instant.parse("2026-10-01T10:00:00Z"),
+                    60L,
+                    0d,
+                    0d,
+                    0d,
+                    0d,
+                    null,
+                    "OPEN",
+                    List.of(),
+                    null,
+                    1L)));
+    String html = render("/missions/" + MISSION_ID);
+
+    String actions = between(html, "class=\"page-actions\"", "class=\"facts-bar\"");
+    assertThat(actions)
+        .containsPattern("id=\"add-participant-btn\"[^>]*data-testid=\"page-head-primary\"");
+    assertThat(html)
+        .containsPattern(
+            "class=\"row-link\" data-testid=\"row-link\" href=\"/refinery-orders/"
+                + orderId
+                + "\"");
   }
 
   /** A member who may not edit sees neither the edit toggle nor the edit mode nor the delete. */

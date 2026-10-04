@@ -102,8 +102,7 @@ class SingleModalShapeTest {
   }
 
   /**
-   * Asserts that no stylesheet, including the generated {@code inline-migration.css}, declares a
-   * rule for a legacy dialog class.
+   * Asserts that no stylesheet declares a rule for a legacy dialog class.
    *
    * @throws IOException if a stylesheet cannot be read
    * @throws URISyntaxException if the CSS classpath root cannot be resolved

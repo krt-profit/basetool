@@ -77,7 +77,7 @@ function fillQualityTierOptions(select, selectedCode) {
  */
 function setHintVisible(hint, visible) {
     if (!hint) return;
-    hint.classList.remove('krtm-hidden');
+    hint.classList.remove('is-hidden');
     /** @type {HTMLElement} */ (hint).hidden = !visible;
 }
 

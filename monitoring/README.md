@@ -618,7 +618,9 @@ the rule keeps parsing, keeps deploying and can never fire again. It was verifie
 2026-09-22** (steps 1–3 below, plus the stream check on production:
 `{app=~"(backend|frontend|ingest)-stdout"}` present in Loki under the Podman journald path) and
 **again on `…@sha256:2ca9adf4…` on 2026-09-25**, the digest `docker/app/Dockerfile` pins since #2035
-(steps 1–5; the #2035 bump itself had skipped it). The next digest bump owes it again.
+(steps 1–5; the #2035 bump itself had skipped it) and **again on `…@sha256:3c0a9084…` (Temurin
+25.0.4.1+1) on 2026-10-04**, the digest `docker/app/Dockerfile` pins now (steps 1–3 and 5; wording
+unchanged). The next digest bump owes it again.
 
 On a workstation, never on production:
 

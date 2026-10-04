@@ -4,6 +4,11 @@
 
 ### Added
 
+- **Layout-Prüfung um die Seitenmuster erweitert (Phase 5).** Die Geräteklassen-Prüfung meldet jetzt
+  auch seitlich scrollende Karten am Smartphone, eine Hauptaktion außerhalb des ersten Bildschirms,
+  mehr als eine Hauptaktion im Seitenkopf, verschachtelte `.hud-box`en und Text im alten Grau.
+  Tabellenzeilen-Links tragen einheitlich die Test-ID `row-link` (REQ-UI-009, REQ-UI-027).
+
 - **Startseite: „Angemeldet" bei den nächsten Einsätzen.** In „Nächste 7 Tage" trägt jeder Einsatz,
   für den man selbst angemeldet ist, den Chip „Angemeldet". Die Missionsliste der API liefert dafür
   pro Zeile das Feld `signedUp` für den Aufrufer (REQ-MISSION-012).
@@ -177,6 +182,11 @@
   redis_exporter v1.93.0, jeweils per Digest gepinnt. Konfiguration und Dashboards bleiben unverändert;
   Compose und Quadlet-Units sind nachgezogen.
 
+- **Aufräumen nach der Website-Überarbeitung (Phase 4).** `inline-migration.css` ist entfernt, die
+  letzten `krtm-*`-Klassen sind Design-System-Bausteine oder Seitenregeln; Bank-Administration hat
+  Seitenkopf und Hinweis-Boxen. Tote CSS-Regeln, Skripte und 205 Sprachschlüssel sind weg; das
+  Bank-Kontodetail ist auf großen Bildschirmen so breit wie die übrigen Seiten (REQ-UI-027).
+  
 - **Kartellbank: „Bestätigen" nur, wo du bestätigen darfst.** Die Antragswarteschlange zeigt die
   Bestätigen-Aktion nur noch bei Anträgen, für die dir die passende Konto-Berechtigung zusteht; sonst
   steht dort „wartet auf berechtigte Bankmitarbeiter". Die Queue-API liefert dafür pro Antrag
@@ -184,6 +194,7 @@
 
 - **Blueprints: Fehlmenge wieder sichtbar.** Ist der Vorrat einer Zutat zu knapp, steht unter dem
   Vorrat wieder „fehlt n“ (REQ-INV-048).
+  
 - **Auftragsdetail: Reiter „Hersteller“.** Der Reiter, der zeigt, wer ein Item craften kann, hieß
   „Herstellung“ wie das Buchen der Herstellung im Reiter „Items“; er heißt jetzt „Hersteller“
   (REQ-ORDERS-026).
@@ -192,12 +203,15 @@
   `--no-configuration-cache` schaltet ihn für einen Lauf ab (BLD-PERF-04).
 - **CI: Cache-Janitor behält je Gradle-Job nur den neuesten Cache** und warnt, wenn der Actions-Cache
   nach dem Aufräumen über 8 GiB liegt (CI-01).
+  
 - **Tests: PostgreSQL-Testcontainer per Digest.** Die Backend-Tests starten genau das Produktions-Image
   (`TestImages.POSTGRES`, gegen Compose und Quadlet-Unit geprüft; TST-18).
 - **CI: Dependabot-Digest-Bumps von Redis und PostgreSQL ziehen `TestImages` mit.** Der Compose-Follow-up
   setzt die Digest-Konstanten auf den Compose-Pin, statt `TestImagesTest` rot zu lassen (REQ-OPS-035,
   ADR-0215).
+  
 - **Doku: Verlängerung der OWASP-Suppressions beschrieben** (CONTRIBUTING, SEC-16).
+  
 - **Modularisierung: die Entscheidungen sind festgehalten.** ADR-0231 bis ADR-0239 (Modulschnitt,
   Zusammenspiel der Module, Prüfwerkzeuge, harter API-Schnitt mit erzwungenem App-Update, Fehlermodell,
   Zugriffsregeln je Fachbereich, NullAway, `switch` ohne `default`, Browser-Baseline 2025), dazu
@@ -288,6 +302,10 @@
 
 ### Fixed
 
+- **Blueprints: Seite scrollt nicht mehr seitlich.** Die unsichtbare Hinweisblase neben
+  „Raffinerie einrechnen" verbreiterte die Seite am Smartphone auf 487 px und am Tablet um 104 px;
+  verborgene Hinweisblasen belegen jetzt keinen Platz mehr (CSS, REQ-UI-009).
+
 - **Systemeinstellungen: Auftragsbearbeitung pro Spezialkommando wieder schaltbar.** Der Abschnitt
   zeigte seit dem Wegfall des anonymen Auftragsformulars immer „Keine Spezialkommandos gefunden.";
   jetzt listet er alle aktiven SKs mit ihrem Schalter (Frontend-Controller, REQ-ADMIN-001).
@@ -363,6 +381,10 @@
 
 ### Security
 
+- **Basis-Images auf den aktuellen Stand der Tags gehoben (nur Digests, keine neuen Versionen).**
+  Temurin JRE/JDK 25.0.4.1+1 (sicherheitsbedingter Sonderrelease), `nginx-unprivileged:1.31.6-alpine`
+  mit neuen Alpine-Schichten und der BuildKit-Builder `buildx-stable-1`. Die Log-Signaturen von
+  `JvmNativeThreadExhaustion` und `JvmStartupCacheRejected` wurden auf dem neuen JRE erneut geprüft.
 - **Ingest prüft den Hostnamen des Backends standardmäßig.** Der Jar-Default von
   `app.ingest.verify-backend-hostname` ist jetzt `true`; nur das `dev`-Profil schaltet ihn ab.
   Compose und Quadlet setzten bereits `true` (ING-SEC-04).

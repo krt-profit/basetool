@@ -126,7 +126,7 @@ function _serializeHandoverForm() {
             const qualityRequirement =
                 tierSel &&
                 tierHolder &&
-                !tierHolder.classList.contains('krtm-hidden') &&
+                !tierHolder.classList.contains('is-hidden') &&
                 tierSel.value
                     ? tierSel.value
                     : null;
@@ -258,7 +258,7 @@ function _refreshHandoverTierChoice(row, inv) {
     const materialId = inv && inv.material ? inv.material.id : null;
     const tiers = materialId ? _orderTiersForMaterial(materialId) : [];
     if (tiers.length < 2) {
-        holder.classList.add('krtm-hidden');
+        holder.classList.add('is-hidden');
         return;
     }
     const quality = inv && typeof inv.quality === 'number' ? inv.quality : 0;
@@ -271,7 +271,7 @@ function _refreshHandoverTierChoice(row, inv) {
         option.selected = suggested ? t.code === suggested : i === 0;
         select.appendChild(option);
     });
-    holder.classList.toggle('krtm-hidden', eligible.length === 0);
+    holder.classList.toggle('is-hidden', eligible.length === 0);
 }
 
 async function openHandoverModal() {
@@ -371,10 +371,10 @@ function addHandoverItemRow() {
                 </select>
             </div>
             <div>
-                <label class="form-label-sm">${escapeHtml(labelMenge)} <span data-role="amount-unit"></span> <span class="scu-hint krtm-hidden" data-role="scu-hint" tabindex="0" role="img" aria-label="${escapeAttr(scuHintText)}"><span aria-hidden="true">?</span><span class="scu-hint__bubble" aria-hidden="true">${escapeHtml(scuHintText)}</span></span></label>
+                <label class="form-label-sm">${escapeHtml(labelMenge)} <span data-role="amount-unit"></span> <span class="scu-hint is-hidden" data-role="scu-hint" tabindex="0" role="img" aria-label="${escapeAttr(scuHintText)}"><span aria-hidden="true">?</span><span class="scu-hint__bubble" aria-hidden="true">${escapeHtml(scuHintText)}</span></span></label>
                 <input type="text" inputmode="decimal" data-scu-decimal step="0.001" name="items[${escapeAttr(index)}].amount" min="0.001" required class="w-full">
             </div>
-            <div data-role="handover-tier-holder" class="krtm-hidden">
+            <div data-role="handover-tier-holder" class="is-hidden">
                 <label class="form-label-sm">${escapeHtml(ORDER_HANDOVER_I18N.tier)}</label>
                 <select data-role="handover-tier" class="w-full" data-testid="handover-tier"></select>
             </div>
@@ -399,17 +399,17 @@ function addHandoverItemRow() {
                 amtInput.setAttribute('step', '1');
                 amtInput.setAttribute('min', '1');
                 if (unitSpan) unitSpan.textContent = '(' + labelPiece + ')';
-                if (rowScuHint) rowScuHint.classList.add('krtm-hidden');
+                if (rowScuHint) rowScuHint.classList.add('is-hidden');
             } else if (qt === 'SCU') {
                 amtInput.setAttribute('step', '0.001');
                 amtInput.setAttribute('min', '0.001');
                 if (unitSpan) unitSpan.textContent = '(' + labelScu + ')';
-                if (rowScuHint) rowScuHint.classList.remove('krtm-hidden');
+                if (rowScuHint) rowScuHint.classList.remove('is-hidden');
             } else {
                 amtInput.setAttribute('step', '0.001');
                 amtInput.setAttribute('min', '0.001');
                 if (unitSpan) unitSpan.textContent = '';
-                if (rowScuHint) rowScuHint.classList.add('krtm-hidden');
+                if (rowScuHint) rowScuHint.classList.add('is-hidden');
             }
             _refreshHandoverMissionPicker(row);
             _refreshHandoverTierChoice(row, inv);
@@ -759,17 +759,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 amountInput.setAttribute('step', '1');
                 amountInput.setAttribute('min', '1');
                 if (unitSpan) unitSpan.textContent = '(' + MSG_UNIT_PIECE + ')';
-                if (hint) hint.classList.add('krtm-hidden');
+                if (hint) hint.classList.add('is-hidden');
             } else if (qt === 'SCU') {
                 amountInput.setAttribute('step', '0.001');
                 amountInput.setAttribute('min', '0.001');
                 if (unitSpan) unitSpan.textContent = '(' + MSG_UNIT_SCU + ')';
-                if (hint) hint.classList.remove('krtm-hidden');
+                if (hint) hint.classList.remove('is-hidden');
             } else {
                 amountInput.setAttribute('step', '0.001');
                 amountInput.setAttribute('min', '0.001');
                 if (unitSpan) unitSpan.textContent = '';
-                if (hint) hint.classList.add('krtm-hidden');
+                if (hint) hint.classList.add('is-hidden');
             }
         }
 
@@ -1042,7 +1042,7 @@ function _openClaimModal(opts) {
         document.getElementById('claim-withdraw-btn').hidden = true;
     }
     const claimScuHint = document.getElementById('claim-scu-hint');
-    if (claimScuHint) claimScuHint.classList.toggle('krtm-hidden', opts.quantityType === 'PIECE');
+    if (claimScuHint) claimScuHint.classList.toggle('is-hidden', opts.quantityType === 'PIECE');
     window.krtModal.open(document.getElementById('claim-modal'));
 }
 

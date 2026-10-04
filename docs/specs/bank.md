@@ -2451,8 +2451,9 @@ collapses (REQ-BANK-050 superseded). Range, series, swap and persistence are unc
 > the „Buchungen" tab of the shared account-detail fragment (REQ-BANK-017); the tab bar, not a
 > collapse, is what keeps the page short. The `.bank-panel-head` / `.bank-collapse-head` toggles are
 > gone from both templates; the persisted-collapse module in `bank.js`
-> (`bank_panel_collapse_<uid>`) and its CSS are now dead and are removed in the clean-up phase. A value
-> a browser still holds under that key is simply ignored. The text below records the retired
+> (`bank_panel_collapse_<uid>`), the `bank-info-collapse` handler and their CSS were removed on
+> 2026-10-04 (website overhaul phase 4). A value a browser still holds under that key is simply
+> ignored. The text below records the retired
 > behaviour.
 
 On both account-detail surfaces the balance chart (REQ-BANK-049) and the booking history are each
@@ -2523,9 +2524,9 @@ failed read leaves the column „–". No new endpoint, audit event or metric. E
 > `.bank-detail-panels` grid; they stack (chart card above history card) on the „Buchungen" tab at
 > every width, and the second tab holds the account info or settings (REQ-BANK-017). Corrected the same
 > day: the breakpoint below read ≥ 1800px, while `bank.css` switched at ≥ 1440px. The
-> `main.bank-detail` widening (`max-width: min(2200px, 94vw)` at ≥ 1440px) and the grid rules are still
-> in `bank.css` and are removed in the clean-up phase; until then the detail page runs wider than
-> other pages on a large screen. The text below records the retired behaviour.
+> `main.bank-detail` widening (`max-width: min(2200px, 94vw)` at ≥ 1440px) and the grid rules were
+> removed from `bank.css` on 2026-10-04 (website overhaul phase 4); the detail page now stops at
+> `--content-max-data` (1600 px) from 1440 px like every other page. The text below records the retired behaviour.
 
 On both account-detail surfaces the balance chart (REQ-BANK-049) and the booking history stack
 vertically (chart above history) by default, but sit **side by side** (chart left, history right) on

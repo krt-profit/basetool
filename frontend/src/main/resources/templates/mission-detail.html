@@ -478,7 +478,7 @@
                             </thead>
                             <tbody>
                                 <tr th:each="order : ${refineryOrders}">
-                                    <td><a class="row-link" th:href="@{/refinery-orders/{id}(id=${order.id})}"><span class="cell-title" th:text="${order.owner != null ? order.owner.effectiveName : '-'}">Nutzer</span></a></td>
+                                    <td><a class="row-link" data-testid="row-link" th:href="@{/refinery-orders/{id}(id=${order.id})}"><span class="cell-title" th:text="${order.owner != null ? order.owner.effectiveName : '-'}">Nutzer</span></a></td>
                                     <td th:attr="data-label=#{refinery.location}" th:text="${order.location != null ? order.location.name : '-'}">Standort</td>
                                     <td th:attr="data-label=#{refinery.ends_at}">
                                         <span class="refinery-endsat-local"
