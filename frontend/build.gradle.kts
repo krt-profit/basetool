@@ -137,6 +137,7 @@ dependencies {
   testImplementation("org.springframework.boot:spring-boot-starter-test")
   testImplementation("org.springframework.boot:spring-boot-test-autoconfigure")
   testImplementation("org.springframework.security:spring-security-test")
+  testImplementation("io.projectreactor:reactor-test")
   testImplementation(libs.okhttp3.mockwebserver)
   testImplementation(libs.okhttp3.tls)
   testImplementation(libs.archunit.core)

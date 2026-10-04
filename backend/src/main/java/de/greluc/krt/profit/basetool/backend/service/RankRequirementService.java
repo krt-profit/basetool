@@ -19,11 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.RankRequirementMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
 import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.model.RankRequirement;
@@ -67,7 +68,7 @@ public class RankRequirementService {
   private final PromotionCategoryRepository categoryRepository;
   private final RankRequirementMapper mapper;
   private final OwnerScopeService ownerScopeService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Pages every rank requirement across all rank transitions; the sort is validated against {@link
@@ -156,7 +157,7 @@ public class RankRequirementService {
     entity.setTopic(resolvedTopic);
     entity.setCategory(resolvedCategory);
     RankRequirement saved = repository.save(entity);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.PROMOTION_RANK_REQUIREMENT_CREATED,
         saved.getId(),
         rankRequirementLabel(saved),
@@ -196,7 +197,7 @@ public class RankRequirementService {
     entity.setTopic(resolvedTopic);
     entity.setCategory(resolvedCategory);
     RankRequirement saved = repository.save(entity);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.PROMOTION_RANK_REQUIREMENT_UPDATED,
         saved.getId(),
         rankRequirementLabel(saved),
@@ -221,7 +222,7 @@ public class RankRequirementService {
     assertCallerMayEdit(entity);
     String label = rankRequirementLabel(entity);
     repository.delete(entity);
-    auditService.record(AuditEventType.PROMOTION_RANK_REQUIREMENT_DELETED, id, label, null, null);
+    auditRecorder.record(AuditEventType.PROMOTION_RANK_REQUIREMENT_DELETED, id, label, null, null);
     log.info("Deleted RankRequirement id={}", id);
   }
 

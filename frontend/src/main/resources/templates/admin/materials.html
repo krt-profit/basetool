@@ -129,26 +129,28 @@
             <button type="submit" class="btn btn-ghost" th:text="#{general.add}">Hinzufügen</button>
         </form>
         <div data-category-table th:hidden="${categories == null or categories.isEmpty()}">
-            <table class="data-table data-table--stack">
-                <thead>
-                    <tr>
-                        <th th:text="#{admin.materials.categories.name}">Kategorie</th>
-                        <th class="cell-actions"><span class="visually-hidden" th:text="#{general.action}">Aktion</span></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="cat : ${categories}" data-category-row>
-                        <td><span class="cell-title" th:text="${cat.name}">Category Name</span></td>
-                        <td class="cell-actions">
-                            <form method="post" th:action="@{/admin/materials/categories/{id}/delete(id=${cat.id})}" class="m-0"
-                                  data-krt-confirm th:data-krt-confirm-message="#{admin.materials.categories.delete.confirm}"
-                                  th:data-category-id="${cat.id}">
-                                <button type="submit" class="btn btn-quiet-danger btn-icon" th:title="#{general.delete}" th:aria-label="#{general.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                            </form>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="table-responsive">
+                <table class="data-table data-table--stack">
+                    <thead>
+                        <tr>
+                            <th th:text="#{admin.materials.categories.name}">Kategorie</th>
+                            <th class="cell-actions"><span class="visually-hidden" th:text="#{general.action}">Aktion</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="cat : ${categories}" data-category-row>
+                            <td><span class="cell-title" th:text="${cat.name}">Category Name</span></td>
+                            <td class="cell-actions">
+                                <form method="post" th:action="@{/admin/materials/categories/{id}/delete(id=${cat.id})}" class="m-0"
+                                      data-krt-confirm th:data-krt-confirm-message="#{admin.materials.categories.delete.confirm}"
+                                      th:data-category-id="${cat.id}">
+                                    <button type="submit" class="btn btn-quiet-danger btn-icon" th:title="#{general.delete}" th:aria-label="#{general.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                                </form>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
         <div class="empty-state" data-testid="empty-state" data-category-empty th:hidden="${categories != null and !categories.isEmpty()}">
             <th:block th:replace="~{fragments/components :: emptyStateBody('admin.materials.categories.empty', 'admin.materials.categories.empty.text', null)}"></th:block>

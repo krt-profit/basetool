@@ -19,15 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.service.exchange;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.event.MemberDepartedEvent;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.repository.ExchangeClientRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ExchangeClientRevocationRepository;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.KeycloakService;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import java.time.Clock;
@@ -64,7 +64,7 @@ public class ExchangeDepartureService {
   private final ExchangeClientRevocationRepository revocationRepository;
   private final ExchangeRevocationMirror revocationMirror;
   private final KeycloakService keycloakService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final MeterRegistry meterRegistry;
   private final TransactionTemplate requiresNew;
   private final Clock clock = Clock.systemUTC();
@@ -76,7 +76,7 @@ public class ExchangeDepartureService {
    * @param revocationRepository the per-member client revocations
    * @param revocationMirror the gateway's revocation mirror
    * @param keycloakService the identity provider's admin API
-   * @param auditService the audit trail
+   * @param auditRecorder the audit trail
    * @param meterRegistry the registry the departure counter binds to
    * @param transactionManager the manager the writes run in, after the sync's own commit
    */
@@ -85,14 +85,14 @@ public class ExchangeDepartureService {
       @NotNull ExchangeClientRevocationRepository revocationRepository,
       @NotNull ExchangeRevocationMirror revocationMirror,
       @NotNull KeycloakService keycloakService,
-      @NotNull AuditService auditService,
+      @NotNull AuditRecorder auditRecorder,
       @NotNull MeterRegistry meterRegistry,
       @NotNull PlatformTransactionManager transactionManager) {
     this.clientRepository = clientRepository;
     this.revocationRepository = revocationRepository;
     this.revocationMirror = revocationMirror;
     this.keycloakService = keycloakService;
-    this.auditService = auditService;
+    this.auditRecorder = auditRecorder;
     this.meterRegistry = meterRegistry;
     this.requiresNew = new TransactionTemplate(transactionManager);
     this.requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -141,7 +141,7 @@ public class ExchangeDepartureService {
         () ->
             requiresNew.executeWithoutResult(
                 status ->
-                    auditService.record(
+                    auditRecorder.record(
                         AuditEventType.EXCHANGE_MEMBER_DEPARTED,
                         null,
                         null,

@@ -19,17 +19,17 @@
 
 package de.greluc.krt.profit.basetool.backend.service.exchange;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.event.ExchangeBulkUndoAppliedEvent;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeBulkUndoRun;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeBulkUndoSkip;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeBulkUndoStatus;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.repository.ExchangeBulkUndoRunRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ExchangeBulkUndoSkipRepository;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
@@ -54,7 +54,7 @@ public class ExchangeBulkUndoStep {
   private final ExchangeUndoService undoService;
   private final ExchangeBulkUndoRunRepository runRepository;
   private final ExchangeBulkUndoSkipRepository skipRepository;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final ApplicationEventPublisher eventPublisher;
   private final Clock clock = Clock.systemUTC();
 
@@ -133,7 +133,7 @@ public class ExchangeBulkUndoStep {
     }
     ExchangeBulkUndoRun run =
         Entities.require(runRepository.findById(runId), "Bulk undo run not found");
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.EXCHANGE_BULK_UNDO_FINISHED,
         run.getExchangeClientId(),
         run.getClientId(),

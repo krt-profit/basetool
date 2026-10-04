@@ -19,10 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.PromotionCategoryMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
 import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryResponse;
@@ -64,7 +65,7 @@ public class PromotionCategoryService {
   private final PromotionTopicRepository topicRepository;
   private final PromotionCategoryMapper mapper;
   private final OwnerScopeService ownerScopeService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Returns a paginated slice of every {@link PromotionCategoryResponse} across all topics. The
@@ -155,7 +156,7 @@ public class PromotionCategoryService {
     PromotionCategory entity = mapper.toEntity(request);
     entity.setTopic(topic);
     PromotionCategory saved = repository.save(entity);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.PROMOTION_CATEGORY_CREATED,
         saved.getId(),
         topic.getName() + " / " + saved.getName(),
@@ -194,7 +195,7 @@ public class PromotionCategoryService {
     mapper.updateEntity(entity, request);
     entity.setTopic(topic);
     PromotionCategory saved = repository.save(entity);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.PROMOTION_CATEGORY_UPDATED,
         saved.getId(),
         topic.getName() + " / " + saved.getName(),
@@ -221,7 +222,7 @@ public class PromotionCategoryService {
     PromotionTopic topic = entity.getTopic();
     String label = (topic != null ? topic.getName() + " / " : "") + entity.getName();
     repository.delete(entity);
-    auditService.record(AuditEventType.PROMOTION_CATEGORY_DELETED, id, label, null, null);
+    auditRecorder.record(AuditEventType.PROMOTION_CATEGORY_DELETED, id, label, null, null);
     log.info("Deleted PromotionCategory id={}", id);
   }
 

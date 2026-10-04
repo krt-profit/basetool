@@ -32,8 +32,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintExternalAlias;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintExternalAliasSource;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;

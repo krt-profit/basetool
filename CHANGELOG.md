@@ -99,6 +99,13 @@
 
 ### Changed
 
+- **Build: Configuration-Cache auch für lokale Builds.** `gradle.properties` schaltet ihn ein;
+  `--no-configuration-cache` schaltet ihn für einen Lauf ab (BLD-PERF-04).
+- **CI: Cache-Janitor behält je Gradle-Job nur den neuesten Cache** und warnt, wenn der Actions-Cache
+  nach dem Aufräumen über 8 GiB liegt (CI-01).
+- **Tests: PostgreSQL-Testcontainer per Digest.** Die Backend-Tests starten genau das Produktions-Image
+  (`TestImages.POSTGRES`, gegen Compose und Quadlet-Unit geprüft; TST-18).
+- **Doku: Verlängerung der OWASP-Suppressions beschrieben** (CONTRIBUTING, SEC-16).
 - **Modularisierung: die Entscheidungen sind festgehalten.** ADR-0231 bis ADR-0239 (Modulschnitt,
   Zusammenspiel der Module, Prüfwerkzeuge, harter API-Schnitt mit erzwungenem App-Update, Fehlermodell,
   Zugriffsregeln je Fachbereich, NullAway, `switch` ohne `default`, Browser-Baseline 2025), dazu
@@ -264,6 +271,16 @@
 
 ### Security
 
+- **Ingest prüft den Hostnamen des Backends standardmäßig.** Der Jar-Default von
+  `app.ingest.verify-backend-hostname` ist jetzt `true`; nur das `dev`-Profil schaltet ihn ab.
+  Compose und Quadlet setzten bereits `true` (ING-SEC-04).
+- **Host: `deploy` darf nur noch die podman-Unterbefehle der Deploy-Skripte als `iri` ausführen**
+  statt `podman *`; repo-lint prüft die Liste gegen die Skripte. Wirkt erst nach einem Ansible-Lauf
+  auf dem Host (OPS-SEC-08).
+- **CI: Werkzeuge per Hash gepinnt.** PyYAML, ansible-core/ansible-lint aus `--require-hashes`-Dateien,
+  markdownlint-cli2 aus einem Lockfile, Ansible-Collections exakt versioniert (CI-SEC-12).
+- **CI: Release-App-Schlüssel in der Umgebung `release`.** `release-prepare` und `refresh-versions`
+  lesen ihn dort; die Umgebung legt der Owner einmalig an (CI-SEC-16, ADR-0201).
 - **Backend: Prüfregeln für Mandantentrennung und Massenzuweisung.** Org-Einheiten-gebundene Aggregate
   tragen `@TenantScoped`; ein Test verlangt für jeden Controller, der solche Daten schreibt, den
   Scope-Gate, und für Request-Bodies `@Valid`, keine Antwort-DTOs und keine servergeführten Felder

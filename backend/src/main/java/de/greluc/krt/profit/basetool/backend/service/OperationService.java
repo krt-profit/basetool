@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
@@ -31,7 +33,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.time.Instant;
@@ -73,7 +74,7 @@ public class OperationService {
   private final UserService userService;
   private final OwnerScopeService ownerScopeService;
   private final AuthHelperService authHelperService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Returns paged operation list.
@@ -204,7 +205,7 @@ public class OperationService {
       }
     }
     Operation saved = operationRepository.save(operation);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.OPERATION_CREATED,
         operation.getId(),
         operation.getName(),
@@ -245,7 +246,7 @@ public class OperationService {
     operation.setStatus(updateDto.status());
 
     Operation saved = operationRepository.saveAndFlush(operation);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.OPERATION_UPDATED,
         operation.getId(),
         operation.getName(),
@@ -273,7 +274,7 @@ public class OperationService {
 
     String deletedOperationName = operation.getName();
     operationRepository.delete(operation);
-    auditService.record(AuditEventType.OPERATION_DELETED, id, deletedOperationName, null, null);
+    auditRecorder.record(AuditEventType.OPERATION_DELETED, id, deletedOperationName, null, null);
     log.info("Successfully deleted operation with ID: {}", id);
   }
 }

@@ -65,40 +65,42 @@
 
     <div id="aliases-results" class="card card--flush">
         <div data-alias-table th:hidden="${#lists.isEmpty(aliases)}">
-            <table id="aliasesTable" class="data-table data-table--stack">
-                <thead>
-                    <tr>
-                        <th th:text="#{admin.materialAlias.externalName}">Externer Name</th>
-                        <th th:text="#{admin.materialAlias.sourceSystem}">Quelle</th>
-                        <th th:text="#{admin.materialAlias.material}">Material</th>
-                        <th th:text="#{admin.materialAlias.externalKey}">Externer Key</th>
-                        <th th:text="#{admin.materialAlias.externalCode}">Code</th>
-                        <th th:text="#{admin.materialAlias.createdBy}">Erstellt von</th>
-                        <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.materialAlias.action}">Aktion</span></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="a : ${aliases}" th:attr="data-alias-id=${a.id}" data-testid="alias-row"
-                        th:with="sourceKey=${a.sourceSystem == 'SCWIKI' ? 'admin.materialAlias.sourceSystem.scwiki'
-                                 : (a.sourceSystem == 'UEX' ? 'admin.materialAlias.sourceSystem.uex'
-                                 : (a.sourceSystem == 'REFINERY_SCREEN' ? 'admin.materialAlias.sourceSystem.refineryScreen' : null))}">
-                        <td><span class="cell-title" data-alias-field="externalName" th:text="${a.externalName}">Raw Silicon</span></td>
-                        <td th:attr="data-label=#{admin.materialAlias.sourceSystem}">
-                            <span class="chip chip--muted" data-alias-field="sourceSystem" th:data-source-system="${a.sourceSystem}"
-                                  th:text="${sourceKey != null} ? #{${sourceKey}} : ${a.sourceSystem}">SC Wiki</span>
-                        </td>
-                        <td data-alias-field="materialName" th:attr="data-label=#{admin.materialAlias.material}" th:text="${a.materialName}">Silicon (Raw)</td>
-                        <td data-alias-field="externalKey" th:attr="data-label=#{admin.materialAlias.externalKey}" th:text="${a.externalKey}">-</td>
-                        <td data-alias-field="externalCode" th:attr="data-label=#{admin.materialAlias.externalCode}" th:text="${a.externalCode}">-</td>
-                        <td th:attr="data-label=#{admin.materialAlias.createdBy}" th:text="${a.createdBy}">system</td>
-                        <td class="cell-actions">
-                            <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" method="post" th:action="@{/admin/material-aliases/{id}/delete(id=${a.id})}" class="m-0" data-alias-delete>
-                                <button type="submit" class="btn btn-quiet-danger btn-icon" th:title="#{admin.materialAlias.action.delete}" th:aria-label="#{admin.materialAlias.action.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                            </form>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="table-responsive">
+                <table id="aliasesTable" class="data-table data-table--stack">
+                    <thead>
+                        <tr>
+                            <th th:text="#{admin.materialAlias.externalName}">Externer Name</th>
+                            <th th:text="#{admin.materialAlias.sourceSystem}">Quelle</th>
+                            <th th:text="#{admin.materialAlias.material}">Material</th>
+                            <th th:text="#{admin.materialAlias.externalKey}">Externer Key</th>
+                            <th th:text="#{admin.materialAlias.externalCode}">Code</th>
+                            <th th:text="#{admin.materialAlias.createdBy}">Erstellt von</th>
+                            <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.materialAlias.action}">Aktion</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="a : ${aliases}" th:attr="data-alias-id=${a.id}" data-testid="alias-row"
+                            th:with="sourceKey=${a.sourceSystem == 'SCWIKI' ? 'admin.materialAlias.sourceSystem.scwiki'
+                                     : (a.sourceSystem == 'UEX' ? 'admin.materialAlias.sourceSystem.uex'
+                                     : (a.sourceSystem == 'REFINERY_SCREEN' ? 'admin.materialAlias.sourceSystem.refineryScreen' : null))}">
+                            <td><span class="cell-title" data-alias-field="externalName" th:text="${a.externalName}">Raw Silicon</span></td>
+                            <td th:attr="data-label=#{admin.materialAlias.sourceSystem}">
+                                <span class="chip chip--muted" data-alias-field="sourceSystem" th:data-source-system="${a.sourceSystem}"
+                                      th:text="${sourceKey != null} ? #{${sourceKey}} : ${a.sourceSystem}">SC Wiki</span>
+                            </td>
+                            <td data-alias-field="materialName" th:attr="data-label=#{admin.materialAlias.material}" th:text="${a.materialName}">Silicon (Raw)</td>
+                            <td data-alias-field="externalKey" th:attr="data-label=#{admin.materialAlias.externalKey}" th:text="${a.externalKey}">-</td>
+                            <td data-alias-field="externalCode" th:attr="data-label=#{admin.materialAlias.externalCode}" th:text="${a.externalCode}">-</td>
+                            <td th:attr="data-label=#{admin.materialAlias.createdBy}" th:text="${a.createdBy}">system</td>
+                            <td class="cell-actions">
+                                <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" method="post" th:action="@{/admin/material-aliases/{id}/delete(id=${a.id})}" class="m-0" data-alias-delete>
+                                    <button type="submit" class="btn btn-quiet-danger btn-icon" th:title="#{admin.materialAlias.action.delete}" th:aria-label="#{admin.materialAlias.action.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                                </form>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
         <div class="empty-state" data-testid="empty-state" data-alias-empty th:hidden="${!#lists.isEmpty(aliases)}">
             <th:block th:replace="~{fragments/components :: emptyStateBody('admin.materialAlias.empty.title', 'admin.materialAlias.empty', null)}"></th:block>

@@ -19,12 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.PersonalBlueprintMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintSource;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintBatchResult;
@@ -37,7 +39,6 @@ import de.greluc.krt.profit.basetool.backend.repository.ExchangeClientRepository
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
 import java.time.Instant;
@@ -86,7 +87,7 @@ public class PersonalBlueprintService {
   private final BlueprintProductService blueprintProductService;
   private final GameItemRepository gameItemRepository;
   private final DefaultBlueprintKeyService defaultBlueprintKeyService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final ExchangeClientRepository exchangeClientRepository;
 
   /**
@@ -155,7 +156,7 @@ public class PersonalBlueprintService {
     entity.setSource(source);
     entity.setSourceClientId(sourceClientId);
     PersonalBlueprint saved = repository.save(entity);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.BLUEPRINT_ADDED,
         saved.getId(),
         product.productName(),
@@ -204,7 +205,7 @@ public class PersonalBlueprintService {
       added++;
     }
     if (added > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.BLUEPRINT_BATCH_ADDED,
           null,
           null,
@@ -271,7 +272,7 @@ public class PersonalBlueprintService {
   public int deleteAllOwn(@NotNull UUID ownerUserId) {
     int removed = repository.deleteRemovableByOwnerUserId(ownerUserId);
     if (removed > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.BLUEPRINT_ALL_REMOVED,
           null,
           null,
@@ -397,7 +398,7 @@ public class PersonalBlueprintService {
   public int deleteAllForAllUsers() {
     int removed = repository.deleteAllRemovable();
     if (removed > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.BLUEPRINT_PURGED_ALL_USERS,
           null,
           null,
@@ -434,7 +435,7 @@ public class PersonalBlueprintService {
     entity.setNote(request.note());
     PersonalBlueprint saved = repository.save(entity);
     if (!changed.isEmpty()) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.BLUEPRINT_UPDATED,
           saved.getId(),
           saved.getProductName(),
@@ -450,7 +451,7 @@ public class PersonalBlueprintService {
    * @param entity the blueprint just deleted
    */
   private void recordRemoved(@NotNull PersonalBlueprint entity) {
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.BLUEPRINT_REMOVED,
         entity.getId(),
         entity.getProductName(),
