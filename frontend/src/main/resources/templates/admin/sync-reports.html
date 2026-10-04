@@ -40,32 +40,34 @@
 
     <div id="sync-results" class="card card--flush">
     <th:block th:fragment="results">
-    <table th:if="${!#lists.isEmpty(events)}" id="syncReportsTable" class="data-table data-table--stack">
-        <thead>
-            <tr>
-                <th th:text="#{admin.syncReports.col.name}">Name</th>
-                <th class="cell-status" th:text="#{admin.syncReports.col.eventType}">Ereignis</th>
-                <th th:text="#{admin.syncReports.col.source}">Quelle</th>
-                <th th:text="#{admin.syncReports.col.aggregate}">Aggregat</th>
-                <th th:text="#{admin.syncReports.col.ranAt}">Zeitpunkt</th>
-                <th th:text="#{admin.syncReports.col.detail}">Detail</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr th:each="ev : ${events}">
-                <td><span class="cell-title" th:text="${ev.externalName != null and !#strings.isEmpty(ev.externalName)} ? ${ev.externalName} : '—'">Name</span></td>
-                <td class="cell-status">
-                    <span class="chip event-type"
-                          th:text="${#messages.msgOrNull('admin.syncReports.event.' + ev.eventType) ?: ev.eventType}">Nur im Wiki angelegt</span>
-                </td>
-                <td th:attr="data-label=#{admin.syncReports.col.source}"
-                    th:text="${ev.sourceSystem == null} ? '—' : (${#messages.msgOrNull('admin.syncReports.tab.' + #strings.toLowerCase(ev.sourceSystem))} ?: ${ev.sourceSystem})">SC Wiki</td>
-                <td th:attr="data-label=#{admin.syncReports.col.aggregate}" th:text="${ev.aggregate}">commodity</td>
-                <td><span class="utc-time" th:text="${ev.ranAt}">2026-05-28T00:00:00Z</span></td>
-                <td class="event-detail" th:text="${ev.detail}">-</td>
-            </tr>
-        </tbody>
-    </table>
+    <div class="table-responsive" th:if="${!#lists.isEmpty(events)}">
+        <table id="syncReportsTable" class="data-table data-table--stack">
+            <thead>
+                <tr>
+                    <th th:text="#{admin.syncReports.col.name}">Name</th>
+                    <th class="cell-status" th:text="#{admin.syncReports.col.eventType}">Ereignis</th>
+                    <th th:text="#{admin.syncReports.col.source}">Quelle</th>
+                    <th th:text="#{admin.syncReports.col.aggregate}">Aggregat</th>
+                    <th th:text="#{admin.syncReports.col.ranAt}">Zeitpunkt</th>
+                    <th th:text="#{admin.syncReports.col.detail}">Detail</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="ev : ${events}">
+                    <td><span class="cell-title" th:text="${ev.externalName != null and !#strings.isEmpty(ev.externalName)} ? ${ev.externalName} : '—'">Name</span></td>
+                    <td class="cell-status">
+                        <span class="chip event-type"
+                              th:text="${#messages.msgOrNull('admin.syncReports.event.' + ev.eventType) ?: ev.eventType}">Nur im Wiki angelegt</span>
+                    </td>
+                    <td th:attr="data-label=#{admin.syncReports.col.source}"
+                        th:text="${ev.sourceSystem == null} ? '—' : (${#messages.msgOrNull('admin.syncReports.tab.' + #strings.toLowerCase(ev.sourceSystem))} ?: ${ev.sourceSystem})">SC Wiki</td>
+                    <td th:attr="data-label=#{admin.syncReports.col.aggregate}" th:text="${ev.aggregate}">commodity</td>
+                    <td><span class="utc-time" th:text="${ev.ranAt}">2026-05-28T00:00:00Z</span></td>
+                    <td class="event-detail" th:text="${ev.detail}">-</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
     <th:block th:if="${#lists.isEmpty(events)}">
         <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.syncReports.empty', textKey='admin.syncReports.empty.text')}"></th:block>
     </th:block>

@@ -100,6 +100,17 @@ class SyncChunkWriterTest {
   }
 
   @Test
+  void runInNewTransaction_runsTheWorkInItsOwnTransaction() {
+    List<String> ran = new ArrayList<>();
+
+    writer.runInNewTransaction(() -> ran.add("done"));
+
+    assertThat(ran).containsExactly("done");
+    assertThat(tx.begun).isEqualTo(1);
+    assertThat(tx.committed).isEqualTo(1);
+  }
+
+  @Test
   void aChunkSizeBelowOneIsRefused() {
     assertThatThrownBy(() -> writer.write(List.of(1), 0, chunk -> chunk, "row", String::valueOf))
         .isInstanceOf(IllegalArgumentException.class);

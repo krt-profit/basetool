@@ -40,7 +40,7 @@ The task files themselves carry the measurements behind each step. This README c
 | `10-packages.yml` | `packages` | podman, passt, netavark, aardvark-dns, crun, skopeo, restic, rclone, acl, rsync, firewalld, SELinux tooling; asserts the Podman floor; removes cockpit and refuses a host still listening on 9090 |
 | `15-cosign.yml` | `packages`, `cosign` | the upstream cosign binary, checked against the sha256 pinned in `defaults/main.yml` |
 | `20-user.yml` | `user` | the service user `iri`, its subuid/subgid range, lingering |
-| `22-deploy-user.yml` | `user`, `deploy` | the `deploy` account and the sudoers bridge to `iri` (`podman *`, `systemctl --user *`, `systemctl restart alloy.service`) — and proves it works. `podman *` means `deploy` can run any code **as `iri`**; it cannot become root |
+| `22-deploy-user.yml` | `user`, `deploy` | the `deploy` account and the sudoers bridge to `iri` (the podman sub-commands in `basetool_host_deploy_podman_subcommands`, `systemctl --user *`, `systemctl restart alloy.service`) — and proves it works. The list is exactly what the `rt_*` seam and the four deploy-account scripts run; `scripts/check-deploy-podman-allowlist.py` (repo-lint) fails when a script starts using another sub-command or an entry goes unused. `podman run` and `exec` are on it, so `deploy` can still run any code **as `iri`**; it cannot become root |
 | `30-directories.yml` | `directories` | `/var/iri`, `/var/lib/iri`, `/etc/iri`, the setgid `env.d`, the backup staging tree, the unit delivery directory `/etc/containers/systemd/users/<uid>`, every data directory at its **translated** owner |
 | `25-scripts.yml` | `scripts` | `deploy.sh`, `backup.sh`, `restore-drill.sh`, `container-cleanup.sh`, `lib/container-runtime.sh`, `lib/common.sh`, `lib/restic-repo.sh`, `render-env-d.py`, `render-redis-acl.py`, `mint-internal-tls.sh` (root-owned, `0755`) and the Redis ACL rules template `redis-users.acl.tmpl` (`0644`); the four `iri-*` units and timers with their shared sandbox drop-in `10-deploy-account-sandbox.conf` (`basetool_host_deploy_account_units`) and the templated `20-service-user.conf`, which orders each after `user@<iri uid>.service` so its sandbox sees `iri`'s runtime, logrotate, the lock tmpfiles; timers **enabled, not started** |
 | `40-selinux.yml` | `selinux` | `container_file_t` on the data tree, `bin_t` on the scripts, `restorecon -RF` |
@@ -90,8 +90,8 @@ ansible-playbook site.yml --limit testing                   # do it
 The controller cannot be Windows natively — use WSL or a container. Ansible **ignores an
 `ansible.cfg` in a world-writable directory**, which a Windows mount under `/mnt/` is: it prints a
 warning and then silently runs without `roles_path`, `collections_path` or `host_key_checking`.
-Copy the tree into the Linux filesystem before running it. The collection versions are capped in
-`requirements.yml` so that an `ansible-core` 2.16 controller keeps working. CI runs
+Copy the tree into the Linux filesystem before running it. The collection versions are pinned exactly in
+`requirements.yml`, at releases that still support an `ansible-core` 2.16 controller. CI runs
 `ansible-playbook --syntax-check` and `ansible-lint` (`repo-lint.yml` → `ansible-lint`).
 
 **A new host gets a full, untagged run**, and a second run must report `changed=0`. Measured on the

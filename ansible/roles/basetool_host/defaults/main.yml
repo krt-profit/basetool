@@ -10,6 +10,23 @@ basetool_host_deploy_account_units:
   - iri-restore-drill.service
   - iri-container-cleanup.service
 
+basetool_host_deploy_podman_subcommands:
+  - cp
+  - create
+  - exec
+  - image inspect
+  - image prune
+  - info
+  - inspect
+  - login
+  - network prune
+  - ps
+  - pull
+  - rm
+  - run
+  - system df
+  - volume inspect
+
 basetool_host_scripts_src: "{{ playbook_dir }}/../scripts"
 
 basetool_host_subuid_base: 100000

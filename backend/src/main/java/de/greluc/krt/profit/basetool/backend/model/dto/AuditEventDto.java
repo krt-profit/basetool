@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
-import de.greluc.krt.profit.basetool.backend.model.AuditDomain;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDomain;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import java.time.Instant;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;

@@ -40,6 +40,11 @@ its target module, first matching rule wins (REQ-MOD-001…005).
   edges. A new upward edge fails `ModuleBaselineTest`; when you remove one, a local test run shrinks
   the file and CI refuses until the shrunk file is committed. Never add a security rule to a
   baseline.
+- **Other modules use a module only through its `api` package** (plan §5.2). The first one is
+  `audit.api`: record audit rows through `AuditRecorder` (it returns nothing), with `AuditEventType`,
+  `AuditDomain` and `AuditDetails` from the same package. `AuditService` and the rest of the audit
+  trail are the audit module's internals; the listener and controller audit rules key on all three
+  recorder types, so a new recorder type is added there too.
 
 ## Concurrency — read this before touching multi-step transactions
 

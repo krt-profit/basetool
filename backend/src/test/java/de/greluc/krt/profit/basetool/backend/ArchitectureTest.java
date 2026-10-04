@@ -49,6 +49,7 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import com.tngtech.archunit.library.dependencies.SliceAssignment;
 import com.tngtech.archunit.library.dependencies.SliceIdentifier;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.config.ActingMemberFilter;
 import de.greluc.krt.profit.basetool.backend.controller.AppVersionPolicyController;
 import de.greluc.krt.profit.basetool.backend.controller.BankAccountController;
@@ -983,7 +984,8 @@ class ArchitectureTest {
   @Test
   void controllerLayerMustNotWriteAuditRowsDirectly() {
     assertClassFloor("controllerLayerMustNotWriteAuditRowsDirectly", CONTROLLER_CODE, 99);
-    controllerLayerMustNotWriteAuditRowsDirectlyRule(AuditService.class, BankAuditService.class)
+    controllerLayerMustNotWriteAuditRowsDirectlyRule(
+            AuditRecorder.class, AuditService.class, BankAuditService.class)
         .check(CLASSES);
   }
 

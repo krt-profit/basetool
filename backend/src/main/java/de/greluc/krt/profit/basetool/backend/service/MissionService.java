@@ -22,9 +22,11 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.bumpSectionVersion;
 import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.enforceSectionVersion;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFrequency;
 import de.greluc.krt.profit.basetool.backend.model.MissionObjectiveKind;
@@ -46,7 +48,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantReposi
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.MissionSection;
 import java.math.BigDecimal;
@@ -98,7 +99,7 @@ public class MissionService {
   private final UserService userService;
   private final OwnerScopeService ownerScopeService;
   private final AuthHelperService authHelperService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final MissionTimelineService missionTimelineService;
   private final MissionParticipantService missionParticipantService;
   private final MissionStructureService missionStructureService;
@@ -285,7 +286,7 @@ public class MissionService {
     }
 
     Mission saved = missionRepository.save(mission);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_CREATED,
         mission.getId(),
         mission.getName(),
@@ -412,7 +413,7 @@ public class MissionService {
     bumpSectionVersion(mission, MissionSection.FLAGS);
 
     Mission saved = missionRepository.save(mission);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_UPDATED,
         mission.getId(),
         mission.getName(),
@@ -469,7 +470,7 @@ public class MissionService {
     }
 
     Mission saved = missionRepository.save(mission);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_UPDATED,
         mission.getId(),
         mission.getName(),
@@ -509,7 +510,7 @@ public class MissionService {
     if (actualEndTime != null) {
       missionParticipantRepository.clampCheckedInEndTimes(missionId, actualEndTime);
     }
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_UPDATED,
         mission.getId(),
         mission.getName(),
@@ -533,7 +534,7 @@ public class MissionService {
         missionRepository, mission, MissionSection.FLAGS, expectedFlagsVersion, missionId);
     mission.setIsInternal(isInternal);
     Mission saved = missionRepository.save(mission);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_UPDATED,
         mission.getId(),
         mission.getName(),
@@ -578,7 +579,7 @@ public class MissionService {
     }
 
     missionRepository.delete(mission);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_DELETED, deletedMissionId, deletedMissionName, null, null);
   }
 
@@ -1008,7 +1009,7 @@ public class MissionService {
 
     validateMissionTimes(subMission);
     Mission saved = missionRepository.save(subMission);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_CREATED,
         subMission.getId(),
         subMission.getName(),
@@ -1038,7 +1039,7 @@ public class MissionService {
 
     missionFrequencyRepository.upsertTypedFrequency(missionId, frequencyTypeId, value);
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_FREQUENCY_CHANGED,
         missionId,
         missionName,
@@ -1069,7 +1070,7 @@ public class MissionService {
     mission.getFrequencies().add(freq);
     MissionFrequency saved = missionFrequencyRepository.save(freq);
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_FREQUENCY_CHANGED,
         mission.getId(),
         mission.getName(),
@@ -1123,7 +1124,7 @@ public class MissionService {
     freq.setValue(value);
     missionFrequencyRepository.save(freq);
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_FREQUENCY_CHANGED,
         mission.getId(),
         mission.getName(),
@@ -1143,7 +1144,7 @@ public class MissionService {
       throw new NotFoundException("Frequency not found in this mission");
     }
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_FREQUENCY_REMOVED,
         mission.getId(),
         mission.getName(),
@@ -1172,7 +1173,7 @@ public class MissionService {
     long ownershipVersion = upsertMissionOwnership(mission, user, expectedOwnershipVersion);
     mission.setOwner(user);
     mission.setOwnershipVersion(ownershipVersion);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_OWNER_CHANGED, mission.getId(), mission.getName(), userId, null);
     return mission;
   }
@@ -1242,7 +1243,7 @@ public class MissionService {
     OrgUnit target = ownerScopeService.resolveReassignTargetOrgUnit(targetOrgUnitId);
     mission.setOwningOrgUnit(target);
     Mission saved = missionRepository.save(mission);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_OWNING_ORG_UNIT_CHANGED,
         mission.getId(),
         mission.getName(),

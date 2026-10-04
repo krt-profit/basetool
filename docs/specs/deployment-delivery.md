@@ -879,8 +879,11 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
 
 - **The privilege boundary is a named sudo bridge, not a group.** Under rootless Podman the
   `deploy` account reaches the service user's containers through `/etc/sudoers.d/basetool-deploy`:
-  `podman *` and `systemctl --user *` as that one user, and `systemctl restart alloy.service` as root
-  — nothing else (`22-deploy-user.yml`). The Docker deployment's `docker` group, which is
+  the podman sub-commands its scripts run (`basetool_host_deploy_podman_subcommands`, kept equal to
+  the `rt_*` seam's calls by `scripts/check-deploy-podman-allowlist.py`) and `systemctl --user *` as
+  that one user, and `systemctl restart alloy.service` as root — nothing else (`22-deploy-user.yml`,
+  OPS-SEC-08). `podman run` and `exec` are among them, so the boundary is still "any code as that
+  user, never root". The Docker deployment's `docker` group, which is
   root-equivalent by design, does not exist on the production host.
 - **Systemd sandbox.** `iri-deploy.service` confines the `deploy.sh` process with
   `ProtectSystem=strict`, `ProtectHome=read-only`, `PrivateTmp`, `PrivateDevices`,
@@ -2348,6 +2351,11 @@ that has no entry at all, before it is used.
   versions nothing uses. PIT's `addJUnitPlatformLauncher` probe is switched off for that reason; the
   launcher reaches PIT through the test runtime classpath ([`dependency-pins.md`](../dependency-pins.md)).
 - **Checksums only.** PGP signatures are not verified (ADR-0208 says why and when to revisit).
+- **The CI tools outside Gradle are pinned the same way** (CI-SEC-12): pip installs read
+  `--require-hashes` requirement files under `.github/requirements/`, markdownlint-cli2 is installed
+  with `npm ci` from `.github/tools/markdownlint/package-lock.json`, and the Ansible collections are
+  exact versions. Galaxy publishes no hash a requirements file could pin, so the collections are
+  version-pinned only.
 - **`-sources.jar`, `-javadoc.jar` and the Gradle distribution's `gradle-<version>-src.zip` are
   trusted** by pattern: IDE downloads, never on a build classpath.
 - **The change that alters the graph carries the regenerated file**, produced by
