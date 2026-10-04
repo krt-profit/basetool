@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorRespons
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
+import de.greluc.krt.profit.basetool.frontend.model.OperationPayoutProgress;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationDto;
@@ -287,7 +288,7 @@ public class OperationPageController {
           yield "operation-detail :: payoutSection";
         }
         case "finance" -> {
-          loadFinanceModel(id, page, size, model);
+          loadFinanceModel(id, model);
           yield "operation-detail :: financeSection";
         }
         default -> "operation-detail :: fragmentError";
@@ -301,9 +302,9 @@ public class OperationPageController {
   /**
    * Loads the full operation-detail model (the overview fragment needs all of it): the four
    * independent reads fanned out on virtual threads via {@link ParallelPageLoader} plus the derived
-   * {@code operationMaxMissionResult}, {@code canEdit} and {@code canUnsetPaidOut}. Propagates a
-   * backend failure to the caller (the full page redirects, the overview fragment shows its inline
-   * error).
+   * {@code operationMaxMissionResult}, {@code payoutProgress}, {@code canEdit} and {@code
+   * canUnsetPaidOut}. Propagates a backend failure to the caller (the full page redirects, the
+   * overview fragment shows its inline error).
    *
    * @param id operation id
    * @param page zero-based page index for the embedded missions table
@@ -343,6 +344,7 @@ public class OperationPageController {
     OperationPayoutSummaryDto payoutSummary = payoutsF.join();
     model.addAttribute("operationPayouts", payoutSummary.payouts());
     model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
+    model.addAttribute("payoutProgress", OperationPayoutProgress.of(payoutSummary.payouts()));
 
     BigDecimal maxMissionResult =
         operationFinance.missions() == null
@@ -360,9 +362,9 @@ public class OperationPageController {
 
   /**
    * Loads only the model the {@code payoutSection} fragment needs (fragment-gating): the operation
-   * (for the preliminary-values flag and the checkbox operation id), the payout summary (rows +
-   * donation total) and the two role flags. Deliberately issues neither the finance-summary nor the
-   * missions read.
+   * (for the preliminary-values flag and the checkbox operation id), the payout summary (rows,
+   * donation total and the folded {@link OperationPayoutProgress} of the sum row) and the two role
+   * flags. Deliberately issues neither the finance-summary nor the missions read.
    *
    * @param id operation id
    * @param authentication current user's authentication
@@ -376,30 +378,24 @@ public class OperationPageController {
             "/api/v1/operations/" + id + "/payouts", OperationPayoutSummaryDto.class);
     model.addAttribute("operationPayouts", payoutSummary.payouts());
     model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
+    model.addAttribute("payoutProgress", OperationPayoutProgress.of(payoutSummary.payouts()));
     model.addAttribute("canEdit", hasMissionManagerRole(authentication));
     model.addAttribute("canUnsetPaidOut", hasOfficerOrAdminRole(authentication));
   }
 
   /**
    * Loads only the model the {@code financeSection} fragment needs (fragment-gating): the finance
-   * roll-up, the donation total (from the payout summary) and the missions page (its total feeds
-   * the sum-strip's per-operation count). Deliberately does not issue the operation-detail read.
+   * roll-up. Deliberately issues neither the operation-detail, the payout nor the missions read;
+   * the totals live in the KPI bar, which the overview refresh carries.
    *
    * @param id operation id
-   * @param page zero-based page index for the embedded missions table
-   * @param size page size for the embedded missions table
    * @param model Thymeleaf model to populate
    */
-  private void loadFinanceModel(UUID id, Integer page, Integer size, @NotNull Model model) {
+  private void loadFinanceModel(UUID id, @NotNull Model model) {
     model.addAttribute(
         "operationFinance",
         backendApiClient.get(
             "/api/v1/operations/" + id + "/finance-summary", OperationFinanceSummaryDto.class));
-    OperationPayoutSummaryDto payoutSummary =
-        backendApiClient.get(
-            "/api/v1/operations/" + id + "/payouts", OperationPayoutSummaryDto.class);
-    model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
-    model.addAttribute("missionsPage", fetchMissionsPage(id, page, size));
   }
 
   /**

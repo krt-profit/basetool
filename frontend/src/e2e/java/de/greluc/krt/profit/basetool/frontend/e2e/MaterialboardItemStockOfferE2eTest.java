@@ -104,6 +104,7 @@ class MaterialboardItemStockOfferE2eTest {
         page.waitForLoadState();
         page.waitForFunction("() => typeof window.krtMaterialRelease === 'object'");
 
+        page.locator("[data-testid='mb-create-offer']").click();
         page.locator("[data-mb-open-release]").first().click();
         Locator pickerInput = page.locator("#mb-modal [data-mb-picker-input]");
         assertThat(pickerInput)

@@ -234,7 +234,43 @@ class ConnectedAppsPageControllerMvcTest {
     mockMvc
         .perform(get("/connected-apps"))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("id=\"ca-empty\"")));
+        .andExpect(content().string(containsString("id=\"ca-empty\"")))
+        .andExpect(content().string(containsString("class=\"empty-state\"")));
+  }
+
+  /**
+   * The page follows the list pattern (REQ-UI-027): the page head with the personal eyebrow, one
+   * card per application in an auto grid, the installations and the activity as stacked tables,
+   * disconnecting as a quiet danger action, and no HUD box or greeting banner.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void thePageShowsOneCardPerApplication() throws Exception {
+    stubApps();
+
+    String html =
+        mockMvc
+            .perform(get("/connected-apps"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    org.assertj.core.api.Assertions.assertThat(html)
+        .contains("class=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Persönlich<")
+        .contains("class=\"grid-auto ca-apps\"")
+        .contains("<section class=\"card ca-app\" data-client-id=\"versekit\">")
+        .contains("class=\"data-table data-table--stack ca-installations\"")
+        .contains("class=\"data-table data-table--stack ca-activity\"")
+        .contains("class=\"btn btn-quiet-danger btn-xs\" data-ca-disconnect-client")
+        .contains("class=\"btn btn-quiet-danger btn-xs\" data-ca-disconnect-installation")
+        .doesNotContain("btn--cta")
+        .doesNotContain("hud-box")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("colspan");
   }
 
   @Test
@@ -247,7 +283,7 @@ class ConnectedAppsPageControllerMvcTest {
         .perform(get("/connected-apps").param("fragment", "apps"))
         .andExpect(status().isOk())
         .andExpect(model().attribute("error", "connectedApps.error.load"))
-        .andExpect(content().string(containsString("class=\"text-danger\"")))
+        .andExpect(content().string(containsString("class=\"alert alert-danger\"")))
         .andExpect(content().string(not(containsString("id=\"ca-empty\""))));
   }
 

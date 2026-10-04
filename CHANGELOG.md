@@ -4,12 +4,28 @@
 
 ### Added
 
+- **Materialbörse im neuen Muster.** Tabs „Angebote · Gesuche" mit „Alle · Meine" statt vier Tabs,
+  eine Schaltfläche „Angebot erstellen" bzw. „Gesuch erstellen" mit Auswahl Material/Item statt vier
+  Buttons, Filter als Popover mit Chips und Sortiermenü. Alte Links auf die Börse funktionieren
+  weiter (REQ-MARKET-009/-018).
+
 - **Startseite und Formulare im neuen Muster (Phase 2).** Die Startseite zeigt die nächsten 7 Tage als
   Liste mit Datumsblock, daneben Information und die neuesten Benachrichtigungen. Neuer Auftrag,
   Einbuchen, Mitglied bearbeiten (mit Reitern), Systemeinstellungen, Information und
   Benachrichtigungsregeln haben nummerierte Abschnitte und eine fixierte Aktionsleiste (REQ-UI-027).
+- **Rechtliches, Organigramm, Verbundene Anwendungen und Schiffsdaten im neuen Muster.** Diese
+  Seiten haben Seitenkopf und Karten statt HUD-Box; die Datenschutzerklärung hat ein
+  Inhaltsverzeichnis, das Organigramm ist auf dem Smartphone eine eingerückte Liste, und „Alle
+  unfitted" sitzt bei den Schiffsdaten im „⋯"-Menü (REQ-UI-027).
+
 - **Profil als eine Einstellungsseite.** Abschnitts-Navigation links, eine Speichern-Leiste, die nur
   bei Änderungen erscheint und alle geänderten Abschnitte speichert.
+- **Einsatz- und Operationsdetail im neuen Muster.** Der Einsatz hat drei Reiter (Übersicht ·
+  Teilnehmer & Einheiten · Finanzen & Auszahlung); statt des Reiters „Verwaltung" öffnet
+  „Bearbeiten" einen Bearbeitungsmodus, „Anmelden" ist die Hauptaktion, Löschen liegt im „⋯"-Menü.
+  Die Operation zeigt eine Kennzahlenleiste und vier Reiter (Übersicht · Einsätze · Auszahlung ·
+  Finanzen) und wird in einem Dialog bearbeitet (REQ-MISSION-004/011).
+
 - **Hangar: Versicherung als „Keine · Monate · LTI".** Statt einer Liste mit 122 Einträgen; Monate
   als Zahl von 1 bis 120.
 
@@ -67,6 +83,11 @@
   Backend-Klasse einem der 26 Zielmodule zu; ein ArchUnit-`modules()`-Test friert die heutigen 138
   Kanten gegen die Rangordnung ein, neue scheitern. Spring Modulith 2.1.1 läuft nur im Testumfang
   (REQ-MOD-001…005).
+
+- **Raffinerie im neuen Muster.** Die Liste teilt sich in „Läuft · Abholbereit · Abgeschlossen ·
+  Alle" mit Zählern; Suche nach Besitzer, Ort, Methode oder Material und das Blättern laufen
+  serverseitig über alle Seiten. Anlegen und Detail sind ein nummeriertes Formular mit Statuskarte
+  und „Ausbeute einlagern" als Hauptaktion (REQ-REFINERY-019).
 
 - **Berechtigungsmatrix des Backends als geprüfte Datei.** `authorization-matrix.txt` hält für jede
   Operation die entscheidende URL-Regel und das wirksame `@PreAuthorize` fest, dazu die
