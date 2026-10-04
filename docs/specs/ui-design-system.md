@@ -658,11 +658,29 @@ class from `inline-migration.css` (retired 2026-10-04).
   lets the text inside it wrap instead of painting straight out of the narrowed track.
 - [ ] On ≤768px the footer is `static` and `--krt-footer-height` is `0px`; above it the footer is
   `fixed` and `main`'s `padding-bottom` covers its measured height.
+- [ ] **The page-pattern rules of REQ-UI-027 hold on every swept page** (2026-10-04): on the phone
+  class no visible `.card` is wider inside than its own box (`scrollWidth` ≤ `clientWidth`; a
+  `.table-responsive` scroller inside the card clips its own overflow and is allowed to scroll, the
+  card is not); at every class the page head's primary action — the visible `page-head-primary`, or
+  else the visible `.btn--cta` in `.page-head .page-actions` — lies inside the first viewport above
+  the phone tab bar; a `.page-actions` row shows at most one visible `.btn--cta`; no `.hud-box`
+  sits inside another (hidden ones included); and no visible element draws its own text in
+  `rgb(100, 100, 100)`, the retired `--color-gray-2` that failed contrast as text (DS-1). A finding
+  names the card's widest box outside a nested scroller, the primary's position against the
+  viewport, the crowded buttons, both boxes, or the gray element.
+- [ ] **A hidden overlay takes no room.** A hidden tooltip bubble still counts toward the page's
+  scrollable width, and on a phone it widens the layout viewport: the hidden `.scu-hint__bubble`
+  beside a toolbar's right edge widened `/personal-inventory/blueprints` to 487 px at 375 px and
+  scrolled it 104 px sideways at 810 px. The hidden bubble is scaled to nothing
+  (`transform: … scale(0)`, restored at once on hover or focus and only after the fade-out).
 
 **Enforced by:** [ADR-0172](../adr/0172-the-phone-class-gets-its-own-layout-contract.md) · `TouchClassLayoutE2eTest` (all five device classes — 375×812, 810×1080, 1024×768, 1280×800, 1600×900 — over the page routes of the shared `FrontendPageRoutes.PAGES` catalogue, plus a real detail view per
 list and every modal on the page — 96 `.krt-modal-overlay` roots, the one shape `MODAL_SHAPES` holds
 since ADR-0177: page-level overflow, cut-off elements, unscrollable tables, control floors, footer
-behaviour, chrome share — with a full-page screenshot per page and class) ·
+behaviour, chrome share, and the five page-pattern checks of REQ-UI-027 — cards scrolling sideways
+on the phone, the head's primary action outside the first viewport, more than one `.btn--cta` in
+`.page-actions`, nested `.hud-box`es, text in `rgb(100, 100, 100)` — with a full-page screenshot per
+page and class and a per-page `patterns:` line in the report) ·
 `PageRouteCatalogueTest` (the route list is no longer hand-maintained on trust: it asks the
 dispatcher for every mapping it knows and fails when a variable-free `GET` route is in neither
 `PAGES` nor `NOT_PAGES`, so a page added next month is swept on the day it is added — and it runs
@@ -1522,7 +1540,16 @@ Pages that swap their filter form call `window.krtFilterChips.refresh()`.
 
 New `data-testid`s: `page-head`, `page-eyebrow`, `page-head-count`, `page-head-primary` (set by
 the page on its primary action), `overflow-menu-toggle`, `toolbar-search`, `segment-<name>-<value>`,
-`filter-chips`, `filter-chip-<name>`, `filter-chips-reset`, `empty-state`, `empty-state-action`.
+`filter-chips`, `filter-chip-<name>`, `filter-chips-reset`, `empty-state`, `empty-state-action`,
+`row-link` (on the `a.row-link` that makes a table row clickable). Every existing `data-testid`
+stays: a primary action or row link that carried a page-specific id before the patterns keeps it
+(`missions-create-link`, `orders-create-link`, `bank-movement-open`, `bank-holder-history-link`, …),
+because an element has one `data-testid` and the smoke tests address the old one. A hand-built
+pattern carries the same ids as its fragment — the bank's account filter is the page's
+`toolbar-search`.
+
+*Amended 2026-10-04 (phase 5): `row-link` added; the ids pinned per pattern by
+`PagePatternTestIdsRenderTest`.*
 
 **Rollout.** Phase 0 (this requirement's foundation) ships the design-system update, the fragments,
 the scripts and the breakpoint gate; the list pages, the home page and the forms, the areas of the
@@ -1634,8 +1661,12 @@ or class read any more (the `*.description` subtitles stay). No template or scri
 the CSP-safe width mechanism.
 
 **Enforced by:** `PagePatternFragmentsRenderTest` (the fragments' markup and ARIA) ·
+`PagePatternTestIdsRenderTest` (the smoke-test ids on a representative page per pattern) ·
 `NoMigrationClassTest` (no `krtm-*` class, no `inline-migration.css`) · Stylelint
-`media-feature-name-value-allowed-list` (breakpoints) · `TouchClassLayoutE2eTest` (touch floors) ·
+`media-feature-name-value-allowed-list` (breakpoints) · `TouchClassLayoutE2eTest` (touch floors, and
+on every swept page: no `.card` scrolling sideways on the phone, the head's primary action in the
+first viewport, one `.btn--cta` per `.page-actions`, no nested `.hud-box`, no text in the retired
+gray — see REQ-UI-009) ·
 **Code:** `static/css/styles.css` (`components` layer), `fragments/page-head.html`,
 `fragments/components.html`, `static/js/krt-overflow-menu.js`, `static/js/krt-filter-chips.js`,
 `frontend/.stylelintrc.json`, `frontend/.stylelintrc.templates.json` · **Related:** REQ-UI-004,

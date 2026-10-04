@@ -5392,7 +5392,7 @@
         width: max-content;
         max-width: min(17rem, 78vw);
         padding: var(--space-2) 0.6rem;
-        transform: translateX(calc(-50% + var(--hint-shift, 0px)));
+        transform: translateX(calc(-50% + var(--hint-shift, 0px))) scale(0);
         background: rgb(0 0 0 / 95%);
         border: 1px solid var(--color-primary);
         box-shadow: 0 0 10px rgb(231 126 35 / 30%);
@@ -5410,7 +5410,8 @@
         pointer-events: none;
         transition:
             opacity 0.2s ease,
-            visibility 0.2s ease;
+            visibility 0.2s ease,
+            transform 0s linear 0.2s;
     }
 
     .scu-hint:hover .scu-hint__bubble,
@@ -5418,6 +5419,10 @@
     .scu-hint:focus-within .scu-hint__bubble {
         opacity: 1;
         visibility: visible;
+        transform: translateX(calc(-50% + var(--hint-shift, 0px)));
+        transition:
+            opacity 0.2s ease,
+            visibility 0.2s ease;
     }
 
     .scu-hint__bubble::after {
