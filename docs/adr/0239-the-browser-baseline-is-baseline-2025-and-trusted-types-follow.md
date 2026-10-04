@@ -1,7 +1,7 @@
 # ADR-0239 — The browser baseline is "Baseline 2025", and Trusted Types follow
 
-- **Status:** Accepted — implementation pending (the language level waits for TypeScript 7 to
-  accept the `ES2025` lib; Trusted Types start in report-only mode)
+- **Status:** Accepted — the baseline and the language level are implemented (2026-10-04);
+  Trusted Types are pending and start in report-only mode
 - **Date:** 2026-10-01
 - **Deciders:** @greluc (owner decision D-16)
 - **Related:** [domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) §8.2 · spec
@@ -36,6 +36,17 @@ the frontend already collects CSP violations through its client-error beacon (`c
    `require-trusted-types-for 'script'` in report-only mode, reported through the existing
    `csp_violation` beacon; two named policies and a tagged-template HTML builder serve the sinks; no
    `default` policy. Enforcement follows once the dialog page-walk E2E collects no violation.
+
+## Implementation
+
+- **2026-10-04 — the language level.** TypeScript 7.0.2, the version the build uses, accepts the
+  `ES2025` lib: a planted `// @ts-check` file using `Set.prototype.union` and an iterator helper
+  (`values().map().toArray()`) passed `:frontend:typecheckJs` under `ES2025` and failed it under
+  `ES2023` with TS2550 and TS2339. `tsconfig.json` (`target`, `lib`) and `eslint.config.mjs`
+  (`ecmaVersion`, browser and Node scripts) moved to 2025 together. The `ES2025` lib also declares
+  `Promise.try`, `RegExp.escape` and `Float16Array`, which the floor does not ship, so ESLint rejects
+  them (`no-restricted-properties`, `no-restricted-globals`; proven by `:frontend:testEslintBans`).
+  The floor is written into REQ-FE-018 and `ui-design-system.md`.
 
 ## Consequences
 

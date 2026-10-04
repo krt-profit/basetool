@@ -44,7 +44,7 @@
      * @returns {number | null} the price, or `null` when the terminal does not trade that side
      */
     function priceOf(row, side) {
-        const raw = row.getAttribute('data-' + side);
+        const raw = row.getAttribute(`data-${side}`);
         if (raw === null || raw === '') {
             return null;
         }
@@ -62,7 +62,7 @@
         const rows = /** @type {HTMLTableRowElement[]} */ (
             Array.prototype.slice.call(rowsBody.rows)
         );
-        rows.sort(function (a, b) {
+        rows.sort((a, b) => {
             const pa = priceOf(a, side);
             const pb = priceOf(b, side);
             if (pa !== null && pb !== null && pa !== pb) {
@@ -76,11 +76,11 @@
                 { sensitivity: 'base' },
             );
         });
-        rows.forEach(function (row) {
+        rows.forEach((row) => {
             rowsBody.appendChild(row);
         });
         priceTable.setAttribute('data-sort', side);
-        priceTable.querySelectorAll('th[data-sort-col]').forEach(function (th) {
+        priceTable.querySelectorAll('th[data-sort-col]').forEach((th) => {
             const active = th.getAttribute('data-sort-col') === side;
             th.setAttribute(
                 'aria-sort',
@@ -93,15 +93,12 @@
     function filterTerminals() {
         const needle = input ? input.value.trim().toLocaleLowerCase() : '';
         let visible = 0;
-        Array.prototype.forEach.call(
-            rowsBody.rows,
-            function (/** @type {HTMLTableRowElement} */ row) {
-                const name = (row.getAttribute('data-terminal') || '').toLocaleLowerCase();
-                const match = needle === '' || name.indexOf(needle) >= 0;
-                row.hidden = !match;
-                if (match) visible++;
-            },
-        );
+        Array.prototype.forEach.call(rowsBody.rows, (/** @type {HTMLTableRowElement} */ row) => {
+            const name = (row.getAttribute('data-terminal') || '').toLocaleLowerCase();
+            const match = needle === '' || name.indexOf(needle) >= 0;
+            row.hidden = !match;
+            if (match) visible++;
+        });
         priceTable.hidden = visible === 0;
         if (noResults) {
             noResults.hidden = visible !== 0;
@@ -112,9 +109,9 @@
         input.addEventListener('input', filterTerminals);
     }
 
-    document.querySelectorAll('input[name="terminalSort"]').forEach(function (el) {
+    document.querySelectorAll('input[name="terminalSort"]').forEach((el) => {
         const radio = /** @type {HTMLInputElement} */ (el);
-        radio.addEventListener('change', function () {
+        radio.addEventListener('change', () => {
             if (radio.checked) {
                 sortBy(radio.value === 'buy' ? 'buy' : 'sell');
             }

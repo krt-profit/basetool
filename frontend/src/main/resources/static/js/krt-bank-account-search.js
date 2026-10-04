@@ -31,26 +31,22 @@
         accountMeta[row.id] = requiresJustification;
         const accountNo = row.accountNo || '';
         const name = row.name || '';
-        const label = accountNo && name ? accountNo + ' — ' + name : accountNo || name || row.id;
+        const label = accountNo && name ? `${accountNo} — ${name}` : accountNo || name || row.id;
         return { value: row.id, label };
     }
 
     function fetchAccounts(query) {
-        return fetch('/api/proxy/bank/accounts/search?query=' + encodeURIComponent(query || ''), {
-            headers: { Accept: 'application/json' },
-        })
-            .then(function (response) {
-                return response.ok ? response.json() : [];
-            })
-            .then(function (list) {
+        return window.krtFetch
+            .getJson(`/api/proxy/bank/accounts/search?query=${encodeURIComponent(query || '')}`)
+            .then((list) => {
                 return (list || []).map(toOption);
             })
-            .catch(function () {
+            .catch(() => {
                 return [];
             });
     }
 
-    window.krtComboboxRemoteSources = window.krtComboboxRemoteSources || {};
+    window.krtComboboxRemoteSources ||= {};
     window.krtComboboxRemoteSources['remote-bank-accounts'] = function (query) {
         return fetchAccounts(query);
     };

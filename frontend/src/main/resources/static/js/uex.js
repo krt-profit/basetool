@@ -19,11 +19,11 @@
 
 /* global MSG_SAVED, MSG_ERROR */
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     function patchOverrideGroup(form, action) {
         const group = form.parentElement;
         if (group) {
-            group.querySelectorAll('form').forEach(function (f) {
+            group.querySelectorAll('form').forEach((f) => {
                 const actionInput = f.querySelector('input[name="action"]');
                 const btn = f.querySelector('button');
                 if (!actionInput || !btn) {
@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const action = actionInput ? actionInput.value : '';
         window.krtFetch.write({
             method: 'POST',
-            url: form.getAttribute('action') + '?action=' + encodeURIComponent(action),
+            url: `${form.getAttribute('action')}?action=${encodeURIComponent(action)}`,
             successMessage: MSG_SAVED,
             errorMessage: MSG_ERROR,
             onSuccess() {
@@ -89,11 +89,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document
         .querySelectorAll('form[action*="/loading-dock"], form[action*="/auto-load"]')
-        .forEach(function (form) {
-            form.addEventListener('click', function (ev) {
+        .forEach((form) => {
+            form.addEventListener('click', (ev) => {
                 ev.stopPropagation();
             });
-            form.addEventListener('submit', function (ev) {
+            form.addEventListener('submit', (ev) => {
                 ev.preventDefault();
                 ev.stopPropagation();
                 if (!window.krtFetch) {
@@ -103,11 +103,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 submitOverride(form);
             });
         });
-    document.querySelectorAll('form[action*="/toggle-visibility"]').forEach(function (form) {
-        form.addEventListener('click', function (ev) {
+    document.querySelectorAll('form[action*="/toggle-visibility"]').forEach((form) => {
+        form.addEventListener('click', (ev) => {
             ev.stopPropagation();
         });
-        form.addEventListener('submit', function (ev) {
+        form.addEventListener('submit', (ev) => {
             ev.preventDefault();
             ev.stopPropagation();
             if (!window.krtFetch) {
@@ -118,7 +118,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    document.querySelectorAll('.local-datetime-display').forEach(function (el) {
+    document.querySelectorAll('.local-datetime-display').forEach((el) => {
         const utcMsStr = el.getAttribute('data-utc');
         if (!utcMsStr) return;
         const date = new Date(parseInt(utcMsStr, 10));
@@ -128,20 +128,20 @@ document.addEventListener('DOMContentLoaded', function () {
         const year = String(date.getFullYear()).slice(-2);
         const hours = String(date.getHours()).padStart(2, '0');
         const minutes = String(date.getMinutes()).padStart(2, '0');
-        el.textContent = day + '.' + month + '.' + year + ' ' + hours + ':' + minutes;
+        el.textContent = `${day}.${month}.${year} ${hours}:${minutes}`;
     });
 
     const filterInput = document.getElementById('filterUex');
     const systems = document.querySelectorAll('details.uex-system');
     if (filterInput) {
-        filterInput.addEventListener('input', function () {
+        filterInput.addEventListener('input', () => {
             const q = (filterInput.value || '').trim().toLowerCase();
-            systems.forEach(function (sysEl) {
+            systems.forEach((sysEl) => {
                 const sysName = (sysEl.getAttribute('data-system-name') || '').toLowerCase();
                 let anyMatch = false;
                 const nestedNames = sysEl.querySelectorAll('[data-name]');
                 const systemSelfMatches = q !== '' && sysName.indexOf(q) !== -1;
-                nestedNames.forEach(function (el) {
+                nestedNames.forEach((el) => {
                     const n = (el.getAttribute('data-name') || '').toLowerCase();
                     const match = q === '' || n.indexOf(q) !== -1 || systemSelfMatches;
                     el.style.display = match ? '' : 'none';

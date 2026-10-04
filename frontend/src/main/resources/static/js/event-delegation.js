@@ -17,8 +17,8 @@
      */
     function on(eventType, actionName, handler) {
         if (typeof handler !== 'function') return;
-        const selector = '[data-trigger="' + actionName + '"]';
-        document.addEventListener(eventType, function (event) {
+        const selector = `[data-trigger="${actionName}"]`;
+        document.addEventListener(eventType, (event) => {
             const target = /** @type {Element | null} */ (event.target);
             if (!target || typeof target.closest !== 'function') return;
             const matched = /** @type {HTMLElement | null} */ (target.closest(selector));
@@ -35,15 +35,15 @@
     }
 
     if (typeof window.setTimeout === 'function') {
-        window.setTimeout(function () {
+        window.setTimeout(() => {
             const stub = window.krtEvents;
             if (stub && stub._isBootstrapStub) {
                 if (typeof console !== 'undefined' && typeof console.error === 'function') {
                     console.error(
-                        '[krtEvents] event-delegation.js did not install the real handler ' +
-                            'registry — ' +
-                            (stub._queuedRegistrations || []).length +
-                            ' registration(s) are queued but inactive. Check network/CSP/cache.',
+                        `[krtEvents] event-delegation.js did not install the real handler ` +
+                            `registry — ${
+                                (stub._queuedRegistrations || []).length
+                            } registration(s) are queued but inactive. Check network/CSP/cache.`,
                     );
                 }
             }

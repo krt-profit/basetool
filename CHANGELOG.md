@@ -183,6 +183,13 @@
 
 ### Changed
 
+- **Auswahlfelder nach abgelaufener Sitzung führen zur Anmeldung.** Ist die Sitzung abgelaufen, zeigt
+  eine Mitglieder-, Material- oder Kontosuche nicht mehr stumm „keine Treffer", sondern leitet zur
+  Anmeldung weiter; dasselbe gilt für alle anderen nachgeladenen Listen und Downloads. Alle Lesezugriffe
+  laufen über `krtFetch.get` / `getJson` (REQ-FE-031).
+- **Unterstützte Browser: Chrome 122, Firefox 131, Safari/iOS 18.4 oder neuer** („Baseline 2025",
+  ADR-0239). Typprüfung und ESLint prüfen die Skripte jetzt auf ES2025 (REQ-FE-018).
+
 - **Gewinnberechnung: Ort des Terminals in der Route.** Der Ort steht jetzt in Klammern hinter dem
   Terminal („Kauf TDD (Hurston · Lorville) · 20") statt nur im Tooltip, damit er auch auf dem
   Smartphone sichtbar ist (REQ-UI-027).

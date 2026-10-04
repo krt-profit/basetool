@@ -21,7 +21,7 @@ const java = readFileSync(source, 'utf8');
 const declAt = java.indexOf('String PROBE_JS');
 if (declAt === -1) {
     console.error(
-        'extract-probe-js: no `String PROBE_JS` in ' + source + ' — has the probe been renamed?',
+        `extract-probe-js: no \`String PROBE_JS\` in ${source} — has the probe been renamed?`,
     );
     process.exit(1);
 }
@@ -46,7 +46,7 @@ let js = java.slice(opening + 3, closing);
 const placeholders = js.match(/%./g) ?? [];
 const unknown = placeholders.filter((p) => p !== '%d' && p !== '%s');
 if (unknown.length > 0) {
-    console.error('extract-probe-js: unsupported format placeholders: ' + unknown.join(', '));
+    console.error(`extract-probe-js: unsupported format placeholders: ${unknown.join(', ')}`);
     process.exit(1);
 }
 js = js.replaceAll('%d', '0').replace(/(.?)%s(.?)/gs, (_match, before, after) => {
@@ -60,13 +60,9 @@ js = js.replaceAll('%d', '0').replace(/(.?)%s(.?)/gs, (_match, before, after) =>
 js = js.replace(/\\([\\"])/g, '$1');
 
 mkdirSync(dirname(target), { recursive: true });
-writeFileSync(target, 'export const probe = ' + js.trim() + ';\n', 'utf8');
+writeFileSync(target, `export const probe = ${js.trim()};\n`, 'utf8');
 console.log(
-    'extract-probe-js: wrote ' +
-        target +
-        ' (' +
-        js.length +
-        ' chars, ' +
-        placeholders.length +
-        ' placeholders substituted)',
+    `extract-probe-js: wrote ${target} (${js.length} chars, ${
+        placeholders.length
+    } placeholders substituted)`,
 );

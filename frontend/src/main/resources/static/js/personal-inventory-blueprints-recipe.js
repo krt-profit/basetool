@@ -144,7 +144,7 @@
     }
 
     function visibleRows() {
-        return rows().filter(function (r) {
+        return rows().filter((r) => {
             return !r.hidden;
         });
     }
@@ -200,16 +200,15 @@
         const dict = i18n();
         const label = window.krtI18nText(dict.sourceLabel, 'krtBlueprintsRecipeI18n.sourceLabel');
         const name = window.krtI18nText(
-            dict['source' + source],
-            'krtBlueprintsRecipeI18n.source' + source,
+            dict[`source${source}`],
+            `krtBlueprintsRecipeI18n.source${source}`,
         );
         const via = client
-            ? ' ' +
-              window.krtI18nText(dict.sourceVia, 'krtBlueprintsRecipeI18n.sourceVia') +
-              ' ' +
-              client
+            ? ` ${window.krtI18nText(dict.sourceVia, 'krtBlueprintsRecipeI18n.sourceVia')} ${
+                  client
+              }`
             : '';
-        return label + ': ' + name + via;
+        return `${label}: ${name}${via}`;
     }
 
     /**
@@ -226,10 +225,10 @@
         }
         const client = clientName || clientId;
         const name = window.krtI18nText(
-            i18n()['source' + source],
-            'krtBlueprintsRecipeI18n.source' + source,
+            i18n()[`source${source}`],
+            `krtBlueprintsRecipeI18n.source${source}`,
         );
-        return client ? name + ' · ' + client : name;
+        return client ? `${name} · ${client}` : name;
     }
 
     function renderDetailHead(row) {
@@ -251,9 +250,10 @@
         nameEl.textContent = name;
         const formatted = formatAcquired(acquired, false);
         acquiredEl.textContent = formatted
-            ? window.krtI18nText(i18n().acquiredLabel, 'krtBlueprintsRecipeI18n.acquiredLabel') +
-              ' ' +
-              formatted
+            ? `${window.krtI18nText(
+                  i18n().acquiredLabel,
+                  'krtBlueprintsRecipeI18n.acquiredLabel',
+              )} ${formatted}`
             : '';
         acquiredEl.title = formatAcquired(acquired, true);
         acquiredEl.hidden = !formatted;
@@ -264,7 +264,7 @@
             sourceEl.hidden = !sourceText;
         }
 
-        [editBtn, deleteBtn].forEach(function (btn) {
+        [editBtn, deleteBtn].forEach((btn) => {
             if (!btn) {
                 return;
             }
@@ -306,14 +306,9 @@
                 window.krtI18nText(i18n().loading, 'krtBlueprintsRecipeI18n.loading'),
             ),
         );
-        fetch(resolveUrl(endpoints().recipe, id), {
-            credentials: 'same-origin',
-            headers: { Accept: 'application/json' },
-        })
-            .then(function (resp) {
-                return resp.ok ? resp.json() : null;
-            })
-            .then(function (recipe) {
+        window.krtFetch
+            .getJson(resolveUrl(endpoints().recipe, id))
+            .then((recipe) => {
                 if (!recipe) {
                     showError();
                     return;
@@ -323,7 +318,7 @@
                     renderRecipe(recipe);
                 }
             })
-            .catch(function () {
+            .catch(() => {
                 showError();
             });
     }
@@ -361,23 +356,24 @@
         }
 
         if (recipe.variantCount > 1) {
-            const hint =
-                recipe.variantCount +
-                ' ' +
-                window.krtI18nText(i18n().variants, 'krtBlueprintsRecipeI18n.variants') +
-                ' · ' +
-                window.krtI18nText(i18n().exampleRecipe, 'krtBlueprintsRecipeI18n.exampleRecipe');
+            const hint = `${recipe.variantCount} ${window.krtI18nText(
+                i18n().variants,
+                'krtBlueprintsRecipeI18n.variants',
+            )} · ${window.krtI18nText(
+                i18n().exampleRecipe,
+                'krtBlueprintsRecipeI18n.exampleRecipe',
+            )}`;
             recipeEl.appendChild(el('p', 'krt-bp-recipe-variants', hint));
         }
 
         if (groups.length > 0) {
             const pane = recipeEl;
-            groups.forEach(function (g, idx) {
+            groups.forEach((g, idx) => {
                 pane.appendChild(renderQualityBlock(g, idx));
             });
         } else {
             const block = el('div', 'quality-block');
-            flat.forEach(function (ing) {
+            flat.forEach((ing) => {
                 block.appendChild(renderIngredientLine(ing));
             });
             const affects = el('div', 'quality-affects');
@@ -397,7 +393,7 @@
         const ings = group.ingredients || [];
         let firstIngredientName = '';
         if (ings.length > 0) {
-            ings.forEach(function (ing, idx) {
+            ings.forEach((ing, idx) => {
                 if (idx === 0) {
                     firstIngredientName = ing.name || '';
                 }
@@ -408,7 +404,7 @@
         }
 
         const mods = group.modifiers || [];
-        const banded = mods.filter(function (m) {
+        const banded = mods.filter((m) => {
             return (
                 m.effectiveQualityMin != null &&
                 m.effectiveQualityMax != null &&
@@ -426,9 +422,9 @@
         }
 
         const chips = [];
-        mods.forEach(function (m) {
+        mods.forEach((m) => {
             const chip = el('span', 'chip');
-            chip.appendChild(el('span', null, (m.label || m.propertyKey || '') + ' '));
+            chip.appendChild(el('span', null, `${m.label || m.propertyKey || ''} `));
             const valueOut = el('output', null, '×?');
             chip.appendChild(valueOut);
             const bw = betterWhenText(m.betterWhen);
@@ -442,13 +438,13 @@
         if (banded.length > 0) {
             const qmin = Math.min.apply(
                 null,
-                banded.map(function (m) {
+                banded.map((m) => {
                     return m.effectiveQualityMin;
                 }),
             );
             const qmax = Math.max.apply(
                 null,
-                banded.map(function (m) {
+                banded.map((m) => {
                     return m.effectiveQualityMax;
                 }),
             );
@@ -477,14 +473,14 @@
             range.setAttribute(
                 'aria-label',
                 window.krtI18nText(i18n().qualityAria, 'krtBlueprintsRecipeI18n.qualityAria') +
-                    (firstIngredientName ? ' ' + firstIngredientName : ''),
+                    (firstIngredientName ? ` ${firstIngredientName}` : ''),
             );
             qrow.appendChild(range);
             const qval = el('span', 'quality-value');
             const qOut = el('output', null, String(Math.round(defaultQ)));
             qval.appendChild(qOut);
             const qMaxSmall = document.createElement('small');
-            qMaxSmall.textContent = ' / ' + Math.round(qmax);
+            qMaxSmall.textContent = ` / ${Math.round(qmax)}`;
             qval.appendChild(qMaxSmall);
             qrow.appendChild(qval);
             block.appendChild(qrow);
@@ -496,30 +492,30 @@
             }
             if (banded[0] && banded[0].modifierAtMaxQuality != null) {
                 hintParts.push(
-                    Math.round(qmax) + ' → ×' + Number(banded[0].modifierAtMaxQuality).toFixed(2),
+                    `${Math.round(qmax)} → ×${Number(banded[0].modifierAtMaxQuality).toFixed(2)}`,
                 );
             }
             if (hintParts.length > 0) {
                 const hint = document.createElement('small');
-                hint.textContent = '(' + hintParts.join(' · ') + ')';
+                hint.textContent = `(${hintParts.join(' · ')})`;
                 affects.appendChild(hint);
             }
 
             function compute() {
                 const q = parseFloat(range.value);
                 qOut.textContent = String(Math.round(q));
-                range.setAttribute('aria-valuetext', Math.round(q) + ' / ' + Math.round(qmax));
-                chips.forEach(function (c) {
+                range.setAttribute('aria-valuetext', `${Math.round(q)} / ${Math.round(qmax)}`);
+                chips.forEach((c) => {
                     const value = computeModifierValue(c.modifier, q);
-                    c.out.textContent = '×' + (value == null ? '?' : value.toFixed(2));
+                    c.out.textContent = `×${value == null ? '?' : value.toFixed(2)}`;
                 });
             }
             range.addEventListener('input', compute);
             compute();
         } else {
-            chips.forEach(function (c) {
+            chips.forEach((c) => {
                 const v = c.modifier.modifierAtMaxQuality;
-                c.out.textContent = v == null ? '–' : '×' + Number(v).toFixed(2);
+                c.out.textContent = v == null ? '–' : `×${Number(v).toFixed(2)}`;
             });
         }
 
@@ -535,24 +531,24 @@
         const metaParts = [];
         if (ing.quantityScu != null) {
             if (ing.quantityType === 'PIECE') {
-                metaParts.push(Math.round(Number(ing.quantityScu)) + ' ' + unitLabel('PIECE'));
+                metaParts.push(`${Math.round(Number(ing.quantityScu))} ${unitLabel('PIECE')}`);
             } else {
-                metaParts.push(Number(ing.quantityScu).toFixed(2) + ' ' + unitLabel('SCU'));
+                metaParts.push(`${Number(ing.quantityScu).toFixed(2)} ${unitLabel('SCU')}`);
             }
         }
         if (ing.quantityUnits != null) {
-            metaParts.push(ing.quantityUnits + 'x');
+            metaParts.push(`${ing.quantityUnits}x`);
         }
         if (ing.minQuality != null) {
             metaParts.push(
-                window.krtI18nText(i18n().minQuality, 'krtBlueprintsRecipeI18n.minQuality') +
-                    ' ' +
-                    ing.minQuality,
+                `${window.krtI18nText(i18n().minQuality, 'krtBlueprintsRecipeI18n.minQuality')} ${
+                    ing.minQuality
+                }`,
             );
         }
         if (metaParts.length > 0) {
             const small = document.createElement('small');
-            small.textContent = ' · ' + metaParts.join(' · ');
+            small.textContent = ` · ${metaParts.join(' · ')}`;
             line.appendChild(small);
         }
         return line;
@@ -643,16 +639,15 @@
         }
         const sep = url.indexOf('?') === -1 ? '?' : '&';
         const target = window.safeSameOriginUrl
-            ? window.safeSameOriginUrl(url + sep + 'includeRefinery=true', url)
-            : url + sep + 'includeRefinery=true';
-        fetch(target, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-            .then(function (resp) {
-                return resp.ok ? resp.json() : null;
-            })
-            .then(function (list) {
+            ? window.safeSameOriginUrl(`${url + sep}includeRefinery=true`, url)
+            : `${url + sep}includeRefinery=true`;
+        window.krtFetch
+            .getJson(target)
+            .catch(() => null)
+            .then((list) => {
                 craftabilityById.clear();
                 if (Array.isArray(list)) {
-                    list.forEach(function (c) {
+                    list.forEach((c) => {
                         if (c && c.blueprintId) {
                             craftabilityById.set(c.blueprintId, c);
                         }
@@ -673,7 +668,7 @@
                     });
                 }
             })
-            .catch(function () {});
+            .catch(() => {});
     }
 
     /**
@@ -748,7 +743,7 @@
     }
 
     function decorateRows() {
-        rows().forEach(function (r) {
+        rows().forEach((r) => {
             const id = attr(r, 'data-id');
             let aside = r.querySelector('.krt-bp-row-aside');
             if (!aside) {
@@ -785,7 +780,7 @@
         if (!countEl) {
             return;
         }
-        const craftable = rows().filter(function (r) {
+        const craftable = rows().filter((r) => {
             return isRowCraftable(attr(r, 'data-id'));
         }).length;
         countEl.textContent = String(craftable);
@@ -801,7 +796,7 @@
     function renderKpi(data) {
         const dict = i18n();
         const state = craftState(data);
-        const kpi = el('div', 'krt-bp-kpi krt-bp-kpi--' + state);
+        const kpi = el('div', `krt-bp-kpi krt-bp-kpi--${state}`);
         kpi.setAttribute('data-testid', 'bp-craft-kpi');
         const body = el('span', 'krt-bp-kpi__body');
         if (state === 'na') {
@@ -837,9 +832,9 @@
             : data.limitingMaterialName;
         if (limit) {
             parts.push(
-                window.krtI18nText(dict.limitedBy, 'krtBlueprintsRecipeI18n.limitedBy') +
-                    ' ' +
-                    limit,
+                `${window.krtI18nText(dict.limitedBy, 'krtBlueprintsRecipeI18n.limitedBy')} ${
+                    limit
+                }`,
             );
         }
         if (refineryOn) {
@@ -913,12 +908,12 @@
         head.appendChild(headRow);
         table.appendChild(head);
         const body = el('tbody');
-        materials.forEach(function (m) {
+        materials.forEach((m) => {
             const avail = refineryOn ? m.availableScuWithRefinery : m.availableScu;
             const missing = refineryOn ? m.missingScuWithRefinery : m.missingScu;
             const eff = refineryOn ? m.effectiveQualityWithRefinery : m.effectiveQuality;
             const qt = m.quantityType;
-            const unit = ' ' + unitLabel(qt);
+            const unit = ` ${unitLabel(qt)}`;
             const row = el('tr');
             row.appendChild(el('td', 'cell-title', m.materialName || '?'));
             const need = el('td', 'num', fmtAmount(m.requiredScu, qt) + unit);
@@ -932,7 +927,7 @@
             }
             const stock = el(
                 'td',
-                'num krt-bp-ing-stock ' + stockState,
+                `num krt-bp-ing-stock ${stockState}`,
                 fmtAmount(avail, qt) + unit,
             );
             stock.setAttribute('data-label', dict.colStock || '');
@@ -950,7 +945,7 @@
             const fill = el('i', 'krt-bp-quality-fill');
             const percent = eff == null ? 0 : Math.max(0, Math.min(100, Number(eff) / 10));
             fill.setAttribute('data-krtm-width', String(percent));
-            fill.style.width = percent + '%';
+            fill.style.width = `${percent}%`;
             meter.appendChild(fill);
             wrap.appendChild(meter);
             wrap.appendChild(
@@ -1079,7 +1074,7 @@
         }
         const q = filterInput ? (filterInput.value || '').trim().toLowerCase() : '';
         let shown = 0;
-        rows().forEach(function (r) {
+        rows().forEach((r) => {
             const matchesSearch = q === '' || attr(r, 'data-name').toLowerCase().indexOf(q) !== -1;
             const matchesCraft = !craftableOnly || isRowCraftable(attr(r, 'data-id'));
             r.hidden = !(matchesSearch && matchesCraft);
@@ -1135,7 +1130,7 @@
                 refineryToggle.dataset.wired = '1';
             }
         }
-        document.querySelectorAll('input[name="bpScope"]').forEach(function (input) {
+        document.querySelectorAll('input[name="bpScope"]').forEach((input) => {
             const scope = /** @type {HTMLInputElement} */ (input);
             if (!scope.dataset.wired) {
                 scope.addEventListener('change', onScopeChange);
@@ -1147,7 +1142,7 @@
             filterInput.addEventListener('input', applyClientFilter);
             const filterForm = filterInput.closest('form');
             if (filterForm) {
-                filterForm.addEventListener('submit', function (e) {
+                filterForm.addEventListener('submit', (e) => {
                     e.preventDefault();
                     applyClientFilter();
                 });
@@ -1176,9 +1171,9 @@
         backBtn = document.getElementById('krt-bp-detail-back');
         detailCraftEl = document.getElementById('krt-bp-detail-craft');
 
-        rows().forEach(function (r) {
+        rows().forEach((r) => {
             r.tabIndex = -1;
-            r.addEventListener('click', function () {
+            r.addEventListener('click', () => {
                 select(r, { showDetail: true });
             });
         });
@@ -1186,7 +1181,7 @@
             rowsEl.addEventListener('keydown', onListKeydown);
         }
         if (backBtn) {
-            backBtn.addEventListener('click', function () {
+            backBtn.addEventListener('click', () => {
                 if (!mdEl) {
                     return;
                 }
@@ -1204,7 +1199,7 @@
         try {
             const wanted = new URLSearchParams(window.location.search).get('bp');
             if (wanted && rowsEl) {
-                initial = rows().find(function (r) {
+                initial = rows().find((r) => {
                     return attr(r, 'data-id') === wanted;
                 });
                 fromDeeplink = initial != null;
@@ -1230,7 +1225,7 @@
         init();
     }
 
-    document.addEventListener('krt:swapped', function (e) {
+    document.addEventListener('krt:swapped', (e) => {
         const c = e.detail && e.detail.container;
         if (c && (c.id === 'krt-bp-list' || c.querySelector('#krt-bp-md'))) {
             activeRow = null;

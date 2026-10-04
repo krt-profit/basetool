@@ -64,7 +64,7 @@ const REFINERY_SECTIONS = {
         if (!results || !window.krtFetch) return;
         const query = queryString();
         window.krtFetch.swap({
-            url: '/refinery-orders' + (query ? '?' + query : ''),
+            url: `/refinery-orders${query ? `?${query}` : ''}`,
             container: results,
             indicator: indicator || undefined,
             history: fromUser,
@@ -94,9 +94,9 @@ const REFINERY_SECTIONS = {
         const days = Math.floor(total / 1440);
         const hours = Math.floor((total % 1440) / 60);
         const mins = total % 60;
-        if (days > 0) return hours > 0 ? days + ' d ' + hours + ' h' : days + ' d';
-        if (hours > 0) return mins > 0 ? hours + ' h ' + mins + ' min' : hours + ' h';
-        return mins + ' min';
+        if (days > 0) return hours > 0 ? `${days} d ${hours} h` : `${days} d`;
+        if (hours > 0) return mins > 0 ? `${hours} h ${mins} min` : `${hours} h`;
+        return `${mins} min`;
     }
 
     /**
@@ -107,8 +107,8 @@ const REFINERY_SECTIONS = {
      * @returns {string} the filled message
      */
     function fill(pattern, args) {
-        return args.reduce(function (text, arg, i) {
-            return text.split('{' + i + '}').join(arg);
+        return args.reduce((text, arg, i) => {
+            return text.split(`{${i}}`).join(arg);
         }, pattern);
     }
 
@@ -126,7 +126,7 @@ const REFINERY_SECTIONS = {
         const now = Date.now();
         table
             .querySelectorAll('tr[data-state="RUNNING"], tr[data-state="READY"]')
-            .forEach(function (node) {
+            .forEach((node) => {
                 const row = /** @type {HTMLElement} */ (node);
                 const endsAt = Number(row.getAttribute('data-ends-at'));
                 const startedAt = Number(row.getAttribute('data-started-at'));
@@ -154,7 +154,7 @@ const REFINERY_SECTIONS = {
                             ),
                         );
                         fillBar.setAttribute('data-krtm-width', String(percent));
-                        fillBar.style.width = percent + '%';
+                        fillBar.style.width = `${percent}%`;
                     }
                     return;
                 }
@@ -181,15 +181,15 @@ const REFINERY_SECTIONS = {
         if (!results || !form) return;
         const source = results.querySelector('[data-refinery-counts]');
         if (!source) return;
-        VIEWS.forEach(function (view) {
+        VIEWS.forEach((view) => {
             const key = view.toLowerCase();
-            const value = source.getAttribute('data-' + key);
-            const count = form.querySelector('[data-testid="segment-view-' + key + '"] .seg-count');
+            const value = source.getAttribute(`data-${key}`);
+            const count = form.querySelector(`[data-testid="segment-view-${key}"] .seg-count`);
             if (count && value !== null) count.textContent = value;
         });
     }
 
-    document.addEventListener('krt:swapped', function (event) {
+    document.addEventListener('krt:swapped', (event) => {
         const detail = /** @type {CustomEvent} */ (event).detail;
         if (detail && detail.container === results) {
             syncCounts();
@@ -216,7 +216,7 @@ const REFINERY_SECTIONS = {
      * @returns {string} the checked radio's value, or the default view
      */
     function currentView() {
-        const checked = viewInputs().filter(function (el) {
+        const checked = viewInputs().filter((el) => {
             return el.checked;
         })[0];
         return checked ? checked.value : DEFAULT_VIEW;
@@ -228,7 +228,7 @@ const REFINERY_SECTIONS = {
      * @param {string} view the view to select
      */
     function selectView(view) {
-        viewInputs().forEach(function (el) {
+        viewInputs().forEach((el) => {
             el.checked = el.value === view;
         });
     }
@@ -281,11 +281,11 @@ const REFINERY_SECTIONS = {
         if (typeof saved.view === 'string' && VIEWS.indexOf(saved.view) >= 0) return saved.view;
         if (!Array.isArray(saved.statuses)) return null;
         /** @type {string[]} */
-        const statuses = saved.statuses.filter(function (/** @type {unknown} */ s) {
+        const statuses = saved.statuses.filter((/** @type {unknown} */ s) => {
             return typeof s === 'string';
         });
         if (statuses.length === 0) return DEFAULT_VIEW;
-        const openOnly = statuses.every(function (s) {
+        const openOnly = statuses.every((s) => {
             return s === 'OPEN' || s === 'IN_PROGRESS';
         });
         if (openOnly) return 'RUNNING';
@@ -323,22 +323,22 @@ const REFINERY_SECTIONS = {
         }
     }
 
-    form.addEventListener('submit', function (event) {
+    form.addEventListener('submit', (event) => {
         event.preventDefault();
         clearTimeout(debounceTimer);
         load(true);
     });
 
-    form.addEventListener('input', function (event) {
+    form.addEventListener('input', (event) => {
         const target = /** @type {HTMLInputElement | null} */ (event.target);
         if (!target || target.type !== 'search') return;
         clearTimeout(debounceTimer);
-        debounceTimer = window.setTimeout(function () {
+        debounceTimer = window.setTimeout(() => {
             load(true);
         }, 300);
     });
 
-    form.addEventListener('change', function (event) {
+    form.addEventListener('change', (event) => {
         const target = /** @type {HTMLInputElement | null} */ (event.target);
         if (!target || target.type === 'search') return;
         persist();

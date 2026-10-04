@@ -63,7 +63,7 @@ const ORDER_SECTIONS = {
         keys: { refreshErrorKey: 'orders.section.refresh.error' },
         sections: ORDER_SECTIONS,
         pageUrl() {
-            return window.orderId ? '/orders/' + window.orderId : null;
+            return window.orderId ? `/orders/${window.orderId}` : null;
         },
         broadcast(keys) {
             if (
@@ -71,7 +71,7 @@ const ORDER_SECTIONS = {
                 window.krtLiveSync &&
                 typeof window.krtLiveSync.sendChanged === 'function'
             ) {
-                window.krtLiveSync.sendChanged('order:' + window.orderId, keys);
+                window.krtLiveSync.sendChanged(`order:${window.orderId}`, keys);
             }
         },
     });
@@ -80,7 +80,7 @@ const ORDER_SECTIONS = {
 
     if (window.orderId && window.krtLiveSync && window.krtLiveSync.createReceiver) {
         window.krtLiveSync.createReceiver({
-            topic: 'order:' + window.orderId,
+            topic: `order:${window.orderId}`,
             sections: ORDER_SECTIONS,
             refresh(keys) {
                 if (window.krtRefreshOrderSection) {
@@ -106,37 +106,32 @@ function _publishOrdersQueue() {
 
 function _serializeHandoverForm() {
     const items = [];
-    document
-        .querySelectorAll('#handover-items-container .handover-item-row')
-        .forEach(function (row) {
-            const sel = row.querySelector('select[name$=".inventoryItemId"]');
-            const amtInput = row.querySelector('input[name$=".amount"]');
-            const inventoryItemId = sel ? sel.value : '';
-            const amount =
-                amtInput && window.krtScuInput
-                    ? window.krtScuInput.parse(amtInput.value)
-                    : amtInput
-                      ? parseFloat(amtInput.value)
-                      : NaN;
-            if (!inventoryItemId || !(amount > 0)) return;
-            const tierSel = /** @type {HTMLSelectElement | null} */ (
-                row.querySelector('select[data-role="handover-tier"]')
-            );
-            const tierHolder = row.querySelector('[data-role="handover-tier-holder"]');
-            const qualityRequirement =
-                tierSel &&
-                tierHolder &&
-                !tierHolder.classList.contains('is-hidden') &&
-                tierSel.value
-                    ? tierSel.value
-                    : null;
-            items.push({
-                inventoryItemId,
-                amount,
-                missionReductions: _collectHandoverMissionReductions(row),
-                qualityRequirement,
-            });
+    document.querySelectorAll('#handover-items-container .handover-item-row').forEach((row) => {
+        const sel = row.querySelector('select[name$=".inventoryItemId"]');
+        const amtInput = row.querySelector('input[name$=".amount"]');
+        const inventoryItemId = sel ? sel.value : '';
+        const amount =
+            amtInput && window.krtScuInput
+                ? window.krtScuInput.parse(amtInput.value)
+                : amtInput
+                  ? parseFloat(amtInput.value)
+                  : NaN;
+        if (!inventoryItemId || !(amount > 0)) return;
+        const tierSel = /** @type {HTMLSelectElement | null} */ (
+            row.querySelector('select[data-role="handover-tier"]')
+        );
+        const tierHolder = row.querySelector('[data-role="handover-tier-holder"]');
+        const qualityRequirement =
+            tierSel && tierHolder && !tierHolder.classList.contains('is-hidden') && tierSel.value
+                ? tierSel.value
+                : null;
+        items.push({
+            inventoryItemId,
+            amount,
+            missionReductions: _collectHandoverMissionReductions(row),
+            qualityRequirement,
         });
+    });
     return {
         handoverTime: (document.getElementById('handoverTime') || {}).value || '',
         recipientHandle: (document.getElementById('recipientHandle') || {}).value || '',
@@ -147,7 +142,7 @@ function _serializeHandoverForm() {
 
 function _serializeItemHandoverForm() {
     const entries = [];
-    document.querySelectorAll('#item-handover-modal .item-handover-line').forEach(function (line) {
+    document.querySelectorAll('#item-handover-modal .item-handover-line').forEach((line) => {
         const idInput = line.querySelector('input[name$=".jobOrderItemId"]');
         const amtInput = line.querySelector('input[name$=".amount"]');
         const jobOrderItemId = idInput ? idInput.value : '';
@@ -218,14 +213,12 @@ async function _loadHandoverTierSuggestions(materialIds, orderId) {
         const tiers = _orderTiersForMaterial(materialId);
         if (tiers.length < 2) continue;
         try {
-            const res = await fetch(
-                '/orders/' + orderId + '/materials/' + materialId + '/attribution',
-                { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } },
+            const entries = await window.krtFetch.getJson(
+                `/orders/${orderId}/materials/${materialId}/attribution`,
             );
-            if (!res.ok) continue;
             /** @type {Map<string, {code: string, amount: number}>} */
             const best = new Map();
-            for (const entry of await res.json()) {
+            for (const entry of entries) {
                 const tier = tiers.find((t) => t.id === entry.qualityTierId);
                 if (!tier) continue;
                 const current = best.get(entry.inventoryItemId);
@@ -291,9 +284,9 @@ async function openHandoverModal() {
                 const orderId = row.dataset.orderId;
                 const matId = row.dataset.materialId;
                 if (orderId && matId) {
-                    return fetch(`/orders/${orderId}/materials/${matId}/inventory`).then((res) =>
-                        res.json(),
-                    );
+                    return window.krtFetch
+                        .getJson(`/orders/${orderId}/materials/${matId}/inventory`)
+                        .catch(() => []);
                 }
                 return Promise.resolve([]);
             });
@@ -325,8 +318,8 @@ async function openHandoverModal() {
  * @returns {string} the filled-in text
  */
 function fillPlaceholders(template, values) {
-    return values.reduce(function (text, value, i) {
-        return text.split('{' + i + '}').join(value == null ? '' : String(value));
+    return values.reduce((text, value, i) => {
+        return text.split(`{${i}}`).join(value == null ? '' : String(value));
     }, template);
 }
 
@@ -359,7 +352,7 @@ function addHandoverItemRow() {
                 formattedAmount,
                 qtyLabel,
                 userName,
-            ]) + (inv.stolen ? ' · ' + MSG_STOLEN : '');
+            ]) + (inv.stolen ? ` · ${MSG_STOLEN}` : '');
         options += `<option value="${escapeAttr(inv.id)}">${escapeHtml(optionLabel)}</option>`;
     });
 
@@ -398,12 +391,12 @@ function addHandoverItemRow() {
             if (qt === 'PIECE') {
                 amtInput.setAttribute('step', '1');
                 amtInput.setAttribute('min', '1');
-                if (unitSpan) unitSpan.textContent = '(' + labelPiece + ')';
+                if (unitSpan) unitSpan.textContent = `(${labelPiece})`;
                 if (rowScuHint) rowScuHint.classList.add('is-hidden');
             } else if (qt === 'SCU') {
                 amtInput.setAttribute('step', '0.001');
                 amtInput.setAttribute('min', '0.001');
-                if (unitSpan) unitSpan.textContent = '(' + labelScu + ')';
+                if (unitSpan) unitSpan.textContent = `(${labelScu})`;
                 if (rowScuHint) rowScuHint.classList.remove('is-hidden');
             } else {
                 amtInput.setAttribute('step', '0.001');
@@ -479,7 +472,7 @@ function _refreshHandoverMissionPicker(row) {
             const max = document.createElement('span');
             max.style.fontSize = '0.7rem';
             max.style.color = 'var(--color-gray-2-text)';
-            max.textContent = '/ ' + _handoverFmtAmount(m.amount, isPiece);
+            max.textContent = `/ ${_handoverFmtAmount(m.amount, isPiece)}`;
             line.appendChild(name);
             line.appendChild(input);
             line.appendChild(max);
@@ -593,8 +586,8 @@ function updateHandoverIndexes() {
     rows.forEach((row, index) => {
         const select = row.querySelector('select');
         const input = row.querySelector('input');
-        if (select) select.name = 'items[' + index + '].inventoryItemId';
-        if (input) input.name = 'items[' + index + '].amount';
+        if (select) select.name = `items[${index}].inventoryItemId`;
+        if (input) input.name = `items[${index}].amount`;
     });
 }
 
@@ -616,7 +609,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             await krtOrderWrite({
                 method: 'POST',
-                url: '/orders/' + orderId + '/handovers',
+                url: `/orders/${orderId}/handovers`,
                 payload,
                 toast: false,
                 errorMessage: MSG_HANDOVER_FAILED,
@@ -658,7 +651,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             await krtOrderWrite({
                 method: 'POST',
-                url: '/orders/' + orderId + '/item-handovers',
+                url: `/orders/${orderId}/item-handovers`,
                 payload,
                 toast: false,
                 errorMessage: MSG_HANDOVER_FAILED,
@@ -758,12 +751,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (qt === 'PIECE') {
                 amountInput.setAttribute('step', '1');
                 amountInput.setAttribute('min', '1');
-                if (unitSpan) unitSpan.textContent = '(' + MSG_UNIT_PIECE + ')';
+                if (unitSpan) unitSpan.textContent = `(${MSG_UNIT_PIECE})`;
                 if (hint) hint.classList.add('is-hidden');
             } else if (qt === 'SCU') {
                 amountInput.setAttribute('step', '0.001');
                 amountInput.setAttribute('min', '0.001');
-                if (unitSpan) unitSpan.textContent = '(' + MSG_UNIT_SCU + ')';
+                if (unitSpan) unitSpan.textContent = `(${MSG_UNIT_SCU})`;
                 if (hint) hint.classList.remove('is-hidden');
             } else {
                 amountInput.setAttribute('step', '0.001');
@@ -783,7 +776,7 @@ document.addEventListener('DOMContentLoaded', () => {
             fragment.querySelectorAll('select, input').forEach((field) => {
                 const name = field.getAttribute('name');
                 if (name) {
-                    field.setAttribute('name', name.replace(/\[\d+\]/, '[' + nextIndex + ']'));
+                    field.setAttribute('name', name.replace(/\[\d+\]/, `[${nextIndex}]`));
                 }
             });
             materialsContainer.appendChild(fragment);
@@ -830,7 +823,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 inputs.forEach((input) => {
                     const name = input.getAttribute('name');
                     if (name) {
-                        input.setAttribute('name', name.replace(/\[\d+\]/, '[' + index + ']'));
+                        input.setAttribute('name', name.replace(/\[\d+\]/, `[${index}]`));
                         if (input.getAttribute('id')) {
                             input.setAttribute(
                                 'id',
@@ -862,7 +855,7 @@ function krtOrderWrite(opts) {
 (function () {
     const form = document.getElementById('delete-order-form');
     if (!form) return;
-    form.addEventListener('submit', async function (e) {
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const orderId = form.getAttribute('data-order-id');
         if (!orderId || typeof window.showKrtConfirm !== 'function' || !window.krtFetch) {
@@ -878,7 +871,7 @@ function krtOrderWrite(opts) {
         if (!ok) return;
         const res = await krtOrderWrite({
             method: 'DELETE',
-            url: '/orders/' + orderId,
+            url: `/orders/${orderId}`,
             toast: false,
             errorMessage: MSG_DELETE_ERROR,
         });
@@ -891,7 +884,7 @@ function krtOrderWrite(opts) {
 
 function _serializeEditForm() {
     const materials = [];
-    document.querySelectorAll('#materials-container .material-row').forEach(function (row) {
+    document.querySelectorAll('#materials-container .material-row').forEach((row) => {
         const matSel = row.querySelector('[name$=".materialId"]');
         const qualSel = row.querySelector('[name$=".minQuality"]');
         const amtInput = row.querySelector('[name$=".amount"]');
@@ -921,7 +914,7 @@ function _serializeEditForm() {
 (function () {
     const form = document.getElementById('edit-order-form');
     if (!form) return;
-    form.addEventListener('submit', async function (e) {
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const orderId = form.getAttribute('data-order-id');
         if (!orderId || !window.krtFetch) {
@@ -935,8 +928,8 @@ function _serializeEditForm() {
         }
         const requesterView = form.getAttribute('data-requester-view') === 'true';
         const updateUrl = requesterView
-            ? '/orders/' + orderId + '/requested-update'
-            : '/orders/' + orderId + '/update';
+            ? `/orders/${orderId}/requested-update`
+            : `/orders/${orderId}/update`;
         await krtOrderWrite({
             method: 'POST',
             url: updateUrl,
@@ -961,14 +954,14 @@ function _refreshMaterialsSection(orderId, broadcastOpts) {
     if (window.krtRefreshOrderSection) {
         return window.krtRefreshOrderSection(['materials', 'aggregated', 'kpi'], broadcastOpts);
     }
-    orderId = orderId || window.orderId || (document.getElementById('claim-order-id') || {}).value;
+    orderId ||= window.orderId || (document.getElementById('claim-order-id') || {}).value;
     const mat = document.getElementById('order-materials-results');
     const agg = document.getElementById('order-aggregated-results');
     const container = mat || agg;
     if (!orderId || !container || !window.krtFetch || !window.krtFetch.swap)
         return Promise.resolve(false);
     return window.krtFetch.swap({
-        url: '/orders/' + orderId,
+        url: `/orders/${orderId}`,
         container,
         fragmentValue: mat ? 'materials' : 'aggregated',
         history: false,
@@ -983,7 +976,7 @@ function _swapOrderSection(orderId, containerId, fragmentValue, broadcastOpts) {
     const c = document.getElementById(containerId);
     if (!c || !orderId || !window.krtFetch || !window.krtFetch.swap) return Promise.resolve(false);
     return window.krtFetch.swap({
-        url: '/orders/' + orderId,
+        url: `/orders/${orderId}`,
         container: c,
         fragmentValue,
         history: false,
@@ -997,7 +990,7 @@ async function unlinkInventoryItem(btn) {
     if (!orderId || !invId) return;
     await krtOrderWrite({
         method: 'DELETE',
-        url: '/orders/' + orderId + '/inventory/' + invId + '/unlink/ajax',
+        url: `/orders/${orderId}/inventory/${invId}/unlink/ajax`,
         toast: false,
         errorMessage: MSG_INVENTORY_UNLINK_ERROR,
         onSuccess(data) {
@@ -1022,7 +1015,7 @@ function _openClaimModal(opts) {
     const open = parseFloat(opts.open || '0') || 0;
     const qualityLabel = opts.qualityLabel || opts.quality || '';
     document.getElementById('claim-modal-bucket').textContent =
-        (opts.materialName || '') + ' — ' + qualityLabel;
+        `${opts.materialName || ''} — ${qualityLabel}`;
     if (opts.edit) {
         document.getElementById('claim-modal-title').textContent = MSG_CLAIM_TITLE_EDIT;
         sel.value = opts.squadronId || '';
@@ -1030,7 +1023,7 @@ function _openClaimModal(opts) {
         amountInput.value = opts.amount || '';
         const maxEdit = open + (parseFloat(opts.amount || '0') || 0);
         document.getElementById('claim-max').value = maxEdit;
-        document.getElementById('claim-open-hint').textContent = MSG_CLAIM_MAX_HINT + ' ' + maxEdit;
+        document.getElementById('claim-open-hint').textContent = `${MSG_CLAIM_MAX_HINT} ${maxEdit}`;
         document.getElementById('claim-withdraw-btn').hidden = false;
     } else {
         document.getElementById('claim-modal-title').textContent = MSG_CLAIM_TITLE_ADD;
@@ -1038,7 +1031,7 @@ function _openClaimModal(opts) {
         sel.disabled = false;
         amountInput.value = '';
         document.getElementById('claim-max').value = open;
-        document.getElementById('claim-open-hint').textContent = MSG_CLAIM_MAX_HINT + ' ' + open;
+        document.getElementById('claim-open-hint').textContent = `${MSG_CLAIM_MAX_HINT} ${open}`;
         document.getElementById('claim-withdraw-btn').hidden = true;
     }
     const claimScuHint = document.getElementById('claim-scu-hint');
@@ -1094,7 +1087,7 @@ function submitClaim() {
     }
     krtOrderWrite({
         method: 'POST',
-        url: '/orders/' + orderId + '/claims',
+        url: `/orders/${orderId}/claims`,
         payload: {
             materialId,
             qualityRequirement: quality,
@@ -1119,7 +1112,7 @@ function withdrawClaimAction() {
     }
     krtOrderWrite({
         method: 'POST',
-        url: '/orders/' + orderId + '/claims/' + claimId + '/withdraw',
+        url: `/orders/${orderId}/claims/${claimId}/withdraw`,
         toast: false,
         errorMessage: MSG_CLAIM_ERROR,
         onSuccess() {
@@ -1184,7 +1177,7 @@ function _doStatusUpdate(orderId, status, selectElement) {
     const savedStatus = selectElement ? _knownStatus(selectElement) : null;
     krtOrderWrite({
         method: 'POST',
-        url: '/orders/' + orderId + '/status',
+        url: `/orders/${orderId}/status`,
         payload() {
             return { status, version: _orderVersion() };
         },
@@ -1199,7 +1192,7 @@ function _doStatusUpdate(orderId, status, selectElement) {
             if (selectElement) selectElement.dataset.savedStatus = status;
             _swapOrderSection(orderId, 'order-header-results', 'header');
             if (status === 'COMPLETED' || status === 'REJECTED') {
-                document.querySelectorAll('.inventory-details-row').forEach(function (r) {
+                document.querySelectorAll('.inventory-details-row').forEach((r) => {
                     r.remove();
                 });
                 _refreshMaterialsSection(orderId);
@@ -1207,7 +1200,7 @@ function _doStatusUpdate(orderId, status, selectElement) {
             _publishOrdersQueue();
             showFrontendSuccessToast(MSG_STATUS_SUCCESS);
         },
-    }).then(function (res) {
+    }).then((res) => {
         if (selectElement && (!res || !res.ok)) {
             selectElement.value = savedStatus;
         }
@@ -1223,7 +1216,7 @@ function _toggleBlueprintCounting(checkbox) {
     checkbox.disabled = true;
     krtOrderWrite({
         method: 'POST',
-        url: '/orders/' + orderId + '/blueprint-variant-counting',
+        url: `/orders/${orderId}/blueprint-variant-counting`,
         payload() {
             return { countBlueprintsWithVariants: desired, version: _orderVersion() };
         },
@@ -1239,7 +1232,7 @@ function _toggleBlueprintCounting(checkbox) {
             showFrontendSuccessToast(MSG_BP_COUNTING_SUCCESS);
             _swapOrderSection(orderId, 'blueprint-owners-section', 'blueprint-owners');
         },
-    }).then(function (res) {
+    }).then((res) => {
         checkbox.disabled = false;
         if (!res || !res.ok) {
             checkbox.checked = !desired;
@@ -1254,20 +1247,16 @@ async function downloadHandoverReport(btn) {
     const orderNumberRaw =
         document.getElementById('order-display-id')?.getAttribute('data-order-number') ||
         document.getElementById('order-display-id')?.textContent?.trim() ||
-        '#' + orderId;
+        `#${orderId}`;
     const orderNumber = orderNumberRaw.replace(/^#/, '');
     let dateStr = '';
     let timeStr = '';
     if (handoverTimeRaw) {
         const d = new Date(handoverTimeRaw);
-        dateStr =
-            d.getFullYear() +
-            '-' +
-            String(d.getMonth() + 1).padStart(2, '0') +
-            '-' +
-            String(d.getDate()).padStart(2, '0');
-        timeStr =
-            String(d.getHours()).padStart(2, '0') + '-' + String(d.getMinutes()).padStart(2, '0');
+        dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+            d.getDate(),
+        ).padStart(2, '0')}`;
+        timeStr = `${String(d.getHours()).padStart(2, '0')}-${String(d.getMinutes()).padStart(2, '0')}`;
     }
     const filename = fillPlaceholders(ORDER_HANDOVER_I18N.reportFilename, [
         orderNumber,
@@ -1281,14 +1270,11 @@ async function downloadHandoverReport(btn) {
         if (userTimeZone) {
             downloadHeaders['X-User-Time-Zone'] = userTimeZone;
         }
-        const response = await fetch(
-            '/api/v1/orders/' + orderId + '/handovers/' + handoverId + '/report',
-            {
-                method: 'GET',
-                headers: downloadHeaders,
-            },
+        const response = await window.krtFetch.get(
+            `/api/v1/orders/${orderId}/handovers/${handoverId}/report`,
+            { headers: downloadHeaders },
         );
-        if (!response.ok) {
+        if (!response || !response.ok) {
             showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
             return;
         }
@@ -1314,20 +1300,16 @@ async function downloadItemHandoverReport(btn) {
     const orderNumberRaw =
         document.getElementById('order-display-id')?.getAttribute('data-order-number') ||
         document.getElementById('order-display-id')?.textContent?.trim() ||
-        '#' + orderId;
+        `#${orderId}`;
     const orderNumber = orderNumberRaw.replace(/^#/, '');
     let dateStr = '';
     let timeStr = '';
     if (handoverTimeRaw) {
         const d = new Date(handoverTimeRaw);
-        dateStr =
-            d.getFullYear() +
-            '-' +
-            String(d.getMonth() + 1).padStart(2, '0') +
-            '-' +
-            String(d.getDate()).padStart(2, '0');
-        timeStr =
-            String(d.getHours()).padStart(2, '0') + '-' + String(d.getMinutes()).padStart(2, '0');
+        dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+            d.getDate(),
+        ).padStart(2, '0')}`;
+        timeStr = `${String(d.getHours()).padStart(2, '0')}-${String(d.getMinutes()).padStart(2, '0')}`;
     }
     const filename = fillPlaceholders(ORDER_HANDOVER_I18N.reportFilename, [
         orderNumber,
@@ -1341,14 +1323,11 @@ async function downloadItemHandoverReport(btn) {
         if (userTimeZone) {
             downloadHeaders['X-User-Time-Zone'] = userTimeZone;
         }
-        const response = await fetch(
-            '/api/v1/orders/' + orderId + '/item-handovers/' + handoverId + '/report',
-            {
-                method: 'GET',
-                headers: downloadHeaders,
-            },
+        const response = await window.krtFetch.get(
+            `/api/v1/orders/${orderId}/item-handovers/${handoverId}/report`,
+            { headers: downloadHeaders },
         );
-        if (!response.ok) {
+        if (!response || !response.ok) {
             showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
             return;
         }
@@ -1384,7 +1363,7 @@ async function previewHandoverReport(btn) {
     const orderNumber =
         document.getElementById('order-display-id')?.getAttribute('data-order-number') ||
         document.getElementById('order-display-id')?.textContent?.trim() ||
-        '#' + orderId;
+        `#${orderId}`;
     const datePart = document.querySelector('#handover-modal .date-part')?.value;
     const timePart = document.querySelector('#handover-modal .time-part')?.value;
     const recipientHandle = document.getElementById('recipientHandle')?.value?.trim();
@@ -1433,7 +1412,7 @@ async function previewHandoverReport(btn) {
     });
     let handoverTimeIso;
     try {
-        const localDateStr = datePart + 'T' + timePart;
+        const localDateStr = `${datePart}T${timePart}`;
         const localDate = new Date(localDateStr);
         if (isNaN(localDate.getTime())) {
             showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_DATE);
@@ -1453,7 +1432,7 @@ async function previewHandoverReport(btn) {
     if (!window.krtFetch) return;
     const result = await window.krtFetch.write({
         method: 'POST',
-        url: '/api/v1/orders/' + encodeURIComponent(orderId) + '/handovers/report/preview',
+        url: `/api/v1/orders/${encodeURIComponent(orderId)}/handovers/report/preview`,
         payload,
         accept: 'application/pdf, application/problem+json',
         responseType: 'blob',
@@ -1477,7 +1456,7 @@ async function previewHandoverReport(btn) {
         const previewOrderNumberRaw =
             document.getElementById('order-display-id')?.getAttribute('data-order-number') ||
             document.getElementById('order-display-id')?.textContent?.trim() ||
-            '#' + orderId;
+            `#${orderId}`;
         const previewOrderNumber = previewOrderNumberRaw.replace(/^#/, '');
         const previewDate = datePart;
         const previewTime = timePart ? timePart.replace(':', '-') : '';
@@ -1507,14 +1486,9 @@ async function previewHandoverReport(btn) {
 async function _loadStockAttribution(orderId, materialId, tierId) {
     if (!tierId || !orderId || !materialId) return null;
     try {
-        const res = await fetch(
-            '/orders/' + orderId + '/materials/' + materialId + '/attribution',
-            {
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-            },
+        const list = await window.krtFetch.getJson(
+            `/orders/${orderId}/materials/${materialId}/attribution`,
         );
-        if (!res.ok) return null;
-        const list = await res.json();
         /** @type {Map<string, number>} */
         const here = new Map();
         /** @type {Set<string>} */
@@ -1565,11 +1539,9 @@ async function toggleInventory(row) {
     row.parentNode.insertBefore(detailsRow, row.nextSibling);
 
     try {
-        const response = await fetch(
-            '/orders/' + orderId + '/materials/' + materialId + '/inventory',
+        const allItems = await window.krtFetch.getJson(
+            `/orders/${orderId}/materials/${materialId}/inventory`,
         );
-        if (!response.ok) throw new Error('Network response was not ok');
-        const allItems = await response.json();
         const attribution = await _loadStockAttribution(
             orderId,
             materialId,
@@ -1623,12 +1595,12 @@ async function toggleInventory(row) {
             const unit = amountType ? amountType : '';
             const counted = attribution ? attribution.here.get(item.id) : undefined;
             const total = item.amount !== null ? item.amount.toFixed(3) : '0.000';
-            let quantity = total + ' ' + unit;
+            let quantity = `${total} ${unit}`;
             if (counted !== undefined && Math.abs(counted - (item.amount || 0)) > 0.0005) {
                 quantity = MSG_INVENTORY_PART_OF.replace(
                     '{0}',
-                    counted.toFixed(3) + ' ' + unit,
-                ).replace('{1}', total + ' ' + unit);
+                    `${counted.toFixed(3)} ${unit}`,
+                ).replace('{1}', `${total} ${unit}`);
             }
             if (attribution && counted === undefined && attribution.unattributed.has(item.id)) {
                 stolenChip += ` <span class="chip chip-xs" data-testid="below-floor-chip">${escapeHtml(MSG_INVENTORY_BELOW_FLOOR)}</span>`;
@@ -1709,7 +1681,7 @@ async function toggleInventory(row) {
      * @returns {HTMLElement[]} the visible tabs in order
      */
     function visibleTabs() {
-        return tabs.filter(function (t) {
+        return tabs.filter((t) => {
             return !t.hidden;
         });
     }
@@ -1720,20 +1692,20 @@ async function toggleInventory(row) {
      * @returns {string[]} the tab keys
      */
     function validKeysNow() {
-        return visibleTabs().map(function (t) {
+        return visibleTabs().map((t) => {
             return t.getAttribute('data-tab');
         });
     }
 
     function apply(key) {
-        tabs.forEach(function (t) {
+        tabs.forEach((t) => {
             const on = t.getAttribute('data-tab') === key;
             t.classList.toggle('active', on);
             t.setAttribute('aria-selected', String(on));
             t.tabIndex = on ? 0 : -1;
         });
-        document.querySelectorAll('.tab-panes .tab-pane').forEach(function (p) {
-            p.classList.toggle('on', p.id === 'pane-' + key);
+        document.querySelectorAll('.tab-panes .tab-pane').forEach((p) => {
+            p.classList.toggle('on', p.id === `pane-${key}`);
         });
         try {
             localStorage.setItem(storeKey, key);
@@ -1774,12 +1746,12 @@ async function toggleInventory(row) {
         }
     }
 
-    tabs.forEach(function (t) {
-        t.addEventListener('click', function () {
+    tabs.forEach((t) => {
+        t.addEventListener('click', () => {
             show(t.getAttribute('data-tab'), true);
         });
     });
-    nav.addEventListener('keydown', function (e) {
+    nav.addEventListener('keydown', (e) => {
         if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') {
             return;
         }
@@ -1793,16 +1765,16 @@ async function toggleInventory(row) {
         next.focus();
         show(next.getAttribute('data-tab'), true);
     });
-    document.addEventListener('krt:swapped', function (ev) {
+    document.addEventListener('krt:swapped', (ev) => {
         const container = ev && ev.detail && ev.detail.container;
         if (!container || typeof container.querySelectorAll !== 'function') {
             return;
         }
         const metas = Array.prototype.slice.call(container.querySelectorAll('[data-od-tab-count]'));
-        metas.forEach(function (meta) {
+        metas.forEach((meta) => {
             const key = meta.getAttribute('data-od-tab-count');
             const count = parseInt((meta.textContent || '0').trim(), 10) || 0;
-            const tab = document.getElementById('tab-' + key);
+            const tab = document.getElementById(`tab-${key}`);
             if (!tab) {
                 return;
             }
@@ -1821,13 +1793,13 @@ async function toggleInventory(row) {
             }
         });
     });
-    window.addEventListener('popstate', function () {
+    window.addEventListener('popstate', () => {
         apply(resolveInitial(false));
     });
     apply(resolveInitial(true));
 })();
 
-document.addEventListener('krt:swapped', function (ev) {
+document.addEventListener('krt:swapped', (ev) => {
     const container = ev && ev.detail && ev.detail.container;
     if (!container || container.id !== 'order-header-results') {
         return;
@@ -1838,7 +1810,7 @@ document.addEventListener('krt:swapped', function (ev) {
         return;
     }
     const statusClass = meta.getAttribute('data-status-class') || '';
-    Array.prototype.slice.call(badge.classList).forEach(function (cls) {
+    Array.prototype.slice.call(badge.classList).forEach((cls) => {
         if (cls.indexOf('status-') === 0 && cls !== 'status-badge') {
             badge.classList.remove(cls);
         }
@@ -1866,13 +1838,13 @@ function _prodFmtNum(x, quantityType) {
 
 function _prodFmtQty(x, quantityType) {
     return quantityType === 'PIECE'
-        ? String(Math.round(x)) + ' ' + PRODUCTION_I18N.unitPiece
-        : _prodRound3(x).toFixed(3) + ' ' + PRODUCTION_I18N.unitScu;
+        ? `${String(Math.round(x))} ${PRODUCTION_I18N.unitPiece}`
+        : `${_prodRound3(x).toFixed(3)} ${PRODUCTION_I18N.unitScu}`;
 }
 
 function _prodDemand(mat, k) {
     const lineAmount = _prodContext && _prodContext.lineAmount ? _prodContext.lineAmount : 1;
-    return mat.requiredTotals.reduce(function (sum, rt) {
+    return mat.requiredTotals.reduce((sum, rt) => {
         return sum + _prodRoundForType((rt * k) / lineAmount, mat.quantityType);
     }, 0);
 }
@@ -1904,7 +1876,7 @@ function openProductionModal(button) {
 
     const title = document.getElementById('production-modal-title');
     if (title) {
-        title.textContent = PRODUCTION_I18N.record + ' — ' + itemName;
+        title.textContent = `${PRODUCTION_I18N.record} — ${itemName}`;
     }
 
     const amtInput = document.getElementById('production-amount');
@@ -1915,17 +1887,9 @@ function openProductionModal(button) {
     }
     const hint = document.getElementById('production-remaining-hint');
     if (hint) {
-        hint.textContent =
-            PRODUCTION_I18N.remaining +
-            ': ' +
-            remaining +
-            ' (' +
-            manufactured +
-            ' / ' +
-            lineAmount +
-            ' ' +
-            PRODUCTION_I18N.alreadyMade +
-            ')';
+        hint.textContent = `${PRODUCTION_I18N.remaining}: ${remaining} (${manufactured} / ${
+            lineAmount
+        } ${PRODUCTION_I18N.alreadyMade})`;
     }
 
     const container = document.getElementById('production-materials');
@@ -1940,7 +1904,7 @@ function openProductionModal(button) {
     const row = button.closest('tr');
     const demandLis = row ? row.querySelectorAll('.od-production-demand li') : [];
     const byMaterialId = new Map();
-    demandLis.forEach(function (li) {
+    demandLis.forEach((li) => {
         const materialId = li.getAttribute('data-material-id');
         if (!materialId) {
             return;
@@ -1966,23 +1930,23 @@ function openProductionModal(button) {
             entries: [],
         });
     });
-    byMaterialId.forEach(function (mat) {
+    byMaterialId.forEach((mat) => {
         _prodMaterials.push(mat);
         const card = document.createElement('div');
         card.className = 'card card--inset mb-1';
         card.setAttribute('data-prod-material', mat.materialId);
         card.innerHTML =
-            '<div class="card-head"><h3 class="card-title">' +
-            escapeHtml(mat.materialName) +
-            '</h3><span class="chip chip--muted" data-prod-chip></span></div>' +
-            '<label class="od-prod-skip" title="' +
-            escapeHtml(PRODUCTION_I18N.skipHint) +
-            '"><input type="checkbox" data-prod-skip> ' +
-            escapeHtml(PRODUCTION_I18N.skipLabel) +
-            '</label>' +
-            '<div data-prod-entries><p class="text-muted">' +
-            escapeHtml(PRODUCTION_I18N.loadingStock) +
-            '</p></div>';
+            `<div class="card-head"><h3 class="card-title">${escapeHtml(
+                mat.materialName,
+            )}</h3><span class="chip chip--muted" data-prod-chip></span></div>` +
+            `<label class="od-prod-skip" title="${escapeHtml(
+                PRODUCTION_I18N.skipHint,
+            )}"><input type="checkbox" data-prod-skip> ${escapeHtml(
+                PRODUCTION_I18N.skipLabel,
+            )}</label>` +
+            `<div data-prod-entries><p class="text-muted">${escapeHtml(
+                PRODUCTION_I18N.loadingStock,
+            )}</p></div>`;
         const title = card.querySelector('.card-title');
         if (mat.floor > 0 && title) {
             const badge = document.createElement('span');
@@ -1998,19 +1962,17 @@ function openProductionModal(button) {
             skipCb.addEventListener('change', _prodReconcile);
         }
         Promise.all([
-            fetch('/orders/' + orderId + '/materials/' + mat.materialId + '/inventory').then(
-                function (r) {
-                    return r.ok ? r.json() : [];
-                },
-            ),
+            window.krtFetch
+                .getJson(`/orders/${orderId}/materials/${mat.materialId}/inventory`)
+                .catch(() => []),
             _prodLoadHigherAttribution(orderId, mat),
         ])
-            .then(function (results) {
+            .then((results) => {
                 const items = results[0];
                 mat.countedHigher = results[1];
                 mat.entries = (items || [])
-                    .map(function (it) {
-                        const alloc = (it.jobOrderAllocations || []).find(function (a) {
+                    .map((it) => {
+                        const alloc = (it.jobOrderAllocations || []).find((a) => {
                             return a.jobOrderId === orderId;
                         });
                         const slice = alloc && alloc.amount != null ? alloc.amount : 0;
@@ -2025,14 +1987,14 @@ function openProductionModal(button) {
                             version: it.version,
                         };
                     })
-                    .filter(function (e) {
+                    .filter((e) => {
                         return e.slice > 0;
                     })
-                    .map(function (e) {
+                    .map((e) => {
                         const q = typeof e.quality === 'number' ? e.quality : 0;
                         return Object.assign(e, { belowFloor: q < mat.floor });
                     })
-                    .sort(function (a, b) {
+                    .sort((a, b) => {
                         if (a.belowFloor !== b.belowFloor) return a.belowFloor ? 1 : -1;
                         const qa = typeof a.quality === 'number' ? a.quality : 0;
                         const qb = typeof b.quality === 'number' ? b.quality : 0;
@@ -2042,7 +2004,7 @@ function openProductionModal(button) {
                 _prodPrefill(card, mat);
                 _prodReconcile();
             })
-            .catch(function () {
+            .catch(() => {
                 _renderProdMaterialEntries(card, mat);
                 _prodReconcile();
             });
@@ -2056,53 +2018,39 @@ function _renderProdMaterialEntries(card, mat) {
         return;
     }
     if (mat.entries.length === 0) {
-        entriesEl.innerHTML =
-            '<p class="text-muted">' + escapeHtml(PRODUCTION_I18N.noStock) + '</p>';
+        entriesEl.innerHTML = `<p class="text-muted">${escapeHtml(PRODUCTION_I18N.noStock)}</p>`;
         return;
     }
     let html = '';
-    mat.entries.forEach(function (e, idx) {
+    mat.entries.forEach((e, idx) => {
         const cap = Math.min(e.slice, e.stock);
         let stolenChip = '';
         if (e.stolen) {
-            stolenChip =
-                ' <span class="chip chip--danger chip-xs">' + escapeHtml(MSG_STOLEN) + '</span>';
+            stolenChip = ` <span class="chip chip--danger chip-xs">${escapeHtml(MSG_STOLEN)}</span>`;
         }
         const higher = mat.countedHigher ? mat.countedHigher.get(e.inventoryItemId) : null;
         if (higher && !e.belowFloor) {
-            stolenChip +=
-                ' <span class="chip chip--warning chip-xs" data-testid="prod-counted-higher">' +
-                escapeHtml(MSG_PRODUCTION_COUNTED_HIGHER.replace('{0}', higher)) +
-                '</span>';
+            stolenChip += ` <span class="chip chip--warning chip-xs" data-testid="prod-counted-higher">${escapeHtml(
+                MSG_PRODUCTION_COUNTED_HIGHER.replace('{0}', higher),
+            )}</span>`;
         }
         if (e.belowFloor) {
-            stolenChip +=
-                ' <span class="chip chip-xs" data-testid="prod-below-floor">' +
-                escapeHtml(MSG_INVENTORY_BELOW_FLOOR) +
-                '</span>';
+            stolenChip += ` <span class="chip chip-xs" data-testid="prod-below-floor">${escapeHtml(
+                MSG_INVENTORY_BELOW_FLOOR,
+            )}</span>`;
         }
-        html +=
-            '<div class="od-prod-entry"><div class="od-prod-src">' +
-            escapeHtml(e.ownerName) +
-            ' · ' +
-            escapeHtml(String(e.location)) +
-            stolenChip +
-            ' <small>' +
-            escapeHtml(MSG_QUALITY) +
-            ' ' +
-            escapeHtml(String(e.quality)) +
-            ' · ' +
-            escapeHtml(PRODUCTION_I18N.available) +
-            ' ' +
-            escapeHtml(_prodFmtQty(cap, mat.quantityType)) +
-            '</small></div><input type="number" min="0" step="' +
-            escapeAttr(mat.quantityType === 'PIECE' ? '1' : 'any') +
-            '" value="0" data-prod-alloc data-prod-idx="' +
-            escapeAttr(idx) +
-            '"></div>';
+        html += `<div class="od-prod-entry"><div class="od-prod-src">${escapeHtml(
+            e.ownerName,
+        )} · ${escapeHtml(String(e.location))}${stolenChip} <small>${escapeHtml(
+            MSG_QUALITY,
+        )} ${escapeHtml(String(e.quality))} · ${escapeHtml(PRODUCTION_I18N.available)} ${escapeHtml(
+            _prodFmtQty(cap, mat.quantityType),
+        )}</small></div><input type="number" min="0" step="${escapeAttr(
+            mat.quantityType === 'PIECE' ? '1' : 'any',
+        )}" value="0" data-prod-alloc data-prod-idx="${escapeAttr(idx)}"></div>`;
     });
     entriesEl.innerHTML = html;
-    entriesEl.querySelectorAll('[data-prod-alloc]').forEach(function (inp) {
+    entriesEl.querySelectorAll('[data-prod-alloc]').forEach((inp) => {
         const entry = mat.entries[Number(inp.getAttribute('data-prod-idx'))];
         if (entry && entry.belowFloor) {
             inp.disabled = true;
@@ -2135,12 +2083,10 @@ async function _prodLoadHigherAttribution(orderId, mat) {
     });
     if (tiers.size < 2 || !orderId) return higher;
     try {
-        const res = await fetch(
-            '/orders/' + orderId + '/materials/' + mat.materialId + '/attribution',
-            { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } },
+        const entries = await window.krtFetch.getJson(
+            `/orders/${orderId}/materials/${mat.materialId}/attribution`,
         );
-        if (!res.ok) return higher;
-        for (const entry of await res.json()) {
+        for (const entry of entries) {
             const tier = tiers.get(entry.qualityTierId);
             if (tier && tier.floor > mat.floor && entry.amount > 0) {
                 higher.set(entry.inventoryItemId, tier.label);
@@ -2166,7 +2112,7 @@ function _prodPrefill(card, mat) {
     const k = parseInt(amtInput ? amtInput.value : '0', 10);
     if (!isFinite(k) || k < 1) return;
     let left = _prodDemand(mat, k);
-    card.querySelectorAll('[data-prod-alloc]').forEach(function (el) {
+    card.querySelectorAll('[data-prod-alloc]').forEach((el) => {
         const inp = /** @type {HTMLInputElement} */ (el);
         const e = mat.entries[parseInt(inp.getAttribute('data-prod-idx') || '0', 10)];
         if (!e || e.belowFloor || left <= 1e-4) return;
@@ -2254,19 +2200,14 @@ function _prodRefreshOrgUnitPicker() {
         wrapper.hidden = true;
         return;
     }
-    fetch('/users/' + encodeURIComponent(ownerId) + '/memberships?allKinds=true', {
-        headers: { Accept: 'application/json' },
-        credentials: 'same-origin',
-    })
-        .then(function (r) {
-            return r.ok ? r.json() : [];
-        })
-        .then(function (memberships) {
+    window.krtFetch
+        .getJson(`/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true`)
+        .then((memberships) => {
             if (!Array.isArray(memberships) || memberships.length < 1) {
                 wrapper.hidden = true;
                 return;
             }
-            memberships.forEach(function (opt) {
+            memberships.forEach((opt) => {
                 const o = document.createElement('option');
                 o.value = opt.orgUnitId;
                 o.textContent = opt.orgUnitName;
@@ -2278,7 +2219,7 @@ function _prodRefreshOrgUnitPicker() {
                 : '';
             if (
                 responsibleId &&
-                memberships.some(function (m) {
+                memberships.some((m) => {
                     return m.orgUnitId === responsibleId;
                 })
             ) {
@@ -2286,7 +2227,7 @@ function _prodRefreshOrgUnitPicker() {
             }
             wrapper.hidden = false;
         })
-        .catch(function () {
+        .catch(() => {
             wrapper.hidden = true;
         });
 }
@@ -2321,8 +2262,8 @@ function _prodReconcile() {
         k = 0;
     }
     let allCovered = k >= 1 && k <= _prodContext.remaining;
-    _prodMaterials.forEach(function (mat) {
-        const card = document.querySelector('[data-prod-material="' + mat.materialId + '"]');
+    _prodMaterials.forEach((mat) => {
+        const card = document.querySelector(`[data-prod-material="${mat.materialId}"]`);
         if (!card) {
             return;
         }
@@ -2330,7 +2271,7 @@ function _prodReconcile() {
         const skipped = !!(skipCb && skipCb.checked);
         const chip = card.querySelector('[data-prod-chip]');
         card.classList.toggle('od-prod-skipped', skipped);
-        card.querySelectorAll('[data-prod-alloc]').forEach(function (inp) {
+        card.querySelectorAll('[data-prod-alloc]').forEach((inp) => {
             inp.disabled = skipped || inp.getAttribute('data-below-floor') === 'true';
         });
         if (skipped) {
@@ -2342,7 +2283,7 @@ function _prodReconcile() {
         }
         const demand = _prodDemand(mat, k);
         let assigned = 0;
-        card.querySelectorAll('[data-prod-alloc]').forEach(function (inp) {
+        card.querySelectorAll('[data-prod-alloc]').forEach((inp) => {
             assigned += _prodRoundForType(parseFloat(inp.value) || 0, mat.quantityType);
         });
         assigned = mat.quantityType === 'PIECE' ? Math.round(assigned) : _prodRound3(assigned);
@@ -2352,13 +2293,9 @@ function _prodReconcile() {
                 .replace('{0}', _prodFmtNum(demand, mat.quantityType))
                 .replace('{1}', _prodFmtNum(assigned, mat.quantityType))
                 .replace('{2}', _prodFmtNum(rest, mat.quantityType));
-            chip.className =
-                'chip ' +
-                (Math.abs(rest) < 1e-4
-                    ? 'chip--success'
-                    : rest < 0
-                      ? 'chip--danger'
-                      : 'chip--muted');
+            chip.className = `chip ${
+                Math.abs(rest) < 1e-4 ? 'chip--success' : rest < 0 ? 'chip--danger' : 'chip--muted'
+            }`;
         }
         if (Math.abs(rest) >= 1e-4) {
             allCovered = false;
@@ -2387,8 +2324,8 @@ function bookProduction() {
     const consumption = [];
     const skippedMaterialIds = [];
     let ok = true;
-    _prodMaterials.forEach(function (mat) {
-        const card = document.querySelector('[data-prod-material="' + mat.materialId + '"]');
+    _prodMaterials.forEach((mat) => {
+        const card = document.querySelector(`[data-prod-material="${mat.materialId}"]`);
         const skipCb = card ? card.querySelector('[data-prod-skip]') : null;
         if (skipCb && skipCb.checked) {
             skippedMaterialIds.push(mat.materialId);
@@ -2397,7 +2334,7 @@ function bookProduction() {
         const demand = _prodDemand(mat, k);
         let assigned = 0;
         if (card) {
-            card.querySelectorAll('[data-prod-alloc]').forEach(function (inp) {
+            card.querySelectorAll('[data-prod-alloc]').forEach((inp) => {
                 const v = _prodRoundForType(parseFloat(inp.value) || 0, mat.quantityType);
                 if (v > 0) {
                     const idx = parseInt(inp.getAttribute('data-prod-idx'), 10);
@@ -2431,7 +2368,7 @@ function bookProduction() {
 
     krtOrderWrite({
         method: 'POST',
-        url: '/orders/' + _prodContext.orderId + '/items/' + _prodContext.itemId + '/production',
+        url: `/orders/${_prodContext.orderId}/items/${_prodContext.itemId}/production`,
         payload: {
             amount: k,
             version: _prodContext.version ? parseInt(_prodContext.version, 10) : null,
@@ -2462,13 +2399,13 @@ function bookProduction() {
 }
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('change', 'od-update-status', function (el) {
+    window.krtEvents.on('change', 'od-update-status', (el) => {
         updateStatus(el);
     });
-    window.krtEvents.on('change', 'od-toggle-bp-counting', function (el) {
+    window.krtEvents.on('change', 'od-toggle-bp-counting', (el) => {
         _toggleBlueprintCounting(el);
     });
-    window.krtEvents.on('click', 'od-toggle-inventory', function (el, ev) {
+    window.krtEvents.on('click', 'od-toggle-inventory', (el, ev) => {
         if (
             ev &&
             ev.target &&
@@ -2479,56 +2416,56 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         }
         toggleInventory(el);
     });
-    window.krtEvents.on('click', 'od-unlink-inventory', function (el) {
+    window.krtEvents.on('click', 'od-unlink-inventory', (el) => {
         unlinkInventoryItem(el);
     });
-    window.krtEvents.on('click', 'claim-add', function (el) {
+    window.krtEvents.on('click', 'claim-add', (el) => {
         openClaimCreate(el);
     });
-    window.krtEvents.on('click', 'claim-edit', function (el) {
+    window.krtEvents.on('click', 'claim-edit', (el) => {
         openClaimEdit(el);
     });
-    window.krtEvents.on('click', 'claim-submit', function () {
+    window.krtEvents.on('click', 'claim-submit', () => {
         submitClaim();
     });
-    window.krtEvents.on('click', 'claim-withdraw', function () {
+    window.krtEvents.on('click', 'claim-withdraw', () => {
         withdrawClaimAction();
     });
     window.krtEvents.on('click', 'od-open-handover', openHandoverModal);
     window.krtEvents.on('click', 'od-open-production', openProductionModal);
     window.krtEvents.on('click', 'od-book-production', bookProduction);
-    window.krtEvents.on('change', 'od-production-bookin-changed', function () {
+    window.krtEvents.on('change', 'od-production-bookin-changed', () => {
         _prodReconcile();
     });
-    window.krtEvents.on('change', 'od-production-owner-changed', function () {
+    window.krtEvents.on('change', 'od-production-owner-changed', () => {
         _prodSyncPersonalForOwner();
         _prodRefreshOrgUnitPicker();
     });
-    window.krtEvents.on('change', 'od-production-personal-toggle', function () {
+    window.krtEvents.on('change', 'od-production-personal-toggle', () => {
         _prodSyncPersonalAllocate();
     });
     window.krtEvents.on('click', 'od-toggle-demand', _odToggleDemandRow);
-    window.krtEvents.on('click', 'od-download-report', function (el) {
+    window.krtEvents.on('click', 'od-download-report', (el) => {
         downloadHandoverReport(el);
     });
-    window.krtEvents.on('click', 'od-download-item-report', function (el) {
+    window.krtEvents.on('click', 'od-download-item-report', (el) => {
         downloadItemHandoverReport(el);
     });
     window.krtEvents.on('click', 'od-cancel-status', cancelStatusChange);
     window.krtEvents.on('click', 'od-confirm-status', confirmStatusChange);
-    window.krtEvents.on('click', 'od-confirm-remove-material', function () {
+    window.krtEvents.on('click', 'od-confirm-remove-material', () => {
         if (typeof window.confirmRemoveMaterial === 'function') window.confirmRemoveMaterial();
     });
     window.krtEvents.on('click', 'od-add-handover-item', addHandoverItemRow);
-    window.krtEvents.on('click', 'od-preview-handover', function (el) {
+    window.krtEvents.on('click', 'od-preview-handover', (el) => {
         previewHandoverReport(el);
     });
-    window.krtEvents.on('click', 'od-remove-handover-row', function (el) {
+    window.krtEvents.on('click', 'od-remove-handover-row', (el) => {
         const row = el.parentElement && el.parentElement.parentElement;
         if (row) row.remove();
         updateHandoverIndexes();
     });
-    window.krtEvents.on('submit', 'od-disable-submit', function (el) {
+    window.krtEvents.on('submit', 'od-disable-submit', (el) => {
         const btn = el.querySelector('button[type=submit]');
         if (btn) btn.disabled = true;
     });
@@ -2559,7 +2496,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
      * @returns {Promise<boolean>} true when the mutation succeeded and the section was re-rendered
      */
     async function oaSend(method, url, opts) {
-        opts = opts || {};
+        opts ||= {};
         if (!window.krtFetch) return false;
         const errorMsg = opts.errorMsg || I18N_NOTE_ERROR;
         const common = {
@@ -2608,13 +2545,13 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     function oaUpdateCounter() {
         const ta = document.getElementById('assignee-note-text');
         const counter = document.getElementById('assignee-note-counter');
-        if (ta && counter) counter.textContent = ta.value.length + ' / 500';
+        if (ta && counter) counter.textContent = `${ta.value.length} / 500`;
     }
 
     function oaAdd(userId) {
         const orderId = oaOrderId();
         if (!userId || !orderId) return;
-        oaSend('POST', '/orders/' + orderId + '/assignees', {
+        oaSend('POST', `/orders/${orderId}/assignees`, {
             form: new URLSearchParams({ userId }),
             successMsg: I18N_ADDED,
             errorMsg: I18N_ADD_ERROR,
@@ -2625,7 +2562,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         const userId = el.getAttribute('data-user-id');
         const orderId = oaOrderId();
         if (!userId || !orderId) return;
-        oaSend('DELETE', '/orders/' + orderId + '/assignees/' + userId, {
+        oaSend('DELETE', `/orders/${orderId}/assignees/${userId}`, {
             successMsg: I18N_REMOVED,
             errorMsg: I18N_REMOVE_ERROR,
         });
@@ -2656,7 +2593,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         const orderId = oaOrderId();
         if (!userId || !orderId) return;
         const payload = { note, version: version ? parseInt(version, 10) : null };
-        oaSend('PUT', '/orders/' + orderId + '/assignees/' + userId + '/note', {
+        oaSend('PUT', `/orders/${orderId}/assignees/${userId}/note`, {
             json: payload,
             successMsg: I18N_NOTE_SAVED,
         }).then((ok) => {
@@ -2669,8 +2606,8 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         const version = el.getAttribute('data-version') || '';
         const orderId = oaOrderId();
         if (!userId || !orderId) return;
-        const q = version ? '?version=' + encodeURIComponent(version) : '';
-        oaSend('DELETE', '/orders/' + orderId + '/assignees/' + userId + '/note' + q, {
+        const q = version ? `?version=${encodeURIComponent(version)}` : '';
+        oaSend('DELETE', `/orders/${orderId}/assignees/${userId}/note${q}`, {
             successMsg: I18N_NOTE_DELETED,
         });
     }
@@ -2681,23 +2618,23 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     });
 
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('click', 'oa-add-me', function (el) {
+        window.krtEvents.on('click', 'oa-add-me', (el) => {
             oaAdd(el.getAttribute('data-user-id'));
         });
-        window.krtEvents.on('click', 'oa-add-user', function () {
+        window.krtEvents.on('click', 'oa-add-user', () => {
             const sel = document.getElementById('assignee-add-select');
             if (sel && sel.value) oaAdd(sel.value);
         });
-        window.krtEvents.on('click', 'oa-remove-assignee', function (el) {
+        window.krtEvents.on('click', 'oa-remove-assignee', (el) => {
             oaRemove(el);
         });
-        window.krtEvents.on('click', 'oa-edit-note', function (el) {
+        window.krtEvents.on('click', 'oa-edit-note', (el) => {
             oaOpenNote(el);
         });
-        window.krtEvents.on('click', 'oa-save-note', function () {
+        window.krtEvents.on('click', 'oa-save-note', () => {
             oaSaveNote();
         });
-        window.krtEvents.on('click', 'oa-delete-note', function (el) {
+        window.krtEvents.on('click', 'oa-delete-note', (el) => {
             oaDeleteNote(el);
         });
     }

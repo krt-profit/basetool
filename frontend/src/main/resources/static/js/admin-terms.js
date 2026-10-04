@@ -32,7 +32,7 @@
     }
 
     if (!results || !window.krtFetch) {
-        form.addEventListener('change', function (event) {
+        form.addEventListener('change', (event) => {
             if (isFilterRadio(event.target)) {
                 form.submit();
             }
@@ -43,7 +43,7 @@
     const krtFetch = window.krtFetch;
     krtFetch.bindSwap({ container: results, history: true });
 
-    form.addEventListener('change', function (event) {
+    form.addEventListener('change', (event) => {
         if (!isFilterRadio(event.target)) {
             return;
         }
@@ -55,7 +55,7 @@
         }
         const query = params.toString();
         krtFetch.swap({
-            url: '/admin/terms' + (query ? '?' + query : ''),
+            url: `/admin/terms${query ? `?${query}` : ''}`,
             container: results,
             history: true,
         });

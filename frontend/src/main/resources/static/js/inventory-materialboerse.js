@@ -18,7 +18,7 @@
     }
 
     function setStatus(itemId, released) {
-        const chip = document.querySelector('[data-boerse-status-for="' + itemId + '"]');
+        const chip = document.querySelector(`[data-boerse-status-for="${itemId}"]`);
         if (!chip) {
             return;
         }
@@ -27,7 +27,7 @@
         chip.classList.toggle('chip--muted', !released);
     }
 
-    window.krtEvents.on('change', 'inv-boerse-toggle', function (el) {
+    window.krtEvents.on('change', 'inv-boerse-toggle', (el) => {
         const itemId = el.getAttribute('data-id');
         if (el.checked) {
             window.krtMaterialRelease.open(
@@ -58,14 +58,14 @@
                 i18n.confirmYes,
                 i18n.confirmNo,
             )
-            .then(function (ok) {
+            .then((ok) => {
                 if (!ok) {
                     el.checked = true;
                     return;
                 }
                 window.krtFetch.write({
                     method: 'POST',
-                    url: '/materialboerse/items/' + itemId + '/deactivate/ajax',
+                    url: `/materialboerse/items/${itemId}/deactivate/ajax`,
                     successMessage: i18n.deactivated,
                     errorMessage: i18n.error,
                     serialize: 'materialboerse',
