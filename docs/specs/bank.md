@@ -1075,7 +1075,7 @@ admin-editable at runtime.
 
 **Enforced by:** `RuleEvaluationServiceTest`, `BankBookingRequestServiceTest`,
 `NotificationCreationServiceTest` · **Code:**
-`event/BankBookingRequest{Created,Confirmed,Rejected,Cancelled}Event`,
+`bank/api/events/BankBookingRequest{Created,Confirmed,Rejected,Cancelled}Event`,
 `service/RecipientResolutionService#resolveAccountGrantHolders`,
 `service/OrgUnitBankResponsibilityService#resolveResponsibleHolderUserIds`,
 `model/SelectorKind#{ACCOUNT_GRANT,EVENT_RECIPIENT,ACCOUNT_RESPONSIBLE}`, `db/migration/V160`,

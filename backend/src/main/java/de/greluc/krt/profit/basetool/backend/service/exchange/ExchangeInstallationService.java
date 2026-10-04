@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service.exchange;
 
-import de.greluc.krt.profit.basetool.backend.event.ExchangeInstallationConnectedEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exchange.api.events.ExchangeInstallationConnectedEvent;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeInstallation;

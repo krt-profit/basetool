@@ -26,7 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.config.MailProperties;
-import de.greluc.krt.profit.basetool.backend.event.UserApprovalDecidedEvent;
+import de.greluc.krt.profit.basetool.backend.identity.api.events.UserApprovalDecidedEvent;
 import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
