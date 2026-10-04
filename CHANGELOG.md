@@ -4,6 +4,10 @@
 
 ### Added
 
+- **Profitberechnung nennt die Terminals der Route.** Jede Zeile zeigt „Kauf <Terminal> · <Preis>"
+  und „Verkauf <Terminal> · <Preis>", der Ort des Terminals erscheint als Tooltip. Die API liefert
+  dafür vier neue Felder je Zeile (REQ-UI-027).
+
 - **Materialbörse im neuen Muster.** Tabs „Angebote · Gesuche" mit „Alle · Meine" statt vier Tabs,
   eine Schaltfläche „Angebot erstellen" bzw. „Gesuch erstellen" mit Auswahl Material/Item statt vier
   Buttons, Filter als Popover mit Chips und Sortiermenü. Alte Links auf die Börse funktionieren

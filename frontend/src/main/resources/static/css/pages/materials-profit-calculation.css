@@ -187,6 +187,16 @@
         color: var(--color-success-text);
     }
 
+    .profit-route__terminal {
+        color: var(--color-white);
+    }
+
+    .profit-route__terminal[title] {
+        text-decoration: underline dotted;
+        text-underline-offset: 2px;
+        cursor: help;
+    }
+
     .profit-table td.profit-max {
         color: var(--color-success-text);
         font-weight: var(--fw-bold);
