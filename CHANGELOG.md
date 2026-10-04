@@ -173,6 +173,9 @@
 
 ### Changed
 
+- **Abhängigkeiten aktualisiert.** Flyway 13.9.0, Bucket4j 8.21.0, commons-lang3 3.21.0, Jackson 2.22.3
+  und 3.2.3 sowie json-schema-validator 3.0.8. Lombok und google-java-format bleiben bewusst stehen.
+
 - **Kartellbank: „Bestätigen" nur, wo du bestätigen darfst.** Die Antragswarteschlange zeigt die
   Bestätigen-Aktion nur noch bei Anträgen, für die dir die passende Konto-Berechtigung zusteht; sonst
   steht dort „wartet auf berechtigte Bankmitarbeiter". Die Queue-API liefert dafür pro Antrag
