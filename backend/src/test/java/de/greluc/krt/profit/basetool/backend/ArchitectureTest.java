@@ -49,6 +49,7 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import com.tngtech.archunit.library.dependencies.SliceAssignment;
 import com.tngtech.archunit.library.dependencies.SliceIdentifier;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.config.ActingMemberFilter;
 import de.greluc.krt.profit.basetool.backend.controller.AppVersionPolicyController;
 import de.greluc.krt.profit.basetool.backend.controller.BankAccountController;
@@ -69,7 +70,6 @@ import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestCreatedEven
 import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestEvent;
 import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestRejectedEvent;
 import de.greluc.krt.profit.basetool.backend.event.NotificationEvent;
-import de.greluc.krt.profit.basetool.backend.exception.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.mapper.BankAccountMapper;

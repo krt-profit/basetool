@@ -17,16 +17,20 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.exception;
+package de.greluc.krt.profit.basetool.backend.inventory.api;
+
+import de.greluc.krt.profit.basetool.backend.exception.DomainProblem;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.http.HttpStatus;
 
 /**
  * Thrown when an allocation to a dimension (job orders or missions) would exceed the inventory
  * entry's own amount (REQ-INV-027).
  *
- * <p>Mapped to {@code 422 Unprocessable Entity} with code {@code OVER_ALLOCATION} via {@link
- * AppExceptionKind#OVER_ALLOCATION}.
+ * <p>Mapped to {@code 422 Unprocessable Entity} with code {@link
+ * InventoryProblemCode#OVER_ALLOCATION}.
  */
-public final class OverAllocationException extends AppException {
+public final class OverAllocationException extends DomainProblem {
 
   /**
    * Creates an {@code OverAllocationException} whose client-visible {@code detail} resolves from
@@ -35,6 +39,39 @@ public final class OverAllocationException extends AppException {
    * Accept-Language} rather than leaking a hard-coded English string).
    */
   public OverAllocationException() {
-    super(AppExceptionKind.OVER_ALLOCATION, "problem.over_allocation.detail");
+    super("problem.over_allocation.detail");
+  }
+
+  /**
+   * The status the refusal is answered with.
+   *
+   * @return {@code 422}
+   */
+  @NotNull
+  @Override
+  public HttpStatus status() {
+    return InventoryProblemCode.OVER_ALLOCATION.status();
+  }
+
+  /**
+   * The stable code of the refusal.
+   *
+   * @return {@code OVER_ALLOCATION}
+   */
+  @NotNull
+  @Override
+  public String code() {
+    return InventoryProblemCode.OVER_ALLOCATION.code();
+  }
+
+  /**
+   * The label the handler's log line names the refusal by.
+   *
+   * @return {@code "Over-allocation"}
+   */
+  @NotNull
+  @Override
+  public String logLabel() {
+    return "Over-allocation";
   }
 }

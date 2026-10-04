@@ -23,6 +23,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.joborder.api.ProductionAllocationException;
+import de.greluc.krt.profit.basetool.backend.refinery.api.MissionParticipantRequiredException;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerOrgUnitRequiredException;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -220,7 +226,8 @@ class DomainProblemContractTest {
         handler.handleAppException(expected.exception(), request);
 
     assertThat(response.getStatusCode().value()).isEqualTo(expected.status().value());
-    assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
+    assertThat(response.getHeaders().getContentType())
+        .isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
     ProblemDetail body = response.getBody();
     assertThat(body).isNotNull();
     assertThat(body.getStatus()).isEqualTo(expected.status().value());

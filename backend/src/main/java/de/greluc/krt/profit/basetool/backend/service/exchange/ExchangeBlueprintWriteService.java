@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service.exchange;
 
-import de.greluc.krt.profit.basetool.backend.exception.ExchangeProblemException;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintSource;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeChange;

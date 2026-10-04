@@ -2043,7 +2043,7 @@ column) · **Code:** `model/BankAccountType#requiresDebitJustification`, `model/
 `service/BankBookingRequestService`, `service/OrgUnitBankAccessService`,
 `service/Bank{Statement,Management}ReportService`, `model/projection/BankBookingRow`,
 `repository/BankPostingRepository`, `model/dto/Bank{Booking,BookingRequest}Dto`,
-`exception/BankConflictException`, `db/migration/V198`, frontend `templates/org-unit-bank.html`,
+`bank/api/BankConflictException`, `db/migration/V198`, frontend `templates/org-unit-bank.html`,
 `templates/bank-account-detail.html`, `templates/bank-requests.html`, `static/js/bank.js`,
 `static/css/bank.css` · **Issues:** —
 
@@ -2641,7 +2641,7 @@ frontend `OrgUnitBankPageControllerMvcTest` (modal renders after the table, with
 `BankOrgUnitRequestsE2eTest` · **Code:** `model/BankBookingRequest` (relaxed `updatable`),
 `model/dto/request/UpdateBankBookingRequest`, `service/BankBookingRequestService#updateOwn`,
 `service/OrgUnitBankAccessService#updateOwnBookingRequest` / `#resolveApprovalRouting`,
-`controller/OrgUnitBankController`, `exception/BankConflictException`,
+`controller/OrgUnitBankController`, `bank/api/BankConflictException`,
 `model/BankAuditEventType`, frontend `controller/OrgUnitBankProxyController`,
 `controller/AdminAuditLogPageController` (audit filter), `templates/org-unit-bank.html` ·
 **ADR:** [ADR-0133](../adr/0133-editable-pending-booking-requests.md)

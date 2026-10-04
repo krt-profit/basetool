@@ -2,8 +2,9 @@
 > open decision on 2026-10-01. **Status:** Phase −1 done (merged 2026-10-01, PRs #2299–#2312);
 > Phase 0 done (2026-10-03, merged as one chain of pull requests, #2350 … #2353): the decision
 > records (ADR-0231 … ADR-0239 and the amendments of §14) and every guard of §6.1 that Phase 0 owns;
-> the app's re-read of the version policy waits for the app release (basetool-android#209). No
-> class has moved yet. Last reviewed: 2026-10-03.
+> the app's re-read of the version policy waits for the app release (basetool-android#209).
+> Phase 1: the error model (P1-12) is done (2026-10-04) — the first classes moved into module
+> packages. Last reviewed: 2026-10-04.
 > **Owner area:** BE · FE · API · SEC · **Related ADRs:** ADR-0020, ADR-0028, ADR-0032, ADR-0047,
 > ADR-0060, ADR-0065, ADR-0069, ADR-0130, ADR-0135, ADR-0136, ADR-0205, ADR-0206, ADR-0212,
 > ADR-0214, ADR-0216, ADR-0219, ADR-0223, ADR-0229, ADR-0231 … ADR-0239 · **Specs:**
@@ -353,6 +354,22 @@ values as a documented list. `GlobalExceptionHandler` and `ErrorDisclosurePolicy
 place that decides what a response discloses. Rejected: keep every exception type in the kernel
 package and seal it (no domain ownership, no code documentation).
 
+**Implemented 2026-10-04 (P1-12).** `AppException` permits the eight existing generic kinds
+(`BadRequest`, `NotFound`, `BusinessConflict`, `DuplicateEntity`, `EntityInUse`, `ExternalService`,
+`ReportGeneration`, `RateLimitExceeded`) and `DomainProblem`; no new "access" kind was added,
+because nothing throws one — access refusals stay Spring Security's `AccessDeniedException`, which
+the handler maps. The six module exceptions moved, names unchanged, into
+`backend.<module>.api` (bank, exchange, inventory, joborder, refinery, scope — the layout of §5.2),
+with one `ProblemCode` enum each (`BankProblemCode`, `ExchangeProblemCode`, `InventoryProblemCode`,
+`JobOrderProblemCode`, `RefineryProblemCode`, `ScopeProblemCode`); `CoreProblemCode` keeps the 27
+kernel codes, wire values unchanged. `ACTING_MEMBER_REFUSED` went to the exchange enum, because its
+producer `ActingMemberFilter` belongs to the exchange module in the domain map. The documented list
+is now collected from every registry enum and sorted by code. Correction, 2026-10-04: the "six
+kernel → domain edges" of the sealed family were never in the ArchUnit baseline — `jdeps` counts a
+`PermittedSubclasses` attribute, ArchUnit does not (REQ-MOD-004 already said so); the baseline
+shrank instead by the two `kernel → platform` edges to `ErrorDisclosurePolicy`, which the domain
+map now assigns to the kernel as part of the exception contract (138 → 136 edges).
+
 ### 5.6 Persistence
 
 - **One schema, one Flyway location, one global `V<n>` sequence** in `backend`, also after the
@@ -630,7 +647,8 @@ Cheap moves that break many cycles without changing behaviour:
   `LikePatterns`, `ProblemResponseFactory`, `Roles`, `Permissions`) and per-domain internal packages;
   the ArchUnit leaf rule's message stops sending shared logic there.
 - `audit.api` created (enum and recorder moved, names unchanged); event records moved into their
-  publishers' `api.events` packages; the error model of §5.5.
+  publishers' `api.events` packages; the error model of §5.5 — **done 2026-10-04** (P1-12, see
+  §5.5).
 
 **Pros** many cycles gone before any domain moves; each step is small. **Cons** broad, shallow
 churn. **Risks** SpEL bean names and FQCN references (guards G-01, G-04 catch them). **Effort** M.

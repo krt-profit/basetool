@@ -423,7 +423,8 @@ ADR-0221, ADR-0224 … ADR-0228; the third-party view is published from `docs/ex
 ## 8.14 Domain modules — decided, being built
 
 The backend is being cut into domain modules inside its one Gradle module (plan
-[`DOMAIN_MODULARISATION_PLAN.md`](../DOMAIN_MODULARISATION_PLAN.md); nothing has moved yet). Five
+[`DOMAIN_MODULARISATION_PLAN.md`](../DOMAIN_MODULARISATION_PLAN.md); the first classes to move
+were the module exceptions and their problem-code enums, into `backend.<module>.api`). Five
 rules hold for every module as it lands:
 
 - **One package per domain, with a rank.** A module depends only on lower ranks or on what its
