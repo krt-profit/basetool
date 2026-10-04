@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 
+import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.time.Instant;
 import java.util.UUID;
@@ -59,7 +60,8 @@ class BankReportProxyControllerTest {
 
   @BeforeEach
   void setUp() {
-    controller = new BankReportProxyController(RealBackendApiClient.over(webClient));
+    controller =
+        new BankReportProxyController(new BankBackendClient(RealBackendApiClient.over(webClient)));
   }
 
   @Test

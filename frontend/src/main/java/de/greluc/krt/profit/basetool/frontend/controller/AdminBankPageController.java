@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
+import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankWipeResetResultDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -51,7 +51,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminBankPageController {
 
-  private final BackendApiClient backendApiClient;
+  /** The bank domain's backend calls. */
+  private final BankBackendClient bankClient;
 
   /**
    * Renders the wipe-reset danger card. The page is static except for the PRG flash attributes,
@@ -93,9 +94,7 @@ public class AdminBankPageController {
       return "redirect:/admin/bank";
     }
     try {
-      BankWipeResetResultDto result =
-          backendApiClient.post(
-              "/api/v1/bank/admin/wipe-reset", Map.of(), BankWipeResetResultDto.class);
+      BankWipeResetResultDto result = bankClient.wipeReset();
       if (result == null || result.accountsReset() == 0) {
         redirectAttributes.addFlashAttribute("wipeNoop", true);
       } else {
@@ -127,9 +126,7 @@ public class AdminBankPageController {
         log,
         "bank wipe reset (ajax)",
         () -> {
-          BankWipeResetResultDto result =
-              backendApiClient.post(
-                  "/api/v1/bank/admin/wipe-reset", Map.of(), BankWipeResetResultDto.class);
+          BankWipeResetResultDto result = bankClient.wipeReset();
           Map<String, Object> body = new LinkedHashMap<>();
           body.put("accountsReset", result == null ? 0 : result.accountsReset());
           body.put("holderStashesZeroed", result == null ? 0 : result.holderStashesZeroed());

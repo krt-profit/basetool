@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
 class WriteUriTemplateTest {
 
   /** The write-verb call sites when the guard was introduced; fewer means the scan broke. */
-  private static final int MIN_WRITE_SITES = 334;
+  private static final int MIN_WRITE_SITES = 324;
 
   /**
    * The methods that still concatenate a runtime value into a write URI, each with the reason it is

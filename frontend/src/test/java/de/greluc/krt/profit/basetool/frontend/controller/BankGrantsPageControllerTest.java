@@ -31,6 +31,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDetailDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankApprovalLimitsDto;
@@ -83,7 +84,8 @@ class BankGrantsPageControllerTest {
   @Test
   void grants_ShouldFilterByAccount_andSeedSelectedAccountForCombobox() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankGrantsPageController controller = new BankGrantsPageController(backendApiClient);
+    BankGrantsPageController controller =
+        new BankGrantsPageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID accountId = UUID.randomUUID();
     UUID user = UUID.randomUUID();
@@ -107,7 +109,8 @@ class BankGrantsPageControllerTest {
   @Test
   void grants_ShouldFilterByUserInEmployeeViewAndCollectGrantees() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankGrantsPageController controller = new BankGrantsPageController(backendApiClient);
+    BankGrantsPageController controller =
+        new BankGrantsPageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID userId = UUID.randomUUID();
     UUID otherUser = UUID.randomUUID();
@@ -135,7 +138,8 @@ class BankGrantsPageControllerTest {
   @Test
   void grants_fragmentGrantsMatrix_rendersOnlyMatrixFragment_andSkipsFilterAndModalLookups() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankGrantsPageController controller = new BankGrantsPageController(backendApiClient);
+    BankGrantsPageController controller =
+        new BankGrantsPageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID accountId = UUID.randomUUID();
     UUID user = UUID.randomUUID();
