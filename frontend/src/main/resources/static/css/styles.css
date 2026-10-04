@@ -7084,8 +7084,10 @@
     }
     .form-section__head {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
-        gap: var(--space-3);
+        gap: var(--space-1) var(--space-3);
+        overflow-wrap: anywhere;
         padding-bottom: var(--space-2);
         border-bottom: var(--border-hairline);
         font-family: var(--font-headline);
