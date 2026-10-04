@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.ImportIssueCode;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ImportIssueDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ImportIssueSeverity;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ImportSuggestionDto;
+import de.greluc.krt.profit.basetool.frontend.model.form.InventoryBookOutForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -275,7 +276,13 @@ class SessionTypeAllowListTest {
     "org.springframework.validation.FieldError,true",
     "org.springframework.validation.beanvalidation.LocalValidatorFactoryBean,false",
     "org.springframework.web.servlet.FlashMap,true",
-    "org.springframework.web.servlet.FlashMapManager,false"
+    "org.springframework.web.servlet.FlashMapManager,false",
+    "de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm,true",
+    "de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm$AllocationRow,true",
+    "de.greluc.krt.profit.basetool.frontend.model.form.InventoryBookOutForm,false",
+    "de.greluc.krt.profit.basetool.frontend.model.dto.ImportIssueDto,true",
+    "de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto,false",
+    "de.greluc.krt.profit.basetool.frontend.config.SessionTypeAllowList,false"
   })
   void theNamePatternsCoverExactlyTheirPackage(String className, boolean allowed) {
     boolean matched =
@@ -283,6 +290,7 @@ class SessionTypeAllowListTest {
             || SessionTypeAllowList.VALIDATION_TYPES.matcher(className).matches()
             || SessionTypeAllowList.JAVA_LANG_SCALARS.matcher(className).matches()
             || SessionTypeAllowList.ALLOWED_EXACT_NAMES.contains(className)
+            || SessionTypeAllowList.SESSION_BOUND_TYPES.contains(className)
             || SessionTypeAllowList.ALLOWED_PREFIXES.stream().anyMatch(className::startsWith);
 
     assertThat(matched).as(className).isEqualTo(allowed);
@@ -321,6 +329,44 @@ class SessionTypeAllowListTest {
                     "InvalidTypeIdException")
                 .count())
         .as("the refused attribute is dropped like any unreadable one, so the drop alert sees it")
+        .isEqualTo(1.0);
+  }
+
+  @Test
+  void aModelPackageClassOffTheExactList_isRefusedDroppedAndCountedLikeAnyOutsider() {
+    MeterRegistry registry = new SimpleMeterRegistry();
+    ObjectProvider<MeterRegistry> provider = provider(registry);
+    RedisSerializer<Object> production =
+        new FaultTolerantSessionSerializer(
+            new GenericJacksonJsonRedisSerializer(
+                RedisSessionConfig.buildSessionJsonMapper(
+                    loader,
+                    SessionTypeAllowList.validatorBuilder(
+                        SessionTypeAllowList.Mode.ENFORCE,
+                        new SessionTypeAllowList.MeteredRefusalListener(provider)))),
+            provider);
+    byte[] unlisted = permissive.serialize(new ArrayList<>(List.of(new InventoryBookOutForm())));
+    byte[] listed = permissive.serialize(new ArrayList<>(List.of(new InventoryForm())));
+
+    assertThat(SessionTypeAllowList.SESSION_BOUND_TYPES)
+        .doesNotContain(InventoryBookOutForm.class.getName())
+        .contains(InventoryForm.class.getName());
+    assertThat(permissive.deserialize(unlisted)).isInstanceOf(List.class);
+    assertThat(production.deserialize(unlisted)).isInstanceOf(UnreadableSessionValue.class);
+    assertThat(((List<?>) production.deserialize(listed)).getFirst())
+        .isInstanceOf(InventoryForm.class);
+    assertThat(
+            registry
+                .counter(MetricNames.SESSION_TYPE_REFUSED, MetricNames.TAG_MODE, "enforce")
+                .count())
+        .isEqualTo(1.0);
+    assertThat(
+            registry
+                .counter(
+                    MetricNames.SESSION_VALUE_DROPPED,
+                    MetricNames.TAG_CAUSE,
+                    "InvalidTypeIdException")
+                .count())
         .isEqualTo(1.0);
   }
 

@@ -893,11 +893,14 @@ you touch these areas.
   module does not depend on Spring Data JPA.
 - In the frontend every handler carries a gate of its own or its class's,
   and the route table with its gates is a committed snapshot
-  (`frontend/src/test/resources/security/route-gate-snapshot.txt`), as is
-  the list of session-bound types (`session/session-bound-types.txt`).
-  An intended change rewrites both with
+  (`frontend/src/test/resources/security/route-gate-snapshot.txt`). An
+  intended change rewrites it with
   `./gradlew :frontend:test -PupdateSnapshots`; commit the diff with the
-  change so the reviewer sees it (REQ-FE-025, REQ-FE-027).
+  change so the reviewer sees it (REQ-FE-025).
+- A type the frontend newly flashes or stores in the session gets an
+  exact entry in `SessionTypeAllowList.SESSION_BOUND_TYPES` in the same
+  change; `SessionBoundTypeClosureTest` fails the build until it has
+  one, and on an entry nothing stores any more (REQ-FE-027).
 - Full role / permission matrix:
   [`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md).
 

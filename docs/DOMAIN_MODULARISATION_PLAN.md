@@ -198,7 +198,8 @@ reference DTOs).
 - **URIs.** Of 624 `BackendApiClient` call sites, 356 build the backend path by string
   concatenation and 41 through URI templates.
 - **Package-keyed couplings.** The session deserializer admits application classes by the prefix
-  `…frontend.model.` (production enforces it since 2026-09-25); 172 `T(…support.Roles)` references in
+  `…frontend.model.` (production enforces it since 2026-09-25; replaced by the exact list on
+  2026-10-04, F2); 172 `T(…support.Roles)` references in
   22 templates resolve only at render time; three DTO contract tests are keyed on the `model.dto`
   package; the authorization gate test checks classes, not handlers.
 - **Assets.** 100 scripts, 64 stylesheets and 120 templates map onto the domains (19 core + 81 domain
@@ -789,7 +790,7 @@ domain stays a package.
 | --- | --- |
 | F0 | Guards (Phase 0.4) |
 | F1 | Kernel extraction: `BackendErrorMapper` (a sealed outcome type with a pattern switch), template overloads for write verbs, the eleven bypassing controllers moved onto the kernel, the `WebClient` confinement rule at zero |
-| F2 | Exact session allow-list in its own release (D-10) |
+| F2 — **done 2026-10-04** | Exact session allow-list in its own release (D-10): `SessionTypeAllowList.SESSION_BOUND_TYPES`, 21 exact names; the `…frontend.model.` prefix is gone, `SessionBoundTypeClosureTest` holds the list equal to the derived set in both directions. Corrections: the list lives in the security class, not in the G-16 golden file (`session-bound-types.txt` is deleted, so `-PupdateSnapshots` can no longer widen the allow-list); the admitted application classes fall from 325 to 21, not "about 20" of "about eleven" forms — the 21 are 10 flashed forms and DTOs with their nested types and enums |
 | F3 | Typed client per domain, small domains first (audit, notification, settings, dashboard, exchange, orgchart), then the large four; untyped `Map` relays typed in the same step |
 | F4 | Package-by-domain move in one pull request; route/gate snapshot byte-identical |
 | F5 | Templates and assets per domain (§8.2), with the page chrome as one layout fragment |
