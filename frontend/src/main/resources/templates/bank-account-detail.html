@@ -4,6 +4,7 @@
     <title th:text="${detail != null ? detail.account().name() : ''} + ' - ' + ${appTitle}">Konto - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/bank.css}">
+        <link rel="stylesheet" th:href="@{/css/bank-account-detail.css}">
     </th:block>
 </head>
 <body>
@@ -16,20 +17,15 @@
     <div id="bank-account-results">
     <th:block th:fragment="accountBody" th:if="${detail != null}"
               th:with="acct=${detail.account()}, caps=${detail.capabilities()}">
-    <div class="greeting hud-box flex-between">
-        <div>
-            <h1 th:text="${acct.name()}">Staffel IRIDIUM</h1>
-            <p class="text-muted krtm-margin-0-25rem-0-0-font-size-0-8rem-cb15">
-                <span class="chip krtm-font-size-0-55rem-eff3"
-                      th:text="#{'bank.account.type.' + ${acct.type()}}">Staffel</span>
-                <span class="status-pill"
-                      th:classappend="${acct.status() == 'ACTIVE'} ? ' status-active' : ' status-completed'"
-                      th:text="#{'bank.account.status.' + ${acct.status()}}"
-                      data-testid="bank-account-status">Aktiv</span>
-                <span th:text="${acct.accountNo()}" data-testid="bank-account-no">KB-0001</span>
-            </p>
-        </div>
-        <div class="bank-head-actions">
+    <th:block th:replace="~{fragments/bank-account-detail :: detailHead(acct=${acct}, eyebrowKey='bank.dashboard.title',
+        eyebrowHref=@{/bank}, noTestId='bank-account-no', actions=~{::bank-detail-actions})}">
+        <th:block th:ref="bank-detail-actions">
+            <button type="button" class="btn btn-ghost"
+                    data-trigger="open-modal-display" data-modal-id="bank-statement-modal"
+                    data-testid="bank-statement-open">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-pdf"/></svg>
+                <span th:text="#{bank.action.statement}">Kontoauszug</span>
+            </button>
             <button type="button" class="btn btn--cta"
                     th:if="${acct.status() == 'ACTIVE' and caps != null and (caps.canDeposit() or caps.canWithdraw() or caps.canTransfer())}"
                     data-trigger="open-modal-display" data-modal-id="bank-movement-modal"
@@ -37,221 +33,43 @@
                 <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-swap"/></svg>
                 <span th:text="#{bank.action.movement}">Kontobewegung</span>
             </button>
-            <button type="button" class="btn btn-ghost"
-                    data-trigger="open-modal-display" data-modal-id="bank-statement-modal"
-                    data-testid="bank-statement-open">
-                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-pdf"/></svg>
-                <span th:text="#{bank.action.statement}">Kontoauszug</span>
-            </button>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
-    <div class="bank-facts mt-2">
-        <div class="kpi-total">
-            <div class="kpi-label" th:text="#{bank.detail.balance}">Kontosaldo</div>
-            <div class="kpi-value" data-testid="bank-balance"
-                 th:text="${#numbers.formatInteger(@moneyFormat.round(acct.balance()), 1, 'POINT')} + ' aUEC'">1.850.000 aUEC</div>
-        </div>
-        <div class="kpi-total">
-            <div class="kpi-label" th:text="#{bank.detail.delta30}">&#177; 30 Tage</div>
-            <div class="kpi-value"
-                 th:classappend="${detail.delta30d().signum() > 0} ? ' bank-amount--pos' : (${detail.delta30d().signum() < 0} ? ' bank-amount--neg' : '')"
-                 th:text="${detail.delta30d().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(detail.delta30d()), 1, 'POINT')}">+420.000</div>
-        </div>
-        <div class="kpi-total">
-            <div class="kpi-label" th:text="#{bank.detail.bookings}">Buchungen</div>
-            <div class="kpi-value" th:text="${detail.bookingCount()}">128</div>
-        </div>
-    </div>
+    <th:block th:replace="~{fragments/bank-account-detail :: kpis(acct=${acct}, delta=${detail.delta30d()},
+        bookingCount=${detail.bookingCount()}, balanceTestId='bank-balance', targetTestId='bank-detail-target')}"></th:block>
 
-    <th:block
-        th:replace="~{fragments/bank-approval-limits :: limitsDisplay(${detail.approvalLimits()})}"></th:block>
+    <th:block th:replace="~{fragments/bank-approval-limits :: limitsDisplay(${detail.approvalLimits()})}"></th:block>
 
-    <div class="bank-panel mt-2" data-testid="bank-info-panel">
-        <button type="button" class="bank-panel-head bank-collapse-head" data-trigger="bank-info-collapse"
-                aria-expanded="false" aria-controls="bank-info-body" data-testid="bank-info-toggle">
-            <span class="bank-collapse-title">
-                <svg class="krt-icon bank-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
-                <span th:text="#{bank.detail.info}">Konto-Info</span>
-            </span>
-        </button>
-        <div class="bank-panel-body" id="bank-info-body" hidden>
-            <div class="bank-kv">
-                <span class="bank-kv-key" th:text="#{bank.detail.info.no}">Kontonummer</span>
-                <span class="bank-kv-value" th:text="${acct.accountNo()}">KB-0001</span>
-            </div>
-            <div class="bank-kv">
-                <span class="bank-kv-key" th:text="#{bank.detail.info.type}">Typ</span>
-                <span class="bank-kv-value" th:text="#{'bank.account.type.' + ${acct.type()}}">Staffel</span>
-            </div>
-            <div class="bank-kv" th:if="${acct.orgUnit() != null}">
-                <span class="bank-kv-key" th:text="#{bank.detail.info.orgUnit}">Org-Einheit</span>
-                <span class="bank-kv-value" th:text="${acct.orgUnit().name()}">IRIDIUM</span>
-            </div>
-            <div class="bank-kv" th:if="${acct.areaName() != null}">
-                <span class="bank-kv-key" th:text="#{bank.detail.info.area}">Bereich</span>
-                <span class="bank-kv-value" th:text="${acct.areaName()}">Logistik</span>
-            </div>
-            <div class="bank-kv">
-                <span class="bank-kv-key" th:text="#{bank.detail.info.status}">Status</span>
-                <span class="bank-kv-value" th:text="#{'bank.account.status.' + ${acct.status()}}">Aktiv</span>
-            </div>
-            <div class="bank-kv">
-                <span class="bank-kv-key" th:text="#{bank.detail.info.created}">Angelegt</span>
-                <span class="bank-kv-value"><span class="utc-time" th:text="${acct.createdAt()}">2026-01-15T10:00:00Z</span></span>
-            </div>
-        </div>
-    </div>
+    <th:block th:replace="~{fragments/bank-account-detail :: tabNav(idPrefix='bank-detail', testIdPrefix='bank-detail',
+        bookingCount=${detail.bookingCount()}, secondTab='info', secondLabelKey='bank.detail.info',
+        secondTestId='bank-detail-tab-info', storageKey='bank_account_tab_', tabsLabel=${acct.name()})}"></th:block>
 
-    <div class="bank-detail-panels mt-2">
-    <div class="bank-panel" data-testid="bank-chart-panel">
-        <button type="button" class="bank-panel-head bank-collapse-head"
-                data-trigger="bank-panel-collapse" data-collapse-key="chart" aria-expanded="true"
-                aria-controls="bank-chart-body" th:aria-label="#{bank.chart.toggle}"
-                data-testid="bank-chart-toggle">
-            <span class="bank-collapse-title">
-                <svg class="krt-icon bank-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
-                <span th:text="#{bank.chart.title}">Saldoverlauf</span>
-            </span>
-        </button>
-        <div class="bank-panel-body" id="bank-chart-body">
-            <div id="bank-chart-results">
+    <div class="stack bank-detail-panel" id="bank-detail-panel-history" data-tabpanel="history" role="tabpanel"
+         aria-labelledby="bank-detail-tab-history">
+        <section class="card bank-chart-card" data-testid="bank-chart-panel">
+            <div id="bank-chart-results" data-bank-swap="balanceChart">
             <th:block th:fragment="balanceChart">
                 <th:block th:replace="~{fragments/bank-balance-chart :: chartBody}"></th:block>
             </th:block>
             </div>
-        </div>
-    </div>
+        </section>
 
-    <div class="bank-panel" data-testid="bank-bookings-panel">
-        <button type="button" class="bank-panel-head bank-collapse-head"
-                data-trigger="bank-panel-collapse" data-collapse-key="history" aria-expanded="true"
-                aria-controls="bank-history-body" th:aria-label="#{bank.history.toggle}"
-                data-testid="bank-history-toggle">
-            <span class="bank-collapse-title">
-                <svg class="krt-icon bank-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
-                <span th:text="#{bank.detail.history}">Buchungshistorie</span>
-            </span>
-        </button>
-        <div class="bank-panel-body" id="bank-history-body">
-            <form class="bank-history-filter" method="get" th:action="@{${historyBaseUrl}}"
-                  data-bank-history-filter>
-                <div class="bank-history-filter-field">
-                    <label for="bank-history-from" th:text="#{bank.filter.period.from}">Von</label>
-                    <input type="date" id="bank-history-from" name="from" th:value="${historyFrom}"
-                           data-testid="bank-history-from">
-                </div>
-                <div class="bank-history-filter-field">
-                    <label for="bank-history-to" th:text="#{bank.filter.period.to}">Bis</label>
-                    <input type="date" id="bank-history-to" name="to" th:value="${historyTo}"
-                           data-testid="bank-history-to">
-                </div>
-                <input type="hidden" name="size" th:value="${bookings != null ? bookings.size() : 50}">
-                <button type="submit" class="btn btn-outline btn-sm" data-testid="bank-history-apply"
-                        th:text="#{bank.filter.period.apply}">Anwenden</button>
-            </form>
-            <div id="bank-bookings-results">
+        <section class="card card--flush bank-bookings-card" data-testid="bank-bookings-panel">
+            <th:block th:replace="~{fragments/bank-account-detail :: historyFilter(idPrefix='bank-history',
+                testIdPrefix='bank-history', resultsId='bank-bookings-results', fragmentName='bookings')}"></th:block>
+            <div id="bank-bookings-results" data-bank-swap="bookings" data-bank-swap-history="true">
             <th:block th:fragment="bookings">
-            <div class="table-responsive" th:if="${bookings != null and !#lists.isEmpty(bookings.content())}">
-                <table class="data-table bank-bookings-table">
-                    <thead>
-                    <tr>
-                        <th class="bank-expand-col" aria-hidden="true"></th>
-                        <th th:text="#{bank.booking.date}">Datum</th>
-                        <th th:text="#{bank.booking.type}">Typ</th>
-                        <th th:text="#{bank.booking.holder}">Halter</th>
-                        <th th:text="#{bank.booking.counterparty}">Quell-/Zielkonto</th>
-                        <th class="text-right" th:text="#{bank.booking.amount}">Betrag</th>
-                        <th sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)"></th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <th:block th:each="b : ${bookings.content()}"
-                              th:with="hasDetail=${!#strings.isEmpty(b.justification()) or !#strings.isEmpty(b.note()) or !#strings.isEmpty(b.staffNote())},detailId='bank-bk-' + ${b.postingId()}">
-                    <tr data-testid="bank-booking-row" class="bank-booking-row"
-                        th:classappend="${hasDetail} ? ' is-expandable' : ''"
-                        th:attr="data-transaction-id=${b.transactionId()}">
-                        <td class="bank-expand-cell">
-                            <button type="button" class="bank-row-toggle" th:if="${hasDetail}"
-                                    data-trigger="bank-row-expand" aria-expanded="false"
-                                    th:attr="aria-controls=${detailId}"
-                                    th:aria-label="#{bank.detail.toggleDetails}"
-                                    data-testid="bank-booking-expand">
-                                <svg class="krt-icon bank-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
-                            </button>
-                        </td>
-                        <td><span class="utc-time" th:text="${b.createdAt()}">2026-06-10T18:30:00Z</span></td>
-                        <td th:switch="${b.type()}">
-                            <span th:case="'DEPOSIT'" class="chip chip--success" th:text="#{bank.type.DEPOSIT}">Einzahlung</span>
-                            <span th:case="'WITHDRAWAL'" class="chip chip--warning" th:text="#{bank.type.WITHDRAWAL}">Auszahlung</span>
-                            <span th:case="'TRANSFER'" class="chip" th:text="#{bank.type.TRANSFER}">Transfer</span>
-                            <span th:case="'REVERSAL'" class="chip chip--danger" th:text="#{bank.type.REVERSAL}">Storno</span>
-                            <span th:case="'WIPE_RESET'" class="chip chip--danger" th:text="#{bank.type.WIPE_RESET}">Wipe-Reset</span>
-                            <span th:case="*" class="chip" th:text="${b.type()}">?</span>
-                        </td>
-                        <td>
-                            <span th:if="${b.type() == 'TRANSFER' and b.counterHolderHandle() != null}"
-                                  th:text="${@handles.display(b.holderHandle())} + ' &#8594; ' + ${@handles.display(b.counterHolderHandle())}">A &#8594; B</span>
-                            <span th:unless="${b.type() == 'TRANSFER' and b.counterHolderHandle() != null}"
-                                  th:text="${@handles.display(b.holderHandle())}">greluc</span>
-                        </td>
-                        <td class="bank-counterparty-cell" data-testid="bank-booking-counterparty">
-                            <span th:if="${b.type() == 'TRANSFER' and b.counterAccountNo() != null}"
-                                  th:text="(${b.amount().signum() < 0} ? '&#8594; ' : '&#8592; ') + ${b.counterAccountNo()}">&#8594; KB-0002</span>
-                            <span th:if="${b.counterpartyHandle() != null}"
-                                  th:text="${@handles.display(b.counterpartyHandle())} + (${b.counterpartyOrgUnitName() != null} ? ' (' + ${b.counterpartyOrgUnitName()} + ')' : '')">carol (Staffel Rot)</span>
-                        </td>
-                        <td class="text-right">
-                            <span class="bank-amount"
-                                  th:classappend="${b.amount().signum() > 0} ? ' bank-amount--pos' : (${b.amount().signum() < 0} ? ' bank-amount--neg' : ' bank-amount--zero')"
-                                  th:text="${b.amount().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(b.amount()), 1, 'POINT')}">+250.000</span>
-                            <span class="bank-fee-note text-muted" data-testid="bank-booking-fee"
-                                  th:if="${b.transferFee() != null and b.transferFee().signum() > 0 and b.amount().signum() < 0}"
-                                  th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'POINT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'POINT')}">Geb&uuml;hr 25 &middot; kommt an 4.975.000</span>
-                        </td>
-                        <td sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)" class="text-right">
-                            <button type="button" class="btn btn-ghost btn-sm bank-reverse-btn"
-                                    th:if="${(b.type() == 'DEPOSIT' or b.type() == 'WITHDRAWAL' or b.type() == 'TRANSFER') and b.reversedTransactionId() == null}"
-                                    data-trigger="open-modal-display" data-modal-id="bank-reverse-modal"
-                                    th:attr="data-field-_id=${b.transactionId()}"
-                                    data-testid="bank-reverse-open"
-                                    th:text="#{bank.action.reverse}">Stornieren</button>
-                        </td>
-                    </tr>
-                    <tr class="bank-booking-detail" th:if="${hasDetail}" th:id="${detailId}" hidden
-                        data-testid="bank-booking-detail">
-                        <td colspan="6" class="bank-booking-detail-cell">
-                            <div class="bank-booking-detail-body">
-                                <div class="bank-detail-item" th:if="${!#strings.isEmpty(b.justification())}">
-                                    <span class="bank-detail-label" th:text="#{bank.booking.justification}">Begr&uuml;ndung</span>
-                                    <span class="bank-detail-value" data-testid="bank-booking-justification" th:text="${b.justification()}">Missionsfreigabe</span>
-                                </div>
-                                <div class="bank-detail-item" th:if="${!#strings.isEmpty(b.note())}">
-                                    <span class="bank-detail-label" th:text="#{bank.booking.note}">Notiz</span>
-                                    <span class="bank-detail-value" th:text="${b.note()}">Missionsertrag</span>
-                                </div>
-                                <div class="bank-detail-item" th:if="${!#strings.isEmpty(b.staffNote())}">
-                                    <span class="bank-detail-label" th:text="#{bank.booking.staffNote}">Notiz Bankmitarbeiter</span>
-                                    <span class="bank-detail-value" data-testid="bank-booking-staff-note" th:text="${b.staffNote()}">Nach Rücksprache</span>
-                                </div>
-                            </div>
-                        </td>
-                        <td sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)"></td>
-                    </tr>
-                    </th:block>
-                    </tbody>
-                </table>
-            </div>
-            <p class="text-center text-muted" th:if="${bookings == null or #lists.isEmpty(bookings.content())}"
-               data-testid="bank-bookings-empty" th:text="#{bank.detail.history.empty}">Noch keine Buchungen.</p>
-            <div class="pagination-controls" th:if="${bookings != null and bookings.totalElements() > 0}">
-                <nav th:replace="~{fragments/pagination :: pageSizePicker(${bookings}, ${paginationBaseUrl}, ${pageSizes})}"></nav>
-                <nav th:replace="~{fragments/pagination :: pagination(${bookings}, ${paginationBaseUrl})}"></nav>
-            </div>
+                <th:block th:replace="~{fragments/bank-account-detail :: bookingsTable(staff=true,
+                    rowTestId='bank-booking-row', testIdPrefix='bank-booking', emptyTestId='bank-bookings-empty')}"></th:block>
             </th:block>
             </div>
-        </div>
+        </section>
     </div>
+
+    <div class="stack bank-detail-panel" id="bank-detail-panel-info" data-tabpanel="info" role="tabpanel"
+         aria-labelledby="bank-detail-tab-info" hidden>
+        <th:block th:replace="~{fragments/bank-account-detail :: infoCard(${acct})}"></th:block>
     </div>
 
     <th:block th:if="${caps != null and (caps.canDeposit() or caps.canWithdraw() or caps.canTransfer())}">
@@ -330,61 +148,7 @@
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
+<script th:src="@{/js/bank-account-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:attr="nonce=${cspNonce}">
-    function bindBankDetailSwaps() {
-        if (window.krtFetch) {
-            window.krtFetch.bindSwap({
-                container: '#bank-bookings-results',
-                fragmentValue: 'bookings',
-                history: true
-            });
-            window.krtFetch.bindSwap({
-                container: '#bank-chart-results',
-                fragmentValue: 'balanceChart',
-                history: false
-            });
-        }
-    }
-    document.addEventListener('DOMContentLoaded', bindBankDetailSwaps);
-    document.addEventListener('krt:swapped', bindBankDetailSwaps);
-
-    function bankHistorySwapUrl(form) {
-        var base = form.getAttribute('action');
-        var params = new URLSearchParams();
-        var fromEl = form.querySelector('input[name="from"]');
-        var toEl = form.querySelector('input[name="to"]');
-        if (fromEl && fromEl.value) { params.set('from', fromEl.value); }
-        if (toEl && toEl.value) { params.set('to', toEl.value); }
-        var size = new URLSearchParams(window.location.search).get('size');
-        if (!size) { var hidden = form.querySelector('input[name="size"]'); size = hidden ? hidden.value : ''; }
-        if (size) { params.set('size', size); }
-        params.set('page', '0');
-        return base + '?' + params.toString();
-    }
-    function bankHistoryFilter(form) {
-        if (!window.krtFetch) { return; }
-        window.krtFetch.swap({
-            url: bankHistorySwapUrl(form),
-            container: '#bank-bookings-results',
-            fragmentValue: 'bookings',
-            history: true
-        });
-    }
-    document.addEventListener('submit', function (event) {
-        var form = event.target.closest ? event.target.closest('form[data-bank-history-filter]') : null;
-        if (!form || !window.krtFetch) { return; }
-        event.preventDefault();
-        bankHistoryFilter(form);
-    });
-    document.addEventListener('change', function (event) {
-        var input = event.target.closest
-            ? event.target.closest('form[data-bank-history-filter] input[type="date"]')
-            : null;
-        if (!input) { return; }
-        var form = input.closest('form[data-bank-history-filter]');
-        if (form) { bankHistoryFilter(form); }
-    });
-</script>
 </body>
 </html>

@@ -35,10 +35,12 @@ import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -160,8 +162,9 @@ public class BankPageController {
   }
 
   /**
-   * Renders the account detail page: facts strip, balance chart, paged booking history and the
-   * booking modals with the holder registry and transfer targets they need.
+   * Renders the account detail page: KPI tiles, balance chart, paged booking history with the
+   * balance after each posting, the Konto-Info tab and the booking modals with the holder registry
+   * they need.
    *
    * @param id the account id
    * @param page zero-based booking page
@@ -284,8 +287,10 @@ public class BankPageController {
       bookings = null;
     }
     model.addAttribute("bookings", bookings);
+    model.addAttribute("balancesAfter", fetchBalancesAfter(id, bookings));
     model.addAttribute("historyFrom", period.fromDate());
     model.addAttribute("historyTo", period.toDate());
+    model.addAttribute("historyPreset", BankAccountDetailSupport.historyPreset(period));
     model.addAttribute("pageSizes", BankAccountDetailSupport.PAGE_SIZES);
     model.addAttribute("historyBaseUrl", "/bank/accounts/" + id);
     model.addAttribute(
@@ -294,6 +299,31 @@ public class BankPageController {
             .queryParam("from", period.fromDate())
             .queryParam("to", period.toDate())
             .toUriString());
+  }
+
+  /**
+   * Derives the balance after each posting of a booking page from the account balance at the newest
+   * posting's instant; a backend failure leaves the column empty.
+   *
+   * @param id the account id
+   * @param bookings the booking page, or {@code null} when it failed to load
+   * @return posting id to balance after that posting, empty when it cannot be derived
+   */
+  @NotNull
+  private Map<UUID, BigDecimal> fetchBalancesAfter(
+      @NotNull UUID id, @Nullable PageResponse<BankBookingDto> bookings) {
+    Instant anchor = BankRunningBalance.anchorInstant(bookings);
+    if (anchor == null || bookings == null) {
+      return Map.of();
+    }
+    try {
+      BigDecimal anchorBalance =
+          BankRunningBalance.lastBalance(fetchBalanceSeries(id, anchor, anchor));
+      return BankRunningBalance.balancesAfter(bookings.content(), anchorBalance);
+    } catch (RuntimeException e) {
+      log.warn("Error loading the running balance for account {}", id, e);
+      return Map.of();
+    }
   }
 
   /**

@@ -57,6 +57,15 @@
 - **Benachrichtigungen: „Ungelesen · Alle" und Links.** Die Seite zeigt zunächst nur Ungelesenes;
   Benachrichtigungen zu Aufträgen, Materialbörse, verbundenen Anwendungen und Admin-Vorgängen
   führen direkt zur Seite (REQ-NOTIF-022).
+- **Kartellbank: Kontodetail mit Kennzahlen und Reitern.** Beide Kontodetailseiten zeigen Saldo,
+  Ziel, ± 30 Tage und Buchungen als Kacheln, darunter die Reiter „Buchungen" und „Konto-Info" bzw.
+  „Ziel & Sichtbarkeit"; die Historie hat „30 Tage · 90 Tage · Zeitraum …" und die Spalte „Saldo
+  nach Buchung", einklappbare Bereiche entfallen. Auf der Org-Einheits-Bank heißt der Reiter jetzt
+  „Anträge an unsere Konten", und „Laufende Anträge" zeigt den Freigabeweg.
+- **Buchungsanträge: Status als Segment.** „Ausstehend · Bestätigt · Abgelehnt · Alle" ersetzt die
+  Status-Checkboxen, „n warten auf dich" zählt die entscheidbaren Anträge; wartet ein Antrag auf
+  eine Freigabe, steht „wartet auf …" in der Zeile. Die KRT-Freigaben sind eine Stufen-Leiste.
+
 - **Auftragsverwaltung: „Meine · Alle".** Wer beides sehen darf, wechselt zwischen eigenen und allen
   Aufträgen (REQ-ORDERS-040).
 

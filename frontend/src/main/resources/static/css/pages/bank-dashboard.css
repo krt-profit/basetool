@@ -1,0 +1,7 @@
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    .bank-totals {
+        margin-bottom: var(--space-4);
+    }
+}
