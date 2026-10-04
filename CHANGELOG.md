@@ -368,6 +368,10 @@
 
 ### Security
 
+- **Monitoring: Grafana 13.2.2 → 13.2.3.** Sicherheitsrelease gegen CVE-2026-13719,
+  CVE-2026-13720 und CVE-2026-81841 (je mittlere Schwere: Alert-Regeln fremder Ordner lesbar,
+  Provisioning-Metadaten durch Editoren setzbar, pausierter öffentlicher Dashboard-Link blieb
+  gültig). Digest in Compose und Quadlet aktualisiert; wirkt nach dem nächsten Deploy.
 - **Ingest prüft den Hostnamen des Backends standardmäßig.** Der Jar-Default von
   `app.ingest.verify-backend-hostname` ist jetzt `true`; nur das `dev`-Profil schaltet ihn ab.
   Compose und Quadlet setzten bereits `true` (ING-SEC-04).
