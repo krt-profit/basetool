@@ -4,6 +4,7 @@
     <title th:text="#{hangar.title} + ' - ' + ${appTitle}">Hangar - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
 <link rel="stylesheet" th:href="@{/css/pages/hangar.css}">
+<link th:if="${activeTab == 'unit'}" rel="stylesheet" th:href="@{/css/pages/hangar-squadron.css}">
     </th:block>
 </head>
 <body th:data-show-modal="${showShipModal}">
@@ -11,115 +12,246 @@
 
 <th:block th:replace="~{fragments/header :: header}" />
 
-<main>
-    <div class="greeting hud-box flex-between">
-        <h1 th:text="#{hangar.title}">Hangar</h1>
-        <a th:href="@{/hangar/squadron}" class="btn btn-ghost" th:text="#{hangar.squadron.title}">Org-Einheitsübersicht</a>
-    </div>
+<main th:with="mineTab=${activeTab != 'unit'}">
+    <th:block th:if="${mineTab}">
+        <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{hangar.title}, count=null, actions=~{::hangar-actions})}">
+            <th:block th:ref="hangar-actions">
+                <button type="button" id="fleetview-import-btn" class="btn btn-ghost" data-testid="hangar-import"
+                        th:title="#{hangar.import.description}"
+                        th:data-uploading="#{hangar.import.uploading}"
+                        th:data-error-toolarge="#{hangar.import.error.tooLarge}"
+                        th:data-max-bytes="${hangarImportMaxBytes}"
+                        th:data-error-failed="#{hangar.import.error.failed}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-upload"/></svg> <span th:text="#{hangar.import.open}">Fleetview importieren</span></button>
+                <input type="file" id="fleetview-file" accept=".json,application/json" hidden
+                       data-testid="hangar-import-file" th:attr="aria-label=#{hangar.import.label}">
+                <button type="button" id="add-ship-btn" data-testid="hangar-add-ship" class="btn btn--cta"
+                        data-trigger="hangar-add-ship" th:data-action="@{/hangar/add}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{hangar.ship.add}">Schiff hinzuf&uuml;gen</span></button>
+                <th:block th:replace="~{fragments/components :: overflowMenu(id='hangar-more', items=~{::hangar-more-items})}">
+                    <th:block th:ref="hangar-more-items">
+                        <button type="button" id="set-home-location-btn" class="overflow-menu__item" role="menuitem"
+                                data-trigger="hangar-open-home" data-testid="hangar-home-location"
+                                th:data-ship-count="${totalShipCount}"
+                                th:data-empty-title="#{hangar.empty}"
+                                th:disabled="${totalShipCount == 0}"
+                                th:title="${totalShipCount == 0} ? #{hangar.empty} : null"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bookout"/></svg> <span th:text="#{hangar.home_location.menu}">Home-Location f&uuml;r alle setzen</span></button>
+                        <div class="overflow-menu__sep" role="separator"></div>
+                        <button type="button" id="delete-all-ships-btn" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
+                                data-testid="hangar-delete-all"
+                                th:data-empty-title="#{hangar.empty}"
+                                th:disabled="${totalShipCount == 0}"
+                                th:title="${totalShipCount == 0} ? #{hangar.empty} : null"
+                                th:data-error-failed="#{hangar.delete_all.error.failed}"
+                                th:data-success="#{hangar.delete_all.success}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{hangar.delete_all.menu}">Hangar leeren &hellip;</span></button>
+                    </th:block>
+                </th:block>
+            </th:block>
+        </th:block>
+    </th:block>
+    <th:block th:unless="${mineTab}">
+        <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{hangar.title}, count=null, actions=null)}"></th:block>
+    </th:block>
 
-    <div class="hud-box mt-2">
+    <nav class="tab-nav hangar-tabs" th:aria-label="#{hangar.title}" data-testid="hangar-tabs"
+         th:with="unitLabel=${activeOrgUnit != null ? (activeOrgUnit.orgUnitShorthand() != null ? activeOrgUnit.orgUnitShorthand() : activeOrgUnit.orgUnitName()) : null}">
+        <a th:href="@{/hangar}" class="tab" th:classappend="${mineTab} ? 'active'"
+           th:attr="aria-current=${mineTab} ? 'page' : null" data-testid="hangar-tab-mine"
+           ><span th:text="#{hangar.tab.mine}">Meine Schiffe</span><span class="tab-count" id="hangar-tab-count-mine"
+                th:if="${mineTabCount != null}" th:text="${mineTabCount}">7</span></a>
+        <a th:href="@{/hangar/squadron}" class="tab" th:classappend="${!mineTab} ? 'active'"
+           th:attr="aria-current=${!mineTab} ? 'page' : null" data-testid="hangar-tab-unit"
+           ><span th:text="${unitLabel != null} ? #{hangar.tab.unit(${unitLabel})} : #{hangar.tab.unit.plain}">Org-Einheit IRI</span><span class="tab-count" id="hangar-tab-count-unit"
+                th:if="${unitTabCount != null}" th:text="${unitTabCount}"
+                th:attr="data-list-count-for=${!mineTab} ? 'squadron-results' : null">31</span></a>
+    </nav>
 
-        <div class="data-section" id="hangar-results" th:data-live-sync-topic="${hangarLiveSyncTopic}">
+    <div th:if="${error}" class="alert alert-danger" th:text="#{__${error}__}">Fehler</div>
+
+    <th:block th:if="${mineTab}">
+        <form id="hangar-filter-form" class="no-track" role="search" method="get" th:action="@{/hangar}">
+            <div class="toolbar">
+                <th:block th:replace="~{fragments/components :: toolbarSearch('hangar-ship-filter', 'search', ${search}, 'hangar.filter.placeholder')}"></th:block>
+                <th:block th:replace="~{fragments/components :: segmented(name='fitted', labelKey='hangar.fit.label', selected=${fitted},
+                    options=${ {{value: '', labelKey: 'filter.all'}, {value: 'true', labelKey: 'hangar.fit.ready'}, {value: 'false', labelKey: 'hangar.fit.notReady'}} })}"></th:block>
+                <span class="toolbar__spacer"></span>
+                <span class="toolbar__count" id="hangar-fit-summary" data-testid="hangar-fit-summary"
+                      th:hidden="${fittedShipCount == null or totalShipCount == 0}"
+                      th:text="${fittedShipCount != null} ? #{hangar.fitSummary(${fittedShipCount}, ${totalShipCount})} : ''">5 von 7 einsatzbereit</span>
+            </div>
+            <input type="hidden" name="size" th:value="${pageSize}">
+        </form>
+
+        <div id="hangar-results" class="card card--flush" th:data-live-sync-topic="${hangarLiveSyncTopic}">
         <th:block th:fragment="hangarResults">
-            <div class="flex-between-mb">
-                <h2 th:text="#{hangar.my_ships}">Meine Schiffe</h2>
-                <div class="flex-gap-xs">
-                    <button id="set-home-location-btn" type="button" class="btn btn-outline"
-                            data-trigger="hangar-open-home"
-                            th:if="${totalShipCount > 0}"
-                            th:data-ship-count="${totalShipCount}"
-                            th:text="#{hangar.home_location.btn}">Home-Location setzen</button>
-                    <button id="add-ship-btn" data-testid="hangar-add-ship" class="btn btn--cta" data-trigger="hangar-add-ship" th:data-action="@{/hangar/add}" th:text="#{hangar.ship.add}">Schiff hinzufügen</button>
-                </div>
+            <div hidden id="hangar-stats" data-testid="hangar-stats"
+                 th:data-total="${totalShipCount}" th:data-fitted="${fittedShipCount}"></div>
+            <div class="table-responsive" th:if="${!#lists.isEmpty(myShips)}">
+                <table class="data-table data-table--stack hangar-table">
+                    <thead>
+                        <tr>
+                            <th th:text="#{hangar.list.ship}">Schiff</th>
+                            <th th:text="#{hangar.list.location}">Standort</th>
+                            <th th:text="#{hangar.ship.insurance}">Versicherung</th>
+                            <th class="cell-status" th:text="#{hangar.list.status}">Status</th>
+                            <th th:if="${isAllSquadronsMode}" th:text="#{hangar.ship.owning_squadron}">Staffel</th>
+                            <th class="cell-actions"><span class="visually-hidden" th:text="#{hangar.ship.action}">Aktion</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="ship : ${myShips}" data-testid="hangar-ship-row"
+                            th:with="typeName=${ship.shipType != null and ship.shipType.name != null ? ship.shipType.name : ''},
+                                     makerName=${ship.shipType != null and ship.shipType.manufacturer != null and ship.shipType.manufacturer.name != null ? ship.shipType.manufacturer.name : ''},
+                                     hull=${#strings.trim(makerName + ' ' + typeName)},
+                                     named=${ship.name != null and !#strings.isEmpty(#strings.trim(ship.name))},
+                                     ready=${ship.fitted == true},
+                                     ins=${ship.insurance},
+                                     locName=${ship.location != null ? ship.location.name : null}">
+                            <td>
+                                <span class="cell-title" th:text="${named ? ship.name : hull}">Iron Mule</span>
+                                <span class="cell-sub"><span th:text="${named ? hull : #messages.msg('hangar.ship.unnamed')}">Drake Cutlass Black</span><span
+                                      class="hangar-row__loc" th:if="${locName != null}" th:text="' · ' + ${locName}"> · Area18</span></span>
+                            </td>
+                            <td class="hangar-cell-loc" th:text="${locName != null ? locName : '–'}">Area18</td>
+                            <td class="hangar-cell-ins">
+                                <span th:if="${ins == 'LTI'}" class="chip chip--primary" th:text="#{hangar.ship.insurance.lti}">LTI</span>
+                                <span th:if="${ins == '0'}" class="chip chip--muted" th:text="#{hangar.ship.insurance.none}">Keine</span>
+                                <span th:if="${ins != null and ins != 'LTI' and ins != '0' and !#strings.isEmpty(ins)}" class="chip"
+                                      th:text="#{hangar.ship.insurance.short(${ins})}">3 Mon.</span>
+                                <span th:if="${ins == null or #strings.isEmpty(ins)}" class="hangar-ins-unset">&ndash;</span>
+                            </td>
+                            <td class="cell-status">
+                                <span class="hangar-fit" th:classappend="${ready} ? 'hangar-fit--ready'"
+                                      ><span class="status-dot" th:classappend="${ready} ? 'status-dot--on'" aria-hidden="true"></span><span
+                                      class="hangar-fit__label" th:text="${ready} ? #{hangar.status.ready} : #{hangar.status.notReady}">Einsatzbereit</span></span>
+                            </td>
+                            <td th:if="${isAllSquadronsMode}" th:attr="data-label=#{hangar.ship.owning_squadron}">
+                                <span th:if="${ship.owningSquadron != null}" class="squadron-badge"
+                                      th:title="${ship.owningSquadron.name()}"
+                                      th:text="${ship.owningSquadron.shorthand()}">IRI</span>
+                                <span th:if="${ship.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
+                            </td>
+                            <td class="cell-actions">
+                                <button type="button" class="btn btn-ghost btn-icon edit-ship-btn"
+                                        data-trigger="hangar-edit-ship"
+                                        th:data-action="@{/hangar/{id}/update(id=${ship.id})}"
+                                        th:data-id="${ship.id}"
+                                        th:data-name="${ship.name}"
+                                        th:data-type="${ship.shipType != null ? ship.shipType.id : ''}"
+                                        th:data-ins="${ship?.insurance}"
+                                        th:data-loc="${ship.location != null ? ship.location.id : ''}"
+                                        th:data-fitted="${ship.fitted}"
+                                        th:data-version="${ship.version}"
+                                        th:title="#{hangar.ship.edit}" th:aria-label="#{hangar.ship.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
 
-            <form th:if="${totalShipCount > 0 or search != null}"
-                  id="hangar-filter-form" class="hangar-filter-form" role="search"
-                  method="get" th:action="@{/hangar}">
-                <div class="hangar-filter">
-                    <span class="hangar-filter-icon" aria-hidden="true">
-                        <svg class="krt-icon"><use href="#krt-icon-search"/></svg>
-                    </span>
-                    <input type="search" id="hangar-ship-filter" name="search" autocomplete="off"
-                           th:value="${search}"
-                           th:attr="placeholder=#{hangar.filter.placeholder},aria-label=#{hangar.filter.placeholder}">
-                    <input type="hidden" name="size" th:value="${pageSize}">
-                </div>
-                <a th:if="${search != null}" id="hangar-filter-clear" class="btn btn-ghost"
-                   th:href="@{/hangar(size=${pageSize})}"
-                   th:text="#{hangar.filter.clear}">Filter zur&uuml;cksetzen</a>
-            </form>
+            <th:block th:if="${#lists.isEmpty(myShips) and error == null and search == null and fitted == ''}">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='hangar.empty', textKey='hangar.empty.text')}"></th:block>
+            </th:block>
+            <th:block th:if="${#lists.isEmpty(myShips) and error == null and (search != null or fitted != '')}">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='hangar.filter.no_results', textKey='hangar.filter.no_results.text',
+                    actionHref=@{/hangar(size=${pageSize})}, actionKey='hangar.filter.clear')}"></th:block>
+            </th:block>
 
-            <div class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th th:text="#{hangar.ship.manufacturer}">Hersteller</th>
-                        <th th:text="#{hangar.ship.type}">Schiffstyp</th>
-                        <th th:text="#{hangar.ship.insurance}">Versicherung</th>
-                        <th th:text="#{hangar.ship.location}">Ort</th>
-                        <th th:text="#{hangar.ship.fitted}">Fitted</th>
-                        <th th:text="#{hangar.ship.name}">Name</th>
-                        <th th:if="${isAllSquadronsMode}" th:text="#{hangar.ship.owning_squadron}">Staffel</th>
-                        <th th:text="#{hangar.ship.action}">Aktion</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="ship : ${myShips}" data-testid="hangar-ship-row">
-                        <td th:text="${ship.shipType != null && ship.shipType.manufacturer != null ? ship.shipType.manufacturer.name : ''}">Hersteller</td>
-                        <td th:text="${ship.shipType != null ? ship.shipType.name : ''}">Typ</td>
-                        <td>
-                            <th:block th:with="ins=${ship?.insurance}">
-                                <th:block th:switch="${ins}">
-                                    <span th:case="'0'" th:text="#{hangar.ship.insurance.none}">Keine</span>
-                                    <span th:case="'LTI'" th:text="#{hangar.ship.insurance.lti}">LTI</span>
-                                    <span th:case="'1'" th:text="#{hangar.ship.insurance.month}">1 Monat</span>
-                                    <span th:case="*" th:if="${ins != null}" th:text="#{hangar.ship.insurance.months(${ins})}">X Monate</span>
-                                    <span th:case="*" th:unless="${ins != null}">-</span>
-                                </th:block>
-                            </th:block>
-                        </td>
-                        <td th:text="${ship.location != null ? ship.location.name : ''}">Ort</td>
-                        <td th:text="${ship.fitted ? #messages.msg('hangar.ship.yes') : #messages.msg('hangar.ship.no')}">Nein</td>
-                        <td th:text="${ship.name}">Name</td>
-                        <td th:if="${isAllSquadronsMode}">
-                            <span th:if="${ship.owningSquadron != null}" class="squadron-badge"
-                                  th:title="${ship.owningSquadron.name()}"
-                                  th:text="${ship.owningSquadron.shorthand()}">IRI</span>
-                            <span th:if="${ship.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
-                        </td>
-                        <td class="flex-gap-xs">
-                            <button class="btn btn-ghost btn-icon edit-ship-btn"
-                                    data-trigger="hangar-edit-ship"
-                                    th:data-action="@{/hangar/{id}/update(id=${ship.id})}"
-                                    th:data-id="${ship.id}"
-                                    th:data-name="${ship.name}"
-                                    th:data-type="${ship.shipType != null ? ship.shipType.id : ''}"
-                                    th:data-ins="${ship?.insurance}"
-                                    th:data-loc="${ship.location != null ? ship.location.id : ''}"
-                                    th:data-fitted="${ship.fitted}"
-                                    th:data-version="${ship.version}"
-                                    th:title="#{hangar.ship.edit}" th:aria-label="#{hangar.ship.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
-                        </td>
-                    </tr>
-                    <tr th:if="${#lists.isEmpty(myShips) and search == null}">
-                        <td th:attr="colspan=${isAllSquadronsMode ? 8 : 7}" class="text-center" th:text="#{hangar.empty}">Keine Schiffe im Hangar.</td>
-                    </tr>
-                    <tr th:if="${#lists.isEmpty(myShips) and search != null}">
-                        <td th:attr="colspan=${isAllSquadronsMode ? 8 : 7}" class="text-center" th:text="#{hangar.filter.no_results}">Keine Treffer für diese Suche.</td>
-                    </tr>
-                </tbody>
-            </table>
-            </div>
-
-            <div class="pagination-controls" th:if="${myShipsPage != null}">
-                <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${myShipsPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
-                <nav th:replace="~{fragments/pagination :: pagination(pageResponse=${myShipsPage}, baseUrl=${paginationBaseUrl})}"></nav>
-            </div>
+            <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${myShipsPage}, baseUrl=${paginationBaseUrl})}"></th:block>
+            <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${myShipsPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
         </th:block>
         </div>
-    </div>
+    </th:block>
 
+    <th:block th:unless="${mineTab}">
+        <form id="squadron-filter-form" class="no-track" role="search" method="get" th:action="@{/hangar/squadron}">
+            <div class="toolbar">
+                <th:block th:replace="~{fragments/components :: toolbarSearch('squadron-ship-filter', 'search', ${search}, 'hangar.filter.placeholder')}"></th:block>
+                <span class="toolbar__spacer"></span>
+                <span class="hangar-legend" aria-hidden="true"
+                      ><span class="hangar-legend__item"><span class="hangar-legend__swatch hangar-legend__swatch--ready"></span><span th:text="#{hangar.status.ready}">einsatzbereit</span></span
+                      ><span class="hangar-legend__item"><span class="hangar-legend__swatch"></span><span th:text="#{hangar.status.notReady}">nicht bereit</span></span></span>
+            </div>
+            <input type="hidden" name="size" th:value="${pageSize}">
+        </form>
+
+        <div th:if="${isAllSquadronsMode}" class="alert alert-info" th:text="#{hangar.squadron.all_squadrons_notice}">
+            Aggregation across all org units. Select a single org unit to filter.
+        </div>
+
+        <div id="squadron-results" class="card card--flush">
+        <th:block th:fragment="squadronResults">
+            <div class="table-responsive" th:if="${!#lists.isEmpty(overview)}">
+                <table class="data-table data-table--stack hangar-tree" data-testid="squadron-table">
+                    <thead>
+                        <tr>
+                            <th th:text="#{hangar.ship.type}">Schiffstyp</th>
+                            <th class="num" th:text="#{hangar.squadron.count}">Anzahl</th>
+                            <th th:text="#{hangar.status.ready}">Einsatzbereit</th>
+                        </tr>
+                    </thead>
+                    <th:block th:each="item, it : ${overview}"
+                              th:with="groupId=${'sq-owners-' + it.index},
+                                       hasDetails=${item.details != null and !item.details.isEmpty()},
+                                       pct=${item.count > 0 ? item.fittedCount * 100 / item.count : 0}">
+                        <tbody class="hangar-tree__group">
+                            <tr class="hangar-tree__row" data-testid="squadron-type-row">
+                                <td>
+                                    <div class="hangar-tree__type">
+                                        <span class="hangar-tree__toggle-slot"
+                                              ><button sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)"
+                                                       th:if="${hasDetails}" type="button" class="btn-icon hangar-tree__toggle"
+                                                       aria-expanded="false" data-testid="squadron-owners-toggle"
+                                                       th:attr="aria-controls=${groupId},aria-label=#{hangar.squadron.owners.toggle(${item.shipType.name})},title=#{hangar.squadron.owners.toggle(${item.shipType.name})}"
+                                              ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg></button></span>
+                                        <span class="hangar-tree__name">
+                                            <span class="cell-title" th:text="${item.shipType.name}">Cutlass Black</span>
+                                            <span class="cell-sub" th:if="${item.shipType.manufacturer != null}"
+                                                  th:text="${item.shipType.manufacturer.name}">Drake</span>
+                                        </span>
+                                    </div>
+                                </td>
+                                <td class="num hangar-tree__count" th:text="${item.count}">9</td>
+                                <td class="hangar-tree__fit">
+                                    <div class="hangar-tree__fit-inner">
+                                        <div class="meter hangar-tree__meter" aria-hidden="true"><i class="meter__fill--success" th:data-krtm-width="${pct}"></i></div>
+                                        <span class="hangar-tree__fit-text" th:text="#{hangar.squadron.fitOf(${item.fittedCount}, ${item.count})}">7 von 9</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tbody sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)"
+                               th:if="${hasDetails}" class="hangar-tree__owners" th:id="${groupId}" hidden>
+                            <tr th:each="detail : ${item.details}" class="hangar-tree__owner" data-testid="squadron-owner-row">
+                                <td><span class="hangar-tree__owner-name" th:text="${detail.ownerName}">greluc</span></td>
+                                <td class="num hangar-tree__owner-gap"></td>
+                                <td>
+                                    <div class="hangar-tree__owner-meta">
+                                        <span class="hangar-fit" th:classappend="${detail.fitted} ? 'hangar-fit--ready'"
+                                              ><span class="status-dot" th:classappend="${detail.fitted} ? 'status-dot--on'" aria-hidden="true"></span><span
+                                              class="hangar-fit__label" th:text="${detail.fitted} ? #{hangar.status.ready} : #{hangar.status.notReady}">Bereit</span></span>
+                                        <span class="hangar-tree__owner-loc" th:text="${detail.locationName != null ? detail.locationName : '–'}">Area18</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </th:block>
+                </table>
+            </div>
+
+            <th:block th:if="${#lists.isEmpty(overview) and error == null and search == null}">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='hangar.squadron.empty', textKey='hangar.squadron.empty.text')}"></th:block>
+            </th:block>
+            <th:block th:if="${#lists.isEmpty(overview) and error == null and search != null}">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='hangar.filter.no_results', textKey='hangar.filter.no_results.text',
+                    actionHref=@{/hangar/squadron(size=${pageSize})}, actionKey='hangar.filter.clear')}"></th:block>
+            </th:block>
+
+            <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${overviewPage}, baseUrl=${paginationBaseUrl})}"></th:block>
+            <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${overviewPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
+        </th:block>
+        </div>
+    </th:block>
+
+    <th:block th:if="${mineTab}">
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='ship-modal', titleKey='hangar.ship.modal_title', variant='krt-modal--wide', titleId='modal-title', closeTrigger='', closeClass='close-ship-modal', body=~{::ship-modal-body})}">
         <th:block th:ref="ship-modal-body">
             <form id="ship-form" data-testid="hangar-ship-form" th:data-title-add="#{hangar.ship.add}" th:data-title-edit="#{hangar.ship.edit}" method="post" th:object="${shipForm}" th:action="${modalAction != null} ? ${modalAction} : @{/hangar}">
@@ -138,12 +270,12 @@
                         <option value="" disabled selected th:text="#{hangar.ship.select_type}">Bitte wählen...</option>
                         <option th:each="st : ${shipTypes}" th:value="${st.id}" th:text="${st.name}" th:data-manufacturer-id="${st.manufacturer != null ? st.manufacturer.id : ''}"></option>
                     </select>
-                    <div th:if="${#fields.hasErrors('shipTypeId')}" th:errors="*{shipTypeId}" class="text-danger"></div>
+                    <div th:if="${#fields.hasErrors('shipTypeId')}" th:errors="*{shipTypeId}" class="field-error"></div>
                 </div>
                 <div class="form-group">
                     <label for="ship-name" th:text="#{hangar.ship.name}">Name</label>
                     <input type="text" id="ship-name" name="name" th:field="*{name}">
-                    <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="text-danger"></div>
+                    <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="field-error"></div>
                 </div>
                 <fieldset class="form-group ship-insurance" data-testid="ship-insurance"
                           th:with="insVal=*{insurance}, insKind=${insVal == null or insVal == '' ? null : (insVal == '0' ? 'NONE' : (insVal == 'LTI' ? 'LTI' : 'MONTHS'))}">
@@ -168,50 +300,21 @@
                         <option value="" th:text="#{hangar.ship.select_location}">Bitte wählen...</option>
                         <option th:each="loc : ${locations}" th:value="${loc.id}" th:text="${loc.name}"></option>
                     </select>
-                    <div th:if="${#fields.hasErrors('locationId')}" th:errors="*{locationId}" class="text-danger"></div>
+                    <div th:if="${#fields.hasErrors('locationId')}" th:errors="*{locationId}" class="field-error"></div>
                 </div>
                 <div class="form-group flex-gap-sm">
                     <input type="checkbox" id="ship-fitted" name="fitted" th:field="*{fitted}">
-                    <label for="ship-fitted" class="krtm-margin-bottom-0-5043" th:text="#{hangar.ship.fitted.label}">Fitted (Einsatzbereit)</label>
+                    <label for="ship-fitted" class="ship-fitted-label" th:text="#{hangar.ship.fitted.label}">Fitted (Einsatzbereit)</label>
                 </div>
                 <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
                 </div>
                 <div class="krt-modal-foot">
-                    <button type="button" id="modal-delete-btn" class="btn btn-quiet-danger krtm-display-none-5790"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{hangar.ship.delete}">Löschen</span></button>
+                    <button type="button" id="modal-delete-btn" class="btn btn-quiet-danger" hidden><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{hangar.ship.delete}">Löschen</span></button>
                     <button type="submit" class="btn btn--cta" data-testid="hangar-ship-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{hangar.ship.save}">Speichern</span></button>
                 </div>
             </form>
         </th:block>
     </th:block>
-
-    <div class="hud-box mt-2 import-section">
-        <h2 th:text="#{hangar.import.title}">Fleetview-Import</h2>
-        <p th:text="#{hangar.import.description}">Importiere deine Schiffe aus einer CCU Game Fleetview-JSON-Exportdatei.</p>
-        <div class="form-row">
-            <div class="form-group">
-                <label for="fleetview-file" th:text="#{hangar.import.label}">Fleetview-JSON-Datei</label>
-                <input type="file" id="fleetview-file" accept=".json,application/json" class="krtm-min-height-44px-1df5">
-            </div>
-            <button id="fleetview-import-btn" class="btn btn-outline" type="button"
-                    th:text="#{hangar.import.btn}"
-                    th:data-uploading="#{hangar.import.uploading}"
-                    th:data-error-nofile="#{hangar.import.error.nofile}"
-                    th:data-error-toolarge="#{hangar.import.error.tooLarge}"
-                    th:data-max-bytes="${hangarImportMaxBytes}"
-                    th:data-error-failed="#{hangar.import.error.failed}">Importieren</button>
-        </div>
-        <p id="fleetview-status" class="import-status-msg krtm-display-none-5790"></p>
-
-        <div class="delete-all-section">
-            <h3 th:text="#{hangar.delete_all.section_title}">Hangar leeren</h3>
-            <div class="delete-all-row">
-                <p th:text="#{hangar.delete_all.description}">Alle eigenen Schiffe aus dem Hangar entfernen.</p>
-                <button id="delete-all-ships-btn" class="btn btn-quiet-danger" type="button"
-                        th:data-error-failed="#{hangar.delete_all.error.failed}"
-                        th:data-success="#{hangar.delete_all.success}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{hangar.delete_all.btn}">Alle Schiffe löschen</span></button>
-            </div>
-        </div>
-    </div>
 
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='import-result-modal', titleKey='hangar.import.result.title', variant='krt-modal--wide', titleId='import-result-title', closeId='import-result-close-x', closeTrigger='', body=~{::import-result-modal-body})}">
         <th:block th:ref="import-result-modal-body">
@@ -228,12 +331,12 @@
                 <span th:text="#{hangar.import.result.duplicates}">Duplikate übersprungen</span>
                 <span id="import-res-duplicates">0</span>
             </div>
-            <div id="import-skip-section" class="krtm-display-none-5790">
-                <p class="krtm-margin-top-1rem-font-weight-700-color-var-co-65be" th:text="#{hangar.import.result.skipped_list}">Nicht erkannte Schiffe</p>
+            <div id="import-skip-section" hidden>
+                <p class="import-list-title" th:text="#{hangar.import.result.skipped_list}">Nicht erkannte Schiffe</p>
                 <div id="import-skip-list" class="skip-list"></div>
             </div>
-            <div id="import-dup-section" class="krtm-display-none-5790">
-                <p class="krtm-margin-top-1rem-font-weight-700-color-var-co-65be" th:text="#{hangar.import.result.duplicates_list}">Übersprungene Duplikate</p>
+            <div id="import-dup-section" hidden>
+                <p class="import-list-title" th:text="#{hangar.import.result.duplicates_list}">Übersprungene Duplikate</p>
                 <div id="import-dup-list" class="skip-list"></div>
             </div>
             </div>
@@ -300,8 +403,10 @@
             </div>
         </th:block>
     </th:block>
+    </th:block>
 </main>
 
+<th:block th:if="${activeTab != 'unit'}">
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     var hangarI18n = {
         addSuccess:    /*[[#{notification.success.ship_add}]]*/ 'Schiff hinzugefuegt.',
@@ -312,7 +417,8 @@
         updateError:   /*[[#{error.hangar.ship.update}]]*/ 'Aktualisieren fehlgeschlagen.',
         deleteError:   /*[[#{error.hangar.ship.delete}]]*/ 'Loeschen fehlgeschlagen.',
         homeError:     /*[[#{error.hangar.home_location.set}]]*/ 'Setzen fehlgeschlagen.',
-        homeBodyTemplate: /*[[#{hangar.home_location.modal.body}]]*/ 'Setzt den Ort von {0} Schiff(en) auf die gewaehlte Home-Location.'
+        homeBodyTemplate: /*[[#{hangar.home_location.modal.body}]]*/ 'Setzt den Ort von {0} Schiff(en) auf die gewaehlte Home-Location.',
+        fitSummaryTemplate: /*[[#{hangar.fitSummary}]]*/ '{0} von {1} einsatzbereit'
     };
     var hangarConflict = {
         title:                /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
@@ -323,5 +429,7 @@
     };
 </script>
 <script th:src="@{/js/hangar.js}" defer th:attr="nonce=${cspNonce}"></script>
+</th:block>
+<script th:if="${activeTab == 'unit'}" th:src="@{/js/hangar-squadron.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

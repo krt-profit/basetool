@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintOverviewEntryDt
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -127,10 +128,53 @@ class BlueprintOverviewPageControllerMvcTest {
     mockMvc
         .perform(get("/blueprint-overview").param("fragment", "results"))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("class=\"data-table\"")))
+        .andExpect(
+            content().string(containsString("class=\"data-table data-table--stack bpo-table\"")))
         .andExpect(content().string(containsString("class=\"pagination\"")))
         .andExpect(content().string(not(containsString("id=\"bp-overview-results\""))))
-        .andExpect(content().string(not(containsString("class=\"bp-filter\""))));
+        .andExpect(content().string(not(containsString("id=\"bp-overview-filter-form\""))));
+  }
+
+  /**
+   * The list follows the list pattern: a page head with the „Flotte &amp; Logistik" eyebrow and the
+   * total, one always-visible search, the owners column filled per row, no HUD box and no „Details"
+   * button column.
+   */
+  @Test
+  @WithMockUser
+  void view_rendersTheListPattern() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page(0, 50, 3));
+
+    mockMvc
+        .perform(get("/blueprint-overview").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-testid=\"page-head\"")))
+        .andExpect(content().string(containsString("data-testid=\"page-eyebrow\"")))
+        .andExpect(content().string(containsString("Flotte &amp; Logistik")))
+        .andExpect(content().string(containsString("data-testid=\"page-head-count\"")))
+        .andExpect(content().string(containsString("data-testid=\"toolbar-search\"")))
+        .andExpect(content().string(containsString("data-testid=\"bp-overview-row\"")))
+        .andExpect(content().string(containsString("data-product-key=\"product-0\"")))
+        .andExpect(content().string(containsString("class=\"bpo-chips\"")))
+        .andExpect(content().string(containsString("Kann craften")))
+        .andExpect(content().string(not(containsString("hud-box"))))
+        .andExpect(content().string(not(containsString("class=\"greeting"))))
+        .andExpect(content().string(not(containsString("bp-filter"))))
+        .andExpect(content().string(not(containsString("<details"))));
+  }
+
+  /** An empty list shows the shared empty state instead of a table row spanning the columns. */
+  @Test
+  @WithMockUser
+  void view_emptyList_rendersTheEmptyState() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page(0, 50, 0));
+
+    mockMvc
+        .perform(get("/blueprint-overview"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-testid=\"empty-state\"")))
+        .andExpect(content().string(not(containsString("text-center"))))
+        .andExpect(content().string(not(containsString("bpo-table"))));
   }
 
   @Test

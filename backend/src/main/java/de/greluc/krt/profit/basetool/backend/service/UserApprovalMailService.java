@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.MailProperties;
-import de.greluc.krt.profit.basetool.backend.event.UserApprovalDecidedEvent;
+import de.greluc.krt.profit.basetool.backend.identity.api.events.UserApprovalDecidedEvent;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
