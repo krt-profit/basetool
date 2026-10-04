@@ -84,7 +84,7 @@ class MaterialgesuchPageControllerMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
-  /** Stubs both count pairs (shared four-tab bar) plus a one-request board + detail. */
+  /** Stubs both count pairs (tabs and scope segment) plus a one-request board + detail. */
   private void stubBoard(MaterialRequestDto request) {
     when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
         .thenReturn(new MaterialExchangeCountsDto(0, 0));
@@ -129,8 +129,8 @@ class MaterialgesuchPageControllerMvcTest {
         .perform(get("/materialboerse").param("mode", "requests"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Agricium")))
-        .andExpect(content().string(containsString("data-mb-tab")))
-        .andExpect(content().string(containsString("Alle Gesuche")))
+        .andExpect(content().string(containsString("data-mb-mode=\"requests\"")))
+        .andExpect(content().string(containsString("data-testid=\"mb-create-request\"")))
         .andExpect(content().string(containsString("<strong>Titanium</strong>")))
         .andExpect(content().string(containsString("squadron-badge")))
         .andExpect(content().string(containsString(">IRI<")))

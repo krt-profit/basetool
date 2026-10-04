@@ -20,12 +20,15 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -58,6 +61,7 @@ import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.time.Instant;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -67,6 +71,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -157,36 +162,71 @@ class RefineryOrderServiceLifecycleTest {
     private final Pageable pageable = PageRequest.of(0, 10);
 
     @Test
-    void getMyRefineryOrders_withEmptyStatusList_callsOwnerOnlyVariant() {
+    void getMyRefineryOrders_withEmptyStatusList_filtersOnEveryStatus() {
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(refineryOrderRepository.findByOwnerId(OWNER_ID, pageable)).thenReturn(page);
-
-      assertEquals(
-          1, service.getMyRefineryOrders(OWNER_ID, List.of(), pageable).getTotalElements());
-      verify(refineryOrderRepository, never()).findByOwnerIdAndStatusIn(any(), any(), any());
-    }
-
-    @Test
-    void getMyRefineryOrders_withNullStatusList_callsOwnerOnlyVariant() {
-      Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(refineryOrderRepository.findByOwnerId(OWNER_ID, pageable)).thenReturn(page);
-
-      assertEquals(1, service.getMyRefineryOrders(OWNER_ID, null, pageable).getTotalElements());
-    }
-
-    @Test
-    void getMyRefineryOrders_withStatusList_routesToStatusFilter() {
-      Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
-      when(refineryOrderRepository.findByOwnerIdAndStatusIn(
-              OWNER_ID, List.of(RefineryOrderStatus.OPEN), pageable))
+      when(refineryOrderRepository.findOwnedFiltered(
+              eq(OWNER_ID),
+              eq(EnumSet.allOf(RefineryOrderStatus.class)),
+              eq(false),
+              any(Instant.class),
+              isNull(),
+              eq(pageable)))
           .thenReturn(page);
 
       assertEquals(
           1,
           service
-              .getMyRefineryOrders(OWNER_ID, List.of(RefineryOrderStatus.OPEN), pageable)
+              .getMyRefineryOrders(OWNER_ID, List.of(), false, null, pageable)
               .getTotalElements());
-      verify(refineryOrderRepository, never()).findByOwnerId(any(), any());
+    }
+
+    @Test
+    void getMyRefineryOrders_withNullStatusListAndBlankQuery_filtersOnEveryStatusWithoutSearch() {
+      Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
+      when(refineryOrderRepository.findOwnedFiltered(
+              eq(OWNER_ID),
+              eq(EnumSet.allOf(RefineryOrderStatus.class)),
+              eq(false),
+              any(Instant.class),
+              isNull(),
+              eq(pageable)))
+          .thenReturn(page);
+
+      assertEquals(
+          1,
+          service.getMyRefineryOrders(OWNER_ID, null, false, "   ", pageable).getTotalElements());
+    }
+
+    @Test
+    void getMyRefineryOrders_withStatusesReadyAndQuery_passesThemAsOneFilteredQuery() {
+      Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
+      Instant before = Instant.now();
+      when(refineryOrderRepository.findOwnedFiltered(
+              eq(OWNER_ID),
+              eq(EnumSet.of(RefineryOrderStatus.OPEN)),
+              eq(true),
+              any(Instant.class),
+              eq("%laranite%"),
+              eq(pageable)))
+          .thenReturn(page);
+
+      assertEquals(
+          1,
+          service
+              .getMyRefineryOrders(
+                  OWNER_ID, List.of(RefineryOrderStatus.OPEN), true, " Laranite ", pageable)
+              .getTotalElements());
+      ArgumentCaptor<Instant> now = ArgumentCaptor.forClass(Instant.class);
+      verify(refineryOrderRepository)
+          .findOwnedFiltered(any(), any(), anyBoolean(), now.capture(), any(), any());
+      assertFalse(now.getValue().isBefore(before));
+    }
+
+    @Test
+    void searchPattern_escapesLikeWildcardsAndLowerCases() {
+      assertEquals("%50\\%\\_a%", RefineryOrderService.searchPattern("50%_A"));
+      assertNull(RefineryOrderService.searchPattern(null));
+      assertNull(RefineryOrderService.searchPattern(" "));
     }
 
     @Test
@@ -198,7 +238,8 @@ class RefineryOrderServiceLifecycleTest {
           .thenReturn(page);
 
       assertEquals(1, service.getUserRefineryOrdersScoped(OWNER_ID, pageable).getTotalElements());
-      verify(refineryOrderRepository, never()).findByOwnerId(any(), any());
+      verify(refineryOrderRepository, never())
+          .findOwnedFiltered(any(), any(), anyBoolean(), any(), any(), any());
     }
 
     @Test
@@ -212,7 +253,8 @@ class RefineryOrderServiceLifecycleTest {
           .thenReturn(page);
 
       assertEquals(1, service.getUserRefineryOrdersScoped(OWNER_ID, pageable).getTotalElements());
-      verify(refineryOrderRepository, never()).findByOwnerId(any(), any());
+      verify(refineryOrderRepository, never())
+          .findOwnedFiltered(any(), any(), anyBoolean(), any(), any(), any());
     }
 
     @Test
@@ -225,35 +267,57 @@ class RefineryOrderServiceLifecycleTest {
           .thenReturn(page);
 
       assertEquals(1, service.getUserRefineryOrdersScoped(OWNER_ID, pageable).getTotalElements());
-      verify(refineryOrderRepository, never()).findByOwnerId(any(), any());
+      verify(refineryOrderRepository, never())
+          .findOwnedFiltered(any(), any(), anyBoolean(), any(), any(), any());
     }
 
     @Test
-    void getAllRefineryOrders_emptyStatusList_callsFindAll() {
+    void getAllRefineryOrders_emptyStatusList_filtersOnEveryStatusInTheCallersScope() {
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
       when(ownerScopeService.currentScopePredicate())
           .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
-      when(refineryOrderRepository.findAllScoped(true, null, java.util.Set.of(), pageable))
+      when(refineryOrderRepository.findFilteredScoped(
+              eq(EnumSet.allOf(RefineryOrderStatus.class)),
+              eq(false),
+              any(Instant.class),
+              isNull(),
+              eq(true),
+              isNull(),
+              eq(Set.of()),
+              eq(pageable)))
           .thenReturn(page);
 
-      assertEquals(1, service.getAllRefineryOrders(List.of(), pageable).getTotalElements());
+      assertEquals(
+          1, service.getAllRefineryOrders(List.of(), false, null, pageable).getTotalElements());
       verify(refineryOrderRepository, never())
-          .findByStatusInScoped(any(), anyBoolean(), any(), any(), any());
+          .findAllScoped(anyBoolean(), any(), any(), any(Pageable.class));
     }
 
     @Test
-    void getAllRefineryOrders_withStatuses_callsFindByStatusIn() {
+    void getAllRefineryOrders_withStatusesReadyAndQuery_forwardsThemWithTheCallersScope() {
+      UUID callerStaffel = UUID.randomUUID();
       Page<RefineryOrder> page = new PageImpl<>(List.of(new RefineryOrder()));
       when(ownerScopeService.currentScopePredicate())
-          .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
-      when(refineryOrderRepository.findByStatusInScoped(
-              List.of(RefineryOrderStatus.COMPLETED), true, null, java.util.Set.of(), pageable))
+          .thenReturn(new ScopePredicate(false, null, Set.of(callerStaffel)));
+      when(refineryOrderRepository.findFilteredScoped(
+              eq(EnumSet.of(RefineryOrderStatus.OPEN, RefineryOrderStatus.IN_PROGRESS)),
+              eq(true),
+              any(Instant.class),
+              eq("%arc-l1%"),
+              eq(false),
+              isNull(),
+              eq(Set.of(callerStaffel)),
+              eq(pageable)))
           .thenReturn(page);
 
       assertEquals(
           1,
           service
-              .getAllRefineryOrders(List.of(RefineryOrderStatus.COMPLETED), pageable)
+              .getAllRefineryOrders(
+                  List.of(RefineryOrderStatus.OPEN, RefineryOrderStatus.IN_PROGRESS),
+                  true,
+                  "ARC-L1",
+                  pageable)
               .getTotalElements());
     }
 

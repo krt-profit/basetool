@@ -113,18 +113,17 @@ function addMaterialRow() {
     }
 
     if (!template.querySelector('.remove-btn')) {
-        const header = template.querySelector('.material-entry-header');
-        if (header) {
+        const actions = template.querySelector('.rod-good__actions');
+        if (actions) {
             const removeBtn = document.createElement('button');
             removeBtn.type = 'button';
-            removeBtn.className = 'btn btn-quiet-danger remove-btn btn-icon';
-            removeBtn.style.cssText = 'padding: 0.25rem 0.5rem; font-size: 0.8rem;';
+            removeBtn.className = 'btn btn-ghost btn-icon remove-btn';
             removeBtn.setAttribute('data-trigger', 'rfc-remove-material');
             removeBtn.setAttribute('title', MATERIAL_REMOVE_LABEL);
             removeBtn.setAttribute('aria-label', MATERIAL_REMOVE_LABEL);
             removeBtn.innerHTML =
                 '<svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>';
-            header.appendChild(removeBtn);
+            actions.appendChild(removeBtn);
         }
     }
 
@@ -233,9 +232,9 @@ function updateMethodRatings() {
             RATING_LEVELS[selectedOption.getAttribute('data-cost')] || '-';
         document.getElementById('ratingSpeedVal').innerText =
             SPEED_LEVELS[selectedOption.getAttribute('data-speed')] || '-';
-        ratingsDiv.style.display = 'flex';
+        ratingsDiv.hidden = false;
     } else {
-        ratingsDiv.style.display = 'none';
+        ratingsDiv.hidden = true;
     }
 }
 
@@ -273,8 +272,22 @@ function updateEndsAt() {
 }
 
 /**
- * Updates the read-only profit/loss preview as oreSales - expenses - otherExpenses; the server
- * computes the stored value.
+ * Fills the `{0}`, `{1,number,integer}`, ... placeholders of a message pattern.
+ *
+ * @param {string} pattern the raw message pattern
+ * @param {string[]} args the values in placeholder order
+ * @returns {string} the filled message
+ */
+function fillRefineryPattern(pattern, args) {
+    return pattern.replace(/\{(\d+)(?:,[^}]*)?\}/g, function (match, index) {
+        const value = args[Number(index)];
+        return value === undefined ? match : value;
+    });
+}
+
+/**
+ * Updates the profit/loss card as oreSales - expenses - otherExpenses with its calculation line;
+ * the server computes the stored value.
  */
 function updateProfitPreview() {
     const expensesEl = document.getElementById('expenses');
@@ -285,10 +298,20 @@ function updateProfitPreview() {
     const expenses = parseFloat(expensesEl && expensesEl.value) || 0;
     const otherExpenses = parseFloat(otherExpensesEl && otherExpensesEl.value) || 0;
     const oreSales = parseFloat(oreSalesEl && oreSalesEl.value) || 0;
+    const locale = document.documentElement.lang || undefined;
     const profit = Math.round(oreSales - expenses - otherExpenses);
-    preview.value = profit.toLocaleString();
-    preview.classList.toggle('text-danger', profit < 0);
-    preview.classList.toggle('text-muted', profit >= 0);
+    const sign = profit > 0 ? '+ ' : profit < 0 ? '− ' : '';
+    preview.textContent = sign + Math.abs(profit).toLocaleString(locale);
+    preview.classList.toggle('rod-profit--neg', profit < 0);
+    preview.classList.toggle('rod-profit--pos', profit >= 0);
+    const breakdown = document.getElementById('profitBreakdown');
+    const template = breakdown ? breakdown.getAttribute('data-template') : null;
+    if (breakdown && template) {
+        breakdown.textContent = fillRefineryPattern(template, [
+            Math.round(oreSales).toLocaleString(locale),
+            Math.round(expenses + otherExpenses).toLocaleString(locale),
+        ]);
+    }
 }
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {

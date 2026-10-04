@@ -1,17 +1,22 @@
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
+ *
  * SPDX-License-Identifier: GPL-3.0-only
  *
- * Materialbörse board interactions (Flotte & Logistik). The board carries two modes — Angebote
- * (offers) and Gesuche (requests) — sharing one four-tab bar. Tabs / filters / sort and row
- * selection re-render server fragments through window.krtFetch.swap; interest / deactivate writes
- * go through window.krtFetch.write; the offer release/edit dialog is window.krtMaterialRelease
- * (materialboerse-release.js) and the request create/edit dialog is window.krtMaterialRequest
- * (materialgesuch-modal.js). Board changes peer-sync over the shared multiplexed window.krtLiveSync
- * `materialboard` room — offers on the `board` section key, requests on `requests`. No hand-rolled
- * fetch, no full-page reload, no native dialogs. REQ-MARKET-*, REQ-FE-001..015.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+
 (function () {
     'use strict';
 
@@ -24,10 +29,13 @@
     const SERIALIZE_KEY = 'materialboerse';
     const REQUEST_SERIALIZE_KEY = 'materialgesuch';
     const MATERIALBOARD_TOPIC = 'materialboard';
+    const FILTER_PREF_KEY = 'materialboerse_filters';
+    const FILTER_PANEL_ID = 'mb-filter-panel';
+    const SORT_KEYS = ['qual', 'menge', 'mat', 'neu'];
+    const form = document.getElementById('mb-filter-form');
     let selectedId = readSelectedId();
     let selectedRequestId = readSelectedRequestId();
     let searchTimer = null;
-    let requestSearchTimer = null;
 
     function fmt(template, value) {
         return String(template || '').replace('{0}', value);
@@ -48,22 +56,40 @@
         return el ? el.value.trim() : '';
     }
 
-    function activeTabEl() {
-        return document.querySelector('.tab.active[data-mb-tab]');
-    }
-
-    function activeTab() {
-        const tab = activeTabEl();
-        return tab ? tab.getAttribute('data-mb-tab') : 'alle';
-    }
-
+    /**
+     * The board view the active tab shows.
+     *
+     * @returns {string} `requests` for the Gesuche, `offers` for the Angebote
+     */
     function activeMode() {
-        const tab = activeTabEl();
-        return tab ? tab.getAttribute('data-mb-mode') || 'offers' : 'offers';
+        const tab = document.querySelector('.tab.active[data-mb-mode]');
+        return tab && tab.getAttribute('data-mb-mode') === 'requests' ? 'requests' : 'offers';
     }
 
-    const FILTER_PREF_KEY = 'materialboerse_filters';
-    const SORT_KEYS = ['qual', 'menge', 'mat', 'neu'];
+    /**
+     * The scope the segment selects, in the stored and backend spelling.
+     *
+     * @returns {string} `mein` for the caller's own entries, `alle` for every entry
+     */
+    function activeTab() {
+        const checked = form ? form.querySelector('input[name="scope"]:checked') : null;
+        return checked && checked.value === 'mine' ? 'mein' : 'alle';
+    }
+
+    /**
+     * Selects the scope segment that matches a stored scope.
+     *
+     * @param {string} tab `mein` or `alle`
+     */
+    function setScope(tab) {
+        if (!form) {
+            return;
+        }
+        const wanted = tab === 'mein' ? 'mine' : 'all';
+        form.querySelectorAll('input[name="scope"]').forEach(function (radio) {
+            radio.checked = radio.value === wanted;
+        });
+    }
 
     function defaultBoardFilters() {
         return { minQuality: '', minAmount: '', sort: 'qual', excludeStolen: false };
@@ -126,70 +152,122 @@
     const rawFilterPref = readFilterPref();
     const filterState = normalizeFilterPref(rawFilterPref);
 
-    function persistFilters() {
-        if (activeTabEl()) {
-            filterState.mode = activeMode();
-            filterState.tab = activeTab();
-        }
-        if (document.querySelector('[data-mb-minquality]')) {
-            filterState.offers.minQuality = val('[data-mb-minquality]');
-            filterState.offers.minAmount = val('[data-mb-minamount]');
-            filterState.offers.sort = val('[data-mb-sort]') || 'qual';
-            filterState.offers.excludeStolen = excludeStolenChecked();
-        }
-        if (document.querySelector('[data-mg-minquality]')) {
-            filterState.requests.minQuality = val('[data-mg-minquality]');
-            filterState.requests.minAmount = val('[data-mg-minamount]');
-            filterState.requests.sort = val('[data-mg-sort]') || 'qual';
-        }
-        writeFilterPref(filterState);
-    }
-
-    function filterVal(selector, savedValue) {
-        const el = document.querySelector(selector);
-        if (el) {
-            return el.value.trim();
-        }
-        return savedValue == null ? '' : String(savedValue);
+    /**
+     * The „ohne gestohlene" checkbox (REQ-INV-053).
+     *
+     * @returns {HTMLInputElement | null} the checkbox, or null when the toolbar is missing
+     */
+    function excludeStolenBox() {
+        return /** @type {HTMLInputElement | null} */ (
+            document.querySelector('[data-mb-exclude-stolen]')
+        );
     }
 
     /**
-     * Whether the board's „ohne gestohlene" filter is on (REQ-INV-053), falling back to the saved
-     * state while the toolbar is not rendered.
+     * Whether the „ohne gestohlene" filter applies; it is offered on the Angebote only.
      *
      * @returns {boolean} the filter state
      */
     function excludeStolenChecked() {
-        const el = /** @type {HTMLInputElement | null} */ (
-            document.querySelector('[data-mb-exclude-stolen]')
-        );
-        return el ? el.checked : filterState.offers.excludeStolen === true;
+        const box = excludeStolenBox();
+        return !!box && box.checked && !box.disabled;
+    }
+
+    /** Stores the active view, scope and the active view's toolbar values (REQ-UI-017). */
+    function persistFilters() {
+        const mode = activeMode();
+        filterState.mode = mode;
+        filterState.tab = activeTab();
+        const current = {
+            minQuality: val('[data-mb-minquality]'),
+            minAmount: val('[data-mb-minamount]'),
+            sort: val('[data-mb-sort]') || 'qual',
+            excludeStolen: mode === 'requests' ? false : excludeStolenChecked(),
+        };
+        if (mode === 'requests') {
+            filterState.requests = current;
+        } else {
+            filterState.offers = current;
+        }
+        writeFilterPref(filterState);
+    }
+
+    function setIfDifferent(selector, value) {
+        const el = document.querySelector(selector);
+        const next = value == null ? '' : String(value);
+        if (!el || el.value.trim() === next) {
+            return false;
+        }
+        el.value = next;
+        return true;
+    }
+
+    /**
+     * Writes a view's stored filters into the shared toolbar; the stolen filter is disabled and
+     * hidden on the Gesuche.
+     *
+     * @param {{minQuality: string, minAmount: string, sort: string, excludeStolen: boolean}} saved
+     *     the stored filters of the view
+     * @param {string} mode the view the toolbar now serves
+     * @returns {boolean} true when a control changed
+     */
+    function writeControls(saved, mode) {
+        let changed = setIfDifferent('[data-mb-minquality]', saved.minQuality);
+        changed = setIfDifferent('[data-mb-minamount]', saved.minAmount) || changed;
+        changed = setIfDifferent('[data-mb-sort]', saved.sort) || changed;
+        const requests = mode === 'requests';
+        const box = excludeStolenBox();
+        if (box) {
+            const wanted = !requests && saved.excludeStolen === true;
+            if (box.checked !== wanted) {
+                box.checked = wanted;
+                changed = true;
+            }
+            box.disabled = requests;
+        }
+        document.querySelectorAll('[data-mb-offers-only]').forEach(function (el) {
+            /** @type {HTMLElement} */ (el).hidden = requests;
+        });
+        return changed;
+    }
+
+    /** Re-renders the filter chips and the filter badge after a programmatic change. */
+    function refreshFilterUi() {
+        if (window.krtFilterChips && form) {
+            window.krtFilterChips.refresh(form);
+        }
+        if (window.krtFilterPanel) {
+            window.krtFilterPanel.refresh(FILTER_PANEL_ID);
+        }
     }
 
     function params() {
         const p = new URLSearchParams();
-        p.set('tab', activeTab());
-        const qv = val('[data-mb-search]');
+        const requests = activeMode() === 'requests';
+        p.set('view', requests ? 'requests' : 'offers');
+        p.set('scope', activeTab() === 'mein' ? 'mine' : 'all');
+        const qv = val('#mb-search');
         if (qv) {
             p.set('q', qv);
         }
-        const minQ = filterVal('[data-mb-minquality]', filterState.offers.minQuality);
+        const minQ = val('[data-mb-minquality]');
         if (minQ) {
             p.set('minQuality', minQ);
         }
-        const minA = filterVal('[data-mb-minamount]', filterState.offers.minAmount);
+        const minA = val('[data-mb-minamount]');
         if (minA) {
             p.set('minAmount', minA);
         }
-        const sort = filterVal('[data-mb-sort]', filterState.offers.sort);
+        const sort = val('[data-mb-sort]');
         if (sort) {
             p.set('sort', sort);
         }
-        if (excludeStolenChecked()) {
+        if (!requests && excludeStolenChecked()) {
             p.set('excludeStolen', 'true');
         }
-        if (selectedId) {
-            p.set('selected', selectedId);
+        const selected = requests ? selectedRequestId : selectedId;
+        if (selected) {
+            p.set('selected', selected);
         }
         return p;
     }
@@ -199,7 +277,7 @@
         p.set('fragment', 'list');
         return window.krtFetch.swap({
             url: '/materialboerse?' + p.toString(),
-            container: '#mb-listwrap',
+            container: activeMode() === 'requests' ? '#mg-listwrap' : '#mb-listwrap',
             fragmentValue: 'list',
             history: false,
         });
@@ -225,61 +303,27 @@
         });
     }
 
-    function requestParams() {
-        const p = new URLSearchParams();
-        p.set('mode', 'requests');
-        p.set('tab', activeTab());
-        const qv = val('[data-mg-search]');
-        if (qv) {
-            p.set('q', qv);
-        }
-        const minQ = filterVal('[data-mg-minquality]', filterState.requests.minQuality);
-        if (minQ) {
-            p.set('minQuality', minQ);
-        }
-        const minA = filterVal('[data-mg-minamount]', filterState.requests.minAmount);
-        if (minA) {
-            p.set('minAmount', minA);
-        }
-        const sort = filterVal('[data-mg-sort]', filterState.requests.sort);
-        if (sort) {
-            p.set('sort', sort);
-        }
-        if (selectedRequestId) {
-            p.set('selected', selectedRequestId);
-        }
-        return p;
-    }
-
-    function swapRequestList() {
-        const p = requestParams();
-        p.set('fragment', 'list');
-        return window.krtFetch.swap({
-            url: '/materialboerse?' + p.toString(),
-            container: '#mg-listwrap',
-            fragmentValue: 'list',
-            history: false,
-        });
-    }
-
-    function swapRequestBoard() {
-        const p = requestParams();
-        p.set('fragment', 'board');
-        return window.krtFetch.swap({
-            url: '/materialboerse?' + p.toString(),
-            container: '#mb-board',
-            fragmentValue: 'board',
-            history: false,
-        });
-    }
-
     function swapRequestDetail(id) {
         return window.krtFetch.swap({
-            url: '/materialboerse?mode=requests&fragment=detail&selected=' + encodeURIComponent(id),
+            url: '/materialboerse?view=requests&fragment=detail&selected=' + encodeURIComponent(id),
             container: '#mg-detail',
             fragmentValue: 'detail',
             history: false,
         });
+    }
+
+    /** Puts the active view and scope into the address bar, so the view can be linked. */
+    function syncUrl() {
+        const p = new URLSearchParams();
+        p.set('view', activeMode());
+        p.set('scope', activeTab() === 'mein' ? 'mine' : 'all');
+        try {
+            window.history.replaceState(
+                window.history.state,
+                '',
+                window.location.pathname + '?' + p.toString(),
+            );
+        } catch (_e) {}
     }
 
     function applyAgo(root) {
@@ -309,24 +353,53 @@
         });
     }
 
-    function setActiveTabEl(el) {
-        document.querySelectorAll('.tab[data-mb-tab]').forEach(function (btn) {
-            const on = btn === el;
+    /**
+     * Marks a view's tab active and shows that view's create menu.
+     *
+     * @param {string} mode `offers` or `requests`
+     */
+    function setActiveMode(mode) {
+        document.querySelectorAll('.tab[data-mb-mode]').forEach(function (btn) {
+            const on = btn.getAttribute('data-mb-mode') === mode;
             btn.classList.toggle('active', on);
             btn.setAttribute('aria-selected', on ? 'true' : 'false');
         });
-    }
-
-    function tabEl(mode, tab) {
-        return document.querySelector(
-            '.tab[data-mb-mode="' + mode + '"][data-mb-tab="' + tab + '"]',
-        );
-    }
-
-    function toggleCtaGroups(mode) {
+        if (window.krtOverflowMenu) {
+            window.krtOverflowMenu.closeAll();
+        }
         document.querySelectorAll('[data-mb-cta-group]').forEach(function (group) {
-            group.hidden = group.getAttribute('data-mb-cta-group') !== mode;
+            /** @type {HTMLElement} */ (group).hidden =
+                group.getAttribute('data-mb-cta-group') !== mode;
         });
+    }
+
+    function setText(selector, value) {
+        const el = document.querySelector(selector);
+        if (el && value != null) {
+            el.textContent = value;
+        }
+    }
+
+    /** Copies the counts the last swapped list carries into the tabs and the scope segment. */
+    function updateCounts() {
+        const counts = /** @type {HTMLElement | null} */ (
+            document.querySelector('[data-mb-counts]')
+        );
+        if (!counts) {
+            return;
+        }
+        const data = counts.dataset;
+        setText('[data-mb-mode="offers"] .tab-count', data.offersAll);
+        setText('[data-mb-mode="requests"] .tab-count', data.requestsAll);
+        const requests = activeMode() === 'requests';
+        setText(
+            '[data-testid="segment-scope-all"] .seg-count',
+            requests ? data.requestsAll : data.offersAll,
+        );
+        setText(
+            '[data-testid="segment-scope-mine"] .seg-count',
+            requests ? data.requestsMine : data.offersMine,
+        );
     }
 
     function markActiveRow(id) {
@@ -345,31 +418,22 @@
         });
     }
 
+    function clearSelection() {
+        if (activeMode() === 'requests') {
+            selectedRequestId = null;
+        } else {
+            selectedId = null;
+        }
+    }
+
     function debouncedList() {
         if (searchTimer) {
             clearTimeout(searchTimer);
         }
         searchTimer = setTimeout(function () {
-            selectedId = null;
+            clearSelection();
             swapList();
         }, 250);
-    }
-
-    function debouncedRequestList() {
-        if (requestSearchTimer) {
-            clearTimeout(requestSearchTimer);
-        }
-        requestSearchTimer = setTimeout(function () {
-            selectedRequestId = null;
-            swapRequestList();
-        }, 250);
-    }
-
-    function setInputVal(selector, value) {
-        const el = document.querySelector(selector);
-        if (el) {
-            el.value = value;
-        }
     }
 
     function anyModalOpen() {
@@ -381,6 +445,48 @@
                 window.getComputedStyle(modal).display !== 'none'
             );
         });
+    }
+
+    /**
+     * Switches the board between Angebote and Gesuche, keeping each view's own filters.
+     *
+     * @param {string} toMode `offers` or `requests`
+     */
+    function switchMode(toMode) {
+        if (toMode === activeMode()) {
+            return;
+        }
+        persistFilters();
+        setActiveMode(toMode);
+        writeControls(toMode === 'requests' ? filterState.requests : filterState.offers, toMode);
+        updateCounts();
+        refreshFilterUi();
+        clearSelection();
+        persistFilters();
+        syncUrl();
+        swapBoard();
+    }
+
+    function resetFilters() {
+        const search = /** @type {HTMLInputElement | null} */ (
+            document.getElementById('mb-search')
+        );
+        if (search) {
+            search.value = '';
+        }
+        setIfDifferent('[data-mb-minquality]', '');
+        setIfDifferent('[data-mb-minamount]', '');
+        const box = excludeStolenBox();
+        if (box) {
+            box.checked = false;
+        }
+        setScope('alle');
+        updateCounts();
+        refreshFilterUi();
+        persistFilters();
+        syncUrl();
+        clearSelection();
+        swapList();
     }
 
     function toggleInterest(button) {
@@ -444,7 +550,7 @@
             serialize: REQUEST_SERIALIZE_KEY,
             onSuccess() {
                 notifyPeersRequests();
-                return swapRequestList();
+                return swapList();
             },
         });
     }
@@ -470,7 +576,7 @@
                     onSuccess() {
                         notifyPeersRequests();
                         selectedRequestId = null;
-                        return swapRequestBoard();
+                        return swapBoard();
                     },
                 });
             });
@@ -480,7 +586,7 @@
         if (body && body.id) {
             selectedRequestId = body.id;
         }
-        return swapRequestBoard();
+        return swapBoard();
     }
 
     function notifyPeersBoard() {
@@ -543,7 +649,7 @@
                     quantityType: el.getAttribute('data-quantity-type'),
                     remark: el.getAttribute('data-remark'),
                 },
-                swapRequestBoard,
+                swapBoard,
             );
         } else if (el.hasAttribute('data-mg-open-request') && window.krtMaterialRequest) {
             window.krtMaterialRequest.open('new', { kind: 'MATERIAL' }, onRequestCreated);
@@ -554,53 +660,12 @@
 
     document.addEventListener('click', function (e) {
         let el;
-        if ((el = e.target.closest('[data-mb-tab]'))) {
-            const toMode = el.getAttribute('data-mb-mode') || 'offers';
-            const fromMode = activeMode();
-            setActiveTabEl(el);
-            toggleCtaGroups(toMode);
-            persistFilters();
-            if (toMode !== fromMode) {
-                if (toMode === 'requests') {
-                    selectedRequestId = null;
-                    swapRequestBoard();
-                } else {
-                    selectedId = null;
-                    swapBoard();
-                }
-            } else if (toMode === 'requests') {
-                selectedRequestId = null;
-                swapRequestList();
-            } else {
-                selectedId = null;
-                swapList();
-            }
+        if ((el = e.target.closest('[data-mb-mode]'))) {
+            switchMode(el.getAttribute('data-mb-mode') === 'requests' ? 'requests' : 'offers');
             return;
         }
-        if (e.target.closest('[data-mb-reset]')) {
-            setInputVal('[data-mb-search]', '');
-            setInputVal('[data-mb-minquality]', '');
-            setInputVal('[data-mb-minamount]', '');
-            const excludeStolenBox = /** @type {HTMLInputElement | null} */ (
-                document.querySelector('[data-mb-exclude-stolen]')
-            );
-            if (excludeStolenBox) {
-                excludeStolenBox.checked = false;
-            }
-            setActiveTabEl(tabEl('offers', 'alle'));
-            persistFilters();
-            selectedId = null;
-            swapList();
-            return;
-        }
-        if (e.target.closest('[data-mg-reset]')) {
-            setInputVal('[data-mg-search]', '');
-            setInputVal('[data-mg-minquality]', '');
-            setInputVal('[data-mg-minamount]', '');
-            setActiveTabEl(tabEl('requests', 'alle'));
-            persistFilters();
-            selectedRequestId = null;
-            swapRequestList();
+        if (e.target.closest('[data-mb-reset]') || e.target.closest('[data-mg-reset]')) {
+            resetFilters();
             return;
         }
         if (e.target.closest('[data-mb-deselect]') || e.target.closest('[data-mg-deselect]')) {
@@ -652,14 +717,9 @@
     });
 
     document.addEventListener('input', function (e) {
-        if (e.target.matches('[data-mb-search], [data-mb-minquality], [data-mb-minamount]')) {
+        if (e.target.matches('#mb-search, [data-mb-minquality], [data-mb-minamount]')) {
             persistFilters();
             debouncedList();
-        } else if (
-            e.target.matches('[data-mg-search], [data-mg-minquality], [data-mg-minamount]')
-        ) {
-            persistFilters();
-            debouncedRequestList();
         }
     });
 
@@ -667,11 +727,26 @@
         if (e.target.matches('[data-mb-sort], [data-mb-exclude-stolen]')) {
             persistFilters();
             swapList();
-        } else if (e.target.matches('[data-mg-sort]')) {
+        } else if (e.target.matches('#mb-filter-form input[name="scope"]')) {
+            clearSelection();
+            updateCounts();
             persistFilters();
-            swapRequestList();
+            syncUrl();
+            swapList();
         }
     });
+
+    if (form) {
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            if (searchTimer) {
+                clearTimeout(searchTimer);
+            }
+            persistFilters();
+            clearSelection();
+            swapList();
+        });
+    }
 
     let peerTimer = null;
     function onPeerChanged(sections) {
@@ -683,11 +758,8 @@
             if (anyModalOpen()) {
                 return;
             }
-            if (activeMode() === 'requests') {
-                if (secs.length === 0 || secs.indexOf('requests') >= 0) {
-                    swapRequestList();
-                }
-            } else if (secs.length === 0 || secs.indexOf('board') >= 0) {
+            const key = activeMode() === 'requests' ? 'requests' : 'board';
+            if (secs.length === 0 || secs.indexOf(key) >= 0) {
                 swapList();
             }
         }, 400);
@@ -700,75 +772,47 @@
         applyAgo(document);
         selectedId = readSelectedId();
         selectedRequestId = readSelectedRequestId();
+        updateCounts();
     });
 
-    function setIfDifferent(selector, value) {
-        const el = document.querySelector(selector);
-        if (!el || el.value.trim() === value) {
-            return false;
-        }
-        el.value = value;
-        return true;
-    }
-
-    function applySavedBoardFilters(prefix, saved) {
-        let changed = setIfDifferent('[data-' + prefix + '-minquality]', saved.minQuality);
-        changed = setIfDifferent('[data-' + prefix + '-minamount]', saved.minAmount) || changed;
-        changed = setIfDifferent('[data-' + prefix + '-sort]', saved.sort) || changed;
-        const stolenBox = /** @type {HTMLInputElement | null} */ (
-            document.querySelector('[data-' + prefix + '-exclude-stolen]')
-        );
-        if (stolenBox && stolenBox.checked !== (saved.excludeStolen === true)) {
-            stolenBox.checked = saved.excludeStolen === true;
-            changed = true;
-        }
-        return changed;
-    }
-
+    /**
+     * Restores the stored view, scope and filters (REQ-UI-017). Filter parameters in the URL win
+     * and are stored instead; a `view` / `scope` (or `mode` / `tab`) parameter fixes only the view
+     * or the scope, and the view's stored filters still apply.
+     */
     function restoreFilters() {
-        if (
-            /[?&](mode|tab|q|minQuality|minAmount|sort|selected|excludeStolen)=/.test(
-                window.location.search,
-            )
-        ) {
+        const search = window.location.search;
+        if (/[?&](q|minQuality|minAmount|sort|selected|excludeStolen)=/.test(search)) {
             persistFilters();
             return;
         }
         if (rawFilterPref === null) {
             return;
         }
-        const target = tabEl(filterState.mode, filterState.tab);
-        if (!target) {
-            return;
+        const targetMode = /[?&](view|mode)=/.test(search) ? activeMode() : filterState.mode;
+        const targetTab = /[?&](scope|tab)=/.test(search) ? activeTab() : filterState.tab;
+        const modeChanged = targetMode !== activeMode();
+        if (modeChanged) {
+            setActiveMode(targetMode);
         }
-        if (filterState.mode !== activeMode()) {
-            setActiveTabEl(target);
-            toggleCtaGroups(filterState.mode);
-            if (filterState.mode === 'requests') {
-                selectedRequestId = null;
-                swapRequestBoard();
-            } else {
-                selectedId = null;
-                swapBoard();
-            }
-            return;
-        }
-        let differs =
-            filterState.mode === 'requests'
-                ? applySavedBoardFilters('mg', filterState.requests)
-                : applySavedBoardFilters('mb', filterState.offers);
-        if (filterState.tab !== activeTab()) {
-            setActiveTabEl(target);
+        let differs = writeControls(
+            targetMode === 'requests' ? filterState.requests : filterState.offers,
+            targetMode,
+        );
+        if (targetTab !== activeTab()) {
+            setScope(targetTab);
             differs = true;
         }
-        if (!differs) {
+        updateCounts();
+        refreshFilterUi();
+        persistFilters();
+        if (modeChanged) {
+            clearSelection();
+            swapBoard();
             return;
         }
-        if (filterState.mode === 'requests') {
-            selectedRequestId = null;
-            swapRequestList();
-        } else {
-            selectedId = null;
+        if (differs) {
+            clearSelection();
             swapList();
         }
     }
