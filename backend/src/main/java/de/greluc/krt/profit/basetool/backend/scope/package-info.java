@@ -18,10 +18,10 @@
  */
 
 /**
- * The Materialbörse module's published events: an interest registered and a request's fulfilment
- * signalled, fanned out as notifications after commit (plan §5.3).
+ * The scope module: the request-scoped org-unit scope kernel that filters and stamps tenant data
+ * (REQ-ORG-*).
  */
-@NamedInterface("api")
-package de.greluc.krt.profit.basetool.backend.materialexchange.api.events;
+@ApplicationModule(allowedDependencies = {"audit::api", "identity::api", "notification::api"})
+package de.greluc.krt.profit.basetool.backend.scope;
 
-import org.springframework.modulith.NamedInterface;
+import org.springframework.modulith.ApplicationModule;

@@ -18,10 +18,20 @@
  */
 
 /**
- * The Materialbörse module's published events: an interest registered and a request's fulfilment
- * signalled, fanned out as notifications after commit (plan §5.3).
+ * The bank module: the Kartellbank's accounts, bookings and booking requests, org-unit-blind by
+ * design (ADR-0020).
  */
-@NamedInterface("api")
-package de.greluc.krt.profit.basetool.backend.materialexchange.api.events;
+@ApplicationModule(
+    allowedDependencies = {
+      "audit::api",
+      "identity::api",
+      "inventory::api",
+      "joborder::api",
+      "materialexchange::api",
+      "notification::api",
+      "refinery::api",
+      "scope::api"
+    })
+package de.greluc.krt.profit.basetool.backend.bank;
 
-import org.springframework.modulith.NamedInterface;
+import org.springframework.modulith.ApplicationModule;

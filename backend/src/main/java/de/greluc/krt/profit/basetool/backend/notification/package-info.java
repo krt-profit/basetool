@@ -17,11 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/**
- * The Materialbörse module's published events: an interest registered and a request's fulfilment
- * signalled, fanned out as notifications after commit (plan §5.3).
- */
-@NamedInterface("api")
-package de.greluc.krt.profit.basetool.backend.materialexchange.api.events;
+/** The notification module: notification rules, their fan-out and delivery. */
+@ApplicationModule(allowedDependencies = {})
+package de.greluc.krt.profit.basetool.backend.notification;
 
-import org.springframework.modulith.NamedInterface;
+import org.springframework.modulith.ApplicationModule;

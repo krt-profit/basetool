@@ -73,6 +73,7 @@ bucket4j-core = { module = "com.bucket4j:bucket4j_jdk17-core", version.ref = "bu
 semver4j-core = { module = "org.semver4j:semver4j", version.ref = "semver4j" }
 logstash-logback-encoder = { module = "net.logstash.logback:logstash-logback-encoder", version.ref = "logstashLogback" }
 archunit-core = { module = "com.tngtech.archunit:archunit", version.ref = "archunit" }
+spring-modulith-api = { module = "org.springframework.modulith:spring-modulith-api", version.ref = "springModulith" }
 spring-modulith-core = { module = "org.springframework.modulith:spring-modulith-core", version.ref = "springModulith" }
 spring-modulith-docs = { module = "org.springframework.modulith:spring-modulith-docs", version.ref = "springModulith" }
 json-schema-validator = { module = "com.networknt:json-schema-validator", version.ref = "jsonSchemaValidator" }

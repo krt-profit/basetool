@@ -17,11 +17,16 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/**
- * The Materialbörse module's published events: an interest registered and a request's fulfilment
- * signalled, fanned out as notifications after commit (plan §5.3).
- */
-@NamedInterface("api")
-package de.greluc.krt.profit.basetool.backend.materialexchange.api.events;
+/** The job-order module (Aufträge): orders, their production allocations and deliveries. */
+@ApplicationModule(
+    allowedDependencies = {
+      "audit::api",
+      "identity::api",
+      "inventory::api",
+      "materialexchange::api",
+      "notification::api",
+      "scope::api"
+    })
+package de.greluc.krt.profit.basetool.backend.joborder;
 
-import org.springframework.modulith.NamedInterface;
+import org.springframework.modulith.ApplicationModule;

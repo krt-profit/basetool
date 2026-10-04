@@ -21,4 +21,7 @@
  * The bank module's published events: the booking-request lifecycle the notification module fans
  * out after commit (plan §5.3).
  */
+@NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.bank.api.events;
+
+import org.springframework.modulith.NamedInterface;

@@ -18,10 +18,10 @@
  */
 
 /**
- * The Materialbörse module's published events: an interest registered and a request's fulfilment
- * signalled, fanned out as notifications after commit (plan §5.3).
+ * The inventory module's published API: its problem codes and the over-allocation exception (plan
+ * §5.2, §5.5).
  */
 @NamedInterface("api")
-package de.greluc.krt.profit.basetool.backend.materialexchange.api.events;
+package de.greluc.krt.profit.basetool.backend.inventory.api;
 
 import org.springframework.modulith.NamedInterface;

@@ -17,11 +17,22 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/**
- * The Materialbörse module's published events: an interest registered and a request's fulfilment
- * signalled, fanned out as notifications after commit (plan §5.3).
- */
-@NamedInterface("api")
-package de.greluc.krt.profit.basetool.backend.materialexchange.api.events;
+package de.greluc.krt.profit.basetool.architecturefixture.modulithapi.consumer;
 
-import org.springframework.modulith.NamedInterface;
+import de.greluc.krt.profit.basetool.architecturefixture.modulithapi.provider.api.ProviderApi;
+import de.greluc.krt.profit.basetool.architecturefixture.modulithapi.provider.api.events.ProviderEvent;
+
+/** Fixture of module {@code consumer} that uses only the published api of {@code provider}. */
+public final class ConsumerService {
+
+  private final ProviderApi api = new ProviderApi();
+
+  /**
+   * Builds an event from the published api.
+   *
+   * @return the event named after the api's answer
+   */
+  public ProviderEvent publish() {
+    return new ProviderEvent(api.answer());
+  }
+}

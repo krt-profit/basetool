@@ -18,10 +18,10 @@
  */
 
 /**
- * The Materialbörse module's published events: an interest registered and a request's fulfilment
- * signalled, fanned out as notifications after commit (plan §5.3).
+ * The Materialbörse module's published API: in {@code events}, the interest and fulfilment events
+ * (plan §5.2).
  */
 @NamedInterface("api")
-package de.greluc.krt.profit.basetool.backend.materialexchange.api.events;
+package de.greluc.krt.profit.basetool.backend.materialexchange.api;
 
 import org.springframework.modulith.NamedInterface;

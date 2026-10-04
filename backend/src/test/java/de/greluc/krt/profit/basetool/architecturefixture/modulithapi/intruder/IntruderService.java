@@ -17,11 +17,21 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/**
- * The Materialbörse module's published events: an interest registered and a request's fulfilment
- * signalled, fanned out as notifications after commit (plan §5.3).
- */
-@NamedInterface("api")
-package de.greluc.krt.profit.basetool.backend.materialexchange.api.events;
+package de.greluc.krt.profit.basetool.architecturefixture.modulithapi.intruder;
 
-import org.springframework.modulith.NamedInterface;
+import de.greluc.krt.profit.basetool.architecturefixture.modulithapi.provider.internal.ProviderInternal;
+
+/** Fixture of module {@code intruder} that reaches into the internals of {@code provider}. */
+public final class IntruderService {
+
+  private final ProviderInternal internal = new ProviderInternal();
+
+  /**
+   * Reads the other module's internal type.
+   *
+   * @return the internal type's answer
+   */
+  public String leak() {
+    return internal.secret();
+  }
+}

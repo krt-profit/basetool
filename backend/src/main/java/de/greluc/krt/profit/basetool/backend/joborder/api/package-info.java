@@ -18,10 +18,10 @@
  */
 
 /**
- * The Materialbörse module's published events: an interest registered and a request's fulfilment
- * signalled, fanned out as notifications after commit (plan §5.3).
+ * The job-order module's published API: its problem codes and exception and, in {@code events}, the
+ * order events (plan §5.2).
  */
 @NamedInterface("api")
-package de.greluc.krt.profit.basetool.backend.materialexchange.api.events;
+package de.greluc.krt.profit.basetool.backend.joborder.api;
 
 import org.springframework.modulith.NamedInterface;

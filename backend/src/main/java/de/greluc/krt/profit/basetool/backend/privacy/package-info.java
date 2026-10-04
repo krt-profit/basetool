@@ -18,10 +18,22 @@
  */
 
 /**
- * The Materialbörse module's published events: an interest registered and a request's fulfilment
- * signalled, fanned out as notifications after commit (plan §5.3).
+ * The GDPR module, transitional until its participants become identity-owned SPIs (plan §5.1 rank
+ * 13, §7.6).
  */
-@NamedInterface("api")
-package de.greluc.krt.profit.basetool.backend.materialexchange.api.events;
+@ApplicationModule(
+    allowedDependencies = {
+      "audit::api",
+      "bank::api",
+      "exchange::api",
+      "identity::api",
+      "inventory::api",
+      "joborder::api",
+      "materialexchange::api",
+      "notification::api",
+      "refinery::api",
+      "scope::api"
+    })
+package de.greluc.krt.profit.basetool.backend.privacy;
 
-import org.springframework.modulith.NamedInterface;
+import org.springframework.modulith.ApplicationModule;
