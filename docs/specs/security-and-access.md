@@ -48,7 +48,7 @@ default bare `WWW-Authenticate`-only 401 or empty-body 403 (see
 
 Role codes (`Role.code`, matching the Keycloak realm role names minus their `ROLE_` prefix) and
 the fine-grained permission strings a role's `permissions` collection carries are centralised in
-`support.Roles` / `support.Permissions` (S3, #909) rather than repeated as raw string literals.
+`kernel.Roles` / `kernel.Permissions` (S3, #909) rather than repeated as raw string literals.
 `SecurityConfig` (the `roleHierarchy()` chain and every `hasRole`/`hasAnyRole`/`hasAuthority`/
 `hasAnyAuthority` call in the `authorizeHttpRequests` matrix — these are plain Java method calls,
 not SpEL, so passing a `String` constant is a zero-risk substitution) and `DataInitializer` (the
@@ -1861,7 +1861,7 @@ version scoping, one-sided cache, sort translation), `TermsAcceptancePageControl
 `LiveSyncCloseCodeWireParityTest` (the WebSocket handoff: the mark is relayed, the socket is closed
 with `4003` and the consent URL, the refusal costs no per-user socket slot, and the code cannot
 drift from the client's) · **Code:** `TermsVersionProvider`, `TermsAcceptanceService`,
-`support.TermsConsentCheck` (the leaf interface that keeps `config` and `service` acyclic per
+`identity.api.TermsConsentCheck` (the leaf interface that keeps `config` and `service` acyclic per
 ADR-0047), `support.TermsGateHandoff` (the leaf that does the same for the frontend's `config` →
 `websocket` handoff), `TermsController`, `AdminTermsController` · **Monitoring:**
 `basetool_terms_acceptances_total`, `basetool_terms_accepted_users`,
@@ -4277,7 +4277,7 @@ and siblings, so the Spring-apps dashboard's cache panels and the `CacheHitRatio
 **Enforced by:** `BackendPropertiesValidationTest` (default, both bounds, and the ceiling accepted
 exactly) · `CustomJwtGrantedAuthoritiesConverterTest` (the converter builds against the real
 properties; the session key, the claims fingerprint, the `azp` split, the `iat` fallback and the
-cache meters) · `FirstLoginAuthoritiesIntegrationTest` · `ArchitectureTest` (`supportPackageMustStayADependencyLeaf`,
+cache meters) · `FirstLoginAuthoritiesIntegrationTest` · `ArchitectureTest` (`leafHelpersMustStayDependencyLeaves`,
 `backendPackagesShouldBeFreeOfDependencyCycles`) · **Code:** `AuthoritiesCacheProperties`,
 `CustomJwtGrantedAuthoritiesConverter`, `application.yml`, `docker-compose.yml`,
 `quadlet/env.d/backend.env.tmpl` · **Decision:**
@@ -4526,7 +4526,7 @@ of its own, and the localised surfaces (`pdf.export.note.thirdParty`, the JSON's
 > wrote the three columns out for itself, and a `DataExportService` Javadoc claimed a
 > `HandleSpellingCoverageTest` held them together while no such class existed.
 >
-> `support.HandleSpellings` is that list now, and the test exists: every searched `app_user`
+> `privacy.internal.HandleSpellings` is that list now, and the test exists: every searched `app_user`
 > name column is a spelling or is declared `NOT_A_SPELLING` with a reason, and the projection
 > yields exactly one value per declared column. Since `PersonSearchCoverageTest` sweeps
 > `information_schema`, a new name column cannot reach the schema without being registered for
@@ -4626,7 +4626,7 @@ data is no more disclosable to an admin serving somebody's Art. 15 request than 
 **Enforced by:** `DataExportIntegrationTest`, `DataExportParticipantSectionsIntegrationTest`,
 `DataExportScrubCoverageTest`, `DataExportPdfFieldLabelCoverageTest`,
 `DataExportPdfSectionLabelCoverageTest`, `GdprParticipantCoverageTest`, `HandleScrubberTest`,
-`DataExportControllerSecurityTest` · **Code:** `support/DataExportSections`,
+`DataExportControllerSecurityTest` · **Code:** `privacy/internal/DataExportSections`,
 `kernel/HandleScrubber`, `service/DataExportService`, `service/DataExportReportService`,
 `service/pdf/DataExportPdfFormat`, `controller/DataExportController`,
 `controller/AdminDataExportController`, frontend `controller/DataExportProxyController`,
@@ -4841,7 +4841,7 @@ aggregates.
 - [x] The audit event records the term's length and never the term.
 
 **Enforced by:** `PersonSearchCoverageTest`, `AdminPersonSearchControllerSecurityTest` · **Code:**
-`support/PersonSearchTargets`, `service/PersonSearchService`,
+`privacy/internal/PersonSearchTargets`, `service/PersonSearchService`,
 `controller/AdminPersonSearchController`, `model/dto/PersonSearchHitDto`,
 `frontend/controller/AdminPersonSearchPageController`, `templates/admin/person-search.html`,
 `static/js/admin-person-search.js` · **Decision:**
@@ -5074,7 +5074,7 @@ it.
 - [x] Nothing is deleted: row counts, timestamps, event types, amounts and subjects are unchanged.
 
 **Enforced by:** `HandleAnonymisationServiceTest`, `HandleErasureCoverageTest` · **Code:**
-`service/HandleAnonymisationService`, `kernel/HandleAnonymisation`, `support/HandleErasureCoverage`,
+`service/HandleAnonymisationService`, `kernel/HandleAnonymisation`, `privacy/internal/HandleErasureCoverage`,
 `repository/AuditEventRepository#anonymiseActorHandle`,
 `repository/BankAuditEventRepository#anonymiseActorHandle`,
 `repository/BankTransactionRepository#anonymiseCounterpartyHandle`,

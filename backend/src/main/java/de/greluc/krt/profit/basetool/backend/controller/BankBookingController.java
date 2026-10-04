@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingOutcomeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
@@ -33,7 +34,6 @@ import de.greluc.krt.profit.basetool.backend.service.BankLedgerService;
 import de.greluc.krt.profit.basetool.backend.service.BankSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.BankTransferFeeService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitBankAccessService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

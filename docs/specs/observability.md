@@ -388,7 +388,7 @@ is `DEBUG`, because at any higher level it is a log-flood vector; an operator-ac
 - **Optimistic-lock 409** (`GlobalExceptionHandler`) — level unchanged (`WARN`); the line now carries
   `entity`, `entityId` and `versions` (`expected=<client> persisted=<persisted>`), degrading to the
   exception text alone for the bare JPA variant that names no entity. Numbers and ids only. All
-  `support.OptimisticLock` call sites pass a `UUID`, an `entity.getId()` or `null`; the single
+  `kernel.OptimisticLock` call sites pass a `UUID`, an `entity.getId()` or `null`; the single
   exception (`SystemSettingService`) passes a setting key that must already have matched a persisted
   row, so it is a bounded seeded key and not free text.
 - **Rate-limit rejection** (`RateLimitingFilter`) — level unchanged (`DEBUG`, attacker-paced); the
@@ -3389,7 +3389,7 @@ client if the exchange registry holds it and `other` if not (`ClientAttribution.
 REQ-XCH-010, REQ-XCH-028). `ApiUnknownClient` (warning) fires on a sustained
 `other`; the `none` rule ships staged (below).
 
-That mapping is **not private to this counter**. It lives in `support.ClientAttribution` and is
+That mapping is **not private to this counter**. It lives in `platform.api.ClientAttribution` and is
 shared with the audit trail's `client_id` column (REQ-AUDIT-005), which records the same bounded
 value on every audited mutation. The sharing is the requirement, not an implementation detail: an
 operator who sees a burst on this counter and then filters the audit log for the same client is

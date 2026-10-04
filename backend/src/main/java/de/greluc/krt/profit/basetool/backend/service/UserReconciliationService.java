@@ -21,15 +21,15 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationPendingEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.MemberDepartedEvent;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
+import de.greluc.krt.profit.basetool.backend.platform.api.PartialRoleScopeProperties;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.PartialRoleScopeProperties;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.Collection;

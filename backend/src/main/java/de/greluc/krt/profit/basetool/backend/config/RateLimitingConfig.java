@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.backend.config;
 
 import de.greluc.krt.profit.basetool.backend.filter.RateLimitingFilter;
 import de.greluc.krt.profit.basetool.backend.filter.RequestBodySizeLimitFilter;
-import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
-import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
-import de.greluc.krt.profit.basetool.backend.support.RequestBodyLimitProperties;
+import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.RateLimitProperties;
+import de.greluc.krt.profit.basetool.backend.platform.internal.RequestBodyLimitProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.Filter;
 import org.jetbrains.annotations.NotNull;

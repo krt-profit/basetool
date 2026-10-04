@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestR
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
@@ -53,7 +54,6 @@ import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestReposi
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;

@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderInventoryOwnerRedactor;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.support.JobOrderInventoryOwnerRedactor;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

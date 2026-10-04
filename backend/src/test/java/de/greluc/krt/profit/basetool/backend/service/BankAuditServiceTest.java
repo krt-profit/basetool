@@ -26,19 +26,20 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientDirectory;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
 import de.greluc.krt.profit.basetool.backend.mapper.BankAuditEventMapper;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEvent;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientAttribution;
+import de.greluc.krt.profit.basetool.backend.platform.internal.ApiClientMetricsProperties;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.ApiClientMetricsProperties;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
-import de.greluc.krt.profit.basetool.backend.support.ClientAttribution;
-import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
-import de.greluc.krt.profit.basetool.backend.support.KnownExchangeClients;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
@@ -76,8 +77,9 @@ class BankAuditServiceTest {
   private ClientAttribution clientAttribution =
       new ClientAttribution(
           BoundProperties.defaults(ApiClientMetricsProperties.class),
-          BoundProperties.defaults(IngestGatewayProperties.class),
-          Mockito.mock(KnownExchangeClients.class));
+          new ExchangeClientDirectory(
+              BoundProperties.defaults(IngestGatewayProperties.class),
+              Mockito.mock(KnownExchangeClients.class)));
 
   @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 

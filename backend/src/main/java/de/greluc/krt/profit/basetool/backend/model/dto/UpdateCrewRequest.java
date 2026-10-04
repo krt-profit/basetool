@@ -27,6 +27,6 @@ import java.util.UUID;
  *
  * <p>{@code jobTypeIds} is the full replacement set. A present {@code version} that does not match
  * the crew's current version yields 409; {@code null} skips the check via {@link
- * de.greluc.krt.profit.basetool.backend.support.OptimisticLock#checkOptionalClient}.
+ * de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock#checkOptionalClient}.
  */
 public record UpdateCrewRequest(Set<UUID> jobTypeIds, Long version) {}

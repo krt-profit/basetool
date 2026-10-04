@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialPrice;
@@ -32,7 +33,6 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.Terminal;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceOverviewDto;
-import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;

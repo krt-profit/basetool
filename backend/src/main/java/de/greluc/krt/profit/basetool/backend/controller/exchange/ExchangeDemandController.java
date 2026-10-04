@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.controller.exchange;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeOrgDemandDto;
+import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeDemandService;
-import de.greluc.krt.profit.basetool.backend.support.SubjectAuthentication;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;

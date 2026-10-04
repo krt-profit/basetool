@@ -684,7 +684,7 @@ there is no separate income-attribution input.
 e2e `InventoryOperationsE2eTest` (Herkunft picker gate + deduct-from; re-picking an
 already-allocated order edits its slice instead of posting a duplicate) ·
 **Code:** `InventoryJobOrderAllocation`, `InventoryMissionAllocation`,
-`support/InventoryAllocations`, `InventoryItemController` (allocation endpoints),
+`inventory/api/InventoryAllocations`, `InventoryItemController` (allocation endpoints),
 `InventoryItemService#createInventoryItem`, `InventoryCheckoutService` (book-out / merge / SELL),
 `InventoryAggregationService#getMaterialCollection`, `InventoryItemMapper`,
 `V217__add_inventory_allocation_tables.sql`, `V218__drop_inventory_scalar_associations.sql`,

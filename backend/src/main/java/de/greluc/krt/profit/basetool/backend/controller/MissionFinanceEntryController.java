@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionPeerRedactor;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryUpdateDto;
@@ -26,7 +27,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceTotalsDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.MissionFinanceEntryService;
-import de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
