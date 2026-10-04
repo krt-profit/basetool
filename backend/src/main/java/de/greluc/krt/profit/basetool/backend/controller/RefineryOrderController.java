@@ -66,6 +66,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Transactional
 public class RefineryOrderController {
+
+  /** Sort keys of the order lists; {@code endsAt} is the run's end, computed by the database. */
+  private static final Set<String> LIST_SORT_FIELDS =
+      Set.of("startedAt", "endsAt", "durationMinutes", "expenses", "id");
+
   private final RefineryOrderService refineryOrderService;
   private final UserService userService;
   private final RefineryOrderMapper mapper;
@@ -73,8 +78,18 @@ public class RefineryOrderController {
   private final OwnerScopeService ownerScopeService;
 
   /**
-   * Lists the calling user's own refinery orders. Optional status filter.
+   * Lists the calling user's own refinery orders, one page under the list filters
+   * (REQ-REFINERY-019).
    *
+   * @param jwt the caller's token, whose user owns the listed orders
+   * @param status optional status filter; absent means every status
+   * @param ready {@code true} keeps only orders whose end is unknown or at or before now
+   * @param q optional case-insensitive substring search over the owner's names, the location, the
+   *     refining method and the goods' input and output materials
+   * @param page zero-based page index
+   * @param size page size
+   * @param sort {@code field,asc|desc} over {@code startedAt}, {@code endsAt}, {@code
+   *     durationMinutes}, {@code expenses} and {@code id}; default {@code startedAt}
    * @return paged refinery-order list DTOs
    */
   @GetMapping("/my-orders")
@@ -83,19 +98,16 @@ public class RefineryOrderController {
   public PageResponse<RefineryOrderListDto> getMyRefineryOrders(
       @AuthenticationPrincipal Jwt jwt,
       @RequestParam(required = false) List<RefineryOrderStatus> status,
+      @RequestParam(required = false) Boolean ready,
+      @RequestParam(required = false) String q,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
     Pageable pageable =
-        PaginationUtil.createPageRequest(
-            page,
-            size,
-            sort,
-            Set.of("startedAt", "durationMinutes", "expenses", "id"),
-            "startedAt");
+        PaginationUtil.createPageRequest(page, size, sort, LIST_SORT_FIELDS, "startedAt");
     Page<RefineryOrder> p =
         refineryOrderService.getMyRefineryOrders(
-            userService.getUserIdFromJwt(jwt), status, pageable);
+            userService.getUserIdFromJwt(jwt), status, Boolean.TRUE.equals(ready), q, pageable);
     return PageResponse.of(p.map(mapper::toListDto));
   }
 
@@ -252,8 +264,17 @@ public class RefineryOrderController {
   }
 
   /**
-   * Squadron-wide refinery-order list. Open to all authenticated callers (read-only).
+   * Lists the refinery orders in the caller's org-unit scope, one page under the list filters
+   * (REQ-REFINERY-019). Open to all authenticated callers (read-only).
    *
+   * @param status optional status filter; absent means every status
+   * @param ready {@code true} keeps only orders whose end is unknown or at or before now
+   * @param q optional case-insensitive substring search over the owner's names, the location, the
+   *     refining method and the goods' input and output materials
+   * @param page zero-based page index
+   * @param size page size
+   * @param sort {@code field,asc|desc} over {@code startedAt}, {@code endsAt}, {@code
+   *     durationMinutes}, {@code expenses} and {@code id}; default {@code startedAt}
    * @return paged refinery-order list DTOs
    */
   @GetMapping("/all")
@@ -261,17 +282,15 @@ public class RefineryOrderController {
   @Transactional(readOnly = true)
   public PageResponse<RefineryOrderListDto> getAllRefineryOrders(
       @RequestParam(required = false) List<RefineryOrderStatus> status,
+      @RequestParam(required = false) Boolean ready,
+      @RequestParam(required = false) String q,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
     Pageable pageable =
-        PaginationUtil.createPageRequest(
-            page,
-            size,
-            sort,
-            Set.of("startedAt", "durationMinutes", "expenses", "id"),
-            "startedAt");
-    Page<RefineryOrder> p = refineryOrderService.getAllRefineryOrders(status, pageable);
+        PaginationUtil.createPageRequest(page, size, sort, LIST_SORT_FIELDS, "startedAt");
+    Page<RefineryOrder> p =
+        refineryOrderService.getAllRefineryOrders(status, Boolean.TRUE.equals(ready), q, pageable);
     return PageResponse.of(p.map(mapper::toListDto));
   }
 

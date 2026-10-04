@@ -169,9 +169,9 @@ class AdminMissionDataPageControllerMvcTest {
   }
 
   /**
-   * The page follows the list-pattern basics (REQ-UI-027): page head with the admin eyebrow and no
-   * primary action, each box a card with a switch and a ghost create button, stacked tables and
-   * translated values.
+   * The page follows the master-detail pattern (REQ-UI-027): page head with the admin eyebrow and
+   * no primary action, the three data kinds as master rows with counts, and one detail pane per
+   * kind with its switch, its create button as the pane's primary action and its stacked table.
    */
   @Test
   @WithMockUser(roles = "ADMIN")
@@ -189,9 +189,10 @@ class AdminMissionDataPageControllerMvcTest {
 
     assertThat(html)
         .containsPattern("class=\"page-eyebrow\"[^>]*>Stammdaten<")
-        .contains("id=\"add-squadron-btn\" class=\"btn btn-ghost\"")
-        .contains("id=\"add-jobtype-btn\" class=\"btn btn-ghost\"")
-        .contains("id=\"add-freqtype-btn\" class=\"btn btn-ghost\"")
+        .doesNotContain("class=\"page-actions\"")
+        .contains("id=\"add-squadron-btn\" class=\"btn btn--cta\"")
+        .contains("id=\"add-jobtype-btn\" class=\"btn btn--cta\"")
+        .contains("id=\"add-freqtype-btn\" class=\"btn btn--cta\"")
         .contains("class=\"switch\" for=\"includeInactiveSquadrons\"")
         .contains("class=\"switch\" for=\"includeInactiveJobTypes\"")
         .contains("class=\"switch\" for=\"includeInactiveFrequencyTypes\"")
@@ -199,9 +200,52 @@ class AdminMissionDataPageControllerMvcTest {
         .contains(">Nein<")
         .doesNotContain(">MISSION<")
         .doesNotContain("class=\"greeting")
-        .doesNotContain("hud-box");
-    assertThat(main).doesNotContain("btn--cta").doesNotContain("krtm-");
+        .doesNotContain("hud-box")
+        .doesNotContain("md-box__toggle");
+    assertThat(main)
+        .contains("class=\"master-detail md-md\"")
+        .containsPattern(
+            "class=\"master-row md-kind-row is-active\" role=\"tab\" id=\"md-kind-squadrons\"")
+        .containsPattern("data-list-count-for=\"squadrons-results\"\\s*>1<")
+        .containsPattern("id=\"squadrons-box\"[^>]*role=\"tabpanel\"[^>]*>")
+        .containsPattern("id=\"jobtypes-box\"[^>]*hidden")
+        .containsPattern("id=\"freqtypes-box\"[^>]*hidden")
+        .doesNotContainPattern("id=\"squadrons-box\"[^>]*hidden")
+        .contains("data-list-total=\"1\"")
+        .doesNotContain("krtm-");
+    assertThat(main.split("btn--cta", -1)).hasSize(4);
     assertThat(main.split("data-table data-table--stack", -1)).hasSize(4);
+  }
+
+  /** The {@code kind} parameter opens that data kind's pane, an unknown value the first. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void list_kindParameter_selectsThePane() throws Exception {
+    stubAllThree();
+
+    String freq =
+        mockMvc
+            .perform(get("/admin/mission-data").param("kind", "freqtypes"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String unknown =
+        mockMvc
+            .perform(get("/admin/mission-data").param("kind", "nonsense"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(freq)
+        .contains(
+            "class=\"master-row md-kind-row is-active\" role=\"tab\" id=\"md-kind-freqtypes\"")
+        .containsPattern("id=\"squadrons-box\"[^>]*hidden")
+        .doesNotContainPattern("id=\"freqtypes-box\"[^>]*hidden");
+    assertThat(unknown)
+        .contains(
+            "class=\"master-row md-kind-row is-active\" role=\"tab\" id=\"md-kind-squadrons\"");
   }
 
   @Test

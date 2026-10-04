@@ -24,19 +24,42 @@
         gap: 0.5rem;
         margin-bottom: 0;
     }
+    .md-kind-list {
+        display: flex;
+        flex-direction: column;
+    }
+    .md-kind-row {
+        width: 100%;
+        min-height: 44px;
+        color: var(--color-gray-1);
+        background: transparent;
+        border: 0;
+        border-bottom: var(--border-hairline);
+        font: inherit;
+        text-align: left;
+    }
+    .md-kind-row:last-child {
+        border-bottom: 0;
+    }
+    .md-panes {
+        min-width: 0;
+    }
+    .md-box {
+        min-width: 0;
+        padding: 0;
+    }
+    .md-box[hidden] {
+        display: none;
+    }
     .md-box__head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
         margin: 0;
         padding: var(--space-3) var(--space-4);
         border-bottom: var(--border-hairline);
-    }
-    .md-box.is-collapsed .md-box__head {
-        border-bottom: 0;
-    }
-    .md-box__toggle .krt-icon {
-        transition: transform 0.2s;
-    }
-    .md-box.is-collapsed .md-box__toggle .krt-icon {
-        transform: rotate(-90deg);
     }
     .md-filter {
         margin: 0;

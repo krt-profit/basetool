@@ -4,12 +4,28 @@
 
 ### Added
 
+- **Materialbörse im neuen Muster.** Tabs „Angebote · Gesuche" mit „Alle · Meine" statt vier Tabs,
+  eine Schaltfläche „Angebot erstellen" bzw. „Gesuch erstellen" mit Auswahl Material/Item statt vier
+  Buttons, Filter als Popover mit Chips und Sortiermenü. Alte Links auf die Börse funktionieren
+  weiter (REQ-MARKET-009/-018).
+
 - **Startseite und Formulare im neuen Muster (Phase 2).** Die Startseite zeigt die nächsten 7 Tage als
   Liste mit Datumsblock, daneben Information und die neuesten Benachrichtigungen. Neuer Auftrag,
   Einbuchen, Mitglied bearbeiten (mit Reitern), Systemeinstellungen, Information und
   Benachrichtigungsregeln haben nummerierte Abschnitte und eine fixierte Aktionsleiste (REQ-UI-027).
+- **Rechtliches, Organigramm, Verbundene Anwendungen und Schiffsdaten im neuen Muster.** Diese
+  Seiten haben Seitenkopf und Karten statt HUD-Box; die Datenschutzerklärung hat ein
+  Inhaltsverzeichnis, das Organigramm ist auf dem Smartphone eine eingerückte Liste, und „Alle
+  unfitted" sitzt bei den Schiffsdaten im „⋯"-Menü (REQ-UI-027).
+
 - **Profil als eine Einstellungsseite.** Abschnitts-Navigation links, eine Speichern-Leiste, die nur
   bei Änderungen erscheint und alle geänderten Abschnitte speichert.
+- **Einsatz- und Operationsdetail im neuen Muster.** Der Einsatz hat drei Reiter (Übersicht ·
+  Teilnehmer & Einheiten · Finanzen & Auszahlung); statt des Reiters „Verwaltung" öffnet
+  „Bearbeiten" einen Bearbeitungsmodus, „Anmelden" ist die Hauptaktion, Löschen liegt im „⋯"-Menü.
+  Die Operation zeigt eine Kennzahlenleiste und vier Reiter (Übersicht · Einsätze · Auszahlung ·
+  Finanzen) und wird in einem Dialog bearbeitet (REQ-MISSION-004/011).
+
 - **Hangar: Versicherung als „Keine · Monate · LTI".** Statt einer Liste mit 122 Einträgen; Monate
   als Zahl von 1 bis 120.
 
@@ -33,17 +49,41 @@
 
 - **Einsätze und Operationen: Zeitraum „Kommend · Vergangen · Alle".** Ersetzt die Checkbox
   „Vergangene anzeigen"; die gespeicherte Auswahl wird übernommen.
+- **Beförderung und Einsatzdaten im neuen Muster.** „Themenbereiche verwalten" und „Einsatzdaten
+  verwalten" sind Listen mit Detailbereich, deren Auswahl als Link erhalten bleibt; die
+  Rangvoraussetzungen stehen als Matrix Rangsprung × Themenbereich. „Beförderungssystem" zeigt den
+  Rangpfad als Stufen, „Meine Bewertungen" den Fortschritt zum nächsten Rang (REQ-PROMO-002/003).
+
 - **Benachrichtigungen: „Ungelesen · Alle" und Links.** Die Seite zeigt zunächst nur Ungelesenes;
   Benachrichtigungen zu Aufträgen, Materialbörse, verbundenen Anwendungen und Admin-Vorgängen
   führen direkt zur Seite (REQ-NOTIF-022).
+- **Kartellbank: Kontodetail mit Kennzahlen und Reitern.** Beide Kontodetailseiten zeigen Saldo,
+  Ziel, ± 30 Tage und Buchungen als Kacheln, darunter die Reiter „Buchungen" und „Konto-Info" bzw.
+  „Ziel & Sichtbarkeit"; die Historie hat „30 Tage · 90 Tage · Zeitraum …" und die Spalte „Saldo
+  nach Buchung", einklappbare Bereiche entfallen. Auf der Org-Einheits-Bank heißt der Reiter jetzt
+  „Anträge an unsere Konten", und „Laufende Anträge" zeigt den Freigabeweg.
+- **Buchungsanträge: Status als Segment.** „Ausstehend · Bestätigt · Abgelehnt · Alle" ersetzt die
+  Status-Checkboxen, „n warten auf dich" zählt die entscheidbaren Anträge; wartet ein Antrag auf
+  eine Freigabe, steht „wartet auf …" in der Zeile. Die KRT-Freigaben sind eine Stufen-Leiste.
+
 - **Auftragsverwaltung: „Meine · Alle".** Wer beides sehen darf, wechselt zwischen eigenen und allen
   Aufträgen (REQ-ORDERS-040).
+
+- **Auftragsdetail im neuen Muster.** Oben zeigt „Geliefert / benötigt" mit Balken den Fortschritt;
+  die Reiter richten sich nach der Auftragsart (Material: Bedarf · Übergaben · Bearbeiter ·
+  Verknüpft; Item: Items · Materialien · Herstellung · Übergaben · Bearbeiter · Verknüpft), leere
+  Reiter entfallen, Übergaben laufen über „Übergabe erfassen" (REQ-ORDERS-026).
 
 - **Neues Erscheinungsbild der Website, Grundlage (Phase 0).** Fließtext in Lato 400 statt 300, nur
   noch die Seitentitel orange, Zwischenüberschriften weiß; dazu neue Bausteine für Seitenkopf mit
   „⋯“-Menü, Werkzeugleiste mit Filter-Chips, Segment-Schalter, Listentabellen, die auf dem Smartphone
   stapeln, und Formulare mit fixierter Aktionsleiste. Breakpoints nur noch 768/1024/1440 px
   (REQ-UI-027, REQ-UI-009, ADR-0242).
+
+- **Mein Lager und Globales Lager im neuen Muster.** Filter im Popover mit Chips, „Alle · Persönlich
+  · Gemeinsam" statt zweier Haken; Ausbuchen, Umbuchen und Einheit ändern für markierte Einträge
+  stehen in einer Auswahlleiste, die erst bei einer Auswahl erscheint. „Globales Lager leeren" liegt
+  im „⋯"-Menü (REQ-INV-034/036/037/046).
 
 - **Eigenes internes OpenAPI-Dokument für die Exchange-Relay-Schnittstelle.** Die 14 Operationen
   unter `/api/v1/exchange/**` stehen jetzt in `exchange-relay.openapi.json` mit eigener
@@ -68,6 +108,11 @@
   Backend-Klasse einem der 26 Zielmodule zu; ein ArchUnit-`modules()`-Test friert die heutigen 138
   Kanten gegen die Rangordnung ein, neue scheitern. Spring Modulith 2.1.1 läuft nur im Testumfang
   (REQ-MOD-001…005).
+
+- **Raffinerie im neuen Muster.** Die Liste teilt sich in „Läuft · Abholbereit · Abgeschlossen ·
+  Alle" mit Zählern; Suche nach Besitzer, Ort, Methode oder Material und das Blättern laufen
+  serverseitig über alle Seiten. Anlegen und Detail sind ein nummeriertes Formular mit Statuskarte
+  und „Ausbeute einlagern" als Hauptaktion (REQ-REFINERY-019).
 
 - **Berechtigungsmatrix des Backends als geprüfte Datei.** `authorization-matrix.txt` hält für jede
   Operation die entscheidende URL-Regel und das wirksame `@PreAuthorize` fest, dazu die

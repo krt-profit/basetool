@@ -2,7 +2,8 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <th:block th:fragment="chartBody">
-    <div class="bank-chart-toolbar">
+    <div class="card-head bank-chart-head">
+        <h2 class="card-title" th:text="#{bank.chart.title} + ' &middot; ' + #{'bank.chart.range.' + ${chartRange}}">Saldoverlauf &middot; 90 Tage</h2>
         <div class="bank-chart-ranges" role="group" th:aria-label="#{bank.chart.range.label}">
             <th:block th:each="r : ${chartRanges}">
                 <span th:if="${r == chartRange}" class="bank-chart-range-btn is-active"

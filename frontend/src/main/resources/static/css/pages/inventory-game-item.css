@@ -1,10 +1,7 @@
 @layer base, components, page, migration, utilities;
 
 @layer page {
-    .actions-bar {
-        display: flex;
-        gap: 1rem;
-        margin-bottom: 1rem;
-        flex-wrap: wrap;
+    .drill-alert {
+        margin: var(--space-3) var(--space-4);
     }
 }

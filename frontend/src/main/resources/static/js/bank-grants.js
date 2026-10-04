@@ -18,19 +18,22 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-function poToggleAll(openState) {
-    const nodes = document.querySelectorAll('details.rank-group');
-    nodes.forEach(function (d) {
-        /** @type {HTMLDetailsElement} */ (d).open = openState;
+(function () {
+    'use strict';
+
+    const form = /** @type {HTMLFormElement | null} */ (
+        document.getElementById('bank-grants-filter-form')
+    );
+    if (!form) return;
+
+    form.addEventListener('submit', function (event) {
+        event.preventDefault();
     });
-}
-document.addEventListener('DOMContentLoaded', function () {
-    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('click', 'po-expand-all', function () {
-            poToggleAll(true);
-        });
-        window.krtEvents.on('click', 'po-collapse-all', function () {
-            poToggleAll(false);
-        });
-    }
-});
+
+    form.addEventListener('change', function (event) {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement) || target.name !== 'view') return;
+        const view = target.value === 'employee' ? 'employee' : 'account';
+        window.location.assign('/bank/grants?view=' + view);
+    });
+})();

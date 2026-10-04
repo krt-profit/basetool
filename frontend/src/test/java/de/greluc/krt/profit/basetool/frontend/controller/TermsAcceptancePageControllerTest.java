@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -117,6 +118,33 @@ class TermsAcceptancePageControllerTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("4. Pflichten der Nutzer")))
         .andExpect(content().string(containsString("Keine technischen Eingriffe.")));
+  }
+
+  /**
+   * Agreeing is the page's one primary action and declining is the quiet one, on a card under the
+   * page head (REQ-UI-027).
+   */
+  @Test
+  @WithMockUser
+  void agreeingIsThePrimaryAction() throws Exception {
+    when(backendApiClient.get(eq(STATUS_URI), eq(TermsStatusDto.class)))
+        .thenReturn(new TermsStatusDto(false, "v1"));
+
+    String html =
+        mockMvc
+            .perform(get("/terms/accept"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("class=\"page-head\"")
+        .containsPattern("id=\"terms-accept-submit\"[^>]*class=\"btn btn--cta\"")
+        .contains("class=\"btn btn-ghost\"")
+        .doesNotContain("btn-outline")
+        .doesNotContain("hud-box");
+    assertThat(html.split("btn--cta", -1)).hasSize(2);
   }
 
   /**

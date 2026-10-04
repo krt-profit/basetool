@@ -24,16 +24,16 @@ Der Nutzer legt eine Operation an, bearbeitet oder löscht sie, oder er benennt 
 ### Schreibvorgänge in place (`OperationWritesInPlaceE2eTest`, #576)
 
 1. **Anlegen:** Auf `/operations` den Reload-Marker setzen und über das Modal eine Operation anlegen (AJAX-Zwilling von `POST /operations/create`).
-2. **Bearbeiten:** Auf der Detailseite den Namen ändern und speichern, dann ohne Reload ein zweites Mal speichern.
-3. **Löschen:** Auf der Detailseite löschen.
+2. **Bearbeiten:** Auf der Detailseite „Bearbeiten“ öffnen (`[data-testid='operation-edit']`, Dialog `#edit-operation-modal`), den Namen ändern und speichern, dann ohne Reload ein zweites Mal speichern.
+3. **Löschen:** Auf der Detailseite über das „⋯“-Menü (`#operation-menu-toggle`) „Operation löschen …“ wählen und bestätigen.
 
 ### Live-Sync der Detailseite (`OperationLiveSyncE2eTest`, #1115)
 
-4. Beide Kontexte öffnen dieselbe Operation und warten, bis `window.krtLiveSync.subscribedTopics()` nicht leer ist. Kontext A benennt im Tab Verwaltung die Operation um und speichert; Kontext B schaut nur zu.
+4. Beide Kontexte öffnen dieselbe Operation und warten, bis `window.krtLiveSync.subscribedTopics()` nicht leer ist. Kontext A benennt im Bearbeiten-Dialog die Operation um und speichert; Kontext B schaut nur zu.
 
 ### Cross-Publish vom Einsatz (`OperationMissionCrossPublishLiveSyncE2eTest`, #1241)
 
-5. Kontext B öffnet die Operation und wartet auf sein Abo `operation:{id}`. Kontext A öffnet den zugeordneten Einsatz, benennt ihn im Tab Verwaltung um und speichert.
+5. Kontext B öffnet die Operation und wartet auf sein Abo `operation:{id}`. Kontext A öffnet den zugeordneten Einsatz, benennt ihn im Bearbeiten-Modus (`?tab=verw`) um und speichert.
 
 ## Erwartetes Ergebnis
 

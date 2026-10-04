@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
 > **Owner area:** REFINERY · **Related ADRs:** none
 
 # Refinery-order overview list
@@ -7,7 +7,7 @@
 
 The refinery-order overview (`GET /refinery-orders`) shows one row per refinery order — id, owner,
 end time, location, mission, materials — for the whole organisation (read-only for normal members),
-with a status filter and a "Meine Aufträge" (own-orders) toggle. It used to fetch the entire order
+with run segments, a search and a "Meine Aufträge" (own-orders) toggle. It used to fetch the entire order
 set in a single unbounded `size=1000` response and render every row at once. As the order history
 grows this is wasteful and unbounded; this spec pins the page down to a server-side page using the
 shared pagination component, exactly like the blueprint availability overview (REQ-INV-013) and the
@@ -17,32 +17,81 @@ unit hangar overview (REQ-HANGAR-001).
 
 ### REQ-REFINERY-019 — Refinery-order list is paginated server-side
 
-The refinery-order overview MUST fetch one **server-side page** of orders (from
-`/api/v1/refinery-orders/all` or, when the own-orders toggle is on, `/api/v1/refinery-orders/my-orders`)
-instead of the former unbounded `size=1000` pull, and render the shared pagination component — the
-`.pagination` page-nav plus the square `.page-btn` size picker from `fragments/pagination.html`. It
-adopts the shared page-size contract (REQ-INV-013 / REQ-API-005): **page sizes {10, 50, 100} with a
-default of 50**; a client-supplied `size` outside that set snaps back to the default before the
-backend call, and a negative `page` clamps to 0. The default sort stays `startedAt,desc` so the
-newest orders remain on the first page.
+The refinery-order overview MUST fetch exactly one **server-side page** of orders for whatever it
+lists (from `/api/v1/refinery-orders/all` or, when the own-orders toggle is on,
+`/api/v1/refinery-orders/my-orders`). It MUST NOT pull a large or unbounded page (the former
+`size=1000`) to filter, search, sort or page in memory — not for a segment, not for the search and
+not for a counter. It renders the shared pagination component — the `.pagination` page-nav plus the
+square `.page-btn` size picker from `fragments/pagination.html` — and adopts the shared page-size
+contract (REQ-INV-013 / REQ-API-005): **page sizes {10, 50, 100} with a default of 50**; a
+client-supplied `size` outside that set snaps back to the default before the backend call, and a
+negative `page` clamps to 0.
 
-Page and size links MUST preserve the active filter — the repeatable `status` params and the
-`onlyMine` toggle — and the pagination controls live **inside** the `refineryOrdersResults`
-AJAX-swap fragment so an in-place status-filter change re-renders them.
+**Segments.** The list is split by the `view` parameter into four segments, each one backend
+request (amended 2026-10-03; the list used to page only by status and filter the open segments in
+memory):
+
+| `view` | Backend request | Sort |
+| --- | --- | --- |
+| `RUNNING` (default) | `status=OPEN,IN_PROGRESS` | `endsAt,asc` |
+| `READY` | `status=OPEN,IN_PROGRESS&ready=true` | `endsAt,asc` |
+| `COMPLETED` | `status=COMPLETED` | `startedAt,desc` |
+| `ALL` | every status | `startedAt,desc` |
+
+A legacy `status` filter without a `view` maps onto a segment: none or `OPEN`+`IN_PROGRESS` →
+`RUNNING`, `COMPLETED` alone → `COMPLETED`, every status → `ALL`. Any other subset (e.g.
+`CANCELED`) stays an **exact** filter, sorted `startedAt,desc`, and the `ALL` segment is shown as
+selected. An order's end is `startedAt + durationMinutes`; an open order whose end has passed or is
+unknown counts as ready, as `RefineryProgress` draws it.
+
+**Search.** The toolbar search is sent to the backend as `q` and narrows the requested segment; the
+backend matches it case-insensitively as a substring of the owner's display name or username, the
+location name, the refining-method name, or an input or output material name of any of the order's
+goods. Its LIKE wildcards are matched literally.
+
+**Counters.** The four segment counters are the `totalElements` of four `size=1` requests of the
+segments without the search; the ready counter is the open statuses plus `ready=true`.
+
+**Backend list API.** `GET /api/v1/refinery-orders/all` (the caller's org-unit scope, unchanged)
+and `GET /api/v1/refinery-orders/my-orders` (the caller's own orders) take, besides `page`, `size`
+and the repeatable `status`:
+
+- `q` — optional search as above. An order with several matching goods is one row and counts once
+  in `totalElements`. The search never widens the endpoint's scope.
+- `ready` — optional boolean; `true` keeps only orders whose end is unknown or at or before the
+  server's current time. It combines with `status` as AND.
+- `sort` — `field,asc|desc` over `startedAt`, `endsAt`, `durationMinutes`, `expenses` and `id`
+  (`id` is appended as tiebreaker); without `sort` the backend orders by `startedAt` ascending.
+  `endsAt` is computed by the database (`RefineryOrder.endsAt`, a read-only formula); orders with
+  an unknown end sort last ascending.
+
+Page and size links MUST preserve the active filter — the `view` (or the legacy exact `status`
+params), the `onlyMine` toggle and the search `q` — and the pagination controls live **inside** the
+`refineryOrdersResults` AJAX-swap fragment so an in-place filter change re-renders them.
 
 **Acceptance**
 
 - [ ] A result spanning more than one page renders the page-nav and the 10/50/100 size picker; a
   short result (≤ the smallest size, single page) renders neither.
-- [ ] Every page-nav and size-picker link carries the active `status` (repeatable) and `onlyMine`
-  params; changing the size jumps back to page 0.
-- [ ] The default view shows `OPEN`+`IN_PROGRESS`, sorted `startedAt,desc`, with the newest order on
-  page 0.
+- [ ] Every page-nav and size-picker link carries the active `view` (or exact `status`), `onlyMine`
+  and `q` params; changing the size jumps back to page 0.
+- [ ] Every segment, with or without a search, is exactly one backend page of the requested size;
+  no request asks for `size=1000`.
+- [ ] `RUNNING` and `READY` are ordered by end ascending, `COMPLETED` and `ALL` by start
+  descending; `READY` sends `ready=true`.
+- [ ] The search reaches the backend as `q`; the backend finds an order by each searched field,
+  returns it once however many of its goods match, and keeps the caller's scope.
+- [ ] `ready=true` keeps an order whose end is exactly now and drops one whose end is later.
 - [ ] A `?size=` outside {10,50,100} falls back to 50; a negative `?page=` clamps to 0.
 
-**Enforced by:** `RefineryOrderPaginationMvcTest`, `RefineryOrderDurationTest`
-(`testViewOrders_*`) · **Code:** `RefineryOrderPageController.viewOrders` / `buildPaginationBaseUrl`,
-`templates/refinery-orders-index.html`, `templates/fragments/pagination.html` · **Issues:** #2
+**Enforced by:** `RefineryOrderPaginationMvcTest`, `RefineryOrdersListPatternRenderTest`,
+`RefineryOrderListViewResolutionTest`, `RefineryOrderDurationTest` (`testViewOrders_*`),
+`RefineryOrderRepositoryListFilterTest`, `RefineryOrderControllerTest` (`ListFilterTests`),
+`RefineryOrderServiceLifecycleTest` · **Code:** `RefineryOrderPageController.viewOrders` /
+`segmentQuery` / `orderPageUri` / `buildPaginationBaseUrl`, `templates/refinery-orders-index.html`,
+`templates/fragments/pagination.html`, `RefineryOrderController` (`/all`, `/my-orders`),
+`RefineryOrderService.getAllRefineryOrders` / `getMyRefineryOrders`,
+`RefineryOrderRepository.findFilteredScoped` / `findOwnedFiltered` / `LIST_FILTER` · **Issues:** #2
 (performance audit)
 
 ### REQ-REFINERY-020 — A location counts as a refinery iff it hosts a refinery terminal
@@ -191,10 +240,9 @@ event per row plus one `REFINERY_ORDER_STORED` event. It MUST happen at most onc
   handlers; this spec only governs the list view's pagination. The store dialog's personal marker
   (booking refinery output straight into the receiver's private pool) is specified in
   [`inventory-lager.md`](inventory-lager.md) `REQ-INV-035`.
-- New sortable columns. The backend sort whitelist for these endpoints is
-  `{startedAt, durationMinutes, expenses, id}`; the UI keeps the fixed `startedAt,desc` order. The
-  end-time column the list displays is a derived value (`startedAt + durationMinutes`) and is not
-  server-sortable.
+- User-chosen sort columns. The UI sorts each segment by the fixed order of REQ-REFINERY-019; the
+  backend sort whitelist (`{startedAt, endsAt, durationMinutes, expenses, id}`) is not exposed as
+  column headers.
 
 ## Open questions
 

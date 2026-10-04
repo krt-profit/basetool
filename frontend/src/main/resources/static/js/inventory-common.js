@@ -351,10 +351,10 @@
         function setStackEntriesStatus(content, message, isError) {
             content.replaceChildren();
             const div = document.createElement('div');
-            div.className = 'stack-entries-status';
-            if (isError) div.classList.add('hud-box-error');
-            div.style.padding = '1rem 2.5rem';
-            div.style.color = 'var(--color-gray-2-text)';
+            div.className = isError
+                ? 'stack-entries-status alert alert-danger'
+                : 'stack-entries-status';
+            if (isError) div.setAttribute('role', 'alert');
             div.textContent = message;
             content.appendChild(div);
         }
@@ -460,7 +460,8 @@
                     if (!firstChecked && label) firstChecked = label.innerText;
                 }
             }
-            if (count === 0 || count === checkboxes.length) {
+            const active = count > 0 && count < checkboxes.length;
+            if (!active) {
                 headerSpan.innerText = window.krtI18nText(
                     header.getAttribute('data-all'),
                     'data-all',
@@ -473,6 +474,36 @@
                     ' ' +
                     window.krtI18nText(header.getAttribute('data-selected'), 'data-selected');
             }
+            const summary = /** @type {HTMLInputElement | null} */ (
+                document.querySelector('input[data-chip-header="' + headerId + '"]')
+            );
+            if (summary) summary.value = active ? headerSpan.innerText : '';
+        }
+
+        /**
+         * Clears a multi-select family whose filter chip was removed: the chip empties the
+         * family's hidden summary input, which unticks the family and re-runs the filter.
+         *
+         * @param {Event} event the change event
+         */
+        function clearFamilyFromChip(event) {
+            const summary = event.target;
+            if (!(summary instanceof HTMLInputElement)) return;
+            if (!summary.hasAttribute('data-chip-family') || summary.value !== '') return;
+            const family = summary.getAttribute('data-chip-family');
+            const boxes = familyBoxes(family);
+            let changed = false;
+            for (let i = 0; i < boxes.length; i++) {
+                if (boxes[i].checked) changed = true;
+                boxes[i].checked = false;
+            }
+            if (!changed) return;
+            updateSelectState(
+                summary.getAttribute('data-chip-all'),
+                family,
+                summary.getAttribute('data-chip-header'),
+            );
+            cfg.refreshTable();
         }
 
         /**
@@ -646,7 +677,7 @@
                 document.getElementById('terminal')
             );
             const sellAmount = input('sellAmount');
-            if (sellFields) sellFields.style.display = typeSell ? 'block' : 'none';
+            if (sellFields) sellFields.hidden = !typeSell;
             if (terminal) terminal.required = typeSell;
             if (sellAmount) sellAmount.required = typeSell;
             const submitBtn = document.getElementById('bookOutSubmitBtn');
@@ -692,7 +723,7 @@
                 if (discard) discard.checked = true;
                 toggleBookOutTypeFields();
             }
-            if (reason) reason.style.display = 'inline';
+            if (reason) reason.hidden = false;
         }
 
         /**
@@ -709,7 +740,7 @@
             if (!materialId) {
                 setPlaceholderOption(terminalSelect, bookOutI18n.terminalNoMaterial);
                 sellRadio.disabled = true;
-                if (reason) reason.style.display = 'inline';
+                if (reason) reason.hidden = false;
                 return;
             }
             fetch('/api/proxy/materials/' + encodeURIComponent(materialId) + '/terminals')
@@ -812,7 +843,7 @@
 
             const sellNotPossibleReason = document.getElementById('sellNotPossibleReason');
             sellRadio.disabled = true;
-            if (sellNotPossibleReason) sellNotPossibleReason.style.display = 'none';
+            if (sellNotPossibleReason) sellNotPossibleReason.hidden = true;
             loadSellTerminals(materialId, terminalSelect, sellRadio, sellNotPossibleReason);
 
             window.krtModal.open(modal);
@@ -1063,7 +1094,7 @@
             const targetUserId = userSelect.value;
             select.replaceChildren();
             if (!targetUserId) {
-                wrapper.style.display = 'none';
+                wrapper.hidden = true;
                 return;
             }
             fetch('/users/' + encodeURIComponent(targetUserId) + '/memberships?allKinds=true', {
@@ -1077,7 +1108,7 @@
                     /** @param {Array<{ orgUnitId: string, orgUnitName: string }>} memberships */
                     function (memberships) {
                         if (!Array.isArray(memberships) || memberships.length < 1) {
-                            wrapper.style.display = 'none';
+                            wrapper.hidden = true;
                             return;
                         }
                         memberships.forEach(function (opt) {
@@ -1092,11 +1123,11 @@
                         ) {
                             select.value = current;
                         }
-                        wrapper.style.display = 'block';
+                        wrapper.hidden = false;
                     },
                 )
                 .catch(function () {
-                    wrapper.style.display = 'none';
+                    wrapper.hidden = true;
                 });
         }
 
@@ -1120,7 +1151,7 @@
          */
         function assocCloseAllPops(except) {
             document.querySelectorAll('[data-assoc-pop]').forEach(function (p) {
-                if (p !== except) p.classList.add('krtm-hidden');
+                if (p !== except) /** @type {HTMLElement} */ (p).hidden = true;
             });
         }
 
@@ -1157,7 +1188,7 @@
          */
         function assocRepositionOpenPop() {
             const pop = /** @type {HTMLElement | null} */ (
-                document.querySelector('[data-assoc-pop]:not(.krtm-hidden)')
+                document.querySelector('[data-assoc-pop]:not([hidden])')
             );
             if (pop) assocPositionPop(pop);
         }
@@ -1168,10 +1199,14 @@
          * @param {Element} pop the popover
          */
         function assocShowPickSection(pop) {
-            const pick = pop.querySelector('[data-assoc-pop-pick]');
-            const amount = pop.querySelector('[data-assoc-pop-amount]');
-            if (pick) pick.classList.remove('krtm-hidden');
-            if (amount) amount.classList.add('krtm-hidden');
+            const pick = /** @type {HTMLElement | null} */ (
+                pop.querySelector('[data-assoc-pop-pick]')
+            );
+            const amount = /** @type {HTMLElement | null} */ (
+                pop.querySelector('[data-assoc-pop-amount]')
+            );
+            if (pick) pick.hidden = false;
+            if (amount) amount.hidden = true;
         }
 
         /**
@@ -1181,12 +1216,18 @@
          * @param {boolean} showRemove whether the slice exists and can be removed
          */
         function assocShowAmountSection(pop, showRemove) {
-            const pick = pop.querySelector('[data-assoc-pop-pick]');
-            const amount = pop.querySelector('[data-assoc-pop-amount]');
-            if (pick) pick.classList.add('krtm-hidden');
-            if (amount) amount.classList.remove('krtm-hidden');
-            const removeBtn = pop.querySelector('[data-trigger="' + trigger('assoc-remove') + '"]');
-            if (removeBtn) removeBtn.classList.toggle('krtm-hidden', !showRemove);
+            const pick = /** @type {HTMLElement | null} */ (
+                pop.querySelector('[data-assoc-pop-pick]')
+            );
+            const amount = /** @type {HTMLElement | null} */ (
+                pop.querySelector('[data-assoc-pop-amount]')
+            );
+            if (pick) pick.hidden = true;
+            if (amount) amount.hidden = false;
+            const removeBtn = /** @type {HTMLElement | null} */ (
+                pop.querySelector('[data-trigger="' + trigger('assoc-remove') + '"]')
+            );
+            if (removeBtn) removeBtn.hidden = !showRemove;
         }
 
         /**
@@ -1321,7 +1362,7 @@
                 }),
                 onSuccess(dto) {
                     if (dto && typeof dto === 'object') assocRerender(split, dto);
-                    pop.classList.add('krtm-hidden');
+                    /** @type {HTMLElement} */ (pop).hidden = true;
                     cfg.notifyInventoryChanged();
                     if (body && body.field === 'JOB_ORDER') {
                         broadcastOrdersChanged([body.targetId]);
@@ -1418,7 +1459,7 @@
                 const ctx = assocContext(el);
                 if (!ctx) return;
                 const pop = ctx.pop;
-                const wasHidden = pop.classList.contains('krtm-hidden');
+                const wasHidden = pop.hidden;
                 assocCloseAllPops(pop);
                 if (wasHidden) {
                     pop.removeAttribute('data-assoc-target');
@@ -1427,14 +1468,14 @@
                         pop.querySelector('input[type="hidden"]')
                     );
                     if (hidden && hidden.krtCombobox) hidden.krtCombobox.setValue('');
-                    pop.classList.remove('krtm-hidden');
+                    pop.hidden = false;
                     assocPositionPop(pop);
                     const cbInput = /** @type {HTMLElement | null} */ (
                         pop.querySelector('.krt-combobox__input')
                     );
                     if (cbInput) cbInput.focus();
                 } else {
-                    pop.classList.add('krtm-hidden');
+                    pop.hidden = true;
                 }
             });
             window.krtEvents.on('change', trigger('assoc-pick'), function (el) {
@@ -1468,7 +1509,7 @@
                     pop.querySelector('[data-assoc-amount-input]')
                 );
                 if (amountInput) amountInput.value = el.getAttribute('data-amount') ?? '';
-                pop.classList.remove('krtm-hidden');
+                pop.hidden = false;
                 assocPositionPop(pop);
                 if (amountInput) amountInput.focus();
             });
@@ -1521,6 +1562,7 @@
         function bind() {
             document.addEventListener('DOMContentLoaded', restoreExpandedTree);
             document.addEventListener('click', closeMultiSelectsOnOutsideClick);
+            document.addEventListener('change', clearFamilyFromChip);
             if (window.krtEvents && typeof window.krtEvents.on === 'function') {
                 window.krtEvents.on('click', trigger('toggle-group'), toggleGroup);
                 window.krtEvents.on('click', trigger('toggle-stack'), toggleStack);

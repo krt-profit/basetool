@@ -38,7 +38,7 @@ Der Nutzer öffnet die auftragsübergreifende Bedarfsübersicht, bucht die Herst
 ### Herstellung eines ITEM-Auftrags (`JobOrderProductionE2eTest`, REQ-ORDERS-025)
 
 8. Vor der Herstellung die Detailseite des Auftrags prüfen.
-9. Im Tab „Bestellte Items" das Herstellungs-Modal öffnen, eine Menge eingeben, den Bedarf dem geknüpften Lagereintrag zuteilen und — Pflicht seit REQ-INV-032 — einen Einbuchungsort in der Combobox wählen; buchen, sobald der Abgleich-Chip volle Deckung meldet.
+9. Im Tab „Items" das Herstellungs-Modal („Herstellung erfassen") öffnen, eine Menge eingeben, den Bedarf dem geknüpften Lagereintrag zuteilen und — Pflicht seit REQ-INV-032 — einen Einbuchungsort in der Combobox wählen; buchen, sobald der Abgleich-Chip volle Deckung meldet.
 10. Danach Detailseite, `/inventory/all?view=items` und die Item-Sammelseite (`/item-collection`) prüfen und dort den Eintrag als geliefert markieren.
 
 ### Lagereintrag in place entknüpfen (`JobOrderInventoryUnlinkInPlaceE2eTest`, #571)

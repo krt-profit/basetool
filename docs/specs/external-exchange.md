@@ -1831,12 +1831,16 @@ with a suspend switch. The page is web-only; the app links to it.
 
 The page is `/connected-apps` (the drawer's personal menu *Persönlich*, REQ-UI-026, every member),
 over `/api/v1/connected-apps`.
-Its header links `docs/legal/approved-clients.md` on GitHub
+A line directly under its page head links `docs/legal/approved-clients.md` on GitHub
 (`https://github.com/krt-profit/basetool/blob/main/docs/legal/approved-clients.md`) in a new tab,
 the address the developer site's onboarding page links as well.
 An installation is always named as `‹client name› – „‹label›"`, the client-supplied label escaped
 and never first, so a label cannot pose as the Basetool. Both disconnects ask first and re-swap the
 `connected-apps :: apps` fragment; the page is the member's own and joins no peer sync.
+*Amended 2026-10-03 (website overhaul phase 3):* both pages wear the page head of REQ-UI-027 — the
+confirmation page with „Verbundene Anwendungen" as its back link instead of a link at the bottom —
+and each client is a card with its capabilities as chips; the installation table keeps label,
+first and last seen (first seen as the row's sub-line). No behaviour changed.
 
 The notification is the rule-engine event `EXCHANGE_INSTALLATION_CONNECTED` (seed `V251`,
 `EVENT_RECIPIENT`), published when the installation upsert reports that it created the row, so two

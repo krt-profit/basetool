@@ -906,6 +906,8 @@ class InventoryOperationsE2eTest {
           page.waitForResponse(
               r -> r.url().contains("/inventory/my?") && r.url().contains("stolenOnly=true"),
               () -> page.locator("#stolenFilter").selectOption("only"));
+          page.locator("#stolenFilter").press("Escape");
+          assertThat(page.locator("#myFilterPanel")).isHidden();
           assertThat(stackHeader(stolenMatId, true, page)).hasCount(1);
           assertThat(stackHeader(stolenMatId, false, page)).hasCount(0);
 

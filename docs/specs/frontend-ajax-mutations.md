@@ -351,8 +351,11 @@ The operations area (#576) combines the patterns through a set of `X-Requested-W
 (`createOperationAjax` / `updateOperationAjax` / `deleteOperationAjax`) beside the classic
 POST→redirect fallbacks. Creating or deleting from the list re-renders `#operations-results` via the
 existing `GET /operations?fragment=results` swap (the page exposes `window.krtOperationsReload` so the
-write handlers reuse the active filter query); editing on the detail page patches the version input
-and the title in place from the twin's `{version, name, status}` (the backend PUT echoes the
+write handlers reuse the active filter query); editing on the detail page — since 2026-10-03 in
+the „Bearbeiten" dialog — patches the version input from the twin's `{version, name, status}`,
+adopts the saved values as the form's defaults, closes the dialog and re-renders the overview
+fragment, whose head meta repaints the title, the status badge and the KPI bar (the backend PUT
+echoes the
 persisted operation in-transaction, so no second round-trip can observe a concurrent writer's
 `version+2` or mask an already-committed write — no navigation); deleting
 from the detail page navigates back to the list (the entity is gone — REQ-FE-006). The payout
@@ -455,7 +458,9 @@ writes for in-place fragment swaps. The two admin pages re-render their list reg
 mutation: **topics/categories** create / edit / delete and the up/down **reorder** swap
 `promotion-admin-topics :: topicsResults` into `#pa-topics-results`, and the **rank-requirements**
 create / edit / delete + group-delete swap `promotion-admin-rank-requirements :: ranksResults` into
-`#ar-results`. A full server re-render is exactly what re-syncs every card's `@Version`, sort order
+`#ar-results`. The topics swap requests `?topic=<selected id>` (2026-10-03, REQ-PROMO-003), so the
+master-detail keeps the selected topic open across every write and a freshly created topic opens
+selected. A full server re-render is exactly what re-syncs every card's `@Version`, sort order
 and first/last arrow state, so a second reorder can no longer 409 — and the reorder no longer relies
 on a non-existent GET-by-id proxy route (it now reads the full DTO each PUT needs straight from the
 card's edit-button data attributes). The **manage** matrix already saved grades in place through its
@@ -505,6 +510,10 @@ same `?fragment=…` fragment the include-inactive filters already swap, plus a 
 `special-command-detail :: membersResults` fragment for the member roster. A full server re-render is
 exactly what re-syncs every row's `@Version`, the active / role / lead badges and the frequency
 ordering, so a second action can no longer 409, and the reorder drops its `location.reload()`.
+Since 2026-10-03 mission-data is a master-detail over its three data kinds (Staffeln · Aufgaben ·
+Frequenztypen): the selected kind is the `?kind=squadrons|jobtypes|freqtypes` deep link, rewritten
+in place on every selection, sent along with the include-inactive swaps, and a validation
+re-render opens the kind whose dialog failed.
 **announcement** (update / delete), **material-aliases** (create / update / delete), **material
 categories** (create / delete) and **admin-settings** (the five-version save) patch their own
 row / version inputs in place; settings validation failures and material-category conflicts come back
@@ -839,8 +848,8 @@ notification SSE registry carries the same two fixes (#1157 / #1156, see REQ-NOT
 - [ ] With the same mission open in two sessions, a mutation by user A (participant add, crew move,
   finance entry, manager/owner change, core/schedule/status/party-lead edit, Ablauf-step,
   Ziele-objective or frequency/custom-frequency edit) appears on user B's view within a short delay
-  without a manual reload — including the Verwaltung steps/objectives/frequencies editors, not only
-  their Übersicht mirrors.
+  without a manual reload — including the edit mode's (formerly Verwaltung)
+  steps/objectives/frequencies editors, not only their Übersicht mirrors.
 - [ ] No mission data crosses the socket — a peer viewer's auto-refresh still renders the
   PII-redacted fragment and the member-only finance section stays gated per viewer.
 - [ ] An incoming change while user B has a modal open (or is editing the affected section) does not
@@ -1328,7 +1337,9 @@ itself, while `missions` (the embedded child-missions table) and `finance` (the 
 `overview → missions` / `finance → finance` onto its parent `operation:{id}` (publishing needs no
 subscription), so an operation viewer refreshes those two sections in place without a reload (#1241).
 The mission page reads its parent operation id from `window.missionOperationId`; a mission with no
-operation forwards nothing.
+operation forwards nothing. The operation page adds `overview` to every section it re-renders for a
+peer, and its own paid-out toggle refreshes `overview` too, because the head, the KPI bar and the
+payout card read their values from the overview fragment (`#operation-head-meta`, 2026-10-03).
 
 **Authorization is asymmetric by design (ADR-0094).** *Subscribing* to a topic requires the same
 authenticated read the page itself performs (table above), checked asynchronously off the WS
@@ -1991,6 +2002,13 @@ ADR-0165
 
 ### REQ-FE-021 — A list page's filters collapse behind one toggle
 
+> **Amended 2026-10-03 (website overhaul phases 1–3).** Every list page now renders its filter block
+> as the toolbar's transient filter popover (`fragments/components :: filterPopover`, REQ-UI-027):
+> it keeps the `.filter-toggle` / `.filter-panel` contract, the count badge and the
+> script-collapses-a-rendered-panel fallback below, but it **always starts closed and stores no
+> open/closed preference** — the third property below is retired. No page uses `filterToggle` any
+> more; active filters are additionally shown as `.filter-chips`.
+
 Every list page whose filter block carries **more than a single control** must render that block as
 a collapsible panel: the block gets `data-filter-panel="<page>"`, and the shared
 `fragments/components :: filterToggle` sits beside it in an `actions-bar` that also carries the
@@ -2036,8 +2054,8 @@ calls `refresh()` after the swap so a collapsed panel never under-reports.
 > handler, where the deferred script has run and the restored widget state is also in place.
 
 **Enforced by:** `InventoryFilterPanelCollapseE2eTest`, `JobOrderMaterialDemandE2eTest`,
-`InventoryPageControllerMvcTest` (the panel markup and the shared `filterToggle`) · **Code:**
-`krt-filter-panel.js`, `fragments/components.html` (`filterToggle`)
+`InventoryPageControllerMvcTest` (the filters inside the toolbar popover) · **Code:**
+`krt-filter-panel.js`, `fragments/components.html` (`filterPopover`)
 
 ### REQ-FE-023 — Every script is deferred, and an inline script runs nothing at parse time
 
