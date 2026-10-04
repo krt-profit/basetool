@@ -31,8 +31,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Verifies that the {@link TestImages} constants equal the images {@code docker-compose.yml} and
- * the Quadlet units run in production, and that the backend's JDBC URL is pinned through {@link
- * PinnedImageSubstitutor}.
+ * the Quadlet units run in production, and that the backend's JDBC URL names the pinned tag.
  */
 class TestImagesTest {
 
@@ -108,21 +107,21 @@ class TestImagesTest {
   }
 
   /**
-   * The backend's Testcontainers JDBC URL names the tag {@link PinnedImageSubstitutor} replaces,
-   * and the backend's test classpath activates the substitutor, so the tests run the pinned image.
+   * The backend's Testcontainers JDBC URL names exactly the tag of the PostgreSQL constant, the one
+   * reference the backend's image-name substitutor replaces with the pinned image.
    *
-   * @throws IOException if a backend test resource cannot be read
+   * @throws IOException if the backend's test configuration cannot be read
    */
   @Test
-  void theBackendJdbcUrlIsSubstitutedWithThePinnedImage() throws IOException {
-    Path resources = repositoryRoot().resolve("backend/src/test/resources");
-    String tag = PinnedImageSubstitutor.TAGGED_POSTGRES.substring("postgres:".length());
-    assertThat(imageLines(resources.resolve("application-test.yml"), "url: jdbc:tc:"))
-        .as("the backend's JDBC URL must start the tag PinnedImageSubstitutor pins")
+  void theBackendJdbcUrlNamesThePinnedTag() throws IOException {
+    String tag =
+        TestImages.POSTGRES.substring("postgres:".length(), TestImages.POSTGRES.indexOf('@'));
+    assertThat(
+            imageLines(
+                repositoryRoot().resolve("backend/src/test/resources/application-test.yml"),
+                "url: jdbc:tc:"))
+        .as("the backend's JDBC URL must name the tag TestImages.POSTGRES pins")
         .containsExactly("url: jdbc:tc:postgresql:" + tag + ":///testdb?TC_DAEMON=true");
-    assertThat(imageLines(resources.resolve("testcontainers.properties"), "image.substitutor="))
-        .as("the backend's testcontainers.properties must activate PinnedImageSubstitutor")
-        .containsExactly("image.substitutor=" + PinnedImageSubstitutor.class.getName());
   }
 
   /**

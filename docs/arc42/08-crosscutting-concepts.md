@@ -362,7 +362,7 @@ production runs where that is cheap to arrange: the Redis integration tests star
 image by digest (`TestImages.REDIS`, guarded against the compose file and the Quadlet unit), and
 the backend's Testcontainers PostgreSQL is one container per test JVM (`TC_DAEMON=true`) of the
 production image by digest (`TestImages.POSTGRES`, substituted for the JDBC URL's tag by
-`PinnedImageSubstitutor`).
+the backend's test `PinnedPostgresImageSubstitutor`).
 
 Backend module coupling is measured in tests too. An ArchUnit `modules()` rule over the domain map
 lets a module depend only on lower-ranked modules and its same-rank `allow` rows; today's violations

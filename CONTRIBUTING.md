@@ -1031,8 +1031,8 @@ because of real bugs that shipped. The short version:
   Redis comes from `TestImages.REDIS` and PostgreSQL from `TestImages.POSTGRES`
   in `test-support`, which a guard test keeps equal to the compose file and the
   Quadlet units. The backend's `jdbc:tc:postgresql:18-alpine` URL cannot carry
-  a digest, so `PinnedImageSubstitutor` (activated in the backend's test
-  `testcontainers.properties`) swaps in the pinned reference. A Dependabot
+  a digest, so the backend's test `PinnedPostgresImageSubstitutor` (activated
+  in its test `testcontainers.properties`) swaps in the pinned reference. A Dependabot
   digest bump of either image updates the constant in the same PR.
 - **Every new feature ships with tests.** No exceptions.
 - **Never use production / real credentials in tests or local test

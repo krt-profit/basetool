@@ -17,21 +17,23 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.testsupport.containers;
+package de.greluc.krt.profit.basetool.backend;
 
+import de.greluc.krt.profit.basetool.testsupport.containers.TestImages;
 import org.jetbrains.annotations.NotNull;
 import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.ImageNameSubstitutor;
 
 /**
- * Testcontainers image-name substitutor that replaces the tag-only PostgreSQL image of a {@code
- * jdbc:tc:postgresql:<tag>} URL with the digest-pinned {@link TestImages#POSTGRES}.
+ * Testcontainers image-name substitutor that replaces the tag-only PostgreSQL image of the
+ * backend's {@code jdbc:tc:postgresql:<tag>} URL with the digest-pinned {@link TestImages#POSTGRES}
+ * (TST-18).
  *
- * <p>A module activates it with {@code image.substitutor} in its test-classpath {@code
+ * <p>Activated by {@code image.substitutor} in the backend's test-classpath {@code
  * testcontainers.properties}. Only the exact tagged reference {@link #TAGGED_POSTGRES} is replaced;
  * every other image passes through unchanged.
  */
-public final class PinnedImageSubstitutor extends ImageNameSubstitutor {
+public final class PinnedPostgresImageSubstitutor extends ImageNameSubstitutor {
 
   /** {@link TestImages#POSTGRES} without its digest: the reference a JDBC URL can express. */
   public static final String TAGGED_POSTGRES =

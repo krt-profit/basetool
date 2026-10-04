@@ -42,8 +42,8 @@ public final class TestImages {
   /**
    * The production PostgreSQL image: the {@code 18-alpine} tag pinned to its multi-arch index
    * digest, as {@code docker-compose.yml} and the database Quadlet units declare it. The
-   * Testcontainers JDBC URL cannot carry a digest, so {@link PinnedImageSubstitutor} maps the URL's
-   * {@code postgres:18-alpine} onto this reference.
+   * Testcontainers JDBC URL cannot carry a digest, so the backend's test-classpath image-name
+   * substitutor maps the URL's {@code postgres:18-alpine} onto this reference.
    */
   public static final String POSTGRES =
       "postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873";

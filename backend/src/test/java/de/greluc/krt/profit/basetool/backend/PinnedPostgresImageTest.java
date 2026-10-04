@@ -27,8 +27,8 @@ import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.ImageNameSubstitutor;
 
 /**
- * Verifies that the backend's test classpath activates the PostgreSQL pin, so the {@code
- * jdbc:tc:postgresql:18-alpine} URL starts the production image by digest (TST-18).
+ * Verifies that the backend's test classpath activates {@link PinnedPostgresImageSubstitutor}, so
+ * the {@code jdbc:tc:postgresql:18-alpine} URL starts the production image by digest (TST-18).
  */
 class PinnedPostgresImageTest {
 
@@ -41,5 +41,22 @@ class PinnedPostgresImageTest {
 
     assertThat(ImageNameSubstitutor.instance().apply(declared).asCanonicalNameString())
         .isEqualTo(TestImages.POSTGRES);
+  }
+
+  /** Another PostgreSQL tag and an unrelated image pass through the substitutor unchanged. */
+  @Test
+  void otherImagesPassThrough() {
+    PinnedPostgresImageSubstitutor substitutor = new PinnedPostgresImageSubstitutor();
+    DockerImageName otherTag = DockerImageName.parse("postgres:17-alpine");
+    DockerImageName redis = DockerImageName.parse(TestImages.REDIS);
+
+    assertThat(substitutor.apply(otherTag)).isSameAs(otherTag);
+    assertThat(substitutor.apply(redis)).isSameAs(redis);
+  }
+
+  /** The tagged reference is the constant without its digest. */
+  @Test
+  void theTaggedReferenceIsTheConstantWithoutItsDigest() {
+    assertThat(PinnedPostgresImageSubstitutor.TAGGED_POSTGRES).isEqualTo("postgres:18-alpine");
   }
 }
