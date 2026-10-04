@@ -19,12 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.OrgUnitMembershipMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
@@ -45,7 +47,6 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipReposit
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.OrgUnitLabels;
 import java.time.Instant;
@@ -89,7 +90,7 @@ public class OrgUnitMembershipService {
   private final OrgUnitRepository orgUnitRepository;
   private final KommandoGroupRepository kommandoGroupRepository;
   private final InventoryOrgUnitReconciler inventoryReconciler;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final OrgChartService orgChartService;
   private final OrgUnitMembershipMapper orgUnitMembershipMapper;
 
@@ -130,7 +131,7 @@ public class OrgUnitMembershipService {
     if (wasMembershipless) {
       inventoryReconciler.onUserGainedFirstOrgUnit(userId, sc);
     }
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MEMBERSHIP_GRANTED,
         sc.getId(),
         OrgUnitLabels.shorthandOrName(sc),
@@ -163,7 +164,7 @@ public class OrgUnitMembershipService {
     if (membershipRepository.countByIdUserId(userId) == 0) {
       inventoryReconciler.onUserLostLastOrgUnit(userId);
     }
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MEMBERSHIP_REVOKED,
         sc.getId(),
         OrgUnitLabels.shorthandOrName(sc),
@@ -222,7 +223,7 @@ public class OrgUnitMembershipService {
     OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
     orgChartService.mirrorBereichRole(bereich.getId(), userId, role);
     final boolean firstGrant = previousRole == null || previousRole == MembershipRole.MEMBER;
-    auditService.record(
+    auditRecorder.record(
         firstGrant ? AuditEventType.ROLE_GRANTED : AuditEventType.ROLE_CHANGED,
         bereich.getId(),
         OrgUnitLabels.shorthandOrName(bereich),
@@ -251,7 +252,7 @@ public class OrgUnitMembershipService {
         orgUnitBankResponsibilityServiceProvider.getObject().snapshotResponsibleHolders(bereichId);
     membershipRepository.delete(m);
     orgChartService.mirrorRemoveUnitSeat(bereichId, userId);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.ROLE_REVOKED,
         bereichId,
         orgUnitLabelById(bereichId),
@@ -303,7 +304,7 @@ public class OrgUnitMembershipService {
     m.setRole(MembershipRole.OL_MEMBER);
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
     orgChartService.mirrorOlMember(ol.getId(), userId);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.ROLE_GRANTED,
         ol.getId(),
         OrgUnitLabels.shorthandOrName(ol),
@@ -345,7 +346,7 @@ public class OrgUnitMembershipService {
               ((Organisationsleitung) u).setGrandAdmiralUserId(null);
               orgUnitRepository.saveAndFlush(u);
             });
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.ROLE_REVOKED,
         organisationsleitungId,
         orgUnitLabelById(organisationsleitungId),
@@ -382,14 +383,14 @@ public class OrgUnitMembershipService {
     ol.setGrandAdmiralDisplayName(null);
     orgUnitRepository.saveAndFlush(ol);
     if (previous != null) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.ROLE_CHANGED,
           ol.getId(),
           OrgUnitLabels.shorthandOrName(ol),
           previous,
           AuditDetails.of("grandAdmiral", false));
     }
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.ROLE_CHANGED,
         ol.getId(),
         OrgUnitLabels.shorthandOrName(ol),
@@ -417,7 +418,7 @@ public class OrgUnitMembershipService {
     ol.setGrandAdmiralDisplayName(null);
     orgUnitRepository.saveAndFlush(ol);
     if (previousUser != null) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.ROLE_CHANGED,
           ol.getId(),
           OrgUnitLabels.shorthandOrName(ol),
@@ -530,7 +531,7 @@ public class OrgUnitMembershipService {
       m.setMissionManager(request.isMissionManager());
     }
     OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.CAPABILITY_FLAGS_CHANGED,
         squadron.getId(),
         OrgUnitLabels.shorthandOrName(squadron),
@@ -637,7 +638,7 @@ public class OrgUnitMembershipService {
         fresh.setMissionManager(wantMissionManager);
         membershipRepository.save(fresh);
         Squadron sq = targetSquadrons.get(squadronId);
-        auditService.record(
+        auditRecorder.record(
             AuditEventType.MEMBERSHIP_GRANTED,
             squadronId,
             OrgUnitLabels.shorthandOrName(sq),
@@ -687,7 +688,7 @@ public class OrgUnitMembershipService {
     m.setRole(request.isLead() ? MembershipRole.SK_LEAD : MembershipRole.MEMBER);
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
     orgChartService.mirrorSkLead(specialCommandId, userId, request.isLead());
-    auditService.record(
+    auditRecorder.record(
         request.isLead() ? AuditEventType.ROLE_GRANTED : AuditEventType.ROLE_REVOKED,
         specialCommandId,
         orgUnitLabelById(specialCommandId),
@@ -748,7 +749,7 @@ public class OrgUnitMembershipService {
     orgChartService.mirrorSquadronRank(squadronId, userId, rank, group);
 
     final boolean firstGrant = previousRole == MembershipRole.MEMBER;
-    auditService.record(
+    auditRecorder.record(
         firstGrant ? AuditEventType.ROLE_GRANTED : AuditEventType.ROLE_CHANGED,
         squadronId,
         orgUnitLabelById(squadronId),
@@ -790,7 +791,7 @@ public class OrgUnitMembershipService {
     m.setKommandoGroup(null);
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
     orgChartService.mirrorRemoveSquadronRank(squadronId, userId);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.ROLE_REVOKED,
         squadronId,
         orgUnitLabelById(squadronId),
@@ -1072,7 +1073,7 @@ public class OrgUnitMembershipService {
    */
   private void recordStaffelMembershipRevoked(
       @NotNull UUID squadronOrgUnitId, @NotNull UUID userId) {
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MEMBERSHIP_REVOKED,
         squadronOrgUnitId,
         orgUnitLabelById(squadronOrgUnitId),
@@ -1090,7 +1091,7 @@ public class OrgUnitMembershipService {
    */
   private void recordCapabilityFlagsChanged(
       @NotNull UUID orgUnitId, @NotNull UUID userId, @NotNull OrgUnitMembership saved) {
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.CAPABILITY_FLAGS_CHANGED,
         orgUnitId,
         orgUnitLabelById(orgUnitId),

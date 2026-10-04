@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.service.exchange;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeChange;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeJournalAction;
@@ -42,10 +44,8 @@ import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.HangarService;
 import de.greluc.krt.profit.basetool.backend.service.PersonalBlueprintService;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.ExchangeChangeRetentionProperties;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -104,7 +104,7 @@ public class ExchangeUndoService {
   private final LocationRepository locationRepository;
   private final HangarService hangarService;
   private final ExchangeShipLinkRepository linkRepository;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final ExchangeLiveSync liveSync;
   private final ExchangeEntryLabels entryLabels;
   private final ExchangeChangeRetentionProperties retention;
@@ -129,7 +129,7 @@ public class ExchangeUndoService {
         Entities.require(
             clientRepository.findWithCapabilitiesByClientId(clientId), () -> "Client not found");
     Outcome outcome = perform(member, clientId, since, null, null);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.EXCHANGE_CHANGES_UNDONE,
         client.getId(),
         client.getClientId(),
@@ -169,7 +169,7 @@ public class ExchangeUndoService {
       @Nullable ExchangeResource resource,
       @NotNull UUID runId) {
     Outcome outcome = perform(member, client.getClientId(), since, installationKey, resource);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.EXCHANGE_CHANGES_UNDONE,
         client.getId(),
         client.getClientId(),

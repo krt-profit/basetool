@@ -1093,7 +1093,9 @@ class RefineryOrderServiceTest {
       ArgumentCaptor<String> labelCaptor = ArgumentCaptor.forClass(String.class);
       verify(auditService)
           .record(
-              eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.REFINERY_ORDER_CREATED),
+              eq(
+                  de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType
+                      .REFINERY_ORDER_CREATED),
               any(),
               labelCaptor.capture(),
               any(),

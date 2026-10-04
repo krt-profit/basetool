@@ -19,17 +19,18 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.DefaultBlueprintMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.DefaultBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.dto.DefaultBlueprintResponse;
 import de.greluc.krt.profit.basetool.backend.repository.DefaultBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -60,7 +61,7 @@ public class DefaultBlueprintService {
   private final GameItemRepository gameItemRepository;
   private final DefaultBlueprintProvisioningService provisioningService;
   private final DefaultBlueprintKeyService keyService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Lists the current default set, alphabetically by product name, for the admin page.
@@ -105,7 +106,7 @@ public class DefaultBlueprintService {
     }
     entity.setCreatedBy(createdBy);
     DefaultBlueprint saved = repository.save(entity);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.BLUEPRINT_DEFAULT_ADDED,
         saved.getId(),
         saved.getProductName(),
@@ -133,7 +134,7 @@ public class DefaultBlueprintService {
     DefaultBlueprint entity =
         Entities.require(repository.findById(id), () -> "DefaultBlueprint not found: " + id);
     repository.delete(entity);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.BLUEPRINT_DEFAULT_REMOVED,
         id,
         entity.getProductName(),

@@ -19,18 +19,19 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.EntityInUseException;
 import de.greluc.krt.profit.basetool.backend.mapper.QualityTierMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.dto.QualityTierDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.QualityTierWriteDto;
 import de.greluc.krt.profit.basetool.backend.repository.QualityTierRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Quality;
 import java.util.Collection;
@@ -67,7 +68,7 @@ public class QualityTierService {
   private final QualityTierMapper qualityTierMapper;
 
   /** Records every catalogue change in the job-order audit domain. */
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Lists the whole catalogue in picker order, inactive tiers included.
@@ -184,7 +185,7 @@ public class QualityTierService {
             .active(dto.active())
             .build();
     QualityTier saved = qualityTierRepository.saveAndFlush(tier);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.QUALITY_TIER_CREATED,
         saved.getId(),
         saved.getCode(),
@@ -233,7 +234,7 @@ public class QualityTierService {
     tier.setSortOrder(dto.sortOrder());
     tier.setActive(dto.active());
     QualityTier saved = qualityTierRepository.saveAndFlush(tier);
-    auditService.record(
+    auditRecorder.record(
         deactivated ? AuditEventType.QUALITY_TIER_DEACTIVATED : AuditEventType.QUALITY_TIER_UPDATED,
         saved.getId(),
         saved.getCode(),
@@ -265,7 +266,7 @@ public class QualityTierService {
     String code = tier.getCode();
     int minQuality = tier.getMinQuality();
     qualityTierRepository.delete(tier);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.QUALITY_TIER_DELETED,
         id,
         code,

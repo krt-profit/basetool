@@ -21,13 +21,13 @@ RUN case "$MODULE" in \
         backend|frontend|ingest) ;; \
         *) echo "MODULE must be backend, frontend or ingest (got '${MODULE}')" >&2; exit 1 ;; \
     esac; \
-    ./gradlew ":${MODULE}:dependencies" --no-daemon
+    ./gradlew ":${MODULE}:dependencies" --no-daemon --no-configuration-cache
 
 COPY ${MODULE}/src/main/ ${MODULE}/src/main/
 COPY logging-support/src/main/ logging-support/src/main/
 COPY frontend/oss-bundled-components.json frontend/oss-bundled-components.json
 
-RUN ./gradlew ":${MODULE}:bootJar" ${APP_VERSION:+-PappVersion=$APP_VERSION} --no-daemon
+RUN ./gradlew ":${MODULE}:bootJar" ${APP_VERSION:+-PappVersion=$APP_VERSION} --no-daemon --no-configuration-cache
 
 WORKDIR /app/${MODULE}/build/libs
 RUN set -eu; \

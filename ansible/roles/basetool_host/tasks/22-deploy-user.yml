@@ -25,7 +25,7 @@
     create_home: false
     comment: "Runs deploy.sh, backup.sh and restore-drill.sh (ADR-0188)"
 
-- name: Let deploy drive the service user's containers, and nothing else
+- name: Let deploy run only the podman sub-commands its scripts use, as the service user
   ansible.builtin.copy:
     dest: /etc/sudoers.d/basetool-deploy
     owner: root
@@ -34,7 +34,11 @@
     validate: "visudo -cf %s"
     content: |
       Defaults:{{ basetool_host_deploy_user }} !requiretty
-      {{ basetool_host_deploy_user }} ALL=({{ basetool_host_service_user }}) NOPASSWD: /usr/bin/podman *
+      Cmnd_Alias BASETOOL_DEPLOY_PODMAN = {% for sub in basetool_host_deploy_podman_subcommands -%}
+        /usr/bin/podman {{ sub }}, /usr/bin/podman {{ sub }} *{{ ', ' if not loop.last else '' }}
+        {%- endfor %}
+
+      {{ basetool_host_deploy_user }} ALL=({{ basetool_host_service_user }}) NOPASSWD: BASETOOL_DEPLOY_PODMAN
       {{ basetool_host_deploy_user }} ALL=({{ basetool_host_service_user }}) NOPASSWD: SETENV: /usr/bin/systemctl --user *
       {{ basetool_host_deploy_user }} ALL=(root) NOPASSWD: /usr/bin/systemctl restart alloy.service
 

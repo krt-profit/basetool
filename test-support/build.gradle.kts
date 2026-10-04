@@ -32,7 +32,9 @@ tasks.named<Test>("test") {
     .files(
       rootProject.file("docker-compose.yml"),
       rootProject.file("quadlet/systemd/redis.container"),
+      rootProject.file("quadlet/systemd/db-backend.container"),
+      rootProject.file("backend/src/test/resources/application-test.yml"),
     )
-    .withPropertyName("productionRedisImageSources")
+    .withPropertyName("productionImageSources")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 }

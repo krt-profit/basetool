@@ -9,6 +9,7 @@ app:
   ingest:
     backend-base-url: ${BACKEND_URL:https://localhost:11261}
     frontend-base-url: ${FRONTEND_URL:http://localhost:18081}
+    verify-backend-hostname: false
 
 logging:
   level:

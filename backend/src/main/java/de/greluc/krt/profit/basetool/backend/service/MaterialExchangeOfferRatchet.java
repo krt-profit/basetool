@@ -19,11 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferKind;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository.OfferStock;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -47,7 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class MaterialExchangeOfferRatchet {
 
   private final MaterialExchangeOfferRepository offerRepository;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Lowers the active offers on a Lager row to the row's reduced stock and records {@code
@@ -135,7 +136,7 @@ public class MaterialExchangeOfferRatchet {
    */
   private int removed(@NotNull List<OfferStock> offers, @NotNull Reason reason) {
     for (OfferStock offer : offers) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.MARKET_OFFER_REMOVED,
           offer.getId(),
           label(offer),
@@ -155,7 +156,7 @@ public class MaterialExchangeOfferRatchet {
    */
   private void reduced(
       @NotNull OfferStock offer, @NotNull Number from, @NotNull Number to, @NotNull Reason reason) {
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MARKET_OFFER_REDUCED,
         offer.getId(),
         label(offer),

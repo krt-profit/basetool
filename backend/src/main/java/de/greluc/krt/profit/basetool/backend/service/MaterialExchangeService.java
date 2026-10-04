@@ -19,11 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.event.MaterialExchangeInterestRegisteredEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeInterest;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer;
@@ -39,7 +41,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeInterest
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.time.Instant;
 import java.util.UUID;
@@ -73,7 +74,7 @@ public class MaterialExchangeService {
   private final InventoryItemRepository inventoryItemRepository;
   private final UserRepository userRepository;
   private final AuthHelperService authHelperService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * The read half this service projects its mutation results through, so every write response is
@@ -158,7 +159,7 @@ public class MaterialExchangeService {
     offer.setReleasedAt(Instant.now());
     MaterialExchangeOffer saved = offerRepository.saveAndFlush(offer);
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MARKET_OFFER_RELEASED,
         saved.getId(),
         offerLabel(saved),
@@ -218,7 +219,7 @@ public class MaterialExchangeService {
     offer.setReleasedAt(Instant.now());
     MaterialExchangeOffer saved = offerRepository.saveAndFlush(offer);
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MARKET_OFFER_RELEASED,
         saved.getId(),
         offerLabel(saved),
@@ -266,7 +267,7 @@ public class MaterialExchangeService {
     offer.setReleasedAt(Instant.now());
     MaterialExchangeOffer saved = offerRepository.saveAndFlush(offer);
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MARKET_OFFER_RELEASED,
         saved.getId(),
         offerLabel(saved),
@@ -319,7 +320,7 @@ public class MaterialExchangeService {
     offer.setRemark(request.remark());
     MaterialExchangeOffer saved = offerRepository.saveAndFlush(offer);
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MARKET_REMARK_UPDATED,
         offerId,
         offerLabel(offer),
@@ -415,7 +416,7 @@ public class MaterialExchangeService {
     interest.setOffer(offer);
     interest.setInterestedUser(viewer);
     interestRepository.save(interest);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MARKET_INTEREST_REGISTERED,
         offerId,
         offerLabel(offer),
@@ -447,7 +448,7 @@ public class MaterialExchangeService {
         Entities.require(offerRepository.findById(offerId), () -> "Offer not found: " + offerId);
     long removed = interestRepository.deleteByOfferIdAndInterestedUserId(offerId, viewerId);
     if (removed > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.MARKET_INTEREST_WITHDRAWN,
           offerId,
           offerLabel(offer),
@@ -469,7 +470,7 @@ public class MaterialExchangeService {
     if (offer.getStatus() == MaterialExchangeOfferStatus.ACTIVE) {
       offer.setStatus(MaterialExchangeOfferStatus.DEACTIVATED);
       offerRepository.saveAndFlush(offer);
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.MARKET_OFFER_DEACTIVATED,
           offer.getId(),
           offerLabel(offer),
