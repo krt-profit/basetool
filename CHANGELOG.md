@@ -8,6 +8,10 @@
   für den man selbst angemeldet ist, den Chip „Angemeldet". Die Missionsliste der API liefert dafür
   pro Zeile das Feld `signedUp` für den Aufrufer (REQ-MISSION-012).
 
+- **Profitberechnung nennt die Terminals der Route.** Jede Zeile zeigt „Kauf <Terminal> · <Preis>"
+  und „Verkauf <Terminal> · <Preis>", der Ort des Terminals erscheint als Tooltip. Die API liefert
+  dafür vier neue Felder je Zeile (REQ-UI-027).
+
 - **Materialbörse im neuen Muster.** Tabs „Angebote · Gesuche" mit „Alle · Meine" statt vier Tabs,
   eine Schaltfläche „Angebot erstellen" bzw. „Gesuch erstellen" mit Auswahl Material/Item statt vier
   Buttons, Filter als Popover mit Chips und Sortiermenü. Alte Links auf die Börse funktionieren
@@ -70,8 +74,10 @@
   Status-Checkboxen, „n warten auf dich" zählt die entscheidbaren Anträge; wartet ein Antrag auf
   eine Freigabe, steht „wartet auf …" in der Zeile. Die KRT-Freigaben sind eine Stufen-Leiste.
 
-- **Auftragsverwaltung: „Meine · Alle".** Wer beides sehen darf, wechselt zwischen eigenen und allen
-  Aufträgen (REQ-ORDERS-040).
+- **Auftragsverwaltung: „Meine · Zu bearbeiten · Alle".** Wer beides sehen darf, wechselt zwischen
+  eigenen und allen Aufträgen; „Zu bearbeiten" zeigt die Aufträge, für die die eigene Einheit als
+  bearbeitende Einheit zuständig ist. Dafür nimmt `GET /api/v1/orders` den neuen Parameter
+  `toProcess` an (REQ-ORDERS-040).
 
 - **Auftragsdetail im neuen Muster.** Oben zeigt „Geliefert / benötigt" mit Balken den Fortschritt;
   die Reiter richten sich nach der Auftragsart (Material: Bedarf · Übergaben · Bearbeiter ·
@@ -166,6 +172,12 @@
   „Ankündigung gelesen" tragen ihr `isAuthenticated()` jetzt selbst; das Verhalten ist unverändert.
 
 ### Changed
+
+- **Blueprints: Fehlmenge wieder sichtbar.** Ist der Vorrat einer Zutat zu knapp, steht unter dem
+  Vorrat wieder „fehlt n“ (REQ-INV-048).
+- **Auftragsdetail: Reiter „Hersteller“.** Der Reiter, der zeigt, wer ein Item craften kann, hieß
+  „Herstellung“ wie das Buchen der Herstellung im Reiter „Items“; er heißt jetzt „Hersteller“
+  (REQ-ORDERS-026).
 
 - **Build: Configuration-Cache auch für lokale Builds.** `gradle.properties` schaltet ihn ein;
   `--no-configuration-cache` schaltet ihn für einen Lauf ab (BLD-PERF-04).
