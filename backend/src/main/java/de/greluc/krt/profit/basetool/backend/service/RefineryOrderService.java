@@ -52,13 +52,17 @@ import de.greluc.krt.profit.basetool.backend.repository.RefineryYieldRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Contract;
@@ -96,19 +100,51 @@ public class RefineryOrderService {
   private final AuditRecorder auditRecorder;
 
   /**
-   * Owner-scoped paged list with optional status filter.
+   * Owner-scoped paged list under the list filters (REQ-REFINERY-019).
    *
    * @param userId owner id
-   * @param statuses optional status filter; null/empty means "all statuses"
+   * @param statuses optional status filter; {@code null} or empty means every status
+   * @param readyOnly {@code true} to keep only orders whose end is unknown or has passed
+   * @param query optional free-text search; {@code null} or blank means no search
    * @param pageable page request
-   * @return paged orders owned by the user
+   * @return one page of the user's matching orders
    */
   public Page<RefineryOrder> getMyRefineryOrders(
-      @NotNull UUID userId, List<RefineryOrderStatus> statuses, @NotNull Pageable pageable) {
-    if (statuses != null && !statuses.isEmpty()) {
-      return refineryOrderRepository.findByOwnerIdAndStatusIn(userId, statuses, pageable);
+      @NotNull UUID userId,
+      @Nullable List<RefineryOrderStatus> statuses,
+      boolean readyOnly,
+      @Nullable String query,
+      @NotNull Pageable pageable) {
+    return refineryOrderRepository.findOwnedFiltered(
+        userId, statusesOrAll(statuses), readyOnly, Instant.now(), searchPattern(query), pageable);
+  }
+
+  /**
+   * The statuses a list filters on: the given ones, or every status when none is given.
+   *
+   * @param statuses the requested statuses, or {@code null}
+   * @return a non-empty status set
+   */
+  @NotNull
+  private static Set<RefineryOrderStatus> statusesOrAll(
+      @Nullable List<RefineryOrderStatus> statuses) {
+    if (statuses == null || statuses.isEmpty()) {
+      return EnumSet.allOf(RefineryOrderStatus.class);
     }
-    return refineryOrderRepository.findByOwnerId(userId, pageable);
+    return EnumSet.copyOf(statuses);
+  }
+
+  /**
+   * The LIKE pattern of a list search: the stripped, lower-cased text with its wildcards escaped,
+   * wrapped in {@code %…%}.
+   *
+   * @param query the search text, or {@code null}
+   * @return the pattern, or {@code null} for a {@code null} or blank query
+   */
+  @Nullable
+  static String searchPattern(@Nullable String query) {
+    String trimmed = StringNormalization.trimToNull(query);
+    return trimmed == null ? null : LikePatterns.contains(trimmed.toLowerCase(Locale.ROOT));
   }
 
   /**
@@ -215,25 +251,30 @@ public class RefineryOrderService {
   }
 
   /**
-   * Squadron-wide paged list with optional status filter (admin/logistician view).
+   * Paged list of the orders in the caller's org-unit scope under the list filters
+   * (REQ-REFINERY-019).
    *
-   * @param statuses optional status filter
+   * @param statuses optional status filter; {@code null} or empty means every status
+   * @param readyOnly {@code true} to keep only orders whose end is unknown or has passed
+   * @param query optional free-text search; {@code null} or blank means no search
    * @param pageable page request
-   * @return paged orders across all users
+   * @return one page of the matching in-scope orders
    */
   public Page<RefineryOrder> getAllRefineryOrders(
-      List<RefineryOrderStatus> statuses, @NotNull Pageable pageable) {
+      @Nullable List<RefineryOrderStatus> statuses,
+      boolean readyOnly,
+      @Nullable String query,
+      @NotNull Pageable pageable) {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
-    if (statuses != null && !statuses.isEmpty()) {
-      return refineryOrderRepository.findByStatusInScoped(
-          statuses,
-          scope.adminAllScope(),
-          scope.activeOrgUnitId(),
-          scope.memberOrgUnitIds(),
-          pageable);
-    }
-    return refineryOrderRepository.findAllScoped(
-        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable);
+    return refineryOrderRepository.findFilteredScoped(
+        statusesOrAll(statuses),
+        readyOnly,
+        Instant.now(),
+        searchPattern(query),
+        scope.adminAllScope(),
+        scope.activeOrgUnitId(),
+        scope.memberOrgUnitIds(),
+        pageable);
   }
 
   /**

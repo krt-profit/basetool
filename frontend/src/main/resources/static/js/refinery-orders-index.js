@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -21,166 +22,331 @@ const REFINERY_SECTIONS = {
     queue: { container: '#refinery-orders-results', fragmentValue: 'results' },
 };
 
-function refreshRefineryResults() {
-    const filterForm = document.getElementById('refinery-filter-form');
-    const resultsContainer = document.getElementById('refinery-orders-results');
-    if (!filterForm || !resultsContainer || !window.krtFetch) return;
-    const params = new URLSearchParams();
-    for (const [key, value] of new FormData(filterForm).entries()) {
-        if (value !== '') params.append(key, value);
-    }
-    const query = params.toString();
-    window.krtFetch.swap({
-        url: '/refinery-orders' + (query ? '?' + query : ''),
-        container: resultsContainer,
-        history: false,
-        preserveScroll: true,
-    });
-}
+(function () {
+    'use strict';
 
-if (window.krtLiveSync && typeof window.krtLiveSync.createReceiver === 'function') {
-    window.krtLiveSync.createReceiver({
-        topic: 'refinery',
-        sections: REFINERY_SECTIONS,
-        coalesceMs: 1500,
-        refresh: refreshRefineryResults,
-    });
-}
+    const FILTER_PREF_KEY = 'refinery_orders_filter';
+    const VIEWS = ['RUNNING', 'READY', 'COMPLETED', 'ALL'];
+    const DEFAULT_VIEW = 'RUNNING';
+    const TICK_MS = 30000;
+    const MINUTE_MS = 60000;
 
-function updateRefineryOrderColors() {
-    const nowMs = new Date().getTime();
-    document.querySelectorAll('.refinery-order-id-display').forEach((el) => {
-        const utcMsStr = el.getAttribute('data-utc');
-
-        if (utcMsStr && utcMsStr !== 'null') {
-            const endsAtMs = parseInt(utcMsStr, 10);
-            if (!isNaN(endsAtMs) && nowMs > endsAtMs) {
-                el.classList.add('text-success');
-                el.style.fontWeight = 'bold';
-            }
-        }
-    });
-}
-
-function formatLocalDates() {
-    document.querySelectorAll('.local-datetime-display').forEach((el) => {
-        const utcMsStr = el.getAttribute('data-utc');
-        if (utcMsStr && utcMsStr !== 'null') {
-            const date = new Date(parseInt(utcMsStr, 10));
-            if (!isNaN(date)) {
-                const day = String(date.getDate()).padStart(2, '0');
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const hours = String(date.getHours()).padStart(2, '0');
-                const minutes = String(date.getMinutes()).padStart(2, '0');
-                el.innerText = `${day}.${month}. ${hours}:${minutes}`;
-            }
-        } else {
-            el.innerText = '-';
-        }
-    });
-}
-
-const REFINERY_FILTER_PREF_KEY = 'refinery_orders_filter';
-
-function refineryStatusBoxes() {
-    return Array.prototype.slice.call(
-        document.querySelectorAll('#refinery-filter-form input[name="status"]'),
+    const form = /** @type {HTMLFormElement | null} */ (
+        document.getElementById('refinery-filter-form')
     );
-}
+    const results = document.getElementById('refinery-orders-results');
+    const indicator = document.getElementById('refinery-loading-indicator');
 
-function refineryOnlyMineBox() {
-    return document.querySelector('#refinery-filter-form input[name="onlyMine"]');
-}
+    /** @type {number | undefined} */
+    let debounceTimer;
 
-function readRefineryFilterPref() {
-    try {
-        const raw = localStorage.getItem(REFINERY_FILTER_PREF_KEY);
-        return raw === null ? null : JSON.parse(raw);
-    } catch (_e) {
-        return null;
+    /**
+     * The filter form's state as a query string, without empty values.
+     *
+     * @returns {string} the encoded query, possibly empty
+     */
+    function queryString() {
+        if (!form) return '';
+        const params = new URLSearchParams();
+        for (const [key, value] of new FormData(form).entries()) {
+            if (value !== '') params.append(key, String(value));
+        }
+        return params.toString();
     }
-}
 
-function writeRefineryFilterPref(value) {
-    try {
-        localStorage.setItem(REFINERY_FILTER_PREF_KEY, JSON.stringify(value));
-    } catch (_e) {}
-}
+    /**
+     * Re-renders the results for the current filter in place.
+     *
+     * @param {boolean} fromUser whether a filter change caused the load, which keeps the address bar
+     *     in sync; a peer refresh keeps the scroll position instead
+     */
+    function load(fromUser) {
+        if (!results || !window.krtFetch) return;
+        const query = queryString();
+        window.krtFetch.swap({
+            url: '/refinery-orders' + (query ? '?' + query : ''),
+            container: results,
+            indicator: indicator || undefined,
+            history: fromUser,
+            preserveScroll: !fromUser,
+        });
+    }
 
-function persistRefineryFilter() {
-    const checked = refineryStatusBoxes()
-        .filter((b) => b.checked)
-        .map((b) => b.value);
-    const onlyMine = refineryOnlyMineBox();
-    writeRefineryFilterPref({
-        statuses: checked.length > 0 ? checked : null,
-        onlyMine: !!(onlyMine && onlyMine.checked),
+    if (results && window.krtLiveSync && typeof window.krtLiveSync.createReceiver === 'function') {
+        window.krtLiveSync.createReceiver({
+            topic: 'refinery',
+            sections: REFINERY_SECTIONS,
+            coalesceMs: 1500,
+            refresh() {
+                load(false);
+            },
+        });
+    }
+
+    /**
+     * Formats a duration as the list prints it: "45 min", "3 h 20 min", "2 h", "1 d 4 h".
+     *
+     * @param {number} minutes the duration in minutes
+     * @returns {string} the formatted duration
+     */
+    function formatDuration(minutes) {
+        const total = Math.max(0, Math.floor(minutes));
+        const days = Math.floor(total / 1440);
+        const hours = Math.floor((total % 1440) / 60);
+        const mins = total % 60;
+        if (days > 0) return hours > 0 ? days + ' d ' + hours + ' h' : days + ' d';
+        if (hours > 0) return mins > 0 ? hours + ' h ' + mins + ' min' : hours + ' h';
+        return mins + ' min';
+    }
+
+    /**
+     * Fills `{0}`, `{1}` of a message pattern.
+     *
+     * @param {string} pattern the raw message pattern
+     * @param {string[]} args the values in placeholder order
+     * @returns {string} the filled message
+     */
+    function fill(pattern, args) {
+        return args.reduce(function (text, arg, i) {
+            return text.split('{' + i + '}').join(arg);
+        }, pattern);
+    }
+
+    /**
+     * Moves the progress text, bar and store action of every open row to the current time; a
+     * running row whose end has passed turns ready.
+     */
+    function tick() {
+        if (!results) return;
+        const table = results.querySelector('.refinery-table');
+        if (!table) return;
+        const msgReady = table.getAttribute('data-msg-ready') || '{0}';
+        const msgReadyUnknown = table.getAttribute('data-msg-ready-unknown') || '';
+        const msgEndsIn = table.getAttribute('data-msg-ends-in') || '';
+        const now = Date.now();
+        table
+            .querySelectorAll('tr[data-state="RUNNING"], tr[data-state="READY"]')
+            .forEach(function (node) {
+                const row = /** @type {HTMLElement} */ (node);
+                const endsAt = Number(row.getAttribute('data-ends-at'));
+                const startedAt = Number(row.getAttribute('data-started-at'));
+                const text = row.querySelector('[data-refinery-done-text]');
+                const fillBar = /** @type {HTMLElement | null} */ (
+                    row.querySelector('.refinery-meter > i')
+                );
+                if (!row.hasAttribute('data-ends-at') || !isFinite(endsAt)) {
+                    if (text && msgReadyUnknown) text.textContent = msgReadyUnknown;
+                    return;
+                }
+                if (now < endsAt) {
+                    if (text) {
+                        text.textContent = fill(msgEndsIn, [
+                            formatDuration(Math.ceil((endsAt - now) / MINUTE_MS)),
+                            row.getAttribute('data-ends-label') || '',
+                        ]);
+                    }
+                    if (fillBar && isFinite(startedAt) && endsAt > startedAt) {
+                        const percent = Math.max(
+                            0,
+                            Math.min(
+                                100,
+                                Math.floor(((now - startedAt) * 100) / (endsAt - startedAt)),
+                            ),
+                        );
+                        fillBar.setAttribute('data-krtm-width', String(percent));
+                        fillBar.style.width = percent + '%';
+                    }
+                    return;
+                }
+                row.setAttribute('data-state', 'READY');
+                row.classList.add('refinery-row--ready');
+                if (text) {
+                    text.classList.add('refinery-done__text--ready');
+                    text.textContent = fill(msgReady, [formatDuration((now - endsAt) / MINUTE_MS)]);
+                }
+                if (fillBar) {
+                    fillBar.classList.add('meter__fill--success');
+                    fillBar.setAttribute('data-krtm-width', '100');
+                    fillBar.style.width = '100%';
+                }
+                const store = /** @type {HTMLElement | null} */ (
+                    row.querySelector('[data-refinery-store]')
+                );
+                if (store) store.hidden = false;
+            });
+    }
+
+    /** Copies the segment counters of the swapped results into the toolbar's segment labels. */
+    function syncCounts() {
+        if (!results || !form) return;
+        const source = results.querySelector('[data-refinery-counts]');
+        if (!source) return;
+        VIEWS.forEach(function (view) {
+            const key = view.toLowerCase();
+            const value = source.getAttribute('data-' + key);
+            const count = form.querySelector('[data-testid="segment-view-' + key + '"] .seg-count');
+            if (count && value !== null) count.textContent = value;
+        });
+    }
+
+    document.addEventListener('krt:swapped', function (event) {
+        const detail = /** @type {CustomEvent} */ (event).detail;
+        if (detail && detail.container === results) {
+            syncCounts();
+            tick();
+        }
     });
-}
 
-function restoreRefineryFilter() {
-    const saved = readRefineryFilterPref();
-    if (!saved || typeof saved !== 'object') return false;
-    let differs = false;
-    const boxes = refineryStatusBoxes();
-    if (Array.isArray(saved.statuses) && boxes.length > 0) {
-        const known = boxes.filter((b) => saved.statuses.indexOf(b.value) >= 0);
-        if (known.length > 0) {
-            boxes.forEach((b) => {
-                const on = saved.statuses.indexOf(b.value) >= 0;
-                if (b.checked !== on) differs = true;
-                b.checked = on;
-            });
+    if (!form) return;
+
+    /**
+     * The view radios of the segment.
+     *
+     * @returns {HTMLInputElement[]} the radios in document order
+     */
+    function viewInputs() {
+        return /** @type {HTMLInputElement[]} */ (
+            Array.prototype.slice.call(form ? form.querySelectorAll('input[name="view"]') : [])
+        );
+    }
+
+    /**
+     * The selected view.
+     *
+     * @returns {string} the checked radio's value, or the default view
+     */
+    function currentView() {
+        const checked = viewInputs().filter(function (el) {
+            return el.checked;
+        })[0];
+        return checked ? checked.value : DEFAULT_VIEW;
+    }
+
+    /**
+     * Checks the radio of a view.
+     *
+     * @param {string} view the view to select
+     */
+    function selectView(view) {
+        viewInputs().forEach(function (el) {
+            el.checked = el.value === view;
+        });
+    }
+
+    /**
+     * The own-orders switch.
+     *
+     * @returns {HTMLInputElement | null} the checkbox, if rendered
+     */
+    function onlyMineBox() {
+        return /** @type {HTMLInputElement | null} */ (
+            form ? form.querySelector('input[name="onlyMine"]') : null
+        );
+    }
+
+    /**
+     * Reads the stored filter.
+     *
+     * @returns {any} the parsed preference, or null when absent or unreadable
+     */
+    function readPref() {
+        try {
+            const raw = localStorage.getItem(FILTER_PREF_KEY);
+            return raw === null ? null : JSON.parse(raw);
+        } catch (_e) {
+            return null;
         }
     }
-    const onlyMine = refineryOnlyMineBox();
-    if (onlyMine && typeof saved.onlyMine === 'boolean' && onlyMine.checked !== saved.onlyMine) {
-        onlyMine.checked = saved.onlyMine;
-        differs = true;
+
+    /** Stores the segment and the own-orders switch (REQ-UI-017). */
+    function persist() {
+        const mine = onlyMineBox();
+        try {
+            localStorage.setItem(
+                FILTER_PREF_KEY,
+                JSON.stringify({ view: currentView(), onlyMine: !!(mine && mine.checked) }),
+            );
+        } catch (_e) {}
     }
-    return differs;
-}
 
-document.addEventListener('DOMContentLoaded', () => {
-    formatLocalDates();
-    updateRefineryOrderColors();
-    setInterval(updateRefineryOrderColors, 10000);
+    /**
+     * The view a stored preference selects; a preference from the former status checkboxes is
+     * mapped onto its segment.
+     *
+     * @param {any} saved the stored preference
+     * @returns {string | null} the view, or null when the preference names none
+     */
+    function storedView(saved) {
+        if (!saved || typeof saved !== 'object') return null;
+        if (typeof saved.view === 'string' && VIEWS.indexOf(saved.view) >= 0) return saved.view;
+        if (!Array.isArray(saved.statuses)) return null;
+        /** @type {string[]} */
+        const statuses = saved.statuses.filter(function (/** @type {unknown} */ s) {
+            return typeof s === 'string';
+        });
+        if (statuses.length === 0) return DEFAULT_VIEW;
+        const openOnly = statuses.every(function (s) {
+            return s === 'OPEN' || s === 'IN_PROGRESS';
+        });
+        if (openOnly) return 'RUNNING';
+        if (statuses.length === 1 && statuses[0] === 'COMPLETED') return 'COMPLETED';
+        return 'ALL';
+    }
 
-    const filterForm = document.getElementById('refinery-filter-form');
-    const resultsContainer = document.getElementById('refinery-orders-results');
-    if (filterForm && resultsContainer && window.krtFetch) {
-        const applyFilter = () => {
-            const data = new FormData(filterForm);
-            const params = new URLSearchParams();
-            for (const [key, value] of data.entries()) {
-                if (value !== '') params.append(key, value);
-            }
-            const query = params.toString();
-            window.krtFetch.swap({
-                url: '/refinery-orders' + (query ? '?' + query : ''),
-                container: resultsContainer,
-                history: true,
-            });
-        };
-        filterForm.addEventListener('submit', (event) => {
-            event.preventDefault();
-            applyFilter();
-        });
-        filterForm.querySelectorAll('input').forEach((el) => {
-            el.addEventListener('change', () => {
-                persistRefineryFilter();
-                applyFilter();
-            });
-        });
-        if (/[?&](status|onlyMine)=/.test(window.location.search)) {
-            persistRefineryFilter();
-        } else if (restoreRefineryFilter()) {
-            applyFilter();
+    /** Applies the stored filter unless the URL names one, and reloads when it differs. */
+    function restore() {
+        if (/[?&](view|status|onlyMine)=/.test(window.location.search)) {
+            persist();
+            return;
+        }
+        const saved = readPref();
+        const view = storedView(saved);
+        let differs = false;
+        if (view && view !== currentView()) {
+            selectView(view);
+            differs = true;
+        }
+        const mine = onlyMineBox();
+        if (
+            mine &&
+            saved &&
+            typeof saved.onlyMine === 'boolean' &&
+            mine.checked !== saved.onlyMine
+        ) {
+            mine.checked = saved.onlyMine;
+            differs = true;
+        }
+        if (view && (differs || typeof saved.view !== 'string')) persist();
+        if (differs) {
+            if (window.krtFilterChips) window.krtFilterChips.refresh(form || undefined);
+            load(true);
         }
     }
-});
 
-document.addEventListener('krt:swapped', () => {
-    formatLocalDates();
-    updateRefineryOrderColors();
-});
+    form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        clearTimeout(debounceTimer);
+        load(true);
+    });
+
+    form.addEventListener('input', function (event) {
+        const target = /** @type {HTMLInputElement | null} */ (event.target);
+        if (!target || target.type !== 'search') return;
+        clearTimeout(debounceTimer);
+        debounceTimer = window.setTimeout(function () {
+            load(true);
+        }, 300);
+    });
+
+    form.addEventListener('change', function (event) {
+        const target = /** @type {HTMLInputElement | null} */ (event.target);
+        if (!target || target.type === 'search') return;
+        persist();
+        clearTimeout(debounceTimer);
+        load(true);
+    });
+
+    restore();
+    tick();
+    window.setInterval(tick, TICK_MS);
+})();
