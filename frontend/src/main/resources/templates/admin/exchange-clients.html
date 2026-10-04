@@ -140,49 +140,51 @@
                     <p class="form-hint xc-hint" th:text="#{admin.exchangeClients.undo.runs.hint}">L&auml;uft ein Zur&uuml;cknehmen, aktualisiert sich die Liste von selbst.</p>
                 </div>
                 <div class="card card--flush">
-                    <table id="xc-undo-runs-table" class="data-table data-table--stack" th:if="${!#lists.isEmpty(undoRuns)}">
-                        <thead>
-                        <tr>
-                            <th th:text="#{admin.exchangeClients.undo.column.client}">Anwendung</th>
-                            <th class="cell-status" th:text="#{admin.exchangeClients.undo.column.status}">Status</th>
-                            <th th:text="#{admin.exchangeClients.undo.column.by}">Von</th>
-                            <th th:text="#{admin.exchangeClients.undo.column.scope}">Umfang</th>
-                            <th th:text="#{admin.exchangeClients.undo.column.members}">Mitglieder</th>
-                            <th class="num" th:text="#{admin.exchangeClients.undo.column.restored}">Zur&uuml;ckgesetzt</th>
-                            <th class="num" th:text="#{admin.exchangeClients.undo.column.skipped}">&Uuml;bersprungen</th>
-                            <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.exchangeClients.undo.column.actions}">Aktion</span></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="r : ${undoRuns}" th:attr="data-run-id=${r.id}">
-                            <td>
-                                <span class="cell-title" th:text="${r.clientName}">VerseKit</span>
-                                <span class="cell-sub" th:text="#{admin.exchangeClients.utc(${#temporals.format(r.startedAt, 'dd.MM.yyyy HH:mm', 'UTC')})}">27.09.2026 18:00 UTC</span>
-                            </td>
-                            <td class="cell-status">
-                                <span th:if="${r.status == 'RUNNING'}" class="chip chip--info" th:text="#{admin.exchangeClients.undo.status.RUNNING}">L&auml;uft</span>
-                                <span th:if="${r.status == 'COMPLETED'}" class="chip chip--success" th:text="#{admin.exchangeClients.undo.status.COMPLETED}">Abgeschlossen</span>
-                                <span th:if="${r.status == 'FAILED'}" class="chip chip--danger" th:text="#{admin.exchangeClients.undo.status.FAILED}">Fehlgeschlagen</span>
-                            </td>
-                            <td th:attr="data-label=#{admin.exchangeClients.undo.column.by}" th:text="${r.requestedByName} ?: '–'">Admin</td>
-                            <td th:attr="data-label=#{admin.exchangeClients.undo.column.scope}">
-                                <span th:text="#{admin.exchangeClients.undo.scope.since(${#temporals.format(r.since, 'dd.MM.yyyy HH:mm', 'UTC')})}">seit 27.09.2026 12:00 UTC</span>
-                                <span class="chip chip--muted"
-                                      th:text="${r.resource != null} ? #{'admin.exchangeClients.undo.resource.' + ${r.resource}} : #{admin.exchangeClients.undo.resource.ALL}">Alles</span>
-                                <span th:if="${r.installationId != null}" class="chip chip--muted"
-                                      th:text="#{admin.exchangeClients.undo.scope.installation}">eine Installation</span>
-                            </td>
-                            <td th:attr="data-label=#{admin.exchangeClients.undo.column.members}"
-                                th:text="#{admin.exchangeClients.undo.progress(${r.membersDone}, ${r.membersTotal}, ${r.membersFailed})}">2 von 3, 0 fehlgeschlagen</td>
-                            <td class="num" th:attr="data-label=#{admin.exchangeClients.undo.column.restored}" th:text="${r.restored}">4</td>
-                            <td class="num" th:attr="data-label=#{admin.exchangeClients.undo.column.skipped}" th:text="${r.skipped}">1</td>
-                            <td class="cell-actions">
-                                <button type="button" class="btn btn-ghost btn-xs" data-xc-undo-run
-                                        th:text="#{admin.exchangeClients.undo.details}">Details</button>
-                            </td>
-                        </tr>
-                        </tbody>
-                    </table>
+                    <div class="table-responsive" th:if="${!#lists.isEmpty(undoRuns)}">
+                        <table id="xc-undo-runs-table" class="data-table data-table--stack">
+                            <thead>
+                            <tr>
+                                <th th:text="#{admin.exchangeClients.undo.column.client}">Anwendung</th>
+                                <th class="cell-status" th:text="#{admin.exchangeClients.undo.column.status}">Status</th>
+                                <th th:text="#{admin.exchangeClients.undo.column.by}">Von</th>
+                                <th th:text="#{admin.exchangeClients.undo.column.scope}">Umfang</th>
+                                <th th:text="#{admin.exchangeClients.undo.column.members}">Mitglieder</th>
+                                <th class="num" th:text="#{admin.exchangeClients.undo.column.restored}">Zur&uuml;ckgesetzt</th>
+                                <th class="num" th:text="#{admin.exchangeClients.undo.column.skipped}">&Uuml;bersprungen</th>
+                                <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.exchangeClients.undo.column.actions}">Aktion</span></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="r : ${undoRuns}" th:attr="data-run-id=${r.id}">
+                                <td>
+                                    <span class="cell-title" th:text="${r.clientName}">VerseKit</span>
+                                    <span class="cell-sub" th:text="#{admin.exchangeClients.utc(${#temporals.format(r.startedAt, 'dd.MM.yyyy HH:mm', 'UTC')})}">27.09.2026 18:00 UTC</span>
+                                </td>
+                                <td class="cell-status">
+                                    <span th:if="${r.status == 'RUNNING'}" class="chip chip--info" th:text="#{admin.exchangeClients.undo.status.RUNNING}">L&auml;uft</span>
+                                    <span th:if="${r.status == 'COMPLETED'}" class="chip chip--success" th:text="#{admin.exchangeClients.undo.status.COMPLETED}">Abgeschlossen</span>
+                                    <span th:if="${r.status == 'FAILED'}" class="chip chip--danger" th:text="#{admin.exchangeClients.undo.status.FAILED}">Fehlgeschlagen</span>
+                                </td>
+                                <td th:attr="data-label=#{admin.exchangeClients.undo.column.by}" th:text="${r.requestedByName} ?: '–'">Admin</td>
+                                <td th:attr="data-label=#{admin.exchangeClients.undo.column.scope}">
+                                    <span th:text="#{admin.exchangeClients.undo.scope.since(${#temporals.format(r.since, 'dd.MM.yyyy HH:mm', 'UTC')})}">seit 27.09.2026 12:00 UTC</span>
+                                    <span class="chip chip--muted"
+                                          th:text="${r.resource != null} ? #{'admin.exchangeClients.undo.resource.' + ${r.resource}} : #{admin.exchangeClients.undo.resource.ALL}">Alles</span>
+                                    <span th:if="${r.installationId != null}" class="chip chip--muted"
+                                          th:text="#{admin.exchangeClients.undo.scope.installation}">eine Installation</span>
+                                </td>
+                                <td th:attr="data-label=#{admin.exchangeClients.undo.column.members}"
+                                    th:text="#{admin.exchangeClients.undo.progress(${r.membersDone}, ${r.membersTotal}, ${r.membersFailed})}">2 von 3, 0 fehlgeschlagen</td>
+                                <td class="num" th:attr="data-label=#{admin.exchangeClients.undo.column.restored}" th:text="${r.restored}">4</td>
+                                <td class="num" th:attr="data-label=#{admin.exchangeClients.undo.column.skipped}" th:text="${r.skipped}">1</td>
+                                <td class="cell-actions">
+                                    <button type="button" class="btn btn-ghost btn-xs" data-xc-undo-run
+                                            th:text="#{admin.exchangeClients.undo.details}">Details</button>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
                     <th:block th:if="${#lists.isEmpty(undoRuns)}">
                         <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.exchangeClients.undo.runs.empty',
                             textKey='admin.exchangeClients.undo.runs.empty.text', emptyId='xc-undo-runs-empty')}"></th:block>

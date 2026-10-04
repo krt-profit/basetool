@@ -112,45 +112,47 @@
 
         <div id="bp-results" class="card card--flush">
         <th:block th:fragment="results">
-            <table th:if="${!#lists.isEmpty(blueprints)}" class="data-table data-table--stack"
-                   th:data-list-total="${#lists.size(blueprints)}">
-                <thead>
-                <tr>
-                    <th th:text="#{personalInventory.blueprints.field.product}">Produkt</th>
-                    <th th:text="#{personalInventory.blueprints.field.acquired}">Erhalten am</th>
-                    <th th:text="#{personalInventory.blueprints.field.note}">Notiz</th>
-                    <th class="cell-actions"><span class="visually-hidden" th:text="#{personalInventory.blueprints.field.actions}">Aktionen</span></th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr th:each="bp : ${blueprints}" th:attr="data-bp-id=${bp.id}">
-                    <td><span class="cell-title" th:text="${bp.productName}">Produkt</span></td>
-                    <td th:attr="data-label=#{personalInventory.blueprints.field.acquired}">
-                        <span th:if="${bp.acquiredAt != null}" class="utc-time" th:text="${bp.acquiredAt}">2026-01-01</span>
-                        <span th:unless="${bp.acquiredAt != null}" class="krt-bp-dash">&mdash;</span>
-                    </td>
-                    <td class="krt-pi-note" th:attr="data-label=#{personalInventory.blueprints.field.note}" th:text="${bp.note}">Notiz</td>
-                    <td class="cell-actions">
-                        <button type="button" class="btn btn-ghost btn-icon"
-                                data-trigger="bp-open-edit"
-                                th:attr="data-id=${bp.id},
-                                         data-version=${bp.version},
-                                         data-name=${bp.productName},
-                                         data-note=${bp.note},
-                                         data-acquired-at=${bp.acquiredAt}"
-                                th:title="#{personalInventory.blueprints.action.editNote}"
-                                th:aria-label="#{personalInventory.blueprints.action.editNote}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
-                        <button type="button" class="btn btn-quiet-danger btn-icon"
-                                th:if="${bp.removable}"
-                                data-trigger="bp-open-delete"
-                                th:attr="data-id=${bp.id},
-                                         data-name=${bp.productName}"
-                                th:title="#{personalInventory.blueprints.action.remove}"
-                                th:aria-label="#{personalInventory.blueprints.action.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                    </td>
-                </tr>
-                </tbody>
-            </table>
+            <div class="table-responsive" th:if="${!#lists.isEmpty(blueprints)}">
+                <table class="data-table data-table--stack"
+                       th:data-list-total="${#lists.size(blueprints)}">
+                    <thead>
+                    <tr>
+                        <th th:text="#{personalInventory.blueprints.field.product}">Produkt</th>
+                        <th th:text="#{personalInventory.blueprints.field.acquired}">Erhalten am</th>
+                        <th th:text="#{personalInventory.blueprints.field.note}">Notiz</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{personalInventory.blueprints.field.actions}">Aktionen</span></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="bp : ${blueprints}" th:attr="data-bp-id=${bp.id}">
+                        <td><span class="cell-title" th:text="${bp.productName}">Produkt</span></td>
+                        <td th:attr="data-label=#{personalInventory.blueprints.field.acquired}">
+                            <span th:if="${bp.acquiredAt != null}" class="utc-time" th:text="${bp.acquiredAt}">2026-01-01</span>
+                            <span th:unless="${bp.acquiredAt != null}" class="krt-bp-dash">&mdash;</span>
+                        </td>
+                        <td class="krt-pi-note" th:attr="data-label=#{personalInventory.blueprints.field.note}" th:text="${bp.note}">Notiz</td>
+                        <td class="cell-actions">
+                            <button type="button" class="btn btn-ghost btn-icon"
+                                    data-trigger="bp-open-edit"
+                                    th:attr="data-id=${bp.id},
+                                             data-version=${bp.version},
+                                             data-name=${bp.productName},
+                                             data-note=${bp.note},
+                                             data-acquired-at=${bp.acquiredAt}"
+                                    th:title="#{personalInventory.blueprints.action.editNote}"
+                                    th:aria-label="#{personalInventory.blueprints.action.editNote}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                            <button type="button" class="btn btn-quiet-danger btn-icon"
+                                    th:if="${bp.removable}"
+                                    data-trigger="bp-open-delete"
+                                    th:attr="data-id=${bp.id},
+                                             data-name=${bp.productName}"
+                                    th:title="#{personalInventory.blueprints.action.remove}"
+                                    th:aria-label="#{personalInventory.blueprints.action.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
             <th:block th:if="${#lists.isEmpty(blueprints)}">
                 <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.personalInventory.blueprints.empty.title', textKey='admin.personalInventory.blueprints.empty.text')}"></th:block>
             </th:block>
