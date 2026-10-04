@@ -655,7 +655,7 @@ CHECKs — DB-side defence in depth) · **Issues:** #692, #695.
 ### REQ-ORG-018 — Mission owning-OrgUnit reassignment
 
 A mission's `owning_org_unit_id` is **no longer immutable after creation** (it is still create-time
-stamped per REQ-ORG-004). The mission Verwaltung tab exposes a "Verantwortliche Einheit" control that
+stamped per REQ-ORG-004). The mission edit mode (the former Verwaltung tab, REQ-MISSION-004) exposes a "Verantwortliche Einheit" control that
 re-homes an existing mission to a different OrgUnit — Staffel, Spezialkommando, Bereich or
 Organisationsleitung (REQ-ORG-016) — or to **ownerless** (`owning_org_unit_id = NULL`, the
 public-leadership form of REQ-ORG-009). The reassignment is `PUT

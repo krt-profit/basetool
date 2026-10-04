@@ -12,17 +12,20 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main class="oc-page">
-    <div class="greeting hud-box oc-greeting">
-        <div class="oc-greeting-text">
-            <h1 th:text="#{orgChart.title}">Organigramm</h1>
-            <p class="krtm-color-var-color-gray-2-margin-top-0-5rem-e129" th:text="#{orgChart.subtitle}">
-                Übersicht der Funktionsränge in Bereichsleitung, Staffeln und Spezialkommandos.
-            </p>
-        </div>
-        <button type="button" class="btn btn-outline oc-edit-toggle" data-trigger="oc-toggle-edit"
-                sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${orgChart != null}"
-                aria-pressed="false" th:text="#{orgChart.edit}">Bearbeiten</button>
-    </div>
+    <th:block th:with="ocCanEdit=${orgChart != null and #authorization.expression('hasRole(''ADMIN'')')}">
+        <th:block th:if="${ocCanEdit}">
+            <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.organisation', titleText=#{orgChart.title}, actions=~{::oc-head-actions})}">
+                <th:block th:ref="oc-head-actions">
+                    <button type="button" class="btn btn-ghost oc-edit-toggle" data-trigger="oc-toggle-edit"
+                            sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                            data-testid="oc-edit-toggle" aria-pressed="false" th:text="#{orgChart.edit}">Bearbeiten</button>
+                </th:block>
+            </th:block>
+        </th:block>
+        <th:block th:unless="${ocCanEdit}">
+            <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.organisation', titleText=#{orgChart.title})}"></th:block>
+        </th:block>
+    </th:block>
 
     <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${error}, extraClass='mt-2')}"></th:block>
 
@@ -149,11 +152,9 @@
         </div>
         </th:block>
 
-        <div class="hud-box mt-2 krtm-color-var-color-gray-2-4fcb"
-             th:if="${chartEmpty}"
-             th:text="#{orgChart.empty}">
-            Es sind noch keine Staffeln oder Spezialkommandos vorhanden.
-        </div>
+        <th:block th:if="${chartEmpty}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='orgChart.empty.title', textKey='orgChart.empty')}"></th:block>
+        </th:block>
         </th:block>
     </div>
 </main>

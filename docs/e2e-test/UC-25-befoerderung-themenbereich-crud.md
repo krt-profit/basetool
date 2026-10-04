@@ -22,9 +22,9 @@ Der Offizier legt auf `/promotion/admin/topics` einen Themenbereich an, benennt 
 ## Hauptablauf
 
 1. Navigiere zu `/promotion/admin/topics`.
-2. **Anlegen:** `pa-open-create-topic` öffnet `#modal-create-topic`; `#ct-name` füllen → `pa-create-topic` postet `POST /api/proxy/promotion/topics`. Das Fragment `#pa-topics-results` wird in place neu gerendert (`krt:swapped`), die neue Karte trägt den Namen (`.admin-topic-name`).
-3. **Umbenennen:** `pa-edit-topic` der Karte öffnet `#modal-edit-topic`; `#et-name` ändern → `pa-update-topic` postet `PUT …/topics/{id}`. Der neue Name erscheint, der alte verschwindet.
-4. **Löschen:** `pa-delete-topic` → KRT-Confirm (`.krt-confirm-overlay .krt-confirm-ok`) → `DELETE …/topics/{id}`; die Karte verschwindet.
+2. **Anlegen:** `pa-open-create-topic` öffnet `#modal-create-topic`; `#ct-name` füllen → `pa-create-topic` postet `POST /api/proxy/promotion/topics`. Das Fragment `#pa-topics-results` wird in place neu gerendert (`krt:swapped`), die Themenliste (Master-Detail seit 2026-10-03) führt eine Zeile `.pa-topic-row` mit dem Namen.
+3. **Umbenennen:** Die Zeile des Themenbereichs wählen; `pa-edit-topic` im sichtbaren Detailbereich (`section.pa-topic-pane:not([hidden])`) öffnet `#modal-edit-topic`; `#et-name` ändern → `pa-update-topic` postet `PUT …/topics/{id}`. Der neue Name erscheint, der alte verschwindet.
+4. **Löschen:** `pa-delete-topic` → KRT-Confirm (`.krt-confirm-overlay .krt-confirm-ok`) → `DELETE …/topics/{id}`; die Zeile verschwindet.
 
 ## Erwartetes Ergebnis
 

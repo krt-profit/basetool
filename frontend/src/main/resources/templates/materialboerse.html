@@ -7,6 +7,7 @@
         <meta name="_csrf" th:content="${_csrf.token}"/>
         <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
         <link rel="stylesheet" th:href="@{/css/materialboerse.css}"/>
+        <link rel="stylesheet" th:href="@{/css/pages/materialboerse.css}"/>
     </th:block>
 </head>
 <body>
@@ -15,129 +16,130 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box mb-head">
-        <div class="mb-head-title">
-            <h1 th:text="#{materialboerse.title}">Materialbörse</h1>
-        </div>
-        <div class="mb-head-cta">
-            <div class="mb-cta-group" data-mb-cta-group="offers"
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{materialboerse.title}, actions=~{::mb-actions})}">
+        <th:block th:ref="mb-actions">
+            <div class="overflow-menu mb-create" data-overflow-menu data-mb-cta-group="offers"
                  th:hidden="${activeMode == 'requests'}">
-                <button type="button" class="btn btn--cta" data-mb-open-release="new">
+                <button type="button" class="btn btn-outline overflow-menu__toggle" id="mb-create-offer-menu-toggle"
+                        data-testid="mb-create-offer" aria-haspopup="menu" aria-expanded="false"
+                        aria-controls="mb-create-offer-menu">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
-                    <span th:text="#{materialboerse.cta.offer}">Material anbieten</span>
+                    <span th:text="#{materialboerse.create.offer}">Angebot erstellen</span>
+                    <svg class="krt-icon mb-create__chevron" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg>
                 </button>
-                <button type="button" class="btn btn-outline" data-mb-open-item="item">
-                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
-                    <span th:text="#{materialboerse.cta.offerItem}">Item anbieten</span>
-                </button>
+                <div class="overflow-menu__panel" role="menu" hidden id="mb-create-offer-menu"
+                     aria-labelledby="mb-create-offer-menu-toggle">
+                    <button type="button" class="overflow-menu__item" role="menuitem" data-mb-open-release="new"
+                            th:text="#{materialboerse.cta.offer}">Material anbieten</button>
+                    <button type="button" class="overflow-menu__item" role="menuitem" data-mb-open-item="item"
+                            th:text="#{materialboerse.cta.offerItem}">Item anbieten</button>
+                </div>
             </div>
-            <div class="mb-cta-group" data-mb-cta-group="requests"
+            <div class="overflow-menu mb-create" data-overflow-menu data-mb-cta-group="requests"
                  th:hidden="${activeMode != 'requests'}">
-                <button type="button" class="btn btn--cta" data-mg-open-request="new">
-                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
-                    <span th:text="#{materialgesuch.cta.request}">Material suchen</span>
+                <button type="button" class="btn btn-outline overflow-menu__toggle" id="mb-create-request-menu-toggle"
+                        data-testid="mb-create-request" aria-haspopup="menu" aria-expanded="false"
+                        aria-controls="mb-create-request-menu">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                    <span th:text="#{materialboerse.create.request}">Gesuch erstellen</span>
+                    <svg class="krt-icon mb-create__chevron" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg>
                 </button>
-                <button type="button" class="btn btn-outline" data-mg-open-item-request="item">
-                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
-                    <span th:text="#{materialgesuch.cta.requestItem}">Item suchen</span>
-                </button>
+                <div class="overflow-menu__panel" role="menu" hidden id="mb-create-request-menu"
+                     aria-labelledby="mb-create-request-menu-toggle">
+                    <button type="button" class="overflow-menu__item" role="menuitem" data-mg-open-request="new"
+                            th:text="#{materialgesuch.cta.request}">Material suchen</button>
+                    <button type="button" class="overflow-menu__item" role="menuitem" data-mg-open-item-request="item"
+                            th:text="#{materialgesuch.cta.requestItem}">Item suchen</button>
+                </div>
             </div>
-        </div>
-    </div>
-
-    <div id="mb-board">
-        <th:block th:if="${activeMode == 'requests'}">
-            <th:block th:replace="~{fragments/materialgesuch-board :: requestBoard}"></th:block>
         </th:block>
-        <th:block th:unless="${activeMode == 'requests'}">
-        <th:block th:fragment="board">
-            <div class="mb-toolbar">
-                <div class="mb-tabrow" th:fragment="mbtabs">
-                    <div class="tab-nav" role="tablist" aria-label="Materialbörse">
-                        <button type="button" class="tab"
-                                th:classappend="${activeMode == 'offers' and activeTab == 'alle'} ? 'active' : ''"
-                                data-mb-mode="offers" data-mb-tab="alle" role="tab"
-                                th:aria-selected="${activeMode == 'offers' and activeTab == 'alle'}">
-                            <span th:text="#{materialboerse.tab.all}">Alle Angebote</span>
-                            <span class="tab-count" th:text="${countAll}">0</span>
-                        </button>
-                        <button type="button" class="tab"
-                                th:classappend="${activeMode == 'offers' and activeTab == 'mein'} ? 'active' : ''"
-                                data-mb-mode="offers" data-mb-tab="mein" role="tab"
-                                th:aria-selected="${activeMode == 'offers' and activeTab == 'mein'}">
-                            <span th:text="#{materialboerse.tab.mine}">Meine Angebote</span>
-                            <span class="tab-count" th:text="${countMine}">0</span>
-                        </button>
-                        <button type="button" class="tab"
-                                th:classappend="${activeMode == 'requests' and activeTab == 'alle'} ? 'active' : ''"
-                                data-mb-mode="requests" data-mb-tab="alle" role="tab"
-                                th:aria-selected="${activeMode == 'requests' and activeTab == 'alle'}">
-                            <span th:text="#{materialgesuch.tab.all}">Alle Gesuche</span>
-                            <span class="tab-count" th:text="${countReqAll}">0</span>
-                        </button>
-                        <button type="button" class="tab"
-                                th:classappend="${activeMode == 'requests' and activeTab == 'mein'} ? 'active' : ''"
-                                data-mb-mode="requests" data-mb-tab="mein" role="tab"
-                                th:aria-selected="${activeMode == 'requests' and activeTab == 'mein'}">
-                            <span th:text="#{materialgesuch.tab.mine}">Meine Gesuche</span>
-                            <span class="tab-count" th:text="${countReqMine}">0</span>
-                        </button>
-                    </div>
-                </div>
-                <div class="mb-filters">
-                    <div class="mb-filt">
-                        <span class="mb-filt-label" th:text="#{materialboerse.filter.minQuality}">Min. Qualität</span>
-                        <input type="number" min="0" max="1000" step="10" data-mb-minquality
-                               th:value="${filterMinQuality}" placeholder="0"
-                               th:aria-label="#{materialboerse.filter.minQuality}"/>
-                    </div>
-                    <div class="mb-filt">
-                        <span class="mb-filt-label" th:text="#{materialboerse.filter.minAmount}">Min. Menge</span>
-                        <input type="number" min="0" step="1" data-mb-minamount
-                               th:value="${filterMinAmount}" placeholder="0"
-                               th:aria-label="#{materialboerse.filter.minAmount}"/>
-                        <span class="mb-filt-unit" th:text="#{materialboerse.unit.scu}">SCU</span>
-                    </div>
-                    <label class="mb-filt">
-                        <input type="checkbox" data-mb-exclude-stolen data-testid="mb-exclude-stolen"
-                               th:checked="${filterExcludeStolen}"/>
-                        <span class="mb-filt-label" th:text="#{materialboerse.filter.excludeStolen}">Ohne gestohlene</span>
-                    </label>
-                    <div class="mb-filt">
-                        <span class="mb-filt-label" th:text="#{materialboerse.filter.sort}">Sortieren</span>
-                        <select class="chip-select" data-mb-sort th:aria-label="#{materialboerse.filter.sort}">
-                            <option value="qual" th:selected="${filterSort == 'qual'}" th:text="#{materialboerse.sort.qual}">Qualität</option>
-                            <option value="menge" th:selected="${filterSort == 'menge'}" th:text="#{materialboerse.sort.menge}">Menge</option>
-                            <option value="mat" th:selected="${filterSort == 'mat'}" th:text="#{materialboerse.sort.mat}">Name A–Z</option>
-                            <option value="neu" th:selected="${filterSort == 'neu'}" th:text="#{materialboerse.sort.neu}">Neueste zuerst</option>
-                        </select>
-                    </div>
-                    <div class="mb-search">
-                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
-                        <input type="search" data-mb-search th:value="${filterQ}"
-                               th:placeholder="#{materialboerse.filter.search.placeholder}"
-                               th:aria-label="#{materialboerse.filter.search.placeholder}"/>
-                    </div>
-                </div>
-            </div>
+    </th:block>
 
-            <div id="mb-listwrap">
-            <th:block th:fragment="list">
-            <div class="master-detail mb-md" th:classappend="${selectedOffer != null} ? 'has-sel' : ''">
-                <div class="master-list mb-mlist">
-                    <div th:if="${#lists.isEmpty(offers)}" class="empty-state">
-                        <div class="empty-title" th:text="#{materialboerse.empty.title}">Keine Angebote</div>
-                        <p class="empty-text" th:text="#{materialboerse.empty.text}">Für diese Filter gibt es gerade keine freigegebenen Materialien.</p>
-                        <button type="button" class="btn btn-ghost btn-xs" data-mb-reset th:text="#{materialboerse.empty.reset}">Filter zurücksetzen</button>
+    <nav class="tab-nav mb-tabs" role="tablist" th:aria-label="#{materialboerse.title}">
+        <button type="button" class="tab" role="tab" data-mb-mode="offers" data-testid="mb-tab-offers"
+                aria-controls="mb-board"
+                th:classappend="${activeMode != 'requests'} ? 'active'"
+                th:aria-selected="${activeMode != 'requests'}">
+            <span th:text="#{materialboerse.mode.offers}">Angebote</span>
+            <span class="tab-count" th:text="${countAll}">0</span>
+        </button>
+        <button type="button" class="tab" role="tab" data-mb-mode="requests" data-testid="mb-tab-requests"
+                aria-controls="mb-board"
+                th:classappend="${activeMode == 'requests'} ? 'active'"
+                th:aria-selected="${activeMode == 'requests'}">
+            <span th:text="#{materialboerse.mode.requests}">Gesuche</span>
+            <span class="tab-count" th:text="${countReqAll}">0</span>
+        </button>
+    </nav>
+
+    <form id="mb-filter-form" class="no-track mb-toolbar" method="get" th:action="@{/materialboerse}">
+        <div class="toolbar">
+            <th:block th:replace="~{fragments/components :: segmented(name='scope', labelKey='materialboerse.scope.label', selected=${activeScope},
+                options=${ {{value: 'all', labelKey: 'filter.all', count: scopeCountAll}, {value: 'mine', labelKey: 'materialboerse.scope.mine', count: scopeCountMine}} })}"></th:block>
+            <th:block th:replace="~{fragments/components :: toolbarSearch('mb-search', 'q', ${filterQ}, 'materialgesuch.filter.search.placeholder')}"></th:block>
+            <th:block th:replace="~{fragments/components :: filterChips('mb-filter-form')}"></th:block>
+            <th:block th:replace="~{fragments/components :: filterPopover(panelId='mb-filter-panel', panelName='materialboerse',
+                testid='mb-filter-toggle', body=~{::mb-filter-body})}">
+                <th:block th:ref="mb-filter-body">
+                    <div class="form-group">
+                        <label for="mb-min-quality" th:text="#{materialboerse.filter.minQuality}">Min. Qualität</label>
+                        <input type="number" id="mb-min-quality" name="minQuality" min="0" max="1000" step="10"
+                               data-mb-minquality th:value="${filterMinQuality}" placeholder="0"/>
                     </div>
+                    <div class="form-group">
+                        <label for="mb-min-amount" th:text="#{materialboerse.filter.minAmount}">Min. Menge</label>
+                        <input type="number" id="mb-min-amount" name="minAmount" min="0" step="1"
+                               data-mb-minamount th:value="${filterMinAmount}" placeholder="0"/>
+                    </div>
+                    <div class="form-group" data-mb-offers-only th:hidden="${activeMode == 'requests'}">
+                        <label class="mb-check" for="mb-exclude-stolen">
+                            <input type="checkbox" id="mb-exclude-stolen" name="excludeStolen" value="true"
+                                   data-mb-exclude-stolen data-testid="mb-exclude-stolen"
+                                   th:checked="${filterExcludeStolen and activeMode != 'requests'}"
+                                   th:disabled="${activeMode == 'requests'}"/>
+                            <span th:text="#{materialboerse.filter.excludeStolen}">Ohne gestohlene</span>
+                        </label>
+                    </div>
+                </th:block>
+            </th:block>
+            <span class="toolbar__spacer"></span>
+            <select class="chip-select mb-sort" name="sort" data-mb-sort data-filter-chip-ignore
+                    th:aria-label="#{materialboerse.filter.sort}" th:title="#{materialboerse.filter.sort}">
+                <option value="qual" th:selected="${filterSort == 'qual'}" th:text="#{materialboerse.sort.qual}">Qualität</option>
+                <option value="menge" th:selected="${filterSort == 'menge'}" th:text="#{materialboerse.sort.menge}">Menge</option>
+                <option value="mat" th:selected="${filterSort == 'mat'}" th:text="#{materialboerse.sort.mat}">Name A–Z</option>
+                <option value="neu" th:selected="${filterSort == 'neu'}" th:text="#{materialboerse.sort.neu}">Neueste zuerst</option>
+            </select>
+        </div>
+    </form>
+
+    <div id="mb-board" role="tabpanel">
+        <th:block th:fragment="board">
+            <div th:if="${activeMode == 'requests'}" id="mg-listwrap">
+                <th:block th:replace="~{fragments/materialgesuch-board :: requestList}"></th:block>
+            </div>
+            <div th:unless="${activeMode == 'requests'}" id="mb-listwrap">
+            <th:block th:fragment="list">
+            <span th:fragment="counts" hidden data-mb-counts
+                  th:data-offers-all="${countAll}" th:data-offers-mine="${countMine}"
+                  th:data-requests-all="${countReqAll}" th:data-requests-mine="${countReqMine}"></span>
+            <th:block th:if="${#lists.isEmpty(offers)}">
+                <div class="empty-state" data-testid="empty-state">
+                    <th:block th:replace="~{fragments/components :: emptyStateBody('materialboerse.empty.title', 'materialboerse.empty.text', null)}"></th:block>
+                    <button type="button" class="btn btn-ghost btn-xs" data-mb-reset th:text="#{materialboerse.empty.reset}">Filter zurücksetzen</button>
+                </div>
+            </th:block>
+            <div th:unless="${#lists.isEmpty(offers)}" class="master-detail mb-md"
+                 th:classappend="${selectedOffer != null} ? 'has-sel'">
+                <div class="master-list mb-mlist">
                     <button th:each="offer : ${offers}" type="button"
-                            class="master-row mb-mrow"
+                            class="master-row mb-mrow" data-testid="mb-offer-row"
                             th:classappend="${(offer.mine() ? ' mb-mine' : '') + (selectedOffer != null and offer.id() == selectedOffer.id() ? ' is-active' : '')}"
-                            th:data-offer-id="${offer.id()}" data-mb-select role="button"
+                            th:data-offer-id="${offer.id()}" data-mb-select
                             th:aria-pressed="${selectedOffer != null and offer.id() == selectedOffer.id()}">
                         <span class="mb-mrow-main">
                             <span class="mb-mrow-mat">
-                                <span th:text="${offer.kind() == 'ITEM' ? offer.itemName() : offer.material().name()}">Material</span>
+                                <span class="mb-mrow-name" th:text="${offer.kind() == 'ITEM' ? offer.itemName() : offer.material().name()}">Material</span>
                                 <span th:if="${offer.kind() == 'ITEM'}" class="mb-kind-tag" th:text="#{materialboerse.kind.item}">Item</span>
                                 <span th:if="${offer.stolen()}" class="chip chip--danger" data-testid="stolen-chip" th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
                             </span>
@@ -150,35 +152,21 @@
                                           th:title="${unit.name()}">IRI</span>
                                 </span>
                             </span>
-                            <span class="mb-mrow-meta">
-                                <th:block th:if="${offer.kind() == 'ITEM'}">
-                                    <span th:text="${#numbers.formatInteger(offer.itemQuantity(), 1)} + ' ' + #{material.quantity.piece}">0 Stück</span>
-                                </th:block>
-                                <th:block th:unless="${offer.kind() == 'ITEM'}">
-                                    <span th:text="'Q ' + ${offer.quality()}">Q 0</span>
-                                    <span class="mb-dot">·</span>
-                                    <span th:switch="${offer.material().quantityType()}">
-                                        <span th:case="'PIECE'" th:text="${#numbers.formatInteger(offer.amount(), 1)} + ' ' + #{material.quantity.piece}">0 Stück</span>
-                                        <span th:case="*" th:text="${#numbers.formatDecimal(offer.amount(), 1, 'POINT', 3, 'DEFAULT')} + ' ' + #{material.quantity.scu}">0 SCU</span>
-                                    </span>
-                                </th:block>
-                                <span class="mb-dot">·</span>
-                                <span data-mb-ago th:data-ts="${offer.releasedAt()}" th:text="${offer.releasedAt()}">vor …</span>
-                            </span>
                         </span>
-                        <span class="mb-mrow-int chip" th:classappend="${offer.interestCount() > 0} ? 'chip--primary' : 'chip--muted'"
-                              th:title="${offer.interestCount()} + ' Interessent(en)'">
-                            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-users"/></svg>
-                            <span th:text="${offer.interestCount()}">0</span>
-                        </span>
+                        <span class="mb-mrow-q" th:text="${offer.kind() == 'ITEM' ? '' : 'Q ' + offer.quality()}">Q 0</span>
+                        <span class="mb-mrow-amount num" th:if="${offer.kind() == 'ITEM'}"
+                              th:text="${#numbers.formatInteger(offer.itemQuantity(), 1)} + ' ' + #{material.quantity.piece}">0 Stück</span>
+                        <span class="mb-mrow-amount num" th:unless="${offer.kind() == 'ITEM'}" th:switch="${offer.material().quantityType()}"><span
+                                th:case="'PIECE'" th:text="${#numbers.formatInteger(offer.amount(), 1)} + ' ' + #{material.quantity.piece}">0 Stück</span><span
+                                th:case="*" th:text="${#numbers.formatDecimal(offer.amount(), 1, 'POINT', 3, 'DEFAULT')} + ' ' + #{material.quantity.scu}">0 SCU</span></span>
                     </button>
                 </div>
 
                 <div class="detail-pane mb-detailpane" id="mb-detail">
                     <div th:fragment="detail" class="mb-detail-inner">
                         <div th:if="${selectedOffer == null}" class="empty-state mb-detail-empty">
-                            <div class="empty-title" th:text="#{materialboerse.detail.none.title}">Kein Angebot gewählt</div>
-                            <p class="empty-text" th:text="#{materialboerse.detail.none.text}">Wähle links einen Materialposten.</p>
+                            <span class="empty-title" th:text="#{materialboerse.detail.none.title}">Kein Angebot gewählt</span>
+                            <span class="empty-text" th:text="#{materialboerse.detail.none.text}">Wähle links einen Materialposten.</span>
                         </div>
                         <th:block th:if="${selectedOffer != null}" th:with="offer=${selectedOffer}">
                             <div class="mb-dp-head">
@@ -188,19 +176,20 @@
                                         <span th:if="${offer.kind() == 'ITEM'}" class="mb-kind-tag" th:text="#{materialboerse.kind.item}">Item</span>
                                         <span th:if="${offer.stolen()}" class="chip chip--danger" data-testid="stolen-chip" th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
                                     </h2>
-                                    <span class="mb-dp-owner">
+                                    <p class="mb-dp-owner">
                                         <span th:text="#{materialboerse.detail.from}">von</span>
-                                        <span class="mb-dp-owner-name" th:text="${offer.owner().effectiveName()}">Spieler</span>
+                                        <strong class="mb-dp-owner-name" th:text="${offer.owner().effectiveName()}">Spieler</strong>
                                         <span th:if="${offer.ownerOrgUnits() != null and !offer.ownerOrgUnits().isEmpty()}" class="squadron-badge-group">
                                             <span th:each="unit : ${offer.ownerOrgUnits()}" class="squadron-badge"
                                                   th:classappend="${unit.kind() != 'SQUADRON'} ? 'squadron-badge-sk'"
                                                   th:text="${unit.shorthand() != null ? unit.shorthand() : unit.name()}"
                                                   th:title="${unit.name()}">IRI</span>
                                         </span>
-                                    </span>
-                                    <div th:if="${offer.mine()}" class="mb-dp-mine">
-                                        <span class="chip chip--primary" th:text="#{materialboerse.detail.mine}">Dein Angebot</span>
-                                    </div>
+                                        <span aria-hidden="true">&middot;</span>
+                                        <span th:text="#{materialboerse.facts.released}">Freigegeben</span>
+                                        <span data-mb-ago th:data-ts="${offer.releasedAt()}" th:text="${offer.releasedAt()}">vor …</span>
+                                        <span th:if="${offer.mine()}" class="chip chip--primary" th:text="#{materialboerse.detail.mine}">Dein Angebot</span>
+                                    </p>
                                 </div>
                                 <button type="button" class="btn btn-ghost btn-xs mb-dp-back" data-mb-deselect>
                                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-left"/></svg>
@@ -208,78 +197,82 @@
                                 </button>
                             </div>
 
-                            <div class="facts-bar mb-dp-facts">
-                                <span th:if="${offer.kind() == 'ITEM'}"><span class="fact-k" th:text="#{materialboerse.facts.type}">Art</span><span class="fact-v" th:text="#{materialboerse.kind.item}">Item</span></span>
-                                <span th:unless="${offer.kind() == 'ITEM'}"><span class="fact-k" th:text="#{materialboerse.facts.quality}">Qualität</span><span class="fact-v" th:text="${offer.quality()}">0</span></span>
-                                <span><span class="fact-k" th:text="#{materialboerse.facts.amount}">Menge</span>
-                                    <span class="fact-v" th:if="${offer.kind() == 'ITEM'}" th:text="${#numbers.formatInteger(offer.itemQuantity(), 1)} + ' ' + #{material.quantity.piece}">0 Stück</span>
-                                    <span class="fact-v" th:unless="${offer.kind() == 'ITEM'}" th:switch="${offer.material().quantityType()}"><span th:case="'PIECE'" th:text="${#numbers.formatInteger(offer.amount(), 1)} + ' ' + #{material.quantity.piece}">0 Stück</span><span th:case="*" th:text="${#numbers.formatDecimal(offer.amount(), 1, 'POINT', 3, 'DEFAULT')} + ' ' + #{material.quantity.scu}">0 SCU</span></span></span>
-                                <span><span class="fact-k" th:text="#{materialboerse.facts.released}">Freigegeben</span><span class="fact-v" data-mb-ago th:data-ts="${offer.releasedAt()}" th:text="${offer.releasedAt()}">vor …</span></span>
+                            <div class="kpi-grid mb-kpis">
+                                <div class="kpi-total">
+                                    <div class="kpi-label" th:text="${offer.kind() == 'ITEM'} ? #{materialboerse.facts.type} : #{materialboerse.facts.quality}">Qualität</div>
+                                    <div class="kpi-value mb-kpi-quality" th:text="${offer.kind() == 'ITEM'} ? #{materialboerse.kind.item} : ${offer.quality()}">0</div>
+                                </div>
+                                <div class="kpi-total">
+                                    <div class="kpi-label" th:text="#{materialboerse.facts.amount}">Menge</div>
+                                    <div class="kpi-value" th:if="${offer.kind() == 'ITEM'}">
+                                        <span th:text="${#numbers.formatInteger(offer.itemQuantity(), 1)}">0</span>
+                                        <span class="mb-kpi-unit" th:text="#{material.quantity.piece}">Stück</span>
+                                    </div>
+                                    <div class="kpi-value" th:unless="${offer.kind() == 'ITEM'}" th:switch="${offer.material().quantityType()}">
+                                        <th:block th:case="'PIECE'">
+                                            <span th:text="${#numbers.formatInteger(offer.amount(), 1)}">0</span>
+                                            <span class="mb-kpi-unit" th:text="#{material.quantity.piece}">Stück</span>
+                                        </th:block>
+                                        <th:block th:case="*">
+                                            <span th:text="${#numbers.formatDecimal(offer.amount(), 1, 'POINT', 3, 'DEFAULT')}">0</span>
+                                            <span class="mb-kpi-unit" th:text="#{material.quantity.scu}">SCU</span>
+                                        </th:block>
+                                    </div>
+                                </div>
+                                <div class="kpi-total">
+                                    <div class="kpi-label" th:text="#{materialboerse.interest.label}">Interessenten</div>
+                                    <div class="kpi-value" data-testid="mb-interest-count" th:text="${offer.interestCount()}">0</div>
+                                </div>
                             </div>
 
-                            <div class="mb-dp-body">
-                                <div class="mb-dp-remark">
-                                    <p class="mb-dp-label" th:text="#{materialboerse.remark.label}">Bemerkung</p>
-                                    <div class="markdown-content" th:with="remarkHtml=${@markdown.render(offer.remark())}" th:utext="${remarkHtml}">Bemerkung</div>
-                                    <p class="mb-anon-note">
-                                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg>
-                                        <span th:text="#{materialboerse.anon.note}">Standort &amp; Übergabeort werden bewusst nicht angezeigt — das verhandelt ihr direkt.</span>
-                                    </p>
-                                </div>
-                                <div class="mb-dp-side">
-                                    <div th:if="${offer.mine()}" class="mb-int-owner">
-                                        <p class="mb-dp-label" th:text="#{materialboerse.interest.label} + ' (' + ${offer.interestCount()} + ')'">Interessenten (0)</p>
-                                        <div th:if="${!#lists.isEmpty(offer.interestedHandles())}" class="mb-int-names">
-                                            <span th:each="name : ${offer.interestedHandles()}" class="chip">
-                                                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-users"/></svg>
-                                                <span th:text="${name}">Name</span>
-                                            </span>
-                                        </div>
-                                        <span th:if="${#lists.isEmpty(offer.interestedHandles())}" class="mb-int-empty" th:text="#{materialboerse.interest.none}">Noch keine Interessenten.</span>
-                                        <p class="mb-owner-note" th:text="#{materialboerse.interest.ownerNote}">Nur du siehst diese Namen — nimm mit ihnen direkt die Verhandlung auf.</p>
-                                    </div>
-                                    <div th:unless="${offer.mine()}" class="mb-int-anon">
-                                        <p class="mb-dp-label" th:text="#{materialboerse.interest.label}">Interessenten</p>
-                                        <span class="chip" th:classappend="${offer.viewerInterested() or offer.interestCount() > 0} ? 'chip--primary' : 'chip--muted'">
-                                            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-users"/></svg>
-                                            <span th:if="${offer.interestCount() == 0}" th:text="#{materialboerse.interest.countNone}">Keine Interessenten</span>
-                                            <span th:if="${offer.interestCount() > 0}" th:text="${offer.interestCount()} + ' ' + #{materialboerse.interest.countWord}">0 Interessenten</span>
-                                        </span>
-                                        <p class="mb-owner-note">
-                                            <span th:text="#{materialboerse.interest.viewerNote}">Die Namen sieht nur der Anbieter.</span>
-                                            <span th:if="${offer.viewerInterested()}" th:text="#{materialboerse.interest.youIn}">Du bist eingetragen — der Anbieter kann dich kontaktieren.</span>
-                                        </p>
-                                    </div>
+                            <section th:if="${!#strings.isEmpty(offer.remark())}" class="mb-dp-section">
+                                <h3 class="mb-dp-label" th:text="#{materialboerse.remark.label}">Bemerkung</h3>
+                                <div class="markdown-content" th:with="remarkHtml=${@markdown.render(offer.remark())}" th:utext="${remarkHtml}">Bemerkung</div>
+                            </section>
 
-                                    <div class="mb-dp-actions" th:data-offer-id="${offer.id()}" th:data-version="${offer.version()}">
-                                        <th:block th:if="${offer.mine()}">
-                                            <button type="button" class="btn btn-ghost btn-xs" data-mb-edit
-                                                    th:if="${offer.kind() != 'ITEM' or offer.availableAmount() != null}"
-                                                    th:data-offer-id="${offer.id()}" th:data-version="${offer.version()}"
-                                                    th:data-kind="${offer.kind()}"
-                                                    th:data-material="${offer.kind() == 'ITEM' ? offer.itemName() : offer.material().name()}"
-                                                    th:data-quality="${offer.kind() == 'ITEM' ? '' : offer.quality()}"
-                                                    th:data-amount="${offer.kind() == 'ITEM' ? offer.itemQuantity() : offer.amount()}"
-                                                    th:data-available="${offer.availableAmount()}"
-                                                    th:data-quantity-type="${offer.kind() == 'ITEM' ? 'PIECE' : offer.material().quantityType()}"
-                                                    th:data-remark="${offer.remark()}">
-                                                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg>
-                                                <span th:text="#{materialboerse.action.editRemark}">Angebot bearbeiten</span>
-                                            </button>
-                                            <button type="button" class="btn btn-quiet-danger btn-xs" data-mb-deactivate
-                                                    th:data-offer-id="${offer.id()}" th:text="#{materialboerse.action.deactivate}">Angebot deaktivieren</button>
-                                        </th:block>
-                                        <th:block th:unless="${offer.mine()}">
-                                            <button type="button" class="btn btn-xs" data-mb-interest
-                                                    th:classappend="${offer.viewerInterested()} ? 'btn-ghost' : 'btn-outline'"
-                                                    th:data-offer-id="${offer.id()}" th:data-interested="${offer.viewerInterested()}">
-                                                <svg th:if="${offer.viewerInterested()}" class="krt-icon" aria-hidden="true"><use href="#krt-icon-check"/></svg>
-                                                <span th:if="${offer.viewerInterested()}" th:text="#{materialboerse.action.interest.withdraw}">Interesse zurückziehen</span>
-                                                <span th:unless="${offer.viewerInterested()}" th:text="#{materialboerse.action.interest}">Interesse anmelden</span>
-                                            </button>
-                                        </th:block>
-                                    </div>
+                            <section th:if="${offer.mine()}" class="mb-dp-section">
+                                <h3 class="mb-dp-label" th:text="#{materialboerse.interest.label}">Interessenten</h3>
+                                <div th:if="${!#lists.isEmpty(offer.interestedHandles())}" class="mb-int-names">
+                                    <span th:each="name : ${offer.interestedHandles()}" class="chip">
+                                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-users"/></svg>
+                                        <span th:text="${name}">Name</span>
+                                    </span>
                                 </div>
+                                <p th:if="${#lists.isEmpty(offer.interestedHandles())}" class="mb-int-empty" th:text="#{materialboerse.interest.none}">Noch keine Interessenten.</p>
+                                <p class="mb-dp-note" th:text="#{materialboerse.interest.ownerNote}">Nur du siehst diese Namen.</p>
+                            </section>
+
+                            <div class="mb-dp-actions" th:data-offer-id="${offer.id()}" th:data-version="${offer.version()}">
+                                <th:block th:if="${offer.mine()}">
+                                    <button type="button" class="btn btn-ghost btn-xs" data-mb-edit
+                                            th:if="${offer.kind() != 'ITEM' or offer.availableAmount() != null}"
+                                            th:data-offer-id="${offer.id()}" th:data-version="${offer.version()}"
+                                            th:data-kind="${offer.kind()}"
+                                            th:data-material="${offer.kind() == 'ITEM' ? offer.itemName() : offer.material().name()}"
+                                            th:data-quality="${offer.kind() == 'ITEM' ? '' : offer.quality()}"
+                                            th:data-amount="${offer.kind() == 'ITEM' ? offer.itemQuantity() : offer.amount()}"
+                                            th:data-available="${offer.availableAmount()}"
+                                            th:data-quantity-type="${offer.kind() == 'ITEM' ? 'PIECE' : offer.material().quantityType()}"
+                                            th:data-remark="${offer.remark()}">
+                                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg>
+                                        <span th:text="#{materialboerse.action.editRemark}">Angebot bearbeiten</span>
+                                    </button>
+                                    <button type="button" class="btn btn-quiet-danger btn-xs" data-mb-deactivate
+                                            th:data-offer-id="${offer.id()}" th:text="#{materialboerse.action.deactivate}">Angebot deaktivieren</button>
+                                </th:block>
+                                <button th:unless="${offer.mine()}" type="button" class="btn" data-mb-interest
+                                        data-testid="mb-interest"
+                                        th:classappend="${offer.viewerInterested()} ? 'btn-ghost' : 'btn--cta'"
+                                        th:data-offer-id="${offer.id()}" th:data-interested="${offer.viewerInterested()}">
+                                    <svg th:if="${offer.viewerInterested()}" class="krt-icon" aria-hidden="true"><use href="#krt-icon-check"/></svg>
+                                    <span th:if="${offer.viewerInterested()}" th:text="#{materialboerse.action.interest.withdraw}">Interesse zurückziehen</span>
+                                    <span th:unless="${offer.viewerInterested()}" th:text="#{materialboerse.action.interest}">Interesse anmelden</span>
+                                </button>
+                                <p class="mb-dp-hint">
+                                    <span th:text="#{materialboerse.anon.note}">Standort &amp; Übergabeort werden bewusst nicht angezeigt.</span>
+                                    <span th:unless="${offer.mine()}" th:text="#{materialboerse.interest.viewerNote}">Die Namen sieht nur der Anbieter.</span>
+                                    <span th:if="${!offer.mine() and offer.viewerInterested()}" th:text="#{materialboerse.interest.youIn}">Du bist eingetragen.</span>
+                                </p>
                             </div>
                         </th:block>
                     </div>
@@ -287,7 +280,6 @@
             </div>
             </th:block>
             </div>
-        </th:block>
         </th:block>
     </div>
 
