@@ -1,4 +1,4 @@
-@layer base, components, page, migration, utilities;
+@layer base, components, page, utilities;
 
 @layer page {
     .bank-totals {
@@ -92,15 +92,15 @@
         min-width: 0;
     }
 
+    .kpi-card-top .chip {
+        font-size: 0.55rem;
+    }
+
     .kpi-card-foot {
         display: flex;
         justify-content: space-between;
         align-items: flex-end;
         gap: 8px;
-    }
-
-    .kpi-card .kpi-card-foot--actions {
-        margin-top: auto;
     }
 
     .kpi-delta {
@@ -131,55 +131,6 @@
 
     .kpi-sparkline--flat {
         stroke: var(--color-gray-2);
-    }
-
-    .holder-row {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 6px 0;
-        border-bottom: 1px dashed var(--color-surface-input);
-    }
-
-    .holder-row:last-child {
-        border-bottom: none;
-    }
-
-    .holder-row .holder-name {
-        font-weight: var(--fw-bold);
-        color: var(--color-white);
-        font-size: 0.8rem;
-        min-width: 80px;
-    }
-
-    .holder-row .holder-bar {
-        flex: 1;
-        height: 9px;
-        background: var(--color-surface-input);
-        position: relative;
-    }
-
-    .holder-row .holder-bar i {
-        position: absolute;
-        inset: 0 auto 0 0;
-        background: var(--color-primary);
-    }
-
-    .holder-row .holder-value {
-        font-size: 0.76rem;
-        min-width: 110px;
-        text-align: right;
-        color: var(--color-gray-1);
-        font-variant-numeric: tabular-nums;
-    }
-
-    .holder-sum {
-        border-top: var(--border-hairline);
-        margin-top: 7px;
-        padding-top: 7px;
-        display: flex;
-        justify-content: space-between;
-        font-size: 0.76rem;
     }
 
     .stack-bar {
@@ -405,34 +356,6 @@
         margin: 0 0 14px;
     }
 
-    .bank-filter-actions {
-        display: flex;
-        gap: 8px;
-        align-items: flex-end;
-    }
-
-    .bank-head-actions {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-        align-items: center;
-    }
-
-    .bank-requests-head-right {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        align-items: center;
-        justify-content: flex-end;
-    }
-
-    .bank-status-filter {
-        display: inline-flex;
-        flex-wrap: wrap;
-        gap: 8px 14px;
-        align-items: center;
-    }
-
     .kpi-card[hidden],
     .ou-row[hidden] {
         display: none;
@@ -457,87 +380,6 @@
         width: 260px;
         max-width: 100%;
         padding-left: 30px;
-    }
-
-    .bank-facts {
-        display: flex;
-        gap: 16px;
-        flex-wrap: wrap;
-        padding: 8px 16px;
-        background: var(--color-surface-input);
-        border: var(--border-hairline);
-        font-size: 0.78rem;
-        margin-bottom: 12px;
-    }
-
-    .bank-facts .fact-key {
-        color: var(--color-gray-2-text);
-        text-transform: uppercase;
-        font-size: 0.6rem;
-        letter-spacing: 0.08em;
-        font-weight: var(--fw-bold);
-        margin-right: 5px;
-    }
-
-    .bank-facts .fact-value {
-        color: var(--color-white);
-        font-weight: var(--fw-bold);
-        font-variant-numeric: tabular-nums;
-    }
-
-    .bank-cols {
-        display: grid;
-        grid-template-columns: 1.7fr 1fr;
-        gap: 12px;
-        align-items: start;
-    }
-
-    .bank-col-side {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-    }
-
-    .bank-panel {
-        background: var(--color-bg-dark-gray);
-        border: var(--border-hairline);
-    }
-
-    .bank-panel-head {
-        padding: 8px 12px;
-        background: var(--color-surface-input);
-        border-bottom: 2px solid var(--color-primary);
-        font-size: 0.7rem;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        font-weight: var(--fw-bold);
-        color: var(--color-gray-1);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
-    }
-
-    .bank-panel-body {
-        padding: 10px 12px;
-    }
-
-    .bank-kv {
-        display: flex;
-        justify-content: space-between;
-        gap: 8px;
-        font-size: 0.78rem;
-        padding: 2px 0;
-    }
-
-    .bank-kv .bank-kv-key {
-        color: var(--color-gray-2-text);
-    }
-
-    .bank-kv .bank-kv-value {
-        color: var(--color-white);
-        font-variant-numeric: tabular-nums;
     }
 
     .bank-form-row {
@@ -632,40 +474,6 @@
         color: var(--color-gray-2-text);
     }
 
-    .bank-note-cell {
-        color: var(--color-gray-2-text);
-        max-width: 220px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .bank-collapse-head {
-        width: 100%;
-        cursor: pointer;
-        text-align: left;
-        font-family: inherit;
-        border-top: 0;
-        border-left: 0;
-        border-right: 0;
-        border-radius: 0;
-    }
-
-    .bank-collapse-head:hover {
-        background: var(--color-gray-3);
-    }
-
-    .bank-collapse-head:focus-visible {
-        outline: 2px solid var(--color-primary);
-        outline-offset: -2px;
-    }
-
-    .bank-collapse-title {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-    }
-
     .bank-chevron {
         width: 0.85em;
         height: 0.85em;
@@ -676,10 +484,6 @@
 
     [aria-expanded='true'] .bank-chevron {
         transform: rotate(90deg);
-    }
-
-    .bank-bookings-table .bank-expand-col {
-        width: 1.8rem;
     }
 
     .bank-bookings-table .bank-expand-cell {
@@ -745,34 +549,6 @@
         overflow-wrap: break-word;
     }
 
-    .bank-filterbar {
-        display: flex;
-        gap: 8px;
-        align-items: flex-end;
-        flex-wrap: wrap;
-        margin-bottom: 12px;
-    }
-
-    .bank-filterbar label {
-        font-size: 0.6rem;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        font-weight: var(--fw-bold);
-        color: var(--color-gray-2-text);
-    }
-
-    .bank-filterbar--tabs {
-        align-items: stretch;
-    }
-
-    .bank-filterbar--tabs .bank-form-row {
-        margin-bottom: 0;
-    }
-
-    .bank-filterbar--tabs .bank-form-row select {
-        height: 100%;
-    }
-
     .btn-sm {
         padding: 3px 9px;
         font-size: 0.62rem;
@@ -785,10 +561,6 @@
     @media (width <= 1024px) {
         .bank-acc-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .bank-cols {
-            grid-template-columns: 1fr;
         }
 
         .matrix-flag {
@@ -815,10 +587,6 @@
         .bank-form-row {
             grid-template-columns: 1fr;
         }
-
-        .holder-row .holder-value {
-            min-width: 90px;
-        }
     }
 
     @media (width >= 1440px) {
@@ -832,56 +600,6 @@
         grid-template-columns: repeat(auto-fill, minmax(min(540px, 100%), 1fr));
         gap: 12px;
         align-items: start;
-    }
-
-    .bank-target-bar {
-        width: 100%;
-        height: 6px;
-        margin-top: 0.35rem;
-        overflow: hidden;
-        background: var(--color-surface-input);
-        border: var(--border-hairline);
-        border-radius: 2px;
-    }
-
-    .bank-target-bar-fill {
-        height: 100%;
-        background: var(--color-primary);
-    }
-
-    .bank-vis-group {
-        margin-top: 0.75rem;
-    }
-
-    .bank-vis-chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        margin-top: 0.35rem;
-    }
-
-    .bank-vis-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35rem;
-        padding: 0.25rem 0.5rem;
-        background: var(--color-bg-dark-gray);
-        border: var(--border-hairline);
-    }
-
-    .bank-vis-users {
-        margin: 0.35rem 0;
-        padding: 0;
-        list-style: none;
-    }
-
-    .bank-vis-users li {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.5rem;
-        padding: 0.25rem 0;
-        border-bottom: var(--border-hairline);
     }
 
     [data-tabpanel][hidden] {
@@ -1106,24 +824,6 @@
         font-size: 0.6em;
     }
 
-    .ou-card-act {
-        display: flex;
-        justify-content: flex-end;
-        margin-top: auto;
-    }
-
-    .ou-facts {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 10px;
-    }
-
-    @media (width <= 1024px) {
-        .ou-facts {
-            grid-template-columns: 1fr 1fr;
-        }
-    }
-
     .sub-h {
         font-family: var(--font-headline);
         font-weight: var(--fw-bold);
@@ -1268,14 +968,6 @@
         --bank-dept: var(--color-dept-search-rescue);
     }
 
-    .bank-chart-toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        align-items: center;
-        margin-bottom: 0.75rem;
-    }
-
     .bank-chart-ranges {
         display: inline-flex;
         flex-wrap: wrap;
@@ -1405,23 +1097,5 @@
         text-transform: uppercase;
         letter-spacing: 0.04em;
         color: var(--color-gray-2-text);
-    }
-
-    .bank-detail-panels {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        gap: 1rem;
-        align-items: start;
-    }
-
-    @media (width >= 1440px) {
-        main.bank-detail {
-            max-width: min(2200px, 94vw);
-        }
-
-        main.bank-detail .bank-detail-panels {
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-            gap: 1.25rem;
-        }
     }
 }

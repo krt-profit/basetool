@@ -3,7 +3,7 @@
 StartLimitIntervalSec=0
 
 [Container]
-Image=docker.io/oliver006/redis_exporter:v1.92.0@sha256:ca3abd5f19da6c87e96038ba08aaa3dfaab34dc649834584c4d6880b05952fef
+Image=docker.io/oliver006/redis_exporter:v1.93.0@sha256:6ca518a72f30f7f576ef92963de1b91d3c3f5fd3aeac949f878bfda183587820
 ContainerName=redis-exporter
 LogDriver=journald
 ReadOnly=true
