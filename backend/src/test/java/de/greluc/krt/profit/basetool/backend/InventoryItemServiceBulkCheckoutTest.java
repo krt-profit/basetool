@@ -24,6 +24,7 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -42,7 +43,6 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.service.MaterialExchangeOfferRatchet;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;

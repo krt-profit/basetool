@@ -50,12 +50,17 @@ import com.tngtech.archunit.lang.SimpleConditionEvent;
 import com.tngtech.archunit.library.dependencies.SliceAssignment;
 import com.tngtech.archunit.library.dependencies.SliceIdentifier;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.audit.internal.AuditRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCancelledEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestConfirmedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestRejectedEvent;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.CachedEntityGraphs;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexValues;
 import de.greluc.krt.profit.basetool.backend.config.ActingMemberFilter;
 import de.greluc.krt.profit.basetool.backend.controller.AppVersionPolicyController;
 import de.greluc.krt.profit.basetool.backend.controller.BankAccountController;
@@ -70,14 +75,50 @@ import de.greluc.krt.profit.basetool.backend.controller.BasetoolErrorController;
 import de.greluc.krt.profit.basetool.backend.controller.DiscordAccountExistenceController;
 import de.greluc.krt.profit.basetool.backend.controller.OrgUnitBankController;
 import de.greluc.krt.profit.basetool.backend.controller.TermsDocumentController;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ActingMemberAuthorities;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ActingMemberHeader;
+import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ChangeSource;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ChangeSourceProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ConnectedAppsProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeRetentionProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientDirectory;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeConnectionRetentionProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeMirrorProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
+import de.greluc.krt.profit.basetool.backend.identity.api.TermsConsentCheck;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
+import de.greluc.krt.profit.basetool.backend.identity.internal.RejectedRegistrationRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderInventoryOwnerRedactor;
+import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
+import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
+import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
+import de.greluc.krt.profit.basetool.backend.kernel.Quality;
+import de.greluc.krt.profit.basetool.backend.kernel.RequestMemo;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncAuthorization;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
+import de.greluc.krt.profit.basetool.backend.livesync.internal.LiveSyncFanoutProperties;
 import de.greluc.krt.profit.basetool.backend.mapper.BankAccountMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.BankAuditEventMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.BankGrantMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.BankHolderMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.CentralMapperConfig;
 import de.greluc.krt.profit.basetool.backend.mapper.OrgUnitMembershipMapper;
+import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeQueryParams;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionPeerRedactor;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionViewerAccess;
 import de.greluc.krt.profit.basetool.backend.model.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountApprovalLimit;
@@ -159,6 +200,27 @@ import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderBookingR
 import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderLeg;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankPostingSlice;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
+import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationFanoutProperties;
+import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationParamsCodec;
+import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationRetentionProperties;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
+import de.greluc.krt.profit.basetool.backend.orgunit.internal.OrgUnitLabels;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthoritiesCacheProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientAttribution;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
+import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.platform.api.PartialRoleScopeProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.RateLimitProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.RefusedSubjectWindow;
+import de.greluc.krt.profit.basetool.backend.platform.api.ResilientRedisMessageListenerContainer;
+import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
+import de.greluc.krt.profit.basetool.backend.platform.internal.ApiClientMetricsProperties;
+import de.greluc.krt.profit.basetool.backend.platform.internal.RequestBodyLimitProperties;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.DataExportSections;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleErasureCoverage;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleSpellings;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.PersonSearchTargets;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountApprovalLimitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountGrantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
@@ -216,7 +278,6 @@ import de.greluc.krt.profit.basetool.backend.service.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeGate;
 import de.greluc.krt.profit.basetool.backend.service.pdf.BankBalanceChart;
 import de.greluc.krt.profit.basetool.backend.service.pdf.BankPdfFormat;
-import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.task.BankLedgerIntegrityTask;
 import de.greluc.krt.profit.basetool.backend.util.BankAmounts;
 import de.greluc.krt.profit.basetool.backend.validation.DtoConstraints;
@@ -366,9 +427,86 @@ class ArchitectureTest {
   static final DescribedPredicate<JavaClass> VALIDATION_CODE =
       layer("validation code", VALIDATION_TYPES, DtoConstraints.class);
 
-  /** The {@code support} leaf, anchored on {@link AuthenticatedSubject}. */
-  static final DescribedPredicate<JavaClass> SUPPORT_CODE =
-      packageTreeOf("support code", AuthenticatedSubject.class);
+  /**
+   * The dependency-leaf helpers: the kernel's and platform's primitives and the small per-module
+   * helpers the service, mapper and controller layers share, named by class literal (plan §7.3,
+   * P1-9).
+   */
+  static final Set<Class<?>> LEAF_HELPER_CLASSES =
+      Set.of(
+          ActingMemberAuthorities.class,
+          ActingMemberHeader.class,
+          ApiClientMetricsProperties.class,
+          AppProblemProperties.class,
+          AuditRetentionProperties.class,
+          AuthenticatedSubject.class,
+          AuthoritiesCacheProperties.class,
+          CachedEntityGraphs.class,
+          ChangeSource.class,
+          ChangeSourceProperties.class,
+          ClientAttribution.class,
+          ClientDirectory.class,
+          ConnectedAppsProperties.class,
+          DataExportSections.class,
+          ExchangeChangeRetentionProperties.class,
+          ExchangeClientDirectory.class,
+          ExchangeConnectionRetentionProperties.class,
+          ExchangeMirrorProperties.class,
+          HandleErasureCoverage.class,
+          HandleSpellings.class,
+          IngestGatewayProperties.class,
+          InventoryAllocations.class,
+          InventoryAuditLabels.class,
+          InventoryProperties.class,
+          JobOrderAuditLabel.class,
+          JobOrderInventoryOwnerRedactor.class,
+          KnownExchangeClients.class,
+          LikePatterns.class,
+          LiveSyncAuthorization.class,
+          LiveSyncFanoutProperties.class,
+          LiveSyncTopic.class,
+          LiveSyncTopicClass.class,
+          MaterialExchangeQueryParams.class,
+          MissionPeerRedactor.class,
+          MissionSectionVersions.class,
+          MissionViewerAccess.class,
+          NotificationFanoutProperties.class,
+          NotificationParamsCodec.class,
+          NotificationRetentionProperties.class,
+          de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock.class,
+          OrgUnitContextualAuthority.class,
+          OrgUnitLabels.class,
+          PartialRoleScopeProperties.class,
+          Permissions.class,
+          PersonSearchTargets.class,
+          ProblemResponseFactory.class,
+          Quality.class,
+          QuantityTypeRounding.class,
+          RateLimitProperties.class,
+          RefusedSubjectWindow.class,
+          RejectedRegistrationRetentionProperties.class,
+          RequestBodyLimitProperties.class,
+          RequestMemo.class,
+          ResilientRedisMessageListenerContainer.class,
+          Roles.class,
+          StaffelMembershipResolver.class,
+          StalePriceSweep.class,
+          StockViewerAccess.class,
+          StringNormalization.class,
+          SubjectAuthentication.class,
+          TermsConsentCheck.class,
+          UexValues.class,
+          UserDtoRedaction.class);
+
+  /** The dependency-leaf helpers, their nested classes and arrays of either. */
+  static final DescribedPredicate<JavaClass> LEAF_HELPERS =
+      DescribedPredicate.describe(
+          "the dependency-leaf helpers, their nested classes and arrays of them",
+          c ->
+              LEAF_HELPER_CLASSES.stream()
+                  .map(Class::getName)
+                  .anyMatch(
+                      outermost(c.isArray() ? c.getBaseComponentType() : c).getName()::equals));
 
   /** The outbound integration clients, anchored on {@link UexClient}. */
   static final DescribedPredicate<JavaClass> INTEGRATION_CODE =
@@ -556,7 +694,6 @@ class ArchitectureTest {
           "model",
           "repository",
           "service",
-          "support",
           "task",
           "util",
           "validation",
@@ -803,7 +940,7 @@ class ArchitectureTest {
         .belongToAnyOf(SecurityContextHolder.class)
         .because(
             "Mappers must stay pure transformers; route any auth lookup through a dependency-leaf "
-                + "SPI (e.g. support.MissionViewerAccess) so the mapper depends on neither the "
+                + "SPI (e.g. MissionViewerAccess) so the mapper depends on neither the "
                 + "request-scoped SecurityContextHolder nor the service layer.");
   }
 
@@ -1126,19 +1263,19 @@ class ArchitectureTest {
   }
 
   @Test
-  void supportPackageMustStayADependencyLeaf() {
-    assertClassFloor("supportPackageMustStayADependencyLeaf", SUPPORT_CODE, 61);
-    supportPackageMustStayADependencyLeafRule(
-            SUPPORT_CODE, SUPPORT_CODE.or(MODEL_CODE).or(REPOSITORY_CODE), ROOT_PACKAGE)
+  void leafHelpersMustStayDependencyLeaves() {
+    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 63);
+    leafHelpersMustStayDependencyLeavesRule(
+            LEAF_HELPERS, LEAF_HELPERS.or(MODEL_CODE).or(REPOSITORY_CODE), ROOT_PACKAGE)
         .check(CLASSES);
   }
 
-  static ArchRule supportPackageMustStayADependencyLeafRule(
-      DescribedPredicate<JavaClass> support,
+  static ArchRule leafHelpersMustStayDependencyLeavesRule(
+      DescribedPredicate<JavaClass> helpers,
       DescribedPredicate<JavaClass> allowedInside,
       String rootPackage) {
     return classes()
-        .that(support)
+        .that(helpers)
         .should()
         .onlyDependOnClassesThat(
             allowedInside.or(
@@ -1146,10 +1283,10 @@ class ArchitectureTest {
                     "lie outside " + rootPackage,
                     (JavaClass c) -> !isInPackageTree(c.getPackageName(), rootPackage))))
         .because(
-            "support is a leaf for domain-free helpers: it may depend only on itself, the entity"
-                + " model and the repositories, never on a service, mapper, controller or any"
-                + " other layer. Logic that a mapper and a service share belongs to the domain that"
-                + " owns it, inverted through a small SPI there, not into support.");
+            "a leaf helper may depend only on the other leaf helpers, the entity model and the"
+                + " repositories, never on a service, mapper, controller or any other layer. Logic"
+                + " that a mapper and a service share belongs to the module that owns it, inverted"
+                + " through a small SPI there.");
   }
 
   @Test

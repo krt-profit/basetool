@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.config;
 
 import de.greluc.krt.profit.basetool.backend.filter.ClientIpContextFilter;
-import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.RateLimitProperties;
 import jakarta.servlet.DispatcherType;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.ObjectProvider;

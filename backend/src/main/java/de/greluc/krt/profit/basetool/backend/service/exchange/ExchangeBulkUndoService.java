@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeBulkUndoRun;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeBulkUndoSkip;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeBulkUndoStatus;
@@ -47,7 +48,6 @@ import de.greluc.krt.profit.basetool.backend.repository.ExchangeInstallationRepo
 import de.greluc.krt.profit.basetool.backend.repository.ExchangeJournalRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.support.ExchangeChangeRetentionProperties;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;

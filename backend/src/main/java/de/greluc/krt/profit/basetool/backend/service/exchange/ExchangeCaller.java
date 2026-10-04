@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service.exchange;
 
-import de.greluc.krt.profit.basetool.backend.support.SubjectAuthentication;
+import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 

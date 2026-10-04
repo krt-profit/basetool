@@ -21,6 +21,7 @@
 @ApplicationModule(
     allowedDependencies = {
       "audit::api",
+      "catalogue::api",
       "identity::api",
       "inventory::api",
       "joborder::api",
@@ -28,6 +29,7 @@
       "livesync::api",
       "notification::api",
       "orgunit::api",
+      "platform::api",
       "scope::api"
     })
 package de.greluc.krt.profit.basetool.backend.refinery;

@@ -19,13 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestStatus;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.ConfirmBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.RejectBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.service.BankBookingRequestService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;

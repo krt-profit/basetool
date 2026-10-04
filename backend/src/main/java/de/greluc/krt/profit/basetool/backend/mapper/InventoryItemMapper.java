@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
@@ -29,7 +30,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderAllocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionAllocationDto;
-import de.greluc.krt.profit.basetool.backend.support.StockViewerAccess;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.mapper.BankHolderMapper;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.BankHolder;
@@ -39,7 +40,6 @@ import de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingReposit
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;

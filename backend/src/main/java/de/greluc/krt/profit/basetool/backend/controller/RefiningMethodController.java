@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.RefiningMethodMapper;
 import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.service.RefiningMethodService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
 import java.util.Set;

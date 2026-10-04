@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.task;
 
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeBulkUndoService;
 import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeChangeRetentionService;
 import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeJournalService;
-import de.greluc.krt.profit.basetool.backend.support.ExchangeChangeRetentionProperties;
 import jakarta.annotation.PostConstruct;
 import java.time.Clock;
 import java.time.Instant;

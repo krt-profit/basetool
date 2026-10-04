@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.MemberEvaluation;
 import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
 import de.greluc.krt.profit.basetool.backend.model.PromotionLevel;
@@ -27,7 +28,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PromotionEligibilityRespo
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionRequirementCheckResponse;
 import de.greluc.krt.profit.basetool.backend.repository.MemberEvaluationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RankRequirementRepository;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;

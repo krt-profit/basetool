@@ -21,12 +21,12 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.mapper.SystemSettingMapper;
 import de.greluc.krt.profit.basetool.backend.model.SystemSetting;
 import de.greluc.krt.profit.basetool.backend.model.dto.SystemSettingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SystemSettingUpdateDto;
 import de.greluc.krt.profit.basetool.backend.repository.SystemSettingRepository;
-import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;

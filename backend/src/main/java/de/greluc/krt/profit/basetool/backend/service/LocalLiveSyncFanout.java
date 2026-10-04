@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.support.LiveSyncTopic;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
 

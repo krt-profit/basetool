@@ -59,7 +59,7 @@ class JobOrderMapperTest {
     ReflectionTestUtils.setField(
         userMapper,
         "staffelMembershipResolver",
-        new de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver(
+        new de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver(
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.repository.SquadronRepository.class),
             org.mockito.Mockito.mock(
@@ -79,7 +79,7 @@ class JobOrderMapperTest {
     ReflectionTestUtils.setField(
         mapper,
         "stockAccess",
-        new de.greluc.krt.profit.basetool.backend.support.StockViewerAccess() {
+        new de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess() {
           @Override
           public boolean canEditInventoryItem(java.util.UUID inventoryItemId) {
             return true;

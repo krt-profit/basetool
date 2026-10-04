@@ -234,6 +234,6 @@ debt rather than anything TS 7 introduced.
 
 - **Frontend DOM version sync** — when an entity is updated via AJAX (dropdown change, row reorder, etc.), the new `version` must propagate to **every** related DOM element in the same context (edit/action buttons, modals inside the same `<tr>` or container). A missed `data-version` attribute → 409 on the user's next click. A reload on success is **not** an escape hatch here: the Live update rule above forbids it, so a tangled update is re-rendered through a fragment swap instead.
 
-The backend half — the `support.OptimisticLock` helper family, `Mission`'s manual section
+The backend half — the `kernel.OptimisticLock` helper family, `Mission`'s manual section
 counters, the `…WithinTransaction` pattern, bulk-updates-inside-loops and the find-or-create
 retry — lives in [`backend/CLAUDE.md`](../backend/CLAUDE.md).

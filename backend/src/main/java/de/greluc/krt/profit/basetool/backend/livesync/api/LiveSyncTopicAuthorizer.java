@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.livesync.api;
 
-import de.greluc.krt.profit.basetool.backend.support.LiveSyncAuthorization;
-import de.greluc.krt.profit.basetool.backend.support.LiveSyncTopic;
 import java.util.Set;
 import org.jetbrains.annotations.NotNull;
 

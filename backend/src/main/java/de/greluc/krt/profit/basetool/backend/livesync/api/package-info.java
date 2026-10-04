@@ -18,9 +18,9 @@
  */
 
 /**
- * The livesync module's SPI: {@link
- * de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicAuthorizer}, through which the
- * owning modules decide who may join their rooms (ADR-0143, plan §5.3).
+ * The livesync module's published API: the topic vocabulary and the {@link
+ * de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicAuthorizer} SPI, through which
+ * the owning modules decide who may join their rooms (ADR-0143, plan §5.3).
  */
 @NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.livesync.api;

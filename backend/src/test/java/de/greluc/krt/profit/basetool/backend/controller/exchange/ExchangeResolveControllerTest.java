@@ -24,6 +24,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.exchange.api.ActingMemberHeader;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeClient;
@@ -43,8 +45,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.ActingMemberHeader;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Set;

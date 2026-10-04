@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.support.LiveSyncFanoutProperties;
+import de.greluc.krt.profit.basetool.backend.livesync.internal.LiveSyncFanoutProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;

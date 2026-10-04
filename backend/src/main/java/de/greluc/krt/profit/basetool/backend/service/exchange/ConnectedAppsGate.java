@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.service.exchange;
 
-import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
-import de.greluc.krt.profit.basetool.backend.support.ConnectedAppsProperties;
-import de.greluc.krt.profit.basetool.backend.support.SubjectAuthentication;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ConnectedAppsProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject;
+import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.security.core.Authentication;

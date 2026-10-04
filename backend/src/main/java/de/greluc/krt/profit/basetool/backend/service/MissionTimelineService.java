@@ -19,13 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.enforceSectionVersion;
+import static de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions.enforceSectionVersion;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions.MissionSection;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionObjective;
 import de.greluc.krt.profit.basetool.backend.model.MissionObjectiveKind;
@@ -33,8 +35,6 @@ import de.greluc.krt.profit.basetool.backend.model.MissionStep;
 import de.greluc.krt.profit.basetool.backend.repository.MissionObjectiveRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionStepRepository;
-import de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.MissionSection;
-import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;

@@ -22,13 +22,13 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static de.greluc.krt.profit.basetool.backend.util.BankAmounts.plain;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.model.BankHolder;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.math.BigDecimal;
 import java.util.Map;
 import java.util.UUID;

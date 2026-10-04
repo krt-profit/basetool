@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.service.PersonalInventoryItemService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

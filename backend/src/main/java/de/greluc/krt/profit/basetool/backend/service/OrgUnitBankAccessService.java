@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountApprovalLimit;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
@@ -60,8 +62,6 @@ import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestReposi
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.util.BankAmounts;
 import java.math.BigDecimal;
 import java.time.Instant;

@@ -1,0 +1,191 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.platform.api;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.List;
+import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
+import org.junit.jupiter.api.Test;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+
+/**
+ * Tests for the single identity seam (ADR-0129): it must accept an authentication that carries a
+ * subject without a token, and must never invent a subject for one that has none.
+ */
+class AuthenticatedSubjectTest {
+
+  private static final String SUB = "44444444-4444-4444-4444-444444444444";
+
+  /** Stands in for the acting-member authentication: a subject, no token. */
+  private static final class TokenlessSubject extends AbstractAuthenticationToken
+      implements SubjectAuthentication {
+
+    private final String subject;
+
+    TokenlessSubject(String subject) {
+      super(List.of());
+      this.subject = subject;
+      setAuthenticated(true);
+    }
+
+    @Override
+    public Object getCredentials() {
+      return "";
+    }
+
+    @Override
+    public Object getPrincipal() {
+      return subject;
+    }
+
+    @Override
+    public @NotNull String subject() {
+      return subject;
+    }
+  }
+
+  private static Jwt jwt(String subject) {
+    Jwt.Builder builder = Jwt.withTokenValue("t").header("alg", "none").claim("scope", "read");
+    if (subject != null) {
+      builder.subject(subject);
+    }
+    return builder.build();
+  }
+
+  /** The ordinary case: a bearer token's {@code sub}. */
+  @Test
+  void readsTheSubjectOfABearerToken() {
+    assertThat(AuthenticatedSubject.of(new JwtAuthenticationToken(jwt(SUB), List.of())))
+        .contains(SUB);
+  }
+
+  /**
+   * A token-less authentication that advertises a subject is accepted.
+   *
+   * <p>The half that failed closed: {@code CurrentUserArgumentResolver} demanded a {@code
+   * JwtAuthenticationToken} and 403'd every ingest-gateway call at argument resolution.
+   */
+  @Test
+  void readsTheSubjectOfATokenlessAuthenticationThatAdvertisesOne() {
+    assertThat(AuthenticatedSubject.of(new TokenlessSubject(SUB))).contains(SUB);
+  }
+
+  /**
+   * Verifies that a username/password authentication yields no subject, since its name is a
+   * callsign that must not reach the {@code userId} MDC field (REQ-OBS-004).
+   */
+  @Test
+  void refusesToReadANameThatIsACallsign() {
+    UsernamePasswordAuthenticationToken auth =
+        new UsernamePasswordAuthenticationToken("Redshift", "secret", List.of());
+
+    assertThat(AuthenticatedSubject.of(auth)).isEmpty();
+  }
+
+  /** An anonymous caller is not a subject, even though the token reports itself authenticated. */
+  @Test
+  void treatsAnAnonymousCallerAsNoSubject() {
+    AnonymousAuthenticationToken anonymous =
+        new AnonymousAuthenticationToken(
+            "key", "anon", List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS")));
+
+    assertThat(AuthenticatedSubject.of(anonymous)).isEmpty();
+  }
+
+  /** No authentication at all. */
+  @Test
+  void yieldsNothingForNoAuthentication() {
+    assertThat(AuthenticatedSubject.of(null)).isEmpty();
+  }
+
+  /** A token without a {@code sub} claim is fail-closed, not blank-valued. */
+  @Test
+  void yieldsNothingForATokenWithoutASubjectClaim() {
+    assertThat(AuthenticatedSubject.of(new JwtAuthenticationToken(jwt(null), List.of()))).isEmpty();
+  }
+
+  /** A blank subject is treated as absent rather than as an identity. */
+  @Test
+  void yieldsNothingForABlankSubject() {
+    assertThat(AuthenticatedSubject.of(new TokenlessSubject("   "))).isEmpty();
+  }
+
+  /** {@code idOf} parses the subject as a member id. */
+  @Test
+  void parsesTheSubjectAsAMemberId() {
+    assertThat(AuthenticatedSubject.idOf(new TokenlessSubject(SUB))).contains(UUID.fromString(SUB));
+  }
+
+  /**
+   * A subject that is not a UUID yields no member id.
+   *
+   * <p>Service accounts and machine callers have UUID subjects here too, but a differently
+   * configured realm need not — and the consent gate treats "not a member id" as "not a person who
+   * can accept anything", which only works if this returns empty rather than throwing.
+   */
+  @Test
+  void yieldsNoMemberIdForASubjectThatIsNotAUuid() {
+    assertThat(AuthenticatedSubject.idOf(new TokenlessSubject("service-account-gateway")))
+        .isEmpty();
+  }
+
+  /** The authorized party is the token's {@code azp}, read through the same seam as the subject. */
+  @Test
+  void readsTheAuthorizedPartyFromTheToken() {
+    Jwt jwt =
+        Jwt.withTokenValue("t")
+            .header("alg", "none")
+            .subject(SUB)
+            .claim("azp", "basetool-android")
+            .build();
+
+    assertThat(AuthenticatedSubject.authorizedParty(new JwtAuthenticationToken(jwt, List.of())))
+        .contains("basetool-android");
+  }
+
+  /**
+   * A token without the claim yields empty rather than a blank or a guess.
+   *
+   * <p>The distinction is load-bearing for the client attribution (REQ-OBS-018): "no azp" is a
+   * Keycloak mapper regression, and a consumer that cannot tell it from "an unknown client" would
+   * point the operator at the wrong system.
+   */
+  @Test
+  void yieldsNoAuthorizedPartyWhenTheClaimIsAbsent() {
+    Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject(SUB).build();
+
+    assertThat(AuthenticatedSubject.authorizedParty(new JwtAuthenticationToken(jwt, List.of())))
+        .isEmpty();
+  }
+
+  /** A token-less acting member has a subject but no authorized party, and that is not an error. */
+  @Test
+  void yieldsNoAuthorizedPartyForATokenlessAuthentication() {
+    assertThat(AuthenticatedSubject.authorizedParty(new TokenlessSubject(SUB))).isEmpty();
+    assertThat(AuthenticatedSubject.authorizedParty(null)).isEmpty();
+  }
+}

@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.exception;
 
+import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
-import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import jakarta.persistence.EntityNotFoundException;

@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.task;
 
+import de.greluc.krt.profit.basetool.backend.identity.internal.RejectedRegistrationRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.RejectedRegistrationRetentionService;
-import de.greluc.krt.profit.basetool.backend.support.RejectedRegistrationRetentionProperties;
 import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;

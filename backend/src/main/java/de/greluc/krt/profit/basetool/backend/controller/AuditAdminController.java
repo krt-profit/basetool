@@ -21,12 +21,12 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDomain;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.dto.AuditEventDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.AuditPurgeResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.AuditReportService;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.web.PdfResponses;
 import de.greluc.krt.profit.basetool.backend.web.UserZone;

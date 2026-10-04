@@ -129,6 +129,13 @@ and `AuthHelperService` without its delegations to `OwnerScopeService` (−1).
 
 After the platform SPIs (plan §7.3, P1-8, 2026-10-04): **112 class edges in 30 module pairs**.
 
+After the `support` split (plan §7.3, P1-9, 2026-10-04): **110 class edges in 29 module pairs**.
+`ClientAttribution` asks the platform's `ClientDirectory` SPI, which the exchange implements,
+instead of reading `IngestGatewayProperties` and `KnownExchangeClients` itself (−2, the
+`platform -> exchange` pair). The split moved `RequestMemo`, `Roles`, `Permissions`,
+`ProblemResponseFactory` and `AppProblemProperties` from `platform` to `kernel`; that added no
+edge, since every module may depend on either.
+
 **Acceptance**
 
 - [x] The backend's frozen baseline equals the rule's current violations.
@@ -182,21 +189,28 @@ declared in the same pull request that creates it (plan §5.2, §5.7, step P1-13
   an undeclared module.
 
 A module without an `api` package keeps all its types in its base package, which is its unnamed
-interface: `kernel` today. Its dependents allow it by bare name (`"kernel"`, not
+interface: `kernel` today. A module that publishes nothing yet keeps every type below its base
+package and outside an `api` package, so it exposes no type at all; no declaration allows it,
+and Spring Modulith reports any module that reaches into it: `mission` today, until its module
+API exists (plan §7.5). Its dependents allow it by bare name (`"kernel"`, not
 `"kernel::api"`), it publishes no named interface, and no type lies below its base package. A
 module that may depend on no declared module says so with `allowedDependencies = {}`: the
 annotation's default is Spring Modulith's "everything allowed" sentinel, not an empty list.
 
-Declared on `main`: `audit`, `bank`, `exchange`, `identity`, `inventory`, `joborder`, `kernel`,
-`livesync`, `materialexchange`, `notification`, `orgunit`, `privacy`, `refinery`, `scope` (floor 14).
-`orgunit.web` is internal to `orgunit`.
+Declared on `main`: `audit`, `bank`, `catalogue`, `exchange`, `identity`, `inventory`, `joborder`,
+`kernel`, `livesync`, `materialexchange`, `mission`, `notification`, `orgunit`, `platform`,
+`privacy`, `refinery`, `scope` (floor 17). `orgunit.web` and every `<module>.internal` package are
+internal to their module.
 
 **Acceptance**
 
 - [x] The module packages found in the compiled backend equal `ModularityTest.DECLARED_MODULES`,
-      which equals the detected Modulith modules, with a floor of 14.
+      which equals the detected Modulith modules, with a floor of 17.
 - [x] Each declared module's only named interface is `api`, and it contains every top-level type
-      of the module's `api` package tree and nothing outside it.
+      of the module's `api` package tree and nothing outside it — except `kernel`, whose types all
+      lie in its base package, and a module that publishes nothing, which has no named interface
+      and no type in its base package or an `api` package (a check run against the kernel proves
+      it fails).
 - [x] Each declaration's `allowedDependencies` equals the set the domain map derives.
 - [x] A planted fixture shaped like a backend module proves that a module reaching past another's
       `api` into its `internal` package, and a module depending on an `api` its declaration does not

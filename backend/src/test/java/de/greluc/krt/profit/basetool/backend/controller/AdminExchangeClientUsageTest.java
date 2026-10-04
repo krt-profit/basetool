@@ -24,6 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeClient;
@@ -36,7 +37,6 @@ import de.greluc.krt.profit.basetool.backend.repository.ExchangeClientRevocation
 import de.greluc.krt.profit.basetool.backend.repository.ExchangeInstallationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;

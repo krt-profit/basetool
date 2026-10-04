@@ -24,8 +24,8 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.support.LiveSyncTopic;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;

@@ -260,7 +260,7 @@ negotiation; a member cannot register interest in their own offer. Registration 
 ### REQ-MARKET-007 — Offer lifecycle (edit / deactivate), owner-only, optimistic-locked
 
 Only the owner may edit an offer's **offered amount and remark** ("Angebot bearbeiten",
-version-guarded via `support.OptimisticLock`, 409 on mismatch; a raised amount is re-validated
+version-guarded via `kernel.OptimisticLock`, 409 on mismatch; a raised amount is re-validated
 against the item's current stock, 400 if it exceeds it) or deactivate it (from the board detail or
 by un-checking the Lager checkbox). A deactivated offer is retained for the audit trail but never
 listed.
@@ -577,7 +577,7 @@ non-whole item quantity is rejected (400).
 ### REQ-MARKET-016 — Request lifecycle (edit / deactivate), owner-only, optimistic-locked
 
 Only the owner may edit a request's **desired quantity, minimum quality and description** ("Gesuch
-bearbeiten", version-guarded via `support.OptimisticLock`, 409 on mismatch; a material request
+bearbeiten", version-guarded via `kernel.OptimisticLock`, 409 on mismatch; a material request
 re-validates the amount as positive, an item request as a positive whole number) or deactivate it
 ("Gesuch zurückziehen"). A deactivated request is retained for the audit trail but never listed. The
 subject (material / item) itself is fixed once posted — an edit changes only quantity/quality/remark.

@@ -25,7 +25,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-import de.greluc.krt.profit.basetool.backend.support.SubjectAuthentication;
+import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;

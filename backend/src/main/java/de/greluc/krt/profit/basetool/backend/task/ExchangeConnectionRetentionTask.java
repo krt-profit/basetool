@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.task;
 
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeRetentionProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeConnectionRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeConnectionRetentionService;
-import de.greluc.krt.profit.basetool.backend.support.ExchangeChangeRetentionProperties;
-import de.greluc.krt.profit.basetool.backend.support.ExchangeConnectionRetentionProperties;
 import jakarta.annotation.PostConstruct;
 import java.time.Clock;
 import lombok.RequiredArgsConstructor;
