@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
-import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.ConsolidateAccountRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
@@ -323,7 +323,7 @@ public class UserController {
   public UserDto getUserById(@PathVariable @NotNull UUID id) {
     User user = userService.findById(id);
     UserDto dto = userMapper.toDto(user);
-    if (isCrossSquadronNonAdmin(user)) {
+    if (userService.isCrossSquadronForNonAdmin(user.getId())) {
       return redactToPeerShape(dto);
     }
     return redactForPeerIfNeeded(dto);
@@ -360,25 +360,6 @@ public class UserController {
     return allKinds
         ? orgUnitMembershipQueryService.listDirectMembershipOptions(id)
         : orgUnitMembershipQueryService.listOptionsForUser(id);
-  }
-
-  /**
-   * Returns whether the caller is a non-admin who can see none of the target user's Staffeln via
-   * {@code OwnerScopeService}. A target without any squadron counts as cross-squadron.
-   *
-   * @param user target user resolved by id; never {@code null}
-   * @return {@code true} if the caller is a non-admin and shares none of the user's squadrons
-   */
-  private boolean isCrossSquadronNonAdmin(@NotNull User user) {
-    if (authHelperService.isAdmin()) {
-      return false;
-    }
-    List<UUID> targetSquadronIds =
-        orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(user.getId());
-    if (targetSquadronIds.isEmpty()) {
-      return true;
-    }
-    return targetSquadronIds.stream().noneMatch(authHelperService::canSeeSquadron);
   }
 
   /**

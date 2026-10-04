@@ -435,6 +435,7 @@ Every finding that is not DONE or not CONFIRMED, grouped by the priority of the 
   exchange registry added a new copy, `blankToNull`
   (`backend/src/main/java/…/service/exchange/ExchangeRegistryService.java:413-416`). The copy folds
   into `StringNormalization`, which becomes part of the kernel; a dedicated gate is not worth it.
+  **Done 2026-10-04:** the registry calls `StringNormalization.trimToNull`, the copy is gone.
 - **BE-SIMP-10** (Backend · PARTIAL · ADJUSTED · P1 → P3). The backend half is done (#2011, 659
   names; 19 deliberate ones remain, mostly clashes between the Jakarta and JetBrains `@NotNull`).
   The frontend half never ran: 482 inline fully qualified names in 42 files today (the audit counted
@@ -641,7 +642,7 @@ open.
 | J-REDACT | Peer-redactor extraction, explicit full-field reconstruction kept | #1256 (`ee34c23c`) | DONE | now `MissionPeerRedactor` (`backend/src/main/java/…/support/MissionPeerRedactor.java:56-213`); rule in `backend/src/test/java/…/ArchitectureTest.java:1129-1162` | ADJUSTED | Moves into the mission module; completeness for nested records is untested (PRV-10). |
 | J-ROLES | `Roles.HAS_ROLE_*` constants for `@PreAuthorize` | #1256 (`425c08e7`) | DONE | `backend/src/main/java/…/support/Roles.java:83-110`; 126 uses in 51 files | CONFIRMED | Part of the platform's access core. |
 | J-S15 | Four view assemblers (item #15) | #1256 | PARTIAL | `BankDashboardViewAssembler`, `MissionDetailModelBuilder` and `SecurityHeaders` exist; `HangarPageModelLoader` was never built | ADJUSTED | Assemblers move with their domain; `SecurityHeaders` stays the one CSP policy. |
-| J-S16 | Import-engine split (item #16, topic 11) | #1256 | DONE | `HangarImportService` 851 → 208 lines; `BlueprintFuzzyMatcher.topMatches` (`backend/src/main/java/…/service/BlueprintFuzzyMatcher.java:97`) serves the refinery import | ADJUSTED | Rename and relocate the now generic matcher (PRV-14); the parsers keep their size caps. |
+| J-S16 | Import-engine split (item #16, topic 11) | #1256 | DONE | `HangarImportService` 851 → 208 lines; `BlueprintFuzzyMatcher.topMatches` (`backend/src/main/java/…/service/BlueprintFuzzyMatcher.java:97`) serves the refinery import | ADJUSTED | Rename and relocate the now generic matcher (PRV-14); the parsers keep their size caps. **Done 2026-10-04:** `kernel.FuzzyNameMatcher` (`topMatches`); the blueprint-only `topSuggestions` wrapper moved into `BlueprintImportService`, its only caller. |
 | J-SCWIKI | `ScWikiOrphanSweep` gates the tombstone sweep on a non-empty seen set | #1256 (`8a64acb3`) | DONE | `backend/src/main/java/…/service/scwiki/ScWikiOrphanSweep.java:58` | CONFIRMED | Catalogue internal. |
 | J-CACHEDCAT | `CachedCatalogListLoader`, with its adoption left as a "mechanical follow-up" | #1256 (hangar only) | PARTIAL | one consumer (`frontend/src/main/java/…/controller/HangarPageController.java:88`); 28 `getCached` sites in 10 controllers | REPRIORITISED | Folds into the per-domain typed clients (PRV-07, §5.9). |
 | J-T7-1 | `OrgUnitMembershipQueryService` split | #1256 | DONE | 463 lines, used by 12 classes of 7 domains | CONFIRMED | Seed of the org-unit read API. |
@@ -994,7 +995,8 @@ is listed with where the plan adopts it.
   ArchUnit messages that ask for a code comment. *Adopted* through §15 of the plan, which corrects
   arc42 §4.1 and lists the ArchUnit messages; the Javadoc pointer goes with the presence parity test
   (PRV-14).
-- **PRV-14 — Small leftovers.** Rename and relocate `BlueprintFuzzyMatcher`; split
+- **PRV-14 — Small leftovers.** Rename and relocate `BlueprintFuzzyMatcher` (done 2026-10-04:
+  `kernel.FuzzyNameMatcher`); split
   `GlobalExceptionHandler` by exception family, keeping one advice; `LikePatterns.escape` in the
   blueprint search; a presence heartbeat parity test; a test forbidding `${validatedValue}`;
   Keycloak hardening step 11 on the owner's list. *Not adopted as plan steps*: they are independent

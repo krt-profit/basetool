@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
-import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
+import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.UUID;

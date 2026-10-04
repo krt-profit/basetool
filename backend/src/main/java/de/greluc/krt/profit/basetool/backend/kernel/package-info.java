@@ -17,13 +17,5 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto.exchange;
-
-/**
- * One non-hidden location as the exchange catalogue reads it from the database.
- *
- * @param name the location name
- * @param uexCityId the UEX id of the linked city, or {@code null}
- * @param uexSpaceStationId the UEX id of the linked space station, or {@code null}
- */
-public record ExchangeLocationRow(String name, Integer uexCityId, Integer uexSpaceStationId) {}
+/** The kernel: domain-free primitives every module may use (plan §5.1 rank 0). */
+package de.greluc.krt.profit.basetool.backend.kernel;

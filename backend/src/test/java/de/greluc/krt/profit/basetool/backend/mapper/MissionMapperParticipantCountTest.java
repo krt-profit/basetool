@@ -34,7 +34,7 @@ import org.junit.jupiter.api.Test;
  */
 class MissionMapperParticipantCountTest {
 
-  private final MissionMapper mapper = new MissionMapperImpl(null, null, null, null);
+  private final MissionMapper mapper = new MissionMapperImpl(null, null, null, null, null);
 
   @Test
   void shouldReturnZeroCounts_WhenNoParticipants() {

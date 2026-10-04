@@ -17,10 +17,18 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model;
+package de.greluc.krt.profit.basetool.backend.orgunit.web;
 
-/** Enumeration of Payout Preference values. */
-public enum PayoutPreference {
-  PAYOUT,
-  DONATE
-}
+import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichLeadershipRole;
+import jakarta.validation.constraints.NotNull;
+import java.util.UUID;
+
+/**
+ * Request body to add a Bereichsleitung member or change their role (REQ-ORG-017). The user must
+ * hold no Staffel membership; an existing membership on this Bereich is updated in place, otherwise
+ * one is created.
+ *
+ * @param userId the user to grant the Bereichsleitung role to; required
+ * @param role the Bereichsleitung role (Leiter / Koordinator / Operator); required
+ */
+public record AddBereichLeaderRequest(@NotNull UUID userId, @NotNull BereichLeadershipRole role) {}

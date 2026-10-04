@@ -24,11 +24,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
@@ -212,15 +212,11 @@ class UserControllerTest {
 
   @Test
   void getUserById_officerFromForeignSquadron_redactsPii() {
-    when(authHelperService.isAdmin()).thenReturn(false);
     UUID userId = UUID.randomUUID();
-    UUID foreignSquadronId = UUID.randomUUID();
-    when(authHelperService.canSeeSquadron(foreignSquadronId)).thenReturn(false);
+    when(userService.isCrossSquadronForNonAdmin(userId)).thenReturn(true);
 
     User entity = new User();
     entity.setId(userId);
-    when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(userId))
-        .thenReturn(java.util.List.of(foreignSquadronId));
     UserDto fullDto = fullPiiUserDto(userId);
     when(userService.findById(userId)).thenReturn(entity);
     when(userMapper.toDto(entity)).thenReturn(fullDto);
@@ -234,12 +230,10 @@ class UserControllerTest {
 
   @Test
   void getUserById_unassignedUser_redactsPiiForNonAdmin() {
-    when(authHelperService.isAdmin()).thenReturn(false);
     UUID userId = UUID.randomUUID();
     User entity = new User();
     entity.setId(userId);
-    when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(userId))
-        .thenReturn(java.util.List.of());
+    when(userService.isCrossSquadronForNonAdmin(userId)).thenReturn(true);
     UserDto fullDto = fullPiiUserDto(userId);
     when(userService.findById(userId)).thenReturn(entity);
     when(userMapper.toDto(entity)).thenReturn(fullDto);
@@ -251,15 +245,11 @@ class UserControllerTest {
 
   @Test
   void getUserById_sameSquadronOfficer_keepsPii() {
-    when(authHelperService.isAdmin()).thenReturn(false);
     UUID userId = UUID.randomUUID();
-    UUID sharedSquadronId = UUID.randomUUID();
-    when(authHelperService.canSeeSquadron(sharedSquadronId)).thenReturn(true);
+    when(userService.isCrossSquadronForNonAdmin(userId)).thenReturn(false);
 
     User entity = new User();
     entity.setId(userId);
-    when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(userId))
-        .thenReturn(java.util.List.of(sharedSquadronId));
     UserDto fullDto = fullPiiUserDto(userId);
     when(userService.findById(userId)).thenReturn(entity);
     when(userMapper.toDto(entity)).thenReturn(fullDto);

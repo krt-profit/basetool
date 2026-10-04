@@ -87,6 +87,16 @@ The first module package is `audit.api`, the audit module's published interface 
 entity, its repository, the viewer and the retention purge are the module's internals and still sit
 in the layer packages.
 
+The Phase 1 re-homings (plan §7.3) added four more: `kernel` (handle anonymisation, the handle
+scrubber and the generic `FuzzyNameMatcher`), `identity.api` (`PayoutPreference`),
+`orgunit.api` (`BereichLeadershipRole` and the observer SPI `MembershipChangeObserver`) and
+`orgunit.web` (the Bereich-leader and Grand-Admiral request bodies). The org chart mirrors the
+leadership ranks as that observer, inside the transaction of the rank change, so the org-unit
+services no longer know `OrgChartService`. The exchange's row records are nested in the
+repositories that produce them, the catalogue's `ShipTypeMapper` maps ship types, and
+`AuthHelperService` no longer delegates to `OwnerScopeService`: callers ask the scope API
+directly.
+
 ## 5.3 Level 2 — inside `frontend`
 
 | Package | What lives there |

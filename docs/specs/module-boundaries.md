@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-02.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-04.
 > **Owner area:** MOD · **Related ADRs:** none yet (plan step 0.1 records the module ADRs)
 
 # Backend module boundaries
@@ -36,10 +36,13 @@ assigns every top-level backend production type to exactly one module. It is lin
 A nested, local or anonymous class belongs to its top-level class, and a generated MapStruct
 `XMapperImpl` to the `@Mapper` type `XMapper` it implements. The rules are a faithful port of the
 audit's classification (`docs/archive/domain-modularisation-audit-2026-09/scripts/10-backend-domains-classify.py`)
-with the behaviour-free re-homings of plan §7.3 applied (leadership into `orgunit`, the access core
-into `platform`, the scope kernel into `scope`, the 31 GDPR classes into `privacy`,
+with the behaviour-free re-homings of plan §7.3 applied (the leadership writes into `orgunit` and
+the Leitung view into `orgchart` — corrected 2026-10-04, the view was first mapped to `orgunit` —,
+the access core into `platform`, the scope kernel into `scope`, the 31 GDPR classes into `privacy`,
 `HandleAnonymisation` into `kernel`, `PayoutPreference` into `identity`, the composition root into
-`app`). Changing a class's target module is a reviewed edit of this file.
+`app`). Changing a class's target module is a reviewed edit of this file. Once a module's package
+exists, a `package` rule assigns its tree (`audit`, `kernel`, `identity`, `orgunit` today) and the
+`class` rules of the classes that moved into it are removed.
 
 **Acceptance**
 
@@ -116,6 +119,11 @@ and nine types that appear only in the descriptor of a called member or in an in
 while ArchUnit additionally sees one annotation class value (`@Mapper(uses = SquadronMapper.class)`
 in `UserMapper`) and the two `kernel → platform` edges of `AppException` and `AppExceptionKind` to
 `ErrorDisclosurePolicy`, which the plan's count left out as same-rank edges.
+
+Shrunk on 2026-10-04 to **129 class edges in 38 module pairs** by the Phase 1 re-homings of plan
+§7.3: the exchange row records nested in the repositories that produce them (−5), the catalogue
+`ShipTypeMapper` (−1), the org chart behind the org-unit module's `MembershipChangeObserver` (−2)
+and `AuthHelperService` without its delegations to `OwnerScopeService` (−1).
 
 **Acceptance**
 

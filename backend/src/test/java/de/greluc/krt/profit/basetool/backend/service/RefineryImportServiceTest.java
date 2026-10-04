@@ -26,6 +26,7 @@ import static org.mockito.Mockito.verify;
 
 import de.greluc.krt.profit.basetool.backend.config.RefineryImportProperties;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
 import de.greluc.krt.profit.basetool.backend.mapper.LocationMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialCategoryMapperImpl;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapperImpl;
@@ -150,7 +151,7 @@ class RefineryImportServiceTest {
             locationRepository,
             userRepository,
             aliasService,
-            new BlueprintFuzzyMatcher(),
+            new FuzzyNameMatcher(),
             BoundProperties.defaults(RefineryImportProperties.class),
             new MaterialMapperImpl(new MaterialCategoryMapperImpl()),
             Mappers.getMapper(LocationMapper.class),

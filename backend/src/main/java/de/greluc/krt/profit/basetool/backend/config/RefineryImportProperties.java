@@ -32,7 +32,7 @@ import org.springframework.validation.annotation.Validated;
  * Tuning of the refinery screenshot import's fuzzy material and method matching, under {@code
  * krt.refinery-import.*}.
  *
- * @param fuzzyAcceptThreshold the minimum {@code BlueprintFuzzyMatcher} score for auto-applying a
+ * @param fuzzyAcceptThreshold the minimum {@code FuzzyNameMatcher} score for auto-applying a
  *     material candidate, still flagged {@code LOW_CONFIDENCE_MATERIAL}
  * @param methodFuzzyAcceptThreshold the minimum score for accepting the nearest refining method
  * @param suggestionFloor the minimum score for a candidate to be offered as a suggestion

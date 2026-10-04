@@ -25,6 +25,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintExternalAliasSource;
 import de.greluc.krt.profit.basetool.backend.model.Material;
@@ -32,7 +33,6 @@ import de.greluc.krt.profit.basetool.backend.model.MaterialExternalAlias;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeCatalogKind;
-import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeItemKeyRow;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeItemRef;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeResolveRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeResolveResponse;
@@ -41,12 +41,12 @@ import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeResolveR
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintExternalAliasRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
+import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository.ExchangeItemKeyRow;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExternalAliasRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintFuzzyMatcher;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintNameNormalizer;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService;
@@ -91,7 +91,7 @@ class ExchangeResolveServiceTest {
             JsonMapper.builder().build(),
             blueprintProductService,
             new BlueprintNameNormalizer(),
-            new BlueprintFuzzyMatcher(),
+            new FuzzyNameMatcher(),
             blueprintAliasRepository,
             personalBlueprintRepository,
             gameItemRepository,
@@ -101,7 +101,7 @@ class ExchangeResolveServiceTest {
             blueprintProductService,
             importService,
             new BlueprintNameNormalizer(),
-            new BlueprintFuzzyMatcher(),
+            new FuzzyNameMatcher(),
             blueprintRepository,
             gameItemRepository,
             materialRepository,

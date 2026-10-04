@@ -121,7 +121,8 @@ class JobOrderServiceAssigneeAndListTest {
             jobOrderItemService,
             jobOrderStockProjectionService,
             null,
-            null);
+            null,
+            ownerScopeService);
     queryService =
         new JobOrderQueryService(
             jobOrderRepository,

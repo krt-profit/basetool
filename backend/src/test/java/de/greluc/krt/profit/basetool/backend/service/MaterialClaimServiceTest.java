@@ -503,7 +503,7 @@ class MaterialClaimServiceTest {
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       when(authHelperService.isAdmin()).thenReturn(false);
       when(ownerScopeService.hasRoleInOrgUnit(SK_ID, "LOGISTICIAN")).thenReturn(false);
-      when(authHelperService.canEditOrgUnit(SQUADRON_A)).thenReturn(false);
+      when(ownerScopeService.canEditOrgUnit(SQUADRON_A)).thenReturn(false);
 
       assertThrows(
           org.springframework.security.access.AccessDeniedException.class,
@@ -517,7 +517,7 @@ class MaterialClaimServiceTest {
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       when(authHelperService.isAdmin()).thenReturn(false);
       when(ownerScopeService.hasRoleInOrgUnit(SK_ID, "LOGISTICIAN")).thenReturn(false);
-      when(authHelperService.canEditOrgUnit(SQUADRON_A)).thenReturn(true);
+      when(ownerScopeService.canEditOrgUnit(SQUADRON_A)).thenReturn(true);
       when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
               ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
           .thenReturn(List.of());

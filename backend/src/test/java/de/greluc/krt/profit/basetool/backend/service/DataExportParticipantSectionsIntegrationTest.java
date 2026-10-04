@@ -21,10 +21,10 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.kernel.HandleScrubber;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.DataExportSections;
-import de.greluc.krt.profit.basetool.backend.support.HandleScrubber;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;

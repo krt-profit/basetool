@@ -31,10 +31,11 @@ import de.greluc.krt.profit.basetool.backend.model.OrgChartScope;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichLeadershipRole;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipChangeObserver;
 import de.greluc.krt.profit.basetool.backend.repository.OrgChartPositionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -61,7 +62,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class OrgChartService {
+public class OrgChartService implements MembershipChangeObserver {
 
   /** Maximum number of Kommandos (COMMAND_LEAD rows) per Staffel. */
   static final int MAX_COMMAND_LEADS = 4;
@@ -269,8 +270,9 @@ public class OrgChartService {
    * @param userId the appointed account; never {@code null}.
    * @param role the Bereich leadership role granted; never {@code null}.
    */
+  @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public void mirrorBereichRole(
+  public void onBereichRoleGranted(
       @NotNull UUID bereichId, @NotNull UUID userId, @NotNull BereichLeadershipRole role) {
     clearUnitSeatsForUser(bereichId, userId);
     OrgChartPositionType type =
@@ -293,8 +295,9 @@ public class OrgChartService {
    * @param organisationsleitungId the OL the membership is on; never {@code null}.
    * @param userId the OL member's account; never {@code null}.
    */
+  @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public void mirrorOlMember(@NotNull UUID organisationsleitungId, @NotNull UUID userId) {
+  public void onOlMemberAdded(@NotNull UUID organisationsleitungId, @NotNull UUID userId) {
     if (positionRepository.findByOrgUnitIdAndUserId(organisationsleitungId, userId).isEmpty()
         && !reuseFreeTextSeat(
             organisationsleitungId, OrgChartPositionType.OL_MEMBER, null, userId)) {
@@ -310,8 +313,10 @@ public class OrgChartService {
    * @param userId the toggled account; never {@code null}.
    * @param isLead the new lead state.
    */
+  @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public void mirrorSkLead(@NotNull UUID specialCommandId, @NotNull UUID userId, boolean isLead) {
+  public void onSkLeadChanged(
+      @NotNull UUID specialCommandId, @NotNull UUID userId, boolean isLead) {
     if (isLead) {
       if (positionRepository.findByOrgUnitIdAndUserId(specialCommandId, userId).isEmpty()
           && !reuseFreeTextSeat(
@@ -343,8 +348,9 @@ public class OrgChartService {
    * @param rank the squadron rank assigned; must be a squadron rank.
    * @param group the bound Kommandogruppe, or {@code null} for a Staffelleiter / general Ensign.
    */
+  @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public void mirrorSquadronRank(
+  public void onSquadronRankAssigned(
       @NotNull UUID squadronId,
       @NotNull UUID userId,
       @NotNull MembershipRole rank,
@@ -375,8 +381,9 @@ public class OrgChartService {
    * @param squadronId the Staffel; never {@code null}.
    * @param userId the member whose squadron seat to clear; never {@code null}.
    */
+  @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public void mirrorRemoveSquadronRank(@NotNull UUID squadronId, @NotNull UUID userId) {
+  public void onSquadronRankCleared(@NotNull UUID squadronId, @NotNull UUID userId) {
     clearSquadronSeatForUser(squadronId, userId);
   }
 
@@ -388,8 +395,9 @@ public class OrgChartService {
    * @param orgUnitId the org unit the membership pointed at; never {@code null}.
    * @param userId the user whose seat to remove; never {@code null}.
    */
+  @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public void mirrorRemoveUnitSeat(@NotNull UUID orgUnitId, @NotNull UUID userId) {
+  public void onUnitMembershipRemoved(@NotNull UUID orgUnitId, @NotNull UUID userId) {
     clearUnitSeatsForUser(orgUnitId, userId);
   }
 
@@ -399,8 +407,9 @@ public class OrgChartService {
    *
    * @param group the freshly-created Kommandogruppe; never {@code null}.
    */
+  @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public void mirrorCreateKommandoGroup(@NotNull KommandoGroup group) {
+  public void onKommandoGroupCreated(@NotNull KommandoGroup group) {
     OrgChartPosition command = new OrgChartPosition();
     command.setPositionType(OrgChartPositionType.COMMAND_LEAD);
     command.setOrgUnit(group.getSquadron());
@@ -416,8 +425,9 @@ public class OrgChartService {
    *
    * @param group the updated Kommandogruppe; never {@code null}.
    */
+  @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public void mirrorUpdateKommandoGroup(@NotNull KommandoGroup group) {
+  public void onKommandoGroupUpdated(@NotNull KommandoGroup group) {
     positionRepository
         .findByKommandoGroupId(group.getId())
         .ifPresent(
@@ -434,8 +444,9 @@ public class OrgChartService {
    *
    * @param kommandoGroupId the deleted group's id; never {@code null}.
    */
+  @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public void mirrorDeleteKommandoGroup(@NotNull UUID kommandoGroupId) {
+  public void onKommandoGroupDeleted(@NotNull UUID kommandoGroupId) {
     positionRepository.findByKommandoGroupId(kommandoGroupId).ifPresent(positionRepository::delete);
   }
 

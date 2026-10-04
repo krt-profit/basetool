@@ -633,6 +633,36 @@ Cheap moves that break many cycles without changing behaviour:
   instead of the entity — **done 2026-10-04** (P1-7): no caller used the row; the two
   `UexRefinerySyncService` calls that handed it through `SyncChunkWriter.inNewTransaction(Supplier)`
   now use `runInNewTransaction(Runnable)`.
+  The re-homings P1-1 … P1-6 are **done 2026-10-04**; the module baseline shrank from 138 to 129
+  edges (38 module pairs):
+  - P1-1: `BereichLeadershipRole` moved to `orgunit.api`, `GrandAdmiralRequest` and
+    `AddBereichLeaderRequest` to `orgunit.web` (the latter had to move with the enum, or
+    `model ⇄ orgunit` would have closed a package cycle). The Leitung view (`Leitung*`) is now
+    assigned to `orgchart`; it was mapped to `orgunit`. The org chart sits behind the observer SPI
+    `orgunit.api.MembershipChangeObserver` (`@ObserverSpi`), which `OrgChartService` implements with
+    its nine `MANDATORY` mirror methods, so `OrgUnitMembershipService` and `KommandoGroupService` no
+    longer know it (−2 edges). *Correction:* `AreaLeadershipDto` cannot move alone — it nests
+    `OrgChartNodeDto` and is nested by `OrgChartDto`/`BereichChartDto`, so a lone move closes a
+    `model ⇄ orgchart` package cycle; it moves with the org chart's DTOs in Phase 2 and stays
+    assigned to `orgchart` by its `class` rule until then.
+  - P1-2: `PayoutPreference` moved to `identity.api` (no edge change: it was assigned by a `class`
+    rule).
+  - P1-3: `HandleAnonymisation` and `HandleScrubber` moved to `kernel`. *Correction:*
+    `HandleSpellings` reads the `User` entity, so the kernel cannot hold it; it stays a `privacy`
+    class until the GDPR participants of §7.6.
+  - P1-4: the five exchange row records are nested in the repositories that produce them
+    (`ShipRepository`, `BlueprintRepository`, `GameItemRepository`, `LocationRepository`,
+    `InventoryItemRepository`); the JPQL constructor expressions name the binary nested-class name
+    (`…Repository$ExchangeShipRow`) (−5 edges).
+  - P1-5: catalogue `ShipTypeMapper`; `ShipMapper` and `MissionMapper` use it, `HangarService`
+    no longer needs `ShipMapper` (−1 edge).
+  - P1-6: `AuthHelperService` lost `currentSquadronId`, `canSeeSquadron`, `canEditSquadron`,
+    `canEditOrgUnit` and its `ApplicationContext` lookup (−1 edge). *Correction:* none of the 18
+    `@authHelperService` SpEL references used them (all are `isMemberOrAbove()`), so no SpEL and no
+    authorization-matrix line changed. `JobOrderService` and `MaterialClaimService` call
+    `OwnerScopeService` directly; `UserController`'s cross-squadron check moved into
+    `UserService.isCrossSquadronForNonAdmin`, because a controller call would have added an
+    `identity -> scope` edge.
 - The platform SPIs of §5.3 (`ActorHandleResolver`, `RetentionParticipant`, `RecipientDirectory`,
   `LiveSyncTopicAuthorizer`, `ActiveOrgUnitProvider`) — they remove 21 upward edges.
 - `support` split into the kernel (`RequestMemo`, `StringNormalization`, `OptimisticLock`,

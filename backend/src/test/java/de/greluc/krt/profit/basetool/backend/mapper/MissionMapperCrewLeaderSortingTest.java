@@ -43,7 +43,7 @@ import org.junit.jupiter.api.Test;
  */
 class MissionMapperCrewLeaderSortingTest {
 
-  private final MissionMapper mapper = new MissionMapperImpl(null, null, null, null);
+  private final MissionMapper mapper = new MissionMapperImpl(null, null, null, null, null);
 
   @Test
   void shouldReturnEmptyList_WhenUnitIsNull() {

@@ -45,6 +45,14 @@ its target module, first matching rule wins (REQ-MOD-001…005).
   `AuditDomain` and `AuditDetails` from the same package. `AuditService` and the rest of the audit
   trail are the audit module's internals; the listener and controller audit rules key on all three
   recorder types, so a new recorder type is added there too.
+- **A lower module reacts upward only through an observer it owns** (plan §5.3). The org-unit
+  services report leadership and Kommandogruppe changes to `orgunit.api.MembershipChangeObserver`;
+  `OrgChartService` implements it. An implementation is `@Transactional(propagation = MANDATORY)`
+  and the interface carries `@ObserverSpi` (`ListenerAndObserverRulesTest` fails otherwise); never
+  call a higher module's service from `orgunit` directly.
+- **Domain-free helpers go to `kernel`**, not to `support`, when they need nothing but the JDK
+  (`HandleAnonymisation`, `HandleScrubber`, `FuzzyNameMatcher`). A helper that reads an entity is
+  not domain-free.
 
 ## Concurrency — read this before touching multi-step transactions
 

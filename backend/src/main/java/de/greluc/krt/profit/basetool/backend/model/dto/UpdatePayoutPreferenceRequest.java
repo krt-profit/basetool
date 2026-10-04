@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
+import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import jakarta.validation.constraints.NotNull;
 
 /** Inbound request payload for the Update Payout Preference operation. */

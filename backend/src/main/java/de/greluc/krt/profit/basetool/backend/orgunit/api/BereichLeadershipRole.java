@@ -17,26 +17,21 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto.exchange;
-
-import java.util.UUID;
+package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
 /**
- * The identifiers of one game item, for resolving an item reference (REQ-XCH-012).
- *
- * @param id the item's id
- * @param name the item's display name
- * @param className the item's DataForge class name, or {@code null}
- * @param externalUuid the item's Wiki UUID, or {@code null}
- * @param p4kUuid the item's game-file UUID, or {@code null}
- * @param uexId the item's UEX id, or {@code null}
- * @param nameKey the item's {@code global.ini} name key, or {@code null}
+ * The role a member holds within a Bereichsleitung (REQ-ORG-017), each mapping to one flag on the
+ * member's {@code org_unit_membership} row. All three confer the same cascading officer-equivalent
+ * reach (REQ-ORG-015).
  */
-public record ExchangeItemKeyRow(
-    UUID id,
-    String name,
-    String className,
-    UUID externalUuid,
-    UUID p4kUuid,
-    Integer uexId,
-    String nameKey) {}
+public enum BereichLeadershipRole {
+
+  /** Bereichsleiter — the head of the Bereich ({@code is_bereichsleiter}). */
+  LEITER,
+
+  /** Bereichskoordinator — an area coordinator ({@code is_bereichskoordinator}). */
+  KOORDINATOR,
+
+  /** Bereichsoperator — an area operator ({@code is_bereichsoperator}). */
+  OPERATOR
+}
