@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
+
 /**
  * How a {@link NotificationRuleSelector} resolves its recipients.
  *
@@ -42,26 +44,24 @@ public enum SelectorKind {
 
   /**
    * Resolves to every employee holding a {@code bank_account_grant} on the <em>bank account carried
-   * by the event</em> ({@link
-   * de.greluc.krt.profit.basetool.backend.event.NotificationEvent#contextAccountId()}). Reads no
-   * selector columns — the account comes from the event, mirroring {@link #ORG_RELATIVE_ROLE}.
+   * by the event</em> ({@link NotificationEvent#contextAccountId()}). Reads no selector columns —
+   * the account comes from the event, mirroring {@link #ORG_RELATIVE_ROLE}.
    */
   ACCOUNT_GRANT,
 
   /**
    * Resolves to the single user the event is directed at ({@link
-   * de.greluc.krt.profit.basetool.backend.event.NotificationEvent#contextRecipientUserId()}) — e.g.
-   * the officer/lead who raised a booking request, notified when it is confirmed or rejected. Reads
-   * no selector columns — the recipient comes from the event.
+   * NotificationEvent#contextRecipientUserId()}) — e.g. the officer/lead who raised a booking
+   * request, notified when it is confirmed or rejected. Reads no selector columns — the recipient
+   * comes from the event.
    */
   EVENT_RECIPIENT,
 
   /**
    * Resolves to the responsible holder(s) (Kontoverantwortliche) of the bank account carried by the
-   * event ({@link
-   * de.greluc.krt.profit.basetool.backend.event.NotificationEvent#contextAccountId()}), derived
-   * from the account's owning org unit via {@code OrgUnitBankAccessService} (REQ-BANK-034). Reads
-   * no selector columns, like {@link #ACCOUNT_GRANT}.
+   * event ({@link NotificationEvent#contextAccountId()}), derived from the account's owning org
+   * unit via {@code OrgUnitBankAccessService} (REQ-BANK-034). Reads no selector columns, like
+   * {@link #ACCOUNT_GRANT}.
    */
   ACCOUNT_RESPONSIBLE
 }

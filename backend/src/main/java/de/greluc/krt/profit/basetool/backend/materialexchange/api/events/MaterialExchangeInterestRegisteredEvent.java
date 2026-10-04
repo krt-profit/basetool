@@ -17,10 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.event;
+package de.greluc.krt.profit.basetool.backend.materialexchange.api.events;
 
 import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -29,32 +31,32 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published when a member signals they can supply a Materialbörse request (Gesuch,
- * REQ-MARKET-020), directed at the request's owner via {@link #contextRecipientUserId()}.
+ * Domain event published when a member registers interest in a Materialbörse offer
+ * (REQ-MARKET-011), directed at the offer's owner via {@link #contextRecipientUserId()}.
  *
- * <p>Carries only immutable scalars; the supplier's name is disclosed to the owner only.
+ * <p>Carries only immutable scalars; the interested member's name is disclosed to the owner only.
  *
- * @param requestId the request (also the notification's loose entity id)
- * @param subjectName the requested material's or item's name, for rendering
- * @param fulfillerName the signalling member's effective name, for rendering (owner-only)
- * @param requesterSub the request owner's sub; the directed recipient
- * @param actorSub the signalling member's sub
+ * @param offerId the offer (also the notification's loose entity id)
+ * @param materialName the offered material's name, for rendering
+ * @param interestedUserName the registering member's effective name, for rendering (owner-only)
+ * @param ownerUserId the offer owner's sub; the directed recipient
+ * @param actorSub the registering member's sub
  */
-public record MaterialRequestFulfillmentSignalledEvent(
-    UUID requestId,
-    String subjectName,
-    String fulfillerName,
-    @Nullable UUID requesterSub,
+public record MaterialExchangeInterestRegisteredEvent(
+    UUID offerId,
+    String materialName,
+    String interestedUserName,
+    @Nullable UUID ownerUserId,
     @Nullable UUID actorSub)
     implements NotificationEvent {
 
   /** Loose entity-type tag stored on the produced notification for deep-linking to the board. */
-  public static final String ENTITY_TYPE = "MATERIAL_EXCHANGE_REQUEST";
+  public static final String ENTITY_TYPE = "MATERIAL_EXCHANGE_OFFER";
 
   @NotNull
   @Override
   public NotificationEventType eventType() {
-    return NotificationEventType.MATERIAL_REQUEST_FULFILLMENT_SIGNALLED;
+    return NotificationEventType.MATERIAL_EXCHANGE_INTEREST_REGISTERED;
   }
 
   @NotNull
@@ -66,7 +68,7 @@ public record MaterialRequestFulfillmentSignalledEvent(
 
   @Override
   public UUID contextRecipientUserId() {
-    return requesterSub;
+    return ownerUserId;
   }
 
   @NotNull
@@ -77,15 +79,15 @@ public record MaterialRequestFulfillmentSignalledEvent(
 
   @Override
   public UUID entityId() {
-    return requestId;
+    return offerId;
   }
 
   @NotNull
   @Override
   public Map<String, String> renderParams() {
     Map<String, String> params = new LinkedHashMap<>();
-    params.put("lieferant", fulfillerName);
-    params.put("material", subjectName);
+    params.put("interessent", interestedUserName);
+    params.put("material", materialName);
     return params;
   }
 }

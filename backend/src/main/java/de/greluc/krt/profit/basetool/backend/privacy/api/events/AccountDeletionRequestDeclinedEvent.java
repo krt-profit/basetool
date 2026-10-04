@@ -17,28 +17,29 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.event;
+package de.greluc.krt.profit.basetool.backend.privacy.api.events;
 
 import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
-import java.util.LinkedHashMap;
+import de.greluc.krt.profit.basetool.backend.model.NotificationType;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published when a member raises an Art. 17 erasure request (REQ-SEC-061); the default
- * rule notifies every admin.
+ * Domain event published when an admin refuses a member's erasure request (REQ-SEC-061); the
+ * default rule notifies the requesting member.
  *
- * <p>Carries no e-mail address, Discord id or the member's reasoning.
+ * <p>The admin's reasoning does not ride the event; the member reads it on their profile page.
  *
- * @param userId the requesting member's id, also the notification's loose entity id
- * @param handle the requesting member's effective name, for rendering; may be {@code null}
+ * @param userId the requesting member, who is the single recipient
  */
-public record AccountDeletionRequestedEvent(UUID userId, @Nullable String handle)
-    implements NotificationEvent {
+public record AccountDeletionRequestDeclinedEvent(UUID userId) implements NotificationEvent {
 
   /** Loose entity-type tag stored on the produced notifications for deep-linking. */
   public static final String ENTITY_TYPE = "DELETION_REQUEST";
@@ -46,12 +47,13 @@ public record AccountDeletionRequestedEvent(UUID userId, @Nullable String handle
   @NotNull
   @Override
   public NotificationEventType eventType() {
-    return NotificationEventType.ACCOUNT_DELETION_REQUESTED;
+    return NotificationEventType.ACCOUNT_DELETION_REQUEST_DECLINED;
   }
 
+  @Nullable
   @Override
   public UUID actorSub() {
-    return userId;
+    return null;
   }
 
   @NotNull
@@ -73,12 +75,31 @@ public record AccountDeletionRequestedEvent(UUID userId, @Nullable String handle
   }
 
   @NotNull
+  @Unmodifiable
   @Override
   public Map<String, String> renderParams() {
-    Map<String, String> params = new LinkedHashMap<>();
-    if (handle != null && !handle.isBlank()) {
-      params.put("handle", handle);
-    }
-    return params;
+    return Map.of();
+  }
+
+  /**
+   * The single recipient the {@code EVENT_RECIPIENT} selector resolves to — the requesting member.
+   *
+   * @return the requesting member's id
+   */
+  @Override
+  public UUID contextRecipientUserId() {
+    return userId;
+  }
+
+  /**
+   * Clears the administrators' now-stale erasure-request notifications (REQ-NOTIF-018).
+   *
+   * @return the singleton {@link NotificationType#ACCOUNT_DELETION_REQUESTED}
+   */
+  @NotNull
+  @Unmodifiable
+  @Override
+  public Set<NotificationType> resolvesNotificationTypes() {
+    return Set.of(NotificationType.ACCOUNT_DELETION_REQUESTED);
   }
 }

@@ -17,35 +17,41 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.event;
+package de.greluc.krt.profit.basetool.backend.exchange.api.events;
 
 import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
-import de.greluc.krt.profit.basetool.backend.model.NotificationType;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published when an admin refuses a member's erasure request (REQ-SEC-061); the
- * default rule notifies the requesting member.
+ * Domain event published when an exchange client is first seen with a new installation of a member
+ * (REQ-XCH-032); the default rule notifies that member, so a connection they did not make is
+ * noticed.
  *
- * <p>The admin's reasoning does not ride the event; the member reads it on their profile page.
+ * <p>Only the registry's display name rides the event: the client-supplied label arrives later and
+ * could pose as the Basetool, so it never enters a notification.
  *
- * @param userId the requesting member, who is the single recipient
+ * @param userId the member whose account the installation connected to, the single recipient
+ * @param installationId the new installation
+ * @param clientName the registry display name of the client
  */
-public record AccountDeletionRequestDeclinedEvent(UUID userId) implements NotificationEvent {
+public record ExchangeInstallationConnectedEvent(
+    @NotNull UUID userId, @NotNull UUID installationId, @NotNull String clientName)
+    implements NotificationEvent {
 
-  /** Loose entity-type tag stored on the produced notifications for deep-linking. */
-  public static final String ENTITY_TYPE = "DELETION_REQUEST";
+  /** Loose entity-type tag stored on the produced notifications. */
+  public static final String ENTITY_TYPE = "EXCHANGE_INSTALLATION";
 
   @NotNull
   @Override
   public NotificationEventType eventType() {
-    return NotificationEventType.ACCOUNT_DELETION_REQUEST_DECLINED;
+    return NotificationEventType.EXCHANGE_INSTALLATION_CONNECTED;
   }
 
   @Nullable
@@ -69,35 +75,23 @@ public record AccountDeletionRequestDeclinedEvent(UUID userId) implements Notifi
 
   @Override
   public UUID entityId() {
-    return userId;
+    return installationId;
   }
 
   @NotNull
   @Unmodifiable
   @Override
   public Map<String, String> renderParams() {
-    return Map.of();
+    return Map.of("client", clientName);
   }
 
   /**
-   * The single recipient the {@code EVENT_RECIPIENT} selector resolves to — the requesting member.
+   * The single recipient the {@code EVENT_RECIPIENT} selector resolves to — the connected member.
    *
-   * @return the requesting member's id
+   * @return the member's id
    */
   @Override
   public UUID contextRecipientUserId() {
     return userId;
-  }
-
-  /**
-   * Clears the administrators' now-stale erasure-request notifications (REQ-NOTIF-018).
-   *
-   * @return the singleton {@link NotificationType#ACCOUNT_DELETION_REQUESTED}
-   */
-  @NotNull
-  @Unmodifiable
-  @Override
-  public Set<NotificationType> resolvesNotificationTypes() {
-    return Set.of(NotificationType.ACCOUNT_DELETION_REQUESTED);
   }
 }
