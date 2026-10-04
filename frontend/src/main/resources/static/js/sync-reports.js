@@ -19,7 +19,7 @@
 
 /* global SYNC_MSG */
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     if (window.krtFetch) {
         window.krtFetch.bindSwap({ container: '#sync-results', history: true });
     }
@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    trigger.addEventListener('click', function () {
+    trigger.addEventListener('click', () => {
         renderMessage();
         window.krtModal.open(modal);
     });
@@ -70,11 +70,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         closeModal();
         const sourceValue = sourceInput ? sourceInput.value : '';
-        const url =
-            '/admin/sync-reports/delete-old?days=' +
-            encodeURIComponent(daysInput.value) +
-            '&source=' +
-            encodeURIComponent(sourceValue);
+        const url = `/admin/sync-reports/delete-old?days=${encodeURIComponent(
+            daysInput.value,
+        )}&source=${encodeURIComponent(sourceValue)}`;
         window.krtFetch.write({
             method: 'POST',
             url,
@@ -97,12 +95,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     confirmBtn.addEventListener('click', purge);
-    modal.addEventListener('click', function (event) {
+    modal.addEventListener('click', (event) => {
         if (event.target === modal) {
             closeModal();
         }
     });
-    form.addEventListener('submit', function (event) {
+    form.addEventListener('submit', (event) => {
         event.preventDefault();
         purge();
     });

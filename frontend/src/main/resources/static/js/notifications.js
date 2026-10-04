@@ -93,25 +93,23 @@
         }
         const n = typeof count === 'number' ? count : 0;
         const text = n > 99 ? '99+' : String(n);
-        [badge, ...Array.from(document.querySelectorAll('[data-notif-badge]'))].forEach(
-            function (el) {
-                el.textContent = text;
-                el.classList.toggle('notification-badge-hidden', n <= 0);
-            },
-        );
+        [badge, ...Array.from(document.querySelectorAll('[data-notif-badge]'))].forEach((el) => {
+            el.textContent = text;
+            el.classList.toggle('notification-badge-hidden', n <= 0);
+        });
     }
 
     function refreshUnreadCount() {
         return fetch('/notifications/unread-count', csrfRequestInit())
-            .then(function (res) {
+            .then((res) => {
                 return readJson(res, null);
             })
-            .then(function (data) {
+            .then((data) => {
                 if (data && data.count != null) {
                     setBadge(Number(data.count));
                 }
             })
-            .catch(function () {});
+            .catch(() => {});
     }
 
     /**
@@ -123,7 +121,7 @@
      */
     function buildItem(item, linkable) {
         const li = document.createElement('li');
-        li.className = 'notification-item' + (item.read ? ' is-read' : '');
+        li.className = `notification-item${item.read ? ' is-read' : ''}`;
         li.setAttribute('data-notif-id', item.id);
         li.setAttribute('data-notif-read', item.read ? 'true' : 'false');
 
@@ -194,14 +192,14 @@
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = className;
-        btn.setAttribute('data-' + attr, '');
+        btn.setAttribute(`data-${attr}`, '');
         btn.setAttribute('aria-label', label);
         btn.title = label;
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.setAttribute('class', 'krt-icon');
         svg.setAttribute('aria-hidden', 'true');
         const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
-        use.setAttribute('href', '#' + icon);
+        use.setAttribute('href', `#${icon}`);
         svg.appendChild(use);
         btn.appendChild(svg);
         return btn;
@@ -218,21 +216,21 @@
             empty.classList.add('notification-badge-hidden');
         }
         fetch('/notifications/recent', csrfRequestInit())
-            .then(function (res) {
+            .then((res) => {
                 return readJson(res, []);
             })
-            .then(function (items) {
+            .then((items) => {
                 if (!Array.isArray(items) || items.length === 0) {
                     if (empty) {
                         empty.classList.remove('notification-badge-hidden');
                     }
                     return;
                 }
-                items.forEach(function (item) {
+                items.forEach((item) => {
                     list.appendChild(buildItem(item));
                 });
             })
-            .catch(function () {
+            .catch(() => {
                 if (empty) {
                     empty.classList.remove('notification-badge-hidden');
                 }
@@ -277,7 +275,7 @@
     }
 
     function eachItem(id, fn) {
-        const nodes = document.querySelectorAll('[data-notif-id="' + cssEscape(id) + '"]');
+        const nodes = document.querySelectorAll(`[data-notif-id="${cssEscape(id)}"]`);
         Array.prototype.forEach.call(nodes, fn);
     }
 
@@ -327,7 +325,7 @@
         window.krtFetch
             .write({
                 method: 'POST',
-                url: '/notifications/' + encodeURIComponent(id) + '/read',
+                url: `/notifications/${encodeURIComponent(id)}/read`,
                 toast: false,
                 errorMessage: i18n.error,
                 submitter,
@@ -345,7 +343,7 @@
         window.krtFetch
             .write({
                 method: 'DELETE',
-                url: '/notifications/' + encodeURIComponent(id),
+                url: `/notifications/${encodeURIComponent(id)}`,
                 successMessage: i18n.deleted,
                 errorMessage: i18n.error,
                 submitter,
@@ -379,7 +377,7 @@
         if (!window.krtFetch) {
             return;
         }
-        confirmThen(i18n.confirmClearTitle, i18n.confirmClearBody, function () {
+        confirmThen(i18n.confirmClearTitle, i18n.confirmClearBody, () => {
             window.krtFetch
                 .write({
                     method: 'DELETE',
@@ -403,16 +401,16 @@
         }
         const page = parseInt(btn.getAttribute('data-notif-next-page'), 10) || 1;
         btn.disabled = true;
-        fetch('/notifications/page-items?page=' + page, csrfRequestInit())
-            .then(function (res) {
+        fetch(`/notifications/page-items?page=${page}`, csrfRequestInit())
+            .then((res) => {
                 return readJson(res, null);
             })
-            .then(function (data) {
+            .then((data) => {
                 if (!data || !Array.isArray(data.items)) {
                     return;
                 }
-                data.items.forEach(function (item) {
-                    if (!list.querySelector('[data-notif-id="' + cssEscape(item.id) + '"]')) {
+                data.items.forEach((item) => {
+                    if (!list.querySelector(`[data-notif-id="${cssEscape(item.id)}"]`)) {
                         list.appendChild(buildItem(item, true));
                     }
                 });
@@ -427,8 +425,8 @@
                     }
                 }
             })
-            .catch(function () {})
-            .finally(function () {
+            .catch(() => {})
+            .finally(() => {
                 btn.disabled = false;
             });
     }
@@ -447,13 +445,11 @@
 
     function confirmThen(title, body, action) {
         if (typeof window.showKrtConfirm === 'function') {
-            window
-                .showKrtConfirm(title, body, i18n.confirmOk, i18n.confirmCancel)
-                .then(function (ok) {
-                    if (ok) {
-                        action();
-                    }
-                });
+            window.showKrtConfirm(title, body, i18n.confirmOk, i18n.confirmCancel).then((ok) => {
+                if (ok) {
+                    action();
+                }
+            });
         } else {
             action();
         }
@@ -592,7 +588,7 @@
         const base =
             SSE_RECONNECT_BASE_MS * Math.pow(2, Math.min(sseRefusals, SSE_MAX_BACKOFF_STEPS));
         const delay = base + Math.floor(Math.random() * base);
-        sseReconnectTimer = window.setTimeout(function () {
+        sseReconnectTimer = window.setTimeout(() => {
             sseReconnectTimer = null;
             if (!sseStopped) {
                 startSse();
@@ -636,12 +632,12 @@
             const source = new EventSource('/notifications/stream');
             sseSource = source;
             let opened = false;
-            source.addEventListener('open', function () {
+            source.addEventListener('open', () => {
                 opened = true;
                 sseRefusals = 0;
                 markSseHealthy();
             });
-            source.addEventListener('error', function () {
+            source.addEventListener('error', () => {
                 markSseUnhealthy();
                 try {
                     source.close();
@@ -655,10 +651,10 @@
                 }
                 scheduleSseReconnect();
             });
-            source.addEventListener('heartbeat', function () {
+            source.addEventListener('heartbeat', () => {
                 markSseHealthy();
             });
-            source.addEventListener('notification', function () {
+            source.addEventListener('notification', () => {
                 markSseHealthy();
                 refreshUnreadCount();
                 const dropdown = document.getElementById('notification-dropdown');
@@ -666,7 +662,7 @@
                     loadDropdown();
                 }
             });
-            source.addEventListener('reauth', function (event) {
+            source.addEventListener('reauth', (event) => {
                 sseStopped = true;
                 if (sseReconnectTimer !== null) {
                     window.clearTimeout(sseReconnectTimer);
@@ -676,7 +672,7 @@
                     window.krtReauth.redirect(event && event.data ? event.data : null);
                 }
             });
-            source.addEventListener('terms-gate', function (event) {
+            source.addEventListener('terms-gate', (event) => {
                 sseStopped = true;
                 if (sseReconnectTimer !== null) {
                     window.clearTimeout(sseReconnectTimer);
@@ -692,7 +688,7 @@
                     window.krtTermsGate.redirect(event && event.data ? event.data : null);
                 }
             });
-            source.addEventListener('replaced', function () {
+            source.addEventListener('replaced', () => {
                 sseStopped = true;
                 if (sseReconnectTimer !== null) {
                     window.clearTimeout(sseReconnectTimer);

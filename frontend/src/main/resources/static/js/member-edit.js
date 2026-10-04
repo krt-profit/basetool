@@ -36,7 +36,7 @@
         const form = formElement;
         /** @type {HTMLElement[]} */
         const tabs = Array.prototype.slice.call(nav.querySelectorAll('.tab[data-tab]'));
-        const keys = tabs.map(function (tab) {
+        const keys = tabs.map((tab) => {
             return tab.getAttribute('data-tab') || '';
         });
 
@@ -47,7 +47,7 @@
          */
         function apply(key) {
             let formNeeded = false;
-            tabs.forEach(function (tab) {
+            tabs.forEach((tab) => {
                 const on = tab.getAttribute('data-tab') === key;
                 tab.classList.toggle('active', on);
                 tab.setAttribute('aria-selected', String(on));
@@ -92,12 +92,12 @@
             history.replaceState(history.state, '', url);
         }
 
-        tabs.forEach(function (tab) {
-            tab.addEventListener('click', function () {
+        tabs.forEach((tab) => {
+            tab.addEventListener('click', () => {
                 show(tab.getAttribute('data-tab') || '');
             });
         });
-        nav.addEventListener('keydown', function (event) {
+        nav.addEventListener('keydown', (event) => {
             if (!(event instanceof KeyboardEvent)) {
                 return;
             }
@@ -149,7 +149,7 @@
         /** Resets the second slot's Staffel and role flags. */
         function clearSlot2() {
             second.value = '';
-            slot.querySelectorAll('input[type=checkbox]').forEach(function (box) {
+            slot.querySelectorAll('input[type=checkbox]').forEach((box) => {
                 /** @type {HTMLInputElement} */ (box).checked = false;
             });
         }
@@ -158,26 +158,20 @@
         function syncDuplicateOptions() {
             const v1 = first.value;
             const v2 = second.value;
-            Array.prototype.forEach.call(
-                second.options,
-                function (/** @type {HTMLOptionElement} */ o) {
-                    o.disabled = o.value !== '' && o.value === v1;
-                },
-            );
-            Array.prototype.forEach.call(
-                first.options,
-                function (/** @type {HTMLOptionElement} */ o) {
-                    o.disabled = o.value !== '' && o.value === v2;
-                },
-            );
+            Array.prototype.forEach.call(second.options, (/** @type {HTMLOptionElement} */ o) => {
+                o.disabled = o.value !== '' && o.value === v1;
+            });
+            Array.prototype.forEach.call(first.options, (/** @type {HTMLOptionElement} */ o) => {
+                o.disabled = o.value !== '' && o.value === v2;
+            });
         }
 
-        add.addEventListener('click', function () {
+        add.addEventListener('click', () => {
             showSlot2(true);
             syncDuplicateOptions();
             second.focus();
         });
-        removeBtn.addEventListener('click', function () {
+        removeBtn.addEventListener('click', () => {
             clearSlot2();
             showSlot2(false);
             syncDuplicateOptions();
@@ -190,7 +184,7 @@
 
     /** Keeps the "n / max" counter under every textarea with `data-char-counter` current. */
     function bindCharCounters() {
-        document.querySelectorAll('textarea[data-char-counter]').forEach(function (element) {
+        document.querySelectorAll('textarea[data-char-counter]').forEach((element) => {
             const area = /** @type {HTMLTextAreaElement} */ (element);
             const counter = document.getElementById(area.getAttribute('data-char-counter') || '');
             const value = counter ? counter.querySelector('[data-char-count]') : null;

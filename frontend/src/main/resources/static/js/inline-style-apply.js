@@ -16,21 +16,21 @@
      */
     function applyWidths(root) {
         const scope = root && typeof root.querySelectorAll === 'function' ? root : document;
-        scope.querySelectorAll('[data-krtm-width]').forEach(function (el) {
+        scope.querySelectorAll('[data-krtm-width]').forEach((el) => {
             const n = parseFloat(el.getAttribute('data-krtm-width') || '');
-            /** @type {HTMLElement} */ (el).style.width = (isFinite(n) ? n : 0) + '%';
+            /** @type {HTMLElement} */ (el).style.width = `${isFinite(n) ? n : 0}%`;
         });
     }
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('DOMContentLoaded', () => {
             applyWidths(document);
         });
     } else {
         applyWidths(document);
     }
 
-    document.addEventListener('krt:swapped', function (event) {
+    document.addEventListener('krt:swapped', (event) => {
         const container = event && event.detail && event.detail.container;
         applyWidths(container || document);
     });

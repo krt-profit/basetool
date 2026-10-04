@@ -18,7 +18,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     const phone = window.matchMedia('(max-width: 768px)');
     const sidebarEl = document.getElementById('sidebar');
     const overlayEl = document.getElementById('sidebar-overlay');
@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', function () {
             .querySelectorAll(
                 '.nav-top-link, .nav-group:not(.nav-group-filter-only) .nav-link, .nav-personal .nav-link',
             )
-            .forEach(function (link) {
+            .forEach((link) => {
                 if (!(link instanceof HTMLAnchorElement)) return;
                 const href = link.getAttribute('href');
                 if (!href || href.charAt(0) !== '/') return;
@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const isMatch =
                     linkPath === '/'
                         ? here === '/'
-                        : here === linkPath || here.indexOf(linkPath + '/') === 0;
+                        : here === linkPath || here.indexOf(`${linkPath}/`) === 0;
                 if (isMatch && linkPath.length > activeLen) {
                     activeLink = link;
                     activeLen = linkPath.length;
@@ -132,30 +132,30 @@ document.addEventListener('DOMContentLoaded', function () {
      * member collapsed it before.
      */
     const initGroups = function () {
-        groups.forEach(function (group) {
+        groups.forEach((group) => {
             const key = group.getAttribute('data-group-key');
             let open;
             if (phone.matches) {
                 open = group === activeGroup;
             } else {
-                open = group === activeGroup || readState('krt.sidebar.' + key) !== 'closed';
+                open = group === activeGroup || readState(`krt.sidebar.${key}`) !== 'closed';
             }
             groupOpen.set(group, open);
             if (!query) renderGroup(group, open);
         });
     };
 
-    groups.forEach(function (group) {
+    groups.forEach((group) => {
         const count = group.querySelector('.nav-group-count');
         if (count) count.textContent = String(group.querySelectorAll('.nav-link').length);
         const head = group.querySelector('.nav-group-head');
         if (!head) return;
-        head.addEventListener('click', function () {
+        head.addEventListener('click', () => {
             if (query) return;
             const open = !groupOpen.get(group);
             if (open && phone.matches) {
                 const mode = group.closest('.nav-mode');
-                groups.forEach(function (other) {
+                groups.forEach((other) => {
                     if (other !== group && other.closest('.nav-mode') === mode) {
                         groupOpen.set(other, false);
                         renderGroup(other, false);
@@ -166,7 +166,7 @@ document.addEventListener('DOMContentLoaded', function () {
             renderGroup(group, open);
             if (!phone.matches) {
                 writeState(
-                    'krt.sidebar.' + group.getAttribute('data-group-key'),
+                    `krt.sidebar.${group.getAttribute('data-group-key')}`,
                     open ? 'open' : 'closed',
                 );
             }
@@ -185,13 +185,13 @@ document.addEventListener('DOMContentLoaded', function () {
         sidebarEl.classList.toggle('is-admin-mode', adminMode);
         if (adminBarEl instanceof HTMLElement) adminBarEl.hidden = filtering || !adminMode;
         let anyHit = false;
-        groups.forEach(function (group) {
+        groups.forEach((group) => {
             const filterOnly = group.classList.contains('nav-group-filter-only');
             const links = Array.from(group.querySelectorAll('.nav-link'));
             if (!(group instanceof HTMLElement)) return;
             if (!filtering) {
                 group.hidden = filterOnly;
-                links.forEach(function (link) {
+                links.forEach((link) => {
                     if (link instanceof HTMLElement) link.hidden = false;
                 });
                 renderGroup(group, !!groupOpen.get(group));
@@ -201,7 +201,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 .toLowerCase()
                 .includes(query);
             let hits = 0;
-            links.forEach(function (link) {
+            links.forEach((link) => {
                 const hit = groupHit || textOf(link).toLowerCase().includes(query);
                 if (link instanceof HTMLElement) link.hidden = !hit;
                 if (hit) hits++;
@@ -254,9 +254,9 @@ document.addEventListener('DOMContentLoaded', function () {
         /** @type {Element | null} */
         let best = null;
         let bestLen = -1;
-        tabEls.forEach(function (tab) {
+        tabEls.forEach((tab) => {
             const path = tab.getAttribute('data-tab-path') || '';
-            if ((here === path || here.indexOf(path + '/') === 0) && path.length > bestLen) {
+            if ((here === path || here.indexOf(`${path}/`) === 0) && path.length > bestLen) {
                 best = tab;
                 bestLen = path.length;
             }
@@ -338,9 +338,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     renderList();
 
-    [hamburgerEl, menuTabEl].forEach(function (opener) {
+    [hamburgerEl, menuTabEl].forEach((opener) => {
         if (!opener) return;
-        opener.addEventListener('click', function (e) {
+        opener.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
             if (isOpen()) {
@@ -352,18 +352,18 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     if (closeBtn) {
-        closeBtn.addEventListener('click', function (e) {
+        closeBtn.addEventListener('click', (e) => {
             e.preventDefault();
             closeSidebar(true);
         });
     }
     if (overlayEl) {
-        overlayEl.addEventListener('click', function () {
+        overlayEl.addEventListener('click', () => {
             closeSidebar(true);
         });
         overlayEl.addEventListener(
             'touchstart',
-            function (e) {
+            (e) => {
                 e.preventDefault();
                 closeSidebar(true);
             },
@@ -372,7 +372,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (sidebarEl) {
-        sidebarEl.addEventListener('click', function (e) {
+        sidebarEl.addEventListener('click', (e) => {
             const target = e.target instanceof Element ? e.target : null;
             const link = target ? target.closest('a[href]') : null;
             if (link && !link.closest('.nav-lang-menu')) {
@@ -386,11 +386,11 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (filterEl) {
-        filterEl.addEventListener('input', function () {
+        filterEl.addEventListener('input', () => {
             query = filterEl.value.trim().toLowerCase();
             renderList();
         });
-        filterEl.addEventListener('keydown', function (e) {
+        filterEl.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 const first = sidebarEl
@@ -404,7 +404,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (toPaletteEl) {
-        toPaletteEl.addEventListener('click', function () {
+        toPaletteEl.addEventListener('click', () => {
             const text = filterEl ? filterEl.value.trim() : '';
             closeSidebar(false);
             if (window.krtPalette) window.krtPalette.open(text);
@@ -412,8 +412,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (sidebarEl) {
-        sidebarEl.querySelectorAll('.nav-admin-entry, .nav-admin-back').forEach(function (btn) {
-            btn.addEventListener('click', function () {
+        sidebarEl.querySelectorAll('.nav-admin-entry, .nav-admin-back').forEach((btn) => {
+            btn.addEventListener('click', () => {
                 setAdminMode(!adminMode);
                 const list = document.getElementById('nav-list');
                 if (list) list.scrollTop = 0;
@@ -422,19 +422,19 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (userToggleEl) {
-        userToggleEl.addEventListener('click', function () {
+        userToggleEl.addEventListener('click', () => {
             setPersonalOpen(!!personalEl && personalEl.hidden === true);
         });
     }
 
     if (langBtnEl) {
-        langBtnEl.addEventListener('click', function (e) {
+        langBtnEl.addEventListener('click', (e) => {
             e.stopPropagation();
             setLangOpen(!!langMenuEl && langMenuEl.hidden === true);
         });
     }
 
-    document.addEventListener('keydown', function (e) {
+    document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape' || e.defaultPrevented) return;
         if (langMenuEl && !langMenuEl.hidden) {
             setLangOpen(false);
@@ -464,7 +464,7 @@ document.addEventListener('DOMContentLoaded', function () {
             pending = false;
             document.documentElement.style.setProperty(
                 '--krt-footer-height',
-                (covers ? footerEl.offsetHeight : 0) + 'px',
+                `${covers ? footerEl.offsetHeight : 0}px`,
             );
         };
         const applyFooterHeight = () => {
@@ -522,7 +522,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
     formatUtcTimes(document);
-    document.addEventListener('krt:swapped', function (e) {
+    document.addEventListener('krt:swapped', (e) => {
         const container = e && e.detail ? e.detail.container : null;
         formatUtcTimes(container instanceof Element ? container : document);
     });
@@ -530,7 +530,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const switcherForm = document.getElementById('squadron-switcher-form');
     const switcherSelect = document.getElementById('squadron-switcher-select');
     if (switcherForm instanceof HTMLFormElement && switcherSelect) {
-        switcherSelect.addEventListener('change', function () {
+        switcherSelect.addEventListener('change', () => {
             switcherForm.submit();
         });
     }

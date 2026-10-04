@@ -42,7 +42,7 @@ function buildScuHint() {
 function copyTemplateOptions(templateId, target) {
     const tpl = document.getElementById(templateId);
     if (!tpl || !target) return;
-    Array.from(tpl.children).forEach(function (opt) {
+    Array.from(tpl.children).forEach((opt) => {
         target.appendChild(opt.cloneNode(true));
     });
 }
@@ -57,7 +57,7 @@ function copyTemplateOptions(templateId, target) {
 function fillQualityTierOptions(select, selectedCode) {
     const tpl = document.getElementById('item-quality-options-template');
     if (!tpl) return;
-    Array.from(tpl.querySelectorAll('option')).forEach(function (opt) {
+    Array.from(tpl.querySelectorAll('option')).forEach((opt) => {
         const code = opt.value;
         const selected = code === selectedCode;
         if (opt.getAttribute('data-inactive') === 'true' && !selected) return;
@@ -184,7 +184,7 @@ function renderSummary(el, count, strong, unitName) {
         parts.push(document.createTextNode((el.dataset.for || '{0}').replace('{0}', unitName)));
     }
     el.replaceChildren();
-    parts.forEach(function (part, i) {
+    parts.forEach((part, i) => {
         if (i > 0) el.appendChild(document.createTextNode(' · '));
         el.appendChild(part);
     });
@@ -197,7 +197,7 @@ function updateMaterialSummary() {
     if (!el || !container) return;
     let count = 0;
     let scu = 0;
-    container.querySelectorAll('.material-row').forEach(function (row) {
+    container.querySelectorAll('.material-row').forEach((row) => {
         const sel = row.querySelector('[data-role="material-select"]');
         if (!sel || !(/** @type {HTMLInputElement} */ (sel).value)) return;
         count++;
@@ -206,7 +206,7 @@ function updateMaterialSummary() {
         const value = amount ? parseAmount(/** @type {HTMLInputElement} */ (amount).value) : NaN;
         if (!isNaN(value)) scu += value;
     });
-    const scuText = scu > 0 ? formatSummaryNumber(scu) + ' ' + (el.dataset.unit || '') : '';
+    const scuText = scu > 0 ? `${formatSummaryNumber(scu)} ${el.dataset.unit || ''}` : '';
     renderSummary(el, count, scuText.trim(), selectedUnitName('requestingOrgUnitId'));
 }
 
@@ -216,7 +216,7 @@ function updateItemSummary() {
     const container = document.getElementById('item-lines');
     if (!el || !container) return;
     let count = 0;
-    container.querySelectorAll('.item-line').forEach(function (row) {
+    container.querySelectorAll('.item-line').forEach((row) => {
         const sel = row.querySelector('[data-role="item-select"]');
         if (sel && /** @type {HTMLInputElement} */ (sel).value) count++;
     });
@@ -230,7 +230,7 @@ function syncMaterialRemoveButtons() {
     const container = document.getElementById('materials-container');
     if (!container) return;
     const buttons = container.querySelectorAll('[data-trigger="orders-remove-material"]');
-    buttons.forEach(function (btn) {
+    buttons.forEach((btn) => {
         /** @type {HTMLButtonElement} */ (btn).disabled = buttons.length <= 1;
     });
 }
@@ -243,10 +243,10 @@ function renumberMaterialRows() {
     const container = document.getElementById('materials-container');
     if (!container) return;
     const rows = container.querySelectorAll('.material-row');
-    rows.forEach(function (row, i) {
-        row.querySelectorAll('[name^="materials["]').forEach(function (field) {
+    rows.forEach((row, i) => {
+        row.querySelectorAll('[name^="materials["]').forEach((field) => {
             const name = field.getAttribute('name') || '';
-            field.setAttribute('name', name.replace(/^materials\[\d+\]/, 'materials[' + i + ']'));
+            field.setAttribute('name', name.replace(/^materials\[\d+\]/, `materials[${i}]`));
         });
     });
     materialIndex = rows.length;
@@ -276,13 +276,13 @@ function updateCounter(area) {
     const counter = document.getElementById(area.dataset.counter || '');
     if (!counter) return;
     const max = area.maxLength > 0 ? area.maxLength : 1000;
-    counter.textContent = area.value.length + ' / ' + max;
+    counter.textContent = `${area.value.length} / ${max}`;
 }
 
 async function findJobOrderMaterialByName(normalizedName) {
     try {
         const res = await fetch(
-            '/catalog/material-search?jobOrder=true&q=' + encodeURIComponent(normalizedName),
+            `/catalog/material-search?jobOrder=true&q=${encodeURIComponent(normalizedName)}`,
             { headers: { Accept: 'application/json' } },
         );
         if (!res.ok) {
@@ -366,7 +366,7 @@ async function importFromScmdb() {
         }
         let successMsg = MSG_SCMDB_SUCCESS;
         if (unknownMaterials.length > 0) {
-            successMsg += ' (' + MSG_SCMDB_SOME_UNKNOWN + ': ' + unknownMaterials.join(', ') + ')';
+            successMsg += ` (${MSG_SCMDB_SOME_UNKNOWN}: ${unknownMaterials.join(', ')})`;
         }
 
         if (window.showFrontendSuccessToast) {
@@ -375,7 +375,7 @@ async function importFromScmdb() {
     } else {
         let errorMsg = MSG_SCMDB_NO_MATCH;
         if (unknownMaterials.length > 0) {
-            errorMsg = MSG_SCMDB_NOT_FOUND + ': ' + unknownMaterials.join(', ');
+            errorMsg = `${MSG_SCMDB_NOT_FOUND}: ${unknownMaterials.join(', ')}`;
         }
 
         if (window.showFrontendErrorToast) {
@@ -426,18 +426,18 @@ function addMaterialRow() {
 let itemLineIndex = 0;
 
 function fetchItemOptions(query) {
-    return fetch('/orders/item-search?q=' + encodeURIComponent(query || ''), {
+    return fetch(`/orders/item-search?q=${encodeURIComponent(query || '')}`, {
         headers: { Accept: 'application/json' },
     })
-        .then(function (r) {
+        .then((r) => {
             return r.ok ? r.json() : [];
         })
-        .then(function (list) {
-            return (list || []).map(function (gi) {
+        .then((list) => {
+            return (list || []).map((gi) => {
                 return { value: gi.id, label: gi.name };
             });
         })
-        .catch(function () {
+        .catch(() => {
             return [];
         });
 }
@@ -463,7 +463,7 @@ function toggleOrderMode() {
 }
 
 function addItemLine(prefill) {
-    prefill = prefill || {};
+    prefill ||= {};
     const idx = itemLineIndex++;
     const container = document.getElementById('item-lines');
     if (!container) return null;
@@ -553,12 +553,12 @@ function loadBlueprints(row, preselectBpId, qualities) {
         bpSelect.innerHTML = '';
         return;
     }
-    fetch('/orders/item-blueprints/' + encodeURIComponent(gameItemId), {
+    fetch(`/orders/item-blueprints/${encodeURIComponent(gameItemId)}`, {
         headers: { Accept: 'application/json' },
     })
         .then((r) => (r.ok ? r.json() : []))
         .then((list) => {
-            list = list || [];
+            list ||= [];
             bpSelect.replaceChildren(
                 ...list.map((b) => {
                     const opt = document.createElement('option');
@@ -593,7 +593,7 @@ function loadDerivation(row, qualities) {
     const derived = row.querySelector('[data-role="derived"]');
     const unresolved = row.querySelector('[data-role="unresolved"]');
     const subs = row.querySelector('[data-role="subassemblies"]');
-    fetch('/orders/item-derivation/' + encodeURIComponent(blueprintId) + '?amount=' + amount, {
+    fetch(`/orders/item-derivation/${encodeURIComponent(blueprintId)}?amount=${amount}`, {
         headers: { Accept: 'application/json' },
     })
         .then((r) => (r.ok ? r.json() : null))
@@ -623,7 +623,7 @@ function loadDerivation(row, qualities) {
             derived.innerHTML = '';
             if ((d.materials || []).length) {
                 derived.innerHTML = html;
-                derived.querySelectorAll('select[data-quality-code]').forEach(function (sel) {
+                derived.querySelectorAll('select[data-quality-code]').forEach((sel) => {
                     fillQualityTierOptions(
                         /** @type {HTMLSelectElement} */ (sel),
                         sel.getAttribute('data-quality-code'),
@@ -718,9 +718,9 @@ const itemModeEl = document.getElementById('mode-item');
 if (itemModeEl) {
     itemModeEl.addEventListener('change', updateItemSummary);
 }
-document.querySelectorAll('textarea[data-counter]').forEach(function (area) {
+document.querySelectorAll('textarea[data-counter]').forEach((area) => {
     const textarea = /** @type {HTMLTextAreaElement} */ (area);
-    textarea.addEventListener('input', function () {
+    textarea.addEventListener('input', () => {
         updateCounter(textarea);
     });
     updateCounter(textarea);

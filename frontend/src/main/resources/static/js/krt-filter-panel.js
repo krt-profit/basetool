@@ -38,7 +38,7 @@
     function toggleFor(panel) {
         if (!panel.id) return null;
         return /** @type {HTMLElement | null} */ (
-            document.querySelector('[aria-controls="' + panel.id + '"]')
+            document.querySelector(`[aria-controls="${panel.id}"]`)
         );
     }
 
@@ -115,7 +115,7 @@
         if (!toggle) return;
         updateBadge(panel);
         setCollapsed(panel, true);
-        toggle.addEventListener('click', function () {
+        toggle.addEventListener('click', () => {
             const collapsed = !panel.hidden;
             setCollapsed(panel, collapsed);
             if (collapsed) return;
@@ -128,13 +128,13 @@
             );
             if (first) first.focus();
         });
-        document.addEventListener('click', function (event) {
+        document.addEventListener('click', (event) => {
             if (panel.hidden || !(event.target instanceof Node)) return;
             if (panel.contains(event.target) || toggle.contains(event.target)) return;
             if (!event.target.isConnected) return;
             setCollapsed(panel, true);
         });
-        document.addEventListener('keydown', function (event) {
+        document.addEventListener('keydown', (event) => {
             if (event.key !== 'Escape' || panel.hidden) return;
             if (!(event.target instanceof Node)) return;
             if (!panel.contains(event.target) && !toggle.contains(event.target)) return;
@@ -143,10 +143,10 @@
             setCollapsed(panel, true);
             toggle.focus();
         });
-        panel.addEventListener('input', function () {
+        panel.addEventListener('input', () => {
             updateBadge(panel);
         });
-        panel.addEventListener('change', function () {
+        panel.addEventListener('change', () => {
             updateBadge(panel);
         });
     }

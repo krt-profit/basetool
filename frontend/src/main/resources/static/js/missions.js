@@ -27,7 +27,7 @@ const MISSIONS_SECTIONS = {
     function loadResults(pushHistory) {
         const query = buildQueryString();
         window.krtFetch.swap({
-            url: '/missions' + (query ? '?' + query : ''),
+            url: `/missions${query ? `?${query}` : ''}`,
             container: resultsContainer,
             indicator: loadingIndicator,
             history: pushHistory !== false,
@@ -49,7 +49,7 @@ const MISSIONS_SECTIONS = {
 
     function onFilterChange() {
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(function () {
+        debounceTimer = setTimeout(() => {
             loadResults(true);
         }, 300);
     }
@@ -67,7 +67,7 @@ const MISSIONS_SECTIONS = {
     }
 
     function selectPeriod(value) {
-        periodInputs().forEach(function (el) {
+        periodInputs().forEach((el) => {
             el.checked = el.value === value;
         });
     }
@@ -111,20 +111,20 @@ const MISSIONS_SECTIONS = {
         loadResults();
     }
 
-    form.querySelectorAll('input, select').forEach(function (el) {
+    form.querySelectorAll('input, select').forEach((el) => {
         el.addEventListener('input', onFilterChange);
         el.addEventListener('change', onFilterChange);
     });
 
-    periodInputs().forEach(function (el) {
+    periodInputs().forEach((el) => {
         el.addEventListener('change', persistFilters);
     });
 
     if (resetBtn) {
-        resetBtn.addEventListener('click', function () {
+        resetBtn.addEventListener('click', () => {
             form.querySelectorAll(
                 'input[type="search"], input[type="text"], input[type="hidden"], input[type="date"], input[type="time"]',
-            ).forEach(function (el) {
+            ).forEach((el) => {
                 el.value = '';
             });
             selectPeriod('UPCOMING');

@@ -60,7 +60,7 @@
          * @returns {string} the prefixed trigger, e.g. `inv-admin-toggle-group`
          */
         function trigger(action) {
-            return cfg.triggerPrefix + '-' + action;
+            return `${cfg.triggerPrefix}-${action}`;
         }
 
         /** @type {string | null} */
@@ -178,8 +178,8 @@
             if (owningOrgUnitId) params.set('owningOrgUnitId', owningOrgUnitId);
             if (page != null) params.set('page', String(page));
             const path = gameItemId
-                ? cfg.basePath + '/game-item-stack/entries?'
-                : cfg.basePath + '/stack/entries?';
+                ? `${cfg.basePath}/game-item-stack/entries?`
+                : `${cfg.basePath}/stack/entries?`;
             return path + params.toString();
         }
 
@@ -242,7 +242,7 @@
         function restoreExpandedGroups() {
             const expandedRows = readExpanded(groupStorageKey());
             if (expandedRows.length === 0) return;
-            document.querySelectorAll('.tree-row--group').forEach(function (row) {
+            document.querySelectorAll('.tree-row--group').forEach((row) => {
                 const groupKey = groupKeyOf(row);
                 if (groupKey && expandedRows.includes(groupKey)) {
                     const nextRow = row.nextElementSibling;
@@ -260,7 +260,7 @@
         function restoreExpandedStacks() {
             const expandedStacks = readExpanded(stackStorageKey());
             if (expandedStacks.length === 0) return;
-            document.querySelectorAll('.stack-header').forEach(function (row) {
+            document.querySelectorAll('.stack-header').forEach((row) => {
                 if (!expandedStacks.includes(stackKey(row))) return;
                 const nextRow = row.nextElementSibling;
                 if (nextRow && nextRow.classList.contains('tree-stack-entries')) {
@@ -376,11 +376,11 @@
             fetch(buildStackEntriesUrl(headerRow, page), {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
             })
-                .then(function (r) {
-                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                .then((r) => {
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
                     return r.text();
                 })
-                .then(function (html) {
+                .then((html) => {
                     window.krtFetch.setTrustedHtml(content, html);
                     headerRow.setAttribute('data-stack-loaded', 'true');
                     if (typeof window.krtEnhanceComboboxes === 'function') {
@@ -388,7 +388,7 @@
                     }
                     if (cfg.onStackEntriesLoaded) cfg.onStackEntriesLoaded(content);
                 })
-                .catch(function (e) {
+                .catch((e) => {
                     console.error('Failed to load stack entries', e);
                     setStackEntriesStatus(content, stackEntriesI18n.error, true);
                 });
@@ -418,7 +418,7 @@
             const el = id ? document.getElementById(id) : null;
             if (!el) return;
             const isOpened = el.classList.contains('open');
-            document.querySelectorAll('.multi-select-options').forEach(function (opt) {
+            document.querySelectorAll('.multi-select-options').forEach((opt) => {
                 opt.classList.remove('open');
             });
             if (!isOpened) el.classList.add('open');
@@ -469,13 +469,13 @@
             } else if (count === 1) {
                 headerSpan.innerText = firstChecked || '';
             } else {
-                headerSpan.innerText =
-                    count +
-                    ' ' +
-                    window.krtI18nText(header.getAttribute('data-selected'), 'data-selected');
+                headerSpan.innerText = `${count} ${window.krtI18nText(
+                    header.getAttribute('data-selected'),
+                    'data-selected',
+                )}`;
             }
             const summary = /** @type {HTMLInputElement | null} */ (
-                document.querySelector('input[data-chip-header="' + headerId + '"]')
+                document.querySelector(`input[data-chip-header="${headerId}"]`)
             );
             if (summary) summary.value = active ? headerSpan.innerText : '';
         }
@@ -567,7 +567,7 @@
         function closeMultiSelectsOnOutsideClick(e) {
             const target = /** @type {Element} */ (e.target);
             if (target && target.closest && target.closest('.multi-select-container')) return;
-            document.querySelectorAll('.multi-select-options.open').forEach(function (opt) {
+            document.querySelectorAll('.multi-select-options.open').forEach((opt) => {
                 opt.classList.remove('open');
             });
         }
@@ -581,10 +581,10 @@
         function broadcastOrdersChanged(orderIds) {
             if (!window.krtLiveSync || typeof window.krtLiveSync.sendChanged !== 'function') return;
             let touchedAnyOrder = false;
-            (orderIds || []).forEach(function (orderId) {
+            (orderIds || []).forEach((orderId) => {
                 if (orderId) {
                     touchedAnyOrder = true;
-                    window.krtLiveSync.sendChanged('order:' + orderId, [
+                    window.krtLiveSync.sendChanged(`order:${orderId}`, [
                         'materials',
                         'aggregated',
                         'item-stock',
@@ -612,13 +612,13 @@
          * @returns {string[]} the distinct order ids
          */
         function collectLeafOrderIds(itemId) {
-            const leaf = document.querySelector('.tree-row--leaf[data-item-id="' + itemId + '"]');
+            const leaf = document.querySelector(`.tree-row--leaf[data-item-id="${itemId}"]`);
             if (!leaf) return [];
             /** @type {string[]} */
             const ids = [];
             leaf.querySelectorAll(
                 '.assoc-split[data-assoc-field="JOB_ORDER"] [data-assoc-chip][data-target-id]',
-            ).forEach(function (chip) {
+            ).forEach((chip) => {
                 const id = chip.getAttribute('data-target-id');
                 if (id && ids.indexOf(id) < 0) ids.push(id);
             });
@@ -696,7 +696,7 @@
          */
         function typeRadio(value) {
             return /** @type {HTMLInputElement | null} */ (
-                document.querySelector('input[name="type"][value="' + value + '"]')
+                document.querySelector(`input[name="type"][value="${value}"]`)
             );
         }
 
@@ -743,18 +743,18 @@
                 if (reason) reason.hidden = false;
                 return;
             }
-            fetch('/api/proxy/materials/' + encodeURIComponent(materialId) + '/terminals')
-                .then(function (r) {
+            fetch(`/api/proxy/materials/${encodeURIComponent(materialId)}/terminals`)
+                .then((r) => {
                     if (!r.ok) throw new Error('Network response was not ok');
                     return r.json();
                 })
-                .then(function (data) {
+                .then((data) => {
                     if (data && data.length > 0) {
                         setPlaceholderOption(terminalSelect, bookOutI18n.terminalChoose);
                         sellRadio.disabled = false;
                         data.forEach(
                             /** @param {{ terminalName: string, priceSell?: number }} terminal */
-                            function (terminal) {
+                            (terminal) => {
                                 const label =
                                     terminal.priceSell && terminal.priceSell > 0
                                         ? bookOutI18n.terminalPrice
@@ -771,7 +771,7 @@
                         disableSell(sellRadio, reason);
                     }
                 })
-                .catch(function (e) {
+                .catch((e) => {
                     console.error('Error loading terminals:', e);
                     setPlaceholderOption(terminalSelect, bookOutI18n.terminalError);
                     disableSell(sellRadio, reason);
@@ -813,7 +813,7 @@
             bookOutItemId = id;
             if (window.safeSameOriginUrl) {
                 bookOutForm.action = window.safeSameOriginUrl(
-                    '/inventory/' + id + '/book-out',
+                    `/inventory/${id}/book-out`,
                     bookOutForm.action,
                 );
             }
@@ -919,7 +919,7 @@
             window.krtFetch
                 .write({
                     method: 'POST',
-                    url: '/inventory/' + itemId + '/transfer',
+                    url: `/inventory/${itemId}/transfer`,
                     payload,
                     successMessage: bookOutI18n.success,
                     errorMessage: bookOutI18n.error,
@@ -932,7 +932,7 @@
                         broadcastBoardChanged();
                     },
                 })
-                .then(function () {
+                .then(() => {
                     bookOutInFlight = false;
                     if (submitBtn) submitBtn.disabled = false;
                 });
@@ -1035,7 +1035,7 @@
             window.krtFetch
                 .write({
                     method: 'POST',
-                    url: '/inventory/' + stolenMarkTarget.id + '/stolen',
+                    url: `/inventory/${stolenMarkTarget.id}/stolen`,
                     payload: {
                         version: stolenMarkTarget.version,
                         stolen: marking,
@@ -1053,7 +1053,7 @@
                         broadcastBoardChanged();
                     },
                 })
-                .then(function () {
+                .then(() => {
                     stolenMarkInFlight = false;
                     if (submitBtn) submitBtn.disabled = false;
                 });
@@ -1097,27 +1097,27 @@
                 wrapper.hidden = true;
                 return;
             }
-            fetch('/users/' + encodeURIComponent(targetUserId) + '/memberships?allKinds=true', {
+            fetch(`/users/${encodeURIComponent(targetUserId)}/memberships?allKinds=true`, {
                 headers: { Accept: 'application/json' },
                 credentials: 'same-origin',
             })
-                .then(function (r) {
+                .then((r) => {
                     return r.ok ? r.json() : [];
                 })
                 .then(
                     /** @param {Array<{ orgUnitId: string, orgUnitName: string }>} memberships */
-                    function (memberships) {
+                    (memberships) => {
                         if (!Array.isArray(memberships) || memberships.length < 1) {
                             wrapper.hidden = true;
                             return;
                         }
-                        memberships.forEach(function (opt) {
+                        memberships.forEach((opt) => {
                             select.appendChild(new Option(opt.orgUnitName, opt.orgUnitId));
                         });
                         const current = umbuchenCurrentOwningOrgUnitId;
                         if (
                             current &&
-                            memberships.some(function (m) {
+                            memberships.some((m) => {
                                 return m.orgUnitId === current;
                             })
                         ) {
@@ -1126,7 +1126,7 @@
                         wrapper.hidden = false;
                     },
                 )
-                .catch(function () {
+                .catch(() => {
                     wrapper.hidden = true;
                 });
         }
@@ -1150,7 +1150,7 @@
          * @param {Element | null} except the popover to leave alone
          */
         function assocCloseAllPops(except) {
-            document.querySelectorAll('[data-assoc-pop]').forEach(function (p) {
+            document.querySelectorAll('[data-assoc-pop]').forEach((p) => {
                 if (p !== except) /** @type {HTMLElement} */ (p).hidden = true;
             });
         }
@@ -1173,13 +1173,13 @@
             const maxTop = Math.max(gap, window.innerHeight - popHeight - gap);
             const wantedTop = flipUp ? rect.top - gap - popHeight : rect.bottom + gap;
             const top = Math.max(gap, Math.min(wantedTop, maxTop));
-            pop.style.left = rect.left + 'px';
+            pop.style.left = `${rect.left}px`;
             if (flipUp) {
                 pop.style.top = 'auto';
-                pop.style.bottom = window.innerHeight - top - popHeight + 'px';
+                pop.style.bottom = `${window.innerHeight - top - popHeight}px`;
             } else {
                 pop.style.bottom = 'auto';
-                pop.style.top = top + 'px';
+                pop.style.top = `${top}px`;
             }
         }
 
@@ -1225,7 +1225,7 @@
             if (pick) pick.hidden = true;
             if (amount) amount.hidden = false;
             const removeBtn = /** @type {HTMLElement | null} */ (
-                pop.querySelector('[data-trigger="' + trigger('assoc-remove') + '"]')
+                pop.querySelector(`[data-trigger="${trigger('assoc-remove')}"]`)
             );
             if (removeBtn) removeBtn.hidden = !showRemove;
         }
@@ -1241,16 +1241,15 @@
         function assocBuildChip(field, alloc, isPiece) {
             const isOrder = field === 'JOB_ORDER';
             const chip = document.createElement('span');
-            chip.className =
-                'assoc-chip ' + (isOrder ? 'assoc-chip--order' : 'assoc-chip--mission');
+            chip.className = `assoc-chip ${isOrder ? 'assoc-chip--order' : 'assoc-chip--mission'}`;
             chip.setAttribute('role', 'button');
             chip.setAttribute('tabindex', '0');
             chip.setAttribute('data-trigger', trigger('assoc-edit'));
             chip.setAttribute('data-assoc-chip', isOrder ? 'jobOrder' : 'mission');
             chip.setAttribute('data-target-id', isOrder ? alloc.jobOrderId : alloc.missionId);
             chip.setAttribute('data-amount', alloc.amount);
-            const label = isOrder ? '#' + alloc.jobOrderDisplayId : alloc.missionName;
-            chip.appendChild(document.createTextNode(label + ' · '));
+            const label = isOrder ? `#${alloc.jobOrderDisplayId}` : alloc.missionName;
+            chip.appendChild(document.createTextNode(`${label} · `));
             const amt = document.createElement('span');
             amt.className = 'assoc-chip__amt';
             amt.textContent = assocFormatAmount(alloc.amount, isPiece);
@@ -1300,13 +1299,13 @@
             const isOrder = field === 'JOB_ORDER';
             const allocs = (isOrder ? dto.jobOrderAllocations : dto.missionAllocations) || [];
             const rest = isOrder ? dto.jobOrderRest : dto.missionRest;
-            split.querySelectorAll('[data-assoc-chip]').forEach(function (c) {
+            split.querySelectorAll('[data-assoc-chip]').forEach((c) => {
                 c.remove();
             });
             const addWrap = split.querySelector('.assoc-add-wrap');
             allocs.forEach(
                 /** @param {any} a */
-                function (a) {
+                (a) => {
                     split.insertBefore(assocBuildChip(field, a, isPiece), addWrap);
                 },
             );
@@ -1352,7 +1351,7 @@
             if (!window.krtFetch) return;
             await window.krtFetch.write({
                 method,
-                url: '/inventory/' + encodeURIComponent(entryId ?? '') + '/allocation',
+                url: `/inventory/${encodeURIComponent(entryId ?? '')}/allocation`,
                 payload: body,
                 bodyOnDelete: true,
                 successMessage: assocI18n.saved,
@@ -1410,11 +1409,11 @@
                 amount = Math.round(amount * 1000) / 1000;
             }
             const buttons = pop.querySelectorAll('button');
-            buttons.forEach(function (b) {
+            buttons.forEach((b) => {
                 b.disabled = true;
             });
             const release = function () {
-                buttons.forEach(function (b) {
+                buttons.forEach((b) => {
                     b.disabled = false;
                 });
             };
@@ -1424,7 +1423,7 @@
                 return assocSend(entryId, method, body, split, pop);
             };
             if (window.krtFetch && typeof window.krtFetch.serialize === 'function') {
-                return window.krtFetch.serialize('inv-assoc:' + entryId, run).finally(release);
+                return window.krtFetch.serialize(`inv-assoc:${entryId}`, run).finally(release);
             }
             return Promise.resolve().then(run).finally(release);
         }
@@ -1455,7 +1454,7 @@
 
         /** Installs the delegated allocation-chip handlers and the popover's window listeners. */
         function bindAssoc() {
-            window.krtEvents.on('click', trigger('assoc-add-open'), function (el) {
+            window.krtEvents.on('click', trigger('assoc-add-open'), (el) => {
                 const ctx = assocContext(el);
                 if (!ctx) return;
                 const pop = ctx.pop;
@@ -1478,7 +1477,7 @@
                     pop.hidden = true;
                 }
             });
-            window.krtEvents.on('change', trigger('assoc-pick'), function (el) {
+            window.krtEvents.on('change', trigger('assoc-pick'), (el) => {
                 const value = /** @type {HTMLInputElement} */ (el).value;
                 if (!value) return;
                 const pop = el.closest('[data-assoc-pop]');
@@ -1497,7 +1496,7 @@
                     amountInput.focus();
                 }
             });
-            window.krtEvents.on('click', trigger('assoc-edit'), function (el) {
+            window.krtEvents.on('click', trigger('assoc-edit'), (el) => {
                 const ctx = assocContext(el);
                 if (!ctx) return;
                 const pop = ctx.pop;
@@ -1513,13 +1512,13 @@
                 assocPositionPop(pop);
                 if (amountInput) amountInput.focus();
             });
-            window.krtEvents.on('click', trigger('assoc-save'), function (el) {
+            window.krtEvents.on('click', trigger('assoc-save'), (el) => {
                 const pop = el.closest('[data-assoc-pop]');
                 const split = el.closest('.assoc-split');
                 if (!pop || !split) return;
                 assocSubmit(split, pop, assocSaveMethod(pop));
             });
-            window.krtEvents.on('click', trigger('assoc-remove'), function (el) {
+            window.krtEvents.on('click', trigger('assoc-remove'), (el) => {
                 const pop = el.closest('[data-assoc-pop]');
                 const split = el.closest('.assoc-split');
                 if (!pop || !split) return;
@@ -1527,7 +1526,7 @@
             });
             window.addEventListener('scroll', assocRepositionOpenPop, true);
             window.addEventListener('resize', assocRepositionOpenPop);
-            document.addEventListener('click', function (e) {
+            document.addEventListener('click', (e) => {
                 const target = /** @type {Element} */ (e.target);
                 if (
                     !target.closest('[data-assoc-pop]') &&
@@ -1537,7 +1536,7 @@
                     assocCloseAllPops(null);
                 }
             });
-            document.addEventListener('keydown', function (e) {
+            document.addEventListener('keydown', (e) => {
                 const target = /** @type {HTMLElement | null} */ (e.target);
                 if (!target || typeof target.matches !== 'function') return;
                 if (e.key === 'Enter' && target.matches('[data-assoc-amount-input]')) {
@@ -1568,7 +1567,7 @@
                 window.krtEvents.on('click', trigger('toggle-stack'), toggleStack);
                 window.krtEvents.on('click', trigger('stack-page'), goToStackEntriesPage);
                 bindAssoc();
-                window.krtEvents.on('click', trigger('bookout'), function (el) {
+                window.krtEvents.on('click', trigger('bookout'), (el) => {
                     openBookOutModal(
                         el.getAttribute('data-id'),
                         el.getAttribute('data-amount'),
@@ -1607,7 +1606,7 @@
             }
             const bookOutForm = document.getElementById('bookOutForm');
             if (bookOutForm) {
-                bookOutForm.addEventListener('submit', function (e) {
+                bookOutForm.addEventListener('submit', (e) => {
                     submitBookOut(/** @type {SubmitEvent} */ (e));
                 });
             }

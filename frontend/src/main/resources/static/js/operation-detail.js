@@ -52,7 +52,7 @@ function withOverview(keys) {
         keys: { refreshErrorKey: 'operation.section.refresh.error' },
         sections: OPERATION_SECTIONS,
         pageUrl() {
-            return window.operationId ? '/operations/' + window.operationId : null;
+            return window.operationId ? `/operations/${window.operationId}` : null;
         },
         broadcast(keys) {
             if (
@@ -60,7 +60,7 @@ function withOverview(keys) {
                 window.krtLiveSync &&
                 typeof window.krtLiveSync.sendChanged === 'function'
             ) {
-                window.krtLiveSync.sendChanged('operation:' + window.operationId, keys);
+                window.krtLiveSync.sendChanged(`operation:${window.operationId}`, keys);
             }
         },
     });
@@ -69,7 +69,7 @@ function withOverview(keys) {
 
     if (window.operationId && window.krtLiveSync && window.krtLiveSync.createReceiver) {
         window.krtLiveSync.createReceiver({
-            topic: 'operation:' + window.operationId,
+            topic: `operation:${window.operationId}`,
             sections: OPERATION_SECTIONS,
             refresh(keys) {
                 if (window.opRefreshSection) {
@@ -97,7 +97,7 @@ function withOverview(keys) {
         }
     }
 
-    document.addEventListener('krt:swapped', function (ev) {
+    document.addEventListener('krt:swapped', (ev) => {
         const container = ev && ev.detail && ev.detail.container;
         if (!container || container.id !== 'op-overview-results') {
             return;
@@ -110,7 +110,7 @@ function withOverview(keys) {
         const status = (meta.getAttribute('data-status') || '').trim();
         const badge = document.getElementById('operation-status-badge');
         if (badge && status) {
-            badge.className = 'status-badge status-' + status;
+            badge.className = `status-badge status-${status}`;
             const statusLabel = meta.getAttribute('data-status-label');
             if (statusLabel != null) {
                 badge.textContent = statusLabel;
@@ -136,7 +136,7 @@ function withOverview(keys) {
     const tabs = Array.from(document.querySelectorAll('#operation-tabs > .tab[data-tab]'));
     const panes = Array.from(document.querySelectorAll('.tab-panes > .tab-pane'));
     if (!tabs.length) return;
-    const STORAGE_KEY = 'krt.operation.' + (window.operationId || 'new') + '.tab';
+    const STORAGE_KEY = `krt.operation.${window.operationId || 'new'}.tab`;
 
     /**
      * Shows one tab and its pane.
@@ -153,7 +153,7 @@ function withOverview(keys) {
             t.setAttribute('aria-selected', on ? 'true' : 'false');
             t.setAttribute('tabindex', on ? '0' : '-1');
         });
-        panes.forEach((p) => p.classList.toggle('on', p.id === 'pane-op-' + shown));
+        panes.forEach((p) => p.classList.toggle('on', p.id === `pane-op-${shown}`));
         try {
             localStorage.setItem(STORAGE_KEY, shown || '');
         } catch (_e) {}
@@ -183,7 +183,7 @@ function withOverview(keys) {
         });
     }
 
-    document.addEventListener('click', function (e) {
+    document.addEventListener('click', (e) => {
         const target = /** @type {Element | null} */ (e.target);
         const goto = target && target.closest ? target.closest('[data-op-goto-tab]') : null;
         if (!goto) return;
@@ -221,14 +221,11 @@ function openDeleteModal(id) {
     const deleteForm = /** @type {HTMLFormElement} */ (
         document.getElementById('delete-operation-form')
     );
-    deleteForm.action = window.safeSameOriginUrl(
-        '/operations/' + id + '/delete',
-        deleteForm.action,
-    );
+    deleteForm.action = window.safeSameOriginUrl(`/operations/${id}/delete`, deleteForm.action);
     window.krtModal.open(document.getElementById('delete-operation-modal'));
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     if (window.krtFetch) {
         window.krtFetch.bindSwap({
             container: '#op-missions-results',
@@ -239,7 +236,7 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'operation-open-delete', function (el) {
+    window.krtEvents.on('click', 'operation-open-delete', (el) => {
         openDeleteModal(el.getAttribute('data-id'));
     });
 }
@@ -338,14 +335,14 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         const sel =
             input.value.slice(s, e) ||
             window.krtI18nText(OPS_DETAIL_MSG.linkText, 'OPS_DETAIL_MSG.linkText');
-        input.setRangeText('[' + sel + '](https://)', s, e, 'end');
+        input.setRangeText(`[${sel}](https://)`, s, e, 'end');
         input.focus();
     }
 
     viewTabs.forEach((t) =>
         t.addEventListener('click', () => showView(t.getAttribute('data-md-view'))),
     );
-    toolbar.addEventListener('click', function (e) {
+    toolbar.addEventListener('click', (e) => {
         const target = /** @type {Element} */ (e.target);
         const btn = target.closest('button');
         if (!btn) return;
@@ -360,7 +357,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
 
     const dialog = document.getElementById('edit-operation-modal');
     if (dialog) {
-        dialog.addEventListener('close', function () {
+        dialog.addEventListener('close', () => {
             const form = /** @type {HTMLFormElement | null} */ (
                 document.getElementById('operation-form')
             );
@@ -396,11 +393,11 @@ function opsDetailConflict() {
  * @param {HTMLFormElement} form the edit form
  */
 function adoptOperationFormValues(form) {
-    form.querySelectorAll('input, textarea').forEach(function (el) {
+    form.querySelectorAll('input, textarea').forEach((el) => {
         const field = /** @type {HTMLInputElement | HTMLTextAreaElement} */ (el);
         field.defaultValue = field.value;
     });
-    form.querySelectorAll('select option').forEach(function (el) {
+    form.querySelectorAll('select option').forEach((el) => {
         const option = /** @type {HTMLOptionElement} */ (el);
         option.defaultSelected = option.selected;
     });
@@ -411,7 +408,7 @@ function adoptOperationFormValues(form) {
 
     const form = /** @type {HTMLFormElement | null} */ (document.getElementById('operation-form'));
     if (form) {
-        form.addEventListener('submit', function (event) {
+        form.addEventListener('submit', (event) => {
             event.preventDefault();
             const versionInput = /** @type {HTMLInputElement | null} */ (
                 form.querySelector('[name="version"]')
@@ -456,7 +453,7 @@ function adoptOperationFormValues(form) {
         document.getElementById('delete-operation-form')
     );
     if (deleteForm) {
-        deleteForm.addEventListener('submit', function (event) {
+        deleteForm.addEventListener('submit', (event) => {
             event.preventDefault();
             window.krtFetch.write({
                 method: 'POST',
@@ -479,7 +476,7 @@ function adoptOperationFormValues(form) {
  * @returns {string | null} the URL, or null without an operation id
  */
 function payoutPaidUrl() {
-    return window.operationId ? '/operations/' + window.operationId + '/payouts/paid-out' : null;
+    return window.operationId ? `/operations/${window.operationId}/payouts/paid-out` : null;
 }
 
 /**
@@ -500,7 +497,7 @@ function refreshPayoutPaidCount() {
     const boxes = results.querySelectorAll('.payout-paid-checkbox');
     if (!boxes.length) return;
     const paid = results.querySelectorAll('.payout-paid-checkbox:checked').length;
-    counter.textContent = paid + ' / ' + boxes.length;
+    counter.textContent = `${paid} / ${boxes.length}`;
 }
 
 /**
@@ -600,7 +597,7 @@ async function handlePayoutPaidToggle(checkbox) {
     }
 }
 
-document.addEventListener('change', function (ev) {
+document.addEventListener('change', (ev) => {
     const target = /** @type {Element | null} */ (ev.target);
     const checkbox =
         target && target.closest
@@ -629,8 +626,7 @@ document.addEventListener('change', function (ev) {
         const missionId = details.getAttribute('data-op-finance-mission');
         if (!missionId) return;
         body.setAttribute('data-loaded', 'loading');
-        const url =
-            '/operations/' + encodeURIComponent(opId) + '/finance/' + encodeURIComponent(missionId);
+        const url = `/operations/${encodeURIComponent(opId)}/finance/${encodeURIComponent(missionId)}`;
         fetch(url, {
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
             credentials: 'same-origin',
@@ -653,7 +649,7 @@ document.addEventListener('change', function (ev) {
     }
     document.addEventListener(
         'toggle',
-        function (ev) {
+        (ev) => {
             const details = /** @type {Element | null} */ (ev.target);
             if (details && details.matches && details.matches('details[data-op-finance-mission]')) {
                 loadDetail(/** @type {HTMLDetailsElement} */ (details));

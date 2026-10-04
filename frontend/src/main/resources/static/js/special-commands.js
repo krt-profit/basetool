@@ -71,7 +71,7 @@
     }
 
     document.getElementById('add-sc-btn').addEventListener('click', openCreate);
-    document.addEventListener('click', function (e) {
+    document.addEventListener('click', (e) => {
         const editBtn = e.target.closest('.edit-sc-btn');
         if (editBtn) {
             openEdit(editBtn);
@@ -106,11 +106,11 @@
                 );
             } catch (_e) {}
         };
-        includeInactive.addEventListener('change', function () {
+        includeInactive.addEventListener('change', () => {
             persistScFilter();
-            const url =
-                '/admin/special-commands' +
-                (includeInactive.checked ? '?includeInactive=true' : '');
+            const url = `/admin/special-commands${
+                includeInactive.checked ? '?includeInactive=true' : ''
+            }`;
             window.krtFetch.swap({ url, container: '#sc-results', history: true });
         });
 
@@ -135,9 +135,9 @@
 
     function reswapScResults() {
         if (!window.krtFetch) return;
-        const url =
-            '/admin/special-commands' +
-            (includeInactive && includeInactive.checked ? '?includeInactive=true' : '');
+        const url = `/admin/special-commands${
+            includeInactive && includeInactive.checked ? '?includeInactive=true' : ''
+        }`;
         window.krtFetch.swap({ url, container: '#sc-results', history: false });
     }
 
@@ -157,7 +157,7 @@
     }
 
     if (form) {
-        form.addEventListener('submit', function (e) {
+        form.addEventListener('submit', (e) => {
             e.preventDefault();
             if (!window.krtFetch) {
                 form.submit();
@@ -167,7 +167,7 @@
         });
     }
     if (deleteForm) {
-        deleteForm.addEventListener('submit', function (e) {
+        deleteForm.addEventListener('submit', (e) => {
             e.preventDefault();
             if (!window.krtFetch) {
                 deleteForm.submit();
@@ -176,7 +176,7 @@
             scWrite(deleteForm, SC_MSG.deleted, closeDelete);
         });
     }
-    document.addEventListener('submit', function (e) {
+    document.addEventListener('submit', (e) => {
         const actForm = e.target.closest('form[action*="/activate"]');
         if (!actForm) {
             return;

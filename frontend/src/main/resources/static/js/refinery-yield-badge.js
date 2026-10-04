@@ -20,16 +20,16 @@
      * removes it.
      */
     function setBadge(rowIndex, bonus) {
-        const label = document.querySelector('label[for="outputQuantity_' + rowIndex + '"]');
+        const label = document.querySelector(`label[for="outputQuantity_${rowIndex}"]`);
         if (!label) return;
-        let badge = label.querySelector('#yieldBonus_' + rowIndex);
+        let badge = label.querySelector(`#yieldBonus_${rowIndex}`);
         if (bonus === undefined || bonus === null) {
             if (badge) badge.remove();
             return;
         }
         if (!badge) {
             badge = document.createElement('span');
-            badge.id = 'yieldBonus_' + rowIndex;
+            badge.id = `yieldBonus_${rowIndex}`;
             badge.className = 'yield-bonus-badge';
             /** @type {HTMLElement} */ (badge).title = state.helpText;
             label.appendChild(badge);
@@ -37,10 +37,10 @@
         badge.classList.remove('yield-positive', 'yield-negative', 'yield-zero');
         if (bonus > 0) {
             badge.classList.add('yield-positive');
-            badge.textContent = '+' + bonus + '%';
+            badge.textContent = `+${bonus}%`;
         } else if (bonus < 0) {
             badge.classList.add('yield-negative');
-            badge.textContent = bonus + '%';
+            badge.textContent = `${bonus}%`;
         } else {
             badge.classList.add('yield-zero');
             badge.textContent = '0%';
@@ -63,7 +63,7 @@
 
     /** Re-renders every row's badge against the current map. */
     function refreshAll() {
-        document.querySelectorAll('[id^="inputMaterialId_"]').forEach(function (sel) {
+        document.querySelectorAll('[id^="inputMaterialId_"]').forEach((sel) => {
             refreshFor(sel);
         });
     }
@@ -79,17 +79,17 @@
             refreshAll();
             return Promise.resolve();
         }
-        return fetch('/refinery-orders/locations/' + encodeURIComponent(locationId) + '/yields', {
+        return fetch(`/refinery-orders/locations/${encodeURIComponent(locationId)}/yields`, {
             headers: { Accept: 'application/json' },
             credentials: 'same-origin',
         })
-            .then(function (resp) {
+            .then((resp) => {
                 return resp.ok ? resp.json() : {};
             })
-            .catch(function () {
+            .catch(() => {
                 return {};
             })
-            .then(function (map) {
+            .then((map) => {
                 state.yieldByMaterialId = map || {};
                 refreshAll();
             });

@@ -15,7 +15,7 @@
                 if (value !== '') params.append(key, value);
             }
             const query = params.toString();
-            return '/admin/audit-log' + (query ? '?' + query : '');
+            return `/admin/audit-log${query ? `?${query}` : ''}`;
         };
 
         const loadResults = function (url) {
@@ -28,31 +28,31 @@
 
         const onFilterChange = function () {
             clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(function () {
+            debounceTimer = setTimeout(() => {
                 loadResults();
             }, 300);
         };
 
-        form.addEventListener('submit', function (event) {
+        form.addEventListener('submit', (event) => {
             event.preventDefault();
             clearTimeout(debounceTimer);
             loadResults();
         });
 
-        form.querySelectorAll('input, select').forEach(function (el) {
+        form.querySelectorAll('input, select').forEach((el) => {
             el.addEventListener('input', onFilterChange);
             el.addEventListener('change', onFilterChange);
         });
 
         if (resetLink) {
-            resetLink.addEventListener('click', function (event) {
+            resetLink.addEventListener('click', (event) => {
                 event.preventDefault();
-                form.querySelectorAll('input').forEach(function (el) {
+                form.querySelectorAll('input').forEach((el) => {
                     if (el.name !== 'domain') {
                         el.value = '';
                     }
                 });
-                form.querySelectorAll('select').forEach(function (el) {
+                form.querySelectorAll('select').forEach((el) => {
                     el.selectedIndex = 0;
                 });
                 if (window.krtFilterChips) window.krtFilterChips.refresh(form);
@@ -73,7 +73,7 @@
                 if (value !== '') params.append(key, value);
             }
             const query = params.toString();
-            if (query) url += '?' + query;
+            if (query) url += `?${query}`;
         }
         window.krtFetch.swap({ url, container: resultsContainer, history: true });
     };
@@ -117,7 +117,7 @@
             const saved = readEventFilterPrefs()[activeDomain];
             const known =
                 typeof saved === 'string' &&
-                Array.prototype.some.call(eventSelect.options, function (option) {
+                Array.prototype.some.call(eventSelect.options, (option) => {
                     return option.value === saved;
                 });
             if (known && saved !== eventSelect.value) {
@@ -169,21 +169,21 @@
     };
 
     const clearErrors = function (frm) {
-        frm.querySelectorAll('.bank-field-error').forEach(function (el) {
+        frm.querySelectorAll('.bank-field-error').forEach((el) => {
             el.textContent = '';
         });
     };
 
     const showError = function (frm, field, message) {
         const slot =
-            frm.querySelector('.bank-field-error[data-error-for="' + field + '"]') ||
+            frm.querySelector(`.bank-field-error[data-error-for="${field}"]`) ||
             frm.querySelector('.bank-field-error[data-error-for="_global"]');
         if (slot) {
             slot.textContent = message;
         }
     };
 
-    document.addEventListener('submit', function (event) {
+    document.addEventListener('submit', (event) => {
         const frm = event.target.closest('form.audit-download-form');
         if (!frm) {
             return;
@@ -208,20 +208,17 @@
         }
         const json = event.submitter && event.submitter.getAttribute('data-format') === 'json';
         const endpoint = frm.getAttribute('data-endpoint');
-        const url =
-            (json ? endpoint + '.json' : endpoint) +
-            '?from=' +
-            encodeURIComponent(from.value) +
-            '&to=' +
-            encodeURIComponent(to.value);
+        const url = `${json ? `${endpoint}.json` : endpoint}?from=${encodeURIComponent(
+            from.value,
+        )}&to=${encodeURIComponent(to.value)}`;
         const baseName = frm.getAttribute('data-filename') || 'audit.pdf';
         const filename = json ? baseName.replace(/\.pdf$/, '.json') : baseName;
-        downloadBlob(url, filename, function () {
+        downloadBlob(url, filename, () => {
             showError(frm, '_global', downloadError);
         });
     });
 
-    document.addEventListener('submit', function (event) {
+    document.addEventListener('submit', (event) => {
         const frm = event.target.closest('form.audit-purge-form');
         if (!frm) {
             return;
@@ -244,7 +241,7 @@
             return;
         }
         const endpoint = frm.getAttribute('data-endpoint');
-        const url = endpoint + '?before=' + encodeURIComponent(before.value);
+        const url = `${endpoint}?before=${encodeURIComponent(before.value)}`;
         const successTemplate = frm.getAttribute('data-success-template') || '';
         window.krtFetch.write({
             url,

@@ -45,14 +45,14 @@
         if (searchInput) {
             searchInput.addEventListener('input', onSearchInput);
             searchInput.addEventListener('focus', onSearchInput);
-            document.addEventListener('click', function (e) {
+            document.addEventListener('click', (e) => {
                 if (!resultsEl) return;
                 if (e.target !== searchInput && !resultsEl.contains(e.target)) {
                     resultsEl.hidden = true;
                 }
             });
         }
-        document.addEventListener('keydown', function (e) {
+        document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 closeEdit();
                 closeDelete();
@@ -63,7 +63,7 @@
         if (editForm) editForm.addEventListener('submit', submitEditNote);
         if (deleteForm) deleteForm.addEventListener('submit', submitDeleteBp);
         if (deleteAllForm) deleteAllForm.addEventListener('submit', submitDeleteAll);
-        document.addEventListener('krt:swapped', function (e) {
+        document.addEventListener('krt:swapped', (e) => {
             const c = e.detail && e.detail.container;
             if (c && c.id === 'krt-bp-list') {
                 recountAndSync();
@@ -89,7 +89,7 @@
                 }
             } catch (_e) {}
         }
-        document.addEventListener('change', function (e) {
+        document.addEventListener('change', (e) => {
             const sel = e.target;
             if (sel.matches && sel.matches('form.krt-pi-userform [name="userSub"]')) {
                 persistMember(sel.value);
@@ -110,7 +110,7 @@
         }
         if (saved) {
             window.location.replace(
-                window.location.pathname + '?userSub=' + encodeURIComponent(saved),
+                `${window.location.pathname}?userSub=${encodeURIComponent(saved)}`,
             );
         }
     }
@@ -125,21 +125,21 @@
         let filterTimer = null;
         function swapFilter(form) {
             const params = new URLSearchParams(new FormData(form)).toString();
-            const url = form.getAttribute('action') + (params ? '?' + params : '');
+            const url = form.getAttribute('action') + (params ? `?${params}` : '');
             window.krtFetch.swap({ url, container: '#bp-results', history: true });
         }
-        document.addEventListener('submit', function (e) {
+        document.addEventListener('submit', (e) => {
             if (!e.target.classList || !e.target.classList.contains('krt-pi-filter')) return;
             e.preventDefault();
             if (filterTimer) clearTimeout(filterTimer);
             swapFilter(e.target);
         });
-        document.addEventListener('input', function (e) {
+        document.addEventListener('input', (e) => {
             const input = e.target;
             const form = input && input.form;
             if (!form || !form.classList.contains('krt-pi-filter') || input.name !== 'q') return;
             if (filterTimer) clearTimeout(filterTimer);
-            filterTimer = setTimeout(function () {
+            filterTimer = setTimeout(() => {
                 swapFilter(form);
             }, 300);
         });
@@ -153,22 +153,19 @@
     function runSearch() {
         if (!searchInput || !resultsEl) return;
         const q = searchInput.value || '';
-        const url =
-            (endpoints().search || '/personal-inventory/blueprints/search') +
-            '?q=' +
-            encodeURIComponent(q) +
-            '&limit=25';
+        const url = `${
+            endpoints().search || '/personal-inventory/blueprints/search'
+        }?q=${encodeURIComponent(q)}&limit=25`;
         resultsEl.hidden = false;
-        resultsEl.innerHTML =
-            '<div class="krt-pi-typeahead-loading">' +
-            escapeHtml(window.krtI18nText(i18n().searching, 'krtBlueprintsI18n.searching')) +
-            '</div>';
+        resultsEl.innerHTML = `<div class="krt-pi-typeahead-loading">${escapeHtml(
+            window.krtI18nText(i18n().searching, 'krtBlueprintsI18n.searching'),
+        )}</div>`;
         fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-            .then(function (resp) {
+            .then((resp) => {
                 return resp.ok ? resp.json() : [];
             })
             .then(renderResults)
-            .catch(function () {
+            .catch(() => {
                 renderResults([]);
             });
     }
@@ -176,28 +173,27 @@
     function renderResults(items) {
         if (!resultsEl) return;
         if (!items || items.length === 0) {
-            resultsEl.innerHTML =
-                '<div class="krt-pi-typeahead-empty">' +
-                escapeHtml(window.krtI18nText(i18n().noResults, 'krtBlueprintsI18n.noResults')) +
-                '</div>';
+            resultsEl.innerHTML = `<div class="krt-pi-typeahead-empty">${escapeHtml(
+                window.krtI18nText(i18n().noResults, 'krtBlueprintsI18n.noResults'),
+            )}</div>`;
             return;
         }
         let html = '';
-        items.forEach(function (it) {
+        items.forEach((it) => {
             const isStaged = staged.has(it.productKey);
             const blocked = it.ownedByCurrentUser;
-            const cls =
-                'krt-pi-typeahead-item krt-bp-result' +
-                (blocked ? ' krt-bp-result-owned' : '') +
-                (isStaged ? ' krt-bp-result-staged' : '');
+            const cls = `krt-pi-typeahead-item krt-bp-result${
+                blocked ? ' krt-bp-result-owned' : ''
+            }${isStaged ? ' krt-bp-result-staged' : ''}`;
             let meta = escapeHtml(it.manufacturerName || '');
             if (blocked) {
                 meta = escapeHtml(window.krtI18nText(i18n().owned, 'krtBlueprintsI18n.owned'));
             } else if (it.variantCount && it.variantCount > 1) {
                 meta = escapeHtml(
-                    it.variantCount +
-                        ' ' +
-                        window.krtI18nText(i18n().variants, 'krtBlueprintsI18n.variants'),
+                    `${it.variantCount} ${window.krtI18nText(
+                        i18n().variants,
+                        'krtBlueprintsI18n.variants',
+                    )}`,
                 );
             }
             let disabledAttr = '';
@@ -205,29 +201,17 @@
                 disabledAttr = ' disabled';
             }
             html +=
-                '<button type="button" class="' +
-                escapeAttr(cls) +
-                '"' +
-                ' data-key="' +
-                escapeAttr(it.productKey) +
-                '"' +
-                ' data-name="' +
-                escapeAttr(it.name) +
-                '"' +
-                disabledAttr +
-                '>' +
-                '<span class="krt-pi-typeahead-name">' +
-                escapeHtml(it.name || '') +
-                '</span>' +
-                '<span class="krt-pi-typeahead-meta">' +
-                meta +
-                '</span>' +
-                '</button>';
+                `<button type="button" class="${escapeAttr(cls)}"` +
+                ` data-key="${escapeAttr(it.productKey)}"` +
+                ` data-name="${escapeAttr(it.name)}"${disabledAttr}>` +
+                `<span class="krt-pi-typeahead-name">${escapeHtml(it.name || '')}</span>` +
+                `<span class="krt-pi-typeahead-meta">${meta}</span>` +
+                `</button>`;
         });
         resultsEl.innerHTML = html;
-        resultsEl.querySelectorAll('.krt-bp-result').forEach(function (btn) {
+        resultsEl.querySelectorAll('.krt-bp-result').forEach((btn) => {
             if (btn.disabled) return;
-            btn.addEventListener('click', function () {
+            btn.addEventListener('click', () => {
                 toggleStaged(btn.getAttribute('data-key'), btn.getAttribute('data-name'));
                 btn.classList.toggle(
                     'krt-bp-result-staged',
@@ -251,36 +235,27 @@
         if (!stagingListEl) return;
         let html = '';
         if (staged.size === 0) {
-            stagingListEl.innerHTML =
-                '<span class="krt-bp-staging-empty">' +
-                escapeHtml(
-                    stagingListEl.getAttribute('data-empty-text') || i18n().emptyStaging || '',
-                ) +
-                '</span>';
+            stagingListEl.innerHTML = `<span class="krt-bp-staging-empty">${escapeHtml(
+                stagingListEl.getAttribute('data-empty-text') || i18n().emptyStaging || '',
+            )}</span>`;
         } else {
             const removeLabel = window.krtI18nText(
                 i18n().chipRemove,
                 'krtBlueprintsI18n.chipRemove',
             );
-            staged.forEach(function (name, key) {
+            staged.forEach((name, key) => {
                 html +=
-                    '<span class="chip chip--primary" data-key="' +
-                    escapeAttr(key) +
-                    '">' +
-                    '<span class="krt-bp-chip-name">' +
-                    escapeHtml(name) +
-                    '</span>' +
-                    '<button type="button" class="krt-bp-chip-remove" data-key="' +
-                    escapeAttr(key) +
-                    '"' +
-                    ' aria-label="' +
-                    escapeAttr(removeLabel) +
-                    '">&times;</button>' +
-                    '</span>';
+                    `<span class="chip chip--primary" data-key="${escapeAttr(key)}">` +
+                    `<span class="krt-bp-chip-name">${escapeHtml(name)}</span>` +
+                    `<button type="button" class="krt-bp-chip-remove" data-key="${escapeAttr(
+                        key,
+                    )}"` +
+                    ` aria-label="${escapeAttr(removeLabel)}">&times;</button>` +
+                    `</span>`;
             });
             stagingListEl.innerHTML = html;
-            stagingListEl.querySelectorAll('.krt-bp-chip-remove').forEach(function (btn) {
-                btn.addEventListener('click', function () {
+            stagingListEl.querySelectorAll('.krt-bp-chip-remove').forEach((btn) => {
+                btn.addEventListener('click', () => {
                     toggleStaged(btn.getAttribute('data-key'), null);
                 });
             });
@@ -371,7 +346,7 @@
         }
         if (deleteAllBtn) {
             let removable = 0;
-            rows.forEach(function (r) {
+            rows.forEach((r) => {
                 if (r.getAttribute('data-removable') === 'true') {
                     removable++;
                 }
@@ -398,14 +373,13 @@
                 conflict: conflictObj(),
                 onSuccess(result) {
                     const res = result || {};
-                    const msg =
-                        window.krtI18nText(i18n().addedLabel, 'krtBlueprintsI18n.addedLabel') +
-                        ': ' +
-                        (res.added || 0) +
-                        ', ' +
-                        window.krtI18nText(i18n().skippedLabel, 'krtBlueprintsI18n.skippedLabel') +
-                        ': ' +
-                        ((res.skippedAlreadyOwned || 0) + (res.skippedUnresolved || 0));
+                    const msg = `${window.krtI18nText(
+                        i18n().addedLabel,
+                        'krtBlueprintsI18n.addedLabel',
+                    )}: ${res.added || 0}, ${window.krtI18nText(
+                        i18n().skippedLabel,
+                        'krtBlueprintsI18n.skippedLabel',
+                    )}: ${(res.skippedAlreadyOwned || 0) + (res.skippedUnresolved || 0)}`;
                     if (window.showFrontendSuccessToast) {
                         window.showFrontendSuccessToast(msg);
                     }
@@ -418,7 +392,7 @@
                     afterListWrite();
                 },
             })
-            .then(function () {
+            .then(() => {
                 if (addSelectedBtn) {
                     addSelectedBtn.disabled = staged.size === 0;
                 }
@@ -451,7 +425,7 @@
         const msgEl = $('krt-bp-delete-message');
         const name = btn.getAttribute('data-name');
         if (msgEl && name) {
-            msgEl.textContent = (i18n().removeBody || msgEl.textContent) + ' (' + name + ')';
+            msgEl.textContent = `${i18n().removeBody || msgEl.textContent} (${name})`;
         }
         window.krtModal.open(deleteModal);
     }
@@ -507,7 +481,7 @@
                     patchBlueprintRow(dto);
                 },
             })
-            .then(function () {
+            .then(() => {
                 if (submitBtn) {
                     submitBtn.disabled = false;
                 }
@@ -524,7 +498,7 @@
         }
         const newNote = dto.note == null ? '' : dto.note;
         let row = null;
-        document.querySelectorAll('#krt-bp-master-rows .master-row').forEach(function (r) {
+        document.querySelectorAll('#krt-bp-master-rows .master-row').forEach((r) => {
             if (r.getAttribute('data-id') === dto.id) {
                 row = r;
             }
@@ -595,7 +569,7 @@
                     afterListWrite();
                 },
             })
-            .then(function () {
+            .then(() => {
                 if (submitBtn) {
                     submitBtn.disabled = false;
                 }
@@ -631,7 +605,7 @@
                     afterListWrite();
                 },
             })
-            .then(function () {
+            .then(() => {
                 if (submitBtn) {
                     submitBtn.disabled = false;
                 }

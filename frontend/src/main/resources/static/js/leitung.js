@@ -54,8 +54,8 @@
         }
         params.set('fragment', 'leitungSections');
         return window.krtFetch.swap({
-            url: '/organisation/leitung?' + params.toString(),
-            container: '#' + SECTIONS_ID,
+            url: `/organisation/leitung?${params.toString()}`,
+            container: `#${SECTIONS_ID}`,
             fragmentValue: 'leitungSections',
             history: false,
         });
@@ -101,7 +101,7 @@
             run();
             return;
         }
-        window.showKrtConfirm(title, message, i18n.confirm, i18n.cancel).then(function (ok) {
+        window.showKrtConfirm(title, message, i18n.confirm, i18n.cancel).then((ok) => {
             if (ok) {
                 run();
             }
@@ -120,7 +120,7 @@
         }
         return /** @type {HTMLElement[]} */ (
             Array.prototype.slice.call(md.querySelectorAll('.leitung-tree__row'))
-        ).filter(function (r) {
+        ).filter((r) => {
             return !r.hidden;
         });
     }
@@ -181,7 +181,7 @@
             return;
         }
         const options = opts || {};
-        const pane = document.getElementById('lt-pane-' + unitId);
+        const pane = document.getElementById(`lt-pane-${unitId}`);
         if (!pane) {
             return;
         }
@@ -230,10 +230,10 @@
                 const row = /** @type {HTMLElement} */ (rows[i]);
                 const hit = q === '' || (row.getAttribute('data-search') || '').indexOf(q) !== -1;
                 row.hidden = !hit;
-                groupHit = groupHit || hit;
+                groupHit ||= hit;
             }
             /** @type {HTMLElement} */ (groups[g]).hidden = !groupHit;
-            any = any || groupHit;
+            any ||= groupHit;
         }
         const none = document.getElementById('leitung-tree-nomatch');
         if (none) {
@@ -252,7 +252,7 @@
         }
         const rendered = md.getAttribute('data-selected-unit') || '';
         const unit =
-            state.unit && document.getElementById('lt-pane-' + state.unit) ? state.unit : rendered;
+            state.unit && document.getElementById(`lt-pane-${state.unit}`) ? state.unit : rendered;
         if (!state.unit) {
             state.tab = md.getAttribute('data-selected-tab') || 'members';
         }
@@ -286,7 +286,7 @@
      */
     function currentRow(unitId, userId) {
         return document.querySelector(
-            '#lt-pane-' + CSS.escape(unitId) + ' tr[data-user-id="' + CSS.escape(userId) + '"]',
+            `#lt-pane-${CSS.escape(unitId)} tr[data-user-id="${CSS.escape(userId)}"]`,
         );
     }
 
@@ -322,14 +322,10 @@
         if (groupSelect) {
             groupSelect.disabled = !needsGroup(rank);
         }
-        state.focusSelector =
-            '#lt-pane-' +
-            CSS.escape(unitId) +
-            ' tr[data-user-id="' +
-            CSS.escape(userId) +
-            '"] .' +
-            (changed === groupSelect ? 'leitung-group-select' : 'leitung-rank-select');
-        const base = '/organisation/leitung/squadrons/' + unitId + '/ranks/' + userId + '/ajax';
+        state.focusSelector = `#lt-pane-${CSS.escape(unitId)} tr[data-user-id="${CSS.escape(
+            userId,
+        )}"] .${changed === groupSelect ? 'leitung-group-select' : 'leitung-rank-select'}`;
+        const base = `/organisation/leitung/squadrons/${unitId}/ranks/${userId}/ajax`;
         /** @returns {string} the version the page shows now */
         const version = function () {
             const fresh = currentRow(unitId, userId) || row;
@@ -338,7 +334,7 @@
         if (rank === 'MEMBER') {
             write({
                 url() {
-                    return base + '?version=' + encodeURIComponent(version());
+                    return `${base}?version=${encodeURIComponent(version())}`;
                 },
                 method: 'DELETE',
                 success: i18n.deleted,
@@ -368,19 +364,14 @@
     function clearRank(item) {
         const unitId = item.getAttribute('data-unit-id') || '';
         const userId = item.getAttribute('data-user-id') || '';
-        confirmThen(item.getAttribute('data-user-name'), i18n.confirmClearRank, function () {
+        confirmThen(item.getAttribute('data-user-name'), i18n.confirmClearRank, () => {
             write({
                 url() {
                     const row = currentRow(unitId, userId);
                     const version = row ? row.getAttribute('data-version') || '0' : '0';
-                    return (
-                        '/organisation/leitung/squadrons/' +
-                        unitId +
-                        '/ranks/' +
-                        userId +
-                        '/ajax?version=' +
-                        encodeURIComponent(version)
-                    );
+                    return `/organisation/leitung/squadrons/${unitId}/ranks/${
+                        userId
+                    }/ajax?version=${encodeURIComponent(version)}`;
                 },
                 method: 'DELETE',
                 success: i18n.deleted,
@@ -404,7 +395,7 @@
             return;
         }
         write({
-            url: '/organisation/leitung/squadrons/' + unitId + '/kommando-groups/ajax',
+            url: `/organisation/leitung/squadrons/${unitId}/kommando-groups/ajax`,
             method: 'POST',
             payload: { name },
             success: i18n.saved,
@@ -431,10 +422,7 @@
             return;
         }
         write({
-            url:
-                '/organisation/leitung/kommando-groups/' +
-                row.getAttribute('data-group-id') +
-                '/ajax',
+            url: `/organisation/leitung/kommando-groups/${row.getAttribute('data-group-id')}/ajax`,
             method: 'PUT',
             payload: {
                 name,
@@ -455,12 +443,11 @@
         if (!row) {
             return;
         }
-        confirmThen(btn.getAttribute('data-group-name'), i18n.confirmDeleteGroup, function () {
+        confirmThen(btn.getAttribute('data-group-name'), i18n.confirmDeleteGroup, () => {
             write({
-                url:
-                    '/organisation/leitung/kommando-groups/' +
-                    row.getAttribute('data-group-id') +
-                    '/ajax',
+                url: `/organisation/leitung/kommando-groups/${row.getAttribute(
+                    'data-group-id',
+                )}/ajax`,
                 method: 'DELETE',
                 success: i18n.deleted,
             });
@@ -474,16 +461,11 @@
      * @param {string} segment the URL segment of the unit kind
      */
     function removeMember(item, segment) {
-        confirmThen(item.getAttribute('data-user-name'), i18n.confirmRemove, function () {
+        confirmThen(item.getAttribute('data-user-name'), i18n.confirmRemove, () => {
             write({
-                url:
-                    '/organisation/leitung/' +
-                    segment +
-                    '/' +
-                    item.getAttribute('data-unit-id') +
-                    '/members/' +
-                    item.getAttribute('data-user-id') +
-                    '/ajax',
+                url: `/organisation/leitung/${segment}/${item.getAttribute(
+                    'data-unit-id',
+                )}/members/${item.getAttribute('data-user-id')}/ajax`,
                 method: 'DELETE',
                 success: i18n.deleted,
             });
@@ -496,12 +478,11 @@
      * @param {HTMLElement} item the menu item
      */
     function setGrandAdmiral(item) {
-        confirmThen(item.getAttribute('data-user-name'), i18n.confirmSetGrandAdmiral, function () {
+        confirmThen(item.getAttribute('data-user-name'), i18n.confirmSetGrandAdmiral, () => {
             write({
-                url:
-                    '/organisation/leitung/organisationsleitung/' +
-                    item.getAttribute('data-unit-id') +
-                    '/grand-admiral/ajax',
+                url: `/organisation/leitung/organisationsleitung/${item.getAttribute(
+                    'data-unit-id',
+                )}/grand-admiral/ajax`,
                 method: 'PUT',
                 payload: { userId: item.getAttribute('data-user-id') },
                 success: i18n.saved,
@@ -515,20 +496,15 @@
      * @param {HTMLElement} item the menu item
      */
     function removeGrandAdmiral(item) {
-        confirmThen(
-            item.getAttribute('data-user-name'),
-            i18n.confirmRemoveGrandAdmiral,
-            function () {
-                write({
-                    url:
-                        '/organisation/leitung/organisationsleitung/' +
-                        item.getAttribute('data-unit-id') +
-                        '/grand-admiral/ajax',
-                    method: 'DELETE',
-                    success: i18n.saved,
-                });
-            },
-        );
+        confirmThen(item.getAttribute('data-user-name'), i18n.confirmRemoveGrandAdmiral, () => {
+            write({
+                url: `/organisation/leitung/organisationsleitung/${item.getAttribute(
+                    'data-unit-id',
+                )}/grand-admiral/ajax`,
+                method: 'DELETE',
+                success: i18n.saved,
+            });
+        });
     }
 
     /**
@@ -652,10 +628,7 @@
         }
         if (context.action === 'add-ol') {
             write({
-                url:
-                    '/organisation/leitung/organisationsleitung/' +
-                    context.unitId +
-                    '/members/ajax',
+                url: `/organisation/leitung/organisationsleitung/${context.unitId}/members/ajax`,
                 method: 'POST',
                 payload: { userId },
                 success: i18n.saved,
@@ -666,7 +639,7 @@
                 return;
             }
             write({
-                url: '/organisation/leitung/bereiche/' + context.unitId + '/members/ajax',
+                url: `/organisation/leitung/bereiche/${context.unitId}/members/ajax`,
                 method: 'POST',
                 payload: { userId, role },
                 success: i18n.saved,
@@ -678,7 +651,7 @@
             const params = new URLSearchParams();
             params.set('userId', userId);
             window.krtFetch.submitForm({
-                url: '/organisation/special-commands/' + context.unitId + '/members',
+                url: `/organisation/special-commands/${context.unitId}/members`,
                 method: 'POST',
                 formData: params,
                 successMessage: i18n.saved,
@@ -691,7 +664,7 @@
         closeModal();
     }
 
-    document.addEventListener('click', function (e) {
+    document.addEventListener('click', (e) => {
         const target = e.target instanceof Element ? e.target : null;
         if (!target) {
             return;
@@ -713,7 +686,7 @@
             closeModal();
             return;
         }
-        if (!target.closest('#' + SECTIONS_ID)) {
+        if (!target.closest(`#${SECTIONS_ID}`)) {
             return;
         }
         const row = /** @type {HTMLElement | null} */ (target.closest('.leitung-tree__row'));
@@ -742,9 +715,9 @@
         }
     });
 
-    document.addEventListener('change', function (e) {
+    document.addEventListener('change', (e) => {
         const target = e.target instanceof Element ? e.target : null;
-        if (!target || !target.closest('#' + SECTIONS_ID)) {
+        if (!target || !target.closest(`#${SECTIONS_ID}`)) {
             return;
         }
         if (target.matches('.leitung-rank-select, .leitung-group-select')) {
@@ -757,7 +730,7 @@
         }
     });
 
-    document.addEventListener('input', function (e) {
+    document.addEventListener('input', (e) => {
         const target = e.target instanceof HTMLInputElement ? e.target : null;
         if (target && target.id === 'leitung-tree-search') {
             state.query = target.value;
@@ -765,9 +738,9 @@
         }
     });
 
-    document.addEventListener('keydown', function (e) {
+    document.addEventListener('keydown', (e) => {
         const target = e.target instanceof HTMLElement ? e.target : null;
-        if (!target || !target.closest('#' + SECTIONS_ID)) {
+        if (!target || !target.closest(`#${SECTIONS_ID}`)) {
             return;
         }
         if (target.matches('.leitung-new-group-name') && e.key === 'Enter') {
@@ -826,7 +799,7 @@
         }
     });
 
-    document.addEventListener('krt:swapped', function (e) {
+    document.addEventListener('krt:swapped', (e) => {
         const container = e.detail ? e.detail.container : null;
         if (container && container.id === SECTIONS_ID) {
             init();

@@ -73,13 +73,11 @@ function setMyDisplay(id, display) {
 function bulkGroupSelector(groupCb) {
     const materialId = groupCb.getAttribute('data-material-id');
     if (materialId) {
-        return '.inventory-item-checkbox[data-material-id="' + materialId + '"]';
+        return `.inventory-item-checkbox[data-material-id="${materialId}"]`;
     }
-    return (
-        '.inventory-item-checkbox[data-game-item-id="' +
-        groupCb.getAttribute('data-game-item-id') +
-        '"]'
-    );
+    return `.inventory-item-checkbox[data-game-item-id="${groupCb.getAttribute(
+        'data-game-item-id',
+    )}"]`;
 }
 
 const bulkSelectedIds = new Set();
@@ -91,7 +89,7 @@ function getCheckedItemIds() {
 function applyBulkSelectionToLoaded(root) {
     /** @type {NodeListOf<HTMLInputElement>} */ (
         (root || document).querySelectorAll('.inventory-item-checkbox')
-    ).forEach(function (cb) {
+    ).forEach((cb) => {
         const id = cb.getAttribute('data-id');
         cb.checked = !!id && bulkSelectedIds.has(id);
     });
@@ -117,25 +115,25 @@ function updateBulkCheckoutState() {
         document.getElementById('bulkOrgUnitBtn')
     );
     if (orgUnitBtn) orgUnitBtn.disabled = count === 0;
-    ['bulkStolenMarkBtn', 'bulkStolenUnmarkBtn'].forEach(function (id) {
+    ['bulkStolenMarkBtn', 'bulkStolenUnmarkBtn'].forEach((id) => {
         const stolenBtn = /** @type {HTMLButtonElement | null} */ (document.getElementById(id));
         if (stolenBtn) stolenBtn.disabled = count === 0;
     });
     if (countSpan) countSpan.textContent = String(count);
     /** @type {NodeListOf<HTMLInputElement>} */ (
         document.querySelectorAll('.group-select-all')
-    ).forEach(function (groupCb) {
+    ).forEach((groupCb) => {
         const groupBoxes = /** @type {NodeListOf<HTMLInputElement>} */ (
             document.querySelectorAll(bulkGroupSelector(groupCb))
         );
         let allChecked = groupBoxes.length > 0;
-        groupBoxes.forEach(function (cb) {
+        groupBoxes.forEach((cb) => {
             if (!cb.checked) allChecked = false;
         });
         groupCb.checked = allChecked;
         groupCb.indeterminate =
             !allChecked &&
-            Array.from(groupBoxes).some(function (cb) {
+            Array.from(groupBoxes).some((cb) => {
                 return cb.checked;
             });
     });
@@ -155,7 +153,7 @@ function toggleGroupCheckboxes(groupCb) {
     const groupBoxes = /** @type {NodeListOf<HTMLInputElement>} */ (
         document.querySelectorAll(bulkGroupSelector(groupCb))
     );
-    groupBoxes.forEach(function (cb) {
+    groupBoxes.forEach((cb) => {
         cb.checked = groupCb.checked;
         const id = cb.getAttribute('data-id');
         if (id) {
@@ -204,7 +202,7 @@ function fetchAllMatchingEntryIds() {
     const personalOnly = personalScopeIs('personal');
     const nonPersonalOnly = personalScopeIs('shared');
 
-    const url = new URL(window.location.origin + '/inventory/my/entry-ids');
+    const url = new URL(`${window.location.origin}/inventory/my/entry-ids`);
     if (itemsView) url.searchParams.append('view', 'items');
     activeMaterials.forEach((m) => url.searchParams.append('materialIds', m));
     activeGameItems.forEach((g) => url.searchParams.append('gameItemIds', g));
@@ -220,8 +218,8 @@ function fetchAllMatchingEntryIds() {
         method: 'GET',
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'same-origin',
-    }).then(function (r) {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
+    }).then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
     });
 }
@@ -240,7 +238,7 @@ async function toggleSelectAllInView() {
     try {
         const ids = await fetchAllMatchingEntryIds();
         bulkSelectedIds.clear();
-        (Array.isArray(ids) ? ids : []).forEach(function (id) {
+        (Array.isArray(ids) ? ids : []).forEach((id) => {
             if (id) bulkSelectedIds.add(String(id));
         });
         applyBulkSelectionToLoaded(document);
@@ -285,8 +283,8 @@ async function executeBulkCheckout() {
         return;
     }
     const affectedOrderIds = [];
-    ids.forEach(function (itemId) {
-        myLager.collectLeafOrderIds(itemId).forEach(function (orderId) {
+    ids.forEach((itemId) => {
+        myLager.collectLeafOrderIds(itemId).forEach((orderId) => {
             if (affectedOrderIds.indexOf(orderId) < 0) affectedOrderIds.push(orderId);
         });
     });
@@ -311,7 +309,7 @@ async function executeBulkCheckout() {
     });
 }
 
-window.addEventListener('click', function (event) {
+window.addEventListener('click', (event) => {
     const bulkModal = document.getElementById('bulkCheckoutModal');
     if (event.target === bulkModal) closeBulkCheckoutModal();
     const rebookModal = document.getElementById('bulkRebookModal');
@@ -361,16 +359,16 @@ function refreshBulkRebookOrgUnitPicker() {
             ? userSelect.value
             : currentInventoryUserId();
     if (!ownerId) return;
-    fetch('/users/' + encodeURIComponent(ownerId) + '/memberships?allKinds=true', {
+    fetch(`/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true`, {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
     })
-        .then(function (r) {
+        .then((r) => {
             return r.ok ? r.json() : [];
         })
-        .then(function (memberships) {
+        .then((memberships) => {
             if (!Array.isArray(memberships) || memberships.length < 1) return;
-            memberships.forEach(function (opt) {
+            memberships.forEach((opt) => {
                 const o = document.createElement('option');
                 o.value = opt.orgUnitId;
                 o.textContent = opt.orgUnitName;
@@ -378,7 +376,7 @@ function refreshBulkRebookOrgUnitPicker() {
             });
             wrapper.hidden = false;
         })
-        .catch(function () {
+        .catch(() => {
             wrapper.hidden = true;
         });
 }
@@ -487,8 +485,8 @@ function submitBulkRebook(event) {
     );
 
     const affectedOrderIds = [];
-    ids.forEach(function (itemId) {
-        myLager.collectLeafOrderIds(itemId).forEach(function (orderId) {
+    ids.forEach((itemId) => {
+        myLager.collectLeafOrderIds(itemId).forEach((orderId) => {
             if (affectedOrderIds.indexOf(orderId) < 0) affectedOrderIds.push(orderId);
         });
     });
@@ -522,7 +520,7 @@ function submitBulkRebook(event) {
                 myLager.broadcastBoardChanged();
             },
         })
-        .then(function () {
+        .then(() => {
             bulkRebookInFlight = false;
             if (submitBtn) submitBtn.disabled = false;
         });
@@ -557,7 +555,7 @@ function myPersonalScope() {
  */
 function setMyPersonalScope(scope) {
     const radio = /** @type {HTMLInputElement | null} */ (
-        document.querySelector('input[name="personalScope"][value="' + scope + '"]')
+        document.querySelector(`input[name="personalScope"][value="${scope}"]`)
     );
     if (radio) radio.checked = true;
 }
@@ -732,7 +730,7 @@ function restoreMyInventoryFilters() {
             if (minQualitySelect.value === saved.minQuality) changed = true;
         }
     }
-    families.forEach(function (f) {
+    families.forEach((f) => {
         if (applyMySavedSelection(f[0], f[1], f[2], f[3])) changed = true;
     });
     if (saved.personalOnly === true) {
@@ -753,7 +751,7 @@ function restoreMyInventoryFilters() {
 function countActiveMyInventoryFilters() {
     const snapshot = snapshotMyInventoryFilters();
     let active = 0;
-    ['materials', 'gameItems', 'locations', 'jobOrders', 'missions'].forEach(function (dimension) {
+    ['materials', 'gameItems', 'locations', 'jobOrders', 'missions'].forEach((dimension) => {
         if (Array.isArray(snapshot[dimension]) && snapshot[dimension].length > 0) active++;
     });
     if (typeof snapshot.minQuality === 'string' && snapshot.minQuality !== '') active++;
@@ -785,7 +783,7 @@ function filterMyInventory() {
     container.style.opacity = '0.5';
     container.style.pointerEvents = 'none';
 
-    const url = new URL(window.location.origin + '/inventory/my');
+    const url = new URL(`${window.location.origin}/inventory/my`);
     url.searchParams.append('fragment', 'true');
     if (itemsView) url.searchParams.append('view', 'items');
     activeMaterials.forEach((m) => url.searchParams.append('materialIds', m));
@@ -798,7 +796,7 @@ function filterMyInventory() {
     if (nonPersonalOnly) url.searchParams.append('nonPersonalOnly', 'true');
     appendMyStolenFilter(url.searchParams, stolenFilter);
 
-    const visibleUrl = new URL(window.location.origin + '/inventory/my');
+    const visibleUrl = new URL(`${window.location.origin}/inventory/my`);
     if (itemsView) visibleUrl.searchParams.append('view', 'items');
     activeMaterials.forEach((m) => visibleUrl.searchParams.append('materialIds', m));
     activeGameItems.forEach((g) => visibleUrl.searchParams.append('gameItemIds', g));
@@ -827,14 +825,12 @@ function filterMyInventory() {
 }
 
 function resetMyInventoryFilter() {
-    ['matCheck', 'gameItemCheck', 'locCheck', 'jobOrderCheck', 'missionCheck'].forEach(
-        function (cls) {
-            const boxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
-                document.getElementsByClassName(cls)
-            );
-            for (let i = 0; i < boxes.length; i++) boxes[i].checked = false;
-        },
-    );
+    ['matCheck', 'gameItemCheck', 'locCheck', 'jobOrderCheck', 'missionCheck'].forEach((cls) => {
+        const boxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
+            document.getElementsByClassName(cls)
+        );
+        for (let i = 0; i < boxes.length; i++) boxes[i].checked = false;
+    });
     [
         'matAll',
         'gameItemAll',
@@ -843,7 +839,7 @@ function resetMyInventoryFilter() {
         'jobOrderAll',
         'itemJobOrderAll',
         'missionAll',
-    ].forEach(function (id) {
+    ].forEach((id) => {
         const el = myCheckbox(id);
         if (el) el.checked = false;
     });
@@ -916,7 +912,7 @@ if (
     });
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     const filtersRestored = restoreMyInventoryFilters();
     if (
         /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
@@ -969,7 +965,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (filtersRestored) filterMyInventory();
 });
 
-document.addEventListener('change', function (event) {
+document.addEventListener('change', (event) => {
     const target = event.target;
     if (target instanceof HTMLInputElement && target.name === 'personalScope') {
         filterMyInventory();
@@ -994,16 +990,16 @@ function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
     select.innerHTML = '';
     wrapper.hidden = true;
     if (!ownerId) return;
-    fetch('/users/' + encodeURIComponent(ownerId) + '/memberships?allKinds=true', {
+    fetch(`/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true`, {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
     })
-        .then(function (r) {
+        .then((r) => {
             return r.ok ? r.json() : [];
         })
-        .then(function (memberships) {
+        .then((memberships) => {
             if (!Array.isArray(memberships) || memberships.length < 1) return;
-            memberships.forEach(function (opt) {
+            memberships.forEach((opt) => {
                 const o = document.createElement('option');
                 o.value = opt.orgUnitId;
                 o.textContent = opt.orgUnitName;
@@ -1011,7 +1007,7 @@ function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
             });
             if (
                 umbuchenCurrentOwningOrgUnitId &&
-                memberships.some(function (m) {
+                memberships.some((m) => {
                     return m.orgUnitId === umbuchenCurrentOwningOrgUnitId;
                 })
             ) {
@@ -1019,7 +1015,7 @@ function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
             }
             wrapper.hidden = false;
         })
-        .catch(function () {
+        .catch(() => {
             wrapper.hidden = true;
         });
 }
@@ -1174,7 +1170,7 @@ function submitUmbuchen(event) {
 
     let url, payload;
     if (mode === 'PERSONAL') {
-        url = '/inventory/' + umbuchenItemId + '/personal-rebook';
+        url = `/inventory/${umbuchenItemId}/personal-rebook`;
         const orgWrapper = document.getElementById('umbuchenPersonalOrgUnitWrapper');
         const orgSelect = /** @type {HTMLSelectElement | null} */ (
             document.getElementById('umbuchenPersonalOrgUnitId')
@@ -1199,7 +1195,7 @@ function submitUmbuchen(event) {
         const reductions = window.krtHerkunft
             ? window.krtHerkunft.collect('umbuchen')
             : { jobOrderReductions: null, missionReductions: null };
-        url = '/inventory/' + umbuchenItemId + '/transfer';
+        url = `/inventory/${umbuchenItemId}/transfer`;
         payload = {
             amount,
             type: 'TRANSFER',
@@ -1232,7 +1228,7 @@ function submitUmbuchen(event) {
                 myLager.broadcastBoardChanged();
             },
         })
-        .then(function () {
+        .then(() => {
             umbuchenInFlight = false;
             if (submitBtn) submitBtn.disabled = false;
         });
@@ -1264,16 +1260,16 @@ function fillOrgUnitChangePicker(currentOrgUnitId) {
     select.appendChild(none);
     const me = currentInventoryUserId();
     if (!me) return;
-    fetch('/users/' + encodeURIComponent(me) + '/memberships?allKinds=true', {
+    fetch(`/users/${encodeURIComponent(me)}/memberships?allKinds=true`, {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
     })
-        .then(function (r) {
+        .then((r) => {
             return r.ok ? r.json() : [];
         })
-        .then(function (memberships) {
+        .then((memberships) => {
             if (!Array.isArray(memberships)) return;
-            memberships.forEach(function (opt) {
+            memberships.forEach((opt) => {
                 const o = document.createElement('option');
                 o.value = opt.orgUnitId;
                 o.textContent = opt.orgUnitName;
@@ -1281,13 +1277,13 @@ function fillOrgUnitChangePicker(currentOrgUnitId) {
             });
             select.value =
                 currentOrgUnitId &&
-                memberships.some(function (m) {
+                memberships.some((m) => {
                     return m.orgUnitId === currentOrgUnitId;
                 })
                     ? currentOrgUnitId
                     : '';
         })
-        .catch(function () {
+        .catch(() => {
             select.value = '';
         });
 }
@@ -1382,9 +1378,7 @@ function submitOrgUnitChange(event) {
     const mergeStock = !!(merge && merge.checked);
     const bulk = Array.isArray(orgUnitChangeTarget.itemIds);
     if (!bulk && !orgUnitChangeTarget.id) return;
-    const url = bulk
-        ? '/inventory/bulk-org-unit'
-        : '/inventory/' + orgUnitChangeTarget.id + '/org-unit';
+    const url = bulk ? '/inventory/bulk-org-unit' : `/inventory/${orgUnitChangeTarget.id}/org-unit`;
     const payload = bulk
         ? { itemIds: orgUnitChangeTarget.itemIds, targetOwningOrgUnitId: orgUnitId, mergeStock }
         : { version: orgUnitChangeTarget.version, targetOwningOrgUnitId: orgUnitId, mergeStock };
@@ -1410,7 +1404,7 @@ function submitOrgUnitChange(event) {
                 myLager.broadcastBoardChanged();
             },
         })
-        .then(function () {
+        .then(() => {
             orgUnitChangeInFlight = false;
             if (submitBtn) submitBtn.disabled = false;
         });
@@ -1450,7 +1444,7 @@ function submitBulkStolenMark(el) {
                 myLager.broadcastBoardChanged();
             },
         })
-        .then(function () {
+        .then(() => {
             bulkStolenInFlight = false;
             updateBulkCheckoutState();
         });
@@ -1477,10 +1471,10 @@ function reportBulkStolenOutcome(body) {
 }
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'inv-my-toggle-multi', function (el) {
+    window.krtEvents.on('click', 'inv-my-toggle-multi', (el) => {
         myLager.toggleMultiSelect(el.getAttribute('data-multi-target'));
     });
-    window.krtEvents.on('change', 'inv-my-toggle-all', function (el) {
+    window.krtEvents.on('change', 'inv-my-toggle-all', (el) => {
         myLager.toggleSelectAll(
             el.getAttribute('data-all-id'),
             el.getAttribute('data-check-class'),
@@ -1488,7 +1482,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         );
         filterMyInventory();
     });
-    window.krtEvents.on('change', 'inv-my-update-state', function (el) {
+    window.krtEvents.on('change', 'inv-my-update-state', (el) => {
         myLager.updateSelectState(
             el.getAttribute('data-all-id'),
             el.getAttribute('data-check-class'),
@@ -1500,14 +1494,14 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'inv-my-reset-filter', resetMyInventoryFilter);
     window.krtEvents.on('click', 'inv-my-clear-selection', clearBulkSelection);
     window.krtEvents.on('click', 'inv-my-open-bulk', openBulkCheckoutModal);
-    window.krtEvents.on('change', 'inv-my-toggle-group-cb', function (el) {
+    window.krtEvents.on('change', 'inv-my-toggle-group-cb', (el) => {
         toggleGroupCheckboxes(el);
     });
-    window.krtEvents.on('change', 'inv-my-update-bulk-state', function (el) {
+    window.krtEvents.on('change', 'inv-my-update-bulk-state', (el) => {
         onEntryCheckboxToggle(el);
     });
     window.krtEvents.on('click', 'inv-my-select-all', toggleSelectAllInView);
-    window.krtEvents.on('click', 'inv-my-umbuchen', function (el) {
+    window.krtEvents.on('click', 'inv-my-umbuchen', (el) => {
         openUmbuchenModal(
             el.getAttribute('data-id'),
             el.getAttribute('data-amount'),
@@ -1522,7 +1516,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             el.getAttribute('data-owning-org-unit-id'),
         );
     });
-    window.krtEvents.on('click', 'inv-my-open-note', function (el) {
+    window.krtEvents.on('click', 'inv-my-open-note', (el) => {
         openNoteModal(el);
     });
     window.krtEvents.on('change', 'inv-my-toggle-umbuchen-mode', toggleUmbuchenMode);

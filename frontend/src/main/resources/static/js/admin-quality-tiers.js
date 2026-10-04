@@ -218,7 +218,7 @@
         };
     }
 
-    form.addEventListener('submit', function (event) {
+    form.addEventListener('submit', (event) => {
         event.preventDefault();
         if (!window.krtFetch || !idInput) {
             return;
@@ -226,7 +226,7 @@
         const id = idInput.value;
         window.krtFetch.write({
             method: 'POST',
-            url: id ? PAGE_URL + '/' + encodeURIComponent(id) : PAGE_URL,
+            url: id ? `${PAGE_URL}/${encodeURIComponent(id)}` : PAGE_URL,
             payload: payload(),
             submitter: submitBtn,
             successMessage: id ? QT_MSG.updated : QT_MSG.created,
@@ -241,14 +241,14 @@
     });
 
     if (deleteConfirm) {
-        deleteConfirm.addEventListener('click', function () {
+        deleteConfirm.addEventListener('click', () => {
             if (!window.krtFetch || !pendingDeleteId) {
                 return;
             }
             const id = pendingDeleteId;
             window.krtFetch.write({
                 method: 'POST',
-                url: PAGE_URL + '/' + encodeURIComponent(id) + '/delete',
+                url: `${PAGE_URL}/${encodeURIComponent(id)}/delete`,
                 submitter: deleteConfirm,
                 successMessage: QT_MSG.deleted,
                 errorMessage: QT_MSG.deleteError,
@@ -267,7 +267,7 @@
         addBtn.addEventListener('click', openCreate);
     }
 
-    document.addEventListener('click', function (event) {
+    document.addEventListener('click', (event) => {
         const target = event.target instanceof Element ? event.target : null;
         if (!target) {
             return;

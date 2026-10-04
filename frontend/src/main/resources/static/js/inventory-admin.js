@@ -197,7 +197,7 @@ function restoreAdminInventoryFilters() {
             if (minQualitySelect.value === saved.minQuality) changed = true;
         }
     }
-    families.forEach(function (f) {
+    families.forEach((f) => {
         if (applyAdminSavedSelection(f[0], f[1], f[2], f[3])) changed = true;
     });
     const stolenSelect = adminStolenFilterSelect();
@@ -211,7 +211,7 @@ function restoreAdminInventoryFilters() {
 function countActiveAdminInventoryFilters() {
     const snapshot = snapshotAdminInventoryFilters();
     let active = 0;
-    ['materials', 'gameItems', 'locations', 'jobOrders', 'missions'].forEach(function (dimension) {
+    ['materials', 'gameItems', 'locations', 'jobOrders', 'missions'].forEach((dimension) => {
         if (Array.isArray(snapshot[dimension]) && snapshot[dimension].length > 0) active++;
     });
     if (typeof snapshot.minQuality === 'string' && snapshot.minQuality !== '') active++;
@@ -242,7 +242,7 @@ function filterInventory() {
     container.style.opacity = '0.5';
     container.style.pointerEvents = 'none';
 
-    const url = new URL(window.location.origin + '/inventory/all');
+    const url = new URL(`${window.location.origin}/inventory/all`);
     url.searchParams.append('fragment', 'true');
 
     if (itemsView) url.searchParams.append('view', 'items');
@@ -254,7 +254,7 @@ function filterInventory() {
     activeMissions.forEach((m) => url.searchParams.append('missionIds', m));
     appendAdminStolenFilter(url.searchParams, stolenFilter);
 
-    const visibleUrl = new URL(window.location.origin + '/inventory/all');
+    const visibleUrl = new URL(`${window.location.origin}/inventory/all`);
     if (itemsView) visibleUrl.searchParams.append('view', 'items');
     activeMats.forEach((m) => visibleUrl.searchParams.append('materialIds', m));
     activeGameItems.forEach((g) => visibleUrl.searchParams.append('gameItemIds', g));
@@ -331,14 +331,12 @@ if (
 }
 
 function resetInventoryFilter() {
-    ['matCheck', 'gameItemCheck', 'locCheck', 'jobOrderCheck', 'missionCheck'].forEach(
-        function (cls) {
-            const boxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
-                document.getElementsByClassName(cls)
-            );
-            for (let i = 0; i < boxes.length; i++) boxes[i].checked = false;
-        },
-    );
+    ['matCheck', 'gameItemCheck', 'locCheck', 'jobOrderCheck', 'missionCheck'].forEach((cls) => {
+        const boxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
+            document.getElementsByClassName(cls)
+        );
+        for (let i = 0; i < boxes.length; i++) boxes[i].checked = false;
+    });
     [
         'matAll',
         'gameItemAll',
@@ -347,7 +345,7 @@ function resetInventoryFilter() {
         'jobOrderAll',
         'itemJobOrderAll',
         'missionAll',
-    ].forEach(function (id) {
+    ].forEach((id) => {
         const el = adminCheckbox(id);
         if (el) el.checked = false;
     });
@@ -374,7 +372,7 @@ function resetInventoryFilter() {
     filterInventory();
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     const filtersRestored = restoreAdminInventoryFilters();
     if (
         /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
@@ -430,10 +428,10 @@ document.addEventListener('DOMContentLoaded', function () {
     if (filtersRestored) filterInventory();
 });
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     const matSelect = document.getElementById('materialId');
     if (matSelect) {
-        matSelect.addEventListener('change', function () {
+        matSelect.addEventListener('change', () => {
             filterJobOrdersByMaterial(/** @type {HTMLSelectElement} */ (matSelect).value);
         });
     }
@@ -629,7 +627,7 @@ function submitUmbuchen(event) {
     window.krtFetch
         .write({
             method: 'POST',
-            url: '/inventory/' + adminUmbuchenItemId + '/transfer',
+            url: `/inventory/${adminUmbuchenItemId}/transfer`,
             payload,
             successMessage: umbuchenI18n.success,
             errorMessage: umbuchenI18n.error,
@@ -642,7 +640,7 @@ function submitUmbuchen(event) {
                 adminLager.broadcastBoardChanged();
             },
         })
-        .then(function () {
+        .then(() => {
             adminUmbuchenInFlight = false;
             if (submitBtn) submitBtn.disabled = false;
         });
@@ -665,19 +663,19 @@ function submitUmbuchen(event) {
         window.krtModal.close(dialog);
     }
 
-    deleteBtn.addEventListener('click', function () {
+    deleteBtn.addEventListener('click', () => {
         window.krtModal.open(modal);
     });
 
     cancelBtn.addEventListener('click', closeModal);
 
-    window.addEventListener('click', function (e) {
+    window.addEventListener('click', (e) => {
         if (e.target === modal) {
             closeModal();
         }
     });
 
-    confirmBtn.addEventListener('click', async function () {
+    confirmBtn.addEventListener('click', async () => {
         if (!window.krtFetch) return;
         confirmBtn.disabled = true;
         cancelBtn.disabled = true;
@@ -703,10 +701,10 @@ function submitUmbuchen(event) {
 })();
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'inv-admin-toggle-multi', function (el) {
+    window.krtEvents.on('click', 'inv-admin-toggle-multi', (el) => {
         adminLager.toggleMultiSelect(el.getAttribute('data-multi-target'));
     });
-    window.krtEvents.on('change', 'inv-admin-toggle-all', function (el) {
+    window.krtEvents.on('change', 'inv-admin-toggle-all', (el) => {
         adminLager.toggleSelectAll(
             el.getAttribute('data-all-id'),
             el.getAttribute('data-check-class'),
@@ -714,7 +712,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         );
         filterInventory();
     });
-    window.krtEvents.on('change', 'inv-admin-update-state', function (el) {
+    window.krtEvents.on('change', 'inv-admin-update-state', (el) => {
         adminLager.updateSelectState(
             el.getAttribute('data-all-id'),
             el.getAttribute('data-check-class'),
@@ -724,7 +722,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     });
     window.krtEvents.on('change', 'inv-admin-filter', filterInventory);
     window.krtEvents.on('click', 'inv-admin-reset-filter', resetInventoryFilter);
-    window.krtEvents.on('click', 'inv-admin-umbuchen', function (el) {
+    window.krtEvents.on('click', 'inv-admin-umbuchen', (el) => {
         openUmbuchenModal(
             el.getAttribute('data-id'),
             el.getAttribute('data-amount'),
@@ -738,7 +736,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             el.getAttribute('data-owning-org-unit-id'),
         );
     });
-    window.krtEvents.on('click', 'inv-admin-open-note', function (el) {
+    window.krtEvents.on('click', 'inv-admin-open-note', (el) => {
         openNoteModal(el);
     });
     window.krtEvents.on('click', 'inv-admin-close-note', closeNoteModal);

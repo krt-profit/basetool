@@ -46,7 +46,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
                 fragmentValue: 'chartBody',
                 errorMessage: OC_I18N.refreshFailed,
             })
-            .then(function (ok) {
+            .then((ok) => {
                 if (!ok) {
                     return;
                 }
@@ -119,7 +119,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
 
     function setBackgroundInert(inert) {
         const regions = ['header', 'main', '#sidebar', '#sidebar-overlay'];
-        regions.forEach(function (sel) {
+        regions.forEach((sel) => {
             const el = document.querySelector(sel);
             if (!el) {
                 return;
@@ -145,11 +145,9 @@ const ORG_CHART_UNITS_SECTION = 'units';
         }
         const selector =
             'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-        return Array.prototype.slice
-            .call(modalContent.querySelectorAll(selector))
-            .filter(function (el) {
-                return el.getClientRects().length > 0;
-            });
+        return Array.prototype.slice.call(modalContent.querySelectorAll(selector)).filter((el) => {
+            return el.getClientRects().length > 0;
+        });
     }
 
     function openModal(mode, ctx) {
@@ -187,7 +185,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
             } else {
                 base = OC_I18N.title;
             }
-            titleEl.textContent = ctx.rankLabel ? base + ' — ' + ctx.rankLabel : base;
+            titleEl.textContent = ctx.rankLabel ? `${base} — ${ctx.rankLabel}` : base;
         }
         const submitBtn = modal.querySelector('[data-trigger="oc-modal-submit"]');
         if (submitBtn) {
@@ -248,7 +246,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
         const version = parseInt(field('oc-version'), 10);
 
         if (mode === 'rename') {
-            send('PUT', '/org-chart/positions/' + positionId + '/ajax', {
+            send('PUT', `/org-chart/positions/${positionId}/ajax`, {
                 name: field('oc-name'),
                 version,
             });
@@ -262,11 +260,9 @@ const ORG_CHART_UNITS_SECTION = 'units';
                 return;
             }
             const olId = encodeURIComponent(field('oc-org-unit-id'));
-            send(
-                'PUT',
-                '/organisation/leitung/organisationsleitung/' + olId + '/grand-admiral/ajax',
-                { displayName: gaName },
-            );
+            send('PUT', `/organisation/leitung/organisationsleitung/${olId}/grand-admiral/ajax`, {
+                displayName: gaName,
+            });
             return;
         }
 
@@ -278,7 +274,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
                 window.showFrontendErrorToast(OC_I18N.displayNameRequired);
                 return;
             }
-            send('PUT', '/org-chart/positions/' + positionId + '/ajax', {
+            send('PUT', `/org-chart/positions/${positionId}/ajax`, {
                 displayName,
                 version,
             });
@@ -310,7 +306,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
     }
 
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('click', 'oc-toggle-edit', function (btn) {
+        window.krtEvents.on('click', 'oc-toggle-edit', (btn) => {
             if (!chart) {
                 return;
             }
@@ -322,7 +318,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
             }
         });
 
-        window.krtEvents.on('click', 'oc-add', function (btn) {
+        window.krtEvents.on('click', 'oc-add', (btn) => {
             lastTrigger = btn;
             openModal('create', {
                 positionType: btn.getAttribute('data-position-type'),
@@ -334,12 +330,12 @@ const ORG_CHART_UNITS_SECTION = 'units';
             });
         });
 
-        window.krtEvents.on('click', 'oc-add-staff', function (btn) {
+        window.krtEvents.on('click', 'oc-add-staff', (btn) => {
             lastTrigger = btn;
             openModal('create', { staffChoice: true });
         });
 
-        window.krtEvents.on('click', 'oc-ga-add', function (btn) {
+        window.krtEvents.on('click', 'oc-ga-add', (btn) => {
             lastTrigger = btn;
             openModal('grandAdmiral', {
                 orgUnitId: btn.getAttribute('data-org-unit-id'),
@@ -348,24 +344,20 @@ const ORG_CHART_UNITS_SECTION = 'units';
             });
         });
 
-        window.krtEvents.on('click', 'oc-ga-remove', function (btn) {
-            window
-                .showKrtConfirm(OC_I18N.removeConfirmTitle, OC_I18N.removeConfirm)
-                .then(function (ok) {
-                    if (ok) {
-                        const olId = encodeURIComponent(btn.getAttribute('data-org-unit-id'));
-                        send(
-                            'DELETE',
-                            '/organisation/leitung/organisationsleitung/' +
-                                olId +
-                                '/grand-admiral/ajax',
-                            null,
-                        );
-                    }
-                });
+        window.krtEvents.on('click', 'oc-ga-remove', (btn) => {
+            window.showKrtConfirm(OC_I18N.removeConfirmTitle, OC_I18N.removeConfirm).then((ok) => {
+                if (ok) {
+                    const olId = encodeURIComponent(btn.getAttribute('data-org-unit-id'));
+                    send(
+                        'DELETE',
+                        `/organisation/leitung/organisationsleitung/${olId}/grand-admiral/ajax`,
+                        null,
+                    );
+                }
+            });
         });
 
-        window.krtEvents.on('click', 'oc-reassign', function (btn) {
+        window.krtEvents.on('click', 'oc-reassign', (btn) => {
             lastTrigger = btn;
             openModal('reassign', {
                 positionId: btn.getAttribute('data-position-id'),
@@ -376,7 +368,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
             });
         });
 
-        window.krtEvents.on('click', 'oc-rename', function (btn) {
+        window.krtEvents.on('click', 'oc-rename', (btn) => {
             lastTrigger = btn;
             openModal('rename', {
                 positionId: btn.getAttribute('data-position-id'),
@@ -385,35 +377,35 @@ const ORG_CHART_UNITS_SECTION = 'units';
             });
         });
 
-        window.krtEvents.on('click', 'oc-remove', function (btn) {
+        window.krtEvents.on('click', 'oc-remove', (btn) => {
             const isCommand = btn.getAttribute('data-position-type') === 'COMMAND_LEAD';
             const message = isCommand ? OC_I18N.removeConfirmCommand : OC_I18N.removeConfirm;
             const title = OC_I18N.removeConfirmTitle;
-            window.showKrtConfirm(title, message).then(function (ok) {
+            window.showKrtConfirm(title, message).then((ok) => {
                 if (ok) {
                     const id = encodeURIComponent(btn.getAttribute('data-position-id'));
-                    send('DELETE', '/org-chart/positions/' + id + '/ajax', null);
+                    send('DELETE', `/org-chart/positions/${id}/ajax`, null);
                 }
             });
         });
 
-        window.krtEvents.on('click', 'oc-vacate', function (btn) {
+        window.krtEvents.on('click', 'oc-vacate', (btn) => {
             const title = OC_I18N.vacateConfirmTitle;
             const message = OC_I18N.vacateConfirm;
-            window.showKrtConfirm(title, message).then(function (ok) {
+            window.showKrtConfirm(title, message).then((ok) => {
                 if (ok) {
                     const id = encodeURIComponent(btn.getAttribute('data-position-id'));
                     const version = encodeURIComponent(btn.getAttribute('data-version'));
                     send(
                         'DELETE',
-                        '/org-chart/positions/' + id + '/leader/ajax?version=' + version,
+                        `/org-chart/positions/${id}/leader/ajax?version=${version}`,
                         null,
                     );
                 }
             });
         });
 
-        window.krtEvents.on('click', 'oc-collapse', function (btn) {
+        window.krtEvents.on('click', 'oc-collapse', (btn) => {
             const bodyId = btn.getAttribute('aria-controls');
             const body = bodyId ? document.getElementById(bodyId) : null;
             if (!body) {
@@ -431,7 +423,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
                     if (tree) {
                         Array.prototype.forEach.call(
                             tree.querySelectorAll('[role="treeitem"]'),
-                            function (n) {
+                            (n) => {
                                 n.setAttribute('tabindex', n === leader ? '0' : '-1');
                             },
                         );
@@ -445,12 +437,12 @@ const ORG_CHART_UNITS_SECTION = 'units';
     }
 
     if (modal) {
-        modal.addEventListener('click', function (event) {
+        modal.addEventListener('click', (event) => {
             if (event.target === modal) {
                 closeModal();
             }
         });
-        modal.addEventListener('keydown', function (event) {
+        modal.addEventListener('keydown', (event) => {
             if (event.key === 'Escape') {
                 event.preventDefault();
                 closeModal();
@@ -482,7 +474,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
         const treeItems = function () {
             return Array.prototype.slice
                 .call(tree.querySelectorAll('[role="treeitem"]'))
-                .filter(function (el) {
+                .filter((el) => {
                     return el.offsetParent !== null;
                 });
         };
@@ -491,7 +483,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
         };
 
         const initial = treeItems();
-        initial.forEach(function (el, i) {
+        initial.forEach((el, i) => {
             el.setAttribute('tabindex', i === 0 ? '0' : '-1');
             const next = initial[i + 1];
             if (next && levelOf(next) > levelOf(el)) {
@@ -503,7 +495,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
             if (!el) {
                 return;
             }
-            treeItems().forEach(function (n) {
+            treeItems().forEach((n) => {
                 n.setAttribute('tabindex', n === el ? '0' : '-1');
             });
             el.focus();
@@ -549,7 +541,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
             return null;
         };
 
-        tree.addEventListener('keydown', function (event) {
+        tree.addEventListener('keydown', (event) => {
             const current = event.target;
             if (!current || current.getAttribute('role') !== 'treeitem') {
                 return;
@@ -595,7 +587,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
         Array.prototype.forEach.call(chart.querySelectorAll('.oc-tree'), initOneTree);
     }
     initTrees();
-    document.addEventListener('krt:swapped', function (e) {
+    document.addEventListener('krt:swapped', (e) => {
         if (e && e.detail && e.detail.container === chart) {
             initTrees();
         }
@@ -620,7 +612,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
                 chart.classList.remove('oc-chart--proxied');
                 return;
             }
-            track.style.width = chart.scrollWidth + 'px';
+            track.style.width = `${chart.scrollWidth}px`;
             bar.classList.add('oc-scrollbar--active');
             chart.classList.add('oc-chart--proxied');
         }
@@ -633,10 +625,10 @@ const ORG_CHART_UNITS_SECTION = 'units';
                 to.scrollLeft = target;
             }
         }
-        bar.addEventListener('scroll', function () {
+        bar.addEventListener('scroll', () => {
             mirror(bar, chart);
         });
-        chart.addEventListener('scroll', function () {
+        chart.addEventListener('scroll', () => {
             mirror(chart, bar);
         });
 
@@ -646,7 +638,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
                 return;
             }
             rafPending = true;
-            window.requestAnimationFrame(function () {
+            window.requestAnimationFrame(() => {
                 rafPending = false;
                 measure();
             });

@@ -163,13 +163,13 @@
         fetch(DATA_URL + buildFilterQuery(), {
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
         })
-            .then(function (res) {
+            .then((res) => {
                 if (!res.ok) {
-                    throw new Error('HTTP ' + res.status);
+                    throw new Error(`HTTP ${res.status}`);
                 }
                 return res.json();
             })
-            .then(function (data) {
+            .then((data) => {
                 if (token !== fetchToken) {
                     return;
                 }
@@ -181,7 +181,7 @@
                 show(errorBox, false);
                 render();
             })
-            .catch(function () {
+            .catch(() => {
                 if (token !== fetchToken) {
                     return;
                 }
@@ -204,13 +204,13 @@
         const materials = selectedValues('matCheck');
         const systems = selectedValues('sysCheck');
         if (materials) {
-            materials.forEach(function (v) {
-                parts.push('materials=' + encodeURIComponent(v));
+            materials.forEach((v) => {
+                parts.push(`materials=${encodeURIComponent(v)}`);
             });
         }
         if (systems) {
-            systems.forEach(function (v) {
-                parts.push('systems=' + encodeURIComponent(v));
+            systems.forEach((v) => {
+                parts.push(`systems=${encodeURIComponent(v)}`);
             });
         }
         if (isChecked('filterLoadingDock')) {
@@ -219,7 +219,7 @@
         if (isChecked('filterAutoLoad')) {
             parts.push('autoLoad=true');
         }
-        return parts.length ? '?' + parts.join('&') : '';
+        return parts.length ? `?${parts.join('&')}` : '';
     }
 
     /**
@@ -243,10 +243,10 @@
     function selectedValues(className) {
         const checks = checksOf(className);
         const picked = checks
-            .filter(function (c) {
+            .filter((c) => {
                 return c.checked;
             })
-            .map(function (c) {
+            .map((c) => {
                 return c.value;
             });
         if (picked.length === 0 || picked.length === checks.length) {
@@ -329,7 +329,7 @@
         const checks = checksOf(className);
         let anyChecked = false;
         let allChecked = true;
-        checks.forEach(function (c) {
+        checks.forEach((c) => {
             const on = saved.indexOf(c.value) >= 0;
             c.checked = on;
             if (on) {
@@ -339,7 +339,7 @@
             }
         });
         if (!anyChecked) {
-            checks.forEach(function (c) {
+            checks.forEach((c) => {
                 c.checked = true;
             });
             allChecked = true;
@@ -458,25 +458,25 @@
         if (!grouped) {
             /** @type {MatrixRow[]} */
             const rows = [];
-            groups.forEach(function (g) {
+            groups.forEach((g) => {
                 for (let i = 0; i < g.rows.length; i++) {
                     rows.push(g.rows[i]);
                 }
             });
-            rows.sort(function (a, b) {
+            rows.sort((a, b) => {
                 return String(a.materialName).localeCompare(String(b.materialName), undefined, {
                     sensitivity: 'base',
                 });
             });
-            rows.forEach(function (r) {
+            rows.forEach((r) => {
                 flat.push(rowItem(r, null));
             });
             return;
         }
-        groups.forEach(function (g) {
+        groups.forEach((g) => {
             flat.push({ type: 'kind', kind: g.kind, row: null, bestSell: null, bestBuy: null });
             if (!collapsed[g.kind]) {
-                g.rows.forEach(function (r) {
+                g.rows.forEach((r) => {
                     flat.push(rowItem(r, g.kind));
                 });
             }
@@ -485,14 +485,11 @@
 
     /** Renders the column head when the terminal set changed. */
     function renderHead() {
-        const sig =
-            String(cols.length) +
-            '|' +
-            cols
-                .map(function (c) {
-                    return c.name;
-                })
-                .join('\u0001');
+        const sig = `${String(cols.length)}|${cols
+            .map((c) => {
+                return c.name;
+            })
+            .join('\u0001')}`;
         if (sig === colsSig) {
             return;
         }
@@ -500,42 +497,29 @@
 
         let cgHtml = '<col class="mtx-col-first" />';
         let sysHtml = '<th class="mtx-corner"></th>';
-        let termHtml = '<th class="mtx-corner">' + escapeHtml(I18N.material) + '</th>';
+        let termHtml = `<th class="mtx-corner">${escapeHtml(I18N.material)}</th>`;
 
-        systemGroups(cols).forEach(function (sg) {
-            cgHtml += '<col class="mtx-col-term" span="' + escapeAttr(sg.count) + '" />';
-            sysHtml +=
-                '<th colspan="' +
-                escapeAttr(sg.count) +
-                '" class="col-system">' +
-                escapeHtml(sg.name ? sg.name : DASH) +
-                '</th>';
+        systemGroups(cols).forEach((sg) => {
+            cgHtml += `<col class="mtx-col-term" span="${escapeAttr(sg.count)}" />`;
+            sysHtml += `<th colspan="${escapeAttr(sg.count)}" class="col-system">${escapeHtml(
+                sg.name ? sg.name : DASH,
+            )}</th>`;
         });
 
-        cols.forEach(function (c) {
+        cols.forEach((c) => {
             const label = c.nickname ? c.nickname : c.name;
-            const title = c.planetName ? label + ' — ' + c.planetName : label;
-            const cls = 'col-terminal' + (c.planetCssClass ? ' ' + c.planetCssClass : '');
-            termHtml +=
-                '<th class="' +
-                escapeAttr(cls) +
-                '" title="' +
-                escapeAttr(title) +
-                '"><span class="mtx-term__name">' +
-                escapeHtml(label) +
-                '</span><span class="mtx-term__planet">' +
-                escapeHtml(c.planetName || '') +
-                '</span></th>';
+            const title = c.planetName ? `${label} — ${c.planetName}` : label;
+            const cls = `col-terminal${c.planetCssClass ? ` ${c.planetCssClass}` : ''}`;
+            termHtml += `<th class="${escapeAttr(cls)}" title="${escapeAttr(
+                title,
+            )}"><span class="mtx-term__name">${escapeHtml(
+                label,
+            )}</span><span class="mtx-term__planet">${escapeHtml(c.planetName || '')}</span></th>`;
         });
 
         colgroupEl.innerHTML = cgHtml;
         headEl.innerHTML =
-            '<tr class="row-system">' +
-            sysHtml +
-            '</tr>' +
-            '<tr class="row-terminal">' +
-            termHtml +
-            '</tr>';
+            `<tr class="row-system">${sysHtml}</tr>` + `<tr class="row-terminal">${termHtml}</tr>`;
     }
 
     /**
@@ -586,12 +570,9 @@
 
         /** @param {number} heightPx the spacer height */
         function appendSpacer(heightPx) {
-            bodyHtml +=
-                '<tr class="row-spacer" aria-hidden="true"><td colspan="' +
-                escapeAttr(span) +
-                '" data-krtm-height="' +
-                escapeAttr(heightPx) +
-                '"></td></tr>';
+            bodyHtml += `<tr class="row-spacer" aria-hidden="true"><td colspan="${escapeAttr(
+                span,
+            )}" data-krtm-height="${escapeAttr(heightPx)}"></td></tr>`;
         }
 
         /** @param {FlatItem} item the line */
@@ -599,18 +580,15 @@
             const kind = item.kind || '';
             const label = kind === I18N.unsortedSentinel ? I18N.unsorted : kind;
             const open = !collapsed[kind];
-            bodyHtml +=
-                '<tr class="row-kind" data-kind="' +
-                escapeAttr(kind) +
-                '"><td colspan="' +
-                escapeAttr(span) +
-                '" class="mtx-kind-cell"><button type="button" class="mtx-kind-toggle" aria-expanded="' +
-                (open ? 'true' : 'false') +
-                '"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-' +
-                (open ? 'chevron-down' : 'chevron-right') +
-                '"/></svg><span>' +
-                escapeHtml(label) +
-                '</span></button></td></tr>';
+            bodyHtml += `<tr class="row-kind" data-kind="${escapeAttr(
+                kind,
+            )}"><td colspan="${escapeAttr(
+                span,
+            )}" class="mtx-kind-cell"><button type="button" class="mtx-kind-toggle" aria-expanded="${
+                open ? 'true' : 'false'
+            }"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-${
+                open ? 'chevron-down' : 'chevron-right'
+            }"/></svg><span>${escapeHtml(label)}</span></button></td></tr>`;
         }
 
         /** @param {MatrixRow} r the material row */
@@ -621,18 +599,15 @@
                 [r.isVolatileQt, 'mtx-warn--warning', I18N.volatileQt],
                 [r.isVolatileTime, 'mtx-warn--warning', I18N.volatileTime],
             ];
-            flags.forEach(function (flag) {
+            flags.forEach((flag) => {
                 if (!flag[0]) {
                     return;
                 }
-                bodyHtml +=
-                    '<span class="mtx-warn ' +
-                    flag[1] +
-                    '" role="img" title="' +
-                    escapeAttr(flag[2]) +
-                    '" aria-label="' +
-                    escapeAttr(flag[2]) +
-                    '"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg></span>';
+                bodyHtml += `<span class="mtx-warn ${flag[1]}" role="img" title="${escapeAttr(
+                    flag[2],
+                )}" aria-label="${escapeAttr(
+                    flag[2],
+                )}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg></span>`;
             });
         }
 
@@ -646,34 +621,32 @@
             bodyHtml +=
                 '<tr class="row-material"><td class="mtx-name-cell"><span class="mtx-name">';
             appendWarnings(r);
-            bodyHtml +=
-                '<span class="mtx-name__text">' +
-                escapeHtml(r.materialName) +
-                '</span></span><span class="mtx-spread">' +
-                escapeHtml(I18N.spread + ' ' + spreadText) +
-                '</span></td>';
+            bodyHtml += `<span class="mtx-name__text">${escapeHtml(
+                r.materialName,
+            )}</span></span><span class="mtx-spread">${escapeHtml(
+                `${I18N.spread} ${spreadText}`,
+            )}</span></td>`;
             for (let i = 0; i < cols.length; i++) {
                 const c = cols[i];
                 const cell = r.prices ? r.prices[c.name] : undefined;
                 const sell = cell ? positive(cell.priceSell) : null;
                 const buy = cell ? positive(cell.priceBuy) : null;
-                let cls = 'col-terminal' + (c.planetCssClass ? ' ' + c.planetCssClass : '');
+                let cls = `col-terminal${c.planetCssClass ? ` ${c.planetCssClass}` : ''}`;
                 if (sell !== null && sell === item.bestSell) {
                     cls += ' is-best-sell';
                 }
                 if (buy !== null && buy === item.bestBuy) {
                     cls += ' is-best-buy';
                 }
-                bodyHtml += '<td class="' + escapeAttr(cls) + '">';
+                bodyHtml += `<td class="${escapeAttr(cls)}">`;
                 if (sell === null && buy === null) {
-                    bodyHtml += '<span class="mtx-empty">' + DASH + '</span>';
+                    bodyHtml += `<span class="mtx-empty">${DASH}</span>`;
                 }
                 if (sell !== null) {
-                    bodyHtml += '<span class="price-sell">+' + escapeHtml(fmt(sell)) + '</span>';
+                    bodyHtml += `<span class="price-sell">+${escapeHtml(fmt(sell))}</span>`;
                 }
                 if (buy !== null) {
-                    bodyHtml +=
-                        '<span class="price-buy">' + MINUS + escapeHtml(fmt(buy)) + '</span>';
+                    bodyHtml += `<span class="price-buy">${MINUS}${escapeHtml(fmt(buy))}</span>`;
                 }
                 bodyHtml += '</td>';
             }
@@ -716,7 +689,7 @@
         for (let i = 0; i < spacers.length; i++) {
             const td = /** @type {HTMLElement} */ (spacers[i]);
             const h = parseFloat(td.getAttribute('data-krtm-height') || '0');
-            td.style.height = (isFinite(h) ? h : 0) + 'px';
+            td.style.height = `${isFinite(h) ? h : 0}px`;
         }
     }
 
@@ -742,7 +715,7 @@
             return;
         }
         scrollPending = true;
-        window.requestAnimationFrame(function () {
+        window.requestAnimationFrame(() => {
             scrollPending = false;
             if (!flat.length) {
                 return;
@@ -764,7 +737,7 @@
         if (filterTimer !== null) {
             clearTimeout(filterTimer);
         }
-        filterTimer = window.setTimeout(function () {
+        filterTimer = window.setTimeout(() => {
             filterTimer = null;
             fetchGrid();
         }, 200);
@@ -784,7 +757,7 @@
             return;
         }
         const checks = checksOf(checkClass);
-        const picked = checks.filter(function (c) {
+        const picked = checks.filter((c) => {
             return c.checked;
         });
         if (picked.length === checks.length) {
@@ -805,7 +778,7 @@
             return;
         }
         chipBox.textContent = '';
-        BOOL_FILTERS.forEach(function (id) {
+        BOOL_FILTERS.forEach((id) => {
             const box = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
             if (!box || !box.checked) {
                 return;
@@ -816,9 +789,9 @@
             const chip = document.createElement('button');
             chip.type = 'button';
             chip.className = 'chip chip--primary filter-chip';
-            chip.setAttribute('data-testid', 'filter-chip-' + id);
+            chip.setAttribute('data-testid', `filter-chip-${id}`);
             chip.setAttribute('data-clear', id);
-            chip.setAttribute('aria-label', I18N.remove ? I18N.remove + ': ' + label : label);
+            chip.setAttribute('aria-label', I18N.remove ? `${I18N.remove}: ${label}` : label);
             const text = document.createElement('span');
             text.textContent = label;
             chip.appendChild(text);
@@ -837,11 +810,11 @@
 
     /** Wires the filter controls, the grouping switch, the category heads and the scroll. */
     function bindFilters() {
-        document.querySelectorAll('.mtx-select-all').forEach(function (el) {
+        document.querySelectorAll('.mtx-select-all').forEach((el) => {
             const box = /** @type {HTMLInputElement} */ (el);
-            box.addEventListener('change', function () {
+            box.addEventListener('change', () => {
                 const checkClass = box.getAttribute('data-check-class') || '';
-                checksOf(checkClass).forEach(function (c) {
+                checksOf(checkClass).forEach((c) => {
                     c.checked = box.checked;
                 });
                 updateSelectedText(checkClass, box.getAttribute('data-header-id') || '');
@@ -849,11 +822,11 @@
             });
         });
 
-        document.querySelectorAll('.mtx-check').forEach(function (el) {
+        document.querySelectorAll('.mtx-check').forEach((el) => {
             const chk = /** @type {HTMLInputElement} */ (el);
-            chk.addEventListener('change', function () {
+            chk.addEventListener('change', () => {
                 const checkClass = chk.getAttribute('data-check-class') || '';
-                const allChecked = checksOf(checkClass).every(function (c) {
+                const allChecked = checksOf(checkClass).every((c) => {
                     return c.checked;
                 });
                 const allBox = /** @type {HTMLInputElement | null} */ (
@@ -867,12 +840,12 @@
             });
         });
 
-        document.querySelectorAll('.mtx-bool-filter').forEach(function (b) {
+        document.querySelectorAll('.mtx-bool-filter').forEach((b) => {
             b.addEventListener('change', scheduleRefetch);
         });
 
         if (chipBox) {
-            chipBox.addEventListener('click', function (ev) {
+            chipBox.addEventListener('click', (ev) => {
                 const target = /** @type {Element | null} */ (ev.target);
                 const chip = target ? target.closest('[data-clear]') : null;
                 if (!chip) {
@@ -904,14 +877,14 @@
                 groupBox.checked = pref === '1';
             }
             grouped = groupBox.checked;
-            groupBox.addEventListener('change', function () {
+            groupBox.addEventListener('change', () => {
                 grouped = groupBox.checked;
                 writeGroupPref(grouped ? '1' : '0');
                 render();
             });
         }
 
-        bodyEl.addEventListener('click', function (ev) {
+        bodyEl.addEventListener('click', (ev) => {
             const target = /** @type {Element | null} */ (ev.target);
             const kindRow = target ? target.closest('tr.row-kind') : null;
             if (!kindRow) {
@@ -925,7 +898,7 @@
             renderBody();
             scroll.scrollTop = keepScroll;
             const again = bodyEl.querySelector(
-                'tr.row-kind[data-kind="' + CSS.escape(kind) + '"] .mtx-kind-toggle',
+                `tr.row-kind[data-kind="${CSS.escape(kind)}"] .mtx-kind-toggle`,
             );
             if (again) {
                 /** @type {HTMLElement} */ (again).focus();

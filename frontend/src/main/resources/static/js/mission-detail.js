@@ -57,7 +57,7 @@ function crossPublishToParentOperation(keys) {
         operationSections.push('finance');
     }
     if (operationSections.length) {
-        window.krtLiveSync.sendChanged('operation:' + operationId, operationSections);
+        window.krtLiveSync.sendChanged(`operation:${operationId}`, operationSections);
     }
 }
 
@@ -80,7 +80,7 @@ const missionSeam = window.krtFetch.sectionWrite({
     },
     sections: MISSION_SECTIONS,
     pageUrl() {
-        return window.missionId ? '/missions/' + window.missionId : null;
+        return window.missionId ? `/missions/${window.missionId}` : null;
     },
     broadcast(keys) {
         if (window.missionPresence && typeof window.missionPresence.sendChanged === 'function') {
@@ -95,7 +95,7 @@ window.krtRefreshMissionSection = missionSeam.refresh;
 
 window.krtNotifyMissionChanged = missionSeam.notify;
 
-document.addEventListener('krt:swapped', function (ev) {
+document.addEventListener('krt:swapped', (ev) => {
     const container = ev && ev.detail && ev.detail.container;
     if (!container || container.id !== 'crew-board-results') {
         return;
@@ -116,11 +116,11 @@ document.addEventListener('krt:swapped', function (ev) {
         checkedInEl.textContent = checkedIn;
     }
     if (badge) {
-        badge.textContent = checkedIn + '/' + registered;
+        badge.textContent = `${checkedIn}/${registered}`;
     }
 });
 
-document.addEventListener('krt:swapped', function (ev) {
+document.addEventListener('krt:swapped', (ev) => {
     const container = ev && ev.detail && ev.detail.container;
     if (!container || container.id !== 'finance-results') {
         return;
@@ -132,7 +132,7 @@ document.addEventListener('krt:swapped', function (ev) {
     }
 });
 
-document.addEventListener('krt:swapped', function (ev) {
+document.addEventListener('krt:swapped', (ev) => {
     const container = ev && ev.detail && ev.detail.container;
     if (!container || container.id !== 'overview-results') {
         return;
@@ -150,7 +150,7 @@ document.addEventListener('krt:swapped', function (ev) {
     const statusLabel = meta.getAttribute('data-status-label');
     const pill = document.getElementById('mission-status-badge');
     if (pill && status) {
-        pill.className = 'status-badge status-' + status;
+        pill.className = `status-badge status-${status}`;
         if (statusLabel != null) {
             pill.textContent = statusLabel;
         }
@@ -232,7 +232,7 @@ window.krtLiveSync.createReceiver({
     function listOrder() {
         return Array.prototype.map.call(
             document.querySelectorAll('#mission-step-list .ae-row'),
-            function (r) {
+            (r) => {
                 return r.getAttribute('data-step-id');
             },
         );
@@ -246,7 +246,7 @@ window.krtLiveSync.createReceiver({
         const done = box.getAttribute('data-done') !== 'true';
         writeStep({
             method: 'PATCH',
-            url: '/missions/' + mid() + '/steps/' + sid + '/done/ajax',
+            url: `/missions/${mid()}/steps/${sid}/done/ajax`,
             payload() {
                 return { done, stepsVersion: stepsVersion() };
             },
@@ -262,7 +262,7 @@ window.krtLiveSync.createReceiver({
         );
         writeStep({
             method: 'POST',
-            url: '/missions/' + mid() + '/steps/ajax',
+            url: `/missions/${mid()}/steps/ajax`,
             payload() {
                 return { title, meta: null, stepsVersion: stepsVersion() };
             },
@@ -282,7 +282,7 @@ window.krtLiveSync.createReceiver({
         }
         writeStep({
             method: 'PUT',
-            url: '/missions/' + mid() + '/steps/' + sid + '/ajax',
+            url: `/missions/${mid()}/steps/${sid}/ajax`,
             payload() {
                 return { title, meta, stepsVersion: stepsVersion() };
             },
@@ -321,9 +321,7 @@ window.krtLiveSync.createReceiver({
         writeStep({
             method: 'DELETE',
             url() {
-                return (
-                    '/missions/' + mid() + '/steps/' + sid + '/ajax?stepsVersion=' + stepsVersion()
-                );
+                return `/missions/${mid()}/steps/${sid}/ajax?stepsVersion=${stepsVersion()}`;
             },
         });
     }
@@ -333,7 +331,7 @@ window.krtLiveSync.createReceiver({
         }
         writeStep({
             method: 'PUT',
-            url: '/missions/' + mid() + '/steps/reorder/ajax',
+            url: `/missions/${mid()}/steps/reorder/ajax`,
             payload() {
                 return { stepIds: order, stepsVersion: stepsVersion() };
             },
@@ -356,7 +354,7 @@ window.krtLiveSync.createReceiver({
         reorder(order);
     }
 
-    document.addEventListener('click', function (e) {
+    document.addEventListener('click', (e) => {
         const t = e.target.closest('[data-trigger]');
         if (!t) {
             return;
@@ -379,7 +377,7 @@ window.krtLiveSync.createReceiver({
             moveStep(t, 1);
         }
     });
-    document.addEventListener('keydown', function (e) {
+    document.addEventListener('keydown', (e) => {
         const t = e.target.closest('[data-trigger="mission-toggle-step"]');
         if (!t) {
             return;
@@ -389,7 +387,7 @@ window.krtLiveSync.createReceiver({
             toggleStep(t);
         }
     });
-    document.addEventListener('change', function (e) {
+    document.addEventListener('change', (e) => {
         const inp = e.target.closest('#mission-step-list .ae-title, #mission-step-list .ae-meta');
         if (!inp) {
             return;
@@ -401,7 +399,7 @@ window.krtLiveSync.createReceiver({
     });
 
     let dragRow = null;
-    document.addEventListener('dragstart', function (e) {
+    document.addEventListener('dragstart', (e) => {
         const row = e.target.closest('#mission-step-list .ae-row');
         if (!row) {
             return;
@@ -411,28 +409,28 @@ window.krtLiveSync.createReceiver({
             e.dataTransfer.effectAllowed = 'move';
         }
     });
-    document.addEventListener('dragover', function (e) {
+    document.addEventListener('dragover', (e) => {
         const list = e.target.closest('#mission-step-list');
         if (!list || !dragRow) {
             return;
         }
         e.preventDefault();
         const row = e.target.closest('.ae-row');
-        list.querySelectorAll('.ae-row').forEach(function (r) {
+        list.querySelectorAll('.ae-row').forEach((r) => {
             r.classList.remove('drag-over');
         });
         if (row && row !== dragRow) {
             row.classList.add('drag-over');
         }
     });
-    document.addEventListener('drop', function (e) {
+    document.addEventListener('drop', (e) => {
         const list = e.target.closest('#mission-step-list');
         if (!list || !dragRow) {
             return;
         }
         e.preventDefault();
         const target = e.target.closest('.ae-row');
-        list.querySelectorAll('.ae-row').forEach(function (r) {
+        list.querySelectorAll('.ae-row').forEach((r) => {
             r.classList.remove('drag-over');
         });
         if (target && target !== dragRow) {
@@ -447,8 +445,8 @@ window.krtLiveSync.createReceiver({
         }
         dragRow = null;
     });
-    document.addEventListener('dragend', function () {
-        document.querySelectorAll('#mission-step-list .ae-row.drag-over').forEach(function (r) {
+    document.addEventListener('dragend', () => {
+        document.querySelectorAll('#mission-step-list .ae-row.drag-over').forEach((r) => {
             r.classList.remove('drag-over');
         });
         dragRow = null;
@@ -478,7 +476,7 @@ window.krtLiveSync.createReceiver({
     function listOrder() {
         return Array.prototype.map.call(
             document.querySelectorAll('#mission-objective-list .ae-row'),
-            function (r) {
+            (r) => {
                 return r.getAttribute('data-objective-id');
             },
         );
@@ -494,7 +492,7 @@ window.krtLiveSync.createReceiver({
         );
         writeObjective({
             method: 'POST',
-            url: '/missions/' + mid() + '/objectives/ajax',
+            url: `/missions/${mid()}/objectives/ajax`,
             payload() {
                 return { title, kind: 'PRIMARY', objectivesVersion: objectivesVersion() };
             },
@@ -514,7 +512,7 @@ window.krtLiveSync.createReceiver({
         }
         writeObjective({
             method: 'PUT',
-            url: '/missions/' + mid() + '/objectives/' + oid + '/ajax',
+            url: `/missions/${mid()}/objectives/${oid}/ajax`,
             payload() {
                 return { title, kind, objectivesVersion: objectivesVersion() };
             },
@@ -553,14 +551,9 @@ window.krtLiveSync.createReceiver({
         writeObjective({
             method: 'DELETE',
             url() {
-                return (
-                    '/missions/' +
-                    mid() +
-                    '/objectives/' +
-                    oid +
-                    '/ajax?objectivesVersion=' +
-                    objectivesVersion()
-                );
+                return `/missions/${mid()}/objectives/${
+                    oid
+                }/ajax?objectivesVersion=${objectivesVersion()}`;
             },
         });
     }
@@ -570,7 +563,7 @@ window.krtLiveSync.createReceiver({
         }
         writeObjective({
             method: 'PUT',
-            url: '/missions/' + mid() + '/objectives/reorder/ajax',
+            url: `/missions/${mid()}/objectives/reorder/ajax`,
             payload() {
                 return { objectiveIds: order, objectivesVersion: objectivesVersion() };
             },
@@ -593,7 +586,7 @@ window.krtLiveSync.createReceiver({
         reorder(order);
     }
 
-    document.addEventListener('click', function (e) {
+    document.addEventListener('click', (e) => {
         const t = e.target.closest('[data-trigger]');
         if (!t) {
             return;
@@ -613,7 +606,7 @@ window.krtLiveSync.createReceiver({
             moveObjective(t, 1);
         }
     });
-    document.addEventListener('change', function (e) {
+    document.addEventListener('change', (e) => {
         const inp = e.target.closest(
             '#mission-objective-list .ae-title, #mission-objective-list .ae-kind',
         );
@@ -627,7 +620,7 @@ window.krtLiveSync.createReceiver({
     });
 
     let dragRow = null;
-    document.addEventListener('dragstart', function (e) {
+    document.addEventListener('dragstart', (e) => {
         const row = e.target.closest('#mission-objective-list .ae-row');
         if (!row) {
             return;
@@ -637,28 +630,28 @@ window.krtLiveSync.createReceiver({
             e.dataTransfer.effectAllowed = 'move';
         }
     });
-    document.addEventListener('dragover', function (e) {
+    document.addEventListener('dragover', (e) => {
         const list = e.target.closest('#mission-objective-list');
         if (!list || !dragRow) {
             return;
         }
         e.preventDefault();
         const row = e.target.closest('.ae-row');
-        list.querySelectorAll('.ae-row').forEach(function (r) {
+        list.querySelectorAll('.ae-row').forEach((r) => {
             r.classList.remove('drag-over');
         });
         if (row && row !== dragRow) {
             row.classList.add('drag-over');
         }
     });
-    document.addEventListener('drop', function (e) {
+    document.addEventListener('drop', (e) => {
         const list = e.target.closest('#mission-objective-list');
         if (!list || !dragRow) {
             return;
         }
         e.preventDefault();
         const target = e.target.closest('.ae-row');
-        list.querySelectorAll('.ae-row').forEach(function (r) {
+        list.querySelectorAll('.ae-row').forEach((r) => {
             r.classList.remove('drag-over');
         });
         if (target && target !== dragRow) {
@@ -673,12 +666,10 @@ window.krtLiveSync.createReceiver({
         }
         dragRow = null;
     });
-    document.addEventListener('dragend', function () {
-        document
-            .querySelectorAll('#mission-objective-list .ae-row.drag-over')
-            .forEach(function (r) {
-                r.classList.remove('drag-over');
-            });
+    document.addEventListener('dragend', () => {
+        document.querySelectorAll('#mission-objective-list .ae-row.drag-over').forEach((r) => {
+            r.classList.remove('drag-over');
+        });
         dragRow = null;
     });
 })();
@@ -699,7 +690,7 @@ window.krtLiveSync.createReceiver({
         if (!list) {
             return;
         }
-        Array.prototype.forEach.call(list.querySelectorAll('.ae-row'), function (row, i) {
+        Array.prototype.forEach.call(list.querySelectorAll('.ae-row'), (row, i) => {
             const num = row.querySelector('.ae-num');
             if (num) {
                 num.textContent = String(i + 1);
@@ -765,7 +756,7 @@ window.krtLiveSync.createReceiver({
             return;
         }
         if (Array.isArray(parsed)) {
-            parsed.forEach(function (item) {
+            parsed.forEach((item) => {
                 addRow(list, template, item);
             });
         }
@@ -776,7 +767,7 @@ window.krtLiveSync.createReceiver({
         if (!list) {
             return out;
         }
-        Array.prototype.forEach.call(list.querySelectorAll('.ae-row'), function (row) {
+        Array.prototype.forEach.call(list.querySelectorAll('.ae-row'), (row) => {
             const titleInput = row.querySelector('.ae-title');
             const title = titleInput ? titleInput.value.trim() : '';
             if (!title) {
@@ -796,7 +787,7 @@ window.krtLiveSync.createReceiver({
         return out;
     }
 
-    document.addEventListener('click', function (e) {
+    document.addEventListener('click', (e) => {
         const t = e.target.closest('[data-trigger]');
         if (!t) {
             return;
@@ -834,7 +825,7 @@ window.krtLiveSync.createReceiver({
     if (form) {
         form.addEventListener(
             'submit',
-            function () {
+            () => {
                 if (objectivesJson) {
                     const objectives = serialize(objectiveList, 'kind');
                     objectivesJson.value = objectives.length ? JSON.stringify(objectives) : '';
@@ -860,11 +851,11 @@ window.krtLiveSync.createReceiver({
         window.krtModal.close(overlay);
     };
     window.krtSegSet = function (targetId, value) {
-        const seg = document.querySelector('.seg[data-seg-target="' + targetId + '"]');
+        const seg = document.querySelector(`.seg[data-seg-target="${targetId}"]`);
         const input = document.getElementById(targetId);
         if (!seg || !input) return;
         input.value = value;
-        seg.querySelectorAll('button[data-type-value]').forEach(function (b) {
+        seg.querySelectorAll('button[data-type-value]').forEach((b) => {
             const on = b.getAttribute('data-type-value') === value;
             b.classList.toggle('on-pos', on && value === 'INCOME');
             b.classList.toggle('on-neg', on && value === 'EXPENSE');
@@ -874,12 +865,12 @@ window.krtLiveSync.createReceiver({
             b.setAttribute('aria-pressed', String(on));
         });
     };
-    document.addEventListener('DOMContentLoaded', function () {
-        document.querySelectorAll('.seg[data-seg-target]').forEach(function (seg) {
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.seg[data-seg-target]').forEach((seg) => {
             const targetId = seg.getAttribute('data-seg-target');
             const input = document.getElementById(targetId);
-            seg.querySelectorAll('button[data-type-value]').forEach(function (b) {
-                b.addEventListener('click', function () {
+            seg.querySelectorAll('button[data-type-value]').forEach((b) => {
+                b.addEventListener('click', () => {
                     window.krtSegSet(targetId, b.getAttribute('data-type-value'));
                 });
             });
@@ -888,7 +879,7 @@ window.krtLiveSync.createReceiver({
     });
 })();
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     const pModal = document.getElementById('participant-modal');
     const pBtn = document.getElementById('add-participant-btn');
 
@@ -942,7 +933,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             eOrgUnitsReadonly.textContent = '';
                             const unitNames = (this.getAttribute('data-org-unit-names') || '')
                                 .split(',')
-                                .map(function (s) {
+                                .map((s) => {
                                     return s.trim();
                                 })
                                 .filter(Boolean);
@@ -952,7 +943,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 none.textContent = '—';
                                 eOrgUnitsReadonly.appendChild(none);
                             } else {
-                                unitNames.forEach(function (unitName) {
+                                unitNames.forEach((unitName) => {
                                     const badge = document.createElement('span');
                                     badge.className = 'squadron-badge';
                                     badge.textContent = unitName;
@@ -989,7 +980,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         const pid = this.getAttribute('data-participant-id') || '';
                         eUnregister.setAttribute(
                             'data-action',
-                            '/missions/' + window.missionId + '/participants/' + pid + '/delete',
+                            `/missions/${window.missionId}/participants/${pid}/delete`,
                         );
                         eUnregister.setAttribute('data-participant-id', pid);
                         eUnregister.setAttribute('data-name', this.getAttribute('data-name') || '');
@@ -1025,7 +1016,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.addEventListener('krt:swapped', bindEditParticipantButtons);
 
         if (eForm) {
-            eForm.addEventListener('submit', function () {
+            eForm.addEventListener('submit', () => {
                 const eStartTimeUi = document.getElementById('edit-participant-start-time-ui');
                 const eEndTimeUi = document.getElementById('edit-participant-end-time-ui');
                 const eStartTimeHidden = document.getElementById(
@@ -1047,7 +1038,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    document.querySelectorAll('.freq-input').forEach(function (input) {
+    document.querySelectorAll('.freq-input').forEach((input) => {
         input.addEventListener('input', function () {
             if (this.value.indexOf(',') !== -1) {
                 this.value = this.value.replace(/,/g, '.');
@@ -1059,7 +1050,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const frequencyForm = document.getElementById('frequency-form');
 
     if (frequencyModal) {
-        document.addEventListener('click', function (event) {
+        document.addEventListener('click', (event) => {
             const btn = event.target.closest && event.target.closest('.set-freq-btn');
             if (!btn) {
                 return;
@@ -1073,7 +1064,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         if (frequencyForm) {
-            frequencyForm.addEventListener('submit', async function (event) {
+            frequencyForm.addEventListener('submit', async (event) => {
                 event.preventDefault();
                 const url = frequencyForm.getAttribute('data-action');
                 if (!url || !window.krtMissionWrite) {
@@ -1101,15 +1092,15 @@ document.addEventListener('DOMContentLoaded', function () {
                             const formatted = Number(match.value).toFixed(2);
                             document
                                 .querySelectorAll(
-                                    '.freq-value-display[data-freq-type-id="' + typeId + '"]',
+                                    `.freq-value-display[data-freq-type-id="${typeId}"]`,
                                 )
-                                .forEach(function (display) {
+                                .forEach((display) => {
                                     display.textContent = formatted;
                                     display.hidden = false;
                                 });
                             document
-                                .querySelectorAll('.set-freq-btn[data-type-id="' + typeId + '"]')
-                                .forEach(function (editBtn) {
+                                .querySelectorAll(`.set-freq-btn[data-type-id="${typeId}"]`)
+                                .forEach((editBtn) => {
                                     editBtn.setAttribute('data-current-value', String(match.value));
                                 });
                         }
@@ -1194,7 +1185,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             const result = await window.krtMissionWrite({
                 method: 'DELETE',
-                url: '/missions/' + mid() + '/frequencies/' + fid + '/ajax',
+                url: `/missions/${mid()}/frequencies/${fid}/ajax`,
                 sectionKey: 'frequency',
             });
             if (result.ok && window.krtRefreshMissionSection) {
@@ -1202,7 +1193,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
-        document.addEventListener('click', function (e) {
+        document.addEventListener('click', (e) => {
             const t = e.target.closest('[data-trigger]');
             if (!t) {
                 return;
@@ -1226,7 +1217,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        customFreqForm.addEventListener('submit', async function (event) {
+        customFreqForm.addEventListener('submit', async (event) => {
             event.preventDefault();
             const name = (nameInput.value || '').trim();
             const parsed = Number.parseFloat(valueInput.value);
@@ -1241,21 +1232,21 @@ document.addEventListener('DOMContentLoaded', function () {
             const result = await window.krtMissionWrite({
                 method: isEdit ? 'PUT' : 'POST',
                 url: isEdit
-                    ? '/missions/' + mid() + '/frequencies/custom/' + fid + '/ajax'
-                    : '/missions/' + mid() + '/frequencies/custom/ajax',
+                    ? `/missions/${mid()}/frequencies/custom/${fid}/ajax`
+                    : `/missions/${mid()}/frequencies/custom/ajax`,
                 payload,
                 sectionKey: 'frequency',
             });
             if (result.ok) {
                 window.krtModalClose(customFreqModal);
                 if (isEdit && Array.isArray(result.body) && window.krtFetch) {
-                    const updated = result.body.find(function (e) {
+                    const updated = result.body.find((e) => {
                         return e && e.id === fid;
                     });
                     if (updated && updated.version != null) {
                         document
-                            .querySelectorAll('.custom-freq-row[data-custom-freq-id="' + fid + '"]')
-                            .forEach(function (row) {
+                            .querySelectorAll(`.custom-freq-row[data-custom-freq-id="${fid}"]`)
+                            .forEach((row) => {
                                 window.krtFetch.syncVersion(row, updated.version);
                             });
                         versionInput.value = updated.version;
@@ -1326,7 +1317,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const addUnitBtn = document.getElementById('add-unit-btn');
         if (addUnitBtn && addUnitModal && !addUnitBtn.dataset.auBound) {
             addUnitBtn.dataset.auBound = '1';
-            addUnitBtn.addEventListener('click', function () {
+            addUnitBtn.addEventListener('click', () => {
                 window.krtModalOpen(addUnitModal);
             });
         }
@@ -1402,7 +1393,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         const addForm = document.getElementById('add-unit-form');
         if (addForm) {
-            addForm.addEventListener('submit', async function (ev) {
+            addForm.addEventListener('submit', async (ev) => {
                 ev.preventDefault();
                 const fd = new FormData(addForm);
                 const payload = {
@@ -1416,7 +1407,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 };
                 const res = await window.krtMissionWrite({
                     method: 'POST',
-                    url: '/missions/' + window.missionId + '/units/ajax',
+                    url: `/missions/${window.missionId}/units/ajax`,
                     payload,
                     sectionKey: 'unit',
                 });
@@ -1429,7 +1420,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const editForm = document.getElementById('edit-unit-form');
         if (editForm) {
-            editForm.addEventListener('submit', async function (ev) {
+            editForm.addEventListener('submit', async (ev) => {
                 ev.preventDefault();
                 const unitId = editForm.getAttribute('data-unit-id');
                 if (!unitId) {
@@ -1450,7 +1441,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 };
                 const res = await window.krtMissionWrite({
                     method: 'PUT',
-                    url: '/missions/' + window.missionId + '/units/' + unitId + '/ajax',
+                    url: `/missions/${window.missionId}/units/${unitId}/ajax`,
                     payload,
                     sectionKey: 'unit',
                 });
@@ -1463,7 +1454,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const dForm = document.getElementById('delete-confirm-form');
         if (dForm) {
-            dForm.addEventListener('submit', async function (ev) {
+            dForm.addEventListener('submit', async (ev) => {
                 const sub = dForm.getAttribute('data-sub-section');
                 const subId = dForm.getAttribute('data-sub-id');
                 if (sub !== 'unit' || !subId) {
@@ -1472,7 +1463,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 ev.preventDefault();
                 const res = await window.krtMissionWrite({
                     method: 'DELETE',
-                    url: '/missions/' + window.missionId + '/units/' + subId + '/ajax',
+                    url: `/missions/${window.missionId}/units/${subId}/ajax`,
                     sectionKey: 'unit',
                 });
                 if (res.ok) {
@@ -1484,7 +1475,7 @@ document.addEventListener('DOMContentLoaded', function () {
     })();
 });
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     (function wireParticipantAjax() {
         if (!window.krtMissionWrite || !window.missionId) {
             return;
@@ -1492,7 +1483,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const addForm = document.getElementById('add-participant-form');
         if (addForm) {
-            addForm.addEventListener('submit', async function (ev) {
+            addForm.addEventListener('submit', async (ev) => {
                 ev.preventDefault();
                 const fd = new FormData(addForm);
                 const addOrgUnitIds =
@@ -1510,7 +1501,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 };
                 const res = await window.krtMissionWrite({
                     method: 'POST',
-                    url: '/missions/' + window.missionId + '/participants/ajax',
+                    url: `/missions/${window.missionId}/participants/ajax`,
                     payload,
                     sectionKey: 'participant',
                 });
@@ -1528,7 +1519,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const editForm = document.getElementById('edit-participant-form');
         if (editForm) {
-            editForm.addEventListener('submit', async function (ev) {
+            editForm.addEventListener('submit', async (ev) => {
                 const pId = editForm.getAttribute('data-participant-id');
                 if (!pId) {
                     return;
@@ -1548,7 +1539,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 };
                 const res = await window.krtMissionWrite({
                     method: 'PUT',
-                    url: '/missions/' + window.missionId + '/participants/' + pId + '/ajax',
+                    url: `/missions/${window.missionId}/participants/${pId}/ajax`,
                     payload,
                     sectionKey: 'participant',
                 });
@@ -1561,18 +1552,16 @@ document.addEventListener('DOMContentLoaded', function () {
                         dto.version !== null &&
                         window.krtFetch
                     ) {
-                        document
-                            .querySelectorAll('[data-participant-id="' + pId + '"]')
-                            .forEach(function (c) {
-                                window.krtFetch.syncVersion(c, dto.version);
-                            });
+                        document.querySelectorAll(`[data-participant-id="${pId}"]`).forEach((c) => {
+                            window.krtFetch.syncVersion(c, dto.version);
+                        });
                     }
                     window.krtRefreshMissionSection(['crew', 'finance', 'overview']);
                 }
             });
         }
 
-        document.addEventListener('submit', async function (ev) {
+        document.addEventListener('submit', async (ev) => {
             const f = ev.target;
             if (
                 !f ||
@@ -1589,24 +1578,15 @@ document.addEventListener('DOMContentLoaded', function () {
             ev.preventDefault();
             const res = await window.krtMissionWrite({
                 method: 'POST',
-                url:
-                    '/missions/' +
-                    window.missionId +
-                    '/participants/' +
-                    pId +
-                    '/' +
-                    action +
-                    '/ajax',
+                url: `/missions/${window.missionId}/participants/${pId}/${action}/ajax`,
                 sectionKey: 'participant',
             });
             if (res.ok) {
                 const dto = res.body;
                 if (dto && dto.version !== undefined && dto.version !== null && window.krtFetch) {
-                    document
-                        .querySelectorAll('[data-participant-id="' + pId + '"]')
-                        .forEach(function (c) {
-                            window.krtFetch.syncVersion(c, dto.version);
-                        });
+                    document.querySelectorAll(`[data-participant-id="${pId}"]`).forEach((c) => {
+                        window.krtFetch.syncVersion(c, dto.version);
+                    });
                 }
                 window.krtRefreshMissionSection(['crew', 'finance']);
             }
@@ -1614,7 +1594,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const dForm = document.getElementById('delete-confirm-form');
         if (dForm) {
-            dForm.addEventListener('submit', async function (ev) {
+            dForm.addEventListener('submit', async (ev) => {
                 const sub = dForm.getAttribute('data-sub-section');
                 const subId = dForm.getAttribute('data-sub-id');
                 if (sub !== 'participant' || !subId) {
@@ -1623,7 +1603,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 ev.preventDefault();
                 const res = await window.krtMissionWrite({
                     method: 'DELETE',
-                    url: '/missions/' + window.missionId + '/participants/' + subId + '/ajax',
+                    url: `/missions/${window.missionId}/participants/${subId}/ajax`,
                     sectionKey: 'participant',
                 });
                 if (res.ok) {
@@ -1661,7 +1641,7 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }
 
-    window.addEventListener('click', function (event) {
+    window.addEventListener('click', (event) => {
         if (event.target.classList && event.target.classList.contains('krt-modal-overlay')) {
             window.krtModalClose(event.target);
         }
@@ -1682,7 +1662,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const editForm = document.getElementById('edit-crew-form');
         if (editForm) {
-            editForm.addEventListener('submit', async function (ev) {
+            editForm.addEventListener('submit', async (ev) => {
                 const ajaxUrl = editForm.getAttribute('data-ajax-action');
                 const unitId = editForm.getAttribute('data-unit-id');
                 const crewId = editForm.getAttribute('data-crew-id');
@@ -1710,7 +1690,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const dForm = document.getElementById('delete-confirm-form');
         if (dForm) {
-            dForm.addEventListener('submit', async function (ev) {
+            dForm.addEventListener('submit', async (ev) => {
                 const sub = dForm.getAttribute('data-sub-section');
                 const crewId = dForm.getAttribute('data-sub-id');
                 const unitId = dForm.getAttribute('data-sub-unit-id');
@@ -1720,14 +1700,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 ev.preventDefault();
                 const res = await window.krtMissionWrite({
                     method: 'DELETE',
-                    url:
-                        '/missions/' +
-                        window.missionId +
-                        '/units/' +
-                        unitId +
-                        '/crew/' +
-                        crewId +
-                        '/ajax',
+                    url: `/missions/${window.missionId}/units/${unitId}/crew/${crewId}/ajax`,
                     sectionKey: 'crew',
                 });
                 if (res.ok) {
@@ -1786,7 +1759,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             debounceTimer = setTimeout(() => {
-                fetch('/users/search?query=' + encodeURIComponent(val))
+                fetch(`/users/search?query=${encodeURIComponent(val)}`)
                     .then((response) => {
                         if (!response.ok) throw new Error('Network response was not ok');
                         return response.json();
@@ -1798,7 +1771,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         users.slice(0, USER_SEARCH_RENDER_CAP).forEach((user) => {
                             const div = document.createElement('div');
                             const regex = new RegExp(
-                                '(' + val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')',
+                                `(${val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`,
                                 'gi',
                             );
                             const displayName = user.effectiveName || '';
@@ -1812,7 +1785,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 }
                             });
 
-                            div.addEventListener('click', function () {
+                            div.addEventListener('click', () => {
                                 searchInput.value = displayName;
                                 userIdInput.value = user.id;
                                 const orgUnitsGroup = document.getElementById(
@@ -1837,7 +1810,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
-        document.addEventListener('click', function (e) {
+        document.addEventListener('click', (e) => {
             if (e.target !== searchInput) {
                 closeAllLists();
             }
@@ -1856,7 +1829,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    document.addEventListener('input', function (e) {
+    document.addEventListener('input', (e) => {
         if (!e.target || e.target.id !== 'party-lead-search-input') {
             return;
         }
@@ -1874,7 +1847,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
         partyLeadDebounce = setTimeout(() => {
-            fetch('/users/search?query=' + encodeURIComponent(val))
+            fetch(`/users/search?query=${encodeURIComponent(val)}`)
                 .then((response) => {
                     if (!response.ok) throw new Error('Network response was not ok');
                     return response.json();
@@ -1885,7 +1858,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     users.slice(0, USER_SEARCH_RENDER_CAP).forEach((user) => {
                         const div = document.createElement('div');
                         const regex = new RegExp(
-                            '(' + val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')',
+                            `(${val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`,
                             'gi',
                         );
                         const displayName = user.effectiveName || '';
@@ -1898,7 +1871,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 div.appendChild(document.createTextNode(part));
                             }
                         });
-                        div.addEventListener('click', function () {
+                        div.addEventListener('click', () => {
                             input.value = displayName;
                             userIdEl.value = user.id;
                             partyLeadCloseLists();
@@ -1911,13 +1884,13 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 300);
     });
 
-    document.addEventListener('click', function (e) {
+    document.addEventListener('click', (e) => {
         if (!e.target || e.target.id !== 'party-lead-search-input') {
             partyLeadCloseLists();
         }
     });
 
-    document.addEventListener('click', function (e) {
+    document.addEventListener('click', (e) => {
         const clearBtn = e.target.closest && e.target.closest('#party-lead-clear-btn');
         if (!clearBtn) {
             return;
@@ -1933,7 +1906,7 @@ document.addEventListener('DOMContentLoaded', function () {
         form.requestSubmit();
     });
 
-    document.addEventListener('submit', async function (ev) {
+    document.addEventListener('submit', async (ev) => {
         if (!ev.target || ev.target.id !== 'party-lead-form') {
             return;
         }
@@ -1948,7 +1921,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const submittedGuestName = input.value || null;
         const res = await window.krtMissionWrite({
             method: 'PUT',
-            url: '/missions/' + window.missionId + '/party-lead/ajax',
+            url: `/missions/${window.missionId}/party-lead/ajax`,
             payload() {
                 return {
                     userId: submittedUserId,
@@ -2044,7 +2017,7 @@ async function saveActualTimeInPlace(field, nowDate) {
 
     await window.krtMissionWrite({
         method: 'POST',
-        url: '/missions/' + encodeURIComponent(currentMissionId) + '/actual-time',
+        url: `/missions/${encodeURIComponent(currentMissionId)}/actual-time`,
         payload() {
             return {
                 field,
@@ -2344,15 +2317,13 @@ async function updatePayoutPreference(selectElement) {
     if (participantId) {
         if (updatedParticipant.id === participantId) {
             document
-                .querySelectorAll(
-                    '.edit-participant-btn[data-participant-id="' + participantId + '"]',
-                )
+                .querySelectorAll(`.edit-participant-btn[data-participant-id="${participantId}"]`)
                 .forEach((btn) => {
                     btn.setAttribute('data-payout-preference', value);
                 });
             if (updatedParticipant.version != null) {
                 document
-                    .querySelectorAll('[data-participant-id="' + participantId + '"]')
+                    .querySelectorAll(`[data-participant-id="${participantId}"]`)
                     .forEach((container) => {
                         const current = parseInt(container.getAttribute('data-version'), 10);
                         if (Number.isNaN(current) || updatedParticipant.version > current) {
@@ -2364,7 +2335,7 @@ async function updatePayoutPreference(selectElement) {
     }
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     if (!window.krtMissionWrite || !window.missionId) {
         return;
     }
@@ -2376,12 +2347,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const addForm = document.getElementById('add-finance-form');
     if (addForm) {
-        addForm.addEventListener('submit', async function (ev) {
+        addForm.addEventListener('submit', async (ev) => {
             ev.preventDefault();
             const fd = new FormData(addForm);
             const res = await window.krtMissionWrite({
                 method: 'POST',
-                url: '/missions/' + financeMissionId + '/finance-entries/ajax',
+                url: `/missions/${financeMissionId}/finance-entries/ajax`,
                 payload: {
                     participantId: fd.get('participantId') || null,
                     type: fd.get('type') || 'INCOME',
@@ -2400,7 +2371,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const editForm = document.getElementById('edit-finance-form');
     if (editForm) {
-        editForm.addEventListener('submit', async function (ev) {
+        editForm.addEventListener('submit', async (ev) => {
             const entryId = editForm.getAttribute('data-entry-id');
             if (!entryId) {
                 return;
@@ -2410,7 +2381,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const versionRaw = fd.get('version');
             const res = await window.krtMissionWrite({
                 method: 'PUT',
-                url: '/missions/' + financeMissionId + '/finance-entries/' + entryId + '/ajax',
+                url: `/missions/${financeMissionId}/finance-entries/${entryId}/ajax`,
                 payload: {
                     type: fd.get('type') || 'INCOME',
                     amount: fd.get('amount') || null,
@@ -2424,8 +2395,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 const dto = res.body;
                 if (dto && dto.version != null && window.krtFetch) {
                     document
-                        .querySelectorAll('.edit-finance-btn[data-id="' + entryId + '"]')
-                        .forEach(function (btn) {
+                        .querySelectorAll(`.edit-finance-btn[data-id="${entryId}"]`)
+                        .forEach((btn) => {
                             window.krtFetch.syncVersion(btn, dto.version);
                         });
                     const hiddenVersion = document.getElementById('edit-finance-version');
@@ -2440,7 +2411,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const dForm = document.getElementById('delete-confirm-form');
     if (dForm) {
-        dForm.addEventListener('submit', async function (ev) {
+        dForm.addEventListener('submit', async (ev) => {
             if (dForm.getAttribute('data-sub-section') !== 'finance') {
                 return;
             }
@@ -2454,7 +2425,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             const res = await window.krtMissionWrite({
                 method: 'DELETE',
-                url: '/missions/' + financeMissionId + '/finance-entries/' + entryId + '/ajax',
+                url: `/missions/${financeMissionId}/finance-entries/${entryId}/ajax`,
                 sectionKey: 'finance',
             });
             if (res.ok) {
@@ -2465,7 +2436,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     function setupShipFilter(typeSelectId, shipSelectId) {
         const typeSelect = document.getElementById(typeSelectId);
         const shipSelect = document.getElementById(shipSelectId);
@@ -2523,19 +2494,19 @@ function registerMissionDetailEventHandlers() {
         );
         return;
     }
-    window.krtEvents.on('click', 'mission-set-now', function (el) {
+    window.krtEvents.on('click', 'mission-set-now', (el) => {
         setNowToInput(el.getAttribute('data-input-id'));
     });
     window.krtEvents.on('click', 'mission-change-owner', changeMissionOwner);
     window.krtEvents.on('click', 'mission-change-owning-org-unit', changeMissionOwningOrgUnit);
-    window.krtEvents.on('click', 'mission-remove-manager', function (el) {
+    window.krtEvents.on('click', 'mission-remove-manager', (el) => {
         removeMissionManager(el.getAttribute('data-manager-id'));
     });
     window.krtEvents.on('click', 'mission-add-manager', addMissionManager);
-    window.krtEvents.on('change', 'mission-update-payout', function (el) {
+    window.krtEvents.on('change', 'mission-update-payout', (el) => {
         updatePayoutPreference(el);
     });
-    window.krtEvents.on('click', 'mission-open-edit-finance', function (el) {
+    window.krtEvents.on('click', 'mission-open-edit-finance', (el) => {
         openEditFinanceModal(
             el.getAttribute('data-id'),
             el.getAttribute('data-note'),
@@ -2562,16 +2533,16 @@ if (document.readyState === 'loading') {
     const editBtn = document.getElementById('mission-edit-btn');
     const editDone = document.getElementById('mission-edit-done');
     const validKeys = verwPane && editBtn ? viewKeys.concat(EDIT_KEY) : viewKeys.slice();
-    const storeKey = 'krt.einsatz.' + (window.missionId || 'new') + '.tab';
+    const storeKey = `krt.einsatz.${window.missionId || 'new'}.tab`;
     let dirty = false;
     let current = null;
     let lastView = 'ueb';
 
     if (verwPane) {
-        verwPane.addEventListener('input', function () {
+        verwPane.addEventListener('input', () => {
             dirty = true;
         });
-        verwPane.addEventListener('submit', function () {
+        verwPane.addEventListener('submit', () => {
             dirty = false;
         });
     }
@@ -2594,7 +2565,7 @@ if (document.readyState === 'loading') {
             t.tabIndex = on || (editing && tabKey === lastView) ? 0 : -1;
         });
         document.querySelectorAll('.tab-pane').forEach((p) => {
-            p.classList.toggle('on', p.id === 'pane-' + key);
+            p.classList.toggle('on', p.id === `pane-${key}`);
         });
         if (editBtn) {
             editBtn.setAttribute('aria-pressed', String(editing));
@@ -2664,13 +2635,13 @@ if (document.readyState === 'loading') {
     }
 
     tabs.forEach((t) =>
-        t.addEventListener('click', function () {
+        t.addEventListener('click', () => {
             show(t.getAttribute('data-tab'), true);
         }),
     );
 
     if (editBtn) {
-        editBtn.addEventListener('click', function () {
+        editBtn.addEventListener('click', () => {
             if (currentKey() === EDIT_KEY) {
                 leaveEditMode();
             } else {
@@ -2679,12 +2650,12 @@ if (document.readyState === 'loading') {
         });
     }
     if (editDone) {
-        editDone.addEventListener('click', function () {
+        editDone.addEventListener('click', () => {
             leaveEditMode();
         });
     }
 
-    document.querySelector('.tab-nav').addEventListener('keydown', function (e) {
+    document.querySelector('.tab-nav').addEventListener('keydown', (e) => {
         if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
         const i = tabs.indexOf(document.activeElement);
         if (i < 0) return;
@@ -2694,12 +2665,12 @@ if (document.readyState === 'loading') {
         show(next.getAttribute('data-tab'), true);
     });
 
-    window.addEventListener('popstate', function () {
+    window.addEventListener('popstate', () => {
         apply(resolveInitial(false));
     });
 
     document.querySelectorAll('[data-tab-jump]').forEach((card) => {
-        card.addEventListener('click', function () {
+        card.addEventListener('click', () => {
             show(card.getAttribute('data-tab-jump'), true);
         });
     });
@@ -2710,7 +2681,7 @@ if (document.readyState === 'loading') {
     const pageHeader = document.querySelector('body > header');
     function syncStickyOffset() {
         if (sticky && pageHeader) {
-            sticky.style.top = pageHeader.offsetHeight + 'px';
+            sticky.style.top = `${pageHeader.offsetHeight}px`;
         }
     }
     window.addEventListener('resize', syncStickyOffset);
@@ -2728,7 +2699,7 @@ if (document.readyState === 'loading') {
      * @returns {string} the localized string
      */
     function msg(key) {
-        return window.krtI18nText(D[key], 'MISSION_SUBRES_I18N[' + key + ']');
+        return window.krtI18nText(D[key], `MISSION_SUBRES_I18N[${key}]`);
     }
     const SAVED = msg('mission.save.section.ok');
     const FAILED = msg('mission.save.section.error');
@@ -2745,14 +2716,14 @@ if (document.readyState === 'loading') {
         set('mission-flags-version', v.flagsVersion);
     }
     function clearFieldErrors() {
-        form.querySelectorAll('.field-error[data-error-for]').forEach(function (el) {
+        form.querySelectorAll('.field-error[data-error-for]').forEach((el) => {
             el.textContent = '';
         });
     }
     function renderFieldErrors(map) {
         clearFieldErrors();
-        Object.keys(map || {}).forEach(function (field) {
-            const slot = form.querySelector('.field-error[data-error-for="' + field + '"]');
+        Object.keys(map || {}).forEach((field) => {
+            const slot = form.querySelector(`.field-error[data-error-for="${field}"]`);
             if (slot) slot.textContent = map[field];
             else if (window.showFrontendErrorToast) window.showFrontendErrorToast(map[field]);
         });
@@ -2768,7 +2739,7 @@ if (document.readyState === 'loading') {
                         msg('mission.conflict.action.reload'),
                         msg('mission.conflict.action.dismiss'),
                     )
-                    .then(function (ok) {
+                    .then((ok) => {
                         if (ok) window.location.reload();
                     });
             } else {
@@ -2799,15 +2770,15 @@ if (document.readyState === 'loading') {
     };
     function sectionSnapshot(fd, fields) {
         return fields
-            .map(function (n) {
-                return n + '=' + fd.getAll(n).join(',');
+            .map((n) => {
+                return `${n}=${fd.getAll(n).join(',')}`;
             })
             .join('|');
     }
     const initialSnapshot = {};
     (function captureInitialSnapshot() {
         const fd0 = new FormData(form);
-        Object.keys(SECTION_FIELDS).forEach(function (sec) {
+        Object.keys(SECTION_FIELDS).forEach((sec) => {
             initialSnapshot[sec] = sectionSnapshot(fd0, SECTION_FIELDS[sec]);
         });
     })();
@@ -2865,7 +2836,7 @@ if (document.readyState === 'loading') {
             },
         });
     }
-    form.addEventListener('submit', function (e) {
+    form.addEventListener('submit', (e) => {
         e.preventDefault();
         submitInPlace();
     });
@@ -2916,7 +2887,7 @@ if (document.readyState === 'loading') {
      */
     function visibleBottom() {
         let bottom = window.innerHeight;
-        document.querySelectorAll('.mobile-tabbar, .krt-footer').forEach(function (bar) {
+        document.querySelectorAll('.mobile-tabbar, .krt-footer').forEach((bar) => {
             if (getComputedStyle(bar).position !== 'fixed') return;
             const r = bar.getBoundingClientRect();
             if (r.height > 0 && r.top < bottom) bottom = r.top;
@@ -2967,14 +2938,7 @@ if (document.readyState === 'loading') {
         if (srcCrewId && srcUnitId) {
             const del = await window.krtMissionWrite({
                 method: 'DELETE',
-                url:
-                    '/missions/' +
-                    window.missionId +
-                    '/units/' +
-                    srcUnitId +
-                    '/crew/' +
-                    srcCrewId +
-                    '/ajax',
+                url: `/missions/${window.missionId}/units/${srcUnitId}/crew/${srcCrewId}/ajax`,
                 sectionKey: 'crew',
             });
             if (!del.ok) return;
@@ -2986,7 +2950,7 @@ if (document.readyState === 'loading') {
         if (targetUnitId) {
             await window.krtMissionWrite({
                 method: 'POST',
-                url: '/missions/' + window.missionId + '/units/' + targetUnitId + '/crew/ajax',
+                url: `/missions/${window.missionId}/units/${targetUnitId}/crew/ajax`,
                 payload: { participantId, jobTypeIds: [] },
                 sectionKey: 'crew',
             });
@@ -2994,14 +2958,14 @@ if (document.readyState === 'loading') {
         }
     }
 
-    board.addEventListener('dragstart', function (e) {
+    board.addEventListener('dragstart', (e) => {
         const row = e.target.closest('.person-row');
         if (!row || !board.contains(row)) return;
         dragged = row;
         droppedOnZone = false;
         if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
     });
-    board.addEventListener('dragend', function () {
+    board.addEventListener('dragend', () => {
         if (dragged && !droppedOnZone) {
             const pool = document.getElementById('board-pool');
             if (
@@ -3017,7 +2981,7 @@ if (document.readyState === 'loading') {
         droppedOnZone = false;
     });
 
-    board.addEventListener('click', function (e) {
+    board.addEventListener('click', (e) => {
         if (suppressClick) {
             suppressClick = false;
             return;
@@ -3046,7 +3010,7 @@ if (document.readyState === 'loading') {
         }
     });
 
-    board.addEventListener('keydown', function (e) {
+    board.addEventListener('keydown', (e) => {
         if (e.key !== 'Enter' && e.key !== ' ') return;
         if (!e.target || typeof e.target.closest !== 'function') return;
         const row = e.target.closest('.person-row');
@@ -3064,18 +3028,18 @@ if (document.readyState === 'loading') {
         }
     });
 
-    board.addEventListener('dragover', function (e) {
+    board.addEventListener('dragover', (e) => {
         const zone = e.target.closest('.drop-zone');
         if (!zone || !board.contains(zone)) return;
         e.preventDefault();
         zone.classList.add('is-over');
     });
-    board.addEventListener('dragleave', function (e) {
+    board.addEventListener('dragleave', (e) => {
         const zone = e.target.closest('.drop-zone');
         if (!zone || !board.contains(zone)) return;
         zone.classList.remove('is-over');
     });
-    board.addEventListener('drop', function (e) {
+    board.addEventListener('drop', (e) => {
         const zone = e.target.closest('.drop-zone');
         if (!zone || !board.contains(zone)) return;
         e.preventDefault();
@@ -3087,7 +3051,7 @@ if (document.readyState === 'loading') {
         }
     });
 
-    document.addEventListener('dragover', function (e) {
+    document.addEventListener('dragover', (e) => {
         if (!dragged) return;
         driveEdgeScroll(e.clientY);
     });
@@ -3142,7 +3106,7 @@ if (document.readyState === 'loading') {
         touchPointerId = null;
     }
 
-    board.addEventListener('pointerdown', function (e) {
+    board.addEventListener('pointerdown', (e) => {
         suppressClick = false;
         if (e.pointerType === 'mouse') return;
         const row = e.target.closest('.person-row');
@@ -3159,7 +3123,7 @@ if (document.readyState === 'loading') {
         touchPointerId = e.pointerId;
         pressX = e.clientX;
         pressY = e.clientY;
-        pressTimer = window.setTimeout(function () {
+        pressTimer = window.setTimeout(() => {
             pressTimer = null;
             if (!touchRow) return;
             touchActive = true;
@@ -3170,7 +3134,7 @@ if (document.readyState === 'loading') {
         }, LONG_PRESS_MS);
     });
 
-    document.addEventListener('pointermove', function (e) {
+    document.addEventListener('pointermove', (e) => {
         if (!touchRow || e.pointerId !== touchPointerId) return;
         if (!touchActive) {
             if (
@@ -3185,7 +3149,7 @@ if (document.readyState === 'loading') {
         driveEdgeScroll(e.clientY);
     });
 
-    document.addEventListener('pointerup', function (e) {
+    document.addEventListener('pointerup', (e) => {
         if (!touchRow || e.pointerId !== touchPointerId) return;
         if (!touchActive) {
             endTouchDrag();
@@ -3207,24 +3171,24 @@ if (document.readyState === 'loading') {
         }
     });
 
-    document.addEventListener('pointercancel', function (e) {
+    document.addEventListener('pointercancel', (e) => {
         if (!touchRow || e.pointerId !== touchPointerId) return;
         endTouchDrag();
     });
 
     document.addEventListener(
         'touchmove',
-        function (e) {
+        (e) => {
             if (touchActive) e.preventDefault();
         },
         { passive: false },
     );
 
-    board.addEventListener('contextmenu', function (e) {
+    board.addEventListener('contextmenu', (e) => {
         if (touchRow) e.preventDefault();
     });
 
-    board.addEventListener('change', async function (e) {
+    board.addEventListener('change', async (e) => {
         const sel = e.target.closest('.crew-role-select');
         if (!sel || !board.contains(sel)) return;
         const value = sel.value;
@@ -3257,7 +3221,7 @@ if (document.readyState === 'loading') {
         }
     });
 
-    document.addEventListener('krt:swapped', function (ev) {
+    document.addEventListener('krt:swapped', (ev) => {
         if (ev.detail && ev.detail.container === board) {
             selected = null;
             dragged = null;
@@ -3292,7 +3256,7 @@ function krtFormatLocalDateTime(el) {
 window.krtLocalizeDates = function (root) {
     const scope = root && typeof root.querySelectorAll === 'function' ? root : document;
     scope.querySelectorAll('.krt-local-dt').forEach(krtFormatLocalDateTime);
-    scope.querySelectorAll('.refinery-endsat-local').forEach(function (el) {
+    scope.querySelectorAll('.refinery-endsat-local').forEach((el) => {
         const utcMsStr = el.getAttribute('data-utc');
         if (utcMsStr && utcMsStr !== 'null') {
             krtFormatLocalDateTime(el);
@@ -3302,9 +3266,9 @@ window.krtLocalizeDates = function (root) {
     });
 };
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     window.krtLocalizeDates(document);
 });
-document.addEventListener('krt:swapped', function (ev) {
+document.addEventListener('krt:swapped', (ev) => {
     window.krtLocalizeDates((ev.detail && ev.detail.container) || document);
 });

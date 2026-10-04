@@ -27,13 +27,13 @@
     }
 
     function metaContent(name) {
-        const el = document.querySelector('meta[name="' + name + '"]');
+        const el = document.querySelector(`meta[name="${name}"]`);
         const content = el ? el.getAttribute('content') : null;
         return content && content !== 'undefined' ? content : null;
     }
 
     function setMetaContent(name, value) {
-        let el = document.querySelector('meta[name="' + name + '"]');
+        let el = document.querySelector(`meta[name="${name}"]`);
         if (!el) {
             el = document.createElement('meta');
             el.setAttribute('name', name);
@@ -85,10 +85,10 @@
         refreshInFlight = fetch('/csrf', {
             headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         })
-            .then(function (res) {
+            .then((res) => {
                 return res.ok ? res.json() : null;
             })
-            .then(function (data) {
+            .then((data) => {
                 if (data && data.token && data.headerName) {
                     setMetaContent('_csrf', data.token);
                     setMetaContent('_csrf_header', data.headerName);
@@ -96,10 +96,10 @@
                 }
                 return null;
             })
-            .catch(function () {
+            .catch(() => {
                 return null;
             })
-            .finally(function () {
+            .finally(() => {
                 refreshInFlight = null;
             });
         return refreshInFlight;
@@ -220,7 +220,7 @@
             return;
         }
         container.setAttribute('data-version', String(newVersion));
-        container.querySelectorAll('[data-version]').forEach(function (el) {
+        container.querySelectorAll('[data-version]').forEach((el) => {
             el.setAttribute('data-version', String(newVersion));
         });
     }
@@ -256,14 +256,14 @@
     let pendingSubmitter = null;
     document.addEventListener(
         'submit',
-        function (e) {
+        (e) => {
             const form = /** @type {HTMLFormElement | null} */ (e.target);
             pendingSubmitter =
                 /** @type {SubmitEvent} */ (e).submitter ||
                 (form && form.querySelector
                     ? form.querySelector('button[type="submit"], input[type="submit"]')
                     : null);
-            Promise.resolve().then(function () {
+            Promise.resolve().then(() => {
                 pendingSubmitter = null;
             });
         },
@@ -295,7 +295,7 @@
         const result = prev.then(task, task);
         const tail = result.then(noop, noop);
         serialChains.set(key, tail);
-        tail.then(function () {
+        tail.then(() => {
             if (serialChains.get(key) === tail) {
                 serialChains.delete(key);
             }
@@ -312,7 +312,7 @@
      */
     async function handleProblem(response, problem, opts) {
         const options = opts || {};
-        const prefix = options.conflictSectionLabel ? options.conflictSectionLabel + ': ' : '';
+        const prefix = options.conflictSectionLabel ? `${options.conflictSectionLabel}: ` : '';
         const genericError = text(
             options.errorMessage,
             defaults().saveFailed,
@@ -502,7 +502,7 @@
                 syncVersion(opts.containerSelector, body.version);
             }
             if (opts.toast !== false) {
-                const label = opts.sectionLabel ? opts.sectionLabel + ': ' : '';
+                const label = opts.sectionLabel ? `${opts.sectionLabel}: ` : '';
                 successToast(
                     label + text(opts.successMessage, defaults().saved, 'krtFetchI18n.saved'),
                 );
@@ -651,7 +651,7 @@
     function withFragmentParam(url, paramName, paramValue) {
         const resolved = new URL(url, window.location.origin);
         resolved.searchParams.set(paramName, paramValue);
-        return resolved.pathname + '?' + resolved.searchParams.toString();
+        return `${resolved.pathname}?${resolved.searchParams.toString()}`;
     }
 
     /**
@@ -662,7 +662,7 @@
         const resolved = new URL(url, window.location.origin);
         resolved.searchParams.delete(paramName);
         const query = resolved.searchParams.toString();
-        return resolved.pathname + (query ? '?' + query : '');
+        return resolved.pathname + (query ? `?${query}` : '');
     }
 
     /**
@@ -727,7 +727,7 @@
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
             signal: aborter ? aborter.signal : undefined,
         })
-            .then(function (res) {
+            .then((res) => {
                 if (maybeReauthenticate(res)) {
                     return null;
                 }
@@ -744,7 +744,7 @@
                 }
                 return res.text();
             })
-            .then(function (html) {
+            .then((html) => {
                 if (!isCurrent()) {
                     return false;
                 }
@@ -776,7 +776,7 @@
                 }
                 return true;
             })
-            .catch(function (error) {
+            .catch((error) => {
                 hideIndicatorIfCurrent();
                 releaseAborter();
                 const superseded = (error && error.name === 'AbortError') || !isCurrent();
@@ -792,7 +792,7 @@
             return;
         }
         container._krtSwapBound = true;
-        container.addEventListener('click', function (event) {
+        container.addEventListener('click', (event) => {
             const anchor = event.target.closest('a.page-btn[href], a[data-swap][href]');
             if (!anchor || !container.contains(anchor)) {
                 return;
@@ -859,16 +859,13 @@
                  */
                 function t(key) {
                     if (!key) return undefined;
-                    return window.krtI18nText(
-                        dict[key],
-                        (config.dictName || 'dict') + '[' + key + ']',
-                    );
+                    return window.krtI18nText(dict[key], `${config.dictName || 'dict'}[${key}]`);
                 }
                 const key = opts.sectionKey || '';
                 const k = config.keys;
                 return write(
                     Object.assign({}, opts, {
-                        serialize: opts.serialize || (key ? 'section:' + key : undefined),
+                        serialize: opts.serialize || (key ? `section:${key}` : undefined),
                         sectionLabel: k.saveSectionPrefix
                             ? t(k.saveSectionPrefix + key)
                             : undefined,
@@ -893,7 +890,7 @@
                     config.broadcast(list);
                 }
                 return Promise.all(
-                    list.map(function (sectionKey) {
+                    list.map((sectionKey) => {
                         const cfg = config.sections[sectionKey];
                         const url = cfg ? config.pageUrl() : null;
                         if (!cfg || !url || !document.querySelector(cfg.container)) {

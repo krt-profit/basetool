@@ -73,10 +73,10 @@
             credentials: 'same-origin',
             headers: { Accept: 'application/json' },
         })
-            .then(function (response) {
+            .then((response) => {
                 return response.ok ? response.json() : null;
             })
-            .then(function (data) {
+            .then((data) => {
                 const status = data ? data.approvalStatus : null;
                 if (status === STATE_ACTIVE) {
                     onApproved();
@@ -88,12 +88,12 @@
                 }
                 schedule();
             })
-            .catch(function () {
+            .catch(() => {
                 schedule();
             });
     }
 
-    document.addEventListener('visibilitychange', function () {
+    document.addEventListener('visibilitychange', () => {
         if (stopped) {
             return;
         }

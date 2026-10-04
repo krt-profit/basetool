@@ -37,7 +37,7 @@
         const data = holder ? holder.dataset : /** @type {DOMStringMap} */ ({});
         /** @param {string} key */
         const text = function (key) {
-            const attribute = 'data-' + key.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
+            const attribute = `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
             return window.krtI18nText(data[key], attribute);
         };
         return {
@@ -57,7 +57,7 @@
         const data = holder ? holder.dataset : /** @type {DOMStringMap} */ ({});
         /** @param {string} key */
         const text = function (key) {
-            const attribute = 'data-' + key.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
+            const attribute = `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
             return window.krtI18nText(data[key], attribute);
         };
         return {
@@ -95,12 +95,11 @@
             box.appendChild(title);
             const list = document.createElement('ul');
             list.className = 'ca-undo-skipped';
-            result.skipped.forEach(function (entry) {
+            result.skipped.forEach((entry) => {
                 const item = document.createElement('li');
                 const resource = undoI18n.resources[entry.resource] || entry.resource;
                 const reason = undoI18n.reasons[entry.reason] || entry.reason;
-                item.textContent =
-                    resource + ': ' + (entry.label || undoI18n.unnamed) + ' \u2013 ' + reason;
+                item.textContent = `${resource}: ${entry.label || undoI18n.unnamed} \u2013 ${reason}`;
                 list.appendChild(item);
             });
             box.appendChild(list);
@@ -110,7 +109,7 @@
 
     const undoForm = document.getElementById('ca-undo-form');
     if (undoForm instanceof HTMLFormElement) {
-        undoForm.addEventListener('submit', function (event) {
+        undoForm.addEventListener('submit', (event) => {
             event.preventDefault();
             if (!undoClientId || !window.krtFetch) {
                 return;
@@ -123,7 +122,7 @@
             const submitter = undoForm.querySelector('button[type="submit"]');
             window.krtFetch.write({
                 method: 'POST',
-                url: BASE + '/' + encodeURIComponent(undoClientId) + '/undo',
+                url: `${BASE}/${encodeURIComponent(undoClientId)}/undo`,
                 payload: { since },
                 toast: false,
                 errorMessage: i18n.error,
@@ -148,7 +147,7 @@
         }
         window.krtFetch.write({
             method: 'POST',
-            url: BASE + '/installations/' + encodeURIComponent(id) + '/seen',
+            url: `${BASE}/installations/${encodeURIComponent(id)}/seen`,
             toast: false,
             errorMessage: i18n.error,
             submitter,
@@ -204,7 +203,7 @@
             });
     }
 
-    host.addEventListener('click', function (event) {
+    host.addEventListener('click', (event) => {
         const target = event.target;
         if (!(target instanceof Element)) {
             return;
@@ -226,7 +225,7 @@
                 disconnect(
                     i18n.confirmClientTitle,
                     i18n.confirmClientBody,
-                    BASE + '/' + encodeURIComponent(clientId),
+                    `${BASE}/${encodeURIComponent(clientId)}`,
                     clientBtn,
                 );
             }
@@ -249,7 +248,7 @@
                 disconnect(
                     i18n.confirmInstallationTitle,
                     i18n.confirmInstallationBody,
-                    BASE + '/installations/' + encodeURIComponent(id),
+                    `${BASE}/installations/${encodeURIComponent(id)}`,
                     installationBtn,
                 );
             }
