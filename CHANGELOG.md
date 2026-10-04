@@ -4,6 +4,11 @@
 
 ### Added
 
+- **Layout-Prüfung um die Seitenmuster erweitert (Phase 5).** Die Geräteklassen-Prüfung meldet jetzt
+  auch seitlich scrollende Karten am Smartphone, eine Hauptaktion außerhalb des ersten Bildschirms,
+  mehr als eine Hauptaktion im Seitenkopf, verschachtelte `.hud-box`en und Text im alten Grau.
+  Tabellenzeilen-Links tragen einheitlich die Test-ID `row-link` (REQ-UI-009, REQ-UI-027).
+
 - **Startseite: „Angemeldet" bei den nächsten Einsätzen.** In „Nächste 7 Tage" trägt jeder Einsatz,
   für den man selbst angemeldet ist, den Chip „Angemeldet". Die Missionsliste der API liefert dafür
   pro Zeile das Feld `signedUp` für den Aufrufer (REQ-MISSION-012).
@@ -173,6 +178,10 @@
 
 ### Changed
 
+- **Aufräumen nach der Website-Überarbeitung (Phase 4).** `inline-migration.css` ist entfernt, die
+  letzten `krtm-*`-Klassen sind Design-System-Bausteine oder Seitenregeln; Bank-Administration hat
+  Seitenkopf und Hinweis-Boxen. Tote CSS-Regeln, Skripte und 205 Sprachschlüssel sind weg; das
+  Bank-Kontodetail ist auf großen Bildschirmen so breit wie die übrigen Seiten (REQ-UI-027).
 - **Kartellbank: „Bestätigen" nur, wo du bestätigen darfst.** Die Antragswarteschlange zeigt die
   Bestätigen-Aktion nur noch bei Anträgen, für die dir die passende Konto-Berechtigung zusteht; sonst
   steht dort „wartet auf berechtigte Bankmitarbeiter". Die Queue-API liefert dafür pro Antrag
@@ -283,6 +292,10 @@
   erreichbar; die App selbst ändert sich nicht (REQ-API-021, REQ-OPS-042).
 
 ### Fixed
+
+- **Blueprints: Seite scrollt nicht mehr seitlich.** Die unsichtbare Hinweisblase neben
+  „Raffinerie einrechnen" verbreiterte die Seite am Smartphone auf 487 px und am Tablet um 104 px;
+  verborgene Hinweisblasen belegen jetzt keinen Platz mehr (CSS, REQ-UI-009).
 
 - **Systemeinstellungen: Auftragsbearbeitung pro Spezialkommando wieder schaltbar.** Der Abschnitt
   zeigte seit dem Wegfall des anonymen Auftragsformulars immer „Keine Spezialkommandos gefunden.";

@@ -214,9 +214,10 @@ Two binding rules shape every UI change:
   `AccessibleTextTintTest` fails the build on a stylesheet or script that sets one of the canonical
   hues as a text colour (REQ-UI-006).
 - **The cascade layer decides, not the load order** (FE-MOD-02, 2026-09-23). Every stylesheet
-  declares `@layer base, components, page, migration, utilities;` and keeps its rules inside its
-  layer: page CSS beats the design system without specificity bumps, a migrated inline class beats
-  both, and the two state classes win outright (REQ-UI-024, ADR-0212, `CascadeLayerOrderTest`).
+  declares `@layer base, components, page, utilities;` and keeps its rules inside its layer: page
+  CSS beats the design system without specificity bumps, and the two state classes (`is-hidden`, the
+  dialog's `is-open`) win outright (REQ-UI-024, ADR-0212, `CascadeLayerOrderTest`). The `migration`
+  layer went with `inline-migration.css` on 2026-10-04 (REQ-UI-027 phase 4, `NoMigrationClassTest`).
 - **One navigation chrome, rendered once** (2026-10-03). Every app page includes
   `fragments/header.html` and `fragments/sidebar.html`; the drawer is also the phone menu sheet, and
   the `Ctrl`/`⌘` + `K` quick access indexes the links the server rendered into it, so `sec:authorize`

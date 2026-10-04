@@ -1,4 +1,4 @@
-@layer base, components, page, migration, utilities;
+@layer base, components, page, utilities;
 
 @layer page {
     .card--flush > .alert {

@@ -1,4 +1,4 @@
-@layer base, components, page, migration, utilities;
+@layer base, components, page, utilities;
 
 @layer page {
     .hangar-tabs {
@@ -159,30 +159,5 @@
     #import-result-modal .skip-list p {
         margin: 0.2rem 0;
         color: var(--color-gray-2-text);
-    }
-    .hangar-filter-form {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 0.5rem;
-        margin-bottom: 1.25rem;
-    }
-    .hangar-filter {
-        position: relative;
-        width: 360px;
-        max-width: 100%;
-    }
-    .hangar-filter .hangar-filter-icon {
-        position: absolute;
-        left: 0.85rem;
-        top: 50%;
-        transform: translateY(-50%);
-        display: inline-flex;
-        color: var(--color-gray-2-text);
-        pointer-events: none;
-    }
-    .hangar-filter input[type='search'] {
-        width: 100%;
-        padding-left: 2.6rem;
     }
 }

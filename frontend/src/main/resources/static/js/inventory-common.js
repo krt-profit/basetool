@@ -822,8 +822,8 @@
             targetAmountInput.setAttribute('step', isScu ? '0.001' : '1');
             const targetScuHint = document.getElementById('bookout-target-scu-hint');
             const amountScuHint = document.getElementById('bookout-amount-scu-hint');
-            if (targetScuHint) targetScuHint.classList.toggle('krtm-hidden', !isScu);
-            if (amountScuHint) amountScuHint.classList.toggle('krtm-hidden', !isScu);
+            if (targetScuHint) targetScuHint.classList.toggle('is-hidden', !isScu);
+            if (amountScuHint) amountScuHint.classList.toggle('is-hidden', !isScu);
 
             amountInput.value = amount ?? '';
             amountInput.max = amount ?? '';
@@ -978,7 +978,7 @@
                 amountInput.value = String(stolenMarkTarget.max);
             }
             const scuHint = document.getElementById('stolen-mark-scu-hint');
-            if (scuHint) scuHint.classList.toggle('krtm-hidden', stolenMarkTarget.piece);
+            if (scuHint) scuHint.classList.toggle('is-hidden', stolenMarkTarget.piece);
             const amountOf = document.getElementById('stolenMarkAmountOfText');
             if (amountOf) {
                 amountOf.textContent = (amountOf.getAttribute('data-template') ?? '').replace(
