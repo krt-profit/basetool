@@ -93,4 +93,21 @@ final class CssSources {
   static @NotNull String stripComments(@NotNull String css) {
     return css.replaceAll("(?s)/\\*.*?\\*/", " ");
   }
+
+  /**
+   * Parses an integer read from a stylesheet, failing the test with the source context when it is
+   * not one.
+   *
+   * @param text the digits a pattern matched
+   * @param context where the value was read, for the failure message
+   * @return the parsed value
+   * @throws AssertionError if the text is not an integer in range
+   */
+  static int parseInt(@NotNull String text, @NotNull String context) {
+    try {
+      return Integer.parseInt(text);
+    } catch (NumberFormatException e) {
+      throw new AssertionError(context + ": `" + text + "` is not an integer in range", e);
+    }
+  }
 }

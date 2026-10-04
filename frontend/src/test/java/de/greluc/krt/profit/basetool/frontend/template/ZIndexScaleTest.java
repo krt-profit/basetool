@@ -68,13 +68,13 @@ class ZIndexScaleTest {
           "--z-toast",
           "--z-confirm");
 
-  private static final Pattern TOKEN = Pattern.compile("(--z-[\\w-]+)\\s*:\\s*(-?\\d+)\\s*;");
+  private static final Pattern TOKEN = Pattern.compile("(--z-[\\w-]+)\\s*:\\s*(-?\\d{1,9})\\s*;");
 
   private static final Pattern Z_INDEX = Pattern.compile("(?<![\\w-])z-index\\s*:\\s*([^;}]+)");
 
   private static final Pattern TOKEN_USE = Pattern.compile("var\\(\\s*(--z-[\\w-]+)\\s*\\)");
 
-  private static final Pattern LITERAL = Pattern.compile("-?\\d+");
+  private static final Pattern LITERAL = Pattern.compile("-?\\d{1,9}");
 
   /**
    * The outcome of one scan.
@@ -135,7 +135,7 @@ class ZIndexScaleTest {
     Matcher token = TOKEN.matcher(CssSources.stripComments(read(cssRoot.resolve("styles.css"))));
     String previous = null;
     while (token.find()) {
-      int value = Integer.parseInt(token.group(2));
+      int value = CssSources.parseInt(token.group(2), "static/css/styles.css " + token.group(1));
       if (previous != null && value <= scale.get(previous)) {
         offenders.add(
             "static/css/styles.css: "
@@ -171,7 +171,7 @@ class ZIndexScaleTest {
       return true;
     }
     if (LITERAL.matcher(value).matches()) {
-      return Math.abs(Integer.parseInt(value)) < LOCAL_LIMIT;
+      return Math.abs(CssSources.parseInt(value, "z-index")) < LOCAL_LIMIT;
     }
     Matcher use = TOKEN_USE.matcher(value);
     return use.matches() && scale.containsKey(use.group(1));

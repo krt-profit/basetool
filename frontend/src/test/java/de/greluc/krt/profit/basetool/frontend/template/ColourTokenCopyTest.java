@@ -142,7 +142,7 @@ class ColourTokenCopyTest {
     while (literal.find()) {
       String rgb =
           functional
-              ? rgbOf(literal.group(1), literal.group(2), literal.group(3))
+              ? rgbOf(path, literal.group(1), literal.group(2), literal.group(3))
               : normalise(literal.group(1));
       String name = rgb == null ? null : tokenByRgb.get(rgb);
       if (name != null) {
@@ -151,10 +151,10 @@ class ColourTokenCopyTest {
     }
   }
 
-  private static @Nullable String rgbOf(String red, String green, String blue) {
-    int r = Integer.parseInt(red);
-    int g = Integer.parseInt(green);
-    int b = Integer.parseInt(blue);
+  private static @Nullable String rgbOf(String path, String red, String green, String blue) {
+    int r = CssSources.parseInt(red, path);
+    int g = CssSources.parseInt(green, path);
+    int b = CssSources.parseInt(blue, path);
     if (r > 255 || g > 255 || b > 255) {
       return null;
     }
