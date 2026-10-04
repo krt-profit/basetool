@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionCategoryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionEligibilityDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionLevelContentDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionRequirementCheckDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionTopicDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RankRequirementDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
@@ -162,6 +163,9 @@ class PromotionPageControllerTest {
     assertEquals("19_18", keys.get(0));
     assertEquals("20_19", keys.get(1));
     assertEquals(2, grouped.get("20_19").size());
+    List<List<RankRequirementDto>> steps =
+        (List<List<RankRequirementDto>>) model.getAttribute("rankSteps");
+    assertEquals(List.of(List.of(r1, r2), List.of(r3)), steps, "career order, 20→19 first");
   }
 
   @Test
@@ -425,7 +429,7 @@ class PromotionPageControllerTest {
         .thenReturn(List.of(lc));
     Model model = new ConcurrentModel();
 
-    String view = controller.adminTopics(true, null, model);
+    String view = controller.adminTopics(true, null, null, model);
 
     assertEquals("promotion-admin-topics", view);
     Map<String, List<PromotionCategoryDto>> topicCats =
@@ -478,5 +482,144 @@ class PromotionPageControllerTest {
     assertEquals("promotion-overview", view);
     assertTrue(((List<?>) model.getAttribute("topics")).isEmpty());
     assertNull(model.getAttribute("currentUserRank"));
+  }
+
+  /** The topic editor selects the requested topic and falls back to the first for an unknown id. */
+  @Test
+  void adminTopics_selectsTheRequestedTopicOrTheFirst() {
+    UUID first = UUID.randomUUID();
+    UUID second = UUID.randomUUID();
+    when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
+        .thenReturn(List.of(topic(first, "A", 0), topic(second, "B", 1)));
+    when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef()))
+        .thenReturn(List.of());
+
+    Model requested = new ConcurrentModel();
+    controller.adminTopics(true, null, second.toString(), requested);
+    Model unknown = new ConcurrentModel();
+    controller.adminTopics(true, null, "not-a-topic", unknown);
+
+    assertEquals(second.toString(), requested.getAttribute("selectedTopicId"));
+    assertEquals(first.toString(), unknown.getAttribute("selectedTopicId"));
+    assertNull(PromotionPageController.selectTopicId(List.of(), first.toString()));
+  }
+
+  /** The rank matrix groups requirements per step and topic and keeps each cell's highest level. */
+  @Test
+  void adminRankRequirements_buildsTheMatrixCells() {
+    UUID topicId = UUID.randomUUID();
+    RankRequirementDto global = requirement(20, 19, null, "LEVEL_A", 1);
+    RankRequirementDto low = topicRequirement(20, 19, topicId, "LEVEL_A");
+    RankRequirementDto high = topicRequirement(20, 19, topicId, "LEVEL_C");
+    when(backendApiClient.get(contains("/api/v1/promotion/rank-requirements"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(global, low, high), 0, 1000, 3, 1, List.of()));
+    when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
+        .thenReturn(List.of(topic(topicId, "T", 0)));
+    when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef()))
+        .thenReturn(List.of());
+    when(backendApiClient.get(contains("/api/v1/promotion/categories?"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));
+    Model model = new ConcurrentModel();
+
+    controller.adminRankRequirements(true, null, model);
+
+    Map<String, List<RankRequirementDto>> cells =
+        (Map<String, List<RankRequirementDto>>) model.getAttribute("requirementsByCell");
+    Map<String, String> levels = (Map<String, String>) model.getAttribute("highestLevelByCell");
+    assertEquals(List.of(global), cells.get("20_19_global"));
+    assertEquals(List.of(low, high), cells.get("20_19_" + topicId));
+    assertEquals("LEVEL_C", levels.get("20_19_" + topicId));
+    assertEquals("LEVEL_A", levels.get("20_19_global"));
+  }
+
+  /** My evaluations put the step starting at the caller's rank first and measure its progress. */
+  @Test
+  void myEvaluations_putsTheNextStepFirstWithItsProgress() {
+    PromotionEligibilityDto lower = new PromotionEligibilityDto("u", 21, 20, true, true, List.of());
+    PromotionEligibilityDto next =
+        new PromotionEligibilityDto(
+            "u", 20, 19, false, true, List.of(check(2, 1, false), check(1, 3, true)));
+    when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
+        .thenReturn(List.of());
+    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/my"), anyTypeRef()))
+        .thenReturn(List.of());
+    when(backendApiClient.get(contains("/api/v1/promotion/rank-requirements"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));
+    when(backendApiClient.get(contains("/api/v1/promotion/eligibility/my"), anyTypeRef()))
+        .thenReturn(List.of(lower, next));
+    when(backendApiClient.get(eq("/api/v1/users/me"), anyTypeRef()))
+        .thenReturn(member(UUID.randomUUID(), "self", 20));
+    Model model = new ConcurrentModel();
+
+    controller.myEvaluations(true, model);
+
+    assertEquals(next, model.getAttribute("nextEligibility"));
+    assertEquals(List.of(next, lower), model.getAttribute("eligibilitySteps"));
+    assertEquals(66, model.getAttribute("nextProgressPercent"));
+  }
+
+  /** Progress counts each check at most up to its required count and handles the edge cases. */
+  @Test
+  void progressPercent_capsEachCheckAndHandlesStepsWithoutChecks() {
+    assertEquals(0, PromotionPageController.progressPercent(null));
+    assertEquals(
+        100,
+        PromotionPageController.progressPercent(
+            new PromotionEligibilityDto("u", 20, 19, true, false, List.of())));
+    assertEquals(
+        50,
+        PromotionPageController.progressPercent(
+            new PromotionEligibilityDto(
+                "u", 20, 19, false, true, List.of(check(2, 5, true), check(2, 0, false)))));
+    assertNull(PromotionPageController.findNextStep(List.of(), null));
+  }
+
+  /**
+   * A requirement scoped to a whole topic.
+   *
+   * @param fromRank the rank the step starts at
+   * @param toRank the rank the step leads to
+   * @param topicId the topic the rule covers
+   * @param level the minimum level
+   * @return the requirement
+   */
+  private static RankRequirementDto topicRequirement(
+      int fromRank, int toRank, UUID topicId, String level) {
+    return new RankRequirementDto(
+        UUID.randomUUID(),
+        0L,
+        fromRank,
+        toRank,
+        topicId,
+        "T",
+        null,
+        null,
+        level,
+        1,
+        null,
+        null,
+        null);
+  }
+
+  /**
+   * A requirement check of an eligibility.
+   *
+   * @param required the required count
+   * @param achieved the achieved count
+   * @param satisfied whether the check is met
+   * @return the check
+   */
+  private static PromotionRequirementCheckDto check(int required, int achieved, boolean satisfied) {
+    return new PromotionRequirementCheckDto(
+        UUID.randomUUID(),
+        null,
+        null,
+        UUID.randomUUID(),
+        "C",
+        "LEVEL_A",
+        required,
+        achieved,
+        satisfied,
+        null);
   }
 }

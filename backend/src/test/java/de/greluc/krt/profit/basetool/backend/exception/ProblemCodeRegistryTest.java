@@ -22,7 +22,9 @@ package de.greluc.krt.profit.basetool.backend.exception;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.api.CommittedOpenApi;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.config.OpenApiProblemDetailsConfig;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -183,7 +185,7 @@ class ProblemCodeRegistryTest {
     for (String type :
         List.of(
             "de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler",
-            "de.greluc.krt.profit.basetool.backend.exception.BankConflictException",
+            "de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException",
             "de.greluc.krt.profit.basetool.backend.config.TermsAcceptanceAccessFilter",
             "de.greluc.krt.profit.basetool.backend.config.PendingApprovalAccessFilter",
             "de.greluc.krt.profit.basetool.backend.config.ActingMemberFilter",

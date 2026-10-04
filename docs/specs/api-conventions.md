@@ -199,35 +199,39 @@ is still only built on a miss. **Enforced by `EntitiesRequireRatchetTest`**, a s
 `EntityNotFoundException`, which `handleNotFound` answers identically)
 were migrated message by message (BE-SIMP-01, 2026-09-23); `Entities` itself is the only exemption.
 
-**Domain exceptions carry their own error-code contract (S4, #910).** `BadRequestException`,
+**Domain exceptions carry their own error-code contract (S4, #910; ADR-0235).** The sealed
+`exception.AppException` permits the kernel's generic kinds — `BadRequestException`,
 `NotFoundException`, `BusinessConflictException`, `DuplicateEntityException`,
-`EntityInUseException`, `ExternalServiceException`, `ReportGenerationException`,
-`OverAllocationException`, `ProductionAllocationException`, `OwnerOrgUnitRequiredException`,
-`MissionParticipantRequiredException`, `RateLimitExceededException` and `BankConflictException` —
-thirteen in all, beside the exchange's own `ExchangeProblemException` — extend the sealed `exception.AppException`, exposing `status()`,
+`EntityInUseException`, `ExternalServiceException`, `ReportGenerationException` and
+`RateLimitExceededException` — and one open base, `exception.DomainProblem`, which every module's
+exceptions extend from the module's own `api` package: `bank.api.BankConflictException`,
+`exchange.api.ExchangeProblemException`, `inventory.api.OverAllocationException`,
+`joborder.api.ProductionAllocationException`, `refinery.api.MissionParticipantRequiredException`
+and `scope.api.OwnerOrgUnitRequiredException`. Every one exposes `status()`,
 `code()`, `titleKey()`, `detailKey()`, `typeSuffix()` and `logLabel()` on the type itself instead of
 leaving that identity scattered across `GlobalExceptionHandler`'s `CODE_*` constants and per-type
 `@ExceptionHandler` methods. A single `handleAppException` dispatch handler reads those accessors
 for every subtype except `NotFoundException`, whose handler stays dedicated because it also covers
 three non-`AppException` JPA/JDK "not found" flavors (`EntityNotFoundException`,
 `NoSuchElementException`, `NoResourceFoundException`) that cannot be sealed under this hierarchy.
-Every subtype but `BankConflictException` passes its fixed
-`exception.AppExceptionKind` constant to the `AppException(AppExceptionKind, String)` /
-`AppException(AppExceptionKind, String, Throwable)` superclass constructor and inherit every
-accessor from `AppException`, which delegates to that stored kind; the one addition is
-`RateLimitExceededException`, which also overrides `responseHeaders()` so the dispatch handler sends
-its `Retry-After`. `BankConflictException` is the
-one exception that overrides every accessor directly, computing them per-instance from its own
-`code` field (it has no single fixed identity — each throw site picks one of its `CODE_BANK_*`
-constants) via the legacy kind-less `AppException(String)` / `AppException(String, Throwable)`
-constructors. The one behavioural fork — `ExternalServiceException` / `ReportGenerationException`
+Every generic kind passes its fixed `exception.AppExceptionKind` constant to the
+`AppException(AppExceptionKind, String)` / `AppException(AppExceptionKind, String, Throwable)`
+superclass constructor and inherits every accessor from `AppException`, which delegates to that
+stored kind; the one addition is `RateLimitExceededException`, which also overrides
+`responseHeaders()` so the dispatch handler sends its `Retry-After`. A `DomainProblem` names its
+`status()`, `code()` (from its module's `ProblemCode` enum, or for the exchange from its frozen
+registry) and `logLabel()`; the `type` suffix and the `problem.<code>.title` / `.detail` keys follow
+from the code, and its disclosure policy is `STANDARD`. `BankConflictException` and
+`ExchangeProblemException` choose their code per instance, and add their PII-free extension
+properties and log fields. The one behavioural fork — `ExternalServiceException` / `ReportGenerationException`
 suppressing `getMessage()` from the client and logging at ERROR instead of WARN, an
 info-leak-protection constraint (CWE-209) — is the `ErrorDisclosurePolicy` strategy enum on
-`AppExceptionKind`, likewise inherited automatically via the stored kind. A new domain exception
-joins this hierarchy by extending `AppException` and either passing a new `AppExceptionKind`
-constant to the superclass constructor (the common case, requiring zero accessor overrides) or
-implementing the accessors directly (only if its identity is genuinely per-instance, as
-`BankConflictException`'s is) — never by hand-rolling a new `@ExceptionHandler` method.
+`AppExceptionKind`, likewise inherited automatically via the stored kind. A new module exception
+extends `DomainProblem` in its module's `api` package and takes its code from that module's
+`ProblemCode` enum; a new generic kind is a reviewed change of the kernel — never a hand-rolled
+`@ExceptionHandler` method. `ErrorModelShapeTest` pins the permitted kinds and that every
+`DomainProblem` subclass and every module `ProblemCode` enum lives in a module's `api` package;
+`DomainProblemContractTest` pins each module exception's full problem body.
 
 ### REQ-API-019 — Every problem code is registered once and documented
 
@@ -236,15 +240,22 @@ contract — and until 2026-10-03 it lived as about fifty string literals across
 the handler, six filters and the error controller, with no list, no uniqueness check and no
 documentation. The app once listened for `TERMS_ACCEPTANCE_REQUIRED` while the server sends
 `TERMS_NOT_ACCEPTED`. This is the registry and documentation half of ADR-0235; the exception
-hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) follows in Phase 1.
+hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) landed in Phase 1
+(2026-10-04, P1-12).
 
 - **`exception.ProblemCode`** — a code's wire value (`code()`) and its HTTP status (`status()`). The
   code string is the contract; the Java name is not.
-- **`exception.CoreProblemCode`** — one kernel enum listing every code the backend emits outside the
-  exchange: the handler's, the twelve `AppExceptionKind` codes, the 18 bank codes, the filters'
-  (`TERMS_NOT_ACCEPTED`, `PENDING_APPROVAL`, `NO_ROLE`, `ACTING_MEMBER_REFUSED`,
-  `SERVICE_UNAVAILABLE`, `RATE_LIMIT_EXCEEDED`, `REQUEST_BODY_TOO_LARGE`) and `NOT_ACCEPTABLE`
-  (`406`) — 50 in all. Three are
+- **`exception.CoreProblemCode`** — the error kernel's enum: the handler's codes, the eight
+  `AppExceptionKind` codes, the request pipeline's (`TERMS_NOT_ACCEPTED`, `PENDING_APPROVAL`,
+  `NO_ROLE`, `SERVICE_UNAVAILABLE`, `RATE_LIMIT_EXCEEDED`, `REQUEST_BODY_TOO_LARGE`,
+  `APP_UPDATE_REQUIRED`) and `NOT_ACCEPTABLE` (`406`) — 27 codes.
+- **One enum per module, in the module's `api` package** — `bank.api.BankProblemCode` (the 18
+  `BANK_*` codes), `exchange.api.ExchangeProblemCode` (`ACTING_MEMBER_REFUSED`, which the exchange
+  module's `ActingMemberFilter` answers), `inventory.api.InventoryProblemCode` (`OVER_ALLOCATION`),
+  `joborder.api.JobOrderProblemCode` (`PRODUCTION_ALLOCATION`),
+  `refinery.api.RefineryProblemCode` (`MISSION_PARTICIPANT_REQUIRED`) and
+  `scope.api.ScopeProblemCode` (`OWNER_ORG_UNIT_REQUIRED`). Names and wire values did not change
+  when they left `CoreProblemCode`; the registry holds 50 codes across the seven enums. Three are
   **reserved**, registered but not emitted: `BANK_HOLDER_OVERDRAFT` (ADR-0039),
   `BANK_CARTEL_APPROVAL_REQUIRED` (ADR-0109) and `APP_UPDATE_REQUIRED`, which retired paths will
   answer (ADR-0234, D-11; registered with `410`). Every producer references the enum; no code is a
@@ -256,7 +267,8 @@ hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) foll
   `ExchangeProblemException`, frozen with the exchange contract (REQ-XCH, ADR-0216); the registry
   only asserts that no kernel code clashes with one of them.
 - **The document lists the codes.** `ProblemDetail.code` is a string whose `x-problem-codes`
-  extension and description list the registered values — never a required enum, because
+  extension (every top-level `ProblemCode` enum found under the backend's root package, sorted by
+  code) and description list the registered values — never a required enum, because
   `theContractRequiredEnumsAreFrozen` would then freeze the list against every addition — beside
   `correlationId`, `errors` and `fieldErrors` (`{field, message}`); every `/api/**` operation
   documents `429` (`OpenApiProblemDetailsConfig`).
@@ -266,7 +278,8 @@ hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) foll
 - [x] Every registered code is unique, also against the exchange's; the registry equals the committed
   list, code and status (`ProblemCodeRegistryTest`).
 - [x] Every code `AppExceptionKind`, `GlobalExceptionHandler`, `BankConflictException` and the six
-  filters declare is registered; no main source writes a code as a literal (a source scan whose four
+  filters declare is registered (the module exceptions with a fixed code take it from their module's
+  enum); no main source writes a code as a literal (a source scan whose four
   site shapes are each proven on a planted line); runtime probes through the real filter chain — an
   anonymous read, a wrong verb, an unreadable body, a path no controller serves — answer
   registered codes (`ProblemCodeRuntimeProbeTest`).
@@ -281,8 +294,11 @@ hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) foll
   do so through the real chain (`ProblemCodeRuntimeProbeTest`).
 - [x] The committed document's `ProblemDetail` lists exactly the registered codes, keeps `code`
   optional and not an enum.
-- [ ] One `ProblemCode` enum per module and the app generating its constants from the document —
-  **open**, plan Phase 1 (ADR-0235) and the app.
+- [x] One `ProblemCode` enum per module, in the module's `api` package; the sealed root permits only
+  the generic kinds and `DomainProblem`, and every module exception and module enum lives in a
+  module's `api` package — a planted kernel-package exception and enum are caught
+  (`ErrorModelShapeTest`, 2026-10-04).
+- [ ] The app generating its constants from the document — **open**, the app.
 
 **Enforced by:** `ProblemCodeRegistryTest`, `ProblemCodeRuntimeProbeTest`,
 `GlobalExceptionHandlerClientErrorTest` (backend) ·

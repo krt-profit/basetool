@@ -17,7 +17,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.exception;
+package de.greluc.krt.profit.basetool.backend.refinery.api;
+
+import de.greluc.krt.profit.basetool.backend.exception.DomainProblem;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.http.HttpStatus;
 
 /**
  * Thrown when a refinery order is linked to a mission its owner does not take part in
@@ -26,7 +30,7 @@ package de.greluc.krt.profit.basetool.backend.exception;
  * <p>Answers {@code 400} with code {@code MISSION_PARTICIPANT_REQUIRED}; it is a validation
  * failure, not a permission failure, and applies to managers too.
  */
-public final class MissionParticipantRequiredException extends AppException {
+public final class MissionParticipantRequiredException extends DomainProblem {
 
   /**
    * Creates the exception. The message is the i18n key of the localized detail, so the RFC 7807
@@ -34,8 +38,39 @@ public final class MissionParticipantRequiredException extends AppException {
    * caller's language.
    */
   public MissionParticipantRequiredException() {
-    super(
-        AppExceptionKind.MISSION_PARTICIPANT_REQUIRED,
-        AppExceptionKind.MISSION_PARTICIPANT_REQUIRED.detailKey());
+    super("problem.mission_participant_required.detail");
+  }
+
+  /**
+   * The status the refusal is answered with.
+   *
+   * @return {@code 400}
+   */
+  @NotNull
+  @Override
+  public HttpStatus status() {
+    return RefineryProblemCode.MISSION_PARTICIPANT_REQUIRED.status();
+  }
+
+  /**
+   * The stable code of the refusal.
+   *
+   * @return {@code MISSION_PARTICIPANT_REQUIRED}
+   */
+  @NotNull
+  @Override
+  public String code() {
+    return RefineryProblemCode.MISSION_PARTICIPANT_REQUIRED.code();
+  }
+
+  /**
+   * The label the handler's log line names the refusal by.
+   *
+   * @return {@code "Mission participant required"}
+   */
+  @NotNull
+  @Override
+  public String logLabel() {
+    return "Mission participant required";
   }
 }

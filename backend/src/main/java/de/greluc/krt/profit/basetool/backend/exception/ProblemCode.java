@@ -26,9 +26,10 @@ import org.springframework.http.HttpStatus;
  * One stable value of the {@code code} property of an RFC 7807 problem body (REQ-API-004,
  * REQ-API-019, ADR-0235).
  *
- * <p>Every code the backend emits is a constant of an enum implementing this interface; the code
- * string is the contract, the Java name is not. The exchange's own codes stay in {@link
- * ExchangeProblemException}, which is frozen.
+ * <p>Every code the backend emits is a constant of an enum implementing this interface: {@link
+ * CoreProblemCode} for the error kernel and one enum per module in the module's {@code api}
+ * package. The code string is the contract, the Java name is not. The frozen exchange contract's
+ * own codes stay on the exchange's {@code ExchangeProblemException}.
  */
 public interface ProblemCode {
 

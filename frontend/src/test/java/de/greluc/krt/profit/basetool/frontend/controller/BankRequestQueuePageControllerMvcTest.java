@@ -113,7 +113,8 @@ class BankRequestQueuePageControllerMvcTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            true);
     PageResponse<BankBookingRequestDto> page =
         new PageResponse<>(List.of(request), 0, 200, 1, 1, List.of());
     BankHolderDto holder =
@@ -154,31 +155,40 @@ class BankRequestQueuePageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = {"BANK_EMPLOYEE"})
-  void queue_defaultRendersPendingCheckboxActiveUserIdAndExpandableDetail() throws Exception {
+  void queue_defaultRendersPendingSegmentActiveUserIdAndExpandableDetail() throws Exception {
     stubData();
 
     mockMvc
         .perform(get("/bank/requests"))
         .andExpect(status().isOk())
-        .andExpect(content().string(Matchers.containsString("data-bank-status-filter-bar")))
+        .andExpect(content().string(Matchers.containsString("data-segmented=\"status\"")))
         .andExpect(content().string(Matchers.containsString("data-user-id")))
-        .andExpect(content().string(Matchers.containsString("data-bank-status-filter=\"PENDING\"")))
-        .andExpect(content().string(Matchers.containsString("type=\"checkbox\"")))
-        .andExpect(content().string(Matchers.containsString("checked=\"checked\"")))
+        .andExpect(content().string(Matchers.containsString("segment-status-pending")))
+        .andExpect(
+            content()
+                .string(
+                    Matchers.containsString(
+                        "name=\"status\" value=\"PENDING\" checked=\"checked\"")))
         .andExpect(content().string(Matchers.containsString("bank-request-detail")))
         .andExpect(content().string(Matchers.containsString("from sale")));
   }
 
   @Test
   @WithMockUser(roles = {"BANK_EMPLOYEE"})
-  void queue_allFiltersOffShowsNoFilterHintAndNoTable() throws Exception {
+  void queue_noneSentinelFallsBackToThePendingSegment() throws Exception {
     stubData();
 
     mockMvc
         .perform(get("/bank/requests").param("status", "NONE"))
         .andExpect(status().isOk())
-        .andExpect(content().string(Matchers.containsString("bank-requests-nofilter")))
-        .andExpect(content().string(Matchers.not(Matchers.containsString("bank-requests-table"))));
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("bank-requests-nofilter"))))
+        .andExpect(content().string(Matchers.containsString("bank-requests-table")))
+        .andExpect(
+            content()
+                .string(
+                    Matchers.containsString(
+                        "name=\"status\" value=\"PENDING\" checked=\"checked\"")));
   }
 
   @Test

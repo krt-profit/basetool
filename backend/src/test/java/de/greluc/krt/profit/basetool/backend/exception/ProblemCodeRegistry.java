@@ -80,11 +80,22 @@ final class ProblemCodeRegistry {
    * @throws IllegalStateException if a scanned class cannot be loaded
    */
   static @NotNull @Unmodifiable List<Class<?>> registryEnums() {
+    return mainTypes(ProblemCode.class).stream().filter(Class::isEnum).toList();
+  }
+
+  /**
+   * Finds every concrete main-source class assignable to a supertype.
+   *
+   * @param supertype the class or interface the found classes extend or implement
+   * @return the found classes, sorted by name
+   * @throws IllegalStateException if a scanned class cannot be loaded
+   */
+  static @NotNull @Unmodifiable List<Class<?>> mainTypes(@NotNull Class<?> supertype) {
     ClassPathScanningCandidateComponentProvider scanner =
         new ClassPathScanningCandidateComponentProvider(false);
-    scanner.addIncludeFilter(new AssignableTypeFilter(ProblemCode.class));
+    scanner.addIncludeFilter(new AssignableTypeFilter(supertype));
     URL mainOutput = ProblemCode.class.getProtectionDomain().getCodeSource().getLocation();
-    List<Class<?>> enums = new ArrayList<>();
+    List<Class<?>> types = new ArrayList<>();
     for (BeanDefinition definition : scanner.findCandidateComponents(BACKEND_PACKAGE)) {
       Class<?> type;
       try {
@@ -94,13 +105,12 @@ final class ProblemCodeRegistry {
       } catch (ClassNotFoundException e) {
         throw new IllegalStateException("cannot load " + definition.getBeanClassName(), e);
       }
-      if (type.isEnum()
-          && mainOutput.equals(type.getProtectionDomain().getCodeSource().getLocation())) {
-        enums.add(type);
+      if (mainOutput.equals(type.getProtectionDomain().getCodeSource().getLocation())) {
+        types.add(type);
       }
     }
-    enums.sort((left, right) -> left.getName().compareTo(right.getName()));
-    return List.copyOf(enums);
+    types.sort((left, right) -> left.getName().compareTo(right.getName()));
+    return List.copyOf(types);
   }
 
   /**

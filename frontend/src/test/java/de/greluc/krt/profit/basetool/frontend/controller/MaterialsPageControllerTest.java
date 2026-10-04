@@ -164,6 +164,55 @@ class MaterialsPageControllerTest {
     assertNotNull(prices);
     assertEquals(1, prices.size());
     assertEquals("Area18", prices.get(0).terminalName());
+
+    List<MaterialTerminalPrices.Row> rows =
+        (List<MaterialTerminalPrices.Row>) model.getAttribute("terminalRows");
+    assertNotNull(rows);
+    assertEquals("Area18", rows.get(0).terminalName());
+    MaterialTerminalPrices.Summary summary =
+        (MaterialTerminalPrices.Summary) model.getAttribute("priceSummary");
+    assertNotNull(summary);
+    assertEquals(0, new BigDecimal("7.0").compareTo(summary.bestSell()));
+    assertEquals(0, new BigDecimal("5.0").compareTo(summary.bestBuy()));
+  }
+
+  @Test
+  void getMatrixOverview_addsUexAgeFromTheTerminalCatalogue() {
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    MaterialsPageController controller = new MaterialsPageController(backendApiClient);
+    Model model = new ConcurrentModel();
+    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef()))
+        .thenReturn(matrixPage());
+    when(backendApiClient.getCached(eq(CachedCatalog.TERMINALS), anyTypeRef()))
+        .thenReturn(
+            new PageResponse<>(
+                List.of(Map.of("uexSyncedAt", "2020-01-01T00:00:00Z")),
+                0,
+                10000,
+                1,
+                1,
+                Collections.emptyList()));
+
+    controller.getMatrixOverview(model);
+
+    UexAge age = (UexAge) model.getAttribute("uexAge");
+    assertNotNull(age);
+    assertEquals("days", age.unit());
+  }
+
+  @Test
+  void getMatrixOverview_withoutTerminalCatalogue_rendersWithoutUexAge() {
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    MaterialsPageController controller = new MaterialsPageController(backendApiClient);
+    Model model = new ConcurrentModel();
+    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef()))
+        .thenReturn(matrixPage());
+    when(backendApiClient.getCached(eq(CachedCatalog.TERMINALS), anyTypeRef()))
+        .thenThrow(new RuntimeException("terminals down"));
+
+    assertEquals("materials-overview", controller.getMatrixOverview(model));
+    assertFalse(model.getAttribute("uexAge") instanceof UexAge);
+    assertFalse(model.containsAttribute("error"));
   }
 
   @Test
@@ -181,6 +230,7 @@ class MaterialsPageControllerTest {
     assertEquals("material-detail", viewName);
     assertEquals("error.material.details.load", model.getAttribute("error"));
     assertTrue(((List<MaterialPriceDto>) model.getAttribute("prices")).isEmpty());
+    assertTrue(((List<MaterialTerminalPrices.Row>) model.getAttribute("terminalRows")).isEmpty());
   }
 
   @Test

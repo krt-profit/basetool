@@ -57,19 +57,19 @@
     }
 
     /**
-     * Reports whether a picker is live: not krtm-hidden and inside no display:none subtree. An
-     * inactive picker neither gates its submit button nor contributes a plan.
+     * Reports whether a picker is live: neither it nor an ancestor is hidden or carries an inline
+     * display:none. An inactive picker neither gates its submit button nor contributes a plan.
      *
      * @param {HTMLElement} section the picker section
      * @returns {boolean} true when the picker is visible and should be enforced
      */
     function isActive(section) {
-        if (!section || section.classList.contains('krtm-hidden')) {
+        if (!section) {
             return false;
         }
         let el = section;
         while (el) {
-            if (el.style && el.style.display === 'none') {
+            if (el.hidden || (el.style && el.style.display === 'none')) {
                 return false;
             }
             el = el.parentElement;
@@ -314,7 +314,8 @@
         rest.setAttribute('data-herkunft-rest', '');
         restLine.appendChild(rest);
         const warn = document.createElement('span');
-        warn.className = 'herkunft-warn krtm-hidden';
+        warn.className = 'herkunft-warn';
+        warn.hidden = true;
         warn.setAttribute('data-herkunft-warn', '');
         restLine.appendChild(warn);
         block.appendChild(restLine);
@@ -324,7 +325,8 @@
             sectionOf(prefix).hasAttribute('data-herkunft-sell-amount-id')
         ) {
             const proceeds = document.createElement('div');
-            proceeds.className = 'herkunft-proceeds krtm-hidden';
+            proceeds.className = 'herkunft-proceeds';
+            proceeds.hidden = true;
             proceeds.setAttribute('data-herkunft-proceeds', '');
             block.appendChild(proceeds);
         }
@@ -443,9 +445,9 @@
                     '{0}',
                     fmtAmount(state.minRequired, dim.isPiece),
                 );
-                warnEl.classList.remove('krtm-hidden');
+                warnEl.hidden = false;
             } else {
-                warnEl.classList.add('krtm-hidden');
+                warnEl.hidden = true;
             }
         }
         updateProceeds(block, dim, state, sell, strings);
@@ -467,7 +469,7 @@
             return;
         }
         if (dim.field !== 'MISSION' || !sell || !state.hasDeducted) {
-            el.classList.add('krtm-hidden');
+            el.hidden = true;
             el.textContent = '';
             return;
         }
@@ -502,7 +504,7 @@
             formatAuec(personalCredit) + ' ' + strings.auec,
         );
         el.appendChild(pLine);
-        el.classList.remove('krtm-hidden');
+        el.hidden = false;
     }
 
     /**
@@ -572,11 +574,11 @@
         }
         registry[prefix] = { itemId, dims };
         if (dims.length === 0) {
-            section.classList.add('krtm-hidden');
+            section.hidden = true;
             recompute(prefix);
             return;
         }
-        section.classList.remove('krtm-hidden');
+        section.hidden = false;
         dims.forEach(function (dim) {
             if (body) {
                 body.appendChild(buildDimBlock(prefix, dim));
@@ -646,7 +648,7 @@
             delete registry[prefix];
             const section = sectionOf(prefix);
             if (section) {
-                section.classList.add('krtm-hidden');
+                section.hidden = true;
                 const body = section.querySelector('[data-herkunft-body]');
                 if (body) {
                     body.textContent = '';

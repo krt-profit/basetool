@@ -40,8 +40,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Layout guard (REQ-UI-013): the date and time parts of a {@code .datetime-split-group} must stay
- * inside their {@code .form-row} column on the mission detail page, in the participant edit modal
- * and the Verwaltung form.
+ * inside their grid column on the mission detail page, in the participant edit modal and the
+ * mission form of the edit mode.
  *
  * <p>Every check runs at several desktop widths, because the overflow depends on the container
  * width, and compares bounding rectangles, because the overflow lands in the container's padding
@@ -160,9 +160,8 @@ class MissionDatetimeSplitLayoutE2eTest {
   }
 
   /**
-   * Opens the Verwaltung tab and asserts every time picker of the mission form ("Treffen
-   * Teamspeak", planned start/end, actual start/end) renders inside its column. Same root cause as
-   * the modal, different container: three groups sharing one ~852px row.
+   * Opens the edit mode and asserts every time picker of the mission form ("Treffen Teamspeak",
+   * planned start/end, actual start/end) renders inside its column.
    */
   @Test
   void missionFormKeepsTheTimePickersInsideTheirColumn() {
@@ -205,7 +204,7 @@ class MissionDatetimeSplitLayoutE2eTest {
     assertTrue(
         violations.isEmpty(),
         () ->
-            "date/time parts must stay inside their .form-row column (REQ-UI-013), but "
+            "date/time parts must stay inside their column (REQ-UI-013), but "
                 + scope
                 + " at a "
                 + width

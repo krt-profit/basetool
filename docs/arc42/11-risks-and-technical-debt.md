@@ -365,4 +365,4 @@ ADR-0236 (access policies per domain); the rules are §8.14. Status on 2026-10-0
 along the way are fixed (Phase −1, merged 2026-10-01), the guards of Phase 0 are on `main`, and
 Phase 1 has begun: `audit.api`, `kernel`, `orgunit.api`/`orgunit.web` and the publishers'
 `api.events` packages exist,
-and the frozen module baseline has shrunk from 138 to 129 class edges.
+and the frozen module baseline has shrunk from 138 to 127 class edges.

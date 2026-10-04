@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
-import de.greluc.krt.profit.basetool.backend.exception.CoreProblemCode;
 import de.greluc.krt.profit.basetool.backend.exception.ProblemCode;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -29,18 +28,22 @@ import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SequencedMap;
 import java.util.Set;
+import java.util.TreeSet;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springdoc.core.customizers.OpenApiCustomizer;
+import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.type.filter.AssignableTypeFilter;
+import org.springframework.util.ClassUtils;
 
 /**
  * SpringDoc customizer that documents the RFC&nbsp;7807 {@code application/problem+json} error
@@ -61,6 +64,12 @@ public class OpenApiProblemDetailsConfig {
 
   /** Where the shared header definitions live in the document. */
   private static final String HEADER_REF_PREFIX = "#/components/headers/";
+
+  /** The root package the registered problem-code enums are found under. */
+  private static final String BACKEND_PACKAGE =
+      ProblemCode.class
+          .getPackageName()
+          .substring(0, ProblemCode.class.getPackageName().lastIndexOf('.'));
 
   /** The headers every 429 carries, name to description, in document order. */
   private static final SequencedMap<String, String> RATE_LIMIT_HEADERS = rateLimitHeaders();
@@ -190,7 +199,7 @@ public class OpenApiProblemDetailsConfig {
       components = new Components();
       openApi.setComponents(components);
     }
-    List<String> codes = Arrays.stream(CoreProblemCode.values()).map(ProblemCode::code).toList();
+    List<String> codes = registeredCodes();
 
     Schema<Object> fieldError = typed("object", null, null);
     fieldError.addProperty("field", typed("string", null, "The field or parameter path."));
@@ -200,7 +209,7 @@ public class OpenApiProblemDetailsConfig {
         typed(
             "string",
             null,
-            "The stable reason, one of the values in x-problem-codes (registry CoreProblemCode,"
+            "The stable reason, one of the values in x-problem-codes (the ProblemCode registry,"
                 + " REQ-API-019). The exchange operations under /api/v1/exchange answer the codes"
                 + " of the frozen exchange contract instead (ExchangeProblemException). The list"
                 + " grows; a client treats an unknown code by its status.");
@@ -235,6 +244,34 @@ public class OpenApiProblemDetailsConfig {
     problem.addProperty("errors", errors);
     problem.addProperty("fieldErrors", fieldErrors);
     components.addSchemas(PROBLEM_SCHEMA, problem);
+  }
+
+  /**
+   * Collects the codes of every top-level enum implementing {@link ProblemCode} below the backend's
+   * root package: the kernel's and each module's (ADR-0235).
+   *
+   * @return the registered codes, sorted
+   */
+  @NotNull
+  static List<String> registeredCodes() {
+    ClassPathScanningCandidateComponentProvider scanner =
+        new ClassPathScanningCandidateComponentProvider(false);
+    scanner.addIncludeFilter(new AssignableTypeFilter(ProblemCode.class));
+    ClassLoader loader = ProblemCode.class.getClassLoader();
+    Set<String> codes = new TreeSet<>();
+    for (BeanDefinition definition : scanner.findCandidateComponents(BACKEND_PACKAGE)) {
+      String name = definition.getBeanClassName();
+      if (name == null) {
+        continue;
+      }
+      Class<?> type = ClassUtils.resolveClassName(name, loader);
+      if (type.isEnum() && !type.isMemberClass()) {
+        for (Object constant : type.getEnumConstants()) {
+          codes.add(((ProblemCode) constant).code());
+        }
+      }
+    }
+    return List.copyOf(codes);
   }
 
   /**

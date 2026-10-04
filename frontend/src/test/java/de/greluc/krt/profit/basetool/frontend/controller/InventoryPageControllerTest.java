@@ -129,6 +129,28 @@ class InventoryPageControllerTest {
     assertEquals(materialId, model.getAttribute("selectedMaterialId"));
   }
 
+  /**
+   * The material drilldown names its material for the page head from the catalog when the current
+   * page holds no row to read it from.
+   */
+  @Test
+  void viewMaterialInventory_namesTheMaterialFromTheCatalogWhenThePageIsEmpty() {
+    Model model = new ConcurrentModel();
+    UUID materialId = UUID.randomUUID();
+    PageResponse<InventoryItemDto> page =
+        new PageResponse<>(List.of(), 0, 50, 0, 1, Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.getCached(any(), anyTypeRef()))
+        .thenReturn(
+            List.of(
+                new MaterialReferenceDto(UUID.randomUUID(), "Laranite", "SCU"),
+                new MaterialReferenceDto(materialId, "Quantanium", "SCU")));
+
+    controller.viewMaterialInventory(materialId, null, null, null, model);
+
+    assertEquals("Quantanium", model.getAttribute("materialName"));
+  }
+
   @Test
   void viewMaterialInventory_forwardsPageAndWhitelistedSizeToBackend() {
     Model model = new ConcurrentModel();

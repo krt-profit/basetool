@@ -68,6 +68,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class JobOrderQueryService {
 
+  /** Placeholder id for a disabled id-collection filter, since JPQL rejects an empty IN list. */
+  private static final UUID NIL_ID = new UUID(0L, 0L);
+
   private final JobOrderRepository jobOrderRepository;
   private final MaterialRepository materialRepository;
   private final InventoryItemRepository inventoryItemRepository;
@@ -106,20 +109,55 @@ public class JobOrderQueryService {
    */
   public Page<JobOrderDto> getAllJobOrders(
       List<JobOrderStatus> statuses, Collection<UUID> squadronIds, Pageable pageable) {
+    return getAllJobOrders(statuses, squadronIds, false, pageable);
+  }
+
+  /**
+   * Paged list with optional status, squadron and processing filters, always constrained to the
+   * caller's visibility scope.
+   *
+   * <p>With {@code toProcess} only orders whose profit-eligible responsible unit is one of the
+   * caller's processing units remain, the "Zu bearbeiten" queue (REQ-ORDERS-040): the pinned org
+   * unit when one is active, otherwise the caller's direct memberships. The filter only narrows the
+   * scoped result; a caller with no processing unit gets an empty page.
+   *
+   * @param statuses optional status filter; null/empty means "all"
+   * @param squadronIds optional display filter matching the responsible or requesting side;
+   *     null/empty means no restriction
+   * @param toProcess whether to keep only the orders the caller's own units process
+   * @param pageable page request
+   * @return paged job orders as DTOs, scoped to the caller's visibility
+   */
+  public Page<JobOrderDto> getAllJobOrders(
+      List<JobOrderStatus> statuses,
+      Collection<UUID> squadronIds,
+      boolean toProcess,
+      Pageable pageable) {
     if (!ownerScopeService.canViewJobOrders()) {
       return Page.empty(pageable);
     }
     List<JobOrderStatus> effectiveStatuses =
         (statuses == null || statuses.isEmpty()) ? List.of(JobOrderStatus.values()) : statuses;
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    Set<UUID> processingOrgUnitIds = Set.of(NIL_ID);
+    if (toProcess) {
+      processingOrgUnitIds =
+          scope.activeOrgUnitId() != null
+              ? Set.of(scope.activeOrgUnitId())
+              : ownerScopeService.currentDirectMembershipOrgUnitIds();
+      if (processingOrgUnitIds.isEmpty()) {
+        return Page.empty(pageable);
+      }
+    }
     boolean noSquadronFilter = squadronIds == null || squadronIds.isEmpty();
-    Collection<UUID> effectiveSquadronIds =
-        noSquadronFilter ? Set.of(new UUID(0L, 0L)) : squadronIds;
+    Collection<UUID> effectiveSquadronIds = noSquadronFilter ? Set.of(NIL_ID) : squadronIds;
     Page<JobOrder> page =
         jobOrderRepository.findScopedJobOrders(
             effectiveStatuses,
             noSquadronFilter,
             effectiveSquadronIds,
+            toProcess,
+            processingOrgUnitIds,
             scope.adminAllScope(),
             scope.activeOrgUnitId(),
             scope.memberOrgUnitIds(),

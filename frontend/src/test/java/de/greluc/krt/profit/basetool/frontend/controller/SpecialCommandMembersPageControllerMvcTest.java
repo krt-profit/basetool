@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,6 +44,7 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -133,6 +135,73 @@ class SpecialCommandMembersPageControllerMvcTest {
                             + "/members/"
                             + memberId
                             + "/flags")));
+  }
+
+  /**
+   * The member page renders the shared unit detail: page head with a back link, one primary action,
+   * the members tab and the roster with role flags, the lead flag and a row menu.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void detail_rendersTheSharedUnitDetail() throws Exception {
+    stubSpecialCommandWithOneMember();
+
+    String html =
+        mockMvc
+            .perform(get("/organisation/special-commands/" + skId).locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("class=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\" href=\"/admin/special-commands\"")
+        .containsPattern("<h1>Detail SK</h1>")
+        .contains("id=\"members-box\"")
+        .containsPattern("id=\"add-member-btn\" class=\"btn btn--cta\"")
+        .contains("Spezialkommando · DSK")
+        .contains("data-testid=\"sk-roster\"")
+        .contains("data-testid=\"sk-member-row\"")
+        .containsPattern("data-sk-flag=\"isLogistician\"\\s+aria-pressed=\"false\"")
+        .contains("class=\"matrix-flag unit-roster__lead\"")
+        .contains("data-sk-action=\"toggle-lead\"")
+        .contains("data-sk-action=\"remove\"")
+        .contains("data-refresh-container=\"#members-results\"")
+        .doesNotContain("hud-box")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("use href=\"#krt-icon-save\"");
+    assertThat(html.split("btn--cta", -1)).hasSizeLessThanOrEqualTo(3);
+    assertThat(html.substring(html.indexOf("<main"), html.indexOf("</main>")))
+        .doesNotContain("krtm-");
+  }
+
+  /**
+   * Every roster write stays a classic form post for a browser without JavaScript (REQ-FE-001):
+   * each flag button submits the toggled pair to the flags handler, and removal and the admin lead
+   * toggle submit to their handlers.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void detail_rosterWritesKeepTheirNoScriptForms() throws Exception {
+    stubSpecialCommandWithOneMember();
+
+    String html =
+        mockMvc
+            .perform(get("/organisation/special-commands/" + skId).locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html.split("class=\"unit-flag-form\"", -1)).hasSize(3);
+    assertThat(html)
+        .containsPattern("action=\"/organisation/special-commands/[^\"]+/members/[^\"]+/flags\"")
+        .containsPattern("action=\"/organisation/special-commands/[^\"]+/members/[^\"]+/delete\"")
+        .containsPattern("action=\"/admin/special-commands/[^\"]+/members/[^\"]+/lead\"")
+        .containsPattern("type=\"submit\" class=\"unit-flag\" data-sk-flag=\"isLogistician\"");
   }
 
   @Test

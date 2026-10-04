@@ -123,8 +123,8 @@ class MissionTabsMockupCheckE2eTest {
       page.waitForLoadState();
       Object finProbe =
           page.evaluate(
-              "() => ({ sumstrip: !!document.querySelector('#pane-fin .sumstrip'),"
-                  + " sums: document.querySelectorAll('#pane-fin .sum').length,"
+              "() => ({ kpiGrid: !!document.querySelector('#pane-fin .kpi-grid'),"
+                  + " kpis: document.querySelectorAll('#pane-fin .kpi-total').length,"
                   + " financeRows: document.querySelectorAll('#pane-fin table tbody tr').length,"
                   + " ecoDetails: document.querySelectorAll('#pane-fin details').length,"
                   + " pageWidth: document.querySelector('.page-wrapper').offsetWidth })");

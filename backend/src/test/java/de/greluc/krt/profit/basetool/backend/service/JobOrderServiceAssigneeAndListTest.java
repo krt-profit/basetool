@@ -28,6 +28,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
@@ -186,7 +187,15 @@ class JobOrderServiceAssigneeAndListTest {
     void nullStatusList_passesFullEnumSet() {
       Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
       when(jobOrderRepository.findScopedJobOrders(
-              allStatuses, true, Set.of(new UUID(0L, 0L)), true, null, Set.of(), pageable))
+              allStatuses,
+              true,
+              Set.of(new UUID(0L, 0L)),
+              false,
+              Set.of(new UUID(0L, 0L)),
+              true,
+              null,
+              Set.of(),
+              pageable))
           .thenReturn(page);
 
       Page<JobOrderDto> result = queryService.getAllJobOrders(null, pageable);
@@ -194,21 +203,45 @@ class JobOrderServiceAssigneeAndListTest {
       assertEquals(1, result.getTotalElements());
       verify(jobOrderRepository)
           .findScopedJobOrders(
-              allStatuses, true, Set.of(new UUID(0L, 0L)), true, null, Set.of(), pageable);
+              allStatuses,
+              true,
+              Set.of(new UUID(0L, 0L)),
+              false,
+              Set.of(new UUID(0L, 0L)),
+              true,
+              null,
+              Set.of(),
+              pageable);
     }
 
     @Test
     void emptyStatusList_passesFullEnumSet() {
       Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
       when(jobOrderRepository.findScopedJobOrders(
-              allStatuses, true, Set.of(new UUID(0L, 0L)), true, null, Set.of(), pageable))
+              allStatuses,
+              true,
+              Set.of(new UUID(0L, 0L)),
+              false,
+              Set.of(new UUID(0L, 0L)),
+              true,
+              null,
+              Set.of(),
+              pageable))
           .thenReturn(page);
 
       queryService.getAllJobOrders(List.of(), pageable);
 
       verify(jobOrderRepository)
           .findScopedJobOrders(
-              allStatuses, true, Set.of(new UUID(0L, 0L)), true, null, Set.of(), pageable);
+              allStatuses,
+              true,
+              Set.of(new UUID(0L, 0L)),
+              false,
+              Set.of(new UUID(0L, 0L)),
+              true,
+              null,
+              Set.of(),
+              pageable);
     }
 
     @Test
@@ -217,6 +250,8 @@ class JobOrderServiceAssigneeAndListTest {
       when(jobOrderRepository.findScopedJobOrders(
               List.of(JobOrderStatus.OPEN),
               true,
+              Set.of(new UUID(0L, 0L)),
+              false,
               Set.of(new UUID(0L, 0L)),
               true,
               null,
@@ -230,6 +265,8 @@ class JobOrderServiceAssigneeAndListTest {
           .findScopedJobOrders(
               List.of(JobOrderStatus.OPEN),
               true,
+              Set.of(new UUID(0L, 0L)),
+              false,
               Set.of(new UUID(0L, 0L)),
               true,
               null,
@@ -245,6 +282,8 @@ class JobOrderServiceAssigneeAndListTest {
               List.of(JobOrderStatus.OPEN),
               false,
               Set.of(squadronId),
+              false,
+              Set.of(new UUID(0L, 0L)),
               true,
               null,
               Set.of(),
@@ -258,6 +297,8 @@ class JobOrderServiceAssigneeAndListTest {
               List.of(JobOrderStatus.OPEN),
               false,
               Set.of(squadronId),
+              false,
+              Set.of(new UUID(0L, 0L)),
               true,
               null,
               Set.of(),
@@ -269,14 +310,30 @@ class JobOrderServiceAssigneeAndListTest {
       Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
       UUID squadronId = UUID.randomUUID();
       when(jobOrderRepository.findScopedJobOrders(
-              allStatuses, false, Set.of(squadronId), true, null, Set.of(), pageable))
+              allStatuses,
+              false,
+              Set.of(squadronId),
+              false,
+              Set.of(new UUID(0L, 0L)),
+              true,
+              null,
+              Set.of(),
+              pageable))
           .thenReturn(page);
 
       queryService.getAllJobOrders(List.of(), Set.of(squadronId), pageable);
 
       verify(jobOrderRepository)
           .findScopedJobOrders(
-              allStatuses, false, Set.of(squadronId), true, null, Set.of(), pageable);
+              allStatuses,
+              false,
+              Set.of(squadronId),
+              false,
+              Set.of(new UUID(0L, 0L)),
+              true,
+              null,
+              Set.of(),
+              pageable);
     }
 
     @Test
@@ -288,14 +345,123 @@ class JobOrderServiceAssigneeAndListTest {
       when(ownerScopeService.currentScopePredicate())
           .thenReturn(new ScopePredicate(false, null, union));
       when(jobOrderRepository.findScopedJobOrders(
-              allStatuses, true, Set.of(new UUID(0L, 0L)), false, null, union, pageable))
+              allStatuses,
+              true,
+              Set.of(new UUID(0L, 0L)),
+              false,
+              Set.of(new UUID(0L, 0L)),
+              false,
+              null,
+              union,
+              pageable))
           .thenReturn(page);
 
       queryService.getAllJobOrders(null, pageable);
 
       verify(jobOrderRepository)
           .findScopedJobOrders(
-              allStatuses, true, Set.of(new UUID(0L, 0L)), false, null, union, pageable);
+              allStatuses,
+              true,
+              Set.of(new UUID(0L, 0L)),
+              false,
+              Set.of(new UUID(0L, 0L)),
+              false,
+              null,
+              union,
+              pageable);
+    }
+
+    @Test
+    void toProcess_unpinned_forwardsTheDirectMembershipsAsProcessingUnits() {
+      Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
+      UUID staffel = UUID.randomUUID();
+      UUID sk = UUID.randomUUID();
+      UUID cascaded = UUID.randomUUID();
+      Set<UUID> union = Set.of(staffel, sk, cascaded);
+      Set<UUID> direct = Set.of(staffel, sk);
+      when(ownerScopeService.currentScopePredicate())
+          .thenReturn(new ScopePredicate(false, null, union));
+      when(ownerScopeService.currentDirectMembershipOrgUnitIds()).thenReturn(direct);
+      when(jobOrderRepository.findScopedJobOrders(
+              allStatuses,
+              true,
+              Set.of(new UUID(0L, 0L)),
+              true,
+              direct,
+              false,
+              null,
+              union,
+              pageable))
+          .thenReturn(page);
+
+      Page<JobOrderDto> result = queryService.getAllJobOrders(null, null, true, pageable);
+
+      assertEquals(1, result.getTotalElements());
+      verify(jobOrderRepository)
+          .findScopedJobOrders(
+              allStatuses,
+              true,
+              Set.of(new UUID(0L, 0L)),
+              true,
+              direct,
+              false,
+              null,
+              union,
+              pageable);
+    }
+
+    @Test
+    void toProcess_pinned_forwardsOnlyThePinnedUnit() {
+      Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
+      UUID pinned = UUID.randomUUID();
+      when(ownerScopeService.currentScopePredicate())
+          .thenReturn(new ScopePredicate(false, pinned, Set.of()));
+      when(jobOrderRepository.findScopedJobOrders(
+              allStatuses,
+              true,
+              Set.of(new UUID(0L, 0L)),
+              true,
+              Set.of(pinned),
+              false,
+              pinned,
+              Set.of(),
+              pageable))
+          .thenReturn(page);
+
+      queryService.getAllJobOrders(null, null, true, pageable);
+
+      verify(ownerScopeService, never()).currentDirectMembershipOrgUnitIds();
+      verify(jobOrderRepository)
+          .findScopedJobOrders(
+              allStatuses,
+              true,
+              Set.of(new UUID(0L, 0L)),
+              true,
+              Set.of(pinned),
+              false,
+              pinned,
+              Set.of(),
+              pageable);
+    }
+
+    @Test
+    void toProcess_withoutAnyUnit_returnsAnEmptyPageWithoutQuerying() {
+      when(ownerScopeService.currentDirectMembershipOrgUnitIds()).thenReturn(Set.of());
+
+      Page<JobOrderDto> result = queryService.getAllJobOrders(null, null, true, pageable);
+
+      assertEquals(0, result.getTotalElements());
+      verifyNoInteractions(jobOrderRepository);
+    }
+
+    @Test
+    void toProcess_withoutTheProfitGate_returnsAnEmptyPage() {
+      when(ownerScopeService.canViewJobOrders()).thenReturn(false);
+
+      Page<JobOrderDto> result = queryService.getAllJobOrders(null, null, true, pageable);
+
+      assertEquals(0, result.getTotalElements());
+      verifyNoInteractions(jobOrderRepository);
     }
 
     @Test
@@ -304,7 +470,15 @@ class JobOrderServiceAssigneeAndListTest {
           new PageImpl<>(
               List.of(newJobOrder(JobOrderStatus.OPEN), newJobOrder(JobOrderStatus.IN_PROGRESS)));
       when(jobOrderRepository.findScopedJobOrders(
-              allStatuses, true, Set.of(new UUID(0L, 0L)), true, null, Set.of(), pageable))
+              allStatuses,
+              true,
+              Set.of(new UUID(0L, 0L)),
+              false,
+              Set.of(new UUID(0L, 0L)),
+              true,
+              null,
+              Set.of(),
+              pageable))
           .thenReturn(page);
 
       queryService.getAllJobOrders(null, pageable);
@@ -320,7 +494,15 @@ class JobOrderServiceAssigneeAndListTest {
 
       JobOrder order = newJobOrder(JobOrderStatus.OPEN);
       when(jobOrderRepository.findScopedJobOrders(
-              allStatuses, true, Set.of(new UUID(0L, 0L)), true, null, Set.of(), pageable))
+              allStatuses,
+              true,
+              Set.of(new UUID(0L, 0L)),
+              false,
+              Set.of(new UUID(0L, 0L)),
+              true,
+              null,
+              Set.of(),
+              pageable))
           .thenReturn(new PageImpl<>(List.of(order)));
       when(jobOrderMapper.toDto(order))
           .thenReturn(

@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
-    <title>Globales Lager - Profit Basetool</title>
+    <title th:text="#{inventory.overview.global} + ' - ' + ${appTitle}">Globales Lager - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<link rel="stylesheet" th:href="@{/css/pages/inventory-admin.css}">
+<link rel="stylesheet" th:href="@{/css/inventory-lager.css}">
     </th:block>
 </head>
 <body>
@@ -11,12 +11,37 @@
 
 <th:block th:replace="~{fragments/header :: header}" />
 
-<main>
-    <div class="greeting hud-box flex-between">
-        <h1>Globales Lager</h1>
+<main class="lager-page">
+    <th:block th:with="lagerBackHref=${view == 'items'} ? @{/inventory(view='items')} : @{/inventory}">
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.inventory', eyebrowHref=${lagerBackHref},
+        titleText=#{inventory.overview.global}, count=null, actions=~{::lager-all-actions})}">
+        <th:block th:ref="lager-all-actions">
+            <a sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" th:href="@{/inventory/input(source='admin')}"
+               class="btn btn--cta" data-testid="page-head-primary" th:text="#{inventory.input.new}">Einbuchen</a>
+            <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                <th:block th:replace="~{fragments/components :: overflowMenu(id='lager-all-more', items=~{::lager-all-more-items})}">
+                    <th:block th:ref="lager-all-more-items">
+                        <button type="button" id="delete-all-global-inventory-btn" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
+                                data-testid="delete-all-global-inventory"
+                                th:text="#{inventory.deleteAll.btn}"
+                                th:data-error-failed="#{inventory.deleteAll.error.failed}"
+                                th:data-success="#{inventory.deleteAll.success}">Globales Lager leeren</button>
+                    </th:block>
+                </th:block>
+            </th:block>
+        </th:block>
+    </th:block>
+    </th:block>
+
+    <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
+
+    <div th:if="${org?.springframework?.validation?.BindingResult?.inventoryForm != null}" class="alert alert-danger" role="alert">
+        <ul class="lager-error-list">
+            <li th:each="err : ${org.springframework.validation.BindingResult.inventoryForm.allErrors}" th:text="${err.defaultMessage}">Fehler</li>
+        </ul>
     </div>
 
-    <div class="tab-nav mt-2" role="tablist" th:aria-label="#{inventory.items.view.aria}">
+    <div class="tab-nav lager-tabs" role="tablist" th:aria-label="#{inventory.items.view.aria}">
         <a th:href="@{/inventory/all}" class="tab" role="tab"
            th:classappend="${view != 'items'} ? ' active' : ''" th:aria-selected="${view != 'items'}"
            data-testid="lager-view-material" th:text="#{inventory.items.view.material}">Material</a>
@@ -25,31 +50,15 @@
            data-testid="lager-view-items" th:text="#{inventory.items.view.items}">Items</a>
     </div>
 
-    <div class="hud-box mt-2">
-        <div th:if="${error}" class="alert alert-danger" th:text="#{__${error}__}"></div>
-        
-        <div th:if="${org?.springframework?.validation?.BindingResult?.inventoryForm != null}" class="alert alert-danger">
-            <ul class="krtm-margin-0-padding-left-1-5rem-09a6">
-                <li th:each="err : ${org.springframework.validation.BindingResult.inventoryForm.allErrors}" th:text="${err.defaultMessage}">Fehler</li>
-            </ul>
-        </div>
-
-        <div class="actions-bar">
-            <a th:href="@{/inventory}" class="btn btn-ghost">&laquo; Zurück zur Staffelübersicht</a>
-            <a sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" th:href="@{/inventory/input(source='admin')}" class="btn btn--cta" th:text="#{inventory.input.new}">Neuen Eintrag erfassen</a>
-            <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" type="button" id="delete-all-global-inventory-btn" class="btn btn-quiet-danger"
-                    th:text="#{inventory.deleteAll.btn}"
-                    th:data-error-failed="#{inventory.deleteAll.error.failed}"
-                    th:data-success="#{inventory.deleteAll.success}">Globales Lager leeren</button>
-
-            <div th:replace="~{fragments/components :: filterToggle('globalFilterPanel', 'lager-filter-toggle')}"></div>
-        </div>
-
-        <div class="filter-panel" id="globalFilterPanel" data-filter-panel="inventory-all">
-                <form th:if="${view != 'items'}" th:action="@{/inventory/all}" method="get" id="globalFilterForm" class="global-inventory-filter no-track krtm-margin-0-display-flex-gap-1rem-align-items-c-5700">
-                    <div class="flex-gap-sm">
-                        <label class="form-label-xs" th:text="#{inventory.filter.material}">Material:</label>
-                        <div class="multi-select-container" id="materialFilterContainer">
+    <form th:if="${view != 'items'}" th:action="@{/inventory/all}" method="get" id="globalFilterForm" class="global-inventory-filter no-track">
+        <div class="toolbar lager-toolbar">
+            <th:block th:replace="~{fragments/components :: filterPopover(panelId='globalFilterPanel', panelName='inventory-all',
+                testid='lager-filter-toggle', body=~{::lager-all-filter-body})}">
+                <th:block th:ref="lager-all-filter-body">
+                    <div class="lager-filter-field">
+                        <span class="form-label-xs" th:text="#{inventory.filter.material}">Material</span>
+                        <input type="hidden" name="materialFilter" value="" data-chip-family="matCheck" data-chip-all="matAll" data-chip-header="materialHeader" th:attr="data-chip-label=#{inventory.filter.material}">
+                        <div class="multi-select-container" id="materialFilterContainer" data-filter-chip-ignore>
                             <div class="multi-select-header" data-trigger="inv-admin-toggle-multi" data-multi-target="materialOptions" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="materialHeader">
                                 <span class="selected-text" id="materialSelectedText" th:text="#{filter.all}">Alle</span>
                             </div>
@@ -65,9 +74,10 @@
                             </div>
                         </div>
                     </div>
-                    <div class="flex-gap-sm">
-                        <label class="form-label-xs" th:text="#{inventory.filter.location}">Standort:</label>
-                        <div class="multi-select-container" id="locationFilterContainer">
+                    <div class="lager-filter-field">
+                        <span class="form-label-xs" th:text="#{inventory.filter.location}">Standort</span>
+                        <input type="hidden" name="locationFilter" value="" data-chip-family="locCheck" data-chip-all="locAll" data-chip-header="locationHeader" th:attr="data-chip-label=#{inventory.filter.location}">
+                        <div class="multi-select-container" id="locationFilterContainer" data-filter-chip-ignore>
                             <div class="multi-select-header" data-trigger="inv-admin-toggle-multi" data-multi-target="locationOptions" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="locationHeader">
                                 <span class="selected-text" id="locationSelectedText" th:text="#{filter.all}">Alle</span>
                             </div>
@@ -83,16 +93,17 @@
                             </div>
                         </div>
                     </div>
-                    <div class="flex-gap-sm">
-                        <label for="minQuality" class="form-label-xs" th:text="#{inventory.filter.minQuality}">Qualität &ge;:</label>
-                        <select id="minQuality" name="minQuality" class="krtm-padding-0-375rem-2-5rem-0-375rem-0-75rem-min-caea" data-trigger="inv-admin-filter">
-                            <option value="" th:text="#{filter.all}">-- Alle --</option>
+                    <div class="lager-filter-field">
+                        <label for="minQuality" class="form-label-xs" th:text="#{inventory.filter.minQuality}">Qualit&auml;t &ge;</label>
+                        <select id="minQuality" name="minQuality" class="lager-filter-select" data-trigger="inv-admin-filter">
+                            <option value="" th:text="#{filter.all}">Alle</option>
                             <option th:each="q : ${#numbers.sequence(100, 1000, 100)}" th:value="${q}" th:text="${q}" th:selected="${selectedMinQuality != null and selectedMinQuality == q}"></option>
                         </select>
                     </div>
-                    <div class="flex-gap-sm">
-                        <label class="form-label-xs" th:text="#{inventory.filter.jobOrder}">Auftrag:</label>
-                        <div class="multi-select-container" id="jobOrderFilterContainer">
+                    <div class="lager-filter-field">
+                        <span class="form-label-xs" th:text="#{inventory.filter.jobOrder}">Auftrag</span>
+                        <input type="hidden" name="jobOrderFilter" value="" data-chip-family="jobOrderCheck" data-chip-all="jobOrderAll" data-chip-header="jobOrderHeader" th:attr="data-chip-label=#{inventory.filter.jobOrder}">
+                        <div class="multi-select-container" id="jobOrderFilterContainer" data-filter-chip-ignore>
                             <div class="multi-select-header" data-trigger="inv-admin-toggle-multi" data-multi-target="jobOrderOptions" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="jobOrderHeader">
                                 <span class="selected-text" id="jobOrderSelectedText" th:text="#{filter.all}">Alle</span>
                             </div>
@@ -108,9 +119,10 @@
                             </div>
                         </div>
                     </div>
-                    <div class="flex-gap-sm">
-                        <label class="form-label-xs" th:text="#{inventory.filter.mission}">Einsatz:</label>
-                        <div class="multi-select-container" id="missionFilterContainer">
+                    <div class="lager-filter-field">
+                        <span class="form-label-xs" th:text="#{inventory.filter.mission}">Einsatz</span>
+                        <input type="hidden" name="missionFilter" value="" data-chip-family="missionCheck" data-chip-all="missionAll" data-chip-header="missionHeader" th:attr="data-chip-label=#{inventory.filter.mission}">
+                        <div class="multi-select-container" id="missionFilterContainer" data-filter-chip-ignore>
                             <div class="multi-select-header" data-trigger="inv-admin-toggle-multi" data-multi-target="missionOptions" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="missionHeader">
                                 <span class="selected-text" id="missionSelectedText" th:text="#{filter.all}">Alle</span>
                             </div>
@@ -126,21 +138,30 @@
                             </div>
                         </div>
                     </div>
-                    <div class="flex-gap-sm">
+                    <div class="lager-filter-field">
                         <label for="stolenFilter" class="form-label-xs" th:text="#{inventory.stolen.filter.label}">Gestohlen:</label>
-                        <select id="stolenFilter" class="krtm-padding-0-375rem-2-5rem-0-375rem-0-75rem-min-caea" data-trigger="inv-admin-filter" data-testid="stolen-filter">
+                        <select id="stolenFilter" name="stolen" class="lager-filter-select" data-trigger="inv-admin-filter" data-testid="stolen-filter" th:attr="data-chip-label=#{inventory.stolen.chip}">
                             <option value="" th:text="#{inventory.stolen.filter.all}">Alle</option>
                             <option value="non" th:selected="${selectedNonStolenOnly}" th:text="#{inventory.stolen.filter.nonStolen}">Ohne gestohlene</option>
                             <option value="only" th:selected="${selectedStolenOnly}" th:text="#{inventory.stolen.filter.stolenOnly}">Nur gestohlene</option>
                         </select>
                     </div>
-                    <button type="button" class="btn btn-ghost" data-trigger="inv-admin-reset-filter" th:text="#{inventory.filter.reset}">Filter zur\u00fccksetzen</button>
-                </form>
-                <form th:if="${view == 'items'}" th:action="@{/inventory/all}" method="get" id="globalItemsFilterForm" class="global-inventory-filter no-track krtm-margin-0-display-flex-gap-1rem-align-items-c-5700">
-                    <input type="hidden" name="view" value="items">
-                    <div class="flex-gap-sm">
-                        <label class="form-label-xs" th:text="#{inventory.items.filter.gameItem}">Item:</label>
-                        <div class="multi-select-container" id="gameItemFilterContainer">
+                    <button type="button" class="btn btn-ghost" data-trigger="inv-admin-reset-filter" th:text="#{inventory.filter.reset}">Filter zur&uuml;cksetzen</button>
+                </th:block>
+            </th:block>
+        </div>
+        <th:block th:replace="~{fragments/components :: filterChips('globalFilterForm')}"></th:block>
+    </form>
+    <form th:if="${view == 'items'}" th:action="@{/inventory/all}" method="get" id="globalItemsFilterForm" class="global-inventory-filter no-track">
+        <input type="hidden" name="view" value="items">
+        <div class="toolbar lager-toolbar">
+            <th:block th:replace="~{fragments/components :: filterPopover(panelId='globalFilterPanel', panelName='inventory-all',
+                testid='lager-filter-toggle', body=~{::lager-all-items-filter-body})}">
+                <th:block th:ref="lager-all-items-filter-body">
+                    <div class="lager-filter-field">
+                        <span class="form-label-xs" th:text="#{inventory.items.filter.gameItem}">Item</span>
+                        <input type="hidden" name="gameItemFilter" value="" data-chip-family="gameItemCheck" data-chip-all="gameItemAll" data-chip-header="gameItemHeader" th:attr="data-chip-label=#{inventory.items.filter.gameItem}">
+                        <div class="multi-select-container" id="gameItemFilterContainer" data-filter-chip-ignore>
                             <div class="multi-select-header" data-trigger="inv-admin-toggle-multi" data-multi-target="gameItemOptions" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="gameItemHeader">
                                 <span class="selected-text" id="gameItemSelectedText" th:text="#{filter.all}">Alle</span>
                             </div>
@@ -156,9 +177,10 @@
                             </div>
                         </div>
                     </div>
-                    <div class="flex-gap-sm">
-                        <label class="form-label-xs" th:text="#{inventory.filter.location}">Standort:</label>
-                        <div class="multi-select-container" id="itemLocationFilterContainer">
+                    <div class="lager-filter-field">
+                        <span class="form-label-xs" th:text="#{inventory.filter.location}">Standort</span>
+                        <input type="hidden" name="locationFilter" value="" data-chip-family="locCheck" data-chip-all="itemLocAll" data-chip-header="itemLocationHeader" th:attr="data-chip-label=#{inventory.filter.location}">
+                        <div class="multi-select-container" id="itemLocationFilterContainer" data-filter-chip-ignore>
                             <div class="multi-select-header" data-trigger="inv-admin-toggle-multi" data-multi-target="itemLocationOptions" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="itemLocationHeader">
                                 <span class="selected-text" id="itemLocationSelectedText" th:text="#{filter.all}">Alle</span>
                             </div>
@@ -174,9 +196,10 @@
                             </div>
                         </div>
                     </div>
-                    <div class="flex-gap-sm">
-                        <label class="form-label-xs" th:text="#{inventory.filter.jobOrder}">Auftrag:</label>
-                        <div class="multi-select-container" id="itemJobOrderFilterContainer">
+                    <div class="lager-filter-field">
+                        <span class="form-label-xs" th:text="#{inventory.filter.jobOrder}">Auftrag</span>
+                        <input type="hidden" name="jobOrderFilter" value="" data-chip-family="jobOrderCheck" data-chip-all="itemJobOrderAll" data-chip-header="itemJobOrderHeader" th:attr="data-chip-label=#{inventory.filter.jobOrder}">
+                        <div class="multi-select-container" id="itemJobOrderFilterContainer" data-filter-chip-ignore>
                             <div class="multi-select-header" data-trigger="inv-admin-toggle-multi" data-multi-target="itemJobOrderOptions" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="itemJobOrderHeader">
                                 <span class="selected-text" id="itemJobOrderSelectedText" th:text="#{filter.all}">Alle</span>
                             </div>
@@ -192,37 +215,41 @@
                             </div>
                         </div>
                     </div>
-                    <div class="flex-gap-sm">
+                    <div class="lager-filter-field">
                         <label for="itemStolenFilter" class="form-label-xs" th:text="#{inventory.stolen.filter.label}">Gestohlen:</label>
-                        <select id="itemStolenFilter" class="krtm-padding-0-375rem-2-5rem-0-375rem-0-75rem-min-caea" data-trigger="inv-admin-filter" data-testid="stolen-filter">
+                        <select id="itemStolenFilter" name="stolen" class="lager-filter-select" data-trigger="inv-admin-filter" data-testid="stolen-filter" th:attr="data-chip-label=#{inventory.stolen.chip}">
                             <option value="" th:text="#{inventory.stolen.filter.all}">Alle</option>
                             <option value="non" th:selected="${selectedNonStolenOnly}" th:text="#{inventory.stolen.filter.nonStolen}">Ohne gestohlene</option>
                             <option value="only" th:selected="${selectedStolenOnly}" th:text="#{inventory.stolen.filter.stolenOnly}">Nur gestohlene</option>
                         </select>
                     </div>
-                    <button type="button" class="btn btn-ghost" data-trigger="inv-admin-reset-filter" th:text="#{inventory.filter.reset}">Filter zur\u00fccksetzen</button>
-                </form>
+                    <button type="button" class="btn btn-ghost" data-trigger="inv-admin-reset-filter" th:text="#{inventory.filter.reset}">Filter zur&uuml;cksetzen</button>
+                </th:block>
+            </th:block>
         </div>
+        <th:block th:replace="~{fragments/components :: filterChips('globalItemsFilterForm')}"></th:block>
+    </form>
 
+    <div class="card card--flush lager-tree-card">
         <div class="overflow-x-auto" id="tableContainer" th:fragment="inventoryTableFragment">
             <div class="table-responsive">
             <th:block th:if="${view != 'items'}">
-            <div class="tree-table krtm-tree-cols-minmax-200px-1-4fr-minmax-220px-1-88e9" id="inventoryTable" th:data-user-id="${#authentication.name}" th:data-member-id="${currentMemberId}">
-                <div class="tree-row tree-head">
+            <div class="tree-table lager-material-tree" id="inventoryTable" th:classappend="${#lists.isEmpty(groupedItems)} ? 'tree-table--empty'" th:data-user-id="${#authentication.name}" th:data-member-id="${currentMemberId}">
+                <div class="tree-row tree-head" th:unless="${#lists.isEmpty(groupedItems)}">
                     <div class="tree-cell" th:text="#{inventory.tree.stock}">Bestand</div>
                     <div class="tree-cell" th:text="#{inventory.tree.context}">Kontext / Zuordnung</div>
-                    <div class="tree-cell tree-cell--num" th:text="#{inventory.quality}">Qualität</div>
+                    <div class="tree-cell tree-cell--num" th:text="#{inventory.quality}">Qualit&auml;t</div>
                     <div class="tree-cell tree-cell--num" th:text="#{inventory.amount}">Menge</div>
-                    <div class="tree-cell krtm-text-align-right-3048" th:text="#{inventory.tree.action}">Aktion</div>
+                    <div class="tree-cell lager-cell-end" th:text="#{inventory.tree.action}">Aktion</div>
                 </div>
 
                 <div class="tree-group" th:each="group : ${groupedItems}">
-                    <div class="tree-row tree-row--group krtm-cursor-pointer-74fa" data-trigger="inv-admin-toggle-group" th:data-material-id="${group.material.id}">
+                    <div class="tree-row tree-row--group" data-trigger="inv-admin-toggle-group" th:data-material-id="${group.material.id}">
                         <div class="tree-cell tree-name">
                             <span class="tree-chevron toggle-icon">▶</span>
                             <span class="tree-label" th:text="${group.material.name}">Material</span>
                         </div>
-                        <div class="tree-cell krtm-color-var-color-gray-2-4fcb" th:text="#{inventory.tree.groupContext(${group.userCount()}, ${#lists.size(group.stacks)})}">3 Nutzer · 5 Stacks</div>
+                        <div class="tree-cell lager-cell-muted" th:text="#{inventory.tree.groupContext(${group.userCount()}, ${#lists.size(group.stacks)})}">3 Nutzer · 5 Stacks</div>
                         <div class="tree-cell tree-cell--num">
                             <span class="tree-gauge">
                                 <span class="tree-gauge-val" th:if="${group.averageQuality != null}"><span th:text="${#numbers.formatInteger(group.averageQuality, 1)}">639</span> <span class="tree-gauge-max" th:text="|/ ${group.maxQuality}|">/ 796</span></span>
@@ -231,15 +258,15 @@
                             </span>
                         </div>
                         <div class="tree-cell tree-cell--num tree-amount" th:switch="${group.material.quantityType}">
-                            <span th:case="'PIECE'"><span th:text="${group.totalAmount != null ? #numbers.formatInteger(group.totalAmount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">Stück</span></span>
+                            <span th:case="'PIECE'"><span th:text="${group.totalAmount != null ? #numbers.formatInteger(group.totalAmount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">St&uuml;ck</span></span>
                             <span th:case="*"><span th:text="${group.totalAmount != null ? #numbers.formatDecimal(group.totalAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'}">10.500</span> <span class="tree-unit" th:text="#{material.quantity.scu}">SCU</span></span>
                         </div>
                         <div class="tree-cell"></div>
                     </div>
 
-                    <div class="tree-group-items krtm-display-none-5790">
+                    <div class="tree-group-items">
                         <div th:each="stack : ${group.stacks}">
-                            <div class="tree-row tree-row--mid stack-header krtm-cursor-pointer-74fa" data-trigger="inv-admin-toggle-stack"
+                            <div class="tree-row tree-row--mid stack-header" data-trigger="inv-admin-toggle-stack"
                                  data-stack-loaded="false"
                                  th:data-material-id="${group.material.id}"
                                  th:data-user-id="${stack.user.id}"
@@ -251,7 +278,7 @@
                                     <span class="tree-chevron toggle-icon stack-toggle-icon">▶</span>
                                     <span class="tree-label" th:text="${stack.user.effectiveName}" th:title="${stack.user.effectiveName}">User</span>
                                 </div>
-                                <div class="tree-cell krtm-display-flex-gap-0-5rem-align-items-center-m-b7a7">
+                                <div class="tree-cell lager-cell-context">
                                     <span th:if="${isAllSquadronsMode and stack.owningSquadron != null}" class="squadron-badge" th:title="${stack.owningSquadron.name()}" th:text="${stack.owningSquadron.shorthand()}">IRI</span>
                                     <span th:if="${isAllSquadronsMode and stack.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
                                     <span class="tree-label" th:text="${stack.location.name}" th:title="${stack.location.name}">Ort</span>
@@ -262,14 +289,14 @@
                                     <span class="tree-gauge"><span class="tree-gauge-val" th:text="${stack.quality}">796</span><span class="tree-gauge-track"><span th:attr="data-krtm-width=${stack.quality != null ? stack.quality / 10 : 0}"></span></span></span>
                                 </div>
                                 <div class="tree-cell tree-cell--num tree-amount" th:switch="${group.material.quantityType}">
-                                    <span th:case="'PIECE'"><span th:text="${stack.totalAmount != null ? #numbers.formatInteger(stack.totalAmount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">Stück</span></span>
+                                    <span th:case="'PIECE'"><span th:text="${stack.totalAmount != null ? #numbers.formatInteger(stack.totalAmount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">St&uuml;ck</span></span>
                                     <span th:case="*"><span th:text="${stack.totalAmount != null ? #numbers.formatDecimal(stack.totalAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'}">10.500</span> <span class="tree-unit" th:text="#{material.quantity.scu}">SCU</span></span>
                                 </div>
-                                <div class="tree-cell tree-cell--num krtm-color-var-color-gray-2-font-size-0-78rem-505c">
+                                <div class="tree-cell tree-cell--num lager-cell-count">
                                     <span class="stack-entry-count" th:text="${stack.entryCount == 1} ? #{inventory.tree.entryCount.one} : #{inventory.tree.entryCount.many(${stack.entryCount})}">1 Eintrag</span>
                                 </div>
                             </div>
-                            <div class="tree-stack-entries krtm-display-none-5790">
+                            <div class="tree-stack-entries">
                                 <div class="stack-entries-content">
                                 </div>
                             </div>
@@ -277,22 +304,22 @@
                     </div>
                 </div>
 
-                <div class="tree-row" th:if="${#lists.isEmpty(groupedItems)}">
-                    <div class="tree-cell text-muted krtm-grid-column-1-1-text-align-center-26f2" th:text="#{inventory.grouped.empty}">Keine Einträge gefunden.</div>
-                </div>
+                <th:block th:if="${#lists.isEmpty(groupedItems)}">
+                    <th:block th:replace="~{fragments/components :: emptyState(titleKey='inventory.grouped.empty', textKey='inventory.tree.empty.text')}"></th:block>
+                </th:block>
             </div>
             </th:block>
             <th:block th:if="${view == 'items'}">
-            <div class="tree-table lager-items-tree" th:id="'inventoryTable'" th:data-user-id="${#authentication.name}" th:data-member-id="${currentMemberId}">
-                <div class="tree-row tree-head">
+            <div class="tree-table lager-items-tree" th:id="'inventoryTable'" th:classappend="${#lists.isEmpty(groupedItems)} ? 'tree-table--empty'" th:data-user-id="${#authentication.name}" th:data-member-id="${currentMemberId}">
+                <div class="tree-row tree-head" th:unless="${#lists.isEmpty(groupedItems)}">
                     <div class="tree-cell" th:text="#{inventory.tree.stock}">Bestand</div>
                     <div class="tree-cell" th:text="#{inventory.tree.context}">Kontext / Zuordnung</div>
                     <div class="tree-cell tree-cell--num" th:text="#{inventory.amount}">Menge</div>
-                    <div class="tree-cell krtm-text-align-right-3048" th:text="#{inventory.tree.action}">Aktion</div>
+                    <div class="tree-cell lager-cell-end" th:text="#{inventory.tree.action}">Aktion</div>
                 </div>
 
                 <div class="tree-group" th:each="group : ${groupedItems}">
-                    <div class="tree-row tree-row--group krtm-cursor-pointer-74fa" data-trigger="inv-admin-toggle-group" th:data-game-item-id="${group.gameItem.id}">
+                    <div class="tree-row tree-row--group" data-trigger="inv-admin-toggle-group" th:data-game-item-id="${group.gameItem.id}">
                         <div class="tree-cell tree-name">
                             <span class="tree-chevron toggle-icon">▶</span>
                             <span class="tree-label" th:text="${group.gameItem.name}">Item</span>
@@ -300,19 +327,19 @@
                                   th:with="kindKey=|inventory.items.kind.${group.gameItem.kind}|"
                                   th:text="${#messages.msgOrNull(kindKey)} ?: ${group.gameItem.kind}">Art</span>
                         </div>
-                        <div class="tree-cell krtm-color-var-color-gray-2-4fcb">
+                        <div class="tree-cell lager-cell-muted">
                             <span th:if="${group.gameItem.manufacturer != null}" th:text="|${group.gameItem.manufacturer} · |">Hersteller · </span>
                             <span th:text="#{inventory.tree.groupContext(${group.userCount()}, ${#lists.size(group.stacks)})}">3 Nutzer · 5 Stacks</span>
                         </div>
                         <div class="tree-cell tree-cell--num tree-amount">
-                            <span><span th:text="${group.totalAmount != null ? #numbers.formatInteger(group.totalAmount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">Stück</span></span>
+                            <span><span th:text="${group.totalAmount != null ? #numbers.formatInteger(group.totalAmount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">St&uuml;ck</span></span>
                         </div>
                         <div class="tree-cell"></div>
                     </div>
 
-                    <div class="tree-group-items krtm-display-none-5790">
+                    <div class="tree-group-items">
                         <div th:each="stack : ${group.stacks}">
-                            <div class="tree-row tree-row--mid stack-header krtm-cursor-pointer-74fa" data-trigger="inv-admin-toggle-stack"
+                            <div class="tree-row tree-row--mid stack-header" data-trigger="inv-admin-toggle-stack"
                                  data-stack-loaded="false"
                                  th:data-game-item-id="${group.gameItem.id}"
                                  th:data-user-id="${stack.user.id}"
@@ -323,7 +350,7 @@
                                     <span class="tree-chevron toggle-icon stack-toggle-icon">▶</span>
                                     <span class="tree-label" th:text="${stack.user.effectiveName}" th:title="${stack.user.effectiveName}">User</span>
                                 </div>
-                                <div class="tree-cell krtm-display-flex-gap-0-5rem-align-items-center-m-b7a7">
+                                <div class="tree-cell lager-cell-context">
                                     <span th:if="${isAllSquadronsMode and stack.owningSquadron != null}" class="squadron-badge" th:title="${stack.owningSquadron.name()}" th:text="${stack.owningSquadron.shorthand()}">IRI</span>
                                     <span th:if="${isAllSquadronsMode and stack.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
                                     <span class="tree-label" th:text="${stack.location.name}" th:title="${stack.location.name}">Ort</span>
@@ -331,13 +358,13 @@
                                           th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
                                 </div>
                                 <div class="tree-cell tree-cell--num tree-amount">
-                                    <span><span th:text="${stack.totalAmount != null ? #numbers.formatInteger(stack.totalAmount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">Stück</span></span>
+                                    <span><span th:text="${stack.totalAmount != null ? #numbers.formatInteger(stack.totalAmount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">St&uuml;ck</span></span>
                                 </div>
-                                <div class="tree-cell tree-cell--num krtm-color-var-color-gray-2-font-size-0-78rem-505c">
+                                <div class="tree-cell tree-cell--num lager-cell-count">
                                     <span class="stack-entry-count" th:text="${stack.entryCount == 1} ? #{inventory.tree.entryCount.one} : #{inventory.tree.entryCount.many(${stack.entryCount})}">1 Eintrag</span>
                                 </div>
                             </div>
-                            <div class="tree-stack-entries krtm-display-none-5790">
+                            <div class="tree-stack-entries">
                                 <div class="stack-entries-content">
                                 </div>
                             </div>
@@ -345,9 +372,9 @@
                     </div>
                 </div>
 
-                <div class="tree-row" th:if="${#lists.isEmpty(groupedItems)}">
-                    <div class="tree-cell text-muted krtm-grid-column-1-1-text-align-center-26f2" th:text="#{inventory.items.empty}">Keine Item-Bestände gefunden.</div>
-                </div>
+                <th:block th:if="${#lists.isEmpty(groupedItems)}">
+                    <th:block th:replace="~{fragments/components :: emptyState(titleKey='inventory.items.empty', textKey='inventory.tree.empty.text')}"></th:block>
+                </th:block>
             </div>
             </th:block>
             </div>
@@ -359,14 +386,14 @@
     <th:block th:ref="bookOutModal-body">
         <form id="bookOutForm" th:action="@{/inventory/{id}/book-out(id=${showBookOutModal != null ? showBookOutModal : ''})}" method="post" th:object="${inventoryBookOutForm}">
             <div class="krt-modal-body">
-            <div th:if="${#fields.hasErrors('*')}" class="hud-box hud-box-error">
-                <ul class="text-danger">
+            <div th:if="${#fields.hasErrors('*')}" class="alert alert-danger">
+                <ul class="lager-error-list">
                     <li th:each="err : ${#fields.errors('*')}" th:text="${err}">Fehler</li>
                 </ul>
             </div>
             <input type="hidden" id="version" th:field="*{version}">
             <input type="hidden" id="maxAmount" th:field="*{maxAmount}">
-            
+
             <div class="form-group mb-1">
                 <label for="targetAmount" class="form-label">
                     <span th:text="#{inventory.bookout.targetAmount}">Zielbestand</span>
@@ -374,7 +401,7 @@
                 </label>
                 <input type="text" inputmode="decimal" data-scu-decimal data-scu-allow-zero id="targetAmount" th:field="*{targetAmount}" step="0.001" min="0" class="w-full" data-trigger="inv-admin-amount-from-target">
             </div>
-            
+
             <div class="form-group mb-1">
                 <label for="amount" class="form-label">
                     <span th:text="#{inventory.bookout.amount}">Menge ausbuchen</span>
@@ -382,28 +409,28 @@
                 </label>
                 <div class="flex-gap-sm">
                     <input type="text" inputmode="decimal" data-scu-decimal id="amount" th:field="*{amount}" step="0.001" min="0" required class="w-full" data-trigger="inv-admin-target-from-amount">
-                    <span id="amountOfText" class="krtm-white-space-nowrap-color-var-color-gray-2-8309" th:data-template="#{inventory.bookout.amount.of('{0}')}" th:text="${inventoryBookOutForm.maxAmount != null ? #messages.msg('inventory.bookout.amount.of', inventoryBookOutForm.maxAmount) : ''}"></span>
+                    <span id="amountOfText" class="lager-amount-of" th:data-template="#{inventory.bookout.amount.of('{0}')}" th:text="${inventoryBookOutForm.maxAmount != null ? #messages.msg('inventory.bookout.amount.of', inventoryBookOutForm.maxAmount) : ''}"></span>
                 </div>
             </div>
-            
+
             <div class="form-group mb-1">
                 <label class="form-label" th:text="#{inventory.bookout.type}">Ausbuchungsart</label>
-                <div class="krtm-display-flex-gap-1-5rem-flex-wrap-wrap-82c0">
+                <div class="lager-radio-row">
                     <label class="flex-gap-sm cursor-pointer">
                         <input type="radio" th:field="*{type}" value="DISCARD" checked data-trigger="inv-admin-toggle-bookout-type" class="m-0"> <span th:text="#{inventory.bookout.type.discard}">Einfache Ausbuchung</span>
                     </label>
                     <label class="flex-gap-sm cursor-pointer">
                         <input type="radio" th:field="*{type}" value="SELL" data-trigger="inv-admin-toggle-bookout-type" class="m-0"> <span th:text="#{inventory.bookout.type.sell}">Verkauf</span>
                     </label>
-                    <span id="sellNotPossibleReason" class="krtm-display-none-color-var-color-warning-font-si-b251" th:text="#{inventory.bookout.sellNotPossible}">Kein Verkauf möglich</span>
+                    <span id="sellNotPossibleReason" class="lager-sell-reason" hidden th:text="#{inventory.bookout.sellNotPossible}">Kein Verkauf m&ouml;glich</span>
                 </div>
             </div>
-            
-            <div id="sellFields" class="krtm-display-none-margin-bottom-1rem-42ae">
+
+            <div id="sellFields" class="lager-sell-fields" hidden>
                 <div class="form-group mb-1">
                     <label for="terminal" class="form-label" th:text="#{inventory.bookout.terminal}">Terminal</label>
                     <select id="terminal" th:field="*{terminal}" class="w-full">
-                        <option value="" disabled selected>...wählen...</option>
+                        <option value="" disabled selected th:text="#{inventory.bookout.terminal.choose}">...w&auml;hlen...</option>
                     </select>
                 </div>
                 <div class="form-group mb-1">
@@ -412,7 +439,7 @@
                 </div>
             </div>
 
-            <div class="form-group mb-1 krtm-hidden" data-herkunft="bookout"
+            <div class="form-group mb-1" hidden data-herkunft="bookout"
                  data-herkunft-amount-id="amount"
                  data-herkunft-submit-id="bookOutSubmitBtn"
                  data-herkunft-sell-amount-id="sellAmount">
@@ -454,11 +481,11 @@
                 </label>
                 <div class="flex-gap-sm">
                     <input type="text" inputmode="decimal" data-scu-decimal id="umbuchenAmount" step="0.001" min="0" required class="w-full" data-trigger="inv-admin-umbuchen-target-from-amount">
-                    <span id="umbuchenAmountOfText" class="krtm-white-space-nowrap-color-var-color-gray-2-8309" th:data-template="#{inventory.bookout.amount.of('{0}')}"></span>
+                    <span id="umbuchenAmountOfText" class="lager-amount-of" th:data-template="#{inventory.bookout.amount.of('{0}')}"></span>
                 </div>
             </div>
 
-            <div id="umbuchenTransferFields" class="form-group krtm-margin-bottom-1rem-c2c0">
+            <div id="umbuchenTransferFields" class="form-group lager-mb">
                 <div class="flex-gap-md">
                     <div class="flex-1">
                         <label for="umbuchenTargetUserId" class="form-label" th:text="#{inventory.bookout.targetUser}">Umbuchen zu Nutzer</label>
@@ -471,11 +498,11 @@
                         <select id="umbuchenTargetLocationId" class="w-full" data-krt-combobox="remote-locations"></select>
                     </div>
                 </div>
-                <div id="umbuchenTargetOwningOrgUnitWrapper" class="krtm-display-none-margin-top-0-75rem-d00c">
+                <div id="umbuchenTargetOwningOrgUnitWrapper" class="lager-org-unit-wrapper" hidden>
                     <label for="umbuchenTargetOwningOrgUnitId" class="form-label" th:text="#{inventory.bookout.targetOrgUnit}">Buchen in OrgUnit</label>
                     <select id="umbuchenTargetOwningOrgUnitId" class="w-full"></select>
                 </div>
-                <div class="form-group mb-1 krtm-hidden" data-herkunft="umbuchen"
+                <div class="form-group mb-1" hidden data-herkunft="umbuchen"
                      data-herkunft-amount-id="umbuchenAmount"
                      data-herkunft-submit-id="umbuchenSubmitBtn">
                     <span class="form-label" th:text="#{inventory.herkunft.label}">Herkunft der Menge</span>
@@ -484,11 +511,11 @@
                 </div>
             </div>
 
-            <div id="umbuchenMergeRow" class="form-group check-row mb-1 krtm-hidden">
+            <div id="umbuchenMergeRow" class="form-group check-row mb-1" hidden>
                 <input type="checkbox" id="umbuchenMergeStock">
                 <div>
-                    <label for="umbuchenMergeStock" th:text="#{inventory.merge.label}">Mit vorhandenem Bestand zusammenführen</label>
-                    <p class="form-hint" th:text="#{inventory.merge.help}">Fügt diese Menge mit vorhandenem, gleichartigem Bestand zu einem Eintrag zusammen. Gilt nur für diese Buchung.</p>
+                    <label for="umbuchenMergeStock" th:text="#{inventory.merge.label}">Mit vorhandenem Bestand zusammenf&uuml;hren</label>
+                    <p class="form-hint" th:text="#{inventory.merge.help}">F&uuml;gt diese Menge mit vorhandenem, gleichartigem Bestand zu einem Eintrag zusammen. Gilt nur f&uuml;r diese Buchung.</p>
                 </div>
             </div>
             </div>
@@ -509,13 +536,13 @@
                       th:placeholder="#{inventory.note.placeholder}"
                       data-trigger="inv-admin-update-note-counter"
                       class="w-full"></textarea>
-            <div id="noteModalCounter" class="krtm-text-align-right-color-var-color-gray-2-font-6d96">0 / 1000</div>
+            <div id="noteModalCounter" class="lager-note-counter">0 / 1000</div>
         </div>
         </div>
         <div class="krt-modal-foot">
             <button type="button" class="btn btn--cta" data-trigger="inv-admin-save-note"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{inventory.note.save}">Speichern</span></button>
             <button type="button" class="btn btn-quiet-danger" data-trigger="inv-admin-remove-note"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{inventory.note.remove}">Entfernen</span></button>
-            <button type="button" class="btn btn-ghost krtm-min-height-44px-margin-left-auto-85bf" data-trigger="inv-admin-close-note" th:text="#{inventory.note.cancel}">Abbrechen</button>
+            <button type="button" class="btn btn-ghost lager-push-end" data-trigger="inv-admin-close-note" th:text="#{inventory.note.cancel}">Abbrechen</button>
         </div>
     </th:block>
 </th:block>
@@ -524,11 +551,11 @@
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='delete-all-global-inventory-modal', titleKey='inventory.deleteAll.modal.title', variant='krt-modal--wide krt-modal--danger', body=~{::delete-all-global-inventory-modal-body})}">
     <th:block th:ref="delete-all-global-inventory-modal-body">
         <div class="krt-modal-body">
-        <p th:text="#{inventory.deleteAll.modal.body}" class="mb-2">Alle globalen Lagereinträge wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden. Persönliche Lagereinträge bleiben erhalten.</p>
+        <p th:text="#{inventory.deleteAll.modal.body}" class="mb-2">Alle globalen Lagereintr&auml;ge wirklich l&ouml;schen?</p>
         </div>
         <div class="krt-modal-foot">
             <button type="button" id="delete-all-global-inventory-cancel-btn" class="btn btn-ghost" th:text="#{general.cancel}">Abbrechen</button>
-            <button type="button" id="delete-all-global-inventory-confirm-btn" class="btn btn-danger" th:text="#{inventory.deleteAll.modal.confirm}">Ja, alle löschen</button>
+            <button type="button" id="delete-all-global-inventory-confirm-btn" class="btn btn-danger" th:text="#{inventory.deleteAll.modal.confirm}">Ja, alle l&ouml;schen</button>
         </div>
     </th:block>
 </th:block>

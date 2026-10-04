@@ -177,12 +177,14 @@ public abstract class MissionMapper {
    *
    * @param mission the entity to project; {@code null} returns {@code null}
    * @param registeredCount the mission's participant count, resolved by the caller for the page
+   * @param signedUp whether the calling member is signed up, resolved by the caller for the page
    * @return the list-row DTO
    */
   @Mapping(target = "description", expression = "java(resolveDescription(mission))")
   @Mapping(target = "owningSquadron", source = "mission.owningOrgUnit")
   @Mapping(target = "registeredCount", expression = "java(registeredCount)")
-  public abstract MissionListDto toListDto(Mission mission, long registeredCount);
+  @Mapping(target = "signedUp", expression = "java(signedUp)")
+  public abstract MissionListDto toListDto(Mission mission, long registeredCount, boolean signedUp);
 
   /**
    * Projects org-unit affiliations into {@link OrgUnitReferenceDto}s, Staffel first, then

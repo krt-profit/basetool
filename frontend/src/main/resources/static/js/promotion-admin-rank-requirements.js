@@ -114,15 +114,45 @@ function apiCall(url, method, body) {
         });
 }
 
-function openCreateModal() {
-    document.getElementById('cr-from').value = 20;
-    document.getElementById('cr-to').value = 19;
-    document.getElementById('cr-topic').value = '';
+function openCreateModal(btn) {
+    const presetFrom = btn ? parseInt(btn.getAttribute('data-ar-from') || '', 10) : NaN;
+    const from = Number.isFinite(presetFrom) ? presetFrom : 20;
+    document.getElementById('cr-from').value = from;
+    document.getElementById('cr-to').value = from - 1;
+    document.getElementById('cr-topic').value = (btn && btn.getAttribute('data-ar-topic-id')) || '';
     rebuildCategoryDropdown(document.getElementById('cr-topic'));
     document.getElementById('cr-level').value = 'LEVEL_A';
     document.getElementById('cr-count').value = 1;
     document.getElementById('cr-desc').value = '';
     openModal('modal-create');
+}
+
+function showMatrixCell(btn) {
+    const from = btn.getAttribute('data-ar-from');
+    const to = btn.getAttribute('data-ar-to');
+    const topicId = btn.getAttribute('data-ar-topic-id') || '';
+    const group = document.getElementById('ar-group-' + from + '-' + to);
+    if (!group) return;
+    const rows = Array.from(group.querySelectorAll('tr[data-ar-req-id]')).filter(function (row) {
+        return (row.getAttribute('data-ar-topic') || '') === topicId;
+    });
+    const filter = document.getElementById('ar-filter');
+    if (
+        filter &&
+        filter.value &&
+        rows.some(function (row) {
+            return row.hidden;
+        })
+    ) {
+        filter.value = '';
+        applyFilter();
+    }
+    group.scrollIntoView({ block: 'start' });
+    rows.forEach(function (row) {
+        row.classList.remove('is-flash');
+        row.getBoundingClientRect();
+        row.classList.add('is-flash');
+    });
 }
 
 function openEditModal(btn) {
@@ -263,21 +293,25 @@ function applyFilter() {
                 rankKey.indexOf(query) !== -1 ||
                 fromRank === query ||
                 toRank === query;
-            row.style.display = match ? '' : 'none';
+            row.hidden = !match;
             if (match) groupVisible++;
         });
-        group.classList.toggle('is-hidden', groupVisible === 0 && query !== '');
+        group.hidden = groupVisible === 0 && query !== '';
         if (groupVisible > 0 || query === '') anyVisible = true;
     });
     const empty = document.getElementById('ar-empty');
-    if (empty) empty.hidden = anyVisible;
+    if (empty) empty.hidden = anyVisible || groups.length === 0;
 }
 
 document.addEventListener('DOMContentLoaded', function () {
     rebuildCategoryDropdown(document.getElementById('cr-topic'));
 
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('click', 'ar-open-create', openCreateModal);
+        window.krtEvents.on('click', 'ar-open-create', function () {
+            openCreateModal(null);
+        });
+        window.krtEvents.on('click', 'ar-matrix-add', openCreateModal);
+        window.krtEvents.on('click', 'ar-matrix-show', showMatrixCell);
         window.krtEvents.on('click', 'ar-open-edit', openEditModal);
         window.krtEvents.on('click', 'ar-open-delete', function (btn) {
             confirmAndDelete(btn.getAttribute('data-ar-id'));

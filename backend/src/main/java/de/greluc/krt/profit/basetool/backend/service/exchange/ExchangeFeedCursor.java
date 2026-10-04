@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service.exchange;
 
-import de.greluc.krt.profit.basetool.backend.exception.ExchangeProblemException;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

@@ -115,7 +115,15 @@ class JobOrderScopeQueryIntegrationTest {
     Set<UUID> visible =
         jobOrderRepository
             .findScopedJobOrders(
-                ALL_STATUSES, false, Set.of(squadronBId), true, null, Set.of(), ALL_ROWS)
+                ALL_STATUSES,
+                false,
+                Set.of(squadronBId),
+                false,
+                Set.of(new UUID(0L, 0L)),
+                true,
+                null,
+                Set.of(),
+                ALL_ROWS)
             .stream()
             .map(JobOrder::getId)
             .collect(Collectors.toSet());
@@ -160,11 +168,76 @@ class JobOrderScopeQueryIntegrationTest {
     assertThat(orgUnitRepository.countProfitEligibleByIdIn(Set.of(profitSkId))).isEqualTo(1L);
   }
 
+  @Test
+  void processingFilter_keepsOnlyOrdersTheGivenUnitsProcess() {
+    Set<UUID> visible =
+        processingIds(
+            new ScopePredicate(false, null, Set.of(squadronAId)), Set.of(squadronAId, skId));
+
+    assertThat(visible).contains(orderRespA, orderRespSk);
+    assertThat(visible).doesNotContain(orderRespB);
+  }
+
+  @Test
+  void processingFilter_narrowsToOneUnitAmongTheCallersOwn() {
+    Set<UUID> visible =
+        processingIds(new ScopePredicate(false, null, Set.of(squadronAId)), Set.of(squadronAId));
+
+    assertThat(visible).contains(orderRespA);
+    assertThat(visible).doesNotContain(orderRespB, orderRespSk);
+  }
+
+  @Test
+  void processingFilter_neverWidensBeyondTheScope() {
+    Set<UUID> visible =
+        processingIds(new ScopePredicate(false, null, Set.of(squadronAId)), Set.of(squadronBId));
+
+    assertThat(visible).doesNotContain(orderRespA, orderRespB, orderRespSk);
+  }
+
+  @Test
+  void processingFilter_dropsOrdersOfANonProfitEligibleUnit() {
+    UUID[] ids = new UUID[2];
+    transactionTemplate.executeWithoutResult(
+        _ -> {
+          String tag = UUID.randomUUID().toString().substring(0, 8);
+          Squadron nonProfit = newSquadron("Scope-N-" + tag, "N" + tag);
+          nonProfit.setProfitEligible(false);
+          squadronRepository.save(nonProfit);
+          ids[0] = nonProfit.getId();
+          ids[1] = newOrder(nonProfit, nonProfit).getId();
+        });
+
+    Set<UUID> visible = processingIds(new ScopePredicate(true, null, Set.of()), Set.of(ids[0]));
+
+    assertThat(visible).doesNotContain(ids[1]);
+    assertThat(visibleIds(new ScopePredicate(true, null, Set.of()))).contains(ids[1]);
+  }
+
+  private Set<UUID> processingIds(ScopePredicate scope, Set<UUID> processingOrgUnitIds) {
+    return jobOrderRepository
+        .findScopedJobOrders(
+            ALL_STATUSES,
+            true,
+            Set.of(new UUID(0L, 0L)),
+            true,
+            processingOrgUnitIds,
+            scope.adminAllScope(),
+            scope.activeOrgUnitId(),
+            scope.memberOrgUnitIds(),
+            ALL_ROWS)
+        .stream()
+        .map(JobOrder::getId)
+        .collect(Collectors.toSet());
+  }
+
   private Set<UUID> visibleIds(ScopePredicate scope) {
     return jobOrderRepository
         .findScopedJobOrders(
             ALL_STATUSES,
             true,
+            Set.of(new UUID(0L, 0L)),
+            false,
             Set.of(new UUID(0L, 0L)),
             scope.adminAllScope(),
             scope.activeOrgUnitId(),
@@ -179,6 +252,7 @@ class JobOrderScopeQueryIntegrationTest {
     Squadron s = new Squadron();
     s.setName(name);
     s.setShorthand(shorthand);
+    s.setProfitEligible(true);
     return squadronRepository.save(s);
   }
 
@@ -186,6 +260,7 @@ class JobOrderScopeQueryIntegrationTest {
     SpecialCommand sc = new SpecialCommand();
     sc.setName(name);
     sc.setShorthand(shorthand);
+    sc.setProfitEligible(true);
     return specialCommandRepository.save(sc);
   }
 

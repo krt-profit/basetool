@@ -55,7 +55,8 @@ import org.springframework.web.context.WebApplicationContext;
  * admit only {@code ADMIN} and {@code OFFICER}, and {@code LOGISTICIAN} / {@code MISSION_MANAGER}
  * are forbidden.
  *
- * <p>Also pins that the Spezialkommando section renders the roster and lead caps independently.
+ * <p>Also pins that the Spezialkommando pane renders the roster and lead caps independently, and
+ * that rank and group save on change without a per-row save button.
  */
 @SpringBootTest
 class LeitungPageControllerMvcTest {
@@ -126,17 +127,19 @@ class LeitungPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "OFFICER")
-  void page_skLead_linksToMemberPageWithoutLeadToggle() throws Exception {
+  void page_skLead_managesRosterInPlaceWithoutLeadToggle() throws Exception {
     UUID skId = UUID.randomUUID();
     stubSpecialCommandView(skId, false, true);
 
     mockMvc
         .perform(get("/organisation/leitung"))
         .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-leitung-open=\"add-sk\"")))
         .andExpect(
             content()
-                .string(containsString("href=\"/organisation/special-commands/" + skId + "\"")))
-        .andExpect(content().string(not(containsString("toggle-sk-lead"))));
+                .string(containsString("data-remove-url=\"/organisation/special-commands/" + skId)))
+        .andExpect(content().string(not(containsString("toggle-lead"))))
+        .andExpect(content().string(not(containsString("/lead/ajax"))));
   }
 
   @Test
@@ -148,7 +151,13 @@ class LeitungPageControllerMvcTest {
     mockMvc
         .perform(get("/organisation/leitung"))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("toggle-sk-lead")))
+        .andExpect(content().string(containsString("data-sk-action=\"toggle-lead\"")))
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "data-lead-url=\"/organisation/leitung/special-commands/" + skId)))
+        .andExpect(content().string(not(containsString("add-sk"))))
         .andExpect(content().string(not(containsString("/organisation/special-commands/"))));
   }
 
@@ -218,7 +227,7 @@ class LeitungPageControllerMvcTest {
 
     assertEquals(
         1, count(html, "class=\"leitung-rank-select\""), "only the plain member is editable");
-    assertEquals(1, count(html, "data-leitung-action=\"save-rank\""));
+    assertEquals(0, count(html, "save-rank"));
     assertEquals(0, count(html, "value=\"STAFFELLEITER\""));
     assertEquals(1, count(html, "chip chip--primary"));
   }
@@ -277,7 +286,8 @@ class LeitungPageControllerMvcTest {
         .perform(get("/organisation/leitung"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("leitung-rank-select")))
-        .andExpect(content().string(containsString("save-rank")));
+        .andExpect(content().string(containsString("data-leitung-action=\"clear-rank\"")))
+        .andExpect(content().string(not(containsString("save-rank"))));
   }
 
   @Test

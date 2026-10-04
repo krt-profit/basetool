@@ -1,20 +1,23 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="${appTitle} + ' - ' + (${terms} != null ? ${terms.title} : ${#messages.msg('terms.unavailable.title')})">Profit Basetool - Nutzungsbedingungen</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/legal.css}">
+    </th:block>
 </head>
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
 
 <th:block th:replace="~{fragments/header :: header}" />
 <main>
-    <div class="hud-box mt-2">
-        <h1 th:if="${terms != null}" th:text="${terms.title}">Nutzungsbedingungen</h1>
-        <h1 th:if="${terms == null}" th:text="#{terms.unavailable.title}">Nutzungsbedingungen</h1>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.legal',
+        titleText=${terms != null ? terms.title : #messages.msg('terms.unavailable.title')})}"></th:block>
+    <div class="card legal-doc" data-testid="legal-doc">
         <th:block th:if="${terms != null}">
             <th:block th:replace="~{fragments/terms-body :: termsBody(${terms})}" />
         </th:block>
-        <p th:if="${terms == null}" th:text="#{terms.unavailable}">Die Nutzungsbedingungen k&ouml;nnen gerade nicht geladen werden.</p>
+        <p th:if="${terms == null}" class="alert alert-warning" th:text="#{terms.unavailable}">Die Nutzungsbedingungen k&ouml;nnen gerade nicht geladen werden.</p>
     </div>
 </main>
 </body>

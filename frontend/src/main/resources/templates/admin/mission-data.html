@@ -16,8 +16,39 @@
 <main>
     <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.mission_data.title})}"></th:block>
 
-    <section class="card card--flush md-box" id="squadrons-box">
-        <div class="card-head md-box__head">
+    <div class="master-detail md-md" id="md-md"
+         th:with="mdKind=${openModal == 'jobtype-modal' ? 'jobtypes' : (openModal == 'frequency-type-modal' ? 'freqtypes' : (openModal == 'squadron-modal' ? 'squadrons' : (param.kind != null and (param.kind[0] == 'jobtypes' or param.kind[0] == 'freqtypes') ? param.kind[0] : 'squadrons')))}">
+        <div class="master-list md-kind-list" id="md-kind-list" role="tablist" aria-orientation="vertical"
+             th:aria-label="#{admin.mission_data.kinds.aria}">
+            <button type="button" class="master-row md-kind-row" role="tab" id="md-kind-squadrons"
+                    data-trigger="mission-data-select-kind" data-md-kind="squadrons" aria-controls="squadrons-box"
+                    th:classappend="${mdKind == 'squadrons'} ? 'is-active' : ''"
+                    th:aria-selected="${mdKind == 'squadrons'}" th:tabindex="${mdKind == 'squadrons' ? 0 : -1}">
+                <span th:text="#{admin.mission_data.squadrons}">Art</span>
+                <span class="chip chip--muted" data-list-count-for="squadrons-results"
+                      th:text="${squadrons != null ? #lists.size(squadrons) : 0}">0</span>
+            </button>
+            <button type="button" class="master-row md-kind-row" role="tab" id="md-kind-jobtypes"
+                    data-trigger="mission-data-select-kind" data-md-kind="jobtypes" aria-controls="jobtypes-box"
+                    th:classappend="${mdKind == 'jobtypes'} ? 'is-active' : ''"
+                    th:aria-selected="${mdKind == 'jobtypes'}" th:tabindex="${mdKind == 'jobtypes' ? 0 : -1}">
+                <span th:text="#{admin.mission_data.job_types}">Art</span>
+                <span class="chip chip--muted" data-list-count-for="jobtypes-results"
+                      th:text="${jobTypes != null ? #lists.size(jobTypes) : 0}">0</span>
+            </button>
+            <button type="button" class="master-row md-kind-row" role="tab" id="md-kind-freqtypes"
+                    data-trigger="mission-data-select-kind" data-md-kind="freqtypes" aria-controls="freqtypes-box"
+                    th:classappend="${mdKind == 'freqtypes'} ? 'is-active' : ''"
+                    th:aria-selected="${mdKind == 'freqtypes'}" th:tabindex="${mdKind == 'freqtypes' ? 0 : -1}">
+                <span th:text="#{admin.mission_data.frequency_types}">Art</span>
+                <span class="chip chip--muted" data-list-count-for="freqtypes-results"
+                      th:text="${frequencyTypes != null ? #lists.size(frequencyTypes) : 0}">0</span>
+            </button>
+        </div>
+        <div class="md-panes">
+        <section class="detail-pane md-box" id="squadrons-box" role="tabpanel" aria-labelledby="md-kind-squadrons"
+                 th:hidden="${mdKind != 'squadrons'}">
+        <div class="md-box__head">
             <h2 class="card-title" th:text="#{admin.mission_data.squadrons}">Staffeln</h2>
             <div class="cluster gap-3">
                 <form th:action="@{/admin/mission-data}" method="get" id="squadron-filter-form" class="no-track md-filter">
@@ -29,18 +60,16 @@
                         <span th:text="#{admin.squadron.show_inactive}">Inaktive anzeigen</span>
                     </label>
                 </form>
-                <button type="button" id="add-squadron-btn" class="btn btn-ghost" th:data-action="@{/admin/mission-data/squadrons}">
+                <button type="button" id="add-squadron-btn" class="btn btn--cta" th:data-action="@{/admin/mission-data/squadrons}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
                     <span th:text="#{admin.squadron.create}">Neue Staffel</span>
                 </button>
-                <button type="button" class="btn btn-ghost btn-icon md-box__toggle" data-trigger="mission-data-toggle-box" data-box-id="squadrons-box"
-                        aria-expanded="true" aria-controls="squadrons-results"
-                        th:attr="aria-label=#{admin.mission_data.toggle},title=#{admin.mission_data.toggle}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg></button>
             </div>
         </div>
 
         <div class="box-content" id="squadrons-results">
             <th:block th:fragment="squadrons-results">
+            <span hidden th:data-list-total="${squadrons != null ? #lists.size(squadrons) : 0}"></span>
             <th:block th:if="${squadronsTruncated}">
                 <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', null)}"></div>
             </th:block>
@@ -86,10 +115,11 @@
             </th:block>
             </th:block>
         </div>
-    </section>
+        </section>
 
-    <section class="card card--flush md-box" id="jobtypes-box">
-        <div class="card-head md-box__head">
+        <section class="detail-pane md-box" id="jobtypes-box" role="tabpanel" aria-labelledby="md-kind-jobtypes"
+                 th:hidden="${mdKind != 'jobtypes'}">
+        <div class="md-box__head">
             <h2 class="card-title" th:text="#{admin.mission_data.job_types}">Aufgaben</h2>
             <div class="cluster gap-3">
                 <form th:action="@{/admin/mission-data}" method="get" id="jobtype-filter-form" class="no-track md-filter">
@@ -101,18 +131,16 @@
                         <span th:text="#{admin.job_type.show_inactive}">Inaktive anzeigen</span>
                     </label>
                 </form>
-                <button type="button" id="add-jobtype-btn" class="btn btn-ghost" th:data-action="@{/admin/mission-data/job-types}">
+                <button type="button" id="add-jobtype-btn" class="btn btn--cta" th:data-action="@{/admin/mission-data/job-types}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
                     <span th:text="#{admin.job_type.create}">Neue Aufgabe</span>
                 </button>
-                <button type="button" class="btn btn-ghost btn-icon md-box__toggle" data-trigger="mission-data-toggle-box" data-box-id="jobtypes-box"
-                        aria-expanded="true" aria-controls="jobtypes-results"
-                        th:attr="aria-label=#{admin.mission_data.toggle},title=#{admin.mission_data.toggle}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg></button>
             </div>
         </div>
 
         <div class="box-content" id="jobtypes-results">
             <th:block th:fragment="jobtypes-results">
+            <span hidden th:data-list-total="${jobTypes != null ? #lists.size(jobTypes) : 0}"></span>
             <th:block th:if="${jobTypesTruncated}">
                 <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', null)}"></div>
             </th:block>
@@ -166,10 +194,11 @@
             </th:block>
             </th:block>
         </div>
-    </section>
+        </section>
 
-    <section class="card card--flush md-box" id="freqtypes-box">
-        <div class="card-head md-box__head">
+        <section class="detail-pane md-box" id="freqtypes-box" role="tabpanel" aria-labelledby="md-kind-freqtypes"
+                 th:hidden="${mdKind != 'freqtypes'}">
+        <div class="md-box__head">
             <h2 class="card-title" th:text="#{admin.mission_data.frequency_types}">Frequenztypen</h2>
             <div class="cluster gap-3">
                 <form th:action="@{/admin/mission-data}" method="get" id="freqtype-filter-form" class="no-track md-filter">
@@ -181,18 +210,16 @@
                         <span th:text="#{admin.job_type.show_inactive}">Inaktive anzeigen</span>
                     </label>
                 </form>
-                <button type="button" id="add-freqtype-btn" class="btn btn-ghost" th:data-action="@{/admin/mission-data/frequency-types}">
+                <button type="button" id="add-freqtype-btn" class="btn btn--cta" th:data-action="@{/admin/mission-data/frequency-types}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
                     <span th:text="#{admin.frequency_type.create}">Neuer Frequenztyp</span>
                 </button>
-                <button type="button" class="btn btn-ghost btn-icon md-box__toggle" data-trigger="mission-data-toggle-box" data-box-id="freqtypes-box"
-                        aria-expanded="true" aria-controls="freqtypes-results"
-                        th:attr="aria-label=#{admin.mission_data.toggle},title=#{admin.mission_data.toggle}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg></button>
             </div>
         </div>
 
         <div class="box-content" id="freqtypes-results">
             <th:block th:fragment="freqtypes-results">
+            <span hidden th:data-list-total="${frequencyTypes != null ? #lists.size(frequencyTypes) : 0}"></span>
             <th:block th:if="${frequencyTypesTruncated}">
                 <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', null)}"></div>
             </th:block>
@@ -236,7 +263,10 @@
             </th:block>
             </th:block>
         </div>
-    </section>
+        </section>
+
+        </div>
+    </div>
 
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='squadron-modal', titleKey='admin.squadron.create', variant='krt-modal--wide', titleId='squadron-modal-title', open=${openModal == 'squadron-modal'}, closeTrigger='', closeClass='close-squadron-modal', body=~{::squadron-modal-body})}">
         <th:block th:ref="squadron-modal-body">

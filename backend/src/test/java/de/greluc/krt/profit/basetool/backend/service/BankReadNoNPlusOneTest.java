@@ -19,24 +19,44 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
+import de.greluc.krt.profit.basetool.backend.model.BankAccountGrant;
+import de.greluc.krt.profit.basetool.backend.model.BankAccountGrantId;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
+import de.greluc.krt.profit.basetool.backend.model.BankBookingRequest;
+import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestStatus;
+import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.model.BankHolder;
+import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankDepositRequest;
+import de.greluc.krt.profit.basetool.backend.repository.BankAccountGrantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
+import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
+import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import jakarta.persistence.EntityManagerFactory;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 /**
  * Verifies against real Postgres that the bank dashboard and paged account list issue a fixed
@@ -55,6 +75,13 @@ class BankReadNoNPlusOneTest {
    */
   private static final int STATEMENT_BOUND = 10;
 
+  /** Granted accounts, one pending request each, for the queue case. */
+  private static final int QUEUE_ACCOUNTS = 40;
+
+  @Autowired private BankBookingRequestService bankBookingRequestService;
+  @Autowired private BankAccountGrantRepository grantRepository;
+  @Autowired private BankBookingRequestRepository requestRepository;
+  @Autowired private UserRepository userRepository;
   @Autowired private BankDashboardService bankDashboardService;
   @Autowired private BankAccountService bankAccountService;
   @Autowired private BankLedgerService bankLedgerService;
@@ -99,6 +126,87 @@ class BankReadNoNPlusOneTest {
     assertTrue(
         listStatements <= STATEMENT_BOUND,
         () -> "account list issued " + listStatements + " statements (suspected N+1)");
+  }
+
+  /**
+   * The staff queue judges every row's confirm action for an employee with one grant read, so its
+   * statement count does not grow with the rows, and each row carries the confirm endpoint's answer
+   * (REQ-BANK-023).
+   */
+  @Test
+  void requestQueueMarksConfirmCapabilityStatementBounded_independentOfRowCount() {
+    User employee = newUser("queue-emp-" + UUID.randomUUID());
+    List<BankAccount> depositOnly = new ArrayList<>();
+    for (int i = 0; i < QUEUE_ACCOUNTS; i++) {
+      BankAccount account = newAccount("Queue Konto " + i + " " + UUID.randomUUID());
+      boolean deposit = i % 2 == 0;
+      grant(employee, account, deposit, !deposit);
+      if (deposit) {
+        depositOnly.add(account);
+      }
+      newPendingDeposit(account);
+    }
+    Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+    stats.setStatisticsEnabled(true);
+    JwtAuthenticationToken authentication =
+        new JwtAuthenticationToken(
+            Jwt.withTokenValue("queue-test")
+                .header("alg", "none")
+                .subject(employee.getId().toString())
+                .build(),
+            List.of(new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE")));
+    SecurityContextHolder.getContext().setAuthentication(authentication);
+    try {
+      stats.clear();
+      Page<BankBookingRequestDto> queue =
+          bankBookingRequestService.listQueue(
+              Set.of(BankBookingRequestStatus.PENDING),
+              PageRequest.of(0, QUEUE_ACCOUNTS),
+              authentication);
+      long queueStatements = stats.getPrepareStatementCount();
+
+      assertEquals(QUEUE_ACCOUNTS, queue.getContent().size());
+      Set<UUID> depositAccountIds =
+          depositOnly.stream().map(BankAccount::getId).collect(Collectors.toSet());
+      for (BankBookingRequestDto row : queue.getContent()) {
+        assertEquals(depositAccountIds.contains(row.accountId()), row.callerMayConfirm());
+      }
+      assertTrue(
+          queueStatements <= STATEMENT_BOUND,
+          () -> "request queue issued " + queueStatements + " statements (suspected N+1)");
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  /** Persists a minimal user, the grant's {@code @MapsId} half. */
+  private User newUser(String username) {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername(username);
+    return userRepository.save(user);
+  }
+
+  /** Grants the user a view row on the account with the given deposit and withdraw flags. */
+  private void grant(User user, BankAccount account, boolean deposit, boolean withdraw) {
+    BankAccountGrant grant = new BankAccountGrant();
+    grant.setId(new BankAccountGrantId(user.getId(), account.getId()));
+    grant.setUser(user);
+    grant.setAccount(account);
+    grant.setCanDeposit(deposit);
+    grant.setCanWithdraw(withdraw);
+    grantRepository.save(grant);
+  }
+
+  /** Persists a pending deposit request on the account. */
+  private void newPendingDeposit(BankAccount account) {
+    BankBookingRequest request = new BankBookingRequest();
+    request.setAccount(account);
+    request.setType(BankBookingRequestType.DEPOSIT);
+    request.setAmount(new BigDecimal("100"));
+    request.setStatus(BankBookingRequestStatus.PENDING);
+    request.setRequesterHandle("requester");
+    requestRepository.save(request);
   }
 
   /** Persists a fresh SPECIAL account (no lazy org-unit association to confound the count). */

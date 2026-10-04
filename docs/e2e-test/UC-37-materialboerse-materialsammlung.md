@@ -25,12 +25,14 @@ Der Nutzer bietet auf `/materialboerse` Material oder ein Item an, sucht im Pick
 
 ### Materialbörse
 
+Die Dialoge öffnen über das Menü der Seitenkopf-Aktion: „Angebot erstellen" (`mb-create-offer`) mit den Einträgen „Material anbieten" / „Item anbieten", auf dem Tab „Gesuche" „Gesuch erstellen" (`mb-create-request`) mit „Material suchen" / „Item suchen".
+
 1. **Item aus dem Lager anbieten** (REQ-MARKET-014): „Material anbieten" öffnen, im Picker die Item-Zeile wählen, 5 Stück anbieten, absenden (`/materialboerse/offers/ajax`).
 2. **Mengenfeld** (REQ-MARKET-002, ADR-0086): „Material anbieten" im Neu-Modus öffnen.
 3. **Serverseitige Suche**: im Picker tippen.
 4. **Genau ein Mengenfeld**: erst „Material anbieten", dann „Item anbieten" öffnen.
 5. **Modal wird sichtbar** (REQ-MARKET-007): Seite laden, „Material anbieten" klicken, in das Picker-Feld klicken, Modal schließen.
-6. **Gesuche** (REQ-MARKET-015…): auf den Tab „Alle Gesuche" wechseln, „Material suchen" klicken, den Picker anklicken, zwischen Material und Item umschalten.
+6. **Gesuche** (REQ-MARKET-015…): auf den Tab „Gesuche" (`mb-tab-requests`) wechseln, „Gesuch erstellen" → „Material suchen" klicken, den Picker anklicken, zwischen Material und Item umschalten.
 
 ### Materialsammlung eines Auftrags (#577)
 
@@ -44,7 +46,7 @@ Der Nutzer bietet auf `/materialboerse` Material oder ein Item an, sucht im Pick
 - Das Tippen löst eine neue Anfrage `/materialboerse/releasable-items?q=…` aus — nicht nur einen Client-Filter.
 - Beim Material-Angebot ist nur „Menge anbieten" sichtbar, beim Item-Angebot nur „Menge (Stück)".
 - Das Modal ist beim Laden versteckt, nach dem Klick **wirklich sichtbar** und nach dem Schließen wieder weg; die Picker-Liste ist beim Öffnen zu und klappt erst beim Klick auf.
-- Der Gesuche-Tab benennt die Buttons um („Material suchen" / „Item suchen", die Angebots-Buttons verschwinden); das Anfrage-Modal öffnet sichtbar, der Art-Schalter tauscht Material- gegen Bauplan-Combobox, und Mindestqualität und Wunschmenge gibt es für beide Arten.
+- Der Gesuche-Tab tauscht das Erstellen-Menü („Gesuch erstellen" erscheint, „Angebot erstellen" verschwindet); das Anfrage-Modal öffnet sichtbar, der Art-Schalter tauscht Material- gegen Bauplan-Combobox, und Mindestqualität und Wunschmenge gibt es für beide Arten.
 - Beide Umschaltvorgänge der Materialsammlung zeigen einen Erfolgs-Toast, keinen Fehler-Toast, keinen Reload; das Backend (`GET /api/v1/orders/{id}/material-collection`) hält den zweiten Wert. Nach dem Transfer landet das Umschalten ohne `404`.
 
 ## Sonderfälle & Lehren

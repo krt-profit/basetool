@@ -82,8 +82,6 @@ inventory -> mission: InventoryItemMapper -> Mission
 inventory -> mission: InventoryItemService -> Mission
 inventory -> mission: InventoryItemService -> MissionRepository
 inventory -> mission: InventoryMissionAllocation -> Mission
-kernel -> platform: AppException -> ErrorDisclosurePolicy
-kernel -> platform: AppExceptionKind -> ErrorDisclosurePolicy
 livesync -> bank: LiveSyncSubscriptionAuthorizer -> OrgUnitBankAccessService
 livesync -> scope: LiveSyncSubscriptionAuthorizer -> OwnerScopeService
 mission -> operation: Mission -> Operation

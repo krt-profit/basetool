@@ -95,8 +95,7 @@ public class MaterialboersePageController {
 
   /**
    * The sort keys the board's {@code <select>} offers, and therefore the only ones relayed to the
-   * backend. Mirrors the option list in {@code materialboerse.html} and {@code
-   * fragments/materialgesuch-board.html}.
+   * backend. Mirrors the option list in {@code materialboerse.html}.
    */
   private static final Set<String> SORT_KEYS = Set.of(DEFAULT_SORT, "menge", "mat", "neu");
 
@@ -110,10 +109,16 @@ public class MaterialboersePageController {
 
   /**
    * Renders the Materialbörse page, or only its {@code board}, {@code list} or {@code detail}
-   * region for an in-place swap. The counts of both modes are always loaded for the tab bar.
+   * region for an in-place swap. The counts of both views are always loaded for the tabs and the
+   * scope segment. The view is {@code view=offers|requests} and the scope {@code scope=all|mine};
+   * the older {@code mode} and {@code tab} parameters are honoured when the new ones are absent.
    *
-   * @param mode {@code "requests"} for the Gesuche board, anything else for the Angebote board.
-   * @param tab {@code "mein"} for "Meine …", else "Alle …".
+   * @param view {@code "requests"} for the Gesuche board, {@code "offers"} for the Angebote board,
+   *     or {@code null} to fall back to {@code mode}.
+   * @param scope {@code "mine"} for the caller's own entries, {@code "all"} for every entry, or
+   *     {@code null} to fall back to {@code tab}.
+   * @param mode {@code "requests"} for the Gesuche board when {@code view} is absent.
+   * @param tab {@code "mein"} for the caller's own entries when {@code scope} is absent.
    * @param q the search fragment (material/item or player), or {@code null}.
    * @param minQuality the minimum quality filter 0–1000, or {@code null}.
    * @param minAmount the minimum quantity filter, or {@code null}.
@@ -129,6 +134,8 @@ public class MaterialboersePageController {
   @NotNull
   @GetMapping
   public String board(
+      @RequestParam(required = false) String view,
+      @RequestParam(required = false) String scope,
       @RequestParam(required = false) String mode,
       @RequestParam(required = false) String tab,
       @RequestParam(required = false) String q,
@@ -139,7 +146,7 @@ public class MaterialboersePageController {
       @RequestParam(required = false, defaultValue = "false") boolean excludeStolen,
       @RequestParam(required = false) String fragment,
       Model model) {
-    boolean requests = "requests".equals(mode);
+    boolean requests = "requests".equals(view != null ? view : mode);
 
     if ("detail".equals(fragment)) {
       if (requests) {
@@ -150,17 +157,21 @@ public class MaterialboersePageController {
       return "materialboerse :: detail";
     }
 
-    String activeTab = "mein".equals(tab) ? "mein" : "alle";
+    boolean mine = scope != null ? "mine".equals(scope) : "mein".equals(tab);
+    final String activeTab = mine ? "mein" : "alle";
     String activeSort = sort != null && SORT_KEYS.contains(sort) ? sort : DEFAULT_SORT;
 
     MaterialExchangeCountsDto offerCounts = loadCounts();
     MaterialExchangeCountsDto requestCounts = loadRequestCounts();
+    MaterialExchangeCountsDto viewCounts = requests ? requestCounts : offerCounts;
     model.addAttribute("countAll", offerCounts.all());
     model.addAttribute("countMine", offerCounts.mine());
     model.addAttribute("countReqAll", requestCounts.all());
     model.addAttribute("countReqMine", requestCounts.mine());
+    model.addAttribute("scopeCountAll", viewCounts.all());
+    model.addAttribute("scopeCountMine", viewCounts.mine());
     model.addAttribute("activeMode", requests ? "requests" : "offers");
-    model.addAttribute("activeTab", activeTab);
+    model.addAttribute("activeScope", mine ? "mine" : "all");
     model.addAttribute("filterQ", q);
     model.addAttribute("filterMinQuality", minQuality);
     model.addAttribute("filterMinAmount", minAmount);
@@ -173,7 +184,7 @@ public class MaterialboersePageController {
       model.addAttribute(
           "selectedRequest", loadRequestDetail(pickSelectedRequestId(reqs, selected)));
       if ("board".equals(fragment)) {
-        return "fragments/materialgesuch-board :: requestBoard";
+        return "materialboerse :: board";
       }
       if ("list".equals(fragment)) {
         return "fragments/materialgesuch-board :: requestList";

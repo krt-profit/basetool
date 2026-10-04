@@ -12,116 +12,89 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{nav.materials.profit_calculation}">Profitberechnung</h1>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.materials', titleText=#{nav.materials.profit_calculation}, count=null)}"></th:block>
 
-    <div class="hud-box mt-2">
-        <div class="filter-container">
-            <div class="filter-group">
-                <label for="shipSelect" th:text="#{profit.filter.ship}">Schiff wählen</label>
-                <select id="shipSelect" data-trigger="profit-update">
-                    <option value="" th:text="#{profit.filter.ship.placeholder}">-- Schiff wählen --</option>
-                    <option th:each="ship : ${shipTypes}" 
-                            th:value="${ship.id}" 
-                            th:selected="${ship.id == defaultShipId}"
-                            th:text="${ship.name} + ' (' + (${ship.scu} ?: '0') + ' SCU)'"></option>
-                </select>
-            </div>
+    <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
 
-            <div class="filter-group">
-                <label th:text="#{profit.filter.systems}">Systeme einschränken</label>
-                <div class="multi-select-container" id="systemFilterContainer">
-                    <div class="multi-select-header" data-trigger="profit-toggle-multi" data-multi-target="systemOptions" th:data-all="#{filter.system.all}" th:data-selected="#{filter.selected}" id="systemHeader">
-                        <span class="selected-text" id="systemSelectedText" th:text="#{filter.system.all}">Alle Systeme</span>
-                    </div>
-                    <div class="multi-select-options" id="systemOptions">
-                        <label class="multi-select-option">
-                            <span th:text="#{filter.all}">Alle</span>
-                            <input type="checkbox" id="sysAll" value="ALL" checked data-trigger="profit-toggle-all" data-all-id="sysAll" data-check-class="sysCheck" data-header-id="systemHeader">
-                        </label>
-                        <label class="multi-select-option" th:each="sys : ${starSystems}">
-                            <span th:text="${sys}">System</span>
-                            <input type="checkbox" class="sysCheck" th:value="${sys}" checked data-trigger="profit-update-state" data-all-id="sysAll" data-check-class="sysCheck" data-header-id="systemHeader">
-                        </label>
-                    </div>
+    <div id="profitConfig" hidden
+         th:data-label-select-ship="#{profit.info.select_ship}"
+         th:data-label-loading="#{profit.info.loading}"
+         th:data-label-no-data="#{profit.info.no_data}"
+         th:data-label-fetch-error="#{profit.error.fetch}"
+         th:data-label-all="#{filter.all}"
+         th:data-label-buy="#{profit.route.buy}"
+         th:data-label-sell="#{profit.route.sell}"></div>
+
+    <section class="card profit-inputs" data-testid="profit-inputs">
+        <div class="form-group profit-inputs__ship">
+            <label for="shipSelect" th:text="#{profit.filter.ship}">Schiff</label>
+            <select id="shipSelect" data-trigger="profit-update">
+                <option value="" th:text="#{profit.filter.ship.placeholder}">-- Schiff wählen --</option>
+                <option th:each="ship : ${shipTypes}"
+                        th:value="${ship.id}"
+                        th:selected="${ship.id == defaultShipId}"
+                        th:attr="data-hull-c=${ship.name != null and #strings.containsIgnoreCase(ship.name, 'hull c')}"
+                        th:text="${ship.name} + ' · ' + (${ship.scu} ?: '0') + ' SCU'"></option>
+            </select>
+        </div>
+
+        <div class="form-group profit-inputs__systems">
+            <span class="form-label" id="systemLabel" th:text="#{profit.filter.systems}">Systeme</span>
+            <div class="filter-popover profit-dropdown">
+                <button type="button" class="profit-dropdown__toggle" id="systemHeader"
+                        aria-controls="systemOptions" aria-expanded="false" aria-describedby="systemLabel">
+                    <span class="selected-text" id="systemSelectedText" th:text="#{filter.all}">Alle</span>
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg>
+                </button>
+                <div class="filter-popover__panel profit-dropdown__panel" id="systemOptions" role="group"
+                     data-filter-panel="profit-systems" data-filter-transient aria-labelledby="systemLabel">
+                    <label class="profit-option profit-option--all">
+                        <input type="checkbox" id="sysAll" value="ALL" checked data-trigger="profit-toggle-all"
+                               data-check-class="sysCheck" data-header-id="systemHeader">
+                        <span th:text="#{filter.all}">Alle</span>
+                    </label>
+                    <label class="profit-option" th:each="sys : ${starSystems}">
+                        <input type="checkbox" class="sysCheck" th:value="${sys}" checked data-trigger="profit-update-state"
+                               data-all-id="sysAll" data-check-class="sysCheck" data-header-id="systemHeader">
+                        <span th:text="${sys}">System</span>
+                    </label>
                 </div>
-            </div>
-            
-            <div class="krtm-flex-grow-1-text-align-right-79df">
-                <p class="krtm-font-size-0-8rem-color-var-color-gray-2-marg-8f50">
-                    <span th:text="#{profit.info.autoload}">Berücksichtigt nur Auto-Load Terminals.</span><br>
-                    <span th:text="#{profit.info.hullc}">Hull C Sonderregel (Loading Dock) aktiv.</span>
-                </p>
             </div>
         </div>
 
-        <div id="profitResults" class="table-wrapper">
-            <table id="resultsTable" class="matrix-table" data-sort-col="0" data-sort-dir="asc">
+        <span id="profitHullC" class="chip chip--info profit-inputs__chip" data-testid="profit-hull-c" hidden
+              th:text="#{profit.info.hullcChip}">Hull C · nur Loading Dock</span>
+
+        <span class="grow"></span>
+
+        <p class="profit-inputs__note">
+            <span th:text="#{profit.info.sortedByMaxProfit}">Sortiert nach Max. Profit je Ladung</span>
+            <span th:text="#{profit.info.autoload}">Berücksichtigt nur Auto-Load Terminals.</span>
+        </p>
+    </section>
+
+    <div id="profitResults" class="card card--flush" data-state="idle" aria-live="polite">
+        <div class="table-responsive">
+            <table id="resultsTable" class="data-table data-table--stack profit-table">
                 <thead>
                     <tr>
-                        <th class="sortable-header" data-trigger="profit-sort" data-sort-column="0" title="Klicken zum Sortieren">
-                            <div class="krtm-display-flex-align-items-center-justify-cont-43da">
-                                <span th:text="#{profit.col.material}">Material</span>
-                                <span class="sort-icon krtm-color-var-color-primary-473b" id="sort-icon-0">▲</span>
-                            </div>
-                        </th>
-                        <th class="sortable-header" data-trigger="profit-sort" data-sort-column="1" title="Klicken zum Sortieren">
-                            <div class="flex-end">
-                                <span th:text="#{profit.col.min_buy}">Einkauf (min)</span>
-                                <span class="sort-icon" id="sort-icon-1">↕</span>
-                            </div>
-                        </th>
-                        <th class="sortable-header" data-trigger="profit-sort" data-sort-column="2" title="Klicken zum Sortieren">
-                            <div class="flex-end">
-                                <span th:text="#{profit.col.max_sell}">Verkauf (max)</span>
-                                <span class="sort-icon" id="sort-icon-2">↕</span>
-                            </div>
-                        </th>
-                        <th class="sortable-header" data-trigger="profit-sort" data-sort-column="3" title="Klicken zum Sortieren">
-                            <div class="flex-end">
-                                <span th:text="#{profit.col.profit_scu}">Gewinn / SCU</span>
-                                <span class="sort-icon" id="sort-icon-3">↕</span>
-                            </div>
-                        </th>
-                        <th class="sortable-header" data-trigger="profit-sort" data-sort-column="4" title="Klicken zum Sortieren">
-                            <div class="flex-end">
-                                <span th:text="#{profit.col.margin}">Marge (%)</span>
-                                <span class="sort-icon" id="sort-icon-4">↕</span>
-                            </div>
-                        </th>
-                        <th class="sortable-header" data-trigger="profit-sort" data-sort-column="5" title="Klicken zum Sortieren">
-                            <div class="flex-end">
-                                <span th:text="#{profit.col.load_cost}">Ladungskosten</span>
-                                <span class="sort-icon" id="sort-icon-5">↕</span>
-                            </div>
-                        </th>
-                        <th class="sortable-header" data-trigger="profit-sort" data-sort-column="6" title="Klicken zum Sortieren">
-                            <div class="flex-end">
-                                <span th:text="#{profit.col.total_profit}">Max Profit</span>
-                                <span class="sort-icon" id="sort-icon-6">↕</span>
-                            </div>
-                        </th>
+                        <th scope="col"><span class="profit-rank" aria-hidden="true">#</span><span th:text="#{profit.col.material}">Material</span></th>
+                        <th scope="col" th:text="#{profit.col.route}">Route</th>
+                        <th scope="col" class="num" th:text="#{profit.col.per_scu}">je SCU</th>
+                        <th scope="col" class="num" th:text="#{profit.col.margin}">Marge</th>
+                        <th scope="col" class="num" th:text="#{profit.col.capital}">Kapital</th>
+                        <th scope="col" class="num" th:text="#{profit.col.total_profit}">Max. Profit</th>
                     </tr>
                 </thead>
-                <tbody id="profitBody">
-                    <tr>
-                        <td colspan="7" class="krtm-text-align-center-padding-2rem-color-var-col-aa81" th:text="#{profit.info.select_ship}">Bitte wähle ein Schiff aus, um die Berechnung zu starten.</td>
-                    </tr>
-                </tbody>
+                <tbody id="profitBody"></tbody>
             </table>
+        </div>
+        <div id="profitState" class="empty-state profit-state" data-testid="profit-state">
+            <span class="empty-title" id="profitStateText" th:text="#{profit.info.select_ship}">Bitte wähle ein Schiff aus, um die Berechnung zu starten.</span>
         </div>
     </div>
 </main>
 
-<script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    window.krtProfitI18n = {
-        selectShip: /*[[#{profit.info.select_ship}]]*/ 'Please select a ship to start the calculation.',
-        loading: /*[[#{profit.info.loading}]]*/ 'Calculation in progress...',
-        noData: /*[[#{profit.info.no_data}]]*/ 'No trade data available for the selected filters.',
-        fetchError: /*[[#{profit.error.fetch}]]*/ 'Failed to fetch the profit calculation.'
-    };
-</script>
 <script th:src="@{/js/materials-profit-calculation.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

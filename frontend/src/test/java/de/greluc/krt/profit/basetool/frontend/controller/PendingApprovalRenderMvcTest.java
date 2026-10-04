@@ -89,6 +89,10 @@ class PendingApprovalRenderMvcTest {
     assertThat(html)
         .as("the poll is what forwards a member into the tool the moment an admin approves")
         .contains("pending-approval.js");
+    assertThat(openingTagOf(html, "pending-approval"))
+        .as("the message sits on a card, not in a HUD box with one-off classes")
+        .contains("class=\"card pending-approval-card\"");
+    assertThat(html).doesNotContain("hud-box").doesNotContain("krtm-");
   }
 
   @Test

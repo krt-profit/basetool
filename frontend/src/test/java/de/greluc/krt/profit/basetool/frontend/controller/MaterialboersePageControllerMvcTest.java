@@ -122,7 +122,7 @@ class MaterialboersePageControllerMvcTest {
         .perform(get("/materialboerse"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Agricium")))
-        .andExpect(content().string(containsString("data-mb-tab")))
+        .andExpect(content().string(containsString("data-mb-mode")))
         .andExpect(content().string(containsString("<strong>Titanium</strong>")))
         .andExpect(content().string(containsString("squadron-badge")))
         .andExpect(content().string(containsString(">IRI<")));
@@ -138,9 +138,9 @@ class MaterialboersePageControllerMvcTest {
         .perform(get("/materialboerse"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("id=\"mb-listwrap\"")))
-        .andExpect(content().string(containsString("data-mb-search")))
+        .andExpect(content().string(containsString("id=\"mb-search\"")))
         .andExpect(content().string(not(containsString("id=\"mg-listwrap\""))))
-        .andExpect(content().string(not(containsString("data-mg-search"))));
+        .andExpect(content().string(not(containsString("data-mg-select"))));
   }
 
   /** A PIECE material renders its amount as a count in the piece unit ("12 Piece"), not SCU. */

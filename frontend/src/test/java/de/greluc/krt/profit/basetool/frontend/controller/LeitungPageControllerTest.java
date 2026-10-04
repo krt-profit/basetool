@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -32,11 +33,21 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.model.LeitungUnitContext;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BereichChartDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.LeitungMemberDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.LeitungUnitDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LeitungViewDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitKind;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SpecialCommandChartDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronChartDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
@@ -63,7 +74,7 @@ class LeitungPageControllerTest {
     when(backend.get("/api/v1/leitung/view", LeitungViewDto.class)).thenReturn(view);
     Model model = new ConcurrentModel();
 
-    String result = controller.leitung(null, model);
+    String result = controller.leitung(null, null, null, model);
 
     assertEquals("organisation/leitung", result);
     assertSame(view, model.getAttribute("leitung"));
@@ -78,10 +89,176 @@ class LeitungPageControllerTest {
     when(backend.get("/api/v1/leitung/view", LeitungViewDto.class)).thenReturn(emptyView());
     Model model = new ConcurrentModel();
 
-    String result = controller.leitung("leitungSections", model);
+    String result = controller.leitung("leitungSections", null, null, model);
 
     assertEquals("organisation/leitung :: leitungSections", result);
     verify(backend, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
+  }
+
+  /**
+   * A unit of the given kind with the given caps and roster.
+   *
+   * @param id the unit id
+   * @param kind the unit kind
+   * @param canAppointLead the lead-appointment cap
+   * @param canManageRoster the roster cap
+   * @param members the roster
+   * @return the unit
+   */
+  private static LeitungUnitDto unit(
+      UUID id,
+      OrgUnitKind kind,
+      boolean canAppointLead,
+      boolean canManageRoster,
+      List<LeitungMemberDto> members) {
+    return new LeitungUnitDto(
+        id, "Unit " + id, "U", kind, canAppointLead, canManageRoster, members, List.of(), null);
+  }
+
+  @Test
+  void leitung_requestedUnitListed_isSelected_otherwiseFirstUnit() {
+    BackendApiClient backend = mock(BackendApiClient.class);
+    LeitungPageController controller = new LeitungPageController(backend);
+    UUID squadron = UUID.randomUUID();
+    UUID sk = UUID.randomUUID();
+    when(backend.get("/api/v1/leitung/view", LeitungViewDto.class))
+        .thenReturn(
+            new LeitungViewDto(
+                false,
+                List.of(),
+                List.of(),
+                List.of(unit(squadron, OrgUnitKind.SQUADRON, false, true, List.of())),
+                List.of(unit(sk, OrgUnitKind.SPECIAL_COMMAND, true, false, List.of()))));
+
+    Model requested = new ConcurrentModel();
+    controller.leitung(null, sk.toString(), "groups", requested);
+    Model unknown = new ConcurrentModel();
+    controller.leitung(null, UUID.randomUUID().toString(), "bogus", unknown);
+
+    assertEquals(sk.toString(), requested.getAttribute("selectedUnitId"));
+    assertEquals("groups", requested.getAttribute("selectedTab"));
+    assertEquals(squadron.toString(), unknown.getAttribute("selectedUnitId"));
+    assertEquals("members", unknown.getAttribute("selectedTab"));
+  }
+
+  @Test
+  void leitung_orgChart_placesUnitsUnderTheirBereich() {
+    BackendApiClient backend = mock(BackendApiClient.class);
+    LeitungPageController controller = new LeitungPageController(backend);
+    UUID bereich = UUID.randomUUID();
+    UUID squadron = UUID.randomUUID();
+    UUID sk = UUID.randomUUID();
+    when(backend.get("/api/v1/leitung/view", LeitungViewDto.class)).thenReturn(emptyView());
+    when(backend.get("/api/v1/org-chart", OrgChartDto.class))
+        .thenReturn(
+            new OrgChartDto(
+                null,
+                List.of(
+                    new BereichChartDto(
+                        bereich,
+                        "Logistik",
+                        "LOG",
+                        "SEARCH_RESCUE",
+                        null,
+                        List.of(
+                            new SquadronChartDto(
+                                squadron, "IRIDIUM", "IRI", null, List.of(), List.of(), false,
+                                false)),
+                        List.of(
+                            new SpecialCommandChartDto(sk, "Bergung", "BRG", List.of(), false)))),
+                null,
+                List.of(),
+                List.of()));
+    Model model = new ConcurrentModel();
+
+    controller.leitung(null, null, null, model);
+
+    Map<UUID, LeitungUnitContext> context =
+        assertInstanceOf(Map.class, model.getAttribute("unitContext"));
+    assertNull(context.get(bereich).bereichName());
+    assertEquals("search-rescue", context.get(bereich).departmentModifier());
+    assertEquals("Logistik", context.get(squadron).bereichName());
+    assertEquals("Logistik", context.get(sk).bereichName());
+  }
+
+  @Test
+  void leitung_orgChartFails_rendersWithoutContext() {
+    BackendApiClient backend = mock(BackendApiClient.class);
+    LeitungPageController controller = new LeitungPageController(backend);
+    when(backend.get("/api/v1/leitung/view", LeitungViewDto.class)).thenReturn(emptyView());
+    when(backend.get("/api/v1/org-chart", OrgChartDto.class))
+        .thenThrow(new BackendServiceException("down", null, 503));
+    Model model = new ConcurrentModel();
+
+    String result = controller.leitung(null, null, null, model);
+
+    assertEquals("organisation/leitung", result);
+    assertTrue(assertInstanceOf(Map.class, model.getAttribute("unitContext")).isEmpty());
+    assertNull(model.getAttribute("error"));
+  }
+
+  @Test
+  void leitung_skRoster_readsFlagsOnlyWithTheRosterCap() {
+    BackendApiClient backend = mock(BackendApiClient.class);
+    LeitungPageController controller = new LeitungPageController(backend);
+    UUID managed = UUID.randomUUID();
+    UUID leadOnly = UUID.randomUUID();
+    UUID pilot = UUID.randomUUID();
+    UUID lead = UUID.randomUUID();
+    when(backend.get("/api/v1/leitung/view", LeitungViewDto.class))
+        .thenReturn(
+            new LeitungViewDto(
+                false,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(
+                    unit(
+                        managed,
+                        OrgUnitKind.SPECIAL_COMMAND,
+                        false,
+                        true,
+                        List.of(
+                            new LeitungMemberDto(lead, "Lead", "SK_LEAD", null, 1L, true),
+                            new LeitungMemberDto(pilot, "Pilot", "MEMBER", null, 2L, false))),
+                    unit(
+                        leadOnly,
+                        OrgUnitKind.SPECIAL_COMMAND,
+                        true,
+                        false,
+                        List.of(
+                            new LeitungMemberDto(pilot, "Pilot", "MEMBER", null, 0L, false))))));
+    when(backend.get(eq("/api/v1/special-commands/" + managed + "/members"), anyTypeRef()))
+        .thenReturn(
+            List.of(
+                Map.of(
+                    "userId",
+                    pilot.toString(),
+                    "isLogistician",
+                    true,
+                    "isMissionManager",
+                    false,
+                    "version",
+                    5)));
+    Model model = new ConcurrentModel();
+
+    controller.leitung(null, null, null, model);
+
+    Set<UUID> known = assertInstanceOf(Set.class, model.getAttribute("skFlagsKnown"));
+    assertTrue(known.contains(managed));
+    assertFalse(known.contains(leadOnly));
+    verify(backend, never())
+        .get(eq("/api/v1/special-commands/" + leadOnly + "/members"), anyTypeRef());
+    Map<UUID, List<OrgUnitMembershipDto>> rosters =
+        assertInstanceOf(Map.class, model.getAttribute("skRosters"));
+    List<OrgUnitMembershipDto> rows = rosters.get(managed);
+    assertEquals(2, rows.size());
+    assertTrue(rows.get(0).isLead());
+    assertFalse(rows.get(0).isLogistician());
+    assertEquals(1L, rows.get(0).version());
+    assertTrue(rows.get(1).isLogistician());
+    assertEquals(5L, rows.get(1).version());
+    assertEquals(lead, model.getAttribute("selfUserId"));
   }
 
   @Test
@@ -92,7 +269,7 @@ class LeitungPageControllerTest {
         .thenThrow(new BackendServiceException("boom", null, 503));
     Model model = new ConcurrentModel();
 
-    String result = controller.leitung(null, model);
+    String result = controller.leitung(null, null, null, model);
 
     assertEquals("organisation/leitung", result);
     assertEquals("leitung.error.load", model.getAttribute("error"));

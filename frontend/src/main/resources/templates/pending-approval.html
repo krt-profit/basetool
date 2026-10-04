@@ -2,7 +2,9 @@
 <html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="(${registrationRejected} ? #{pendingApproval.rejected.title} : (${registrationNoRole} ? #{pendingApproval.noRole.title} : #{pendingApproval.title})) + ' - ' + ${appTitle}">Freigabe ausstehend - Profit Basetool</title>
-    <th:block th:fragment="extraLinks"></th:block>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/pages/pending-approval.css}">
+    </th:block>
 </head>
 <body>
 <header>
@@ -15,29 +17,29 @@
 </header>
 
 <main>
-    <div id="pending-approval" class="hud-box krtm-max-width-640px-margin-3rem-auto-text-align-4453"
+    <div id="pending-approval" class="card pending-approval-card"
          th:data-status-url="@{/pending-approval/status}" th:data-home-url="@{/}">
         <div id="pending-approval-waiting" th:if="${!registrationRejected and !registrationNoRole}">
             <h1 th:text="#{pendingApproval.title}">Freigabe ausstehend</h1>
             <p th:text="#{pendingApproval.message}">Dein Account wurde erstellt und wartet auf die Freigabe durch einen Administrator. Du kannst das Tool erst nutzen, sobald ein Administrator deinen Zugang freigegeben hat.</p>
-            <p class="krtm-font-weight-700-5db7" th:text="#{pendingApproval.patience}">Die Freigabe erfolgt manuell und kann 1 bis 2 Tage dauern. Bitte habe so lange etwas Geduld.</p>
-            <p class="krtm-color-var-color-gray-2-font-size-0-9rem-cdef" th:text="#{pendingApproval.help}">Sobald du freigeschaltet bist, geht es hier automatisch weiter.</p>
-            <p id="pending-approval-approved" class="krtm-font-weight-700-5db7" hidden th:text="#{pendingApproval.approved}">Freigabe erteilt. Du wirst weitergeleitet.</p>
+            <p class="pending-approval-emphasis" th:text="#{pendingApproval.patience}">Die Freigabe erfolgt manuell und kann 1 bis 2 Tage dauern. Bitte habe so lange etwas Geduld.</p>
+            <p class="pending-approval-help" th:text="#{pendingApproval.help}">Sobald du freigeschaltet bist, geht es hier automatisch weiter.</p>
+            <p id="pending-approval-approved" class="pending-approval-emphasis" hidden th:text="#{pendingApproval.approved}">Freigabe erteilt. Du wirst weitergeleitet.</p>
         </div>
         <div id="pending-approval-no-role" th:if="${registrationNoRole and !registrationRejected}">
             <h1 th:text="#{pendingApproval.noRole.title}">Keine Rolle vergeben</h1>
             <p th:text="#{pendingApproval.noRole.message}">Dein Zugang ist freigegeben, aber es ist noch keine Rolle hinterlegt.</p>
-            <p class="krtm-font-weight-700-5db7" th:text="#{pendingApproval.noRole.whatNow}">Eine Rolle vergibt die Administration.</p>
-            <p class="krtm-color-var-color-gray-2-font-size-0-9rem-cdef" th:text="#{pendingApproval.noRole.contact}">Wende dich an einen Administrator im DAS-KARTELL-Discord.</p>
+            <p class="pending-approval-emphasis" th:text="#{pendingApproval.noRole.whatNow}">Eine Rolle vergibt die Administration.</p>
+            <p class="pending-approval-help" th:text="#{pendingApproval.noRole.contact}">Wende dich an einen Administrator im DAS-KARTELL-Discord.</p>
         </div>
         <div id="pending-approval-rejected" th:hidden="${!registrationRejected}">
             <h1 th:text="#{pendingApproval.rejected.title}">Registrierung abgelehnt</h1>
             <p th:text="#{pendingApproval.rejected.message}">Deine Registrierung wurde von einem Administrator abgelehnt. Du kannst das Tool damit nicht nutzen.</p>
-            <p class="krtm-font-weight-700-5db7" th:text="#{pendingApproval.rejected.noAutoUnlock}">Es erfolgt keine automatische Freischaltung.</p>
-            <p class="krtm-color-var-color-gray-2-font-size-0-9rem-cdef" th:text="#{pendingApproval.rejected.contact}">Wenn du das für einen Irrtum hältst, wende dich an einen Administrator im DAS-KARTELL-Discord.</p>
+            <p class="pending-approval-emphasis" th:text="#{pendingApproval.rejected.noAutoUnlock}">Es erfolgt keine automatische Freischaltung.</p>
+            <p class="pending-approval-help" th:text="#{pendingApproval.rejected.contact}">Wenn du das für einen Irrtum hältst, wende dich an einen Administrator im DAS-KARTELL-Discord.</p>
         </div>
-        <form th:action="@{/logout}" method="post" class="krtm-margin-top-1-5rem-1d30">
-            <button type="submit" class="btn btn-outline" th:text="#{nav.logout}">Abmelden</button>
+        <form th:action="@{/logout}" method="post" class="pending-approval-logout">
+            <button type="submit" class="btn btn-ghost" th:text="#{nav.logout}">Abmelden</button>
         </form>
     </div>
 </main>
