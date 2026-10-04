@@ -30,35 +30,37 @@
 
     <div id="bp-overview-results" class="card card--flush">
     <th:block th:fragment="results">
-        <table th:if="${!#lists.isEmpty(overview)}" class="data-table data-table--stack bpo-table">
-            <thead>
-            <tr>
-                <th th:text="#{blueprintOverview.column.blueprint}">Blueprint</th>
-                <th class="num" th:text="#{blueprintOverview.column.count}">Anzahl</th>
-                <th th:text="#{blueprintOverview.column.canCraft}">Kann craften</th>
-            </tr>
-            </thead>
-            <tbody>
-            <th:block th:each="item, iter : ${overview}">
-            <tr class="bpo-row" data-testid="bp-overview-row"
-                th:attr="data-product-key=${item.productKey},data-owner-count=${item.ownerCount}">
-                <td><span class="cell-title" th:text="${item.productName}">Blueprint</span></td>
-                <td class="num" th:attr="data-label=#{blueprintOverview.column.count}">
-                    <span class="bpo-count" th:text="${item.ownerCount}">0</span>
-                </td>
-                <td class="bpo-owners-cell" th:attr="data-label=#{blueprintOverview.column.canCraft}">
-                    <div class="bpo-chips" data-loaded="false"
-                         th:attr="data-more-for=${'bpo-more-' + iter.index}"></div>
-                </td>
-            </tr>
-            <tr class="details-row" th:id="${'bpo-more-' + iter.index}">
-                <td colspan="3" class="p-0">
-                    <div class="bp-owners-panel"></div>
-                </td>
-            </tr>
-            </th:block>
-            </tbody>
-        </table>
+        <div class="table-responsive" th:if="${!#lists.isEmpty(overview)}">
+            <table class="data-table data-table--stack bpo-table">
+                <thead>
+                <tr>
+                    <th th:text="#{blueprintOverview.column.blueprint}">Blueprint</th>
+                    <th class="num" th:text="#{blueprintOverview.column.count}">Anzahl</th>
+                    <th th:text="#{blueprintOverview.column.canCraft}">Kann craften</th>
+                </tr>
+                </thead>
+                <tbody>
+                <th:block th:each="item, iter : ${overview}">
+                <tr class="bpo-row" data-testid="bp-overview-row"
+                    th:attr="data-product-key=${item.productKey},data-owner-count=${item.ownerCount}">
+                    <td><span class="cell-title" th:text="${item.productName}">Blueprint</span></td>
+                    <td class="num" th:attr="data-label=#{blueprintOverview.column.count}">
+                        <span class="bpo-count" th:text="${item.ownerCount}">0</span>
+                    </td>
+                    <td class="bpo-owners-cell" th:attr="data-label=#{blueprintOverview.column.canCraft}">
+                        <div class="bpo-chips" data-loaded="false"
+                             th:attr="data-more-for=${'bpo-more-' + iter.index}"></div>
+                    </td>
+                </tr>
+                <tr class="details-row" th:id="${'bpo-more-' + iter.index}">
+                    <td colspan="3" class="p-0">
+                        <div class="bp-owners-panel"></div>
+                    </td>
+                </tr>
+                </th:block>
+                </tbody>
+            </table>
+        </div>
 
         <th:block th:if="${#lists.isEmpty(overview) and search == null}">
             <th:block th:replace="~{fragments/components :: emptyState(titleKey='blueprintOverview.empty.title', textKey='blueprintOverview.empty')}"></th:block>

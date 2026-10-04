@@ -49,50 +49,52 @@
             <th:block th:replace="~{fragments/components :: emptyState(titleKey='personalInventory.collection.emptyTitle', textKey='personalInventory.empty', filterHintKey='personalInventory.collection.emptyFilterHint')}"></th:block>
         </th:block>
 
-        <table th:unless="${#lists.isEmpty(items)}" class="data-table data-table--stack krt-pi-table">
-            <thead>
-            <tr>
-                <th th:text="#{personalInventory.field.name}">Name</th>
-                <th th:text="#{personalInventory.field.location}">Ort</th>
-                <th class="num" th:text="#{personalInventory.field.quantity}">Menge</th>
-                <th th:text="#{personalInventory.field.note}">Notiz</th>
-                <th class="cell-actions"><span class="visually-hidden" th:text="#{personalInventory.field.actions}">Aktionen</span></th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr th:each="item : ${items}" th:attr="data-item-id=${item.id}">
-                <td><span class="cell-title" th:text="${item.name}">Name</span></td>
-                <td th:attr="data-label=#{personalInventory.field.location}">
-                    <span class="krt-pi-location-marker"
-                          th:classappend="${item.locationType?.name() == 'CITY'} ? ' krt-pi-loc-city' : ' krt-pi-loc-station'"></span>
-                    <span th:text="${item.locationName}">Ort</span>
-                </td>
-                <td class="num" th:attr="data-label=#{personalInventory.field.quantity}" th:text="${item.quantity}">1</td>
-                <td class="krt-pi-note" th:attr="data-label=#{personalInventory.field.note}" th:text="${item.note}">Notiz</td>
-                <td class="cell-actions">
-                    <button type="button" class="btn btn-ghost btn-icon"
-                            data-trigger="pi-open-edit"
-                            th:attr="data-action=@{'/personal-inventory/' + ${item.id} + '/update'},
-                                     data-id=${item.id},
-                                     data-version=${item.version},
-                                     data-name=${item.name},
-                                     data-note=${item.note},
-                                     data-quantity=${item.quantity},
-                                     data-location-uex-id=${item.locationUexId},
-                                     data-location-type=${item.locationType?.name()},
-                                     data-location-name=${item.locationName}"
-                            th:title="#{personalInventory.action.edit}"
-                            th:aria-label="#{personalInventory.action.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
-                    <button type="button" class="btn btn-quiet-danger btn-icon"
-                            data-trigger="pi-open-delete"
-                            th:attr="data-action=@{'/personal-inventory/' + ${item.id} + '/delete'},
-                                     data-name=${item.name}"
-                            th:title="#{personalInventory.action.delete}"
-                            th:aria-label="#{personalInventory.action.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                </td>
-            </tr>
-            </tbody>
-        </table>
+        <div class="table-responsive" th:unless="${#lists.isEmpty(items)}">
+            <table class="data-table data-table--stack krt-pi-table">
+                <thead>
+                <tr>
+                    <th th:text="#{personalInventory.field.name}">Name</th>
+                    <th th:text="#{personalInventory.field.location}">Ort</th>
+                    <th class="num" th:text="#{personalInventory.field.quantity}">Menge</th>
+                    <th th:text="#{personalInventory.field.note}">Notiz</th>
+                    <th class="cell-actions"><span class="visually-hidden" th:text="#{personalInventory.field.actions}">Aktionen</span></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="item : ${items}" th:attr="data-item-id=${item.id}">
+                    <td><span class="cell-title" th:text="${item.name}">Name</span></td>
+                    <td th:attr="data-label=#{personalInventory.field.location}">
+                        <span class="krt-pi-location-marker"
+                              th:classappend="${item.locationType?.name() == 'CITY'} ? ' krt-pi-loc-city' : ' krt-pi-loc-station'"></span>
+                        <span th:text="${item.locationName}">Ort</span>
+                    </td>
+                    <td class="num" th:attr="data-label=#{personalInventory.field.quantity}" th:text="${item.quantity}">1</td>
+                    <td class="krt-pi-note" th:attr="data-label=#{personalInventory.field.note}" th:text="${item.note}">Notiz</td>
+                    <td class="cell-actions">
+                        <button type="button" class="btn btn-ghost btn-icon"
+                                data-trigger="pi-open-edit"
+                                th:attr="data-action=@{'/personal-inventory/' + ${item.id} + '/update'},
+                                         data-id=${item.id},
+                                         data-version=${item.version},
+                                         data-name=${item.name},
+                                         data-note=${item.note},
+                                         data-quantity=${item.quantity},
+                                         data-location-uex-id=${item.locationUexId},
+                                         data-location-type=${item.locationType?.name()},
+                                         data-location-name=${item.locationName}"
+                                th:title="#{personalInventory.action.edit}"
+                                th:aria-label="#{personalInventory.action.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                        <button type="button" class="btn btn-quiet-danger btn-icon"
+                                data-trigger="pi-open-delete"
+                                th:attr="data-action=@{'/personal-inventory/' + ${item.id} + '/delete'},
+                                         data-name=${item.name}"
+                                th:title="#{personalInventory.action.delete}"
+                                th:aria-label="#{personalInventory.action.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
 
         <th:block th:with="piBase=${#strings.isEmpty(filterQuery) ? '/personal-inventory' : '/personal-inventory?q=' + #uris.escapeQueryParam(filterQuery)}">
             <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${page}, baseUrl=${piBase})}"></th:block>
