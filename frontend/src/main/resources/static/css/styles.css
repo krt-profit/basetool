@@ -6840,6 +6840,8 @@
     .segmented--block > * {
         flex: 1 1 0;
         min-width: 0;
+    }
+    .segmented--block > :is(button, label) {
         text-align: center;
         white-space: normal;
     }
