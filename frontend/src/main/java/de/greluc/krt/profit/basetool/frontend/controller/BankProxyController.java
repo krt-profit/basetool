@@ -157,7 +157,7 @@ public class BankProxyController {
   @ResponseStatus(HttpStatus.CREATED)
   public Map<String, Object> reverseTransaction(
       @PathVariable @NotNull UUID id, @RequestBody(required = false) Map<String, Object> body) {
-    return postMap("/api/v1/bank/transactions/" + id + "/reversal", body == null ? Map.of() : body);
+    return postMap("/api/v1/bank/transactions/{id}/reversal", body == null ? Map.of() : body, id);
   }
 
   /**
@@ -172,7 +172,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> confirmBookingRequest(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/requests/" + id + "/confirm", body);
+    return postMap("/api/v1/bank/requests/{id}/confirm", body, id);
   }
 
   /**
@@ -186,7 +186,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> rejectBookingRequest(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/requests/" + id + "/reject", body);
+    return postMap("/api/v1/bank/requests/{id}/reject", body, id);
   }
 
   /**
@@ -214,7 +214,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> renameAccount(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return patchMap("/api/v1/bank/accounts/" + id, body);
+    return patchMap("/api/v1/bank/accounts/{id}", body, id);
   }
 
   /**
@@ -229,7 +229,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> setBalanceTarget(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return patchMap("/api/v1/bank/accounts/" + id + "/balance-target", body);
+    return patchMap("/api/v1/bank/accounts/{id}/balance-target", body, id);
   }
 
   /**
@@ -245,7 +245,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> setCartelApprovalTiers(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return patchMap("/api/v1/bank/accounts/" + id + "/approval-tiers", body);
+    return patchMap("/api/v1/bank/accounts/{id}/approval-tiers", body, id);
   }
 
   /**
@@ -259,7 +259,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> closeAccount(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/accounts/" + id + "/close", body);
+    return postMap("/api/v1/bank/accounts/{id}/close", body, id);
   }
 
   /**
@@ -273,7 +273,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> reopenAccount(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/accounts/" + id + "/reopen", body);
+    return postMap("/api/v1/bank/accounts/{id}/reopen", body, id);
   }
 
   /**
@@ -300,7 +300,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> updateHolder(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return patchMap("/api/v1/bank/holders/" + id, body);
+    return patchMap("/api/v1/bank/holders/{id}", body, id);
   }
 
   /**
@@ -330,7 +330,7 @@ public class BankProxyController {
       @PathVariable @NotNull UUID userId,
       @PathVariable @NotNull UUID accountId,
       @RequestBody @NotNull Map<String, Object> body) {
-    return patchMap("/api/v1/bank/grants/" + userId + "/" + accountId, body);
+    return patchMap("/api/v1/bank/grants/{userId}/{accountId}", body, userId, accountId);
   }
 
   /**
@@ -344,33 +344,44 @@ public class BankProxyController {
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void deleteGrant(
       @PathVariable @NotNull UUID userId, @PathVariable @NotNull UUID accountId) {
-    backendApiClient.delete("/api/v1/bank/grants/" + userId + "/" + accountId, Void.class);
+    backendApiClient.delete(
+        "/api/v1/bank/grants/{userId}/{accountId}", Void.class, userId, accountId);
   }
 
   /**
    * POST helper returning the backend's JSON body as a raw map (or an empty map for bodyless 2xx
    * responses, keeping the browser contract uniform).
    *
-   * @param uri the backend endpoint
+   * @param uriTemplate the backend endpoint as a URI template
    * @param body the forwarded payload
+   * @param uriVariables the values expanded into the template, in order
    * @return the backend response body
    */
   @SuppressWarnings("unchecked")
-  private Map<String, Object> postMap(@NotNull String uri, @NotNull Map<String, Object> body) {
-    Map<String, Object> response = backendApiClient.post(uri, body, Map.class);
+  private Map<String, Object> postMap(
+      @NotNull String uriTemplate,
+      @NotNull Map<String, Object> body,
+      @NotNull Object... uriVariables) {
+    Map<String, Object> response =
+        backendApiClient.post(uriTemplate, body, Map.class, uriVariables);
     return response == null ? Map.of() : response;
   }
 
   /**
    * PATCH helper returning the backend's JSON body as a raw map.
    *
-   * @param uri the backend endpoint
+   * @param uriTemplate the backend endpoint as a URI template
    * @param body the forwarded payload
+   * @param uriVariables the values expanded into the template, in order
    * @return the backend response body
    */
   @SuppressWarnings("unchecked")
-  private Map<String, Object> patchMap(@NotNull String uri, @NotNull Map<String, Object> body) {
-    Map<String, Object> response = backendApiClient.patch(uri, body, Map.class);
+  private Map<String, Object> patchMap(
+      @NotNull String uriTemplate,
+      @NotNull Map<String, Object> body,
+      @NotNull Object... uriVariables) {
+    Map<String, Object> response =
+        backendApiClient.patch(uriTemplate, body, Map.class, uriVariables);
     return response == null ? Map.of() : response;
   }
 }

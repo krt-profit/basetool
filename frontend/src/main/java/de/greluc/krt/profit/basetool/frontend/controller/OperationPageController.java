@@ -540,7 +540,7 @@ public class OperationPageController {
       @ModelAttribute OperationForm form,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.put("/api/v1/operations/" + id, form, Void.class);
+      backendApiClient.put("/api/v1/operations/{id}", form, Void.class, id);
       redirectAttributes.addFlashAttribute("successMessage", "operation.update.success");
     } catch (BackendServiceException e) {
       if (e.getStatusCode() == 409) {
@@ -582,9 +582,10 @@ public class OperationPageController {
     try {
       OperationPayoutStatusDto updated =
           backendApiClient.put(
-              "/api/v1/operations/" + id + "/payouts/paid-out",
+              "/api/v1/operations/{id}/payouts/paid-out",
               request,
-              OperationPayoutStatusDto.class);
+              OperationPayoutStatusDto.class,
+              id);
       return ResponseEntity.ok(updated);
     } catch (BackendServiceException e) {
       log.debug(
@@ -640,7 +641,7 @@ public class OperationPageController {
   public String deleteOperation(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/operations/" + id, Void.class);
+      backendApiClient.delete("/api/v1/operations/{id}", Void.class, id);
       redirectAttributes.addFlashAttribute("successMessage", "operation.delete.success");
     } catch (Exception e) {
       log.error("Error deleting operation", e);
@@ -687,7 +688,7 @@ public class OperationPageController {
         "update operation (ajax) for " + id,
         () -> {
           OperationDto updated =
-              backendApiClient.put("/api/v1/operations/" + id, form, OperationDto.class);
+              backendApiClient.put("/api/v1/operations/{id}", form, OperationDto.class, id);
           java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
           result.put("version", updated.version());
           result.put("name", updated.name());
@@ -711,7 +712,7 @@ public class OperationPageController {
         log,
         "delete operation (ajax) for " + id,
         () -> {
-          backendApiClient.delete("/api/v1/operations/" + id, Void.class);
+          backendApiClient.delete("/api/v1/operations/{id}", Void.class, id);
           return ResponseEntity.ok().build();
         });
   }

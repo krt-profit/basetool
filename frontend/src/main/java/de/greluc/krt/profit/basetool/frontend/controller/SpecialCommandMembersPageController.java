@@ -169,7 +169,7 @@ public class SpecialCommandMembersPageController {
       RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.post(
-          "/api/v1/special-commands/" + id + "/members/" + userId, null, Void.class);
+          "/api/v1/special-commands/{id}/members/{userId}", null, Void.class, id, userId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Add SpecialCommand member failed", e);
@@ -202,7 +202,8 @@ public class SpecialCommandMembersPageController {
       @PathVariable @NotNull UUID userId,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/special-commands/" + id + "/members/" + userId, Void.class);
+      backendApiClient.delete(
+          "/api/v1/special-commands/{id}/members/{userId}", Void.class, id, userId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (Exception e) {
       log.error("Remove SpecialCommand member failed", e);
@@ -232,7 +233,11 @@ public class SpecialCommandMembersPageController {
       RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.patch(
-          "/api/v1/special-commands/" + id + "/members/" + userId, flagsBody(form), Void.class);
+          "/api/v1/special-commands/{id}/members/{userId}",
+          flagsBody(form),
+          Void.class,
+          id,
+          userId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Patch SpecialCommand member flags failed", e);
@@ -263,7 +268,7 @@ public class SpecialCommandMembersPageController {
     return okOrRelay(
         () ->
             backendApiClient.post(
-                "/api/v1/special-commands/" + id + "/members/" + userId, null, Void.class));
+                "/api/v1/special-commands/{id}/members/{userId}", null, Void.class, id, userId));
   }
 
   /**
@@ -280,7 +285,7 @@ public class SpecialCommandMembersPageController {
     return okOrRelay(
         () ->
             backendApiClient.delete(
-                "/api/v1/special-commands/" + id + "/members/" + userId, Void.class));
+                "/api/v1/special-commands/{id}/members/{userId}", Void.class, id, userId));
   }
 
   /**
@@ -301,9 +306,11 @@ public class SpecialCommandMembersPageController {
     return okOrRelay(
         () ->
             backendApiClient.patch(
-                "/api/v1/special-commands/" + id + "/members/" + userId,
+                "/api/v1/special-commands/{id}/members/{userId}",
                 flagsBody(form),
-                Void.class));
+                Void.class,
+                id,
+                userId));
   }
 
   /**

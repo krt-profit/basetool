@@ -179,7 +179,8 @@ public class AdminUexPageController {
       return "redirect:/admin/uex-data";
     }
     return dispatchOverride(
-        "/api/v1/" + kind + "/" + id,
+        "/api/v1/" + kind + "/{id}",
+        id,
         action,
         "loading-dock",
         "loading-dock-override",
@@ -203,7 +204,12 @@ public class AdminUexPageController {
       @RequestParam String action,
       RedirectAttributes redirectAttributes) {
     return dispatchOverride(
-        "/api/v1/terminals/" + id, action, "auto-load", "auto-load-override", redirectAttributes);
+        "/api/v1/terminals/{id}",
+        id,
+        action,
+        "auto-load",
+        "auto-load-override",
+        redirectAttributes);
   }
 
   /**
@@ -241,7 +247,7 @@ public class AdminUexPageController {
               current.uexIsAutoLoad(),
               current.uexSyncedAt(),
               hidden);
-      backendApiClient.put("/api/v1/terminals/" + id, body, Void.class);
+      backendApiClient.put("/api/v1/terminals/{id}", body, Void.class, id);
       backendApiClient.evict(CacheDomain.TERMINAL);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
@@ -272,7 +278,7 @@ public class AdminUexPageController {
       return ResponseEntity.badRequest().build();
     }
     return dispatchOverrideAjax(
-        "/api/v1/" + kind + "/" + id, action, "loading-dock", "loading-dock-override");
+        "/api/v1/" + kind + "/{id}", id, action, "loading-dock", "loading-dock-override");
   }
 
   /**
@@ -289,7 +295,7 @@ public class AdminUexPageController {
   public ResponseEntity<Object> updateTerminalAutoLoadOverrideAjax(
       @PathVariable @NotNull UUID id, @RequestParam String action) {
     return dispatchOverrideAjax(
-        "/api/v1/terminals/" + id, action, "auto-load", "auto-load-override");
+        "/api/v1/terminals/{id}", id, action, "auto-load", "auto-load-override");
   }
 
   /**
@@ -327,7 +333,7 @@ public class AdminUexPageController {
                   current.uexIsAutoLoad(),
                   current.uexSyncedAt(),
                   !current.hidden());
-          backendApiClient.put("/api/v1/terminals/" + id, body, Void.class);
+          backendApiClient.put("/api/v1/terminals/{id}", body, Void.class, id);
           backendApiClient.evict(CacheDomain.TERMINAL);
           return ResponseEntity.ok().build();
         });
@@ -337,7 +343,9 @@ public class AdminUexPageController {
    * AJAX counterpart of {@link #dispatchOverride} that returns an HTTP status instead of a
    * redirect.
    *
-   * @param baseUri backend URI up to and including the entity id, with no trailing slash
+   * @param baseTemplate backend URI template ending in the {@code {id}} variable, with no trailing
+   *     slash; its entity kind is an allow-listed literal
+   * @param id the entity id expanded into {@code baseTemplate}
    * @param action button action ({@code uex}, {@code yes}, or {@code no})
    * @param setPath URL segment that pins the flag on a PATCH
    * @param clearPath URL segment that drops the pin on a DELETE
@@ -345,17 +353,19 @@ public class AdminUexPageController {
    *     on failure
    */
   private ResponseEntity<Object> dispatchOverrideAjax(
-      String baseUri, String action, String setPath, String clearPath) {
+      String baseTemplate, UUID id, String action, String setPath, String clearPath) {
     return relay(
         log,
         "override update (ajax)",
         () -> {
           switch (action) {
-            case "uex" -> backendApiClient.delete(baseUri + "/" + clearPath, Void.class);
+            case "uex" -> backendApiClient.delete(baseTemplate + "/" + clearPath, Void.class, id);
             case "yes" ->
-                backendApiClient.patch(baseUri + "/" + setPath + "?value=true", null, Void.class);
+                backendApiClient.patch(
+                    baseTemplate + "/" + setPath + "?value=true", null, Void.class, id);
             case "no" ->
-                backendApiClient.patch(baseUri + "/" + setPath + "?value=false", null, Void.class);
+                backendApiClient.patch(
+                    baseTemplate + "/" + setPath + "?value=false", null, Void.class, id);
             default -> {
               return ResponseEntity.badRequest().build();
             }
@@ -369,7 +379,9 @@ public class AdminUexPageController {
    * clearPath}, {@code yes} to {@code PATCH setPath?value=true}, {@code no} to {@code PATCH
    * setPath?value=false}; anything else is rejected without a backend call.
    *
-   * @param baseUri backend URI up to and including the entity id, with no trailing slash
+   * @param baseTemplate backend URI template ending in the {@code {id}} variable, with no trailing
+   *     slash; its entity kind is an allow-listed literal
+   * @param id the entity id expanded into {@code baseTemplate}
    * @param action button action ({@code uex}, {@code yes}, or {@code no})
    * @param setPath URL segment that pins the flag on a PATCH
    * @param clearPath URL segment that drops the pin on a DELETE
@@ -378,18 +390,21 @@ public class AdminUexPageController {
    */
   @NotNull
   private String dispatchOverride(
-      String baseUri,
+      String baseTemplate,
+      UUID id,
       String action,
       String setPath,
       String clearPath,
       RedirectAttributes redirectAttributes) {
     try {
       switch (action) {
-        case "uex" -> backendApiClient.delete(baseUri + "/" + clearPath, Void.class);
+        case "uex" -> backendApiClient.delete(baseTemplate + "/" + clearPath, Void.class, id);
         case "yes" ->
-            backendApiClient.patch(baseUri + "/" + setPath + "?value=true", null, Void.class);
+            backendApiClient.patch(
+                baseTemplate + "/" + setPath + "?value=true", null, Void.class, id);
         case "no" ->
-            backendApiClient.patch(baseUri + "/" + setPath + "?value=false", null, Void.class);
+            backendApiClient.patch(
+                baseTemplate + "/" + setPath + "?value=false", null, Void.class, id);
         default -> {
           redirectAttributes.addFlashAttribute("errorToast", "error.admin.uex.flag.update");
           return "redirect:/admin/uex-data";

@@ -31,9 +31,8 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.frontend.architecture.fixture.LeakyHttpClient;
 import de.greluc.krt.profit.basetool.frontend.architecture.fixture.RogueWebClientHolder;
 import de.greluc.krt.profit.basetool.frontend.config.WebClientConfig;
-import de.greluc.krt.profit.basetool.frontend.controller.NotificationPageController;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncSubscriptionAuthorizer;
+import de.greluc.krt.profit.basetool.frontend.service.BackendSideChannels;
 import java.lang.annotation.Annotation;
 import java.net.URI;
 import java.util.ArrayList;
@@ -62,11 +61,11 @@ import org.springframework.web.util.UriBuilderFactory;
 /**
  * Keeps every backend {@link WebClient} inside the backend kernel (REQ-FE-029, plan G-17).
  *
- * <p>Only {@link WebClientConfig} builds a client; only the kernel and the two named exceptions —
- * the SSE relay and the live-sync probe — hold one; HTTP-interface clients are created only by the
- * kernel, take no {@code URI}, {@code UriBuilderFactory} or {@code @CookieValue} parameter, name no
- * absolute URL and carry no cache annotation. Each rule is proven against the fixtures in {@code
- * architecture.fixture}.
+ * <p>Only {@link WebClientConfig} builds a client; only the kernel — {@link WebClientConfig},
+ * {@link BackendApiClient} and {@link BackendSideChannels} — holds one, with no exception outside
+ * it; HTTP-interface clients are created only by the kernel, take no {@code URI}, {@code
+ * UriBuilderFactory} or {@code @CookieValue} parameter, name no absolute URL and carry no cache
+ * annotation. Each rule is proven against the fixtures in {@code architecture.fixture}.
  */
 class WebClientConfinementTest {
 
@@ -82,16 +81,12 @@ class WebClientConfinementTest {
   /** The one class that builds backend clients. */
   private static final Set<String> BUILDERS = Set.of(WebClientConfig.class.getName());
 
-  /**
-   * The classes that hold a backend client: the bean factory, the kernel, and the two named
-   * exceptions — the notification SSE relay and the live-sync subscribe probe.
-   */
+  /** The classes that hold a backend client: the bean factory and the backend kernel. */
   private static final Set<String> HOLDERS =
       Set.of(
           WebClientConfig.class.getName(),
           BackendApiClient.class.getName(),
-          NotificationPageController.class.getName(),
-          LiveSyncSubscriptionAuthorizer.class.getName());
+          BackendSideChannels.class.getName());
 
   /** The classes allowed to create HTTP-interface clients over a {@code WebClient}. */
   private static final Set<String> CLIENT_FACTORIES = Set.of(WebClientConfig.class.getName());
@@ -119,11 +114,11 @@ class WebClientConfinementTest {
   }
 
   @Test
-  void onlyTheKernelAndTheNamedExceptionsHoldAWebClient() {
+  void onlyTheKernelHoldsAWebClient() {
     assertThat(holders(MAIN))
         .as(
-            "a WebClient field, constructor parameter or @Bean is confined to the kernel, the SSE"
-                + " relay and the live-sync probe; anything else calls BackendApiClient")
+            "a WebClient field, constructor parameter or @Bean is confined to the backend kernel;"
+                + " anything else calls BackendApiClient or BackendSideChannels")
         .containsExactlyInAnyOrderElementsOf(HOLDERS);
   }
 

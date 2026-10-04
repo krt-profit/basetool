@@ -910,9 +910,10 @@ class OperationPageControllerMvcTest {
     UUID participantId = UUID.randomUUID();
 
     when(backendApiClient.put(
-            eq("/api/v1/operations/" + opId + "/payouts/paid-out"),
+            eq("/api/v1/operations/{id}/payouts/paid-out"),
             any(),
-            eq(OperationPayoutStatusDto.class)))
+            eq(OperationPayoutStatusDto.class),
+            eq(opId)))
         .thenReturn(new OperationPayoutStatusDto(participantId.toString(), false, null, null));
 
     mockMvc
@@ -931,9 +932,10 @@ class OperationPageControllerMvcTest {
     UUID participantId = UUID.randomUUID();
 
     when(backendApiClient.put(
-            eq("/api/v1/operations/" + opId + "/payouts/paid-out"),
+            eq("/api/v1/operations/{id}/payouts/paid-out"),
             any(),
-            eq(OperationPayoutStatusDto.class)))
+            eq(OperationPayoutStatusDto.class),
+            eq(opId)))
         .thenReturn(new OperationPayoutStatusDto(participantId.toString(), true, null, null));
 
     mockMvc
@@ -952,9 +954,10 @@ class OperationPageControllerMvcTest {
     UUID participantId = UUID.randomUUID();
 
     when(backendApiClient.put(
-            eq("/api/v1/operations/" + opId + "/payouts/paid-out"),
+            eq("/api/v1/operations/{id}/payouts/paid-out"),
             any(),
-            eq(OperationPayoutStatusDto.class)))
+            eq(OperationPayoutStatusDto.class),
+            eq(opId)))
         .thenThrow(new BackendServiceException("payout toggle race", null, 409));
 
     mockMvc
@@ -970,7 +973,7 @@ class OperationPageControllerMvcTest {
   @WithMockUser(roles = "MISSION_MANAGER")
   void updateOperation_classicForm_maps409ToOptimisticLockingFlash() throws Exception {
     UUID opId = UUID.randomUUID();
-    when(backendApiClient.put(eq("/api/v1/operations/" + opId), any(), eq(Void.class)))
+    when(backendApiClient.put(eq("/api/v1/operations/{id}"), any(), eq(Void.class), eq(opId)))
         .thenThrow(new BackendServiceException("stale operation version", null, 409));
 
     mockMvc
@@ -989,7 +992,7 @@ class OperationPageControllerMvcTest {
   @WithMockUser(roles = "MISSION_MANAGER")
   void updateOperation_classicForm_mapsOtherErrorsToGenericFlash() throws Exception {
     UUID opId = UUID.randomUUID();
-    when(backendApiClient.put(eq("/api/v1/operations/" + opId), any(), eq(Void.class)))
+    when(backendApiClient.put(eq("/api/v1/operations/{id}"), any(), eq(Void.class), eq(opId)))
         .thenThrow(new BackendServiceException("backend down", null, 500));
 
     mockMvc

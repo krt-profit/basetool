@@ -81,8 +81,9 @@ class InventoryStolenMarkAjaxControllerTest {
   @WithMockUser
   void single_forwardsVersionMarkerAndPartAmount() throws Exception {
     UUID itemId = UUID.randomUUID();
-    String uri = "/api/v1/inventory/" + itemId + "/stolen";
-    when(backendApiClient.post(eq(uri), any(), eq(InventoryItemDto.class))).thenReturn(null);
+    String uri = "/api/v1/inventory/{id}/stolen";
+    when(backendApiClient.post(eq(uri), any(), eq(InventoryItemDto.class), eq(itemId)))
+        .thenReturn(null);
 
     mockMvc
         .perform(
@@ -93,7 +94,7 @@ class InventoryStolenMarkAjaxControllerTest {
         .andExpect(status().isOk());
 
     ArgumentCaptor<Object> body = ArgumentCaptor.forClass(Object.class);
-    verify(backendApiClient).post(eq(uri), body.capture(), eq(InventoryItemDto.class));
+    verify(backendApiClient).post(eq(uri), body.capture(), eq(InventoryItemDto.class), eq(itemId));
     InventoryItemStolenMarkDto forwarded = (InventoryItemStolenMarkDto) body.getValue();
     assertThat(forwarded.version()).isEqualTo(3L);
     assertThat(forwarded.stolen()).isTrue();
@@ -104,8 +105,9 @@ class InventoryStolenMarkAjaxControllerTest {
   @WithMockUser
   void single_nullAmountMeansTheWholeRow() throws Exception {
     UUID itemId = UUID.randomUUID();
-    String uri = "/api/v1/inventory/" + itemId + "/stolen";
-    when(backendApiClient.post(eq(uri), any(), eq(InventoryItemDto.class))).thenReturn(null);
+    String uri = "/api/v1/inventory/{id}/stolen";
+    when(backendApiClient.post(eq(uri), any(), eq(InventoryItemDto.class), eq(itemId)))
+        .thenReturn(null);
 
     mockMvc
         .perform(
@@ -116,7 +118,7 @@ class InventoryStolenMarkAjaxControllerTest {
         .andExpect(status().isOk());
 
     ArgumentCaptor<Object> body = ArgumentCaptor.forClass(Object.class);
-    verify(backendApiClient).post(eq(uri), body.capture(), eq(InventoryItemDto.class));
+    verify(backendApiClient).post(eq(uri), body.capture(), eq(InventoryItemDto.class), eq(itemId));
     InventoryItemStolenMarkDto forwarded = (InventoryItemStolenMarkDto) body.getValue();
     assertThat(forwarded.stolen()).isFalse();
     assertThat(forwarded.amount()).isNull();
@@ -135,6 +137,7 @@ class InventoryStolenMarkAjaxControllerTest {
         .andExpect(jsonPath("$.code").value("VALIDATION"));
 
     verify(backendApiClient, never()).post(anyString(), any(), any());
+    verify(backendApiClient, never()).post(anyString(), any(), any(), any(Object[].class));
   }
 
   @Test
@@ -142,7 +145,7 @@ class InventoryStolenMarkAjaxControllerTest {
   void single_switchedOffConflictIsRelayedWithItsDetail() throws Exception {
     UUID itemId = UUID.randomUUID();
     when(backendApiClient.post(
-            eq("/api/v1/inventory/" + itemId + "/stolen"), any(), eq(InventoryItemDto.class)))
+            eq("/api/v1/inventory/{id}/stolen"), any(), eq(InventoryItemDto.class), eq(itemId)))
         .thenThrow(
             new BackendServiceException(
                 "switched off",
@@ -200,6 +203,7 @@ class InventoryStolenMarkAjaxControllerTest {
         .andExpect(status().isUnprocessableContent());
 
     verify(backendApiClient, never()).post(anyString(), any(), any());
+    verify(backendApiClient, never()).post(anyString(), any(), any(), any(Object[].class));
   }
 
   @Test
@@ -214,6 +218,7 @@ class InventoryStolenMarkAjaxControllerTest {
         .andExpect(status().isUnprocessableContent());
 
     verify(backendApiClient, never()).post(anyString(), any(), any());
+    verify(backendApiClient, never()).post(anyString(), any(), any(), any(Object[].class));
   }
 
   @Test

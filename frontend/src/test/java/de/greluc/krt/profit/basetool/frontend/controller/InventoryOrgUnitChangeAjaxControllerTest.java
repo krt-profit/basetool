@@ -82,8 +82,9 @@ class InventoryOrgUnitChangeAjaxControllerTest {
   void single_forwardsVersionTargetAndMergeFlag() throws Exception {
     UUID itemId = UUID.randomUUID();
     UUID orgUnitId = UUID.randomUUID();
-    String uri = "/api/v1/inventory/" + itemId + "/org-unit";
-    when(backendApiClient.post(eq(uri), any(), eq(InventoryItemDto.class))).thenReturn(null);
+    String uri = "/api/v1/inventory/{id}/org-unit";
+    when(backendApiClient.post(eq(uri), any(), eq(InventoryItemDto.class), eq(itemId)))
+        .thenReturn(null);
 
     mockMvc
         .perform(
@@ -97,7 +98,7 @@ class InventoryOrgUnitChangeAjaxControllerTest {
         .andExpect(status().isOk());
 
     ArgumentCaptor<Object> body = ArgumentCaptor.forClass(Object.class);
-    verify(backendApiClient).post(eq(uri), body.capture(), eq(InventoryItemDto.class));
+    verify(backendApiClient).post(eq(uri), body.capture(), eq(InventoryItemDto.class), eq(itemId));
     InventoryItemOrgUnitChangeDto forwarded = (InventoryItemOrgUnitChangeDto) body.getValue();
     assertThat(forwarded.version()).isEqualTo(4L);
     assertThat(forwarded.targetOwningOrgUnitId()).isEqualTo(orgUnitId);
@@ -108,8 +109,9 @@ class InventoryOrgUnitChangeAjaxControllerTest {
   @WithMockUser
   void single_nullTargetMeansNoUnit() throws Exception {
     UUID itemId = UUID.randomUUID();
-    String uri = "/api/v1/inventory/" + itemId + "/org-unit";
-    when(backendApiClient.post(eq(uri), any(), eq(InventoryItemDto.class))).thenReturn(null);
+    String uri = "/api/v1/inventory/{id}/org-unit";
+    when(backendApiClient.post(eq(uri), any(), eq(InventoryItemDto.class), eq(itemId)))
+        .thenReturn(null);
 
     mockMvc
         .perform(
@@ -120,7 +122,7 @@ class InventoryOrgUnitChangeAjaxControllerTest {
         .andExpect(status().isOk());
 
     ArgumentCaptor<Object> body = ArgumentCaptor.forClass(Object.class);
-    verify(backendApiClient).post(eq(uri), body.capture(), eq(InventoryItemDto.class));
+    verify(backendApiClient).post(eq(uri), body.capture(), eq(InventoryItemDto.class), eq(itemId));
     assertThat(((InventoryItemOrgUnitChangeDto) body.getValue()).targetOwningOrgUnitId()).isNull();
   }
 
@@ -159,6 +161,7 @@ class InventoryOrgUnitChangeAjaxControllerTest {
         .andExpect(status().isUnprocessableContent());
 
     verify(backendApiClient, never()).post(anyString(), any(), any());
+    verify(backendApiClient, never()).post(anyString(), any(), any(), any(Object[].class));
   }
 
   @Test

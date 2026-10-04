@@ -227,7 +227,7 @@ public class AdminNotificationRulePageController {
         "update notification rule " + id + " (ajax)",
         () -> {
           return ResponseEntity.ok(
-              backendApiClient.put(BACKEND_BASE + "/" + id, request, NotificationRuleDto.class));
+              backendApiClient.put(BACKEND_BASE + "/{id}", request, NotificationRuleDto.class, id));
         });
   }
 
@@ -244,7 +244,7 @@ public class AdminNotificationRulePageController {
         log,
         "delete notification rule " + id + " (ajax)",
         () -> {
-          backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
+          backendApiClient.delete(BACKEND_BASE + "/{id}", Void.class, id);
           return ResponseEntity.noContent().build();
         });
   }

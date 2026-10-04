@@ -149,9 +149,10 @@ public class AdminPersonalBlueprintsPageController {
     try {
       PersonalBlueprintBatchResultDto result =
           backendApiClient.post(
-              "/api/v1/admin/personal-blueprints/" + userSub + "/batch",
+              "/api/v1/admin/personal-blueprints/{userSub}/batch",
               new PersonalBlueprintBatchCreateRequest(keys),
-              PersonalBlueprintBatchResultDto.class);
+              PersonalBlueprintBatchResultDto.class,
+              userSub);
       return result == null ? new PersonalBlueprintBatchResultDto(0, 0, 0) : result;
     } catch (Exception e) {
       log.error("Admin batch blueprint add failed for user {}", userSub, e);
@@ -181,10 +182,11 @@ public class AdminPersonalBlueprintsPageController {
       RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.put(
-          "/api/v1/admin/personal-blueprints/items/" + id,
+          "/api/v1/admin/personal-blueprints/items/{id}",
           new PersonalBlueprintUpdateRequest(
               parseInstantOrNull(acquiredAt), StringNormalization.blankToNull(note), version),
-          PersonalBlueprintDto.class);
+          PersonalBlueprintDto.class,
+          id);
       redirectAttributes.addFlashAttribute(
           "successToast", "personalInventory.blueprints.toast.noteUpdated");
     } catch (Exception e) {
@@ -210,7 +212,7 @@ public class AdminPersonalBlueprintsPageController {
       @PathVariable @NotNull UUID id,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/admin/personal-blueprints/items/" + id, Void.class);
+      backendApiClient.delete("/api/v1/admin/personal-blueprints/items/{id}", Void.class, id);
       redirectAttributes.addFlashAttribute(
           "successToast", "personalInventory.blueprints.toast.removed");
     } catch (Exception e) {
@@ -293,9 +295,10 @@ public class AdminPersonalBlueprintsPageController {
         () -> {
           BlueprintImportResultDto result =
               backendApiClient.post(
-                  "/api/v1/admin/personal-blueprints/" + userSub + "/import/apply",
+                  "/api/v1/admin/personal-blueprints/{userSub}/import/apply",
                   new BlueprintImportApplyRequest(list),
-                  BlueprintImportResultDto.class);
+                  BlueprintImportResultDto.class,
+                  userSub);
           return ResponseEntity.ok(
               result == null ? new BlueprintImportResultDto(0, 0, 0, 0, 0) : result);
         });

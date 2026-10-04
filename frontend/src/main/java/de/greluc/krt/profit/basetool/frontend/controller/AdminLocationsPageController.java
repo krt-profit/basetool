@@ -134,7 +134,7 @@ public class AdminLocationsPageController {
               hidden,
               currentLocation.homeLocation(),
               currentLocation.version());
-      backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
+      backendApiClient.put("/api/v1/locations/{id}", body, Void.class, id);
       backendApiClient.evict(CacheDomain.LOCATION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
@@ -180,7 +180,7 @@ public class AdminLocationsPageController {
               currentLocation.hidden(),
               homeLocation,
               currentLocation.version());
-      backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
+      backendApiClient.put("/api/v1/locations/{id}", body, Void.class, id);
       backendApiClient.evict(CacheDomain.LOCATION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
@@ -224,7 +224,7 @@ public class AdminLocationsPageController {
                   !current.hidden(),
                   current.homeLocation(),
                   current.version());
-          backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
+          backendApiClient.put("/api/v1/locations/{id}", body, Void.class, id);
           backendApiClient.evict(CacheDomain.LOCATION);
           return ResponseEntity.ok(
               backendApiClient.get("/api/v1/locations/" + id, LocationDto.class));
@@ -257,7 +257,7 @@ public class AdminLocationsPageController {
                   current.hidden(),
                   !current.homeLocation(),
                   current.version());
-          backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
+          backendApiClient.put("/api/v1/locations/{id}", body, Void.class, id);
           backendApiClient.evict(CacheDomain.LOCATION);
           return ResponseEntity.ok(
               backendApiClient.get("/api/v1/locations/" + id, LocationDto.class));

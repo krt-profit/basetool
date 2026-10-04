@@ -392,7 +392,7 @@ class MaterialboersePageControllerMvcTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void deactivateProxy_returns200() throws Exception {
-    when(backendApiClient.post(contains("/deactivate"), any(), eq(Object.class)))
+    when(backendApiClient.post(contains("/deactivate"), any(), eq(Object.class), any()))
         .thenReturn(Map.of("id", offerId.toString()));
 
     mockMvc
@@ -474,7 +474,7 @@ class MaterialboersePageControllerMvcTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void remarkProxy_backendConflict_relays409() throws Exception {
-    when(backendApiClient.put(contains("/remark"), any(), eq(Object.class)))
+    when(backendApiClient.put(contains("/remark"), any(), eq(Object.class), any()))
         .thenThrow(
             new BackendServiceException(
                 "conflict", null, 409, "OPTIMISTIC_LOCK", null, List.of(), "conflict"));

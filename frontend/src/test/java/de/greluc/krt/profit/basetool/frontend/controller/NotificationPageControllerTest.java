@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationPageSliceDto
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationViewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendSideChannels;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -63,7 +64,7 @@ class NotificationPageControllerTest {
     return new NotificationPageController(
         backendApiClient,
         messageSource,
-        mock(WebClient.class),
+        new BackendSideChannels(mock(WebClient.class), null),
         mock(OAuth2AuthorizedClientManager.class),
         new SimpleMeterRegistry());
   }

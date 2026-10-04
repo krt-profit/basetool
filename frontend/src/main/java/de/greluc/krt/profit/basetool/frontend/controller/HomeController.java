@@ -193,7 +193,7 @@ public class HomeController {
   public String markAnnouncementAsRead(
       @org.springframework.web.bind.annotation.RequestParam UUID id) {
     try {
-      backendApiClient.put("/api/v1/users/me/read-announcement/" + id, null, Void.class);
+      backendApiClient.put("/api/v1/users/me/read-announcement/{id}", null, Void.class, id);
     } catch (Exception e) {
       log.error("Failed to mark announcement as read", e);
     }
@@ -215,7 +215,7 @@ public class HomeController {
   public org.springframework.http.ResponseEntity<Void> markAnnouncementAsReadAjax(
       @org.springframework.web.bind.annotation.RequestParam UUID id) {
     try {
-      backendApiClient.put("/api/v1/users/me/read-announcement/" + id, null, Void.class);
+      backendApiClient.put("/api/v1/users/me/read-announcement/{id}", null, Void.class, id);
       return org.springframework.http.ResponseEntity.ok().build();
     } catch (Exception e) {
       log.error("Failed to mark announcement as read", e);

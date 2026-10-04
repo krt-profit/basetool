@@ -279,7 +279,7 @@ public class JobOrderWriteController {
               form.getComment(),
               lines,
               form.getVersion());
-      backendApiClient.put("/api/v1/orders/" + id + "/items", dto, JobOrderDto.class);
+      backendApiClient.put("/api/v1/orders/{id}/items", dto, JobOrderDto.class, id);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
       return "redirect:/orders/" + id;
     } catch (Exception e) {
@@ -318,7 +318,7 @@ public class JobOrderWriteController {
                   form.getComment(),
                   lines,
                   form.getVersion());
-          backendApiClient.put("/api/v1/orders/" + id + "/items", dto, JobOrderDto.class);
+          backendApiClient.put("/api/v1/orders/{id}/items", dto, JobOrderDto.class, id);
           return org.springframework.http.ResponseEntity.ok(
               java.util.Map.of("targetUrl", "/orders/" + id));
         });
@@ -475,9 +475,11 @@ public class JobOrderWriteController {
         "error.joborder.priority.failed",
         () ->
             backendApiClient.put(
-                "/api/v1/orders/" + id + "/priority?priority=" + priority,
+                "/api/v1/orders/{id}/priority?priority={priority}",
                 null,
-                JobOrderDto.class));
+                JobOrderDto.class,
+                id,
+                priority));
   }
 
   /**
@@ -502,9 +504,11 @@ public class JobOrderWriteController {
         () -> {
           JobOrderDto result =
               backendApiClient.put(
-                  "/api/v1/orders/" + id + "/priority?priority=" + priority,
+                  "/api/v1/orders/{id}/priority?priority={priority}",
                   null,
-                  JobOrderDto.class);
+                  JobOrderDto.class,
+                  id,
+                  priority);
           return org.springframework.http.ResponseEntity.ok(result);
         });
   }
@@ -525,7 +529,7 @@ public class JobOrderWriteController {
         "update status for order " + id,
         () -> {
           JobOrderDto result =
-              backendApiClient.put("/api/v1/orders/" + id + "/status", dto, JobOrderDto.class);
+              backendApiClient.put("/api/v1/orders/{id}/status", dto, JobOrderDto.class, id);
           return org.springframework.http.ResponseEntity.ok(result);
         });
   }
@@ -549,7 +553,7 @@ public class JobOrderWriteController {
         () -> {
           JobOrderDto result =
               backendApiClient.patch(
-                  "/api/v1/orders/" + id + "/blueprint-variant-counting", dto, JobOrderDto.class);
+                  "/api/v1/orders/{id}/blueprint-variant-counting", dto, JobOrderDto.class, id);
           return org.springframework.http.ResponseEntity.ok(result);
         });
   }
@@ -573,7 +577,7 @@ public class JobOrderWriteController {
         "upsert claim on order " + id,
         () -> {
           ClaimDto result =
-              backendApiClient.post("/api/v1/orders/" + id + "/claims", dto, ClaimDto.class);
+              backendApiClient.post("/api/v1/orders/{id}/claims", dto, ClaimDto.class, id);
           return org.springframework.http.ResponseEntity.status(
                   org.springframework.http.HttpStatus.CREATED)
               .body(result);
@@ -596,7 +600,7 @@ public class JobOrderWriteController {
         log,
         "withdraw claim " + claimId + " on order " + id,
         () -> {
-          backendApiClient.delete("/api/v1/orders/" + id + "/claims/" + claimId, Void.class);
+          backendApiClient.delete("/api/v1/orders/{id}/claims/{claimId}", Void.class, id, claimId);
           return org.springframework.http.ResponseEntity.noContent().build();
         });
   }
@@ -639,7 +643,7 @@ public class JobOrderWriteController {
               form.getComment(),
               materials,
               form.getVersion());
-      backendApiClient.put("/api/v1/orders/" + id, dto, JobOrderDto.class);
+      backendApiClient.put("/api/v1/orders/{id}", dto, JobOrderDto.class, id);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
       return "redirect:/orders/" + id;
     } catch (Exception e) {
@@ -689,7 +693,7 @@ public class JobOrderWriteController {
                   materials,
                   form.getVersion());
           JobOrderDto updated =
-              backendApiClient.put("/api/v1/orders/" + id, dto, JobOrderDto.class);
+              backendApiClient.put("/api/v1/orders/{id}", dto, JobOrderDto.class, id);
           return org.springframework.http.ResponseEntity.ok(updated);
         });
   }
@@ -725,7 +729,7 @@ public class JobOrderWriteController {
       }
       CreateJobOrderDto dto =
           new CreateJobOrderDto(null, null, null, form.getComment(), materials, form.getVersion());
-      backendApiClient.put("/api/v1/orders/" + id + "/requested", dto, JobOrderDto.class);
+      backendApiClient.put("/api/v1/orders/{id}/requested", dto, JobOrderDto.class, id);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
       return "redirect:/orders/" + id;
     } catch (Exception e) {
@@ -769,7 +773,7 @@ public class JobOrderWriteController {
               new CreateJobOrderDto(
                   null, null, null, form.getComment(), materials, form.getVersion());
           JobOrderDto updated =
-              backendApiClient.put("/api/v1/orders/" + id + "/requested", dto, JobOrderDto.class);
+              backendApiClient.put("/api/v1/orders/{id}/requested", dto, JobOrderDto.class, id);
           return org.springframework.http.ResponseEntity.ok(updated);
         });
   }
@@ -787,7 +791,7 @@ public class JobOrderWriteController {
         "/orders",
         "success.joborder.delete",
         "error.joborder.delete.failed",
-        () -> backendApiClient.delete("/api/v1/orders/" + id, Void.class));
+        () -> backendApiClient.delete("/api/v1/orders/{id}", Void.class, id));
   }
 
   /**
@@ -803,7 +807,7 @@ public class JobOrderWriteController {
         log,
         "delete order " + id + " (ajax)",
         () -> {
-          backendApiClient.delete("/api/v1/orders/" + id, Void.class);
+          backendApiClient.delete("/api/v1/orders/{id}", Void.class, id);
           return org.springframework.http.ResponseEntity.noContent().build();
         });
   }
@@ -829,7 +833,7 @@ public class JobOrderWriteController {
             "add assignee",
             () ->
                 backendApiClient.post(
-                    "/api/v1/orders/" + id + "/assignees/" + userId, null, JobOrderDto.class));
+                    "/api/v1/orders/{id}/assignees/{userId}", null, JobOrderDto.class, id, userId));
     populateAssigneeSectionModel(model, principal, order);
     return "orders-detail :: assigneesSection";
   }
@@ -897,7 +901,7 @@ public class JobOrderWriteController {
           new JobOrderHandoverCreateDto(
               handoverTime, form.getRecipientHandle(), form.getRecipientSquadron(), items);
 
-      backendApiClient.post("/api/v1/orders/" + id + "/handovers", dto, JobOrderHandoverDto.class);
+      backendApiClient.post("/api/v1/orders/{id}/handovers", dto, JobOrderHandoverDto.class, id);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.handover");
     } catch (BackendServiceException bse) {
       de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging.warn(
@@ -975,7 +979,7 @@ public class JobOrderWriteController {
       JobOrderItemHandoverCreateDto dto =
           new JobOrderItemHandoverCreateDto(handoverTime, form.getRecipientHandle(), entries);
       backendApiClient.post(
-          "/api/v1/orders/" + id + "/item-handovers", dto, JobOrderItemHandoverDto.class);
+          "/api/v1/orders/{id}/item-handovers", dto, JobOrderItemHandoverDto.class, id);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.handover");
     } catch (BackendServiceException bse) {
       de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging.warn(
@@ -1064,7 +1068,7 @@ public class JobOrderWriteController {
               form.getRecipientHandle(),
               form.getRecipientSquadron(),
               items);
-      backendApiClient.post("/api/v1/orders/" + id + "/handovers", dto, JobOrderHandoverDto.class);
+      backendApiClient.post("/api/v1/orders/{id}/handovers", dto, JobOrderHandoverDto.class, id);
       JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
       return org.springframework.http.ResponseEntity.ok(order);
     } catch (BackendServiceException bse) {
@@ -1115,7 +1119,7 @@ public class JobOrderWriteController {
           new JobOrderItemHandoverCreateDto(
               parseHandoverTime(form.getHandoverTime()), form.getRecipientHandle(), entries);
       backendApiClient.post(
-          "/api/v1/orders/" + id + "/item-handovers", dto, JobOrderItemHandoverDto.class);
+          "/api/v1/orders/{id}/item-handovers", dto, JobOrderItemHandoverDto.class, id);
       JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
       return org.springframework.http.ResponseEntity.ok(order);
     } catch (BackendServiceException bse) {
@@ -1158,9 +1162,11 @@ public class JobOrderWriteController {
           de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemProductionCreateDto dto) {
     try {
       backendApiClient.post(
-          "/api/v1/orders/" + id + "/items/" + itemId + "/production",
+          "/api/v1/orders/{id}/items/{itemId}/production",
           dto,
-          de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemDto.class);
+          de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemDto.class,
+          id,
+          itemId);
       JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
       return org.springframework.http.ResponseEntity.ok(order);
     } catch (BackendServiceException bse) {
@@ -1188,7 +1194,8 @@ public class JobOrderWriteController {
   public String unlinkMaterial(
       @PathVariable UUID id, @RequestParam UUID materialId, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/orders/" + id + "/materials/" + materialId, Void.class);
+      backendApiClient.delete(
+          "/api/v1/orders/{id}/materials/{materialId}", Void.class, id, materialId);
       redirectAttributes.addFlashAttribute("successToast", "orders.detail.material.unlink.success");
     } catch (BackendServiceException bse) {
       de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging.warn(
@@ -1217,7 +1224,10 @@ public class JobOrderWriteController {
       RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.delete(
-          "/api/v1/orders/" + id + "/inventory/" + inventoryItemId + "/unlink", Void.class);
+          "/api/v1/orders/{id}/inventory/{inventoryItemId}/unlink",
+          Void.class,
+          id,
+          inventoryItemId);
       redirectAttributes.addFlashAttribute(
           "successToast", "orders.detail.inventory.unlink.success");
     } catch (BackendServiceException bse) {
@@ -1250,7 +1260,10 @@ public class JobOrderWriteController {
         "unlink inventory item " + inventoryItemId + " from order " + id + " (ajax)",
         () -> {
           backendApiClient.delete(
-              "/api/v1/orders/" + id + "/inventory/" + inventoryItemId + "/unlink", Void.class);
+              "/api/v1/orders/{id}/inventory/{inventoryItemId}/unlink",
+              Void.class,
+              id,
+              inventoryItemId);
           JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
           return org.springframework.http.ResponseEntity.ok(order);
         });
@@ -1277,7 +1290,7 @@ public class JobOrderWriteController {
             "remove assignee",
             () ->
                 backendApiClient.delete(
-                    "/api/v1/orders/" + id + "/assignees/" + userId, JobOrderDto.class));
+                    "/api/v1/orders/{id}/assignees/{userId}", JobOrderDto.class, id, userId));
     populateAssigneeSectionModel(model, principal, order);
     return "orders-detail :: assigneesSection";
   }
@@ -1306,9 +1319,11 @@ public class JobOrderWriteController {
             "set assignee note",
             () ->
                 backendApiClient.put(
-                    "/api/v1/orders/" + id + "/assignees/" + userId + "/note",
+                    "/api/v1/orders/{id}/assignees/{userId}/note",
                     body,
-                    JobOrderDto.class));
+                    JobOrderDto.class,
+                    id,
+                    userId));
     populateAssigneeSectionModel(model, principal, order);
     return "orders-detail :: assigneesSection";
   }
@@ -1332,14 +1347,22 @@ public class JobOrderWriteController {
       @RequestParam(required = false) Long version,
       Model model,
       @AuthenticationPrincipal OidcUser principal) {
-    String query = version != null ? "?version=" + version : "";
     JobOrderDto order =
         callAssigneeMutation(
             "delete assignee note",
             () ->
-                backendApiClient.delete(
-                    "/api/v1/orders/" + id + "/assignees/" + userId + "/note" + query,
-                    JobOrderDto.class));
+                version != null
+                    ? backendApiClient.delete(
+                        "/api/v1/orders/{id}/assignees/{userId}/note?version={version}",
+                        JobOrderDto.class,
+                        id,
+                        userId,
+                        version)
+                    : backendApiClient.delete(
+                        "/api/v1/orders/{id}/assignees/{userId}/note",
+                        JobOrderDto.class,
+                        id,
+                        userId));
     populateAssigneeSectionModel(model, principal, order);
     return "orders-detail :: assigneesSection";
   }

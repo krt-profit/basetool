@@ -970,7 +970,7 @@ class MissionPageControllerMvcTest {
     org.mockito.ArgumentCaptor<Map<String, Object>> sent =
         org.mockito.ArgumentCaptor.forClass(Map.class);
     verify(backendApiClient)
-        .put(eq("/api/v1/missions/" + missionId + "/owner"), sent.capture(), eq(Void.class));
+        .put(eq("/api/v1/missions/{id}/owner"), sent.capture(), eq(Void.class), eq(missionId));
     org.assertj.core.api.Assertions.assertThat(sent.getValue())
         .containsEntry("userId", userId)
         .containsEntry("version", 4);
@@ -982,7 +982,7 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/missions/" + missionId + "/owner"), any(), eq(Void.class)))
+            eq("/api/v1/missions/{id}/owner"), any(), eq(Void.class), eq(missionId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Conflict",
@@ -1013,14 +1013,11 @@ class MissionPageControllerMvcTest {
     UUID participantId = UUID.randomUUID();
     Map<String, Object> row = Map.of("id", participantId.toString(), "version", 7);
     when(backendApiClient.put(
-            eq(
-                "/api/v1/missions/"
-                    + missionId
-                    + "/participants/"
-                    + participantId
-                    + "/payout-preference/slim"),
+            eq("/api/v1/missions/{id}/participants/{participantId}/payout-preference/slim"),
             any(),
-            eq(Object.class)))
+            eq(Object.class),
+            eq(missionId),
+            eq(participantId)))
         .thenReturn(row);
 
     mockMvc
@@ -1157,7 +1154,7 @@ class MissionPageControllerMvcTest {
         .thenReturn(current)
         .thenReturn(refreshed);
     when(backendApiClient.patch(
-            eq("/api/v1/missions/" + missionId + "/schedule"), any(), eq(Void.class)))
+            eq("/api/v1/missions/{id}/schedule"), any(), eq(Void.class), eq(missionId)))
         .thenReturn(null);
 
     String body =
@@ -1216,7 +1213,7 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), eq(MissionDto.class)))
         .thenReturn(current);
     when(backendApiClient.patch(
-            eq("/api/v1/missions/" + missionId + "/schedule"), any(), eq(Void.class)))
+            eq("/api/v1/missions/{id}/schedule"), any(), eq(Void.class), eq(missionId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Conflict", null, 409));
@@ -1252,9 +1249,11 @@ class MissionPageControllerMvcTest {
     UUID userId = UUID.randomUUID();
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/" + missionId + "/managers/" + userId + "/slim"),
+            eq("/api/v1/missions/{missionUuid}/managers/{userUuid}/slim"),
             eq(null),
-            eq(String.class)))
+            eq(String.class),
+            eq(missionId),
+            eq(userId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Error", null, 400));
@@ -1281,7 +1280,7 @@ class MissionPageControllerMvcTest {
     slimResponse.add(freq);
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/" + missionId + "/frequencies/slim"), any(), eq(Object.class)))
+            eq("/api/v1/missions/{id}/frequencies/slim"), any(), eq(Object.class), eq(missionId)))
         .thenReturn(slimResponse);
 
     String body = "{\"frequencyTypeId\":\"" + freqTypeId + "\",\"value\":123.45}";
@@ -1301,7 +1300,7 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID freqTypeId = UUID.randomUUID();
     when(backendApiClient.post(
-            eq("/api/v1/missions/" + missionId + "/frequencies/slim"), any(), eq(Object.class)))
+            eq("/api/v1/missions/{id}/frequencies/slim"), any(), eq(Object.class), eq(missionId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Conflict", null, 409));
@@ -1322,8 +1321,10 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID freqId = UUID.randomUUID();
     when(backendApiClient.delete(
-            eq("/api/v1/missions/" + missionId + "/frequencies/" + freqId + "/slim"),
-            eq(Object.class)))
+            eq("/api/v1/missions/{id}/frequencies/{frequencyId}/slim"),
+            eq(Object.class),
+            eq(missionId),
+            eq(freqId)))
         .thenReturn(java.util.Collections.emptyList());
 
     mockMvc
@@ -1345,9 +1346,10 @@ class MissionPageControllerMvcTest {
     slimResponse.add(freq);
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/" + missionId + "/frequencies/custom/slim"),
+            eq("/api/v1/missions/{id}/frequencies/custom/slim"),
             any(),
-            eq(Object.class)))
+            eq(Object.class),
+            eq(missionId)))
         .thenReturn(slimResponse);
 
     String body = "{\"name\":\"Recon\",\"value\":42.10}";
@@ -1375,9 +1377,11 @@ class MissionPageControllerMvcTest {
     slimResponse.add(freq);
 
     when(backendApiClient.put(
-            eq("/api/v1/missions/" + missionId + "/frequencies/custom/" + freqId + "/slim"),
+            eq("/api/v1/missions/{id}/frequencies/custom/{frequencyId}/slim"),
             any(),
-            eq(Object.class)))
+            eq(Object.class),
+            eq(missionId),
+            eq(freqId)))
         .thenReturn(slimResponse);
 
     String body = "{\"name\":\"Recon 2\",\"value\":43.00,\"version\":0}";
@@ -1397,9 +1401,11 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID freqId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/missions/" + missionId + "/frequencies/custom/" + freqId + "/slim"),
+            eq("/api/v1/missions/{id}/frequencies/custom/{frequencyId}/slim"),
             any(),
-            eq(Object.class)))
+            eq(Object.class),
+            eq(missionId),
+            eq(freqId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Conflict", null, 409));
@@ -1427,7 +1433,7 @@ class MissionPageControllerMvcTest {
     slimResponse.add(unit);
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/" + missionId + "/units/slim"), any(), eq(Object.class)))
+            eq("/api/v1/missions/{id}/units/slim"), any(), eq(Object.class), eq(missionId)))
         .thenReturn(slimResponse);
 
     String body = "{\"name\":\"Alpha\",\"highValueUnit\":false}";
@@ -1447,9 +1453,11 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/missions/" + missionId + "/units/" + unitId + "/slim"),
+            eq("/api/v1/missions/{id}/units/{unitId}/slim"),
             any(),
-            eq(Object.class)))
+            eq(Object.class),
+            eq(missionId),
+            eq(unitId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Conflict", null, 409));
@@ -1470,7 +1478,10 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
     when(backendApiClient.delete(
-            eq("/api/v1/missions/" + missionId + "/units/" + unitId + "/slim"), eq(Void.class)))
+            eq("/api/v1/missions/{id}/units/{unitId}/slim"),
+            eq(Void.class),
+            eq(missionId),
+            eq(unitId)))
         .thenReturn(null);
 
     mockMvc
@@ -1490,7 +1501,7 @@ class MissionPageControllerMvcTest {
     slimResponse.add(p);
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/" + missionId + "/participants/slim"), any(), eq(Object.class)))
+            eq("/api/v1/missions/{id}/participants/slim"), any(), eq(Object.class), eq(missionId)))
         .thenReturn(slimResponse);
 
     String body = "{\"guestName\":\"Guest-X\"}";
@@ -1510,9 +1521,11 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/missions/" + missionId + "/participants/" + participantId + "/slim"),
+            eq("/api/v1/missions/{id}/participants/{participantId}/slim"),
             any(),
-            eq(Object.class)))
+            eq(Object.class),
+            eq(missionId),
+            eq(participantId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Conflict", null, 409));
@@ -1533,8 +1546,10 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     when(backendApiClient.delete(
-            eq("/api/v1/missions/" + missionId + "/participants/" + participantId + "/slim"),
-            eq(Void.class)))
+            eq("/api/v1/missions/{id}/participants/{participantId}/slim"),
+            eq(Void.class),
+            eq(missionId),
+            eq(participantId)))
         .thenReturn(null);
 
     mockMvc
@@ -1553,14 +1568,11 @@ class MissionPageControllerMvcTest {
     slimResponse.put("id", participantId.toString());
     slimResponse.put("version", 2);
     when(backendApiClient.post(
-            eq(
-                "/api/v1/missions/"
-                    + missionId
-                    + "/participants/"
-                    + participantId
-                    + "/check-in/slim"),
+            eq("/api/v1/missions/{id}/participants/{participantId}/check-in/slim"),
             any(),
-            eq(Object.class)))
+            eq(Object.class),
+            eq(missionId),
+            eq(participantId)))
         .thenReturn(slimResponse);
 
     mockMvc
@@ -1577,14 +1589,11 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     when(backendApiClient.post(
-            eq(
-                "/api/v1/missions/"
-                    + missionId
-                    + "/participants/"
-                    + participantId
-                    + "/check-out/slim"),
+            eq("/api/v1/missions/{id}/participants/{participantId}/check-out/slim"),
             any(),
-            eq(Object.class)))
+            eq(Object.class),
+            eq(missionId),
+            eq(participantId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Conflict", null, 409));
@@ -1609,9 +1618,11 @@ class MissionPageControllerMvcTest {
     slimResponse.add(crew);
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/" + missionId + "/units/" + unitId + "/crew/slim"),
+            eq("/api/v1/missions/{id}/units/{unitId}/crew/slim"),
             any(),
-            eq(Object.class)))
+            eq(Object.class),
+            eq(missionId),
+            eq(unitId)))
         .thenReturn(slimResponse);
 
     String body = "{\"participantId\":\"" + UUID.randomUUID() + "\",\"jobTypeIds\":[]}";
@@ -1632,9 +1643,12 @@ class MissionPageControllerMvcTest {
     UUID unitId = UUID.randomUUID();
     UUID crewId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/missions/" + missionId + "/units/" + unitId + "/crew/" + crewId + "/slim"),
+            eq("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim"),
             any(),
-            eq(Object.class)))
+            eq(Object.class),
+            eq(missionId),
+            eq(unitId),
+            eq(crewId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Conflict", null, 409));
@@ -1656,8 +1670,11 @@ class MissionPageControllerMvcTest {
     UUID unitId = UUID.randomUUID();
     UUID crewId = UUID.randomUUID();
     when(backendApiClient.delete(
-            eq("/api/v1/missions/" + missionId + "/units/" + unitId + "/crew/" + crewId + "/slim"),
-            eq(Void.class)))
+            eq("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim"),
+            eq(Void.class),
+            eq(missionId),
+            eq(unitId),
+            eq(crewId)))
         .thenReturn(null);
 
     mockMvc
@@ -3154,7 +3171,7 @@ class MissionPageControllerMvcTest {
   void setPartyLeadAjax_Success_ReturnsRefreshedMission() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/missions/" + missionId + "/party-lead"), any(), eq(Void.class)))
+            eq("/api/v1/missions/{id}/party-lead"), any(), eq(Void.class), eq(missionId)))
         .thenReturn(null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
         .thenReturn(editableMission(missionId));
@@ -3174,7 +3191,7 @@ class MissionPageControllerMvcTest {
   void setPartyLeadAjax_BackendConflict_Returns409() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/missions/" + missionId + "/party-lead"), any(), eq(Void.class)))
+            eq("/api/v1/missions/{id}/party-lead"), any(), eq(Void.class), eq(missionId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Conflict", null, 409));

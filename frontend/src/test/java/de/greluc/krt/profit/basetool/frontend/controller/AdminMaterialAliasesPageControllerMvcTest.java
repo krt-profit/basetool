@@ -226,7 +226,9 @@ class AdminMaterialAliasesPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void deleteAjax_withHeader_returns200() throws Exception {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.delete(eq(BACKEND_BASE + "/" + id), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.delete(
+            eq("/api/v1/material-external-aliases/{id}"), eq(Void.class), eq(id)))
+        .thenReturn(null);
 
     mockMvc
         .perform(
