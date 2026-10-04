@@ -1,4 +1,4 @@
-@layer base, components, page, migration, utilities;
+@layer base, components, page, utilities;
 
 @layer page {
     .hangar-legend {
@@ -146,23 +146,5 @@
         .hangar-tree__owner-name {
             padding-left: calc(var(--touch-target-dense) + var(--space-2));
         }
-    }
-    .hangar-filter {
-        position: relative;
-        width: 360px;
-        max-width: 100%;
-    }
-    .hangar-filter .hangar-filter-icon {
-        position: absolute;
-        left: 0.85rem;
-        top: 50%;
-        transform: translateY(-50%);
-        display: inline-flex;
-        color: var(--color-gray-2-text);
-        pointer-events: none;
-    }
-    .hangar-filter input[type='search'] {
-        width: 100%;
-        padding-left: 2.6rem;
     }
 }

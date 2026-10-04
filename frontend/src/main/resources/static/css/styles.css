@@ -1,4 +1,4 @@
-@layer base, components, page, migration, utilities;
+@layer base, components, page, utilities;
 
 @layer base {
     @font-face {
@@ -5542,14 +5542,6 @@
         margin-left: auto;
     }
 
-    .filter-chevron {
-        transition: transform 0.15s ease;
-    }
-
-    [aria-expanded='true'] .filter-chevron {
-        transform: rotate(90deg);
-    }
-
     .filter-count[hidden] {
         display: none;
     }
@@ -6446,10 +6438,6 @@
         font-size: var(--fs-xs);
         text-transform: uppercase;
         letter-spacing: 0.06em;
-    }
-
-    .oss-unavailable {
-        color: var(--color-warning);
     }
 
     details.oss-group > summary {
@@ -7737,5 +7725,15 @@
 
     .terms-body {
         overflow-wrap: anywhere;
+    }
+}
+
+@layer utilities {
+    .is-hidden {
+        display: none;
+    }
+
+    .krt-modal-overlay.is-open {
+        display: flex;
     }
 }

@@ -173,6 +173,10 @@
 
 ### Changed
 
+- **Aufräumen nach der Website-Überarbeitung (Phase 4).** `inline-migration.css` ist entfernt, die
+  letzten `krtm-*`-Klassen sind Design-System-Bausteine oder Seitenregeln; Bank-Administration hat
+  Seitenkopf und Hinweis-Boxen. Tote CSS-Regeln, Skripte und 205 Sprachschlüssel sind weg; das
+  Bank-Kontodetail ist auf großen Bildschirmen so breit wie die übrigen Seiten (REQ-UI-027).
 - **Kartellbank: „Bestätigen" nur, wo du bestätigen darfst.** Die Antragswarteschlange zeigt die
   Bestätigen-Aktion nur noch bei Anträgen, für die dir die passende Konto-Berechtigung zusteht; sonst
   steht dort „wartet auf berechtigte Bankmitarbeiter". Die Queue-API liefert dafür pro Antrag

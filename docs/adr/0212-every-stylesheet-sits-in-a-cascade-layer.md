@@ -1,6 +1,6 @@
 # ADR-0212 — Every stylesheet sits in a cascade layer
 
-- **Status:** Accepted — amended 2026-10-02 (no comment beside a page-layer winner, see below)
+- **Status:** Accepted — amended 2026-10-02 (no comment beside a page-layer winner) and 2026-10-04 (the `migration` layer retired), see below
 - **Date:** 2026-09-23
 - **Deciders:** @greluc (owner decisions 2026-09-23)
 - **Requirement:** [REQ-UI-024](../specs/ui-design-system.md)
@@ -99,3 +99,14 @@ Domain modularisation plan §15. The consequence "goes into the page-layer block
 instruction to add a comment is withdrawn: a design-system declaration that must keep beating page
 CSS still goes into the page-layer block at the end of `styles.css`, and what it beats is stated in
 the commit message and the pull request that put it there.
+
+## Amendment — 2026-10-04: the `migration` layer is retired
+
+Website overhaul phase 4 ([ADR-0242](0242-page-patterns-a-to-c-and-the-design-system-update-2026-10.md),
+REQ-UI-027) replaced the last `krtm-*` classes with design-system building blocks and page rules and
+deleted `inline-migration.css`. Its layer went with it: every stylesheet now declares
+`@layer base, components, page, utilities;`. The two state classes are renamed to neutral names,
+`is-hidden` and the dialog overlay's `is-open` (`.krt-modal-overlay.is-open`), and sit in a
+`utilities` block at the end of `styles.css`, which `CascadeLayerOrderTest` now allows to own that
+layer. They still win outright, by layer. `NoMigrationClassTest` fails the build on a `krtm-*` class
+in any template or script.

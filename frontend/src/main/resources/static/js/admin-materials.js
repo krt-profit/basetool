@@ -374,7 +374,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
 document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
         const overlay = document.getElementById('modal-create-material');
-        if (overlay && overlay.classList.contains('krtm-modal-open')) {
+        if (overlay && overlay.classList.contains('is-open')) {
             closeCreateMaterialModal();
         }
     }
