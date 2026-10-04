@@ -29,7 +29,7 @@
 
     .bpo-more:hover,
     .bpo-more:focus-visible {
-        background-color: rgb(231 126 35 / 20%);
+        background-color: color-mix(in srgb, var(--color-primary) 20%, transparent);
     }
 
     .bpo-note {
@@ -57,7 +57,7 @@
     .details-row td {
         border-left: 2px solid var(--color-primary);
         padding: 0;
-        background-color: rgb(0 0 0 / 10%);
+        background-color: color-mix(in srgb, var(--color-bg-black) 10%, transparent);
     }
 
     .bp-owners-panel {

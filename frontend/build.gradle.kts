@@ -506,8 +506,7 @@ val lintCss =
 val lintCssInline =
   tasks.register<NpxTask>("lintCssInline") {
     group = "verification"
-    description =
-      "Lints the page stylesheets (static/css/pages) and any Thymeleaf <style> block with Stylelint."
+    description = "Lints any Thymeleaf <style> block with Stylelint's template rule set."
     dependsOn(tasks.named("npmInstall"))
     command.set("stylelint")
     args.set(
@@ -515,12 +514,10 @@ val lintCssInline =
         "--config",
         ".stylelintrc.templates.json",
         "src/main/resources/templates/**/*.html",
-        "src/main/resources/static/css/pages/**/*.css",
       )
     )
     ignoreExitValue.set(false)
     inputs.files(fileTree("src/main/resources/templates") { include("**/*.html") })
-    inputs.files(fileTree("src/main/resources/static/css/pages") { include("**/*.css") })
     inputs.file("package.json")
     inputs.file(".stylelintrc.templates.json")
   }

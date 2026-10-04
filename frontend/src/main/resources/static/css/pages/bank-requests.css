@@ -42,7 +42,7 @@
     }
 
     .bank-req-actions .overflow-menu:has(.overflow-menu__panel:not([hidden])) {
-        z-index: 60;
+        z-index: var(--z-popover-raised);
     }
 
     @media (768px < width <= 1024px) {

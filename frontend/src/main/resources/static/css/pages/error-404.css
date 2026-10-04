@@ -4,7 +4,7 @@
     .error-container {
         text-align: center;
         border: 2px solid var(--color-primary);
-        box-shadow: 0 0 15px rgba(231, 126, 35, 0.2);
+        box-shadow: 0 0 15px color-mix(in srgb, var(--color-primary) 20%, transparent);
         background: var(--color-bg-dark-gray);
         padding: 2.5rem 2rem;
         max-width: 600px;

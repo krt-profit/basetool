@@ -7,7 +7,7 @@
         font-family: var(--font-body);
         font-size: 0.8rem;
     }
-    .form-group input:where(:not([type='checkbox']):not([type='radio'])),
+    .form-group input:where(:not([type='checkbox'], [type='radio'])),
     .form-group select,
     .form-group textarea {
         width: 100%;
