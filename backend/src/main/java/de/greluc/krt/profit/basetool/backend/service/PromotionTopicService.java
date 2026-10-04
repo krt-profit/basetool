@@ -19,11 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.PromotionTopicMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicResponse;
@@ -65,7 +66,7 @@ public class PromotionTopicService {
   private final PromotionTopicRepository repository;
   private final PromotionTopicMapper mapper;
   private final OwnerScopeService ownerScopeService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Pages the promotion topics in the caller's squadron scope; admins in "all squadrons" mode see
@@ -143,7 +144,7 @@ public class PromotionTopicService {
     PromotionTopic entity = mapper.toEntity(request);
     entity.setOwningSquadron(squadron);
     PromotionTopic saved = repository.save(entity);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.PROMOTION_TOPIC_CREATED, saved.getId(), saved.getName(), null, null);
     log.info(
         "Created PromotionTopic id={} name={} squadron={}",
@@ -173,7 +174,7 @@ public class PromotionTopicService {
     OptimisticLock.check(entity.getVersion(), request.version(), PromotionTopic.class, id);
     mapper.updateEntity(entity, request);
     PromotionTopic saved = repository.save(entity);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.PROMOTION_TOPIC_UPDATED, saved.getId(), saved.getName(), null, null);
     log.info("Updated PromotionTopic id={}", id);
     return mapper.toResponse(saved);
@@ -194,7 +195,7 @@ public class PromotionTopicService {
     assertCallerMayEdit(entity);
     String label = entity.getName();
     repository.delete(entity);
-    auditService.record(AuditEventType.PROMOTION_TOPIC_DELETED, id, label, null, null);
+    auditRecorder.record(AuditEventType.PROMOTION_TOPIC_DELETED, id, label, null, null);
     log.info("Deleted PromotionTopic id={}", id);
   }
 
