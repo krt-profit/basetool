@@ -4,6 +4,10 @@
 
 ### Added
 
+- **Startseite: „Angemeldet" bei den nächsten Einsätzen.** In „Nächste 7 Tage" trägt jeder Einsatz,
+  für den man selbst angemeldet ist, den Chip „Angemeldet". Die Missionsliste der API liefert dafür
+  pro Zeile das Feld `signedUp` für den Aufrufer (REQ-MISSION-012).
+
 - **Materialbörse im neuen Muster.** Tabs „Angebote · Gesuche" mit „Alle · Meine" statt vier Tabs,
   eine Schaltfläche „Angebot erstellen" bzw. „Gesuch erstellen" mit Auswahl Material/Item statt vier
   Buttons, Filter als Popover mit Chips und Sortiermenü. Alte Links auf die Börse funktionieren

@@ -22,7 +22,12 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Data transfer record carrying Mission List payload. */
+/**
+ * Data transfer record carrying Mission List payload.
+ *
+ * <p>{@code signedUp} is an answer about the caller: {@code true} iff the calling member holds a
+ * participant row on the mission.
+ */
 public record MissionListDto(
     UUID id,
     String name,
@@ -39,4 +44,5 @@ public record MissionListDto(
     SquadronReferenceDto owningSquadron,
     String meetingPoint,
     long registeredCount,
+    boolean signedUp,
     Long version) {}

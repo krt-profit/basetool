@@ -77554,6 +77554,9 @@
             "type" : "integer",
             "format" : "int64"
           },
+          "signedUp" : {
+            "type" : "boolean"
+          },
           "status" : {
             "type" : "string"
           },

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -247,9 +248,34 @@ class MissionControllerLifecycleTest {
     controller.getAllMissions(null, null, null);
 
     ArgumentCaptor<Long> counts = ArgumentCaptor.forClass(Long.class);
-    verify(missionMapper, times(2)).toListDto(any(Mission.class), counts.capture());
+    verify(missionMapper, times(2)).toListDto(any(Mission.class), counts.capture(), anyBoolean());
     assertThat(counts.getAllValues()).containsExactly(7L, 0L);
     verify(missionService, times(1)).registeredCounts(List.of(crowded.getId(), empty.getId()));
+  }
+
+  /**
+   * Verifies that a list page resolves the caller's own sign-ups in one batched read and flags
+   * exactly those rows (REQ-MISSION-012, REQ-DATA-003).
+   */
+  @Test
+  void listRows_flagTheCallersOwnSignUpsFromOneBatchedRead() {
+    Mission joined = new Mission();
+    joined.setId(UUID.randomUUID());
+    Mission other = new Mission();
+    other.setId(UUID.randomUUID());
+    Page<Mission> page = new PageImpl<>(List.of(joined, other), PageRequest.of(0, 50), 2);
+    when(missionService.searchMissions(
+            any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+        .thenReturn(page);
+    when(missionService.registeredCounts(any())).thenReturn(Map.of());
+    when(missionService.signedUpMissionIds(any())).thenReturn(Set.of(joined.getId()));
+
+    controller.searchMissions(null, null, null, List.of("PLANNED"), null, 0, 50, null);
+
+    ArgumentCaptor<Boolean> flags = ArgumentCaptor.forClass(Boolean.class);
+    verify(missionMapper, times(2)).toListDto(any(Mission.class), anyLong(), flags.capture());
+    assertThat(flags.getAllValues()).containsExactly(true, false);
+    verify(missionService, times(1)).signedUpMissionIds(List.of(joined.getId(), other.getId()));
   }
 
   @Test
@@ -273,6 +299,7 @@ class MissionControllerLifecycleTest {
             null,
             null,
             0L,
+            false,
             1L);
     Page<Mission> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);
     when(missionService.searchMissions(
@@ -284,7 +311,7 @@ class MissionControllerLifecycleTest {
             org.mockito.ArgumentMatchers.isNull(),
             any(Pageable.class)))
         .thenReturn(page);
-    when(missionMapper.toListDto(eq(m), anyLong())).thenReturn(listDto);
+    when(missionMapper.toListDto(eq(m), anyLong(), anyBoolean())).thenReturn(listDto);
 
     PageResponse<MissionListDto> result = controller.getAllMissions(0, 20, null);
 
@@ -321,6 +348,7 @@ class MissionControllerLifecycleTest {
             null,
             null,
             0L,
+            false,
             1L);
     Page<Mission> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);
     Instant start = Instant.parse("2026-04-01T00:00:00Z");
@@ -335,7 +363,7 @@ class MissionControllerLifecycleTest {
             eq(operationId),
             any(Pageable.class)))
         .thenReturn(page);
-    when(missionMapper.toListDto(eq(m), anyLong())).thenReturn(listDto);
+    when(missionMapper.toListDto(eq(m), anyLong(), anyBoolean())).thenReturn(listDto);
 
     PageResponse<MissionListDto> result =
         controller.searchMissions(
