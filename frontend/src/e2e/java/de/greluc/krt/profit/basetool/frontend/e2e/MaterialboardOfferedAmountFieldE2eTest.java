@@ -89,6 +89,7 @@ class MaterialboardOfferedAmountFieldE2eTest {
         page.waitForLoadState();
         page.waitForFunction("() => typeof window.krtMaterialRelease === 'object'");
 
+        page.locator("[data-testid='mb-create-offer']").click();
         page.locator("[data-mb-open-release]").first().click();
         assertThat(page.locator("#mb-modal"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));

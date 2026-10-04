@@ -34,7 +34,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Verifies per-browser filter persistence across reloads (REQ-UI-017, ADR-0120) on {@code
- * /refinery-orders} (status checkboxes), {@code /missions} ({@code showPast}) and {@code
+ * /refinery-orders} (status segment), {@code /missions} ({@code showPast}) and {@code
  * /materialboerse} (offer sort).
  *
  * <p>Needs no seeded data and mutates no server state; runs as {@code test-admin}.
@@ -97,8 +97,8 @@ class FilterPersistenceE2eTest {
   }
 
   /**
-   * Refinery queue: COMPLETED added to the default status subset and "only mine" both stay checked
-   * after a reload.
+   * Refinery queue: the "Abgeschlossen" segment and the "only mine" switch both stay selected after
+   * a reload.
    */
   @Test
   void refineryStatusFilterSurvivesReload() {
@@ -106,15 +106,17 @@ class FilterPersistenceE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.navigate(page, STACK.baseUrl() + "/refinery-orders");
-        E2eSupport.openFilterPanel(page);
-        page.locator("#refinery-filter-form input[name='status'][value='COMPLETED']").check();
-        page.locator("#refinery-filter-form input[name='onlyMine']").check();
+        page.locator("[data-testid='segment-view-completed']").click();
+        assertThat(page.locator("#refinery-filter-form input[name='view'][value='COMPLETED']"))
+            .isChecked();
+        page.locator("label.switch[for='refinery-only-mine']").click();
+        assertThat(page.locator("#refinery-filter-form input[name='onlyMine']")).isChecked();
 
         E2eSupport.navigate(page, STACK.baseUrl() + "/refinery-orders");
-        E2eSupport.openFilterPanel(page);
-        assertThat(page.locator("#refinery-filter-form input[name='status'][value='COMPLETED']"))
+        assertThat(page.locator("#refinery-filter-form input[name='view'][value='COMPLETED']"))
             .isChecked();
-        assertThat(page.locator("#refinery-filter-form input[name='status'][value='OPEN']"))
+        assertThat(page.locator("#refinery-filter-form input[name='view'][value='RUNNING']"))
+            .not()
             .isChecked();
         assertThat(page.locator("#refinery-filter-form input[name='onlyMine']")).isChecked();
       } catch (RuntimeException | AssertionError failure) {

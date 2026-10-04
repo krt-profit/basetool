@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -26,6 +27,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -76,7 +79,38 @@ class PrivacyControllerTest {
     mockMvc
         .perform(get("/privacy").param("lang", lang))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("<h3>" + heading + "</h3>")))
+        .andExpect(content().string(containsString("<h3 id=\"privacy-3-10\">" + heading + "</h3>")))
         .andExpect(content().string(containsString("href=\"" + APPROVED_CLIENTS_URL + "\"")));
+  }
+
+  /**
+   * The notice opens with a table of contents whose every entry jumps to a heading of the text, and
+   * the text sits on a card under the legal page head (REQ-UI-027).
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  void rendersAJumpListToEveryHeading() throws Exception {
+    String html =
+        mockMvc
+            .perform(get("/privacy").param("lang", "de"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("data-testid=\"privacy-toc\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Rechtliches<")
+        .contains("class=\"card legal-doc\"")
+        .doesNotContain("hud-box")
+        .doesNotContain("krtm-");
+    Matcher link = Pattern.compile("href=\"#(privacy-[0-9-]+)\"").matcher(html);
+    int links = 0;
+    while (link.find()) {
+      links++;
+      assertThat(html).as("target of #%s", link.group(1)).contains("id=\"" + link.group(1) + "\"");
+    }
+    assertThat(links).as("one jump link per section and subsection").isEqualTo(22);
   }
 }

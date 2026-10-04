@@ -672,6 +672,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     _swapOrderSection(orderId, 'order-item-handovers-results', 'item-handovers');
                     _swapOrderSection(orderId, 'item-handover-lines', 'item-handover-lines');
                     _swapOrderSection(orderId, 'order-header-results', 'header');
+                    _swapOrderSection(orderId, 'order-kpi-results', 'kpi');
                     if (
                         window.krtLiveSync &&
                         typeof window.krtLiveSync.sendChanged === 'function'
@@ -958,7 +959,7 @@ function _serializeEditForm() {
 
 function _refreshMaterialsSection(orderId, broadcastOpts) {
     if (window.krtRefreshOrderSection) {
-        return window.krtRefreshOrderSection(['materials', 'aggregated'], broadcastOpts);
+        return window.krtRefreshOrderSection(['materials', 'aggregated', 'kpi'], broadcastOpts);
     }
     orderId = orderId || window.orderId || (document.getElementById('claim-order-id') || {}).value;
     const mat = document.getElementById('order-materials-results');
@@ -1030,7 +1031,7 @@ function _openClaimModal(opts) {
         const maxEdit = open + (parseFloat(opts.amount || '0') || 0);
         document.getElementById('claim-max').value = maxEdit;
         document.getElementById('claim-open-hint').textContent = MSG_CLAIM_MAX_HINT + ' ' + maxEdit;
-        document.getElementById('claim-withdraw-btn').classList.remove('krtm-hidden');
+        document.getElementById('claim-withdraw-btn').hidden = false;
     } else {
         document.getElementById('claim-modal-title').textContent = MSG_CLAIM_TITLE_ADD;
         sel.value = '';
@@ -1038,7 +1039,7 @@ function _openClaimModal(opts) {
         amountInput.value = '';
         document.getElementById('claim-max').value = open;
         document.getElementById('claim-open-hint').textContent = MSG_CLAIM_MAX_HINT + ' ' + open;
-        document.getElementById('claim-withdraw-btn').classList.add('krtm-hidden');
+        document.getElementById('claim-withdraw-btn').hidden = true;
     }
     const claimScuHint = document.getElementById('claim-scu-hint');
     if (claimScuHint) claimScuHint.classList.toggle('krtm-hidden', opts.quantityType === 'PIECE');
@@ -1700,10 +1701,29 @@ async function toggleInventory(row) {
     if (tabs.length === 0) {
         return;
     }
-    const validKeys = tabs.map(function (t) {
-        return t.getAttribute('data-tab');
-    });
     const storeKey = 'orders-detail-tab';
+
+    /**
+     * Lists the tabs the order shows; a tab without content and without an action stays hidden.
+     *
+     * @returns {HTMLElement[]} the visible tabs in order
+     */
+    function visibleTabs() {
+        return tabs.filter(function (t) {
+            return !t.hidden;
+        });
+    }
+
+    /**
+     * Lists the keys of the visible tabs.
+     *
+     * @returns {string[]} the tab keys
+     */
+    function validKeysNow() {
+        return visibleTabs().map(function (t) {
+            return t.getAttribute('data-tab');
+        });
+    }
 
     function apply(key) {
         tabs.forEach(function (t) {
@@ -1721,6 +1741,7 @@ async function toggleInventory(row) {
     }
 
     function resolveInitial(useStore) {
+        const validKeys = validKeysNow();
         const q = new URLSearchParams(window.location.search).get('tab');
         if (q && validKeys.indexOf(q) >= 0) {
             return q;
@@ -1741,7 +1762,7 @@ async function toggleInventory(row) {
     }
 
     function show(key, push) {
-        if (validKeys.indexOf(key) < 0) {
+        if (validKeysNow().indexOf(key) < 0) {
             return;
         }
         apply(key);
@@ -1762,20 +1783,71 @@ async function toggleInventory(row) {
         if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') {
             return;
         }
-        const i = tabs.indexOf(document.activeElement);
+        const shown = visibleTabs();
+        const i = shown.indexOf(/** @type {HTMLElement} */ (document.activeElement));
         if (i < 0) {
             return;
         }
         e.preventDefault();
-        const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+        const next = shown[(i + (e.key === 'ArrowRight' ? 1 : shown.length - 1)) % shown.length];
         next.focus();
         show(next.getAttribute('data-tab'), true);
+    });
+    document.addEventListener('krt:swapped', function (ev) {
+        const container = ev && ev.detail && ev.detail.container;
+        if (!container || typeof container.querySelectorAll !== 'function') {
+            return;
+        }
+        const metas = Array.prototype.slice.call(container.querySelectorAll('[data-od-tab-count]'));
+        metas.forEach(function (meta) {
+            const key = meta.getAttribute('data-od-tab-count');
+            const count = parseInt((meta.textContent || '0').trim(), 10) || 0;
+            const tab = document.getElementById('tab-' + key);
+            if (!tab) {
+                return;
+            }
+            const badge = tab.querySelector('.tab-count');
+            if (badge) {
+                badge.textContent = String(count);
+            }
+            if (count > 0 && tab.hidden) {
+                tab.hidden = false;
+            } else if (count === 0 && !tab.hidden && tab.hasAttribute('data-od-hide-empty')) {
+                const wasActive = tab.classList.contains('active');
+                tab.hidden = true;
+                if (wasActive && visibleTabs().length > 0) {
+                    show(visibleTabs()[0].getAttribute('data-tab'), false);
+                }
+            }
+        });
     });
     window.addEventListener('popstate', function () {
         apply(resolveInitial(false));
     });
     apply(resolveInitial(true));
 })();
+
+document.addEventListener('krt:swapped', function (ev) {
+    const container = ev && ev.detail && ev.detail.container;
+    if (!container || container.id !== 'order-header-results') {
+        return;
+    }
+    const meta = document.getElementById('order-head-meta');
+    const badge = document.getElementById('order-status-badge');
+    if (!meta || !badge) {
+        return;
+    }
+    const statusClass = meta.getAttribute('data-status-class') || '';
+    Array.prototype.slice.call(badge.classList).forEach(function (cls) {
+        if (cls.indexOf('status-') === 0 && cls !== 'status-badge') {
+            badge.classList.remove(cls);
+        }
+    });
+    if (statusClass) {
+        badge.classList.add(statusClass);
+    }
+    badge.textContent = meta.getAttribute('data-status-label') || badge.textContent;
+});
 
 let _prodMaterials = [];
 let _prodContext = null;

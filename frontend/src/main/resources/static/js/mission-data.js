@@ -19,6 +19,19 @@
 
 /* global MISSION_MSG, MISSION_CONFLICT, MISSION_TITLES */
 
+const MISSION_KINDS = ['squadrons', 'jobtypes', 'freqtypes'];
+
+/**
+ * Returns the data kind whose list the detail pane shows.
+ *
+ * @returns {string} one of MISSION_KINDS
+ */
+function selectedMissionKind() {
+    const active = document.querySelector('.md-kind-row[aria-selected="true"]');
+    const kind = active ? active.getAttribute('data-md-kind') : null;
+    return kind && MISSION_KINDS.indexOf(kind) !== -1 ? kind : MISSION_KINDS[0];
+}
+
 function missionFilterParams() {
     function checked(id) {
         const el = document.getElementById(id);
@@ -30,8 +43,55 @@ function missionFilterParams() {
         '&includeInactiveJobTypes=' +
         checked('includeInactiveJobTypes') +
         '&includeInactiveFrequencyTypes=' +
-        checked('includeInactiveFrequencyTypes')
+        checked('includeInactiveFrequencyTypes') +
+        '&kind=' +
+        selectedMissionKind()
     );
+}
+
+/**
+ * Shows the list of one data kind, marks its master row and records the choice in the address bar
+ * and the page's stored preference.
+ *
+ * @param {string | null} kind one of MISSION_KINDS; anything else selects the first
+ * @param {boolean} focusRow whether the selected master row takes the focus
+ */
+function selectMissionKind(kind, focusRow) {
+    const want = kind && MISSION_KINDS.indexOf(kind) !== -1 ? kind : MISSION_KINDS[0];
+    document.querySelectorAll('.md-kind-row').forEach(function (row) {
+        const on = row.getAttribute('data-md-kind') === want;
+        row.classList.toggle('is-active', on);
+        row.setAttribute('aria-selected', String(on));
+        row.setAttribute('tabindex', on ? '0' : '-1');
+        const pane = document.getElementById(row.getAttribute('aria-controls'));
+        if (pane) pane.hidden = !on;
+        if (on && focusRow) row.focus();
+    });
+    try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('kind', want);
+        window.history.replaceState(window.history.state, '', url.pathname + url.search);
+    } catch (_e) {}
+    persistMissionFilters();
+}
+
+function onMissionKindKeydown(e) {
+    const list = e.target && e.target.closest ? e.target.closest('#md-kind-list') : null;
+    if (!list) return;
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') {
+        return;
+    }
+    e.preventDefault();
+    const rows = Array.from(list.querySelectorAll('.md-kind-row'));
+    const current = rows.findIndex(function (r) {
+        return r.getAttribute('aria-selected') === 'true';
+    });
+    let idx;
+    if (e.key === 'ArrowDown') idx = Math.min(rows.length - 1, current + 1);
+    else if (e.key === 'ArrowUp') idx = Math.max(0, current - 1);
+    else if (e.key === 'Home') idx = 0;
+    else idx = rows.length - 1;
+    selectMissionKind(rows[idx].getAttribute('data-md-kind'), true);
 }
 
 function missionSectionForAction(action) {
@@ -248,17 +308,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    ['squadrons-box', 'jobtypes-box', 'freqtypes-box'].forEach((boxId) => {
-        let isCollapsed;
-        try {
-            isCollapsed = localStorage.getItem(boxId + '-collapsed') === 'true';
-        } catch (_e) {
-            isCollapsed = false;
-        }
-        if (isCollapsed) {
-            setBoxCollapsed(document.getElementById(boxId), true);
-        }
-    });
+    document.addEventListener('keydown', onMissionKindKeydown);
 
     function wireModalSave(form, modal) {
         if (!form) {
@@ -309,38 +359,6 @@ document.addEventListener('DOMContentLoaded', function () {
         missionWrite(actForm, MISSION_MSG.saved, null);
     });
 });
-
-/**
- * Shows or hides a box's list and keeps its toggle's expanded state in step.
- *
- * @param {HTMLElement | null} box the section element
- * @param {boolean} collapsed true to hide the list
- */
-function setBoxCollapsed(box, collapsed) {
-    if (!box) return;
-    const content = box.querySelector('.box-content');
-    const toggle = box.querySelector('.md-box__toggle');
-    if (content) content.hidden = collapsed;
-    if (toggle) toggle.setAttribute('aria-expanded', String(!collapsed));
-    box.classList.toggle('is-collapsed', collapsed);
-}
-
-/**
- * Collapses or expands a box and remembers the choice per browser.
- *
- * @param {string} boxId the section element id
- */
-function toggleBox(boxId) {
-    const box = document.getElementById(boxId);
-    if (!box) return;
-    const content = box.querySelector('.box-content');
-    if (!content) return;
-    const collapse = !content.hidden;
-    setBoxCollapsed(box, collapse);
-    try {
-        localStorage.setItem(boxId + '-collapsed', String(collapse));
-    } catch (_e) {}
-}
 
 function setupDragAndDrop(containerId, reorderUrl) {
     const container = document.getElementById(containerId);
@@ -423,8 +441,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'mission-data-toggle-box', function (el) {
-        toggleBox(el.getAttribute('data-box-id'));
+    window.krtEvents.on('click', 'mission-data-select-kind', function (el) {
+        selectMissionKind(el.getAttribute('data-md-kind'), false);
     });
 }
 
@@ -452,6 +470,7 @@ function persistMissionFilters() {
                 squadrons: checked('includeInactiveSquadrons'),
                 jobTypes: checked('includeInactiveJobTypes'),
                 frequencyTypes: checked('includeInactiveFrequencyTypes'),
+                kind: selectedMissionKind(),
             }),
         );
     } catch (_e) {}
@@ -484,13 +503,21 @@ if (window.krtFetch) {
         if (!document.getElementById(toggles[0].id)) {
             return;
         }
+        const saved = readMissionFilterPref();
+        if (
+            !/[?&]kind=/.test(window.location.search) &&
+            saved !== null &&
+            typeof saved.kind === 'string' &&
+            saved.kind !== selectedMissionKind()
+        ) {
+            selectMissionKind(saved.kind, false);
+        }
         if (
             /[?&]includeInactive(Squadrons|JobTypes|FrequencyTypes)=/.test(window.location.search)
         ) {
             persistMissionFilters();
             return;
         }
-        const saved = readMissionFilterPref();
         if (saved === null) {
             return;
         }

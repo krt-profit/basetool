@@ -18,123 +18,131 @@
     <span id="ca-undo-i18n" hidden
           th:attr="data-done=#{connectedApps.undo.done},data-skipped-title=#{connectedApps.undo.skippedTitle},data-unnamed=#{connectedApps.undo.unnamed},data-reason-changed-afterwards=#{connectedApps.undo.reason.CHANGED_AFTERWARDS},data-reason-gone=#{connectedApps.undo.reason.GONE},data-resource-blueprint=#{connectedApps.undo.resource.BLUEPRINT},data-resource-stock=#{connectedApps.undo.resource.STOCK},data-resource-ship=#{connectedApps.undo.resource.SHIP}"></span>
 
-    <div class="greeting hud-box">
-        <h1 th:text="#{connectedApps.title}">Verbundene Anwendungen</h1>
-        <p th:text="#{connectedApps.subtitle}">Anwendungen, die du mit deinem Konto verbunden hast.</p>
-        <p>
-            <span th:text="#{connectedApps.approvedClients.lead}">Nur zugelassene Anwendungen d&uuml;rfen sich mit deinem Konto verbinden.</span>
-            <a href="https://github.com/krt-profit/basetool/blob/main/docs/legal/approved-clients.md"
-               target="_blank" rel="noopener noreferrer" data-testid="ca-approved-clients"
-               th:text="#{connectedApps.approvedClients.link}">Liste der zugelassenen Anwendungen</a>
-        </p>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.personal', titleText=#{connectedApps.title})}"></th:block>
+
+    <p class="ca-approved">
+        <span th:text="#{connectedApps.approvedClients.lead}">Nur zugelassene Anwendungen d&uuml;rfen sich mit deinem Konto verbinden.</span>
+        <a href="https://github.com/krt-profit/basetool/blob/main/docs/legal/approved-clients.md"
+           target="_blank" rel="noopener noreferrer" data-testid="ca-approved-clients"
+           th:text="#{connectedApps.approvedClients.link}">Liste der zugelassenen Anwendungen</a>
+    </p>
 
     <div id="ca-host">
         <th:block th:fragment="apps">
-            <div class="hud-box mt-2" th:if="${error}">
-                <p class="text-danger" th:text="#{${error}}">Fehler beim Laden.</p>
-            </div>
+            <div class="alert alert-danger" role="alert" th:if="${error}" th:text="#{${error}}">Fehler beim Laden.</div>
 
-            <div class="alert alert-warning mt-2" role="status" id="ca-unseen-notice" th:if="${anyUnseen}"
+            <div class="alert alert-warning" role="status" id="ca-unseen-notice" th:if="${anyUnseen}"
                  th:text="#{connectedApps.unseen.notice}">Neue Verbindung.</div>
 
-            <div class="hud-box mt-2" th:if="${error == null and #lists.isEmpty(apps)}" id="ca-empty">
-                <p th:text="#{connectedApps.empty}">Du hast noch keine Anwendung verbunden.</p>
-            </div>
+            <th:block th:if="${error == null and #lists.isEmpty(apps)}">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='connectedApps.empty', textKey='connectedApps.empty.text', emptyId='ca-empty')}"></th:block>
+            </th:block>
 
-            <section class="hud-box mt-2 ca-app" th:each="app : ${apps}" th:attr="data-client-id=${app.clientId}">
-                <div class="ca-app-head">
-                    <h2 th:text="${app.displayName}">VerseKit</h2>
-                    <div class="ca-app-actions">
-                        <button type="button" class="btn btn-outline" data-ca-undo
-                                data-testid="ca-undo-open"
-                                th:text="#{connectedApps.undo.open}">&Auml;nderungen zur&uuml;cknehmen</button>
-                        <button type="button" class="btn btn-quiet-danger" data-ca-disconnect-client
-                                th:text="#{connectedApps.disconnectClient}">Anwendung trennen</button>
+            <div class="grid-auto ca-apps" th:if="${apps != null and !#lists.isEmpty(apps)}">
+                <section class="card ca-app" th:each="app : ${apps}" th:attr="data-client-id=${app.clientId}">
+                    <div class="card-head">
+                        <h2 class="card-title" th:text="${app.displayName}">VerseKit</h2>
+                        <div class="cluster gap-2">
+                            <button type="button" class="btn btn-ghost btn-xs" data-ca-undo
+                                    data-testid="ca-undo-open"
+                                    th:text="#{connectedApps.undo.open}">&Auml;nderungen zur&uuml;cknehmen</button>
+                            <button type="button" class="btn btn-quiet-danger btn-xs" data-ca-disconnect-client
+                                    th:text="#{connectedApps.disconnectClient}">Anwendung trennen</button>
+                        </div>
                     </div>
-                </div>
-                <h3 th:text="#{connectedApps.capabilities}">Darf</h3>
-                <ul class="ca-capabilities">
-                    <li th:each="cap : ${app.capabilities}"
-                        th:text="${#messages.msgOrNull('exchange.capability.' + cap) ?: cap}">Lagerbest&auml;nde lesen</li>
-                </ul>
-                <h3 th:text="#{connectedApps.installations}">Installationen</h3>
-                <div class="table-responsive">
-                    <table class="ca-installations">
-                        <thead>
-                        <tr>
-                            <th th:text="#{connectedApps.column.installation}">Installation</th>
-                            <th th:text="#{connectedApps.column.firstSeen}">Zuerst gesehen</th>
-                            <th th:text="#{connectedApps.column.lastSeen}">Zuletzt gesehen</th>
-                            <th th:text="#{connectedApps.column.actions}">Aktion</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="inst : ${app.installations}" th:attr="data-installation-id=${inst.id}"
-                            th:classappend="${inst.unseen} ? 'ca-unseen'">
-                            <td>
-                                <span th:text="${inst.label != null} ? #{connectedApps.installation.named(${app.displayName}, ${inst.label})} : #{connectedApps.installation.unnamed(${app.displayName})}">VerseKit &ndash; &bdquo;Gaming-PC&ldquo;</span>
-                                <span class="ca-new-badge" th:if="${inst.unseen}" data-ca-unseen
-                                      th:text="#{connectedApps.installation.new}">Neu</span>
-                            </td>
-                            <td th:text="${inst.firstSeenAt != null} ? #{connectedApps.utc(${#temporals.format(inst.firstSeenAt, 'dd.MM.yyyy HH:mm', 'UTC')})} : '–'">27.09.2026 08:00 UTC</td>
-                            <td th:text="${inst.lastSeenAt != null} ? #{connectedApps.utc(${#temporals.format(inst.lastSeenAt, 'dd.MM.yyyy HH:mm', 'UTC')})} : '–'">27.09.2026 09:00 UTC</td>
-                            <td class="ca-row-actions">
-                                <button type="button" class="btn btn-ghost" th:if="${inst.unseen}" data-ca-mark-seen
-                                        data-testid="ca-mark-seen" th:title="#{connectedApps.installation.markSeen.title}"
-                                        th:text="#{connectedApps.installation.markSeen}">Gesehen</button>
-                                <button type="button" class="btn btn-quiet-danger" data-ca-disconnect-installation
-                                        th:text="#{connectedApps.disconnectInstallation}">Trennen</button>
-                            </td>
-                        </tr>
-                        <tr th:if="${#lists.isEmpty(app.installations)}">
-                            <td colspan="4" th:text="#{connectedApps.installations.empty}">Keine aktive Installation.</td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <h3 th:text="#{connectedApps.activity}">Letzte &Auml;nderungen</h3>
-                <p th:if="${#lists.isEmpty(app.activity)}" th:text="#{connectedApps.activity.empty}">Diese Anwendung hat noch nichts ge&auml;ndert.</p>
-                <div class="table-responsive" th:unless="${#lists.isEmpty(app.activity)}">
-                    <table class="ca-activity" data-testid="ca-activity">
-                        <thead>
-                        <tr>
-                            <th th:text="#{connectedApps.activity.when}">Wann</th>
-                            <th th:text="#{connectedApps.activity.what}">Was</th>
-                            <th th:text="#{connectedApps.activity.entry}">Eintrag</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="act : ${app.activity}" th:classappend="${act.undone} ? 'ca-undone'">
-                            <td th:text="${act.recordedAt != null} ? #{connectedApps.utc(${#temporals.format(act.recordedAt, 'dd.MM.yyyy HH:mm', 'UTC')})} : '–'">27.09.2026 10:00 UTC</td>
-                            <td>
-                                <span th:text="${#messages.msgOrNull('connectedApps.activity.action.' + act.action) ?: act.action}">Blueprint hinzugef&uuml;gt</span>
-                                <span th:if="${act.undone}" th:text="#{connectedApps.activity.undone}">(zur&uuml;ckgenommen)</span>
-                            </td>
-                            <td th:text="${act.label != null} ? ${act.label} : #{connectedApps.undo.unnamed}">Arrowhead Rifle</td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
+
+                    <h3 class="ca-section-title" th:text="#{connectedApps.capabilities}">Darf</h3>
+                    <ul class="cluster gap-2 ca-capabilities">
+                        <li class="chip chip--muted" th:each="cap : ${app.capabilities}"
+                            th:text="${#messages.msgOrNull('exchange.capability.' + cap) ?: cap}">Lagerbest&auml;nde lesen</li>
+                    </ul>
+
+                    <h3 class="ca-section-title" th:text="#{connectedApps.installations}">Installationen</h3>
+                    <div class="table-responsive" th:unless="${#lists.isEmpty(app.installations)}">
+                        <table class="data-table data-table--stack ca-installations">
+                            <thead>
+                            <tr>
+                                <th th:text="#{connectedApps.column.installation}">Installation</th>
+                                <th th:text="#{connectedApps.column.lastSeen}">Zuletzt gesehen</th>
+                                <th class="cell-actions" th:text="#{connectedApps.column.actions}">Aktion</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="inst : ${app.installations}" th:attr="data-installation-id=${inst.id}"
+                                th:classappend="${inst.unseen} ? 'ca-unseen'">
+                                <td>
+                                    <span class="cell-title">
+                                        <span th:text="${inst.label != null} ? #{connectedApps.installation.named(${app.displayName}, ${inst.label})} : #{connectedApps.installation.unnamed(${app.displayName})}">VerseKit &ndash; &bdquo;Gaming-PC&ldquo;</span>
+                                        <span class="chip chip--primary ca-new-badge" th:if="${inst.unseen}" data-ca-unseen
+                                              th:text="#{connectedApps.installation.new}">Neu</span>
+                                    </span>
+                                    <span class="cell-sub"
+                                          th:text="#{connectedApps.column.firstSeen} + ': ' + (${inst.firstSeenAt != null} ? #{connectedApps.utc(${#temporals.format(inst.firstSeenAt, 'dd.MM.yyyy HH:mm', 'UTC')})} : '–')">Zuerst gesehen: 27.09.2026 08:00 UTC</span>
+                                </td>
+                                <td th:attr="data-label=#{connectedApps.column.lastSeen}"
+                                    th:text="${inst.lastSeenAt != null} ? #{connectedApps.utc(${#temporals.format(inst.lastSeenAt, 'dd.MM.yyyy HH:mm', 'UTC')})} : '–'">27.09.2026 09:00 UTC</td>
+                                <td class="cell-actions">
+                                    <div class="cluster gap-2">
+                                        <button type="button" class="btn btn-ghost btn-xs" th:if="${inst.unseen}" data-ca-mark-seen
+                                                data-testid="ca-mark-seen" th:title="#{connectedApps.installation.markSeen.title}"
+                                                th:text="#{connectedApps.installation.markSeen}">Gesehen</button>
+                                        <button type="button" class="btn btn-quiet-danger btn-xs" data-ca-disconnect-installation
+                                                th:text="#{connectedApps.disconnectInstallation}">Trennen</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="ca-muted" th:if="${#lists.isEmpty(app.installations)}"
+                       th:text="#{connectedApps.installations.empty}">Keine aktive Installation.</p>
+
+                    <h3 class="ca-section-title" th:text="#{connectedApps.activity}">Letzte &Auml;nderungen</h3>
+                    <p class="ca-muted" th:if="${#lists.isEmpty(app.activity)}" th:text="#{connectedApps.activity.empty}">Diese Anwendung hat noch nichts ge&auml;ndert.</p>
+                    <div class="table-responsive" th:unless="${#lists.isEmpty(app.activity)}">
+                        <table class="data-table data-table--stack ca-activity" data-testid="ca-activity">
+                            <thead>
+                            <tr>
+                                <th th:text="#{connectedApps.activity.entry}">Eintrag</th>
+                                <th th:text="#{connectedApps.activity.what}">Was</th>
+                                <th th:text="#{connectedApps.activity.when}">Wann</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="act : ${app.activity}" th:classappend="${act.undone} ? 'ca-undone'">
+                                <td><span class="cell-title" th:text="${act.label != null} ? ${act.label} : #{connectedApps.undo.unnamed}">Arrowhead Rifle</span></td>
+                                <td th:attr="data-label=#{connectedApps.activity.what}">
+                                    <span th:text="${#messages.msgOrNull('connectedApps.activity.action.' + act.action) ?: act.action}">Blueprint hinzugef&uuml;gt</span>
+                                    <span th:if="${act.undone}" th:text="#{connectedApps.activity.undone}">(zur&uuml;ckgenommen)</span>
+                                </td>
+                                <td th:attr="data-label=#{connectedApps.activity.when}"
+                                    th:text="${act.recordedAt != null} ? #{connectedApps.utc(${#temporals.format(act.recordedAt, 'dd.MM.yyyy HH:mm', 'UTC')})} : '–'">27.09.2026 10:00 UTC</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
         </th:block>
     </div>
 
-    <div class="hud-box mt-2" id="ca-undo-result" hidden aria-live="polite" data-testid="ca-undo-result"></div>
+    <div class="alert alert-success ca-undo-result" id="ca-undo-result" hidden aria-live="polite" data-testid="ca-undo-result"></div>
 
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='ca-undo-modal', titleKey='connectedApps.undo.title', variant='', body=~{::ca-undo-modal-body})}">
         <th:block th:ref="ca-undo-modal-body">
             <form id="ca-undo-form" class="no-track">
                 <div class="krt-modal-body">
                     <p th:text="#{connectedApps.undo.body}">Setzt alles zur&uuml;ck, was diese Anwendung im gew&auml;hlten Zeitraum ge&auml;ndert hat.</p>
-                    <label for="ca-undo-span" th:text="#{connectedApps.undo.span}">Zeitraum</label>
-                    <select id="ca-undo-span" name="span">
-                        <option value="1" th:text="#{connectedApps.undo.span.1h}">Letzte Stunde</option>
-                        <option value="24" selected th:text="#{connectedApps.undo.span.24h}">Letzte 24 Stunden</option>
-                        <option value="168" th:text="#{connectedApps.undo.span.7d}">Letzte 7 Tage</option>
-                        <option value="720" th:text="#{connectedApps.undo.span.30d}">Letzte 30 Tage</option>
-                        <option value="2160" th:text="#{connectedApps.undo.span.90d}">Letzte 90 Tage</option>
-                    </select>
+                    <div class="form-group">
+                        <label for="ca-undo-span" th:text="#{connectedApps.undo.span}">Zeitraum</label>
+                        <select id="ca-undo-span" name="span">
+                            <option value="1" th:text="#{connectedApps.undo.span.1h}">Letzte Stunde</option>
+                            <option value="24" selected th:text="#{connectedApps.undo.span.24h}">Letzte 24 Stunden</option>
+                            <option value="168" th:text="#{connectedApps.undo.span.7d}">Letzte 7 Tage</option>
+                            <option value="720" th:text="#{connectedApps.undo.span.30d}">Letzte 30 Tage</option>
+                            <option value="2160" th:text="#{connectedApps.undo.span.90d}">Letzte 90 Tage</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="krt-modal-foot">
                     <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
@@ -146,11 +154,11 @@
         </th:block>
     </th:block>
 
-    <div class="hud-box mt-2">
-        <h2 th:text="#{connectedApps.about.title}">So funktioniert es</h2>
+    <section class="card ca-about">
+        <h2 class="card-title" th:text="#{connectedApps.about.title}">So funktioniert es</h2>
         <p th:text="#{connectedApps.about.connect}">Verbinden startest du in der Anwendung selbst.</p>
         <p th:text="#{connectedApps.about.disconnect}">Trennen wirkt sofort.</p>
-    </div>
+    </section>
 </main>
 
 <script th:src="@{/js/connected-apps.js}" defer th:attr="nonce=${cspNonce}"></script>

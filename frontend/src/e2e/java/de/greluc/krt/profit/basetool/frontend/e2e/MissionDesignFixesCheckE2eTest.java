@@ -130,10 +130,11 @@ class MissionDesignFixesCheckE2eTest {
       Object finProbe =
           page.evaluate(
               "() => { const w ="
-                  + " document.querySelector('.payout-table')?.closest('.table-responsive');"
-                  + " let d = document.querySelector('#pane-fin details.hud-details');"
+                  + " document.querySelector('.payout-table')?.closest('.card');"
+                  + " let d = document.querySelector('#pane-fin details.fin-details');"
                   + " let synthetic = false;"
-                  + " if (!d) { d = document.createElement('details'); d.className = 'hud-details';"
+                  + " if (!d) { d = document.createElement('details');"
+                  + " d.className = 'card card--flush fin-details';"
                   + " document.getElementById('pane-fin').appendChild(d); synthetic = true; }"
                   + " return { payoutFits: w ? w.scrollWidth <= w.clientWidth : null,"
                   + " payoutOverflowPx: w ? w.scrollWidth - w.clientWidth : null,"
