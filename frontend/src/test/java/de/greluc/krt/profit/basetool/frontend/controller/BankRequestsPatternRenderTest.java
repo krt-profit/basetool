@@ -238,7 +238,7 @@ class BankRequestsPatternRenderTest {
         .containsPattern("data-testid=\"bank-requests-waiting\"[^>]*>2 warten auf dich<")
         .contains("data-count-waiting=\"2\"");
     assertThat(html)
-        .contains("class=\"data-table data-table--stack\"")
+        .contains("class=\"data-table data-table--stack bank-req-table\"")
         .contains(">Ausstehend<")
         .doesNotContain(">PENDING<")
         .contains("Quartalsabgabe Q3")
