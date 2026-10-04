@@ -142,7 +142,7 @@ class MissionServiceLifecycleTest {
       verify(missionRepository).delete(mission);
       verify(auditService)
           .record(
-              eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.MISSION_DELETED),
+              eq(de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType.MISSION_DELETED),
               any(),
               any(),
               isNull(),

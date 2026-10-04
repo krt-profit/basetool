@@ -46,33 +46,35 @@
         <h2 id="krt-dbp-list-heading" class="krt-bp-section-title" th:text="#{admin.defaultBlueprints.list.heading}">Aktuelle Standard-Blueprints</h2>
         <div id="krt-dbp-list-host" class="card card--flush">
             <th:block th:fragment="rows">
-            <table th:if="${!#lists.isEmpty(defaults)}" class="data-table data-table--stack"
-                   th:data-list-total="${#lists.size(defaults)}">
-                <thead>
-                <tr>
-                    <th th:text="#{admin.defaultBlueprints.table.product}">Produkt</th>
-                    <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.defaultBlueprints.table.actions}">Aktionen</span></th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr th:each="d : ${defaults}" th:attr="data-product-key=${d.productKey}">
-                    <td><span class="cell-title" th:text="${d.productName}">Produkt</span></td>
-                    <td class="cell-actions">
-                        <form th:id="${'krt-dbp-del-' + d.id}"
-                              th:action="@{/admin/default-blueprints/{id}/delete(id=${d.id})}"
-                              method="post" class="krt-dbp-del-form">
-                            <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-                            <button type="button" class="btn btn-quiet-danger btn-icon"
-                                    data-trigger="dbp-open-delete"
-                                    th:attr="data-form=${'krt-dbp-del-' + d.id},
-                                             data-name=${d.productName}"
-                                    th:title="#{admin.defaultBlueprints.action.remove}"
-                                    th:aria-label="#{admin.defaultBlueprints.action.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                        </form>
-                    </td>
-                </tr>
-                </tbody>
-            </table>
+            <div class="table-responsive" th:if="${!#lists.isEmpty(defaults)}">
+                <table class="data-table data-table--stack"
+                       th:data-list-total="${#lists.size(defaults)}">
+                    <thead>
+                    <tr>
+                        <th th:text="#{admin.defaultBlueprints.table.product}">Produkt</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.defaultBlueprints.table.actions}">Aktionen</span></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="d : ${defaults}" th:attr="data-product-key=${d.productKey}">
+                        <td><span class="cell-title" th:text="${d.productName}">Produkt</span></td>
+                        <td class="cell-actions">
+                            <form th:id="${'krt-dbp-del-' + d.id}"
+                                  th:action="@{/admin/default-blueprints/{id}/delete(id=${d.id})}"
+                                  method="post" class="krt-dbp-del-form">
+                                <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                                <button type="button" class="btn btn-quiet-danger btn-icon"
+                                        data-trigger="dbp-open-delete"
+                                        th:attr="data-form=${'krt-dbp-del-' + d.id},
+                                                 data-name=${d.productName}"
+                                        th:title="#{admin.defaultBlueprints.action.remove}"
+                                        th:aria-label="#{admin.defaultBlueprints.action.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                            </form>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
             <th:block th:if="${#lists.isEmpty(defaults)}">
                 <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.defaultBlueprints.empty', textKey='admin.defaultBlueprints.empty.text')}"></th:block>
             </th:block>

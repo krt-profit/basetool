@@ -19,11 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.service.exchange;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeClientStatus;
@@ -38,8 +40,6 @@ import de.greluc.krt.profit.basetool.backend.repository.ExchangeClientRepository
 import de.greluc.krt.profit.basetool.backend.repository.ExchangeClientRevocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ExchangeInstallationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ExchangeSettingsRepository;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.ChangeSource;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -84,7 +84,7 @@ public class ExchangeMassChangeService {
   private final ExchangeBlueprintWriteService blueprintWriteService;
   private final ExchangeStockWriteService stockWriteService;
   private final ExchangeShipWriteService shipWriteService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final MeterRegistry meterRegistry;
   private final ObjectMapper objectMapper;
   private final Validator validator;
@@ -141,7 +141,7 @@ public class ExchangeMassChangeService {
                 transaction.execute(
                     status -> {
                       ExchangeChangeResultDto applied = run(caller, request, false);
-                      auditService.record(
+                      auditRecorder.record(
                           AuditEventType.EXCHANGE_MASS_CHANGE_CONFIRMED,
                           client.getId(),
                           client.getClientId(),
@@ -190,7 +190,7 @@ public class ExchangeMassChangeService {
     if (stagedAt.isAfter(now.plus(CLOCK_SKEW))) {
       throw new BadRequestException("The staged change set's staging time lies in the future");
     }
-    if (auditService.recordedSince(
+    if (auditRecorder.recordedSince(
         AuditEventType.EXCHANGE_CLIENT_SUSPENDED, client.getId(), stagedAt)) {
       throw new AccessDeniedException("The client was suspended after the batch was staged");
     }

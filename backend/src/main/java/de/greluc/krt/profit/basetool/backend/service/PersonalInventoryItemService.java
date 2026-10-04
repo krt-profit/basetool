@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.PersonalInventoryItemMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.City;
 import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryLocationType;
@@ -34,7 +36,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.UexLocationDto;
 import de.greluc.krt.profit.basetool.backend.repository.CityRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalInventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpaceStationRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -80,7 +81,7 @@ public class PersonalInventoryItemService {
   private final PersonalInventoryItemMapper mapper;
   private final CityRepository cityRepository;
   private final SpaceStationRepository spaceStationRepository;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Owner-scoped paged list of the caller's items.
@@ -130,7 +131,7 @@ public class PersonalInventoryItemService {
     PersonalInventoryItem saved = repository.save(entity);
     log.info(
         "Created personal inventory item id={} for ownerUserId={}", saved.getId(), ownerUserId);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.PERSONAL_INVENTORY_CREATED,
         saved.getId(),
         personalLabel(saved),
@@ -172,7 +173,7 @@ public class PersonalInventoryItemService {
     String label = personalLabel(entity);
     repository.delete(entity);
     log.info("Deleted personal inventory item id={} for ownerUserId={}", id, ownerUserId);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.PERSONAL_INVENTORY_DELETED, id, label, ownerUserId, "scope=own");
   }
 
@@ -235,7 +236,7 @@ public class PersonalInventoryItemService {
     repository.delete(entity);
     log.info(
         "Admin deleted personal inventory item id={} ownerUserId={}", id, entity.getOwnerUserId());
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.PERSONAL_INVENTORY_DELETED, id, label, ownerUserId, "scope=admin");
   }
 
@@ -316,7 +317,7 @@ public class PersonalInventoryItemService {
         "Updated personal inventory item id={} ownerUserId={}",
         saved.getId(),
         saved.getOwnerUserId());
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.PERSONAL_INVENTORY_UPDATED,
         saved.getId(),
         personalLabel(saved),
