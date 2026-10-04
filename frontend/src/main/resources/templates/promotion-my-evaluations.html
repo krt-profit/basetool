@@ -76,67 +76,69 @@
             <th:block th:replace="~{fragments/components :: emptyState(titleKey='promotion.my.eligibility.none', textKey='promotion.my.eligibility.none.text')}"></th:block>
         </th:block>
 
-        <table th:unless="${#lists.isEmpty(eligibilitySteps)}" class="data-table data-table--stack me-table">
-            <thead>
-                <tr>
-                    <th th:text="#{promotion.my.requirement}">Voraussetzung</th>
-                    <th th:text="#{promotion.overview.rank.min.level}">Mindeststufe</th>
-                    <th th:text="#{promotion.my.eligibility.your.level}">Deine Stufe</th>
-                    <th class="cell-status" th:text="#{promotion.my.eligibility.progress}">Erfüllt</th>
-                </tr>
-            </thead>
-            <tbody th:each="elig : ${eligibilitySteps}" class="me-step"
-                   th:with="isNext=${nextEligibility != null and elig.fromRank == nextEligibility.fromRank},
-                            stepChecks=${elig.checks != null ? elig.checks : {}}"
-                   th:classappend="${isNext ? 'is-next' : ''}"
-                   th:attr="data-me-from-rank=${elig.fromRank},data-me-to-rank=${elig.toRank},data-me-eligible=${elig.eligible}">
-                <tr class="me-step-row">
-                    <th scope="rowgroup" colspan="4">
-                        <span class="cluster gap-2">
-                            <span class="me-step-title" th:text="#{promotion.overview.step.title(${elig.fromRank}, ${elig.toRank})}">Rang 20 → 19</span>
-                            <span th:if="${isNext}" class="chip chip--primary" th:text="#{promotion.my.next.step}">Dein nächster Sprung</span>
-                            <span th:if="${elig.eligible}" class="chip chip--success" th:text="#{promotion.my.eligibility.eligible}">Beförderbar</span>
-                            <span th:if="${!elig.eligible and elig.hasConfiguredRules}" class="chip chip--warning" th:text="#{promotion.my.eligibility.not.eligible}">Voraussetzungen offen</span>
-                            <span th:if="${!elig.hasConfiguredRules}" class="chip chip--muted" th:text="#{promotion.my.eligibility.no.rules}">Keine Regeln definiert</span>
-                            <span th:unless="${#lists.isEmpty(stepChecks)}" class="me-step-met"
-                                  th:text="#{promotion.my.step.met(${#lists.size(stepChecks.?[satisfied])}, ${#lists.size(stepChecks)})}">1 / 3 erfüllt</span>
-                        </span>
-                    </th>
-                </tr>
-                <tr th:each="chk : ${stepChecks}"
-                    th:classappend="${chk.satisfied ? 'is-row-satisfied' : 'is-row-missing'}"
-                    th:attr="data-me-satisfied=${chk.satisfied}"
-                    th:with="myEval=${chk.categoryId != null ? evaluationByCategoryId[chk.categoryId.toString()] : null}">
-                    <td>
-                        <span class="cell-title"
-                              th:text="${chk.categoryName != null ? chk.categoryName : (chk.topicName != null ? chk.topicName : #messages.msg('promotion.admin.ranks.matrix.global'))}">Kategorie</span>
-                        <span class="cell-sub" th:if="${chk.categoryName != null and chk.topicName != null}" th:text="${chk.topicName}">Themenbereich</span>
-                        <span class="cell-sub" th:if="${chk.description != null}" th:text="${chk.description}">Beschreibung</span>
-                    </td>
-                    <td th:attr="data-label=#{promotion.overview.rank.min.level}">
-                        <span class="chip chip--primary" th:switch="${chk.minimumLevel}">
-                            <span th:case="'LEVEL_A'" th:text="#{promotion.overview.level.a}">Stufe A</span>
-                            <span th:case="'LEVEL_B'" th:text="#{promotion.overview.level.b}">Stufe B</span>
-                            <span th:case="'LEVEL_C'" th:text="#{promotion.overview.level.c}">Stufe C</span>
-                            <span th:case="*">&mdash;</span>
-                        </span>
-                    </td>
-                    <td th:attr="data-label=#{promotion.my.eligibility.your.level}">
-                        <span th:if="${myEval != null and myEval.assignedLevel != null}" class="chip" th:switch="${myEval.assignedLevel}">
-                            <span th:case="'LEVEL_A'" th:text="#{promotion.overview.level.a}">Stufe A</span>
-                            <span th:case="'LEVEL_B'" th:text="#{promotion.overview.level.b}">Stufe B</span>
-                            <span th:case="'LEVEL_C'" th:text="#{promotion.overview.level.c}">Stufe C</span>
-                        </span>
-                        <span th:unless="${myEval != null and myEval.assignedLevel != null}" class="chip chip--muted"
-                              th:text="#{promotion.my.no.level}">Keine Stufe</span>
-                    </td>
-                    <td class="cell-status">
-                        <span class="chip" th:classappend="${chk.satisfied ? 'chip--success' : 'chip--warning'}"
-                              th:text="${chk.achievedCount} + ' / ' + ${chk.requiredCount}">1 / 3</span>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+        <div class="table-responsive" th:unless="${#lists.isEmpty(eligibilitySteps)}">
+            <table class="data-table data-table--stack me-table">
+                <thead>
+                    <tr>
+                        <th th:text="#{promotion.my.requirement}">Voraussetzung</th>
+                        <th th:text="#{promotion.overview.rank.min.level}">Mindeststufe</th>
+                        <th th:text="#{promotion.my.eligibility.your.level}">Deine Stufe</th>
+                        <th class="cell-status" th:text="#{promotion.my.eligibility.progress}">Erfüllt</th>
+                    </tr>
+                </thead>
+                <tbody th:each="elig : ${eligibilitySteps}" class="me-step"
+                       th:with="isNext=${nextEligibility != null and elig.fromRank == nextEligibility.fromRank},
+                                stepChecks=${elig.checks != null ? elig.checks : {}}"
+                       th:classappend="${isNext ? 'is-next' : ''}"
+                       th:attr="data-me-from-rank=${elig.fromRank},data-me-to-rank=${elig.toRank},data-me-eligible=${elig.eligible}">
+                    <tr class="me-step-row">
+                        <th scope="rowgroup" colspan="4">
+                            <span class="cluster gap-2">
+                                <span class="me-step-title" th:text="#{promotion.overview.step.title(${elig.fromRank}, ${elig.toRank})}">Rang 20 → 19</span>
+                                <span th:if="${isNext}" class="chip chip--primary" th:text="#{promotion.my.next.step}">Dein nächster Sprung</span>
+                                <span th:if="${elig.eligible}" class="chip chip--success" th:text="#{promotion.my.eligibility.eligible}">Beförderbar</span>
+                                <span th:if="${!elig.eligible and elig.hasConfiguredRules}" class="chip chip--warning" th:text="#{promotion.my.eligibility.not.eligible}">Voraussetzungen offen</span>
+                                <span th:if="${!elig.hasConfiguredRules}" class="chip chip--muted" th:text="#{promotion.my.eligibility.no.rules}">Keine Regeln definiert</span>
+                                <span th:unless="${#lists.isEmpty(stepChecks)}" class="me-step-met"
+                                      th:text="#{promotion.my.step.met(${#lists.size(stepChecks.?[satisfied])}, ${#lists.size(stepChecks)})}">1 / 3 erfüllt</span>
+                            </span>
+                        </th>
+                    </tr>
+                    <tr th:each="chk : ${stepChecks}"
+                        th:classappend="${chk.satisfied ? 'is-row-satisfied' : 'is-row-missing'}"
+                        th:attr="data-me-satisfied=${chk.satisfied}"
+                        th:with="myEval=${chk.categoryId != null ? evaluationByCategoryId[chk.categoryId.toString()] : null}">
+                        <td>
+                            <span class="cell-title"
+                                  th:text="${chk.categoryName != null ? chk.categoryName : (chk.topicName != null ? chk.topicName : #messages.msg('promotion.admin.ranks.matrix.global'))}">Kategorie</span>
+                            <span class="cell-sub" th:if="${chk.categoryName != null and chk.topicName != null}" th:text="${chk.topicName}">Themenbereich</span>
+                            <span class="cell-sub" th:if="${chk.description != null}" th:text="${chk.description}">Beschreibung</span>
+                        </td>
+                        <td th:attr="data-label=#{promotion.overview.rank.min.level}">
+                            <span class="chip chip--primary" th:switch="${chk.minimumLevel}">
+                                <span th:case="'LEVEL_A'" th:text="#{promotion.overview.level.a}">Stufe A</span>
+                                <span th:case="'LEVEL_B'" th:text="#{promotion.overview.level.b}">Stufe B</span>
+                                <span th:case="'LEVEL_C'" th:text="#{promotion.overview.level.c}">Stufe C</span>
+                                <span th:case="*">&mdash;</span>
+                            </span>
+                        </td>
+                        <td th:attr="data-label=#{promotion.my.eligibility.your.level}">
+                            <span th:if="${myEval != null and myEval.assignedLevel != null}" class="chip" th:switch="${myEval.assignedLevel}">
+                                <span th:case="'LEVEL_A'" th:text="#{promotion.overview.level.a}">Stufe A</span>
+                                <span th:case="'LEVEL_B'" th:text="#{promotion.overview.level.b}">Stufe B</span>
+                                <span th:case="'LEVEL_C'" th:text="#{promotion.overview.level.c}">Stufe C</span>
+                            </span>
+                            <span th:unless="${myEval != null and myEval.assignedLevel != null}" class="chip chip--muted"
+                                  th:text="#{promotion.my.no.level}">Keine Stufe</span>
+                        </td>
+                        <td class="cell-status">
+                            <span class="chip" th:classappend="${chk.satisfied ? 'chip--success' : 'chip--warning'}"
+                                  th:text="${chk.achievedCount} + ' / ' + ${chk.requiredCount}">1 / 3</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
         <div id="me-open-empty" hidden>
             <th:block th:replace="~{fragments/components :: emptyState(titleKey='promotion.my.filter.open.empty', textKey='promotion.my.filter.open.empty.text')}"></th:block>
         </div>

@@ -101,58 +101,60 @@
                         th:title="#{promotion.admin.ranks.delete.group}"
                         th:aria-label="#{promotion.admin.ranks.delete.group}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
             </div>
-            <table class="data-table data-table--stack ar-rule-table">
-                <thead>
-                    <tr>
-                        <th th:text="#{promotion.admin.ranks.requirement}">Anforderung</th>
-                        <th th:text="#{promotion.admin.ranks.min.level}">Mindeststufe</th>
-                        <th class="num" th:text="#{promotion.admin.ranks.count}">Anzahl</th>
-                        <th class="cell-actions"><span class="visually-hidden" th:text="#{general.action}">Aktion</span></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="req : ${entry.value}"
-                        th:attr="data-ar-req-id=${req.id},
-                                 data-ar-topic=${req.topicId} ?: '',
-                                 data-ar-search=${(req.topicName != null ? #strings.toLowerCase(req.topicName) : '') + ' ' + (req.categoryName != null ? #strings.toLowerCase(req.categoryName) : '') + ' ' + (req.description != null ? #strings.toLowerCase(req.description) : '')}">
-                        <td>
-                            <span class="cell-title"
-                                  th:text="${req.categoryName != null ? req.categoryName : (req.topicName != null ? req.topicName : #messages.msg('promotion.admin.ranks.matrix.global'))}">Kategorie</span>
-                            <span class="cell-sub" th:if="${req.categoryName != null and req.topicName != null}" th:text="${req.topicName}">Themenbereich</span>
-                            <span class="cell-sub" th:if="${req.description != null}" th:text="${req.description}">Beschreibung</span>
-                        </td>
-                        <td th:attr="data-label=#{promotion.admin.ranks.min.level}">
-                            <span class="chip chip--primary" th:switch="${req.minimumLevel}">
-                                <span th:case="'LEVEL_A'" th:text="#{promotion.overview.level.a}">Stufe A</span>
-                                <span th:case="'LEVEL_B'" th:text="#{promotion.overview.level.b}">Stufe B</span>
-                                <span th:case="'LEVEL_C'" th:text="#{promotion.overview.level.c}">Stufe C</span>
-                                <span th:case="*">&mdash;</span>
-                            </span>
-                        </td>
-                        <td class="num" th:attr="data-label=#{promotion.admin.ranks.count}" th:text="${req.requiredCount}">1</td>
-                        <td class="cell-actions">
-                            <button type="button" class="btn btn-ghost btn-icon"
-                                    data-trigger="ar-open-edit"
-                                    th:attr="data-ar-id=${req.id},
-                                             data-ar-from=${req.fromRank},
-                                             data-ar-to=${req.toRank},
-                                             data-ar-topic-id=${req.topicId} ?: '',
-                                             data-ar-category-id=${req.categoryId} ?: '',
-                                             data-ar-level=${req.minimumLevel},
-                                             data-ar-count=${req.requiredCount},
-                                             data-ar-description=${req.description} ?: '',
-                                             data-ar-version=${req.version}"
-                                    th:title="#{promotion.admin.ranks.edit}"
-                                    th:aria-label="#{promotion.admin.ranks.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
-                            <button type="button" class="btn btn-quiet-danger btn-icon"
-                                    data-trigger="ar-open-delete"
-                                    th:attr="data-ar-id=${req.id}"
-                                    th:title="#{promotion.admin.ranks.delete}"
-                                    th:aria-label="#{promotion.admin.ranks.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="table-responsive">
+                <table class="data-table data-table--stack ar-rule-table">
+                    <thead>
+                        <tr>
+                            <th th:text="#{promotion.admin.ranks.requirement}">Anforderung</th>
+                            <th th:text="#{promotion.admin.ranks.min.level}">Mindeststufe</th>
+                            <th class="num" th:text="#{promotion.admin.ranks.count}">Anzahl</th>
+                            <th class="cell-actions"><span class="visually-hidden" th:text="#{general.action}">Aktion</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="req : ${entry.value}"
+                            th:attr="data-ar-req-id=${req.id},
+                                     data-ar-topic=${req.topicId} ?: '',
+                                     data-ar-search=${(req.topicName != null ? #strings.toLowerCase(req.topicName) : '') + ' ' + (req.categoryName != null ? #strings.toLowerCase(req.categoryName) : '') + ' ' + (req.description != null ? #strings.toLowerCase(req.description) : '')}">
+                            <td>
+                                <span class="cell-title"
+                                      th:text="${req.categoryName != null ? req.categoryName : (req.topicName != null ? req.topicName : #messages.msg('promotion.admin.ranks.matrix.global'))}">Kategorie</span>
+                                <span class="cell-sub" th:if="${req.categoryName != null and req.topicName != null}" th:text="${req.topicName}">Themenbereich</span>
+                                <span class="cell-sub" th:if="${req.description != null}" th:text="${req.description}">Beschreibung</span>
+                            </td>
+                            <td th:attr="data-label=#{promotion.admin.ranks.min.level}">
+                                <span class="chip chip--primary" th:switch="${req.minimumLevel}">
+                                    <span th:case="'LEVEL_A'" th:text="#{promotion.overview.level.a}">Stufe A</span>
+                                    <span th:case="'LEVEL_B'" th:text="#{promotion.overview.level.b}">Stufe B</span>
+                                    <span th:case="'LEVEL_C'" th:text="#{promotion.overview.level.c}">Stufe C</span>
+                                    <span th:case="*">&mdash;</span>
+                                </span>
+                            </td>
+                            <td class="num" th:attr="data-label=#{promotion.admin.ranks.count}" th:text="${req.requiredCount}">1</td>
+                            <td class="cell-actions">
+                                <button type="button" class="btn btn-ghost btn-icon"
+                                        data-trigger="ar-open-edit"
+                                        th:attr="data-ar-id=${req.id},
+                                                 data-ar-from=${req.fromRank},
+                                                 data-ar-to=${req.toRank},
+                                                 data-ar-topic-id=${req.topicId} ?: '',
+                                                 data-ar-category-id=${req.categoryId} ?: '',
+                                                 data-ar-level=${req.minimumLevel},
+                                                 data-ar-count=${req.requiredCount},
+                                                 data-ar-description=${req.description} ?: '',
+                                                 data-ar-version=${req.version}"
+                                        th:title="#{promotion.admin.ranks.edit}"
+                                        th:aria-label="#{promotion.admin.ranks.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                                <button type="button" class="btn btn-quiet-danger btn-icon"
+                                        data-trigger="ar-open-delete"
+                                        th:attr="data-ar-id=${req.id}"
+                                        th:title="#{promotion.admin.ranks.delete}"
+                                        th:aria-label="#{promotion.admin.ranks.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </section>
         <div id="ar-empty" class="card card--flush" hidden>
             <th:block th:replace="~{fragments/components :: emptyState(titleKey='promotion.admin.ranks.filter.empty', textKey='promotion.admin.ranks.filter.empty.text')}"></th:block>
