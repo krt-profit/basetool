@@ -45,13 +45,11 @@ import org.junit.jupiter.api.Test;
 class CascadeLayerOrderTest {
 
   /** The one order, restated at the top of every file. */
-  static final String ORDER = "@layer base, components, page, migration, utilities;";
+  static final String ORDER = "@layer base, components, page, utilities;";
 
   /** The layers a file may use; any file not named here is a page stylesheet. */
   private static final Map<String, Set<String>> ALLOWED =
-      Map.of(
-          "styles.css", Set.of("base", "components", "page"),
-          "inline-migration.css", Set.of("migration", "utilities"));
+      Map.of("styles.css", Set.of("base", "components", "page", "utilities"));
 
   private static final Set<String> PAGE_ONLY = Set.of("page");
 
@@ -97,8 +95,9 @@ class CascadeLayerOrderTest {
   }
 
   /**
-   * Asserts that the two runtime state classes are declared only in the {@code utilities} layer, so
-   * they beat every component, page and migrated rule by layer alone.
+   * Asserts that the two runtime state classes, {@code .is-hidden} and the overlay's {@code
+   * .is-open}, are declared only in the {@code utilities} layer of {@code styles.css}, so they beat
+   * every component and page rule by layer alone.
    *
    * @throws IOException if a stylesheet cannot be read
    * @throws URISyntaxException if the CSS classpath root cannot be resolved
@@ -109,25 +108,30 @@ class CascadeLayerOrderTest {
     List<String> offenders = new ArrayList<>();
     boolean hiddenInUtilities = false;
     boolean openInUtilities = false;
-    Pattern stateSelector = Pattern.compile("\\.krtm-(hidden|modal-open)(?![-\\w])");
+    Pattern hidden = Pattern.compile("\\.is-hidden(?![-\\w])");
+    Pattern open = Pattern.compile("\\.krt-modal-overlay\\.is-open(?![-\\w])");
     for (Path sheet : stylesheets()) {
       String name = sheet.getFileName().toString();
       String css =
           Files.readString(sheet, StandardCharsets.UTF_8).replaceAll("(?s)/\\*.*?\\*/", " ");
       for (String statement : topLevel(css)) {
-        if (!stateSelector.matcher(statement).find()) {
+        boolean namesHidden = hidden.matcher(statement).find();
+        boolean namesOpen = open.matcher(statement).find();
+        if (!namesHidden && !namesOpen) {
           continue;
         }
-        if ("inline-migration.css".equals(name) && statement.startsWith("@layer utilities")) {
-          hiddenInUtilities |= statement.contains(".krtm-hidden");
-          openInUtilities |= statement.contains(".krtm-modal-open");
+        if ("styles.css".equals(name) && statement.startsWith("@layer utilities")) {
+          hiddenInUtilities |= namesHidden;
+          openInUtilities |= namesOpen;
         } else {
           offenders.add(name + ": names a state class outside the utilities layer");
         }
       }
     }
-    assertThat(hiddenInUtilities).as(".krtm-hidden is declared in @layer utilities").isTrue();
-    assertThat(openInUtilities).as(".krtm-modal-open is declared in @layer utilities").isTrue();
+    assertThat(hiddenInUtilities).as(".is-hidden is declared in @layer utilities").isTrue();
+    assertThat(openInUtilities)
+        .as(".krt-modal-overlay.is-open is declared in @layer utilities")
+        .isTrue();
     assertThat(offenders)
         .as("REQ-UI-024: the state classes win by layer; no stylesheet re-asserts them")
         .isEmpty();

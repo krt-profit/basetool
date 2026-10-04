@@ -69,7 +69,7 @@ class ModalWrapperRenderTest {
     String dialog = dialog("h-plain");
     assertThat(dialog)
         .startsWith("<dialog class=\"krt-modal-overlay\" id=\"h-plain\" aria-label=\"")
-        .doesNotContain("krtm-modal-open")
+        .doesNotContain("is-open")
         .doesNotContain("aria-labelledby")
         .contains("<div class=\"krt-modal\">")
         .contains("<div class=\"krt-modal-head\">")
@@ -95,7 +95,7 @@ class ModalWrapperRenderTest {
     assertThat(dialog)
         .as("the dialog is labelled by its heading, not by a copy of the title")
         .startsWith(
-            "<dialog class=\"krt-modal-overlay krtm-modal-open\" id=\"h-full\""
+            "<dialog class=\"krt-modal-overlay is-open\" id=\"h-full\""
                 + " aria-labelledby=\"h-full-title\">")
         .contains("<div class=\"krt-modal krt-modal--wide krt-modal--danger\">")
         .containsPattern("<h2 id=\"h-full-title\">[^<]+</h2>")
@@ -112,7 +112,7 @@ class ModalWrapperRenderTest {
     String dialog = dialog("h-class-bound");
     assertThat(dialog)
         .doesNotContain("data-trigger")
-        .doesNotContain("krtm-modal-open")
+        .doesNotContain("is-open")
         .contains("class=\"krt-modal-close close-h-class\"");
   }
 

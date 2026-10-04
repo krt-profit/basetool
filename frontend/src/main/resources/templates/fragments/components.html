@@ -112,19 +112,5 @@
     </table>
 </div>
 
-<button th:fragment="filterToggle(panelId, testid)"
-        type="button" class="btn btn-ghost filter-toggle"
-        th:attr="aria-controls=${panelId},data-testid=${testid}"
-        aria-expanded="true">
-    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-filter"/></svg>
-    <span th:text="#{filter.toggle}">Filter</span>
-    <span class="chip chip--primary filter-count" data-filter-count hidden
-          th:data-label="#{filter.activeCount}">
-        <span data-filter-count-value aria-hidden="true">0</span>
-        <span data-filter-count-label class="visually-hidden"></span>
-    </span>
-    <svg class="krt-icon filter-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
-</button>
-
 </body>
 </html>
