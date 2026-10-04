@@ -1,6 +1,6 @@
 # ADR-0233 — Module boundaries are enforced by ArchUnit and by Spring Modulith in test scope
 
-- **Status:** Accepted — enforcement in place (Phase 0: re-keyed ArchUnit rules with selection floors, the domain map and the frozen module baseline, Spring Modulith 2.1.1 in test scope); the verified module set grows as domains move (Phase 1 on)
+- **Status:** Accepted — enforcement in place (Phase 0: re-keyed ArchUnit rules with selection floors, the domain map and the frozen module baseline, Spring Modulith 2.1.1 in test scope); module declarations in place for every module package since 2026-10-04 (plan P1-13, amendment 1), and the verified module set grows as domains move
 - **Date:** 2026-09-29
 - **Deciders:** @greluc (owner decision D-02)
 - **Related:** [domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) §5.7, §6, §10 ·
@@ -84,3 +84,30 @@ for what neither sees.
   disappear with only a warning, and its listeners run after commit, where audit can never go.
 - **Freezing everything, security rules included** — a frozen security violation is an accepted
   hole that nobody re-reads.
+
+## Amendment 1 (2026-10-04) — the annotations are on the main compile classpath, and how they are declared
+
+**Status:** accepted with plan step P1-13 · **Spec:** REQ-MOD-005, REQ-MOD-006
+
+A `package-info` in `backend/src/main` can carry `@ApplicationModule` and `@NamedInterface` only
+when the annotation types compile there. `org.springframework.modulith:spring-modulith-api` is
+therefore a **`compileOnly`** dependency of the backend's main source set. It holds annotations and
+no runtime behaviour, and `compileOnly` keeps it off the `runtimeClasspath`: it is not in the boot
+jar, the image or the CycloneDX SBOM, and the compiled `package-info` classes carry annotations the
+JVM ignores when their type is absent. Decision 4 stands as written — Spring Modulith *runs* in
+test scope only — and the consequence "nothing is added to an image" still holds; what changes is
+that its annotation vocabulary, unlike its engine, is visible to production sources.
+
+The declarations follow three rules, each proven by `ModularityTest` and its planted fixture:
+
+1. **Every module package is declared.** A first-level backend package named after a module of the
+   domain map carries `@ApplicationModule` (closed); the test fails while one does not.
+2. **The `api` package tree is the only named interface.** `@NamedInterface` on a package covers
+   that package alone (its `propagate` attribute applies to annotated types), so the `api` package
+   and every package below it carry `@NamedInterface("api")`, which Spring Modulith merges into one
+   interface.
+3. **`allowedDependencies` is derived from the domain map**, never written by hand: the
+   `<module>::api` of every declared module that the map's ranks and `allow` rows permit. A bare
+   module name would admit only that module's unnamed interface, and a name that is not a declared
+   module makes Spring Modulith throw, so a module enters the lists when it is declared. One source
+   then states the layering for both tools.

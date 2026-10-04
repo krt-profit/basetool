@@ -22,4 +22,7 @@
  * de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder} and the event vocabulary other
  * modules record with (REQ-AUDIT-001, plan §5.2, §5.3).
  */
+@NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.audit.api;
+
+import org.springframework.modulith.NamedInterface;

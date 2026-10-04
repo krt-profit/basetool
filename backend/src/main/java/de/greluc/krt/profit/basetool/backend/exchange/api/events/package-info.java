@@ -21,4 +21,7 @@
  * The exchange module's published events: an installation connected and a bulk undo applied, fanned
  * out as notifications after commit (plan §5.3).
  */
+@NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.exchange.api.events;
+
+import org.springframework.modulith.NamedInterface;

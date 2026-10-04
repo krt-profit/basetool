@@ -21,4 +21,7 @@
  * The job-order module's published events: an order created or updated by its requester, fanned out
  * as notifications after commit (plan §5.3).
  */
+@NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.joborder.api.events;
+
+import org.springframework.modulith.NamedInterface;

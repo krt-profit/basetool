@@ -22,4 +22,7 @@
  * de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent}, which every
  * notification-producing event implements, and the org-unit reference it carries (plan §5.3).
  */
+@NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.notification.api.events;
+
+import org.springframework.modulith.NamedInterface;

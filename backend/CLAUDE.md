@@ -31,7 +31,7 @@ authorization chain, the scope predicate, the audited areas, the aggregates and 
 
 The backend is being cut by domain (ADR-0231, `docs/DOMAIN_MODULARISATION_PLAN.md`). Until the
 domain packages exist, `src/test/resources/architecture/domain-map.txt` assigns every main class to
-its target module, first matching rule wins (REQ-MOD-001…005).
+its target module, first matching rule wins (REQ-MOD-001…006).
 
 - **A new class must match a rule.** `DomainMapTest` fails on an unassigned class, a dead rule, an
   empty module and a duplicate simple name. Add an explicit `class` rule with its reason when no name
@@ -50,6 +50,15 @@ its target module, first matching rule wins (REQ-MOD-001…005).
   notification-producing event implements `notification.api.events.NotificationEvent`. A new
   module package needs a `package <module> <module>` rule in the domain map. Event payloads are
   data only: `eventLayerShouldNotDependOnServiceLayer` selects every `api.events` package tree.
+- **A new module package gets its Spring Modulith declarations in the same PR** (REQ-MOD-006,
+  ADR-0233 amendment 1). Its root `package-info` carries `@ApplicationModule(allowedDependencies =
+  {…})`, its `api` package **and every package below `api`** carry `@NamedInterface("api")` (a
+  package-level `@NamedInterface` does not cover sub-packages), and the module is added to
+  `ModularityTest.DECLARED_MODULES`. `allowedDependencies` is derived, not chosen: the `"<m>::api"`
+  of every declared module the domain map's ranks and `allow` rows permit — a bare `"<m>"` admits
+  only the unnamed interface. Declaring a module also adds it to the lists of the declared modules
+  above it. `ModularityTest` fails until all of this matches. The annotations come from
+  `spring-modulith-api`, `compileOnly`; never move Spring Modulith's engine out of test scope.
 
 ## Concurrency — read this before touching multi-step transactions
 
