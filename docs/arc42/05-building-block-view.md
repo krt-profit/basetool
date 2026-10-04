@@ -69,7 +69,6 @@ Layered, with the direction enforced by ArchUnit rather than by convention:
 | `support` | Cross-cutting helpers, including the `OptimisticLock` family |
 | `task` | Scheduled jobs |
 | `integration` | Outbound third parties — `UexClient`, `scwiki` — on the blocking `RestClient` from `config.RestClientConfig` (JDK HTTP client, no WebFlux; ADR-0204), which `KeycloakService` shares |
-| `event` | Domain events, including what drives notifications and live sync |
 | `metrics` / `health` / `logging` | `basetool_*` business metrics, health indicators, MDC enrichment |
 | `filter` / `interceptor` / `annotation` / `validation` / `util` / `web` / `exception` / `config` | The usual Spring surface |
 
@@ -87,9 +86,27 @@ The first module package is `audit.api`, the audit module's published interface 
 entity, its repository, the viewer and the retention purge are the module's internals and still sit
 in the layer packages.
 
-The Phase 1 re-homings (plan §7.3) added four more: `kernel` (handle anonymisation, the handle
-scrubber and the generic `FuzzyNameMatcher`), `identity.api` (`PayoutPreference`),
-`orgunit.api` (`BereichLeadershipRole` and the observer SPI `MembershipChangeObserver`) and
+The domain events live in their publisher's `<module>.api.events` package (plan §5.2, §5.3); there
+is no central `event` package. Every listener runs after commit (`@TransactionalEventListener`),
+so the reaction may happen later or fail on its own, and none records an audit row for the mutation
+that published the event (REQ-AUDIT-007). Seven modules publish today:
+
+| Package | Events |
+| --- | --- |
+| `notification.api.events` | `NotificationEvent`, the contract every notification-producing event implements, and the `OrgUnitRef` it carries |
+| `identity.api.events` | `DiscordRegistrationPendingEvent`, `UserApprovalDecidedEvent`, `MemberDepartedEvent` (consumed by the exchange departure) |
+| `privacy.api.events` | the three `AccountDeletionRequest…Event`s (transitional module, plan §7.6) |
+| `bank.api.events` | `BankBookingRequestEvent` and its created, confirmed, rejected and cancelled records |
+| `joborder.api.events` | `JobOrderCreatedEvent`, `JobOrderUpdatedByRequesterEvent` |
+| `materialexchange.api.events` | `MaterialExchangeInterestRegisteredEvent`, `MaterialRequestFulfillmentSignalledEvent` |
+| `exchange.api.events` | `ExchangeInstallationConnectedEvent`, `ExchangeBulkUndoAppliedEvent` |
+
+The publishing services and the listeners still sit in `service`. `OrgUnitRef` stays with the
+notification contract rather than the kernel, because it carries the org-unit module's
+`OrgUnitKind`.
+
+The Phase 1 re-homings (plan §7.3) added three more: `kernel` (handle anonymisation, the handle
+scrubber and the generic `FuzzyNameMatcher`), `orgunit.api` (`BereichLeadershipRole` and the observer SPI `MembershipChangeObserver`) and
 `orgunit.web` (the Bereich-leader and Grand-Admiral request bodies). The org chart mirrors the
 leadership ranks as that observer, inside the transaction of the rank change, so the org-unit
 services no longer know `OrgChartService`. The exchange's row records are nested in the

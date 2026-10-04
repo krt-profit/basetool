@@ -41,7 +41,7 @@ the Leitung view into `orgchart` — corrected 2026-10-04, the view was first ma
 the access core into `platform`, the scope kernel into `scope`, the 31 GDPR classes into `privacy`,
 `HandleAnonymisation` into `kernel`, `PayoutPreference` into `identity`, the composition root into
 `app`). Changing a class's target module is a reviewed edit of this file. Once a module's package
-exists, a `package` rule assigns its tree (`audit`, `kernel`, `identity`, `orgunit` today) and the
+exists, a `package` rule assigns its tree (for example `audit`, `kernel`, `orgunit`) and the
 `class` rules of the classes that moved into it are removed.
 
 **Acceptance**

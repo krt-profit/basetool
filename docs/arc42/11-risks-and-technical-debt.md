@@ -363,5 +363,6 @@ exchange and the bank. Its decisions are recorded as ADR-0231 (the module cut), 
 interact), ADR-0233 (enforcement), ADR-0234 (the API's hard cut), ADR-0235 (the error model) and
 ADR-0236 (access policies per domain); the rules are §8.14. Status on 2026-10-04: the defects found
 along the way are fixed (Phase −1, merged 2026-10-01), the guards of Phase 0 are on `main`, and
-Phase 1 has begun: `audit.api`, `kernel`, `identity.api` and `orgunit.api`/`orgunit.web` exist,
+Phase 1 has begun: `audit.api`, `kernel`, `orgunit.api`/`orgunit.web` and the publishers'
+`api.events` packages exist,
 and the frozen module baseline has shrunk from 138 to 129 class edges.

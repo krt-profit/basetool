@@ -50,6 +50,11 @@ import com.tngtech.archunit.lang.SimpleConditionEvent;
 import com.tngtech.archunit.library.dependencies.SliceAssignment;
 import com.tngtech.archunit.library.dependencies.SliceIdentifier;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCancelledEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestConfirmedEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCreatedEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestRejectedEvent;
 import de.greluc.krt.profit.basetool.backend.config.ActingMemberFilter;
 import de.greluc.krt.profit.basetool.backend.controller.AppVersionPolicyController;
 import de.greluc.krt.profit.basetool.backend.controller.BankAccountController;
@@ -64,12 +69,6 @@ import de.greluc.krt.profit.basetool.backend.controller.BasetoolErrorController;
 import de.greluc.krt.profit.basetool.backend.controller.DiscordAccountExistenceController;
 import de.greluc.krt.profit.basetool.backend.controller.OrgUnitBankController;
 import de.greluc.krt.profit.basetool.backend.controller.TermsDocumentController;
-import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestCancelledEvent;
-import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestConfirmedEvent;
-import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestCreatedEvent;
-import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestEvent;
-import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestRejectedEvent;
-import de.greluc.krt.profit.basetool.backend.event.NotificationEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
@@ -159,6 +158,7 @@ import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderBalance;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderBookingRow;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderLeg;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankPostingSlice;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountApprovalLimitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountGrantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
@@ -372,9 +372,12 @@ class ArchitectureTest {
   static final DescribedPredicate<JavaClass> INTEGRATION_CODE =
       packageTreeOf("integration code", UexClient.class);
 
-  /** The event payloads, anchored on {@link NotificationEvent}. */
+  /**
+   * The event payloads: the {@code api.events} package tree of every module, which holds {@link
+   * NotificationEvent} and every record a module publishes (plan §5.2).
+   */
   static final DescribedPredicate<JavaClass> EVENT_CODE =
-      packageTreeOf("event code", NotificationEvent.class);
+      moduleApiEventsCode("event code", ROOT_PACKAGE);
 
   /** Classes of the exchange domain: a package segment named {@code exchange}. */
   static final DescribedPredicate<JavaClass> EXCHANGE_DOMAIN = inDomain("exchange");
@@ -538,7 +541,6 @@ class ArchitectureTest {
           "config",
           "controller",
           "dto",
-          "event",
           "exception",
           "filter",
           "health",
@@ -2090,6 +2092,26 @@ class ArchitectureTest {
       current = current.getEnclosingClass().get();
     }
     return current;
+  }
+
+  /**
+   * The classes in the {@code api.events} package tree of any module directly below a root package.
+   *
+   * @param name the description
+   * @param rootPackage the root package whose top-level packages are the modules
+   * @return the predicate
+   */
+  static DescribedPredicate<JavaClass> moduleApiEventsCode(String name, String rootPackage) {
+    return DescribedPredicate.describe(
+        "are " + name + " (the api.events package tree of every module below " + rootPackage + ")",
+        c -> {
+          String pkg = c.getPackageName();
+          if (!pkg.startsWith(rootPackage + ".")) {
+            return false;
+          }
+          String[] segments = pkg.substring(rootPackage.length() + 1).split("\\.");
+          return segments.length >= 3 && segments[1].equals("api") && segments[2].equals("events");
+        });
   }
 
   static boolean isInPackageTree(String packageName, String root) {

@@ -53,6 +53,11 @@ its target module, first matching rule wins (REQ-MOD-001…005).
 - **Domain-free helpers go to `kernel`**, not to `support`, when they need nothing but the JDK
   (`HandleAnonymisation`, `HandleScrubber`, `FuzzyNameMatcher`). A helper that reads an entity is
   not domain-free.
+- **A domain event goes into its publisher's `<module>.api.events` package** — the module of the
+  service that calls `publishEvent` with it; there is no central `event` package. A
+  notification-producing event implements `notification.api.events.NotificationEvent`. A new
+  module package needs a `package <module> <module>` rule in the domain map. Event payloads are
+  data only: `eventLayerShouldNotDependOnServiceLayer` selects every `api.events` package tree.
 
 ## Concurrency — read this before touching multi-step transactions
 

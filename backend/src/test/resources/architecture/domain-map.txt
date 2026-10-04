@@ -60,11 +60,9 @@ class DeletionRequestRepository privacy GDPR orchestration, transitional module 
 class DeletionRequestDto privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class CreateDeletionRequestRequest privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class DecideDeletionRequestRequest privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
-class AccountDeletionRequestDeclinedEvent privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
-class AccountDeletionRequestResolvedEvent privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
-class AccountDeletionRequestedEvent privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class ConsolidateAccountRequest privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class MergeAccountRequest privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
+class PayoutPreference identity member preference on User (plan 7.3)
 class AccessGateService scope per-aggregate can* gate slab for mission/joborder/inventory/refinery/operation/ship (ADR-0065)
 class OwnerScopeService scope scope facade referenced by 64+ SpEL strings (ADR-0065)
 class RequestScopeResolver scope request-scoped pin and ScopePredicate resolution (ADR-0065)
@@ -132,9 +130,6 @@ class KeycloakTrustSupport identity Keycloak admin-client truststore
 class KeycloakHealthIndicator platform health probe
 class UserSyncTask identity Keycloak user-sync trigger
 class RejectedRegistrationRetentionTask identity rejected-registration purge (REQ-SEC-057)
-class MemberDepartedEvent identity member left the organisation (identity provider)
-class OrgUnitRef notification org-unit reference carried by NotificationEvent
-class NotificationEvent notification contract every notification-producing event implements
 class SseSendFailureCause platform SSE failure tag shared by notification and live sync
 class RedisJsonFanout platform Redis pub/sub transport shared by notification and live sync
 class ResilientRedisMessageListenerContainer platform Redis listener plumbing
@@ -220,8 +215,14 @@ class RequestBodyLimitProperties platform request-body limit configuration
 package dto catalogue external feed DTO packages of the UEX, SC Wiki and P4K imports
 package integration catalogue outbound catalogue clients
 package audit audit the audit module's package tree (plan 5.2)
-package kernel kernel the kernel's package tree (plan 5.1 rank 0)
+package bank bank the bank module's package tree (plan 5.2)
+package exchange exchange the exchange module's package tree (plan 5.2)
 package identity identity the identity module's package tree (plan 5.2)
+package joborder joborder the job-order module's package tree (plan 5.2)
+package materialexchange materialexchange the Materialboerse module's package tree (plan 5.2)
+package notification notification the notification module's package tree (plan 5.2)
+package privacy privacy the GDPR module's package tree, transitional (plan 5.1 rank 13, 7.6)
+package kernel kernel the kernel's package tree (plan 5.1 rank 0)
 package orgunit orgunit the org-unit module's package tree (plan 5.2)
 
 name ^OrgUnitBank bank

@@ -29,11 +29,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
-import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.mapper.MissionMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.JoinMissionRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionDto;
@@ -187,7 +187,7 @@ class MissionControllerLifecycleTest {
             "comment",
             null,
             null,
-            de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference.PAYOUT,
+            de.greluc.krt.profit.basetool.backend.model.PayoutPreference.PAYOUT,
             1L);
     return new MissionDto(
         id,

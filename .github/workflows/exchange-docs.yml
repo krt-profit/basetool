@@ -10,6 +10,7 @@ on:
       - .github/workflows/exchange-docs.yml
       - .github/scripts/check_exchange_docs_links.py
       - .github/scripts/prepare_exchange_reference.py
+      - .github/tools/markdownlint/**
       - frontend/src/main/resources/static/fonts/**
       - frontend/src/main/resources/META-INF/resources/logos/**
   pull_request:
@@ -20,6 +21,7 @@ on:
       - .github/workflows/exchange-docs.yml
       - .github/scripts/check_exchange_docs_links.py
       - .github/scripts/prepare_exchange_reference.py
+      - .github/tools/markdownlint/**
       - frontend/src/main/resources/static/fonts/**
       - frontend/src/main/resources/META-INF/resources/logos/**
   workflow_dispatch:
@@ -55,7 +57,10 @@ jobs:
         run: python3 .github/scripts/check_exchange_docs_links.py
 
       - name: markdown / Lint the pages
-        run: npx --yes markdownlint-cli2@0.23.3 "docs/exchange/**/*.md"
+        run: |
+          set -euo pipefail
+          npm ci --prefix .github/tools/markdownlint --ignore-scripts --no-audit --no-fund
+          .github/tools/markdownlint/node_modules/.bin/markdownlint-cli2 "docs/exchange/**/*.md"
 
       - name: dpop-reference / Run the reference implementation's tests
         env:

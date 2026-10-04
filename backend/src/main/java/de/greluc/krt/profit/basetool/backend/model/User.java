@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
-import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

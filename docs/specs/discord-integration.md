@@ -555,7 +555,7 @@ reason are **never logged** (REQ-OBS).
 **Enforced by:** `UserRegistrationServiceTest` (publish on decide, none on 409) · `UserApprovalMailServiceTest`
 (approval/rejection composition, reason placeholder, skip-on-no-email) · `UserApprovalMailEventListenerTest`
 (delegate + swallow) · `MessageBundleConsistencyTest` (key parity + umlaut escaping) · **Code:**
-`UserRegistrationService.approveUser`/`rejectUser`, `event/UserApprovalDecidedEvent`, `service/UserApprovalMailService`,
+`UserRegistrationService.approveUser`/`rejectUser`, `identity/api/events/UserApprovalDecidedEvent`, `service/UserApprovalMailService`,
 `service/UserApprovalMailEventListener`, `messages*.properties` (`email.*`) · **Decision:** ADR-0064 · **Issues:** #720
 
 ### REQ-NOTIF-015 — Admins notified by e-mail on new PENDING registration
@@ -600,7 +600,7 @@ and the username are **never logged** (REQ-OBS) — only the recipient count.
 name-less body, empty-admins no-op) · `PendingRegistrationMailEventListenerTest` (delegate + swallow) ·
 `MessageBundleConsistencyTest` (key parity + umlaut escaping) · **Code:**
 `service/PendingRegistrationMailService`, `service/PendingRegistrationMailEventListener`,
-`event/DiscordRegistrationPendingEvent`, `repository/UserRepository#findAllAdmins`,
+`identity/api/events/DiscordRegistrationPendingEvent`, `repository/UserRepository#findAllAdmins`,
 `messages*.properties` (`email.pendingRegistration.*`) · **Decision:** ADR-0064 · **Issues:** #720
 
 ### REQ-DATA-018 — Discord guild nickname captured at login & shown at approval (admin-only)
