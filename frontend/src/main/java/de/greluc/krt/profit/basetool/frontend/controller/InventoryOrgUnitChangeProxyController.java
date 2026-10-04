@@ -71,8 +71,7 @@ public class InventoryOrgUnitChangeProxyController {
     }
     try {
       InventoryItemDto result =
-          backendApiClient.post(
-              "/api/v1/inventory/" + id + "/org-unit", dto, InventoryItemDto.class);
+          backendApiClient.post("/api/v1/inventory/{id}/org-unit", dto, InventoryItemDto.class, id);
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       log.debug(

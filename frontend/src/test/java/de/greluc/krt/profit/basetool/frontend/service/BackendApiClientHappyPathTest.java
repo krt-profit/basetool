@@ -396,6 +396,41 @@ class BackendApiClientHappyPathTest {
     assertEquals("DELETE", req.getMethod());
   }
 
+  /**
+   * Every write verb has a URI-template twin that expands its variables in order and encodes each
+   * value, so a relayed value carrying URI syntax stays one path segment (REQ-SEC-051).
+   *
+   * @throws Exception if a request could not be read back from the stub server
+   */
+  @Test
+  void everyWriteVerbExpandsAndEncodesUriTemplateVariables() throws Exception {
+    for (int i = 0; i < 5; i++) {
+      server.enqueue(jsonOk("\"x\""));
+    }
+    String hostile = "a/b?c=d&e#f";
+
+    client.post("/api/v1/things/{id}/items/{item}", "body", String.class, hostile, 7);
+    client.put("/api/v1/things/{id}?v={v}", null, String.class, hostile, 3L);
+    client.patch("/api/v1/things/{id}", "body", String.class, hostile);
+    client.delete("/api/v1/things/{id}", String.class, hostile);
+    client.delete("/api/v1/things/{id}/slice", "body", String.class, hostile);
+
+    String encoded = "a%2Fb%3Fc%3Dd%26e%23f";
+    List<String> expected =
+        List.of(
+            "POST /api/v1/things/" + encoded + "/items/7",
+            "PUT /api/v1/things/" + encoded + "?v=3",
+            "PATCH /api/v1/things/" + encoded,
+            "DELETE /api/v1/things/" + encoded,
+            "DELETE /api/v1/things/" + encoded + "/slice");
+    for (String line : expected) {
+      RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+      assertNotNull(req);
+      assertEquals(line, req.getMethod() + " " + req.getPath());
+      assertEquals("authenticated", req.getHeader("X-Auth"));
+    }
+  }
+
   private static MockResponse jsonOk(String body) {
     return new MockResponse()
         .setResponseCode(200)

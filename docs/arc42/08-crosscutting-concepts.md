@@ -262,9 +262,11 @@ a matching log line. The per-domain typed clients the frontend gets are built ov
 **The backend clients stay in the kernel and address only the backend** (REQ-FE-029, 2026-10-03).
 `WebClientConfig` builds four clients: `webClient` and the anonymous `termsDocumentClient` carry the
 Resilience4j chain, the SSE relay's `sseWebClient` and the live-sync probe's
-`liveSyncAuthWebClient` deliberately do not. Only `WebClientConfig` builds a client, and only
-`BackendApiClient`, the SSE relay and the probe hold one (`WebClientConfinementTest`); every other
-class calls `BackendApiClient`. The first filter of all four refuses any request whose scheme, host
+`liveSyncAuthWebClient` deliberately do not. Only `WebClientConfig` builds a client, and only the
+kernel holds one — `BackendApiClient`, and `BackendSideChannels` for the SSE relay and the probe
+(`WebClientConfinementTest`); every other class calls one of the two. `BackendErrorMapper` maps
+every failed `BackendApiClient` call in one exhaustive switch, and a runtime value enters a backend
+URI only as a template variable (REQ-SEC-051, `WriteUriTemplateTest` for the write verbs). The first filter of all four refuses any request whose scheme, host
 and port differ from `app.backend-url`, before the OAuth2 filter can attach the member's bearer —
 an absolute URL handed to a client would otherwise carry the token to that host. Future
 HTTP-interface clients are created over the same `webClient` bean and take no `URI`,

@@ -267,7 +267,7 @@ public class MaterialboersePageController {
         "Update Materialbörse offer failed",
         () ->
             backendApiClient.put(
-                "/api/v1/material-exchange/offers/" + id + "/remark", body, Object.class));
+                "/api/v1/material-exchange/offers/{id}/remark", body, Object.class, id));
   }
 
   /**
@@ -283,7 +283,7 @@ public class MaterialboersePageController {
         "Deactivate Materialbörse offer failed",
         () ->
             backendApiClient.post(
-                "/api/v1/material-exchange/offers/" + id + "/deactivate", null, Object.class));
+                "/api/v1/material-exchange/offers/{id}/deactivate", null, Object.class, id));
   }
 
   /**
@@ -300,9 +300,10 @@ public class MaterialboersePageController {
         "Deactivate Materialbörse offer for item failed",
         () ->
             backendApiClient.post(
-                "/api/v1/material-exchange/items/" + inventoryItemId + "/deactivate",
+                "/api/v1/material-exchange/items/{inventoryItemId}/deactivate",
                 null,
-                Object.class));
+                Object.class,
+                inventoryItemId));
   }
 
   /**
@@ -318,7 +319,7 @@ public class MaterialboersePageController {
         "Register Materialbörse interest failed",
         () ->
             backendApiClient.post(
-                "/api/v1/material-exchange/offers/" + id + "/interest", null, Object.class));
+                "/api/v1/material-exchange/offers/{id}/interest", null, Object.class, id));
   }
 
   /**
@@ -334,7 +335,7 @@ public class MaterialboersePageController {
         "Withdraw Materialbörse interest failed",
         () ->
             backendApiClient.delete(
-                "/api/v1/material-exchange/offers/" + id + "/interest", Object.class));
+                "/api/v1/material-exchange/offers/{id}/interest", Object.class, id));
   }
 
   /**
@@ -417,7 +418,7 @@ public class MaterialboersePageController {
       @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
     return proxy(
         "Update Materialbörse request failed",
-        () -> backendApiClient.put("/api/v1/material-requests/" + id, body, Object.class));
+        () -> backendApiClient.put("/api/v1/material-requests/{id}", body, Object.class, id));
   }
 
   /**
@@ -433,7 +434,7 @@ public class MaterialboersePageController {
         "Deactivate Materialbörse request failed",
         () ->
             backendApiClient.post(
-                "/api/v1/material-requests/" + id + "/deactivate", null, Object.class));
+                "/api/v1/material-requests/{id}/deactivate", null, Object.class, id));
   }
 
   /**
@@ -449,7 +450,7 @@ public class MaterialboersePageController {
         "Signal Materialbörse fulfilment failed",
         () ->
             backendApiClient.post(
-                "/api/v1/material-requests/" + id + "/interest", null, Object.class));
+                "/api/v1/material-requests/{id}/interest", null, Object.class, id));
   }
 
   /**
@@ -463,8 +464,7 @@ public class MaterialboersePageController {
   public ResponseEntity<Object> withdrawFulfillment(@PathVariable @NotNull UUID id) {
     return proxy(
         "Withdraw Materialbörse fulfilment failed",
-        () ->
-            backendApiClient.delete("/api/v1/material-requests/" + id + "/interest", Object.class));
+        () -> backendApiClient.delete("/api/v1/material-requests/{id}/interest", Object.class, id));
   }
 
   /**

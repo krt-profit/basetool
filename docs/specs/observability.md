@@ -681,6 +681,26 @@ both as a privacy rule (metrics have 180-day retention) and as a cardinality gua
 Prometheus TSDB. This applies to every meter exposed on `/actuator/prometheus`, including
 the future `basetool_*` business metrics (epic #936 Phase 1c).
 
+**The `uri` tag is bounded by the route table, and its cap must sit above it.** Spring tags
+`http.server.requests` and `http.client.requests` with the route template, never the raw path, so
+the set of `uri` values is the set of routes. Micrometer still caps it
+(`management.metrics.web.server.max-uri-tags` / `.client.max-uri-tags`, default **100**) and, once
+the cap is reached, drops every further `uri` without a metric — one WARN from
+`MaximumAllowableTagsMeterFilter`, then silence. The backend has about 450 route templates and the
+frontend about 420, so the default cut both off within hours of a restart: on 2026-10-04 the
+backend had reached exactly 100 by evening and the frontend's backend calls 94, and every route
+first hit after that was missing from `Http5xxRateHigh`, `HttpLatencyP95High` and the dashboards.
+
+- The backend sets the server cap and the frontend both caps to **1000** in `application.yml`; the
+  ingest keeps the default (16 mappings).
+- `UriTagCapacityTest` (backend, frontend) counts the dispatcher's route templates and fails when
+  they plus 50 fixed tags (`UNKNOWN`, `NOT_FOUND`, `REDIRECTION`, …) reach the bound cap; the
+  frontend test also holds the client cap at 1000 or more, because the frontend relays to every
+  backend route.
+- `HttpUriTagCapNear` (`apps.yml`, warning) fires when an application reports 900 distinct `uri`
+  values on either meter for 15 minutes — the drift a test cannot see, such as a raw path leaking
+  into the tag.
+
 ### REQ-OBS-007 — Log ingestion into the monitoring plane (per-stream rules)
 
 When log streams are shipped to Loki (epic #936 Phase 2), each stream obeys its own recorded

@@ -73,7 +73,7 @@ public class InventoryStolenMarkProxyController {
     }
     try {
       InventoryItemDto result =
-          backendApiClient.post("/api/v1/inventory/" + id + "/stolen", dto, InventoryItemDto.class);
+          backendApiClient.post("/api/v1/inventory/{id}/stolen", dto, InventoryItemDto.class, id);
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       log.debug(

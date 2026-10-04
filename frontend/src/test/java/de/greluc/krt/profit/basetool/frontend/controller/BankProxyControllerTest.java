@@ -40,6 +40,10 @@ import org.mockito.ArgumentCaptor;
 class BankProxyControllerTest {
 
   private BackendApiClient backendApiClient;
+
+  /** The URI variables of a helper call to a path without any. */
+  private static final Object[] NO_VARIABLES = {};
+
   private BankProxyController controller;
 
   @BeforeEach
@@ -51,19 +55,20 @@ class BankProxyControllerTest {
   @Test
   void bookDeposit_ShouldForwardBodyToBackend() {
     Map<String, Object> body = Map.of("accountId", "a", "holderId", "h", "amount", 100);
-    when(backendApiClient.post("/api/v1/bank/deposits", body, Map.class))
+    when(backendApiClient.post("/api/v1/bank/deposits", body, Map.class, NO_VARIABLES))
         .thenReturn(Map.of("id", "x"));
 
     Map<String, Object> result = controller.bookDeposit(body);
 
     assertEquals("x", result.get("id"));
-    verify(backendApiClient).post("/api/v1/bank/deposits", body, Map.class);
+    verify(backendApiClient).post("/api/v1/bank/deposits", body, Map.class, NO_VARIABLES);
   }
 
   @Test
   void bookTransfer_ShouldReturnEmptyMapForBodylessResponse() {
     Map<String, Object> body = Map.of("sourceAccountId", "a");
-    when(backendApiClient.post("/api/v1/bank/transfers", body, Map.class)).thenReturn(null);
+    when(backendApiClient.post("/api/v1/bank/transfers", body, Map.class, NO_VARIABLES))
+        .thenReturn(null);
 
     Map<String, Object> result = controller.bookTransfer(body);
 
@@ -74,20 +79,20 @@ class BankProxyControllerTest {
   void reverseTransaction_ShouldForwardEmptyMapWhenBodyMissing() {
     UUID id = UUID.randomUUID();
     when(backendApiClient.post(
-            eq("/api/v1/bank/transactions/" + id + "/reversal"), eq(Map.of()), eq(Map.class)))
+            eq("/api/v1/bank/transactions/{id}/reversal"), eq(Map.of()), eq(Map.class), eq(id)))
         .thenReturn(Map.of());
 
     controller.reverseTransaction(id, null);
 
     verify(backendApiClient)
-        .post("/api/v1/bank/transactions/" + id + "/reversal", Map.of(), Map.class);
+        .post("/api/v1/bank/transactions/{id}/reversal", Map.of(), Map.class, id);
   }
 
   @Test
   void renameAccount_ShouldPatchBackend() {
     UUID id = UUID.randomUUID();
     Map<String, Object> body = Map.of("name", "Neu", "version", 1);
-    when(backendApiClient.patch("/api/v1/bank/accounts/" + id, body, Map.class))
+    when(backendApiClient.patch("/api/v1/bank/accounts/{id}", body, Map.class, id))
         .thenReturn(Map.of("name", "Neu"));
 
     Map<String, Object> result = controller.renameAccount(id, body);
@@ -103,8 +108,8 @@ class BankProxyControllerTest {
     controller.closeAccount(id, body);
     controller.reopenAccount(id, body);
 
-    verify(backendApiClient).post("/api/v1/bank/accounts/" + id + "/close", body, Map.class);
-    verify(backendApiClient).post("/api/v1/bank/accounts/" + id + "/reopen", body, Map.class);
+    verify(backendApiClient).post("/api/v1/bank/accounts/{id}/close", body, Map.class, id);
+    verify(backendApiClient).post("/api/v1/bank/accounts/{id}/reopen", body, Map.class, id);
   }
 
   @Test
@@ -114,7 +119,7 @@ class BankProxyControllerTest {
 
     controller.updateHolder(id, body);
 
-    verify(backendApiClient).patch("/api/v1/bank/holders/" + id, body, Map.class);
+    verify(backendApiClient).patch("/api/v1/bank/holders/{id}", body, Map.class, id);
   }
 
   @Test
@@ -193,7 +198,8 @@ class BankProxyControllerTest {
     controller.deleteGrant(userId, accountId);
 
     verify(backendApiClient)
-        .patch("/api/v1/bank/grants/" + userId + "/" + accountId, flags, Map.class);
-    verify(backendApiClient).delete("/api/v1/bank/grants/" + userId + "/" + accountId, Void.class);
+        .patch("/api/v1/bank/grants/{userId}/{accountId}", flags, Map.class, userId, accountId);
+    verify(backendApiClient)
+        .delete("/api/v1/bank/grants/{userId}/{accountId}", Void.class, userId, accountId);
   }
 }

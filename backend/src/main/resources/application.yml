@@ -253,6 +253,9 @@ management:
   metrics:
     tags:
       application: basetool-backend
+    web:
+      server:
+        max-uri-tags: 1000
     distribution:
       percentiles-histogram:
         "[http.server.requests]": true

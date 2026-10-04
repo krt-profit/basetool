@@ -57,7 +57,7 @@ public class SpecialCommandAdminProxyController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Void> setProfitEligible(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    backendApiClient.patch("/api/v1/special-commands/" + id + "/profit-eligible", body, Void.class);
+    backendApiClient.patch("/api/v1/special-commands/{id}/profit-eligible", body, Void.class, id);
     backendApiClient.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
     return ResponseEntity.noContent().build();
   }

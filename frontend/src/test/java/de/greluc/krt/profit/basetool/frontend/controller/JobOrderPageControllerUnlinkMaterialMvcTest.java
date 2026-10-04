@@ -74,7 +74,11 @@ class JobOrderPageControllerUnlinkMaterialMvcTest {
 
     doReturn(null)
         .when(backendApiClient)
-        .delete(eq("/api/v1/orders/" + orderId + "/materials/" + materialId), eq(Void.class));
+        .delete(
+            eq("/api/v1/orders/{id}/materials/{materialId}"),
+            eq(Void.class),
+            eq(orderId),
+            eq(materialId));
 
     mockMvc
         .perform(
@@ -86,7 +90,11 @@ class JobOrderPageControllerUnlinkMaterialMvcTest {
         .andExpect(flash().attribute("successToast", "orders.detail.material.unlink.success"));
 
     verify(backendApiClient)
-        .delete(eq("/api/v1/orders/" + orderId + "/materials/" + materialId), eq(Void.class));
+        .delete(
+            eq("/api/v1/orders/{id}/materials/{materialId}"),
+            eq(Void.class),
+            eq(orderId),
+            eq(materialId));
   }
 
   @Test
@@ -111,7 +119,11 @@ class JobOrderPageControllerUnlinkMaterialMvcTest {
 
     doThrow(new BackendServiceException("Internal Server Error", null, 500))
         .when(backendApiClient)
-        .delete(eq("/api/v1/orders/" + orderId + "/materials/" + materialId), eq(Void.class));
+        .delete(
+            eq("/api/v1/orders/{id}/materials/{materialId}"),
+            eq(Void.class),
+            eq(orderId),
+            eq(materialId));
 
     mockMvc
         .perform(

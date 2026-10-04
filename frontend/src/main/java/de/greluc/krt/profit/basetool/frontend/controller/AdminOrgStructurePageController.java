@@ -213,7 +213,7 @@ public class AdminOrgStructurePageController {
         () -> {
           Object updated =
               backendApiClient.patch(
-                  "/api/v1/org-hierarchy/org-units/" + id + "/parent", request, Object.class);
+                  "/api/v1/org-hierarchy/org-units/{id}/parent", request, Object.class, id);
           backendApiClient.evict(CacheDomain.ORG_UNIT);
           return ResponseEntity.ok(updated);
         });

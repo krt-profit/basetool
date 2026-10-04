@@ -203,7 +203,10 @@ class RefineryStorePersonalMarkerTest {
     ArgumentCaptor<Object> payload = ArgumentCaptor.captor();
     verify(backendApiClient)
         .post(
-            eq("/api/v1/refinery-orders/" + orderId + "/store"), payload.capture(), eq(Void.class));
+            eq("/api/v1/refinery-orders/{id}/store"),
+            payload.capture(),
+            eq(Void.class),
+            eq(orderId));
     assertThat(payload.getValue()).isInstanceOf(RefineryOrderStoreDto.class);
     RefineryOrderStoreDto dto = (RefineryOrderStoreDto) payload.getValue();
     assertThat(dto.items()).hasSize(1);
@@ -230,7 +233,7 @@ class RefineryStorePersonalMarkerTest {
         .andExpect(status().isBadRequest());
 
     verify(backendApiClient, never())
-        .post(eq("/api/v1/refinery-orders/" + orderId + "/store"), any(), eq(Void.class));
+        .post(eq("/api/v1/refinery-orders/{id}/store"), any(), eq(Void.class), eq(orderId));
   }
 
   @Test
@@ -254,6 +257,6 @@ class RefineryStorePersonalMarkerTest {
         .andExpect(flash().attribute("showStoreModal", true));
 
     verify(backendApiClient, never())
-        .post(eq("/api/v1/refinery-orders/" + orderId + "/store"), any(), eq(Void.class));
+        .post(eq("/api/v1/refinery-orders/{id}/store"), any(), eq(Void.class), eq(orderId));
   }
 }

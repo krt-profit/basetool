@@ -120,7 +120,7 @@ public class OrgChartPageController {
       @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
     try {
       return ResponseEntity.ok(
-          backendApiClient.put("/api/v1/org-chart/positions/" + id, body, Object.class));
+          backendApiClient.put("/api/v1/org-chart/positions/{id}", body, Object.class, id));
     } catch (BackendServiceException e) {
       return relayError("Update org-chart position failed", e);
     } catch (Exception e) {
@@ -144,7 +144,7 @@ public class OrgChartPageController {
       @PathVariable @NotNull UUID id, @RequestParam("version") long version) {
     try {
       backendApiClient.delete(
-          "/api/v1/org-chart/positions/" + id + "/leader?version=" + version, Void.class);
+          "/api/v1/org-chart/positions/{id}/leader?version={version}", Void.class, id, version);
       return ResponseEntity.ok().build();
     } catch (BackendServiceException e) {
       return relayError("Vacate org-chart Kommandoleiter failed", e);
@@ -164,7 +164,7 @@ public class OrgChartPageController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> deletePosition(@PathVariable @NotNull UUID id) {
     try {
-      backendApiClient.delete("/api/v1/org-chart/positions/" + id, Void.class);
+      backendApiClient.delete("/api/v1/org-chart/positions/{id}", Void.class, id);
       return ResponseEntity.ok().build();
     } catch (BackendServiceException e) {
       return relayError("Delete org-chart position failed", e);

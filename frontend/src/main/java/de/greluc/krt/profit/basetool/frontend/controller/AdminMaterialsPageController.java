@@ -168,7 +168,7 @@ public class AdminMaterialsPageController {
   @PostMapping("/categories/{id}/delete")
   public String deleteCategory(@PathVariable UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/material-categories/" + id, Void.class);
+      backendApiClient.delete("/api/v1/material-categories/{id}", Void.class, id);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "DELETE /api/v1/material-categories", id, e);
@@ -224,7 +224,7 @@ public class AdminMaterialsPageController {
         log,
         "delete category (ajax)",
         () -> {
-          backendApiClient.delete("/api/v1/material-categories/" + id, Void.class);
+          backendApiClient.delete("/api/v1/material-categories/{id}", Void.class, id);
           return ResponseEntity.ok().build();
         });
   }
@@ -300,7 +300,7 @@ public class AdminMaterialsPageController {
               isVisible,
               request.version());
 
-      backendApiClient.put("/api/v1/materials/" + id, body, Void.class);
+      backendApiClient.put("/api/v1/materials/{id}", body, Void.class, id);
       backendApiClient.evict(CacheDomain.MATERIAL);
       MaterialDto updatedMaterial =
           backendApiClient.get("/api/v1/materials/" + id, MaterialDto.class);

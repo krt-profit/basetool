@@ -152,7 +152,10 @@ public class AdminPersonalInventoryPageController {
               form.getLocationType(),
               form.getQuantity());
       backendApiClient.post(
-          "/api/v1/admin/personal-inventory/" + userSub, request, PersonalInventoryItemDto.class);
+          "/api/v1/admin/personal-inventory/{userSub}",
+          request,
+          PersonalInventoryItemDto.class,
+          userSub);
       redirectAttributes.addFlashAttribute("successToast", "personalInventory.toast.created");
     } catch (Exception e) {
       log.error("Admin failed to create personal inventory item for {}", userSub, e);
@@ -199,7 +202,10 @@ public class AdminPersonalInventoryPageController {
               form.getQuantity(),
               form.getVersion());
       backendApiClient.put(
-          "/api/v1/admin/personal-inventory/items/" + id, request, PersonalInventoryItemDto.class);
+          "/api/v1/admin/personal-inventory/items/{id}",
+          request,
+          PersonalInventoryItemDto.class,
+          id);
       redirectAttributes.addFlashAttribute("successToast", "personalInventory.toast.updated");
     } catch (Exception e) {
       log.error("Admin failed to update personal inventory item {}", id, e);
@@ -224,7 +230,7 @@ public class AdminPersonalInventoryPageController {
       @PathVariable @NotNull UUID id,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/admin/personal-inventory/items/" + id, Void.class);
+      backendApiClient.delete("/api/v1/admin/personal-inventory/items/{id}", Void.class, id);
       redirectAttributes.addFlashAttribute("successToast", "personalInventory.toast.deleted");
     } catch (Exception e) {
       log.error("Admin failed to delete personal inventory item {}", id, e);

@@ -57,7 +57,7 @@ class SquadronAdminProxyControllerTest {
     InOrder inOrder = inOrder(backendApiClient);
     inOrder
         .verify(backendApiClient)
-        .patch(eq("/api/v1/squadrons/" + id + "/promotion-enabled"), eq(body), eq(Void.class));
+        .patch(eq("/api/v1/squadrons/{id}/promotion-enabled"), eq(body), eq(Void.class), eq(id));
     inOrder.verify(backendApiClient).evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
     inOrder.verifyNoMoreInteractions();
   }
@@ -73,7 +73,7 @@ class SquadronAdminProxyControllerTest {
     InOrder inOrder = inOrder(backendApiClient);
     inOrder
         .verify(backendApiClient)
-        .patch(eq("/api/v1/squadrons/" + id + "/profit-eligible"), eq(body), eq(Void.class));
+        .patch(eq("/api/v1/squadrons/{id}/profit-eligible"), eq(body), eq(Void.class), eq(id));
     inOrder.verify(backendApiClient).evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
     inOrder.verifyNoMoreInteractions();
   }

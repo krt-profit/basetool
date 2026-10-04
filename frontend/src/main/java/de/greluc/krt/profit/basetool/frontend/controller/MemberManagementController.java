@@ -424,7 +424,7 @@ public class MemberManagementController {
     UserAttributesUpdateDto body =
         new UserAttributesUpdateDto(
             form.rank(), form.description(), form.displayName(), form.version(), form.joinDate());
-    backendApiClient.put("/api/v1/users/" + id + "/attributes", body, Void.class);
+    backendApiClient.put("/api/v1/users/{id}/attributes", body, Void.class, id);
 
     if (!Boolean.TRUE.equals(form.staffelDetailLoaded())) {
       return;
@@ -442,9 +442,10 @@ public class MemberManagementController {
               form.staffel2Id(), form.staffel2Logistician(), form.staffel2MissionManager()));
     }
     backendApiClient.patch(
-        "/api/v1/users/" + id + "/memberships",
+        "/api/v1/users/{id}/memberships",
         new MembershipDeltaRequest(staffeln, null),
-        MembershipDeltaResponse.class);
+        MembershipDeltaResponse.class,
+        id);
   }
 
   /**
@@ -506,7 +507,7 @@ public class MemberManagementController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String deleteMember(@PathVariable UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/users/" + id, Void.class);
+      backendApiClient.delete("/api/v1/users/{id}", Void.class, id);
       liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.user.delete");
     } catch (BackendServiceException e) {
@@ -530,7 +531,7 @@ public class MemberManagementController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> deleteMemberAjax(@PathVariable @NotNull UUID id) {
     try {
-      backendApiClient.delete("/api/v1/users/" + id, Void.class);
+      backendApiClient.delete("/api/v1/users/{id}", Void.class, id);
       liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       return ResponseEntity.ok(Map.of());
     } catch (BackendServiceException e) {
@@ -582,7 +583,7 @@ public class MemberManagementController {
       @Nullable @RequestBody(required = false) ConsolidateAccountRequest body) {
     try {
       UserDto survivor =
-          backendApiClient.post("/api/v1/users/" + id + "/consolidate", body, UserDto.class);
+          backendApiClient.post("/api/v1/users/{id}/consolidate", body, UserDto.class, id);
       liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       return ResponseEntity.ok(survivor);
     } catch (BackendServiceException e) {

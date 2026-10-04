@@ -115,7 +115,10 @@ class PersonalInventoryWriteAjaxControllerTest {
   void updateAjax_backendOptimisticLock_propagatesProblemJsonWithCode() throws Exception {
     UUID id = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/personal-inventory/" + id), any(), eq(PersonalInventoryItemDto.class)))
+            eq("/api/v1/personal-inventory/{id}"),
+            any(),
+            eq(PersonalInventoryItemDto.class),
+            eq(id)))
         .thenThrow(
             new BackendServiceException(
                 "conflict", null, 409, "OPTIMISTIC_LOCK", null, Collections.emptyList(), null));
@@ -147,6 +150,6 @@ class PersonalInventoryWriteAjaxControllerTest {
                 .with(csrf()))
         .andExpect(status().isNoContent());
 
-    verify(backendApiClient).delete(eq("/api/v1/personal-inventory/" + id), eq(Void.class));
+    verify(backendApiClient).delete(eq("/api/v1/personal-inventory/{id}"), eq(Void.class), eq(id));
   }
 }

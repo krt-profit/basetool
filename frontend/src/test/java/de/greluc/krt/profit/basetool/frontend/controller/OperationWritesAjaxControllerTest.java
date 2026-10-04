@@ -97,7 +97,7 @@ class OperationWritesAjaxControllerTest {
     OperationDto refreshed =
         new OperationDto(OPERATION_ID, "Renamed Op", "desc", "ACTIVE", null, 7L, null, null, null);
     when(backendApiClient.put(
-            eq("/api/v1/operations/" + OPERATION_ID), any(), eq(OperationDto.class)))
+            eq("/api/v1/operations/{id}"), any(), eq(OperationDto.class), eq(OPERATION_ID)))
         .thenReturn(refreshed);
 
     mockMvc
@@ -115,14 +115,14 @@ class OperationWritesAjaxControllerTest {
         .andExpect(jsonPath("$.status").value("ACTIVE"));
 
     verify(backendApiClient)
-        .put(eq("/api/v1/operations/" + OPERATION_ID), any(), eq(OperationDto.class));
+        .put(eq("/api/v1/operations/{id}"), any(), eq(OperationDto.class), eq(OPERATION_ID));
   }
 
   @Test
   @WithMockUser(roles = "MISSION_MANAGER")
   void updateOperationAjax_backendConflict_propagatesProblemJsonWithCode() throws Exception {
     when(backendApiClient.put(
-            eq("/api/v1/operations/" + OPERATION_ID), any(), eq(OperationDto.class)))
+            eq("/api/v1/operations/{id}"), any(), eq(OperationDto.class), eq(OPERATION_ID)))
         .thenThrow(
             new BackendServiceException(
                 "conflict", null, 409, "OPTIMISTIC_LOCK", null, Collections.emptyList(), null));
@@ -148,7 +148,8 @@ class OperationWritesAjaxControllerTest {
                 .with(csrf()))
         .andExpect(status().isOk());
 
-    verify(backendApiClient).delete(eq("/api/v1/operations/" + OPERATION_ID), eq(Void.class));
+    verify(backendApiClient)
+        .delete(eq("/api/v1/operations/{id}"), eq(Void.class), eq(OPERATION_ID));
   }
 
   @Test

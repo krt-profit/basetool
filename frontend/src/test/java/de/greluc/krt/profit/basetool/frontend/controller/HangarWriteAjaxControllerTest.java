@@ -117,7 +117,7 @@ class HangarWriteAjaxControllerTest {
   @WithMockUser
   void updateShipAjax_backendOptimisticLock_propagatesProblemJsonWithCode() throws Exception {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.put(eq("/api/v1/hangar/ships/" + id), any(), eq(ShipDto.class)))
+    when(backendApiClient.put(eq("/api/v1/hangar/ships/{id}"), any(), eq(ShipDto.class), eq(id)))
         .thenThrow(
             new BackendServiceException(
                 "conflict", null, 409, "OPTIMISTIC_LOCK", null, Collections.emptyList(), null));
@@ -150,7 +150,7 @@ class HangarWriteAjaxControllerTest {
                 .with(csrf()))
         .andExpect(status().isNoContent());
 
-    verify(backendApiClient).delete(eq("/api/v1/hangar/ships/" + id), eq(Void.class));
+    verify(backendApiClient).delete(eq("/api/v1/hangar/ships/{id}"), eq(Void.class), eq(id));
   }
 
   @Test

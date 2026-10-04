@@ -136,9 +136,11 @@ class JobOrderPageControllerNoReloadMvcTest {
   void updatePriorityAjax_AsLogistician_RelaysAndReturnsOrder() throws Exception {
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/orders/" + orderId + "/priority?priority=2"),
+            eq("/api/v1/orders/{id}/priority?priority={priority}"),
             isNull(),
-            eq(JobOrderDto.class)))
+            eq(JobOrderDto.class),
+            eq(orderId),
+            eq(2)))
         .thenReturn(materialOrder(orderId, 5L));
 
     mockMvc
@@ -148,9 +150,11 @@ class JobOrderPageControllerNoReloadMvcTest {
 
     verify(backendApiClient)
         .put(
-            eq("/api/v1/orders/" + orderId + "/priority?priority=2"),
+            eq("/api/v1/orders/{id}/priority?priority={priority}"),
             isNull(),
-            eq(JobOrderDto.class));
+            eq(JobOrderDto.class),
+            eq(orderId),
+            eq(2));
   }
 
   @Test
@@ -158,9 +162,11 @@ class JobOrderPageControllerNoReloadMvcTest {
   void updatePriorityAjax_WhenBackendConflicts_PropagatesProblemJson() throws Exception {
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/orders/" + orderId + "/priority?priority=3"),
+            eq("/api/v1/orders/{id}/priority?priority={priority}"),
             isNull(),
-            eq(JobOrderDto.class)))
+            eq(JobOrderDto.class),
+            eq(orderId),
+            eq(3)))
         .thenThrow(new BackendServiceException("conflict", null, 409));
 
     mockMvc
@@ -179,6 +185,8 @@ class JobOrderPageControllerNoReloadMvcTest {
         .andExpect(status().isForbidden());
 
     verify(backendApiClient, never()).put(any(String.class), any(), eq(JobOrderDto.class));
+    verify(backendApiClient, never())
+        .put(any(String.class), any(), eq(JobOrderDto.class), any(Object[].class));
   }
 
   @Test
@@ -186,9 +194,10 @@ class JobOrderPageControllerNoReloadMvcTest {
   void blueprintVariantCounting_AsLogistician_RelaysAndReturnsOrder() throws Exception {
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.patch(
-            eq("/api/v1/orders/" + orderId + "/blueprint-variant-counting"),
+            eq("/api/v1/orders/{id}/blueprint-variant-counting"),
             any(),
-            eq(JobOrderDto.class)))
+            eq(JobOrderDto.class),
+            eq(orderId)))
         .thenReturn(materialOrder(orderId, 9L));
 
     mockMvc
@@ -202,9 +211,10 @@ class JobOrderPageControllerNoReloadMvcTest {
 
     verify(backendApiClient)
         .patch(
-            eq("/api/v1/orders/" + orderId + "/blueprint-variant-counting"),
+            eq("/api/v1/orders/{id}/blueprint-variant-counting"),
             any(),
-            eq(JobOrderDto.class));
+            eq(JobOrderDto.class),
+            eq(orderId));
   }
 
   @Test
@@ -221,6 +231,8 @@ class JobOrderPageControllerNoReloadMvcTest {
         .andExpect(status().isForbidden());
 
     verify(backendApiClient, never()).patch(any(String.class), any(), eq(JobOrderDto.class));
+    verify(backendApiClient, never())
+        .patch(any(String.class), any(), eq(JobOrderDto.class), any(Object[].class));
   }
 
   @Test
@@ -238,7 +250,10 @@ class JobOrderPageControllerNoReloadMvcTest {
 
     verify(backendApiClient)
         .delete(
-            eq("/api/v1/orders/" + orderId + "/inventory/" + invId + "/unlink"), eq(Void.class));
+            eq("/api/v1/orders/{id}/inventory/{inventoryItemId}/unlink"),
+            eq(Void.class),
+            eq(orderId),
+            eq(invId));
   }
 
   @Test
@@ -249,7 +264,10 @@ class JobOrderPageControllerNoReloadMvcTest {
     doThrow(new BackendServiceException("conflict", null, 409))
         .when(backendApiClient)
         .delete(
-            eq("/api/v1/orders/" + orderId + "/inventory/" + invId + "/unlink"), eq(Void.class));
+            eq("/api/v1/orders/{id}/inventory/{inventoryItemId}/unlink"),
+            eq(Void.class),
+            eq(orderId),
+            eq(invId));
 
     mockMvc
         .perform(delete("/orders/" + orderId + "/inventory/" + invId + "/unlink/ajax").with(csrf()))
@@ -268,6 +286,8 @@ class JobOrderPageControllerNoReloadMvcTest {
         .andExpect(status().isForbidden());
 
     verify(backendApiClient, never()).delete(any(String.class), eq(Void.class));
+    verify(backendApiClient, never())
+        .delete(any(String.class), eq(Void.class), any(Object[].class));
   }
 
   @Test
@@ -277,7 +297,7 @@ class JobOrderPageControllerNoReloadMvcTest {
 
     mockMvc.perform(delete("/orders/" + orderId).with(csrf())).andExpect(status().isNoContent());
 
-    verify(backendApiClient).delete(eq("/api/v1/orders/" + orderId), eq(Void.class));
+    verify(backendApiClient).delete(eq("/api/v1/orders/{id}"), eq(Void.class), eq(orderId));
   }
 
   @Test
@@ -286,7 +306,7 @@ class JobOrderPageControllerNoReloadMvcTest {
     UUID orderId = UUID.randomUUID();
     doThrow(new BackendServiceException("in use", null, 409))
         .when(backendApiClient)
-        .delete(eq("/api/v1/orders/" + orderId), eq(Void.class));
+        .delete(eq("/api/v1/orders/{id}"), eq(Void.class), eq(orderId));
 
     mockMvc
         .perform(delete("/orders/" + orderId).with(csrf()))
@@ -306,7 +326,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void updateOrderAjax_AsLogistician_RelaysAndReturnsOrder() throws Exception {
     UUID orderId = UUID.randomUUID();
-    when(backendApiClient.put(eq("/api/v1/orders/" + orderId), any(), eq(JobOrderDto.class)))
+    when(backendApiClient.put(eq("/api/v1/orders/{id}"), any(), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(materialOrder(orderId, 4L));
 
     mockMvc
@@ -333,7 +353,7 @@ class JobOrderPageControllerNoReloadMvcTest {
         .andExpect(status().isBadRequest());
 
     verify(backendApiClient, never())
-        .put(eq("/api/v1/orders/" + orderId), any(), eq(JobOrderDto.class));
+        .put(eq("/api/v1/orders/{id}"), any(), eq(JobOrderDto.class), eq(orderId));
   }
 
   @Test
@@ -449,9 +469,11 @@ class JobOrderPageControllerNoReloadMvcTest {
 
     verify(backendApiClient)
         .post(
-            eq("/api/v1/orders/" + orderId + "/items/" + itemId + "/production"),
+            eq("/api/v1/orders/{id}/items/{itemId}/production"),
             any(),
-            eq(JobOrderItemDto.class));
+            eq(JobOrderItemDto.class),
+            eq(orderId),
+            eq(itemId));
   }
 
   @Test
@@ -460,9 +482,11 @@ class JobOrderPageControllerNoReloadMvcTest {
     UUID orderId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     when(backendApiClient.post(
-            eq("/api/v1/orders/" + orderId + "/items/" + itemId + "/production"),
+            eq("/api/v1/orders/{id}/items/{itemId}/production"),
             any(),
-            eq(JobOrderItemDto.class)))
+            eq(JobOrderItemDto.class),
+            eq(orderId),
+            eq(itemId)))
         .thenThrow(new BackendServiceException("Conflict", null, 409));
 
     mockMvc
@@ -536,7 +560,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   void updateStatus_AsAuthenticated_RelaysAndReturnsOrder() throws Exception {
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/orders/" + orderId + "/status"), any(), eq(JobOrderDto.class)))
+            eq("/api/v1/orders/{id}/status"), any(), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(materialOrder(orderId, 8L));
 
     mockMvc
@@ -549,7 +573,7 @@ class JobOrderPageControllerNoReloadMvcTest {
         .andExpect(jsonPath("$.version").value(8));
 
     verify(backendApiClient)
-        .put(eq("/api/v1/orders/" + orderId + "/status"), any(), eq(JobOrderDto.class));
+        .put(eq("/api/v1/orders/{id}/status"), any(), eq(JobOrderDto.class), eq(orderId));
   }
 
   @Test
@@ -558,7 +582,7 @@ class JobOrderPageControllerNoReloadMvcTest {
       throws Exception {
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/orders/" + orderId + "/status"), any(), eq(JobOrderDto.class)))
+            eq("/api/v1/orders/{id}/status"), any(), eq(JobOrderDto.class), eq(orderId)))
         .thenThrow(new BackendServiceException("illegal transition", null, 400));
 
     mockMvc
@@ -585,7 +609,7 @@ class JobOrderPageControllerNoReloadMvcTest {
         .andExpect(status().is3xxRedirection());
 
     verify(backendApiClient, never())
-        .put(eq("/api/v1/orders/" + orderId + "/status"), any(), eq(JobOrderDto.class));
+        .put(eq("/api/v1/orders/{id}/status"), any(), eq(JobOrderDto.class), eq(orderId));
   }
 
   @Test
@@ -593,7 +617,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   void updateOrderAsRequesterAjax_RelaysToRequestedEndpointAndReturnsOrder() throws Exception {
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/orders/" + orderId + "/requested"), any(), eq(JobOrderDto.class)))
+            eq("/api/v1/orders/{id}/requested"), any(), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(materialOrder(orderId, 4L));
 
     mockMvc
@@ -608,9 +632,10 @@ class JobOrderPageControllerNoReloadMvcTest {
     ArgumentCaptor<CreateJobOrderDto> captor = ArgumentCaptor.captor();
     verify(backendApiClient)
         .put(
-            eq("/api/v1/orders/" + orderId + "/requested"),
+            eq("/api/v1/orders/{id}/requested"),
             captor.capture(),
-            eq(JobOrderDto.class));
+            eq(JobOrderDto.class),
+            eq(orderId));
     CreateJobOrderDto sent = captor.getValue();
     assertThat(sent.responsibleOrgUnitId()).as("responsible org unit is never relayed").isNull();
     assertThat(sent.requestingOrgUnitId()).as("requesting org unit is stripped").isNull();
@@ -632,7 +657,7 @@ class JobOrderPageControllerNoReloadMvcTest {
         .andExpect(status().isBadRequest());
 
     verify(backendApiClient, never())
-        .put(eq("/api/v1/orders/" + orderId + "/requested"), any(), eq(JobOrderDto.class));
+        .put(eq("/api/v1/orders/{id}/requested"), any(), eq(JobOrderDto.class), eq(orderId));
   }
 
   @Test
@@ -640,7 +665,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   void updateOrderAsRequesterAjax_FrozenAfterDelivery_Propagates400ProblemJson() throws Exception {
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/orders/" + orderId + "/requested"), any(), eq(JobOrderDto.class)))
+            eq("/api/v1/orders/{id}/requested"), any(), eq(JobOrderDto.class), eq(orderId)))
         .thenThrow(new BackendServiceException("frozen after delivery", null, 400));
 
     mockMvc

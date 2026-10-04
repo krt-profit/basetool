@@ -58,7 +58,8 @@ class SpecialCommandAdminProxyControllerTest {
     InOrder inOrder = inOrder(backendApiClient);
     inOrder
         .verify(backendApiClient)
-        .patch(eq("/api/v1/special-commands/" + id + "/profit-eligible"), eq(body), eq(Void.class));
+        .patch(
+            eq("/api/v1/special-commands/{id}/profit-eligible"), eq(body), eq(Void.class), eq(id));
     inOrder.verify(backendApiClient).evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
     inOrder.verifyNoMoreInteractions();
   }

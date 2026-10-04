@@ -99,6 +99,7 @@ class MissionFinancePageControllerTest {
           "validation error -> direct render via missionDetail, NOT redirect");
       assertEquals("finance-entry-modal", model.getAttribute("openModal"));
       verify(backendApiClient, never()).post(anyString(), any(), any());
+      verify(backendApiClient, never()).post(anyString(), any(), any(), any(Object[].class));
     }
 
     @Test
@@ -181,6 +182,7 @@ class MissionFinancePageControllerTest {
           "/missions/" + MISSION_ID + "/finance-entries/" + ENTRY_ID + "/update",
           model.getAttribute("modalAction"));
       verify(backendApiClient, never()).put(anyString(), any(), any());
+      verify(backendApiClient, never()).put(anyString(), any(), any(), any(Object[].class));
     }
 
     @Test
@@ -199,7 +201,11 @@ class MissionFinancePageControllerTest {
       assertEquals("redirect:/missions/" + MISSION_ID, view);
       ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.captor();
       verify(backendApiClient)
-          .put(eq("/api/v1/finance-entries/" + ENTRY_ID), bodyCaptor.capture(), eq(Void.class));
+          .put(
+              eq("/api/v1/finance-entries/{entryId}"),
+              bodyCaptor.capture(),
+              eq(Void.class),
+              eq(ENTRY_ID));
       Map<String, Object> body = bodyCaptor.getValue();
       assertEquals("repairs", body.get("note"));
       assertEquals(FinanceType.EXPENSE, body.get("type"));
@@ -218,7 +224,9 @@ class MissionFinancePageControllerTest {
       MissionFinanceEntryForm form = newForm(FinanceType.INCOME, BigDecimal.TEN);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
-      doThrow(new RuntimeException("409")).when(backendApiClient).put(anyString(), any(), any());
+      doThrow(new RuntimeException("409"))
+          .when(backendApiClient)
+          .put(anyString(), any(), any(), any(Object[].class));
 
       String view =
           controller.updateFinanceEntry(
@@ -239,7 +247,7 @@ class MissionFinancePageControllerTest {
           controller.deleteFinanceEntry(MISSION_ID, ENTRY_ID, principal, redirectAttributes);
 
       assertEquals("redirect:/missions/" + MISSION_ID, view);
-      verify(backendApiClient).delete("/api/v1/finance-entries/" + ENTRY_ID, Void.class);
+      verify(backendApiClient).delete("/api/v1/finance-entries/{entryId}", Void.class, ENTRY_ID);
       assertEquals(
           "notification.success.delete",
           redirectAttributes.getFlashAttributes().get("successToast"));
@@ -247,7 +255,9 @@ class MissionFinancePageControllerTest {
 
     @Test
     void backendFailure_addsErrorToast() {
-      doThrow(new RuntimeException("404")).when(backendApiClient).delete(anyString(), any());
+      doThrow(new RuntimeException("404"))
+          .when(backendApiClient)
+          .delete(anyString(), any(), any(Object[].class));
 
       String view =
           controller.deleteFinanceEntry(MISSION_ID, ENTRY_ID, principal, redirectAttributes);
@@ -282,14 +292,15 @@ class MissionFinancePageControllerTest {
       Map<String, Object> body = new HashMap<>();
       body.put("amount", "99");
       body.put("version", 3);
-      when(backendApiClient.put(eq("/api/v1/finance-entries/" + ENTRY_ID), any(), eq(Object.class)))
+      when(backendApiClient.put(
+              eq("/api/v1/finance-entries/{entryId}"), any(), eq(Object.class), eq(ENTRY_ID)))
           .thenReturn(Map.of("id", ENTRY_ID.toString()));
 
       ResponseEntity<Object> resp = controller.updateFinanceEntryAjax(MISSION_ID, ENTRY_ID, body);
 
       assertEquals(200, resp.getStatusCode().value());
       verify(backendApiClient)
-          .put(eq("/api/v1/finance-entries/" + ENTRY_ID), eq(body), eq(Object.class));
+          .put(eq("/api/v1/finance-entries/{entryId}"), eq(body), eq(Object.class), eq(ENTRY_ID));
     }
 
     @Test
@@ -297,7 +308,7 @@ class MissionFinancePageControllerTest {
       ResponseEntity<Object> resp = controller.deleteFinanceEntryAjax(MISSION_ID, ENTRY_ID);
 
       assertEquals(204, resp.getStatusCode().value());
-      verify(backendApiClient).delete("/api/v1/finance-entries/" + ENTRY_ID, Void.class);
+      verify(backendApiClient).delete("/api/v1/finance-entries/{entryId}", Void.class, ENTRY_ID);
     }
   }
 

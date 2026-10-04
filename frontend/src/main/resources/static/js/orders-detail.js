@@ -2293,7 +2293,7 @@ function _prodReconcile() {
         const demand = _prodDemand(mat, k);
         let assigned = 0;
         card.querySelectorAll('[data-prod-alloc]').forEach((inp) => {
-            assigned += parseFloat(inp.value) || 0;
+            assigned += _prodRoundForType(parseFloat(inp.value) || 0, mat.quantityType);
         });
         assigned = mat.quantityType === 'PIECE' ? Math.round(assigned) : _prodRound3(assigned);
         const rest = _prodRound3(demand - assigned);
@@ -2344,7 +2344,7 @@ function bookProduction() {
         let assigned = 0;
         if (card) {
             card.querySelectorAll('[data-prod-alloc]').forEach((inp) => {
-                const v = parseFloat(inp.value) || 0;
+                const v = _prodRoundForType(parseFloat(inp.value) || 0, mat.quantityType);
                 if (v > 0) {
                     const idx = parseInt(inp.getAttribute('data-prod-idx'), 10);
                     const entry = mat.entries[idx];

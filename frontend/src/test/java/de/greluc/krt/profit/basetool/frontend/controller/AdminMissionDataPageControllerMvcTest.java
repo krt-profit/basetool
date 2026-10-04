@@ -333,7 +333,8 @@ class AdminMissionDataPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void deleteJobTypeAjax_withHeader_returns200() throws Exception {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.delete(eq("/api/v1/job-types/" + id), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.delete(eq("/api/v1/job-types/{id}"), eq(Void.class), eq(id)))
+        .thenReturn(null);
 
     mockMvc
         .perform(

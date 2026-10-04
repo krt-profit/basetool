@@ -221,7 +221,7 @@ public class PersonalInventoryPageController {
               form.getQuantity(),
               form.getVersion());
       backendApiClient.put(
-          "/api/v1/personal-inventory/" + id, request, PersonalInventoryItemDto.class);
+          "/api/v1/personal-inventory/{id}", request, PersonalInventoryItemDto.class, id);
       redirectAttributes.addFlashAttribute("successToast", "personalInventory.toast.updated");
     } catch (Exception e) {
       log.error("Failed to update personal inventory item {}", id, e);
@@ -242,7 +242,7 @@ public class PersonalInventoryPageController {
   @PostMapping("/{id}/delete")
   public String delete(@PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/personal-inventory/" + id, Void.class);
+      backendApiClient.delete("/api/v1/personal-inventory/{id}", Void.class, id);
       redirectAttributes.addFlashAttribute("successToast", "personalInventory.toast.deleted");
     } catch (Exception e) {
       log.error("Failed to delete personal inventory item {}", id, e);
@@ -303,7 +303,7 @@ public class PersonalInventoryPageController {
         "update personal inventory item " + id + " (ajax)",
         () -> {
           backendApiClient.put(
-              "/api/v1/personal-inventory/" + id, request, PersonalInventoryItemDto.class);
+              "/api/v1/personal-inventory/{id}", request, PersonalInventoryItemDto.class, id);
           return ResponseEntity.noContent().build();
         });
   }
@@ -322,7 +322,7 @@ public class PersonalInventoryPageController {
         log,
         "delete personal inventory item " + id + " (ajax)",
         () -> {
-          backendApiClient.delete("/api/v1/personal-inventory/" + id, Void.class);
+          backendApiClient.delete("/api/v1/personal-inventory/{id}", Void.class, id);
           return ResponseEntity.noContent().build();
         });
   }

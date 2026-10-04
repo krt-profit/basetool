@@ -365,7 +365,11 @@ public class LeitungPageController {
         "Assign squadron rank failed",
         () ->
             backendApiClient.put(
-                "/api/v1/squadrons/" + squadronId + "/ranks/" + userId, body, Object.class));
+                "/api/v1/squadrons/{squadronId}/ranks/{userId}",
+                body,
+                Object.class,
+                squadronId,
+                userId));
   }
 
   /**
@@ -387,8 +391,11 @@ public class LeitungPageController {
         "Remove squadron rank failed",
         () ->
             backendApiClient.delete(
-                "/api/v1/squadrons/" + squadronId + "/ranks/" + userId + "?version=" + version,
-                Object.class));
+                "/api/v1/squadrons/{squadronId}/ranks/{userId}?version={version}",
+                Object.class,
+                squadronId,
+                userId,
+                version));
   }
 
   /**
@@ -407,7 +414,7 @@ public class LeitungPageController {
         "Create Kommandogruppe failed",
         () ->
             backendApiClient.post(
-                "/api/v1/squadrons/" + squadronId + "/kommando-groups", body, Object.class));
+                "/api/v1/squadrons/{squadronId}/kommando-groups", body, Object.class, squadronId));
   }
 
   /**
@@ -424,7 +431,8 @@ public class LeitungPageController {
       @PathVariable @NotNull UUID groupId, @RequestBody Map<String, Object> body) {
     return proxy(
         "Update Kommandogruppe failed",
-        () -> backendApiClient.put("/api/v1/kommando-groups/" + groupId, body, Object.class));
+        () ->
+            backendApiClient.put("/api/v1/kommando-groups/{groupId}", body, Object.class, groupId));
   }
 
   /**
@@ -439,7 +447,7 @@ public class LeitungPageController {
   public ResponseEntity<Object> deleteKommandoGroup(@PathVariable @NotNull UUID groupId) {
     return proxy(
         "Delete Kommandogruppe failed",
-        () -> backendApiClient.delete("/api/v1/kommando-groups/" + groupId, Object.class));
+        () -> backendApiClient.delete("/api/v1/kommando-groups/{groupId}", Object.class, groupId));
   }
 
   /**
@@ -458,7 +466,10 @@ public class LeitungPageController {
         "Add Bereich leader failed",
         () ->
             backendApiClient.post(
-                "/api/v1/org-hierarchy/bereiche/" + bereichId + "/members", body, Object.class));
+                "/api/v1/org-hierarchy/bereiche/{bereichId}/members",
+                body,
+                Object.class,
+                bereichId));
   }
 
   /**
@@ -477,8 +488,10 @@ public class LeitungPageController {
         "Remove Bereich leader failed",
         () ->
             backendApiClient.delete(
-                "/api/v1/org-hierarchy/bereiche/" + bereichId + "/members/" + userId,
-                Object.class));
+                "/api/v1/org-hierarchy/bereiche/{bereichId}/members/{userId}",
+                Object.class,
+                bereichId,
+                userId));
   }
 
   /**
@@ -497,9 +510,10 @@ public class LeitungPageController {
         "Add OL member failed",
         () ->
             backendApiClient.post(
-                "/api/v1/org-hierarchy/organisationsleitung/" + olId + "/members",
+                "/api/v1/org-hierarchy/organisationsleitung/{olId}/members",
                 body,
-                Object.class));
+                Object.class,
+                olId));
   }
 
   /**
@@ -518,8 +532,10 @@ public class LeitungPageController {
         "Remove OL member failed",
         () ->
             backendApiClient.delete(
-                "/api/v1/org-hierarchy/organisationsleitung/" + olId + "/members/" + userId,
-                Object.class));
+                "/api/v1/org-hierarchy/organisationsleitung/{olId}/members/{userId}",
+                Object.class,
+                olId,
+                userId));
   }
 
   /**
@@ -539,9 +555,10 @@ public class LeitungPageController {
         "Set Grand Admiral failed",
         () ->
             backendApiClient.put(
-                "/api/v1/org-hierarchy/organisationsleitung/" + olId + "/grand-admiral",
+                "/api/v1/org-hierarchy/organisationsleitung/{olId}/grand-admiral",
                 body,
-                Object.class));
+                Object.class,
+                olId));
   }
 
   /**
@@ -558,8 +575,9 @@ public class LeitungPageController {
         "Remove Grand Admiral failed",
         () ->
             backendApiClient.delete(
-                "/api/v1/org-hierarchy/organisationsleitung/" + olId + "/grand-admiral",
-                Object.class));
+                "/api/v1/org-hierarchy/organisationsleitung/{olId}/grand-admiral",
+                Object.class,
+                olId));
   }
 
   /**
@@ -581,9 +599,11 @@ public class LeitungPageController {
         "Toggle SK lead failed",
         () ->
             backendApiClient.patch(
-                "/api/v1/special-commands/" + skId + "/members/" + userId + "/lead",
+                "/api/v1/special-commands/{skId}/members/{userId}/lead",
                 body,
-                Object.class));
+                Object.class,
+                skId,
+                userId));
   }
 
   /**

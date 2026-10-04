@@ -3836,6 +3836,10 @@ proxy seam, it is a `400` from Spring's type conversion, handled by `GlobalExcep
   state; a catalogue name carrying `&` or `=` opens no second query parameter on the backend call.
 - [ ] The audit tab list has exactly one definition in the frontend, so the page and its
   export/purge proxy cannot disagree about which tabs exist.
+- [x] Every `BackendApiClient` write verb (`post`, `put`, `patch`, `delete`, with or without a
+  body) has a URI-template twin that encodes each variable, and every write call passes its runtime
+  values through it; the only reviewed concatenation is the UEX override's entity kind, narrowed to
+  its allow-list first (`WriteUriTemplateTest`, 2026-10-04).
 - [ ] The mission and operation list pages relay `search`, `start` and `end` as `WebClient`
   URI-template variables, never concatenated into the URI: a search carrying `&`, `#`, `+`, `{…}` or
   `%` reaches the backend as one decoded `query`, and a period reaches it decoded exactly once so it

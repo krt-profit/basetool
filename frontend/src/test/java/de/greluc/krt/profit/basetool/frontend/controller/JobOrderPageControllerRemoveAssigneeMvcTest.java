@@ -104,7 +104,10 @@ class JobOrderPageControllerRemoveAssigneeMvcTest {
     UUID userId = UUID.randomUUID();
 
     when(backendApiClient.delete(
-            eq("/api/v1/orders/" + orderId + "/assignees/" + userId), eq(JobOrderDto.class)))
+            eq("/api/v1/orders/{id}/assignees/{userId}"),
+            eq(JobOrderDto.class),
+            eq(orderId),
+            eq(userId)))
         .thenReturn(orderWithNoAssignees(orderId));
 
     mockMvc
@@ -113,7 +116,11 @@ class JobOrderPageControllerRemoveAssigneeMvcTest {
         .andExpect(content().string(containsString("assignees-section")));
 
     verify(backendApiClient)
-        .delete(eq("/api/v1/orders/" + orderId + "/assignees/" + userId), eq(JobOrderDto.class));
+        .delete(
+            eq("/api/v1/orders/{id}/assignees/{userId}"),
+            eq(JobOrderDto.class),
+            eq(orderId),
+            eq(userId));
     verify(backendApiClient, never())
         .get(startsWith("/api/v1/users?"), ArgumentMatchers.<Class<Object>>any());
     verify(backendApiClient, never())
@@ -129,7 +136,10 @@ class JobOrderPageControllerRemoveAssigneeMvcTest {
     UUID userId = UUID.randomUUID();
 
     when(backendApiClient.delete(
-            eq("/api/v1/orders/" + orderId + "/assignees/" + userId), eq(JobOrderDto.class)))
+            eq("/api/v1/orders/{id}/assignees/{userId}"),
+            eq(JobOrderDto.class),
+            eq(orderId),
+            eq(userId)))
         .thenReturn(orderWithNoAssignees(orderId));
 
     mockMvc
@@ -145,7 +155,10 @@ class JobOrderPageControllerRemoveAssigneeMvcTest {
     UUID userId = UUID.randomUUID();
 
     when(backendApiClient.delete(
-            eq("/api/v1/orders/" + orderId + "/assignees/" + userId), eq(JobOrderDto.class)))
+            eq("/api/v1/orders/{id}/assignees/{userId}"),
+            eq(JobOrderDto.class),
+            eq(orderId),
+            eq(userId)))
         .thenThrow(new BackendServiceException("Internal Server Error", null, 500));
 
     mockMvc

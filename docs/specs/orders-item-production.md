@@ -148,7 +148,11 @@ section shipped. The full contract lives in REQ-INV-032.
 carries a **"Nicht ausbuchen" checkbox** (`data-prod-skip`). Ticking it flags the card, disables that
 material's stock inputs, drops the material from the "buchen" coverage gate, and adds its id to the
 posted `skippedMaterialIds` (no `consumption` is sent for it) — so the operator can record production
-while leaving a material's linked stock untouched. Below the cards the modal carries the book-in
+while leaving a material's linked stock untouched. Each typed amount is rounded to the material's
+precision (three decimals for SCU, a whole number for `PIECE`) **before** the card's coverage gate
+adds it and before it is posted, so the gate checks exactly the figures the backend receives: a gate
+that rounded only the sum let a figure with a fourth decimal pass in the dialog and come back
+`422` from the backend's unrounded comparison. Below the cards the modal carries the book-in
 section (location — required, the booking button stays disabled without it —, owner defaulting to
 the acting user, owning org unit, personal flag, "allocate to order") that fills the `bookIn` block.
 The relay `JobOrderWriteController.bookProductionAjax`

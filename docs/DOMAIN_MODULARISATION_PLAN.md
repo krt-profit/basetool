@@ -807,11 +807,27 @@ domain stays a package.
 | Step | Content |
 | --- | --- |
 | F0 | Guards (Phase 0.4) |
-| F1 | Kernel extraction: `BackendErrorMapper` (a sealed outcome type with a pattern switch), template overloads for write verbs, the eleven bypassing controllers moved onto the kernel, the `WebClient` confinement rule at zero |
+| F1 — **done 2026-10-04** | Kernel extraction: `BackendErrorMapper` (a sealed outcome type with a pattern switch), template overloads for write verbs, the eleven bypassing controllers moved onto the kernel, the `WebClient` confinement rule at zero |
 | F2 — **done 2026-10-04** | Exact session allow-list in its own release (D-10): `SessionTypeAllowList.SESSION_BOUND_TYPES`, 21 exact names; the `…frontend.model.` prefix is gone, `SessionBoundTypeClosureTest` holds the list equal to the derived set in both directions. Corrections: the list lives in the security class, not in the G-16 golden file (`session-bound-types.txt` is deleted, so `-PupdateSnapshots` can no longer widen the allow-list); the admitted application classes fall from 325 to 21, not "about 20" of "about eleven" forms — the 21 are 10 flashed forms and DTOs with their nested types and enums |
 | F3 | Typed client per domain, small domains first (audit, notification, settings, dashboard, exchange, orgchart), then the large four; untyped `Map` relays typed in the same step |
 | F4 | Package-by-domain move in one pull request; route/gate snapshot byte-identical |
 | F5 | Templates and assets per domain (§8.2), with the page chrome as one layout fragment |
+
+*F1 as built (2026-10-04).* `service.BackendErrorMapper` classifies every failed call into one case
+of its sealed `Outcome` (`Problem`, `Reauthentication`, `CircuitOpen`, `BulkheadFull`, `Timeout`,
+`Unexpected`) and maps it in one exhaustive switch, writing to `BackendApiClient`'s logger so log
+categories, levels, messages, statuses, problem codes and the `basetool_backend_client_errors_total`
+labels are unchanged; `BackendErrorResponses` parses raw refusals through it. Every write verb has a
+URI-template twin, and the 235 write calls that concatenated an id, plus the bank proxies' helper
+calls, pass their values as template variables; `WriteUriTemplateTest` (with a planted fixture and
+a floor of 344 write sites) keeps them there, with one reviewed exception, the UEX override's
+allow-listed entity kind. The two remaining `WebClient` holders outside the kernel — the SSE relay
+and the live-sync probe — now call `service.BackendSideChannels`, so `WebClientConfinementTest`
+names only kernel classes and `ArchitectureTest#noControllerHoldsARawWebClient` has no allow-list.
+Corrections: the eleven bypassing controllers had already returned to the kernel with Phase 0.4,
+so F1 only verified it; the "zero" in this row was reached by moving the two named
+exceptions into the kernel, not by removing them; the 130 concatenating GET call sites are left for
+F3, where the typed clients replace them.
 
 ### 7.9 REST API track
 
