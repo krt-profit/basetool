@@ -1,7 +1,3 @@
-audit -> bank: AuditRetentionService -> BankAuditEventRepository
-audit -> bank: AuditRetentionService -> BankAuditService
-audit -> identity: AuditService -> User
-audit -> identity: AuditService -> UserRepository
 blueprint -> exchange: BlueprintUploadPreviewService -> ExchangeBlueprintDraftDto
 blueprint -> exchange: BlueprintUploadPreviewService -> ExchangeDraftService
 blueprint -> exchange: PersonalBlueprintService -> ExchangeClientDisplayName
@@ -90,8 +86,6 @@ inventory -> mission: InventoryItemService -> MissionRepository
 inventory -> mission: InventoryMissionAllocation -> Mission
 kernel -> platform: AppException -> ErrorDisclosurePolicy
 kernel -> platform: AppExceptionKind -> ErrorDisclosurePolicy
-livesync -> bank: LiveSyncSubscriptionAuthorizer -> OrgUnitBankAccessService
-livesync -> scope: LiveSyncSubscriptionAuthorizer -> OwnerScopeService
 mission -> operation: Mission -> Operation
 mission -> operation: MissionDto -> OperationDto
 mission -> operation: MissionListDto -> OperationDto
@@ -102,15 +96,7 @@ mission -> refinery: MissionFinanceEntryService -> RefineryOrder
 mission -> refinery: MissionFinanceEntryService -> RefineryOrderRepository
 mission -> refinery: MissionFinanceSummaryDto -> RefineryOrderDto
 mission -> refinery: MissionService -> RefineryOrder
-notification -> bank: RecipientResolutionService -> BankAccountGrant
-notification -> bank: RecipientResolutionService -> BankAccountGrantId
-notification -> bank: RecipientResolutionService -> BankAccountGrantRepository
-notification -> bank: RecipientResolutionService -> OrgUnitBankResponsibilityService
-notification -> identity: NotificationRuleService -> Role
-notification -> identity: NotificationRuleService -> RoleRepository
-notification -> identity: RecipientResolutionService -> UserRepository
 notification -> orgunit: OrgUnitRef -> OrgUnitKind
-notification -> orgunit: RecipientResolutionService -> OrgUnitMembershipRepository
 orgunit -> bank: OrgUnitMembershipService -> OrgUnitBankResponsibilityService
 orgunit -> inventory: OrgUnitMembershipService -> InventoryOrgUnitReconciler
 orgunit -> orgchart: KommandoGroupService -> OrgChartService
@@ -118,7 +104,6 @@ orgunit -> orgchart: OrgUnitMembershipService -> OrgChartService
 platform -> exchange: ClientAttribution -> IngestGatewayProperties
 platform -> exchange: ClientAttribution -> KnownExchangeClients
 platform -> scope: AuthHelperService -> OwnerScopeService
-platform -> scope: CorrelationIdFilter -> OwnerScopeService
 scope -> exchange: CustomJwtGrantedAuthoritiesConverter -> IngestGatewayProperties
 scope -> hangar: AccessGateService -> Ship
 scope -> hangar: AccessGateService -> ShipRepository

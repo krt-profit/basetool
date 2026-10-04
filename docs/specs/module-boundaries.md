@@ -117,6 +117,8 @@ while ArchUnit additionally sees one annotation class value (`@Mapper(uses = Squ
 in `UserMapper`) and the two `kernel → platform` edges of `AppException` and `AppExceptionKind` to
 `ErrorDisclosurePolicy`, which the plan's count left out as same-rank edges.
 
+After the platform SPIs (plan §7.3, P1-8, 2026-10-04): **123 class edges in 36 module pairs**.
+
 **Acceptance**
 
 - [x] The backend's frozen baseline equals the rule's current violations.

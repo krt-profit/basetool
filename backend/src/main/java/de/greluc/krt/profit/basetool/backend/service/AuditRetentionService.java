@@ -20,20 +20,21 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDomain;
+import de.greluc.krt.profit.basetool.backend.audit.api.RetentionParticipant;
 import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankAuditEventRepository;
 import java.time.Instant;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
 /**
- * Bounds how long the activity and bank audit trails are kept by periodically purging old rows
- * (REQ-AUDIT-006).
+ * Bounds how long the activity audit trail and every {@link RetentionParticipant}'s trail are kept
+ * by periodically purging old rows (REQ-AUDIT-006).
  *
  * <p>Reuses the manual admin purge, so an automatic purge leaves the same {@code *_AUDIT_PURGED}
- * marker. Each domain is purged in its own transaction.
+ * marker. Each domain and each participant is purged in its own transaction.
  */
 @Service
 @RequiredArgsConstructor
@@ -41,18 +42,20 @@ import org.springframework.stereotype.Service;
 public class AuditRetentionService {
 
   private final AuditService auditService;
-  private final BankAuditService bankAuditService;
   private final AuditEventRepository auditEventRepository;
-  private final BankAuditEventRepository bankAuditEventRepository;
+
+  /** The trails outside the audit module, purged after the activity-audit domains. */
+  private final List<RetentionParticipant> retentionParticipants;
 
   /**
-   * Purges every activity-audit domain and the bank audit trail of rows older than the cutoff.
+   * Purges every activity-audit domain and then every participant's trail of rows older than the
+   * cutoff.
    *
-   * <p>Domains holding no such rows are skipped, so no empty purge marker is written. A failing
-   * domain is logged and does not abort the run.
+   * <p>Domains and trails holding no such rows are skipped, so no empty purge marker is written. A
+   * failing domain or trail is logged and does not abort the run.
    *
    * @param cutoff purge audit rows that occurred strictly before this instant
-   * @return the total number of audit rows deleted across all domains and the bank trail
+   * @return the total number of audit rows deleted across all domains and participant trails
    */
   public int purgeOlderThan(@NotNull Instant cutoff) {
     int total = 0;
@@ -66,11 +69,14 @@ public class AuditRetentionService {
         log.warn("Retention: could not purge audit domain {}: {}", domain, e.toString());
       }
     }
-    if (bankAuditEventRepository.existsByOccurredAtBefore(cutoff)) {
+    for (RetentionParticipant participant : retentionParticipants) {
+      if (!participant.holdsRowsBefore(cutoff)) {
+        continue;
+      }
       try {
-        total += bankAuditService.purgeBefore(cutoff);
+        total += participant.purgeBefore(cutoff);
       } catch (RuntimeException e) {
-        log.warn("Retention: could not purge the bank audit trail: {}", e.toString());
+        log.warn("Retention: could not purge {}: {}", participant.retentionLabel(), e.toString());
       }
     }
     return total;

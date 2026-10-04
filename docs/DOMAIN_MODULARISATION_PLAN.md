@@ -635,6 +635,23 @@ Cheap moves that break many cycles without changing behaviour:
   now use `runInNewTransaction(Runnable)`.
 - The platform SPIs of §5.3 (`ActorHandleResolver`, `RetentionParticipant`, `RecipientDirectory`,
   `LiveSyncTopicAuthorizer`, `ActiveOrgUnitProvider`) — they remove 21 upward edges.
+  **Done 2026-10-04** (P1-8). The module baseline shrank from 138 to **123 edges** and from 42 to
+  36 module pairs: `ActorHandleResolver` 2 (`audit -> identity`), `RetentionParticipant` 2
+  (`audit -> bank`), the recipient directories 8 (`notification -> bank` 4, `-> identity` 3,
+  `-> orgunit` 1), `LiveSyncTopicAuthorizer` 2 (`livesync -> scope`, `-> bank`),
+  `ActiveOrgUnitProvider` 1 (`platform -> scope`). **Correction:** 15 edges, not 21. The 21 are
+  all upward edges of the rank-0 and rank-1 modules in the baseline, and six of them are not SPI
+  cases: `notification -> orgunit: OrgUnitRef -> OrgUnitKind` waits for a kernel `OrgUnitKind`
+  (P1-11), `platform -> scope: AuthHelperService -> OwnerScopeService` leaves with the removal of
+  its four delegations, the two `platform -> exchange` edges of `ClientAttribution` and the two
+  `kernel -> platform` edges of the error model (§5.5) need their own moves. `RecipientDirectory` is three interfaces in `notification.api`, one per implementing
+  module (`RoleRecipientDirectory` identity, `OrgUnitRecipientDirectory` orgunit,
+  `AccountRecipientDirectory` bank); the role-code check of `NotificationRuleService` uses the
+  first, which removed two edges §5.3 had not listed. `ActiveOrgUnitProvider` lives in the
+  `service` package beside `AuthHelperService` (a `logging` package would close a
+  `logging -> service -> logging` layer cycle). None of the SPIs is an observer, so the G-12 rules
+  do not select them; the audit and retention calls keep their transactions (`record` stays
+  `MANDATORY`, each purge its own transaction).
 - `support` split into the kernel (`RequestMemo`, `StringNormalization`, `OptimisticLock`,
   `LikePatterns`, `ProblemResponseFactory`, `Roles`, `Permissions`) and per-domain internal packages;
   the ArchUnit leaf rule's message stops sending shared logic there.

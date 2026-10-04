@@ -24,13 +24,12 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.NotificationRuleMapper;
 import de.greluc.krt.profit.basetool.backend.model.NotificationRule;
 import de.greluc.krt.profit.basetool.backend.model.NotificationRuleSelector;
-import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.SelectorKind;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleSelectorWriteRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleWriteRequest;
+import de.greluc.krt.profit.basetool.backend.notification.api.RoleRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRuleRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.Comparator;
@@ -60,7 +59,7 @@ public class NotificationRuleService {
   private final NotificationRuleRepository notificationRuleRepository;
 
   /** Resolves a {@code ROLE} selector's {@code roleCode} against the catalogue (REQ-SEC-053). */
-  private final RoleRepository roleRepository;
+  private final RoleRecipientDirectory roleRecipientDirectory;
 
   private final NotificationRuleMapper notificationRuleMapper;
 
@@ -152,7 +151,7 @@ public class NotificationRuleService {
   private void applySelectors(
       @NotNull NotificationRule rule, @NotNull NotificationRuleWriteRequest request) {
     for (NotificationRuleSelectorWriteRequest selectorRequest : request.selectors()) {
-      Role resolvedRole = validateSelector(selectorRequest);
+      String resolvedRoleCode = validateSelector(selectorRequest);
       if (readsOnlyTheEvent(selectorRequest.kind())) {
         rule.addSelector(NotificationRuleSelector.builder().kind(selectorRequest.kind()).build());
         continue;
@@ -161,7 +160,7 @@ public class NotificationRuleService {
           NotificationRuleSelector.builder()
               .kind(selectorRequest.kind())
               .userId(selectorRequest.userId())
-              .roleCode(resolvedRole != null ? resolvedRole.getCode() : null)
+              .roleCode(resolvedRoleCode)
               .orgRelativeRole(selectorRequest.orgRelativeRole())
               .contextRole(selectorRequest.contextRole())
               .build());
@@ -169,16 +168,16 @@ public class NotificationRuleService {
   }
 
   /**
-   * Validates one selector and, for a {@code ROLE} selector, returns the catalogue row it names.
+   * Validates one selector and, for a {@code ROLE} selector, returns the catalogue code it names.
    *
    * @param selector the submitted selector
-   * @return the resolved {@link Role} for a {@code ROLE} selector, {@code null} for every other
+   * @return the catalogue's role code for a {@code ROLE} selector, {@code null} for every other
    *     kind
    * @throws IllegalArgumentException when the selector is incomplete, or names a role the catalogue
    *     does not know
    */
   @Nullable
-  private Role validateSelector(@NotNull NotificationRuleSelectorWriteRequest selector) {
+  private String validateSelector(@NotNull NotificationRuleSelectorWriteRequest selector) {
     switch (selector.kind()) {
       case SPECIFIC_USER -> {
         if (selector.userId() == null) {
@@ -190,8 +189,8 @@ public class NotificationRuleService {
         if (roleCode == null) {
           throw new IllegalArgumentException("ROLE selector requires roleCode");
         }
-        return roleRepository
-            .findByCodeIgnoreCase(roleCode)
+        return roleRecipientDirectory
+            .catalogueRoleCode(roleCode)
             .orElseThrow(
                 () ->
                     new IllegalArgumentException(
