@@ -84,66 +84,68 @@
         <th:block th:fragment="hangarResults">
             <div hidden id="hangar-stats" data-testid="hangar-stats"
                  th:data-total="${totalShipCount}" th:data-fitted="${fittedShipCount}"></div>
-            <table th:if="${!#lists.isEmpty(myShips)}" class="data-table data-table--stack hangar-table">
-                <thead>
-                    <tr>
-                        <th th:text="#{hangar.list.ship}">Schiff</th>
-                        <th th:text="#{hangar.list.location}">Standort</th>
-                        <th th:text="#{hangar.ship.insurance}">Versicherung</th>
-                        <th class="cell-status" th:text="#{hangar.list.status}">Status</th>
-                        <th th:if="${isAllSquadronsMode}" th:text="#{hangar.ship.owning_squadron}">Staffel</th>
-                        <th class="cell-actions"><span class="visually-hidden" th:text="#{hangar.ship.action}">Aktion</span></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="ship : ${myShips}" data-testid="hangar-ship-row"
-                        th:with="typeName=${ship.shipType != null and ship.shipType.name != null ? ship.shipType.name : ''},
-                                 makerName=${ship.shipType != null and ship.shipType.manufacturer != null and ship.shipType.manufacturer.name != null ? ship.shipType.manufacturer.name : ''},
-                                 hull=${#strings.trim(makerName + ' ' + typeName)},
-                                 named=${ship.name != null and !#strings.isEmpty(#strings.trim(ship.name))},
-                                 ready=${ship.fitted == true},
-                                 ins=${ship.insurance},
-                                 locName=${ship.location != null ? ship.location.name : null}">
-                        <td>
-                            <span class="cell-title" th:text="${named ? ship.name : hull}">Iron Mule</span>
-                            <span class="cell-sub"><span th:text="${named ? hull : #messages.msg('hangar.ship.unnamed')}">Drake Cutlass Black</span><span
-                                  class="hangar-row__loc" th:if="${locName != null}" th:text="' · ' + ${locName}"> · Area18</span></span>
-                        </td>
-                        <td class="hangar-cell-loc" th:text="${locName != null ? locName : '–'}">Area18</td>
-                        <td class="hangar-cell-ins">
-                            <span th:if="${ins == 'LTI'}" class="chip chip--primary" th:text="#{hangar.ship.insurance.lti}">LTI</span>
-                            <span th:if="${ins == '0'}" class="chip chip--muted" th:text="#{hangar.ship.insurance.none}">Keine</span>
-                            <span th:if="${ins != null and ins != 'LTI' and ins != '0' and !#strings.isEmpty(ins)}" class="chip"
-                                  th:text="#{hangar.ship.insurance.short(${ins})}">3 Mon.</span>
-                            <span th:if="${ins == null or #strings.isEmpty(ins)}" class="hangar-ins-unset">&ndash;</span>
-                        </td>
-                        <td class="cell-status">
-                            <span class="hangar-fit" th:classappend="${ready} ? 'hangar-fit--ready'"
-                                  ><span class="status-dot" th:classappend="${ready} ? 'status-dot--on'" aria-hidden="true"></span><span
-                                  class="hangar-fit__label" th:text="${ready} ? #{hangar.status.ready} : #{hangar.status.notReady}">Einsatzbereit</span></span>
-                        </td>
-                        <td th:if="${isAllSquadronsMode}" th:attr="data-label=#{hangar.ship.owning_squadron}">
-                            <span th:if="${ship.owningSquadron != null}" class="squadron-badge"
-                                  th:title="${ship.owningSquadron.name()}"
-                                  th:text="${ship.owningSquadron.shorthand()}">IRI</span>
-                            <span th:if="${ship.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
-                        </td>
-                        <td class="cell-actions">
-                            <button type="button" class="btn btn-ghost btn-icon edit-ship-btn"
-                                    data-trigger="hangar-edit-ship"
-                                    th:data-action="@{/hangar/{id}/update(id=${ship.id})}"
-                                    th:data-id="${ship.id}"
-                                    th:data-name="${ship.name}"
-                                    th:data-type="${ship.shipType != null ? ship.shipType.id : ''}"
-                                    th:data-ins="${ship?.insurance}"
-                                    th:data-loc="${ship.location != null ? ship.location.id : ''}"
-                                    th:data-fitted="${ship.fitted}"
-                                    th:data-version="${ship.version}"
-                                    th:title="#{hangar.ship.edit}" th:aria-label="#{hangar.ship.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="table-responsive" th:if="${!#lists.isEmpty(myShips)}">
+                <table class="data-table data-table--stack hangar-table">
+                    <thead>
+                        <tr>
+                            <th th:text="#{hangar.list.ship}">Schiff</th>
+                            <th th:text="#{hangar.list.location}">Standort</th>
+                            <th th:text="#{hangar.ship.insurance}">Versicherung</th>
+                            <th class="cell-status" th:text="#{hangar.list.status}">Status</th>
+                            <th th:if="${isAllSquadronsMode}" th:text="#{hangar.ship.owning_squadron}">Staffel</th>
+                            <th class="cell-actions"><span class="visually-hidden" th:text="#{hangar.ship.action}">Aktion</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="ship : ${myShips}" data-testid="hangar-ship-row"
+                            th:with="typeName=${ship.shipType != null and ship.shipType.name != null ? ship.shipType.name : ''},
+                                     makerName=${ship.shipType != null and ship.shipType.manufacturer != null and ship.shipType.manufacturer.name != null ? ship.shipType.manufacturer.name : ''},
+                                     hull=${#strings.trim(makerName + ' ' + typeName)},
+                                     named=${ship.name != null and !#strings.isEmpty(#strings.trim(ship.name))},
+                                     ready=${ship.fitted == true},
+                                     ins=${ship.insurance},
+                                     locName=${ship.location != null ? ship.location.name : null}">
+                            <td>
+                                <span class="cell-title" th:text="${named ? ship.name : hull}">Iron Mule</span>
+                                <span class="cell-sub"><span th:text="${named ? hull : #messages.msg('hangar.ship.unnamed')}">Drake Cutlass Black</span><span
+                                      class="hangar-row__loc" th:if="${locName != null}" th:text="' · ' + ${locName}"> · Area18</span></span>
+                            </td>
+                            <td class="hangar-cell-loc" th:text="${locName != null ? locName : '–'}">Area18</td>
+                            <td class="hangar-cell-ins">
+                                <span th:if="${ins == 'LTI'}" class="chip chip--primary" th:text="#{hangar.ship.insurance.lti}">LTI</span>
+                                <span th:if="${ins == '0'}" class="chip chip--muted" th:text="#{hangar.ship.insurance.none}">Keine</span>
+                                <span th:if="${ins != null and ins != 'LTI' and ins != '0' and !#strings.isEmpty(ins)}" class="chip"
+                                      th:text="#{hangar.ship.insurance.short(${ins})}">3 Mon.</span>
+                                <span th:if="${ins == null or #strings.isEmpty(ins)}" class="hangar-ins-unset">&ndash;</span>
+                            </td>
+                            <td class="cell-status">
+                                <span class="hangar-fit" th:classappend="${ready} ? 'hangar-fit--ready'"
+                                      ><span class="status-dot" th:classappend="${ready} ? 'status-dot--on'" aria-hidden="true"></span><span
+                                      class="hangar-fit__label" th:text="${ready} ? #{hangar.status.ready} : #{hangar.status.notReady}">Einsatzbereit</span></span>
+                            </td>
+                            <td th:if="${isAllSquadronsMode}" th:attr="data-label=#{hangar.ship.owning_squadron}">
+                                <span th:if="${ship.owningSquadron != null}" class="squadron-badge"
+                                      th:title="${ship.owningSquadron.name()}"
+                                      th:text="${ship.owningSquadron.shorthand()}">IRI</span>
+                                <span th:if="${ship.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
+                            </td>
+                            <td class="cell-actions">
+                                <button type="button" class="btn btn-ghost btn-icon edit-ship-btn"
+                                        data-trigger="hangar-edit-ship"
+                                        th:data-action="@{/hangar/{id}/update(id=${ship.id})}"
+                                        th:data-id="${ship.id}"
+                                        th:data-name="${ship.name}"
+                                        th:data-type="${ship.shipType != null ? ship.shipType.id : ''}"
+                                        th:data-ins="${ship?.insurance}"
+                                        th:data-loc="${ship.location != null ? ship.location.id : ''}"
+                                        th:data-fitted="${ship.fitted}"
+                                        th:data-version="${ship.version}"
+                                        th:title="#{hangar.ship.edit}" th:aria-label="#{hangar.ship.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
 
             <th:block th:if="${#lists.isEmpty(myShips) and error == null and search == null and fitted == ''}">
                 <th:block th:replace="~{fragments/components :: emptyState(titleKey='hangar.empty', textKey='hangar.empty.text')}"></th:block>
@@ -177,61 +179,63 @@
 
         <div id="squadron-results" class="card card--flush">
         <th:block th:fragment="squadronResults">
-            <table th:if="${!#lists.isEmpty(overview)}" class="data-table data-table--stack hangar-tree" data-testid="squadron-table">
-                <thead>
-                    <tr>
-                        <th th:text="#{hangar.ship.type}">Schiffstyp</th>
-                        <th class="num" th:text="#{hangar.squadron.count}">Anzahl</th>
-                        <th th:text="#{hangar.status.ready}">Einsatzbereit</th>
-                    </tr>
-                </thead>
-                <th:block th:each="item, it : ${overview}"
-                          th:with="groupId=${'sq-owners-' + it.index},
-                                   hasDetails=${item.details != null and !item.details.isEmpty()},
-                                   pct=${item.count > 0 ? item.fittedCount * 100 / item.count : 0}">
-                    <tbody class="hangar-tree__group">
-                        <tr class="hangar-tree__row" data-testid="squadron-type-row">
-                            <td>
-                                <div class="hangar-tree__type">
-                                    <span class="hangar-tree__toggle-slot"
-                                          ><button sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)"
-                                                   th:if="${hasDetails}" type="button" class="btn-icon hangar-tree__toggle"
-                                                   aria-expanded="false" data-testid="squadron-owners-toggle"
-                                                   th:attr="aria-controls=${groupId},aria-label=#{hangar.squadron.owners.toggle(${item.shipType.name})},title=#{hangar.squadron.owners.toggle(${item.shipType.name})}"
-                                          ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg></button></span>
-                                    <span class="hangar-tree__name">
-                                        <span class="cell-title" th:text="${item.shipType.name}">Cutlass Black</span>
-                                        <span class="cell-sub" th:if="${item.shipType.manufacturer != null}"
-                                              th:text="${item.shipType.manufacturer.name}">Drake</span>
-                                    </span>
-                                </div>
-                            </td>
-                            <td class="num hangar-tree__count" th:text="${item.count}">9</td>
-                            <td class="hangar-tree__fit">
-                                <div class="hangar-tree__fit-inner">
-                                    <div class="meter hangar-tree__meter" aria-hidden="true"><i class="meter__fill--success" th:data-krtm-width="${pct}"></i></div>
-                                    <span class="hangar-tree__fit-text" th:text="#{hangar.squadron.fitOf(${item.fittedCount}, ${item.count})}">7 von 9</span>
-                                </div>
-                            </td>
+            <div class="table-responsive" th:if="${!#lists.isEmpty(overview)}">
+                <table class="data-table data-table--stack hangar-tree" data-testid="squadron-table">
+                    <thead>
+                        <tr>
+                            <th th:text="#{hangar.ship.type}">Schiffstyp</th>
+                            <th class="num" th:text="#{hangar.squadron.count}">Anzahl</th>
+                            <th th:text="#{hangar.status.ready}">Einsatzbereit</th>
                         </tr>
-                    </tbody>
-                    <tbody sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)"
-                           th:if="${hasDetails}" class="hangar-tree__owners" th:id="${groupId}" hidden>
-                        <tr th:each="detail : ${item.details}" class="hangar-tree__owner" data-testid="squadron-owner-row">
-                            <td><span class="hangar-tree__owner-name" th:text="${detail.ownerName}">greluc</span></td>
-                            <td class="num hangar-tree__owner-gap"></td>
-                            <td>
-                                <div class="hangar-tree__owner-meta">
-                                    <span class="hangar-fit" th:classappend="${detail.fitted} ? 'hangar-fit--ready'"
-                                          ><span class="status-dot" th:classappend="${detail.fitted} ? 'status-dot--on'" aria-hidden="true"></span><span
-                                          class="hangar-fit__label" th:text="${detail.fitted} ? #{hangar.status.ready} : #{hangar.status.notReady}">Bereit</span></span>
-                                    <span class="hangar-tree__owner-loc" th:text="${detail.locationName != null ? detail.locationName : '–'}">Area18</span>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </th:block>
-            </table>
+                    </thead>
+                    <th:block th:each="item, it : ${overview}"
+                              th:with="groupId=${'sq-owners-' + it.index},
+                                       hasDetails=${item.details != null and !item.details.isEmpty()},
+                                       pct=${item.count > 0 ? item.fittedCount * 100 / item.count : 0}">
+                        <tbody class="hangar-tree__group">
+                            <tr class="hangar-tree__row" data-testid="squadron-type-row">
+                                <td>
+                                    <div class="hangar-tree__type">
+                                        <span class="hangar-tree__toggle-slot"
+                                              ><button sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)"
+                                                       th:if="${hasDetails}" type="button" class="btn-icon hangar-tree__toggle"
+                                                       aria-expanded="false" data-testid="squadron-owners-toggle"
+                                                       th:attr="aria-controls=${groupId},aria-label=#{hangar.squadron.owners.toggle(${item.shipType.name})},title=#{hangar.squadron.owners.toggle(${item.shipType.name})}"
+                                              ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg></button></span>
+                                        <span class="hangar-tree__name">
+                                            <span class="cell-title" th:text="${item.shipType.name}">Cutlass Black</span>
+                                            <span class="cell-sub" th:if="${item.shipType.manufacturer != null}"
+                                                  th:text="${item.shipType.manufacturer.name}">Drake</span>
+                                        </span>
+                                    </div>
+                                </td>
+                                <td class="num hangar-tree__count" th:text="${item.count}">9</td>
+                                <td class="hangar-tree__fit">
+                                    <div class="hangar-tree__fit-inner">
+                                        <div class="meter hangar-tree__meter" aria-hidden="true"><i class="meter__fill--success" th:data-krtm-width="${pct}"></i></div>
+                                        <span class="hangar-tree__fit-text" th:text="#{hangar.squadron.fitOf(${item.fittedCount}, ${item.count})}">7 von 9</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tbody sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)"
+                               th:if="${hasDetails}" class="hangar-tree__owners" th:id="${groupId}" hidden>
+                            <tr th:each="detail : ${item.details}" class="hangar-tree__owner" data-testid="squadron-owner-row">
+                                <td><span class="hangar-tree__owner-name" th:text="${detail.ownerName}">greluc</span></td>
+                                <td class="num hangar-tree__owner-gap"></td>
+                                <td>
+                                    <div class="hangar-tree__owner-meta">
+                                        <span class="hangar-fit" th:classappend="${detail.fitted} ? 'hangar-fit--ready'"
+                                              ><span class="status-dot" th:classappend="${detail.fitted} ? 'status-dot--on'" aria-hidden="true"></span><span
+                                              class="hangar-fit__label" th:text="${detail.fitted} ? #{hangar.status.ready} : #{hangar.status.notReady}">Bereit</span></span>
+                                        <span class="hangar-tree__owner-loc" th:text="${detail.locationName != null ? detail.locationName : '–'}">Area18</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </th:block>
+                </table>
+            </div>
 
             <th:block th:if="${#lists.isEmpty(overview) and error == null and search == null}">
                 <th:block th:replace="~{fragments/components :: emptyState(titleKey='hangar.squadron.empty', textKey='hangar.squadron.empty.text')}"></th:block>
