@@ -63,14 +63,18 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 
 /**
  * Mockito unit tests for the per-allocation write methods of {@link InventoryItemService}
  * (REQ-INV-027): {@code addAllocation}, {@code changeAllocation} and {@code removeAllocation},
- * covering every guard, the optimistic-lock echo and the not-found paths.
+ * covering every guard, the owner-or-logistician gate, the optimistic-lock echo and the not-found
+ * paths.
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryItemServiceAllocationTest {
+
+  private static final UUID OWNER = UUID.randomUUID();
 
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private UserRepository userRepository;
@@ -100,7 +104,7 @@ class InventoryItemServiceAllocationTest {
 
   private InventoryItem entry(double amount) {
     User user = new User();
-    user.setId(UUID.randomUUID());
+    user.setId(OWNER);
     InventoryItem item = new InventoryItem();
     item.setId(itemId);
     item.setVersion(1L);
@@ -157,7 +161,9 @@ class InventoryItemServiceAllocationTest {
         service.addAllocation(
             itemId,
             new InventoryAllocationWriteDto(
-                InventoryAllocationDimension.JOB_ORDER, orderId, 4.0, 1L));
+                InventoryAllocationDimension.JOB_ORDER, orderId, 4.0, 1L),
+            OWNER,
+            false);
 
     assertEquals(2L, result.version());
     assertEquals(1, item.getJobOrderAllocations().size());
@@ -184,7 +190,9 @@ class InventoryItemServiceAllocationTest {
 
     service.addAllocation(
         itemId,
-        new InventoryAllocationWriteDto(InventoryAllocationDimension.MISSION, missionId, 6.0, 1L));
+        new InventoryAllocationWriteDto(InventoryAllocationDimension.MISSION, missionId, 6.0, 1L),
+        OWNER,
+        false);
 
     assertEquals(1, item.getMissionAllocations().size());
     assertEquals(6.0, item.getMissionAllocations().get(0).getAmount(), 1e-9);
@@ -207,7 +215,9 @@ class InventoryItemServiceAllocationTest {
             service.addAllocation(
                 itemId,
                 new InventoryAllocationWriteDto(
-                    InventoryAllocationDimension.JOB_ORDER, orderB, 5.0, 1L)));
+                    InventoryAllocationDimension.JOB_ORDER, orderB, 5.0, 1L),
+                OWNER,
+                false));
     verify(inventoryItemRepository, never()).saveAndFlush(any());
   }
 
@@ -226,7 +236,9 @@ class InventoryItemServiceAllocationTest {
 
     service.addAllocation(
         itemId,
-        new InventoryAllocationWriteDto(InventoryAllocationDimension.JOB_ORDER, orderB, 4.0, 1L));
+        new InventoryAllocationWriteDto(InventoryAllocationDimension.JOB_ORDER, orderB, 4.0, 1L),
+        OWNER,
+        false);
 
     assertEquals(2, item.getJobOrderAllocations().size());
   }
@@ -243,7 +255,9 @@ class InventoryItemServiceAllocationTest {
             service.addAllocation(
                 itemId,
                 new InventoryAllocationWriteDto(
-                    InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 4.0, 1L)));
+                    InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 4.0, 1L),
+                OWNER,
+                false));
     verify(inventoryItemRepository, never()).saveAndFlush(any());
   }
 
@@ -262,7 +276,9 @@ class InventoryItemServiceAllocationTest {
             service.addAllocation(
                 itemId,
                 new InventoryAllocationWriteDto(
-                    InventoryAllocationDimension.JOB_ORDER, orderId, 4.0, 1L)));
+                    InventoryAllocationDimension.JOB_ORDER, orderId, 4.0, 1L),
+                OWNER,
+                false));
   }
 
   @Test
@@ -282,7 +298,9 @@ class InventoryItemServiceAllocationTest {
                 service.addAllocation(
                     itemId,
                     new InventoryAllocationWriteDto(
-                        InventoryAllocationDimension.JOB_ORDER, orderId, 2.0, 1L)));
+                        InventoryAllocationDimension.JOB_ORDER, orderId, 2.0, 1L),
+                    OWNER,
+                    false));
 
     assertEquals("error.inventory.allocation.duplicate.jobOrder", ex.getMessage());
   }
@@ -307,7 +325,9 @@ class InventoryItemServiceAllocationTest {
                 service.addAllocation(
                     itemId,
                     new InventoryAllocationWriteDto(
-                        InventoryAllocationDimension.MISSION, missionId, 2.0, 1L)));
+                        InventoryAllocationDimension.MISSION, missionId, 2.0, 1L),
+                    OWNER,
+                    false));
 
     assertEquals("error.inventory.allocation.duplicate.mission", ex.getMessage());
   }
@@ -325,7 +345,9 @@ class InventoryItemServiceAllocationTest {
                 service.addAllocation(
                     itemId,
                     new InventoryAllocationWriteDto(
-                        InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 1.5, 1L)));
+                        InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 1.5, 1L),
+                    OWNER,
+                    false));
     assertEquals("A PIECE allocation amount must be a whole number", ex.getMessage());
   }
 
@@ -362,7 +384,9 @@ class InventoryItemServiceAllocationTest {
 
     service.addAllocation(
         itemId,
-        new InventoryAllocationWriteDto(InventoryAllocationDimension.JOB_ORDER, orderId, 4.0, 1L));
+        new InventoryAllocationWriteDto(InventoryAllocationDimension.JOB_ORDER, orderId, 4.0, 1L),
+        OWNER,
+        false);
 
     assertEquals(1, item.getJobOrderAllocations().size());
     assertSame(order, item.getJobOrderAllocations().get(0).getJobOrder());
@@ -384,7 +408,9 @@ class InventoryItemServiceAllocationTest {
             service.addAllocation(
                 itemId,
                 new InventoryAllocationWriteDto(
-                    InventoryAllocationDimension.JOB_ORDER, orderId, 4.0, 1L)));
+                    InventoryAllocationDimension.JOB_ORDER, orderId, 4.0, 1L),
+                OWNER,
+                false));
     verify(inventoryItemRepository, never()).saveAndFlush(any());
   }
 
@@ -399,7 +425,9 @@ class InventoryItemServiceAllocationTest {
             service.addAllocation(
                 itemId,
                 new InventoryAllocationWriteDto(
-                    InventoryAllocationDimension.MISSION, UUID.randomUUID(), 2.0, 1L)));
+                    InventoryAllocationDimension.MISSION, UUID.randomUUID(), 2.0, 1L),
+                OWNER,
+                false));
     verify(inventoryItemRepository, never()).saveAndFlush(any());
     verifyNoMissionLookups();
   }
@@ -415,7 +443,9 @@ class InventoryItemServiceAllocationTest {
             service.changeAllocation(
                 itemId,
                 new InventoryAllocationWriteDto(
-                    InventoryAllocationDimension.MISSION, UUID.randomUUID(), 3.0, 1L)));
+                    InventoryAllocationDimension.MISSION, UUID.randomUUID(), 3.0, 1L),
+                OWNER,
+                false));
     verify(inventoryItemRepository, never()).saveAndFlush(any());
     verifyNoMissionLookups();
   }
@@ -432,7 +462,9 @@ class InventoryItemServiceAllocationTest {
                 service.addAllocation(
                     itemId,
                     new InventoryAllocationWriteDto(
-                        InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 1.5, 1L)));
+                        InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 1.5, 1L),
+                    OWNER,
+                    false));
     assertEquals("An item allocation amount must be a whole number", ex.getMessage());
     verify(inventoryItemRepository, never()).saveAndFlush(any());
   }
@@ -453,7 +485,9 @@ class InventoryItemServiceAllocationTest {
             service.addAllocation(
                 itemId,
                 new InventoryAllocationWriteDto(
-                    InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), null, 1L)));
+                    InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), null, 1L),
+                OWNER,
+                false));
   }
 
   @Test
@@ -468,7 +502,9 @@ class InventoryItemServiceAllocationTest {
             service.addAllocation(
                 itemId,
                 new InventoryAllocationWriteDto(
-                    InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 4.0, 1L)));
+                    InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 4.0, 1L),
+                OWNER,
+                false));
   }
 
   @Test
@@ -481,7 +517,9 @@ class InventoryItemServiceAllocationTest {
             service.addAllocation(
                 itemId,
                 new InventoryAllocationWriteDto(
-                    InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 4.0, 1L)));
+                    InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 4.0, 1L),
+                OWNER,
+                false));
   }
 
   @Test
@@ -495,7 +533,9 @@ class InventoryItemServiceAllocationTest {
 
     service.changeAllocation(
         itemId,
-        new InventoryAllocationWriteDto(InventoryAllocationDimension.JOB_ORDER, orderId, 7.0, 1L));
+        new InventoryAllocationWriteDto(InventoryAllocationDimension.JOB_ORDER, orderId, 7.0, 1L),
+        OWNER,
+        false);
 
     assertEquals(7.0, item.getJobOrderAllocations().get(0).getAmount(), 1e-9);
     verify(auditService)
@@ -517,7 +557,9 @@ class InventoryItemServiceAllocationTest {
             service.changeAllocation(
                 itemId,
                 new InventoryAllocationWriteDto(
-                    InventoryAllocationDimension.JOB_ORDER, orderA, 8.0, 1L)));
+                    InventoryAllocationDimension.JOB_ORDER, orderA, 8.0, 1L),
+                OWNER,
+                false));
   }
 
   @Test
@@ -531,7 +573,9 @@ class InventoryItemServiceAllocationTest {
             service.changeAllocation(
                 itemId,
                 new InventoryAllocationWriteDto(
-                    InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 2.0, 1L)));
+                    InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 2.0, 1L),
+                OWNER,
+                false));
   }
 
   @Test
@@ -549,11 +593,75 @@ class InventoryItemServiceAllocationTest {
 
     service.removeAllocation(
         itemId,
-        new InventoryAllocationWriteDto(InventoryAllocationDimension.MISSION, missionId, null, 1L));
+        new InventoryAllocationWriteDto(InventoryAllocationDimension.MISSION, missionId, null, 1L),
+        OWNER,
+        false);
 
     assertTrue(item.getMissionAllocations().isEmpty());
     verify(auditService)
         .record(eq(AuditEventType.INVENTORY_ALLOCATION_REMOVED), eq(itemId), any(), any(), any());
+  }
+
+  @Test
+  void allocationWrites_byAMemberOnAnotherMembersEntry_areRefusedBeforeAnyWrite() {
+    InventoryItem item = entry(10.0);
+    UUID orderId = UUID.randomUUID();
+    addJobOrderSlice(item, jobOrder(orderId, 7), 2.0);
+    when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
+    UUID otherMember = UUID.randomUUID();
+
+    assertThrows(
+        AccessDeniedException.class,
+        () ->
+            service.addAllocation(
+                itemId,
+                new InventoryAllocationWriteDto(
+                    InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 1.0, 1L),
+                otherMember,
+                false));
+    assertThrows(
+        AccessDeniedException.class,
+        () ->
+            service.changeAllocation(
+                itemId,
+                new InventoryAllocationWriteDto(
+                    InventoryAllocationDimension.JOB_ORDER, orderId, 3.0, 1L),
+                otherMember,
+                false));
+    assertThrows(
+        AccessDeniedException.class,
+        () ->
+            service.removeAllocation(
+                itemId,
+                new InventoryAllocationWriteDto(
+                    InventoryAllocationDimension.JOB_ORDER, orderId, null, 1L),
+                otherMember,
+                false));
+
+    assertEquals(1, item.getJobOrderAllocations().size());
+    assertEquals(2.0, item.getJobOrderAllocations().get(0).getAmount(), 1e-9);
+    verify(inventoryItemRepository, never()).saveAndFlush(any());
+    verify(auditService, never()).record(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void changeAllocation_byALogisticianOnAnotherMembersEntry_changesTheSlice() {
+    InventoryItem item = entry(10.0);
+    UUID orderId = UUID.randomUUID();
+    addJobOrderSlice(item, jobOrder(orderId, 7), 2.0);
+    when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
+    when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
+    when(inventoryItemMapper.toDto(item)).thenReturn(sentinelDto());
+
+    service.changeAllocation(
+        itemId,
+        new InventoryAllocationWriteDto(InventoryAllocationDimension.JOB_ORDER, orderId, 3.0, 1L),
+        UUID.randomUUID(),
+        true);
+
+    assertEquals(3.0, item.getJobOrderAllocations().get(0).getAmount(), 1e-9);
+    verify(auditService)
+        .record(eq(AuditEventType.INVENTORY_ALLOCATION_CHANGED), eq(itemId), any(), any(), any());
   }
 
   @Test
@@ -567,6 +675,8 @@ class InventoryItemServiceAllocationTest {
             service.removeAllocation(
                 itemId,
                 new InventoryAllocationWriteDto(
-                    InventoryAllocationDimension.MISSION, UUID.randomUUID(), null, 1L)));
+                    InventoryAllocationDimension.MISSION, UUID.randomUUID(), null, 1L),
+                OWNER,
+                false));
   }
 }

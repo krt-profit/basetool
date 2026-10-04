@@ -684,7 +684,8 @@ public class ExchangeStockWriteService {
           row.getId(),
           new InventoryItemStolenMarkDto(
               row.getVersion(), stolen, take.compareTo(rowAmount) == 0 ? null : take.doubleValue()),
-          member);
+          member,
+          false);
       left = left.subtract(take);
     }
     return amount.subtract(left);
