@@ -154,34 +154,36 @@
             </div>
             <div id="op-missions-results" class="card card--flush">
             <th:block th:fragment="missions">
-            <table th:if="${missions != null and !missions.isEmpty()}" class="data-table data-table--stack">
-                <thead>
-                    <tr>
-                        <th th:text="#{mission.name}">Name</th>
-                        <th class="cell-status" th:text="#{mission.status}">Status</th>
-                        <th th:text="#{mission.planned_start}">Geplanter Start</th>
-                        <th class="cell-actions"><span class="visually-hidden" th:text="#{general.open}">&Ouml;ffnen</span></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="msn : ${missions}" data-testid="operation-mission-row">
-                        <td>
-                            <a class="row-link" data-testid="row-link" th:href="@{/missions/{id}(id=${msn.id})}">
-                                <span class="cell-title" th:text="${msn.name}">Name</span>
-                            </a>
-                        </td>
-                        <td class="cell-status">
-                            <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(msn.status)}"
-                                  th:text="#{__${'mission.status.' + #strings.toLowerCase(msn.status)}__}">Status</span>
-                        </td>
-                        <td th:attr="data-label=#{mission.planned_start}">
-                            <span th:if="${msn.plannedStartTime != null}" class="utc-time" data-format="short" th:text="${msn.plannedStartTime}">Start</span>
-                            <span th:if="${msn.plannedStartTime == null}">&mdash;</span>
-                        </td>
-                        <td class="cell-actions"><svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg></td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="table-responsive" th:if="${missions != null and !missions.isEmpty()}">
+                <table class="data-table data-table--stack">
+                    <thead>
+                        <tr>
+                            <th th:text="#{mission.name}">Name</th>
+                            <th class="cell-status" th:text="#{mission.status}">Status</th>
+                            <th th:text="#{mission.planned_start}">Geplanter Start</th>
+                            <th class="cell-actions"><span class="visually-hidden" th:text="#{general.open}">&Ouml;ffnen</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="msn : ${missions}" data-testid="operation-mission-row">
+                            <td>
+                                <a class="row-link" data-testid="row-link" th:href="@{/missions/{id}(id=${msn.id})}">
+                                    <span class="cell-title" th:text="${msn.name}">Name</span>
+                                </a>
+                            </td>
+                            <td class="cell-status">
+                                <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(msn.status)}"
+                                      th:text="#{__${'mission.status.' + #strings.toLowerCase(msn.status)}__}">Status</span>
+                            </td>
+                            <td th:attr="data-label=#{mission.planned_start}">
+                                <span th:if="${msn.plannedStartTime != null}" class="utc-time" data-format="short" th:text="${msn.plannedStartTime}">Start</span>
+                                <span th:if="${msn.plannedStartTime == null}">&mdash;</span>
+                            </td>
+                            <td class="cell-actions"><svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
             <th:block th:if="${missions == null or missions.isEmpty()}">
                 <th:block th:replace="~{fragments/components :: emptyState(titleKey='mission.empty', textKey='operation.missions.empty.text')}"></th:block>
             </th:block>
@@ -202,63 +204,65 @@
                 <span th:text="' ' + #{operation.payout.preliminary.message}">Die Anteile sind noch nicht endg&uuml;ltig.</span>
             </div>
             <div class="card card--flush">
-                <table th:if="${operationPayouts != null and !operationPayouts.isEmpty()}" class="data-table data-table--stack payout-table">
-                    <thead>
-                        <tr>
-                            <th th:text="#{general.user}">Nutzer</th>
-                            <th class="num" th:text="#{mission.payout.percentage}" sec:authorize="isAuthenticated()">Anteil</th>
-                            <th th:text="#{mission.payout.preference}">Auszahlungsart</th>
-                            <th class="num" th:text="#{operation.payout.amount}" sec:authorize="isAuthenticated()">Auszahlungsbetrag</th>
-                            <th class="cell-actions" th:text="#{operation.payout.paid}" sec:authorize="isAuthenticated()">Bezahlt</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr th:each="payout : ${operationPayouts}" th:attr="data-participant-id=${payout.participantId}">
-                            <td><span class="cell-title" th:text="${payout.participantName != null ? payout.participantName : #messages.msg('mission.participant.deleted')}">User</span></td>
-                            <td class="num" sec:authorize="isAuthenticated()" th:attr="data-label=#{mission.payout.percentage}"
-                                th:text="${#numbers.formatDecimal(payout.participationPercentage, 1, 'POINT', 2, 'COMMA')} + ' %'">0,00 %</td>
-                            <td th:attr="data-label=#{mission.payout.preference}">
-                                <span th:if="${payout.payoutPreference.name() == 'PAYOUT'}" class="chip" th:text="#{mission.payout.preference.payout}">Auszahlen</span>
-                                <span th:if="${payout.payoutPreference.name() == 'DONATE'}" class="chip chip--success" th:text="#{mission.payout.preference.donate}">Spenden</span>
-                            </td>
-                            <td class="num" sec:authorize="isAuthenticated()" th:attr="data-label=#{operation.payout.amount}">
-                                <span class="cell-title" th:text="${#numbers.formatInteger(@moneyFormat.round(payout.payoutAmount), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
-                                <span class="cell-sub" th:if="${payout.personalExpenses != null and payout.personalExpenses.signum() > 0}" th:text="#{operation.payout.amount.reimbursement} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.personalExpenses), 1, 'POINT')} + ' aUEC'">davon Auslagen: 0 aUEC</span>
-                                <span class="cell-sub" th:if="${payout.transferFee != null and payout.transferFee.signum() > 0}" th:text="#{operation.payout.amount.transferfee} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.transferFee), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
-                                <span class="cell-sub" th:if="${payout.donatedAmount != null and payout.donatedAmount.signum() > 0}" th:text="#{operation.payout.amount.donation} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.donatedAmount), 1, 'POINT')} + ' aUEC'">gespendet: 0 aUEC</span>
-                            </td>
-                            <td class="cell-actions payout-paid-cell" sec:authorize="isAuthenticated()" th:attr="data-label=#{operation.payout.paid}">
-                                <label class="payout-paid-label" th:if="${canEdit}">
-                                    <input type="checkbox" class="payout-paid-checkbox"
-                                           th:attr="data-participant-id=${payout.participantId}, data-operation-id=${operation.id}, aria-label=#{operation.payout.paid}"
-                                           th:checked="${payout.paidOut}"
-                                           th:disabled="${payout.paidOut and not canUnsetPaidOut}"
-                                           th:title="${payout.paidOut and not canUnsetPaidOut} ? #{operation.payout.paid.unset.locked} : ''">
-                                    <span class="payout-paid-status" th:if="${payout.paidOut and payout.paidOutByName != null}"
-                                          th:text="${payout.paidOutByName}"
-                                          th:title="${payout.paidOutAt != null ? #temporals.format(payout.paidOutAt, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : ''}">audit name</span>
-                                </label>
-                                <th:block th:unless="${canEdit}">
-                                    <span th:if="${payout.paidOut}" th:text="#{general.yes}" class="chip chip--success payout-paid-yes">Ja</span>
-                                    <span th:unless="${payout.paidOut}" th:text="#{general.no}" class="chip chip--muted payout-paid-no">Nein</span>
-                                </th:block>
-                            </td>
-                        </tr>
-                    </tbody>
-                    <tfoot sec:authorize="isAuthenticated()">
-                        <tr class="payout-sum" data-testid="operation-payout-sum">
-                            <td colspan="3"><span class="cell-title" th:text="#{operation.payout.sum}">Summe</span></td>
-                            <td class="num" th:attr="data-label=#{operation.payout.amount}">
-                                <span class="cell-title" th:text="${#numbers.formatInteger(@moneyFormat.round(payoutProgress.totalAmount()), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
-                                <span class="cell-sub" th:if="${operationDonationTotal != null and operationDonationTotal.signum() > 0}"
-                                      th:text="#{operation.payout.donation.total} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'POINT')} + ' aUEC'">Spenden gesamt: 0 aUEC</span>
-                            </td>
-                            <td class="cell-actions" th:attr="data-label=#{operation.payout.paid}">
-                                <span id="op-payout-paid-count" th:text="|${payoutProgress.paidOut()} / ${payoutProgress.participants()}|">0 / 0</span>
-                            </td>
-                        </tr>
-                    </tfoot>
-                </table>
+                <div class="table-responsive" th:if="${operationPayouts != null and !operationPayouts.isEmpty()}">
+                    <table class="data-table data-table--stack payout-table">
+                        <thead>
+                            <tr>
+                                <th th:text="#{general.user}">Nutzer</th>
+                                <th class="num" th:text="#{mission.payout.percentage}" sec:authorize="isAuthenticated()">Anteil</th>
+                                <th th:text="#{mission.payout.preference}">Auszahlungsart</th>
+                                <th class="num" th:text="#{operation.payout.amount}" sec:authorize="isAuthenticated()">Auszahlungsbetrag</th>
+                                <th class="cell-actions" th:text="#{operation.payout.paid}" sec:authorize="isAuthenticated()">Bezahlt</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="payout : ${operationPayouts}" th:attr="data-participant-id=${payout.participantId}">
+                                <td><span class="cell-title" th:text="${payout.participantName != null ? payout.participantName : #messages.msg('mission.participant.deleted')}">User</span></td>
+                                <td class="num" sec:authorize="isAuthenticated()" th:attr="data-label=#{mission.payout.percentage}"
+                                    th:text="${#numbers.formatDecimal(payout.participationPercentage, 1, 'POINT', 2, 'COMMA')} + ' %'">0,00 %</td>
+                                <td th:attr="data-label=#{mission.payout.preference}">
+                                    <span th:if="${payout.payoutPreference.name() == 'PAYOUT'}" class="chip" th:text="#{mission.payout.preference.payout}">Auszahlen</span>
+                                    <span th:if="${payout.payoutPreference.name() == 'DONATE'}" class="chip chip--success" th:text="#{mission.payout.preference.donate}">Spenden</span>
+                                </td>
+                                <td class="num" sec:authorize="isAuthenticated()" th:attr="data-label=#{operation.payout.amount}">
+                                    <span class="cell-title" th:text="${#numbers.formatInteger(@moneyFormat.round(payout.payoutAmount), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
+                                    <span class="cell-sub" th:if="${payout.personalExpenses != null and payout.personalExpenses.signum() > 0}" th:text="#{operation.payout.amount.reimbursement} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.personalExpenses), 1, 'POINT')} + ' aUEC'">davon Auslagen: 0 aUEC</span>
+                                    <span class="cell-sub" th:if="${payout.transferFee != null and payout.transferFee.signum() > 0}" th:text="#{operation.payout.amount.transferfee} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.transferFee), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
+                                    <span class="cell-sub" th:if="${payout.donatedAmount != null and payout.donatedAmount.signum() > 0}" th:text="#{operation.payout.amount.donation} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(payout.donatedAmount), 1, 'POINT')} + ' aUEC'">gespendet: 0 aUEC</span>
+                                </td>
+                                <td class="cell-actions payout-paid-cell" sec:authorize="isAuthenticated()" th:attr="data-label=#{operation.payout.paid}">
+                                    <label class="payout-paid-label" th:if="${canEdit}">
+                                        <input type="checkbox" class="payout-paid-checkbox"
+                                               th:attr="data-participant-id=${payout.participantId}, data-operation-id=${operation.id}, aria-label=#{operation.payout.paid}"
+                                               th:checked="${payout.paidOut}"
+                                               th:disabled="${payout.paidOut and not canUnsetPaidOut}"
+                                               th:title="${payout.paidOut and not canUnsetPaidOut} ? #{operation.payout.paid.unset.locked} : ''">
+                                        <span class="payout-paid-status" th:if="${payout.paidOut and payout.paidOutByName != null}"
+                                              th:text="${payout.paidOutByName}"
+                                              th:title="${payout.paidOutAt != null ? #temporals.format(payout.paidOutAt, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : ''}">audit name</span>
+                                    </label>
+                                    <th:block th:unless="${canEdit}">
+                                        <span th:if="${payout.paidOut}" th:text="#{general.yes}" class="chip chip--success payout-paid-yes">Ja</span>
+                                        <span th:unless="${payout.paidOut}" th:text="#{general.no}" class="chip chip--muted payout-paid-no">Nein</span>
+                                    </th:block>
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot sec:authorize="isAuthenticated()">
+                            <tr class="payout-sum" data-testid="operation-payout-sum">
+                                <td colspan="3"><span class="cell-title" th:text="#{operation.payout.sum}">Summe</span></td>
+                                <td class="num" th:attr="data-label=#{operation.payout.amount}">
+                                    <span class="cell-title" th:text="${#numbers.formatInteger(@moneyFormat.round(payoutProgress.totalAmount()), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
+                                    <span class="cell-sub" th:if="${operationDonationTotal != null and operationDonationTotal.signum() > 0}"
+                                          th:text="#{operation.payout.donation.total} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'POINT')} + ' aUEC'">Spenden gesamt: 0 aUEC</span>
+                                </td>
+                                <td class="cell-actions" th:attr="data-label=#{operation.payout.paid}">
+                                    <span id="op-payout-paid-count" th:text="|${payoutProgress.paidOut()} / ${payoutProgress.participants()}|">0 / 0</span>
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
                 <th:block th:if="${operationPayouts == null or operationPayouts.isEmpty()}">
                     <th:block th:replace="~{fragments/components :: emptyState(titleKey='operation.payout.empty', textKey='operation.payout.empty.text')}"></th:block>
                 </th:block>
@@ -295,33 +299,35 @@
                 <p th:if="${financeDetailError != null}" class="op-fin-note op-fin-error"
                    th:text="#{operation.finance.detail.error}">Details konnten nicht geladen werden.</p>
                 <th:block th:if="${financeDetailError == null and financeDetail != null}">
-                    <table class="data-table data-table--compact data-table--stack op-fin-table">
-                        <thead>
-                            <tr>
-                                <th th:text="#{general.type}">Typ</th>
-                                <th th:text="#{general.user}">Nutzer</th>
-                                <th th:text="#{mission.finance.note}">Notiz</th>
-                                <th class="num" th:text="#{mission.finance.amount}">Betrag</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr th:each="entry : ${financeDetail.entries}">
-                                <td>
-                                    <span th:if="${entry.type.name() == 'INCOME'}" class="chip chip--success" th:text="#{mission.finance.type.income}">Einnahme</span>
-                                    <span th:if="${entry.type.name() == 'EXPENSE'}" class="chip chip--danger" th:text="#{mission.finance.type.expense}">Ausgabe</span>
-                                </td>
-                                <td th:attr="data-label=#{general.user}" th:text="${entry.participant == null ? '-' : (entry.participant.user != null ? entry.participant.user.effectiveName : (entry.participant.guestName != null ? entry.participant.guestName : #messages.msg('mission.participant.deleted')))}">User</td>
-                                <td th:attr="data-label=#{mission.finance.note}" th:text="${entry.note}">Notiz</td>
-                                <td class="num" th:attr="data-label=#{mission.finance.amount}" th:text="${(entry.type.name() == 'INCOME' ? '+' : '&minus;') + #numbers.formatInteger(@moneyFormat.round(entry.amount), 1, 'POINT')} + ' aUEC'">0 aUEC</td>
-                            </tr>
-                            <tr th:each="order : ${financeDetail.refineryOrders}" th:if="${order.expenses != null and order.expenses > 0}">
-                                <td><span class="chip chip--danger" th:text="#{mission.finance.type.expense}">Ausgabe</span></td>
-                                <td th:attr="data-label=#{general.user}" th:text="${order.owner != null ? order.owner.effectiveName : '-'}">User</td>
-                                <td th:attr="data-label=#{mission.finance.note}"><a th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}" class="op-fin-link">Raffinerieauftrag</a></td>
-                                <td class="num" th:attr="data-label=#{mission.finance.amount}" th:text="'&minus;' + ${#numbers.formatInteger(@moneyFormat.roundNumber(order.expenses), 1, 'POINT')} + ' aUEC'">0 aUEC</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div class="table-responsive">
+                        <table class="data-table data-table--compact data-table--stack op-fin-table">
+                            <thead>
+                                <tr>
+                                    <th th:text="#{general.type}">Typ</th>
+                                    <th th:text="#{general.user}">Nutzer</th>
+                                    <th th:text="#{mission.finance.note}">Notiz</th>
+                                    <th class="num" th:text="#{mission.finance.amount}">Betrag</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="entry : ${financeDetail.entries}">
+                                    <td>
+                                        <span th:if="${entry.type.name() == 'INCOME'}" class="chip chip--success" th:text="#{mission.finance.type.income}">Einnahme</span>
+                                        <span th:if="${entry.type.name() == 'EXPENSE'}" class="chip chip--danger" th:text="#{mission.finance.type.expense}">Ausgabe</span>
+                                    </td>
+                                    <td th:attr="data-label=#{general.user}" th:text="${entry.participant == null ? '-' : (entry.participant.user != null ? entry.participant.user.effectiveName : (entry.participant.guestName != null ? entry.participant.guestName : #messages.msg('mission.participant.deleted')))}">User</td>
+                                    <td th:attr="data-label=#{mission.finance.note}" th:text="${entry.note}">Notiz</td>
+                                    <td class="num" th:attr="data-label=#{mission.finance.amount}" th:text="${(entry.type.name() == 'INCOME' ? '+' : '&minus;') + #numbers.formatInteger(@moneyFormat.round(entry.amount), 1, 'POINT')} + ' aUEC'">0 aUEC</td>
+                                </tr>
+                                <tr th:each="order : ${financeDetail.refineryOrders}" th:if="${order.expenses != null and order.expenses > 0}">
+                                    <td><span class="chip chip--danger" th:text="#{mission.finance.type.expense}">Ausgabe</span></td>
+                                    <td th:attr="data-label=#{general.user}" th:text="${order.owner != null ? order.owner.effectiveName : '-'}">User</td>
+                                    <td th:attr="data-label=#{mission.finance.note}"><a th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}" class="op-fin-link">Raffinerieauftrag</a></td>
+                                    <td class="num" th:attr="data-label=#{mission.finance.amount}" th:text="'&minus;' + ${#numbers.formatInteger(@moneyFormat.roundNumber(order.expenses), 1, 'POINT')} + ' aUEC'">0 aUEC</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                     <p th:if="${(financeDetail.entries == null or financeDetail.entries.isEmpty()) and (financeDetail.refineryOrders == null or financeDetail.refineryOrders.isEmpty())}" class="op-fin-note" th:text="#{mission.finance.empty}">Keine Eintr&auml;ge.</p>
                 </th:block>
             </th:block>

@@ -368,54 +368,56 @@
                         <h2 class="card-title" th:text="#{mission.finances}">Finanzen</h2>
                         <button type="button" class="btn btn--cta" data-trigger="open-modal-display" data-modal-id="finance-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.finance.add}">Finanzeintrag hinzuf&uuml;gen</span></button>
                     </div>
-                    <table class="data-table data-table--stack" th:if="${(financeEntries != null and !financeEntries.isEmpty()) or (refineryOrders != null and !refineryOrders.isEmpty())}">
-                        <thead>
-                            <tr>
-                                <th th:text="#{mission.finance.user}">Nutzer</th>
-                                <th class="cell-status" th:text="#{mission.finance.type}">Typ</th>
-                                <th class="num" th:text="#{mission.finance.amount}">Betrag</th>
-                                <th class="cell-actions" sec:authorize="isAuthenticated()"><span class="visually-hidden" th:text="#{general.actions}">Aktionen</span></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr th:each="entry : ${financeEntries}">
-                                <td>
-                                    <span class="cell-title" th:text="${entry.participant == null ? '-' : (entry.participant.user != null ? entry.participant.user.effectiveName : (entry.participant.guestName != null ? entry.participant.guestName : #messages.msg('mission.participant.deleted')))}">Nutzer</span>
-                                    <span class="cell-sub fin-note" th:if="${!#strings.isEmpty(entry.note)}" th:text="${entry.note}" th:title="${entry.note}">Notiz</span>
-                                </td>
-                                <td class="cell-status">
-                                    <span th:if="${entry.type.name() == 'INCOME'}" class="chip chip--success chip-xs" th:text="#{mission.finance.type.income}">Einnahme</span>
-                                    <span th:if="${entry.type.name() == 'EXPENSE'}" class="chip chip--danger chip-xs" th:text="#{mission.finance.type.expense}">Ausgabe</span>
-                                </td>
-                                <td class="num" th:classappend="${entry.type.name() == 'INCOME'} ? 'is-pos' : 'is-neg'" th:text="${(entry.type.name() == 'INCOME' ? '+' : '&minus;') + #numbers.formatInteger(@moneyFormat.round(entry.amount), 1, 'POINT')} + ' aUEC'">1.000</td>
-                                <td class="cell-actions" sec:authorize="isAuthenticated()">
-                                    <button type="button" class="btn btn-ghost btn-icon edit-finance-btn"
-                                            th:with="financeEditAmount=${@moneyFormat.round(entry.amount)}"
-                                            th:data-id="${entry.id}"
-                                            th:data-note="${entry.note}"
-                                            th:data-type="${entry.type}"
-                                            th:data-amount="${financeEditAmount}"
-                                            th:data-version="${entry.version}"
-                                            data-trigger="mission-open-edit-finance"
-                                            th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
-                                    <button type="button" class="btn btn-quiet-danger btn-icon delete-finance-btn" th:attr="data-action=@{/missions/{id}/finance-entries/{entryId}/delete(id=${mission.id}, entryId=${entry.id})}" data-sub-section="finance" th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                                </td>
-                            </tr>
-                            <tr th:if="${refineryOrders != null}" th:each="order : ${refineryOrders}" th:unless="${order.expenses == null or order.expenses <= 0}">
-                                <td>
-                                    <span class="cell-title" th:text="${order.owner != null ? order.owner.effectiveName : '-'}">Nutzer</span>
-                                    <a class="cell-sub reflink" th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}">Raffinerieauftrag</a>
-                                </td>
-                                <td class="cell-status">
-                                    <span class="chip chip--danger chip-xs" th:text="#{mission.finance.type.expense}">Ausgabe</span>
-                                </td>
-                                <td class="num is-neg" th:text="'&minus;' + ${#numbers.formatInteger(@moneyFormat.roundNumber(order.expenses), 1, 'POINT')} + ' aUEC'">1.000</td>
-                                <td class="cell-actions" sec:authorize="isAuthenticated()">
-                                    <span class="auto-marker" th:title="#{mission.finance.auto.tooltip}" th:text="#{mission.finance.auto}">auto</span>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div class="table-responsive" th:if="${(financeEntries != null and !financeEntries.isEmpty()) or (refineryOrders != null and !refineryOrders.isEmpty())}">
+                        <table class="data-table data-table--stack">
+                            <thead>
+                                <tr>
+                                    <th th:text="#{mission.finance.user}">Nutzer</th>
+                                    <th class="cell-status" th:text="#{mission.finance.type}">Typ</th>
+                                    <th class="num" th:text="#{mission.finance.amount}">Betrag</th>
+                                    <th class="cell-actions" sec:authorize="isAuthenticated()"><span class="visually-hidden" th:text="#{general.actions}">Aktionen</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="entry : ${financeEntries}">
+                                    <td>
+                                        <span class="cell-title" th:text="${entry.participant == null ? '-' : (entry.participant.user != null ? entry.participant.user.effectiveName : (entry.participant.guestName != null ? entry.participant.guestName : #messages.msg('mission.participant.deleted')))}">Nutzer</span>
+                                        <span class="cell-sub fin-note" th:if="${!#strings.isEmpty(entry.note)}" th:text="${entry.note}" th:title="${entry.note}">Notiz</span>
+                                    </td>
+                                    <td class="cell-status">
+                                        <span th:if="${entry.type.name() == 'INCOME'}" class="chip chip--success chip-xs" th:text="#{mission.finance.type.income}">Einnahme</span>
+                                        <span th:if="${entry.type.name() == 'EXPENSE'}" class="chip chip--danger chip-xs" th:text="#{mission.finance.type.expense}">Ausgabe</span>
+                                    </td>
+                                    <td class="num" th:classappend="${entry.type.name() == 'INCOME'} ? 'is-pos' : 'is-neg'" th:text="${(entry.type.name() == 'INCOME' ? '+' : '&minus;') + #numbers.formatInteger(@moneyFormat.round(entry.amount), 1, 'POINT')} + ' aUEC'">1.000</td>
+                                    <td class="cell-actions" sec:authorize="isAuthenticated()">
+                                        <button type="button" class="btn btn-ghost btn-icon edit-finance-btn"
+                                                th:with="financeEditAmount=${@moneyFormat.round(entry.amount)}"
+                                                th:data-id="${entry.id}"
+                                                th:data-note="${entry.note}"
+                                                th:data-type="${entry.type}"
+                                                th:data-amount="${financeEditAmount}"
+                                                th:data-version="${entry.version}"
+                                                data-trigger="mission-open-edit-finance"
+                                                th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                                        <button type="button" class="btn btn-quiet-danger btn-icon delete-finance-btn" th:attr="data-action=@{/missions/{id}/finance-entries/{entryId}/delete(id=${mission.id}, entryId=${entry.id})}" data-sub-section="finance" th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                                    </td>
+                                </tr>
+                                <tr th:if="${refineryOrders != null}" th:each="order : ${refineryOrders}" th:unless="${order.expenses == null or order.expenses <= 0}">
+                                    <td>
+                                        <span class="cell-title" th:text="${order.owner != null ? order.owner.effectiveName : '-'}">Nutzer</span>
+                                        <a class="cell-sub reflink" th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}">Raffinerieauftrag</a>
+                                    </td>
+                                    <td class="cell-status">
+                                        <span class="chip chip--danger chip-xs" th:text="#{mission.finance.type.expense}">Ausgabe</span>
+                                    </td>
+                                    <td class="num is-neg" th:text="'&minus;' + ${#numbers.formatInteger(@moneyFormat.roundNumber(order.expenses), 1, 'POINT')} + ' aUEC'">1.000</td>
+                                    <td class="cell-actions" sec:authorize="isAuthenticated()">
+                                        <span class="auto-marker" th:title="#{mission.finance.auto.tooltip}" th:text="#{mission.finance.auto}">auto</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                     <th:block th:if="${(financeEntries == null or financeEntries.isEmpty()) and (refineryOrders == null or refineryOrders.isEmpty())}">
                         <th:block th:replace="~{fragments/components :: emptyState(titleKey='mission.finance.empty.title', textKey='mission.finance.empty')}"></th:block>
                     </th:block>
@@ -425,33 +427,35 @@
                     <div class="card-head fin-card-head">
                         <h2 class="card-title" th:text="#{mission.payout}">Auszahlung</h2>
                     </div>
-                    <table class="data-table data-table--stack payout-table" th:if="${participants != null and !participants.isEmpty()}">
-                        <thead>
-                            <tr>
-                                <th th:text="#{mission.participant.user}">Benutzer</th>
-                                <th class="num" th:text="#{mission.participant.participation_percentage}" sec:authorize="isAuthenticated()">Teilnahme (%)</th>
-                                <th class="cell-actions" th:text="#{mission.participant.payout_preference}">Auszahlungsart</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr th:each="p : ${participants}" th:attr="data-participant-id=${p?.id}, data-version=${p?.version}">
-                                <td><span class="cell-title" th:text="${p?.user != null ? p.user.effectiveName : (p?.guestName != null ? p.guestName : #messages.msg('mission.participant.deleted'))}">Username</span></td>
-                                <td class="num" th:attr="data-label=#{mission.participant.participation_percentage}" th:text="${#numbers.formatDecimal(participationPercentages[p.id] ?: 0.0, 1, 'NONE', 2, 'DEFAULT')} + ' %'" sec:authorize="isAuthenticated()">0.00 %</td>
-                                <td class="cell-actions">
-                                    <select class="form-control payout-select"
-                                            th:aria-label="#{mission.participant.payout_preference}"
-                                            th:data-payout-url="@{/missions/{id}/participants/{pId}/payout-preference(id=${mission.id}, pId=${p?.id})}"
-                                            th:data-participant-id="${p?.id}"
-                                            th:data-original-value="${p?.payoutPreference?.name()}"
-                                            data-trigger="mission-update-payout"
-                                            th:disabled="${(p.user != null and !#authorization.expression('isAuthenticated()')) or (p.user != null and !#authorization.expression('hasRole(''MISSION_MANAGER'')') and (authUserId == null or p.user.id.toString() != authUserId) and !mission.canEdit)}">
-                                        <option value="PAYOUT" th:selected="${p?.payoutPreference?.name() == 'PAYOUT'}" th:text="#{mission.payout.preference.payout}">Auszahlen</option>
-                                        <option value="DONATE" th:selected="${p?.payoutPreference?.name() == 'DONATE'}" th:text="#{mission.payout.preference.donate}">Spenden</option>
-                                    </select>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div class="table-responsive" th:if="${participants != null and !participants.isEmpty()}">
+                        <table class="data-table data-table--stack payout-table">
+                            <thead>
+                                <tr>
+                                    <th th:text="#{mission.participant.user}">Benutzer</th>
+                                    <th class="num" th:text="#{mission.participant.participation_percentage}" sec:authorize="isAuthenticated()">Teilnahme (%)</th>
+                                    <th class="cell-actions" th:text="#{mission.participant.payout_preference}">Auszahlungsart</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="p : ${participants}" th:attr="data-participant-id=${p?.id}, data-version=${p?.version}">
+                                    <td><span class="cell-title" th:text="${p?.user != null ? p.user.effectiveName : (p?.guestName != null ? p.guestName : #messages.msg('mission.participant.deleted'))}">Username</span></td>
+                                    <td class="num" th:attr="data-label=#{mission.participant.participation_percentage}" th:text="${#numbers.formatDecimal(participationPercentages[p.id] ?: 0.0, 1, 'NONE', 2, 'DEFAULT')} + ' %'" sec:authorize="isAuthenticated()">0.00 %</td>
+                                    <td class="cell-actions">
+                                        <select class="form-control payout-select"
+                                                th:aria-label="#{mission.participant.payout_preference}"
+                                                th:data-payout-url="@{/missions/{id}/participants/{pId}/payout-preference(id=${mission.id}, pId=${p?.id})}"
+                                                th:data-participant-id="${p?.id}"
+                                                th:data-original-value="${p?.payoutPreference?.name()}"
+                                                data-trigger="mission-update-payout"
+                                                th:disabled="${(p.user != null and !#authorization.expression('isAuthenticated()')) or (p.user != null and !#authorization.expression('hasRole(''MISSION_MANAGER'')') and (authUserId == null or p.user.id.toString() != authUserId) and !mission.canEdit)}">
+                                            <option value="PAYOUT" th:selected="${p?.payoutPreference?.name() == 'PAYOUT'}" th:text="#{mission.payout.preference.payout}">Auszahlen</option>
+                                            <option value="DONATE" th:selected="${p?.payoutPreference?.name() == 'DONATE'}" th:text="#{mission.payout.preference.donate}">Spenden</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                     <th:block th:if="${participants == null or participants.isEmpty()}">
                         <th:block th:replace="~{fragments/components :: emptyState(titleKey='mission.payout.empty.title', textKey='mission.participants.empty')}"></th:block>
                     </th:block>
@@ -461,83 +465,87 @@
             <th:block sec:authorize="isAuthenticated()" th:if="${(refineryOrders != null and !#lists.isEmpty(refineryOrders)) or (inventoryEntries != null and !#lists.isEmpty(inventoryEntries))}">
                 <details class="card card--flush fin-details" open th:if="${refineryOrders != null and !#lists.isEmpty(refineryOrders)}">
                     <summary><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg> <span th:text="#{mission.refinery_orders}">Raffinerieauftr&auml;ge</span> <span class="chip chip--data chip-xs" th:text="${#lists.size(refineryOrders)}">2</span></summary>
-                    <table class="data-table data-table--stack">
-                        <thead>
-                            <tr>
-                                <th th:text="#{refinery.user}">Nutzer</th>
-                                <th th:text="#{refinery.location}">Standort</th>
-                                <th th:text="#{refinery.ends_at}">Ende</th>
-                                <th class="cell-status" th:text="#{refinery.status}">Status</th>
-                                <th th:text="#{nav.materials}">Materialien</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr th:each="order : ${refineryOrders}">
-                                <td><a class="row-link" th:href="@{/refinery-orders/{id}(id=${order.id})}"><span class="cell-title" th:text="${order.owner != null ? order.owner.effectiveName : '-'}">Nutzer</span></a></td>
-                                <td th:attr="data-label=#{refinery.location}" th:text="${order.location != null ? order.location.name : '-'}">Standort</td>
-                                <td th:attr="data-label=#{refinery.ends_at}">
-                                    <span class="refinery-endsat-local"
-                                          th:data-utc="${order.endsAt != null ? order.endsAt.toEpochMilli() : 'null'}"
-                                          th:text="${order.endsAt != null ? #temporals.format(order.endsAt, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '-'}">Ende</span>
-                                </td>
-                                <td class="cell-status" th:text="${order.status != null ? #messages.msgOrNull('refinery.status.' + order.status) ?: order.status : '-'}">Status</td>
-                                <td th:attr="data-label=#{nav.materials}">
-                                    <ul class="goods-list" th:if="${order.goods != null and !#lists.isEmpty(order.goods)}">
-                                        <li th:each="good : ${order.goods}">
-                                            <span th:text="${good.outputMaterial != null ? good.outputMaterial.name : '-'}">Material</span>
-                                            <span class="goods-amount" th:switch="${good.outputMaterial?.quantityType}">
-                                                <span th:case="'PIECE'" th:text="${good.outputQuantity != null} ? |${#numbers.formatInteger(good.outputQuantity, 1)} #{material.quantity.piece}| : '-'">10 St&uuml;ck</span>
-                                                <span th:case="*" th:text="${good.outputQuantity != null} ? |${#numbers.formatDecimal(good.outputQuantity / 100.0, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}| : '-'">10.500 SCU</span>
-                                            </span>
-                                            <span class="goods-quality" th:if="${good.quality != null}" th:text="|#{refinery.quality} ${good.quality}|">Qualit&auml;t 500</span>
-                                        </li>
-                                    </ul>
-                                    <span th:if="${order.goods == null or #lists.isEmpty(order.goods)}">-</span>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div class="table-responsive">
+                        <table class="data-table data-table--stack">
+                            <thead>
+                                <tr>
+                                    <th th:text="#{refinery.user}">Nutzer</th>
+                                    <th th:text="#{refinery.location}">Standort</th>
+                                    <th th:text="#{refinery.ends_at}">Ende</th>
+                                    <th class="cell-status" th:text="#{refinery.status}">Status</th>
+                                    <th th:text="#{nav.materials}">Materialien</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="order : ${refineryOrders}">
+                                    <td><a class="row-link" th:href="@{/refinery-orders/{id}(id=${order.id})}"><span class="cell-title" th:text="${order.owner != null ? order.owner.effectiveName : '-'}">Nutzer</span></a></td>
+                                    <td th:attr="data-label=#{refinery.location}" th:text="${order.location != null ? order.location.name : '-'}">Standort</td>
+                                    <td th:attr="data-label=#{refinery.ends_at}">
+                                        <span class="refinery-endsat-local"
+                                              th:data-utc="${order.endsAt != null ? order.endsAt.toEpochMilli() : 'null'}"
+                                              th:text="${order.endsAt != null ? #temporals.format(order.endsAt, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '-'}">Ende</span>
+                                    </td>
+                                    <td class="cell-status" th:text="${order.status != null ? #messages.msgOrNull('refinery.status.' + order.status) ?: order.status : '-'}">Status</td>
+                                    <td th:attr="data-label=#{nav.materials}">
+                                        <ul class="goods-list" th:if="${order.goods != null and !#lists.isEmpty(order.goods)}">
+                                            <li th:each="good : ${order.goods}">
+                                                <span th:text="${good.outputMaterial != null ? good.outputMaterial.name : '-'}">Material</span>
+                                                <span class="goods-amount" th:switch="${good.outputMaterial?.quantityType}">
+                                                    <span th:case="'PIECE'" th:text="${good.outputQuantity != null} ? |${#numbers.formatInteger(good.outputQuantity, 1)} #{material.quantity.piece}| : '-'">10 St&uuml;ck</span>
+                                                    <span th:case="*" th:text="${good.outputQuantity != null} ? |${#numbers.formatDecimal(good.outputQuantity / 100.0, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}| : '-'">10.500 SCU</span>
+                                                </span>
+                                                <span class="goods-quality" th:if="${good.quality != null}" th:text="|#{refinery.quality} ${good.quality}|">Qualit&auml;t 500</span>
+                                            </li>
+                                        </ul>
+                                        <span th:if="${order.goods == null or #lists.isEmpty(order.goods)}">-</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </details>
 
                 <details class="card card--flush fin-details" open th:if="${inventoryEntries != null and !#lists.isEmpty(inventoryEntries)}">
                     <summary><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg> <span th:text="#{mission.inventory_entries}">Lagereintr&auml;ge</span> <span class="chip chip--data chip-xs" th:text="${#lists.size(inventoryEntries)}">3</span></summary>
-                    <table class="data-table data-table--stack">
-                        <thead>
-                            <tr>
-                                <th th:text="#{inventory.material}">Material</th>
-                                <th th:text="#{inventory.user}">Nutzer</th>
-                                <th th:text="#{inventory.location}">Standort</th>
-                                <th class="num" th:text="#{inventory.amount}">Menge</th>
-                                <th class="num" th:text="#{inventory.quality}">Qualit&auml;t</th>
-                                <th th:text="#{inventory.order}">Auftrag</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr th:each="item : ${inventoryEntries}">
-                                <td>
-                                    <span class="cell-title" th:text="${item.material != null ? item.material.name : '-'}">Material</span>
-                                    <span th:if="${item.stolen}" class="chip chip--danger chip-xs" data-testid="stolen-chip"
-                                          th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
-                                </td>
-                                <td th:attr="data-label=#{inventory.user}" th:text="${item.user != null ? item.user.effectiveName : '-'}">Nutzer</td>
-                                <td th:attr="data-label=#{inventory.location}" th:text="${item.location != null ? item.location.name : '-'}">Standort</td>
-                                <td class="num" th:switch="${item.material?.quantityType}">
-                                    <span th:case="'PIECE'" th:text="${item.amount != null} ? |${#numbers.formatInteger(item.amount, 1)} #{material.quantity.piece}| : '-'">10 St&uuml;ck</span>
-                                    <span th:case="*" th:text="${item.amount != null} ? |${#numbers.formatDecimal(item.amount, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}| : '-'">10.500 SCU</span>
-                                </td>
-                                <td class="num" th:attr="data-label=#{inventory.quality}" th:text="${item.quality != null ? item.quality : '-'}">Qualit&auml;t</td>
-                                <td th:attr="data-label=#{inventory.order}">
-                                    <span th:each="a : ${item.jobOrderAllocations}"
-                                          class="assoc-chip assoc-chip--order">
-                                        <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
-                                        <span class="assoc-chip__amt"
-                                              th:text="${item.material?.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'NONE') : #numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
-                                    </span>
-                                    <span th:if="${#lists.isEmpty(item.jobOrderAllocations)}">-</span>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div class="table-responsive">
+                        <table class="data-table data-table--stack">
+                            <thead>
+                                <tr>
+                                    <th th:text="#{inventory.material}">Material</th>
+                                    <th th:text="#{inventory.user}">Nutzer</th>
+                                    <th th:text="#{inventory.location}">Standort</th>
+                                    <th class="num" th:text="#{inventory.amount}">Menge</th>
+                                    <th class="num" th:text="#{inventory.quality}">Qualit&auml;t</th>
+                                    <th th:text="#{inventory.order}">Auftrag</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="item : ${inventoryEntries}">
+                                    <td>
+                                        <span class="cell-title" th:text="${item.material != null ? item.material.name : '-'}">Material</span>
+                                        <span th:if="${item.stolen}" class="chip chip--danger chip-xs" data-testid="stolen-chip"
+                                              th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
+                                    </td>
+                                    <td th:attr="data-label=#{inventory.user}" th:text="${item.user != null ? item.user.effectiveName : '-'}">Nutzer</td>
+                                    <td th:attr="data-label=#{inventory.location}" th:text="${item.location != null ? item.location.name : '-'}">Standort</td>
+                                    <td class="num" th:switch="${item.material?.quantityType}">
+                                        <span th:case="'PIECE'" th:text="${item.amount != null} ? |${#numbers.formatInteger(item.amount, 1)} #{material.quantity.piece}| : '-'">10 St&uuml;ck</span>
+                                        <span th:case="*" th:text="${item.amount != null} ? |${#numbers.formatDecimal(item.amount, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}| : '-'">10.500 SCU</span>
+                                    </td>
+                                    <td class="num" th:attr="data-label=#{inventory.quality}" th:text="${item.quality != null ? item.quality : '-'}">Qualit&auml;t</td>
+                                    <td th:attr="data-label=#{inventory.order}">
+                                        <span th:each="a : ${item.jobOrderAllocations}"
+                                              class="assoc-chip assoc-chip--order">
+                                            <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
+                                            <span class="assoc-chip__amt"
+                                                  th:text="${item.material?.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'NONE') : #numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
+                                        </span>
+                                        <span th:if="${#lists.isEmpty(item.jobOrderAllocations)}">-</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </details>
             </th:block>
             </th:block></div>
