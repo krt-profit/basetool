@@ -55,32 +55,34 @@
         </div>
 
         <div class="card card--flush">
-            <table id="shipTypesTable" class="data-table data-table--stack" th:unless="${#lists.isEmpty(shipTypes)}">
-                <thead>
-                    <tr>
-                        <th th:text="#{ship.shiptype.name}">Name</th>
-                        <th th:text="#{ship.shiptype.description}">Beschreibung</th>
-                        <th class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:text="#{general.action}">Aktion</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="st : ${shipTypes}" data-testid="ship-type-row" th:classappend="${st.hidden} ? 'sd-row--hidden' : ''">
-                        <td>
-                            <span class="cell-title" th:text="${st.name}">Name</span>
-                            <span class="cell-sub" th:if="${st.manufacturer != null}" th:text="${st.manufacturer.abbreviation}">Hersteller</span>
-                        </td>
-                        <td th:attr="data-label=#{ship.shiptype.description}" th:text="${st.description}">Desc</td>
-                        <td class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
-                            <form th:action="@{/ship-data/ship-types/{id}/visibility(id=${st.id})}" method="post"
-                                  class="js-visibility-toggle m-0"
-                                  th:data-label-show="#{info.show}" th:data-label-hide="#{info.hide}">
-                                <input type="hidden" name="hidden" th:value="${!st.hidden}">
-                                <button type="submit" class="btn btn-ghost btn-xs" th:text="${st.hidden} ? #{info.show} : #{info.hide}">Ausblenden</button>
-                            </form>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="table-responsive" th:unless="${#lists.isEmpty(shipTypes)}">
+                <table id="shipTypesTable" class="data-table data-table--stack">
+                    <thead>
+                        <tr>
+                            <th th:text="#{ship.shiptype.name}">Name</th>
+                            <th th:text="#{ship.shiptype.description}">Beschreibung</th>
+                            <th class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:text="#{general.action}">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="st : ${shipTypes}" data-testid="ship-type-row" th:classappend="${st.hidden} ? 'sd-row--hidden' : ''">
+                            <td>
+                                <span class="cell-title" th:text="${st.name}">Name</span>
+                                <span class="cell-sub" th:if="${st.manufacturer != null}" th:text="${st.manufacturer.abbreviation}">Hersteller</span>
+                            </td>
+                            <td th:attr="data-label=#{ship.shiptype.description}" th:text="${st.description}">Desc</td>
+                            <td class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                                <form th:action="@{/ship-data/ship-types/{id}/visibility(id=${st.id})}" method="post"
+                                      class="js-visibility-toggle m-0"
+                                      th:data-label-show="#{info.show}" th:data-label-hide="#{info.hide}">
+                                    <input type="hidden" name="hidden" th:value="${!st.hidden}">
+                                    <button type="submit" class="btn btn-ghost btn-xs" th:text="${st.hidden} ? #{info.show} : #{info.hide}">Ausblenden</button>
+                                </form>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
             <th:block th:if="${error == null and #lists.isEmpty(shipTypes)}">
                 <th:block th:replace="~{fragments/components :: emptyState(titleKey='shipdata.shipTypes.empty', textKey='shipdata.empty.text')}"></th:block>
             </th:block>
@@ -107,32 +109,34 @@
         </div>
 
         <div class="card card--flush">
-            <table id="manufacturersTable" class="data-table data-table--stack" th:unless="${#lists.isEmpty(manufacturers)}">
-                <thead>
-                    <tr>
-                        <th th:text="#{ship.manufacturer.name}">Name</th>
-                        <th th:text="#{ship.manufacturer.description}">Beschreibung</th>
-                        <th class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:text="#{general.action}">Aktion</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="m : ${manufacturers}" data-testid="manufacturer-row" th:classappend="${m.hidden} ? 'sd-row--hidden' : ''">
-                        <td>
-                            <span class="cell-title" th:text="${m.name}">Name</span>
-                            <span class="cell-sub" th:text="${m.abbreviation}">Kürzel</span>
-                        </td>
-                        <td th:attr="data-label=#{ship.manufacturer.description}" th:text="${m.description}">Desc</td>
-                        <td class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
-                            <form th:action="@{/ship-data/manufacturers/{id}/visibility(id=${m.id})}" method="post"
-                                  class="js-visibility-toggle m-0"
-                                  th:data-label-show="#{info.show}" th:data-label-hide="#{info.hide}">
-                                <input type="hidden" name="hidden" th:value="${!m.hidden}">
-                                <button type="submit" class="btn btn-ghost btn-xs" th:text="${m.hidden} ? #{info.show} : #{info.hide}">Ausblenden</button>
-                            </form>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="table-responsive" th:unless="${#lists.isEmpty(manufacturers)}">
+                <table id="manufacturersTable" class="data-table data-table--stack">
+                    <thead>
+                        <tr>
+                            <th th:text="#{ship.manufacturer.name}">Name</th>
+                            <th th:text="#{ship.manufacturer.description}">Beschreibung</th>
+                            <th class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:text="#{general.action}">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="m : ${manufacturers}" data-testid="manufacturer-row" th:classappend="${m.hidden} ? 'sd-row--hidden' : ''">
+                            <td>
+                                <span class="cell-title" th:text="${m.name}">Name</span>
+                                <span class="cell-sub" th:text="${m.abbreviation}">Kürzel</span>
+                            </td>
+                            <td th:attr="data-label=#{ship.manufacturer.description}" th:text="${m.description}">Desc</td>
+                            <td class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                                <form th:action="@{/ship-data/manufacturers/{id}/visibility(id=${m.id})}" method="post"
+                                      class="js-visibility-toggle m-0"
+                                      th:data-label-show="#{info.show}" th:data-label-hide="#{info.hide}">
+                                    <input type="hidden" name="hidden" th:value="${!m.hidden}">
+                                    <button type="submit" class="btn btn-ghost btn-xs" th:text="${m.hidden} ? #{info.show} : #{info.hide}">Ausblenden</button>
+                                </form>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
             <th:block th:if="${error == null and #lists.isEmpty(manufacturers)}">
                 <th:block th:replace="~{fragments/components :: emptyState(titleKey='shipdata.manufacturers.empty', textKey='shipdata.empty.text')}"></th:block>
             </th:block>
