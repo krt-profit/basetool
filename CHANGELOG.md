@@ -381,22 +381,33 @@
 
 ### Security
 
+- **Monitoring: Grafana 13.2.2 → 13.2.3.** Sicherheitsrelease gegen CVE-2026-13719,
+  CVE-2026-13720 und CVE-2026-81841 (je mittlere Schwere: Alert-Regeln fremder Ordner lesbar,
+  Provisioning-Metadaten durch Editoren setzbar, pausierter öffentlicher Dashboard-Link blieb
+  gültig). Digest in Compose und Quadlet aktualisiert; wirkt nach dem nächsten Deploy.
+  
 - **Basis-Images auf den aktuellen Stand der Tags gehoben (nur Digests, keine neuen Versionen).**
+  
   Temurin JRE/JDK 25.0.4.1+1 (sicherheitsbedingter Sonderrelease), `nginx-unprivileged:1.31.6-alpine`
   mit neuen Alpine-Schichten und der BuildKit-Builder `buildx-stable-1`. Die Log-Signaturen von
   `JvmNativeThreadExhaustion` und `JvmStartupCacheRejected` wurden auf dem neuen JRE erneut geprüft.
+  
 - **Ingest prüft den Hostnamen des Backends standardmäßig.** Der Jar-Default von
   `app.ingest.verify-backend-hostname` ist jetzt `true`; nur das `dev`-Profil schaltet ihn ab.
   Compose und Quadlet setzten bereits `true` (ING-SEC-04).
+  
 - **Host: `deploy` darf nur noch die podman-Unterbefehle der Deploy-Skripte als `iri` ausführen**
   statt `podman *`; repo-lint prüft die Liste gegen die Skripte. Wirkt erst nach einem Ansible-Lauf
   auf dem Host (OPS-SEC-08).
+  
 - **CI: Werkzeuge per Hash gepinnt.** PyYAML, ansible-core/ansible-lint aus `--require-hashes`-Dateien,
   markdownlint-cli2 aus einem Lockfile, Ansible-Collections exakt versioniert (CI-SEC-12).
+  
 - **CI: Release-App-Schlüssel in der Umgebung `release`.** `release-prepare`, `refresh-versions` und
   `release-publish` lesen ihn dort; `release-publish` läuft dafür auf dem Push nach `main` und erkennt
   den Release-Merge selbst. Der Owner legt die Umgebung einmalig an und löscht danach das
   Repository-Secret (CI-SEC-16, ADR-0201).
+  
 - **Backend: Prüfregeln für Mandantentrennung und Massenzuweisung.** Org-Einheiten-gebundene Aggregate
   tragen `@TenantScoped`; ein Test verlangt für jeden Controller, der solche Daten schreibt, den
   Scope-Gate, und für Request-Bodies `@Valid`, keine Antwort-DTOs und keine servergeführten Felder
