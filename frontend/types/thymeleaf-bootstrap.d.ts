@@ -265,6 +265,8 @@ declare const MSG_DELETE_MESSAGE: string;
 /** Injected by the page bootstrap (declared in orders-detail.html). */
 declare const MSG_EMPTY_INVENTORY: string;
 /** Injected by the page bootstrap (declared in orders-detail.html). */
+declare const MSG_INVENTORY_LOAD_ERROR: string;
+/** Injected by the page bootstrap (declared in orders-detail.html). */
 declare const MSG_INVENTORY_BELOW_FLOOR: string;
 /** Injected by the page bootstrap (declared in orders-detail.html). */
 declare const MSG_INVENTORY_PART_OF: string;

@@ -2047,9 +2047,7 @@ async function changeMissionOwner() {
     const userId = document.getElementById('new-owner-id').value;
     if (!userId || userId.trim() === '') {
         showFrontendErrorToast(
-            typeof MSG_ERROR_USER_REQUIRED !== 'undefined'
-                ? MSG_ERROR_USER_REQUIRED
-                : 'Bitte wähle einen Benutzer aus',
+            window.krtI18nText(MSG_ERROR_USER_REQUIRED, 'MSG_ERROR_USER_REQUIRED'),
         );
         return;
     }
@@ -2109,9 +2107,9 @@ async function changeMissionOwner() {
                 window.krtRefreshMissionSection('mgmt');
             },
         });
-    } catch (err) {
+    } catch (_err) {
         showFrontendErrorToast(
-            `${typeof MSG_ERROR_OWNER_CHANGE !== 'undefined' ? MSG_ERROR_OWNER_CHANGE : 'Fehler beim Ändern des Besitzers'} (Error: ${err.message})`,
+            window.krtI18nText(MSG_ERROR_OWNER_CHANGE, 'MSG_ERROR_OWNER_CHANGE'),
         );
     }
 }
@@ -2199,21 +2197,20 @@ async function changeMissionOwningOrgUnit() {
                 }
             },
         });
-    } catch (err) {
+    } catch (_err) {
         showFrontendErrorToast(
-            `${typeof MSG_ERROR_OWNING_ORG_UNIT_CHANGE !== 'undefined' ? MSG_ERROR_OWNING_ORG_UNIT_CHANGE : 'Fehler beim Ändern der verantwortlichen Einheit'} (Error: ${err.message})`,
+            window.krtI18nText(
+                MSG_ERROR_OWNING_ORG_UNIT_CHANGE,
+                'MSG_ERROR_OWNING_ORG_UNIT_CHANGE',
+            ),
         );
     }
 }
 
 async function removeMissionManager(userId) {
     const removeConfirmed = await window.showKrtConfirm(
-        typeof MSG_CONFIRM_MANAGER_REMOVE !== 'undefined'
-            ? MSG_CONFIRM_MANAGER_REMOVE
-            : 'Verwalter entfernen?',
-        typeof MSG_CONFIRM_MANAGER_REMOVE !== 'undefined'
-            ? MSG_CONFIRM_MANAGER_REMOVE
-            : 'Verwalter entfernen?',
+        window.krtI18nText(MSG_CONFIRM_MANAGER_REMOVE, 'MSG_CONFIRM_MANAGER_REMOVE'),
+        window.krtI18nText(MSG_CONFIRM_MANAGER_REMOVE, 'MSG_CONFIRM_MANAGER_REMOVE'),
         window.krtI18nText(
             window.MISSION_SUBRES_I18N &&
                 window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
@@ -2252,9 +2249,7 @@ async function addMissionManager() {
     const userId = document.getElementById('new-manager-id').value;
     if (!userId || userId.trim() === '') {
         showFrontendErrorToast(
-            typeof MSG_ERROR_USER_REQUIRED !== 'undefined'
-                ? MSG_ERROR_USER_REQUIRED
-                : 'Bitte wähle einen Benutzer aus',
+            window.krtI18nText(MSG_ERROR_USER_REQUIRED, 'MSG_ERROR_USER_REQUIRED'),
         );
         return;
     }
@@ -2292,10 +2287,7 @@ async function updatePayoutPreference(selectElement) {
         payload: { preference: value },
         serialize: 'section:participant',
         toast: false,
-        errorMessage:
-            typeof MSG_ERROR_PAYOUT_UPDATE !== 'undefined'
-                ? MSG_ERROR_PAYOUT_UPDATE
-                : 'Speichern fehlgeschlagen.',
+        errorMessage: window.krtI18nText(MSG_ERROR_PAYOUT_UPDATE, 'MSG_ERROR_PAYOUT_UPDATE'),
     });
     if (!result.ok) {
         selectElement.value = selectElement.getAttribute('data-original-value') || 'PAYOUT';

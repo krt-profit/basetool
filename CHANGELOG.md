@@ -328,6 +328,10 @@
   JavaScript-Stringliteral schrieb; die Werte kommen jetzt sauber aus dem Seiten-Bootstrap
   (Templates, ADR-0069).
 
+- **Auftragsdetail und Einsatzdetail: Fehlermeldungen in der Sprache des Nutzers.** Der Ladefehler der
+  Lagereinträge eines Auftrags und fünf Ersatztexte der Einsatzseite waren fest auf Deutsch; sie
+  kommen jetzt aus den Sprachdateien, ein Test findet fest verdrahteten Text in Skripten (i18n).
+
 - **Request-Metriken fallen nicht mehr nach 100 Endpunkten weg.** Backend und Frontend durften nur
   100 verschiedene `uri`-Werte in `http.server.requests` / `http.client.requests` führen; jeder
   danach erstmals aufgerufene Endpunkt fehlte in 5xx- und Latenz-Alerts und Dashboards. Die Grenze
