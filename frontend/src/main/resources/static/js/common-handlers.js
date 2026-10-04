@@ -167,7 +167,7 @@
     on('keyup', 'filter-table', filterTableHandler);
 
     /**
-     * Toggles the `krtm-hidden` class on the element whose id is in `data-target`, without writing
+     * Toggles the `is-hidden` class on the element whose id is in `data-target`, without writing
      * an inline style.
      */
     on('click', 'toggle-display', function (el, event) {
@@ -176,7 +176,7 @@
         const target = document.getElementById(id);
         if (!target) return;
         event.preventDefault();
-        target.classList.toggle('krtm-hidden');
+        target.classList.toggle('is-hidden');
     });
 
     /**

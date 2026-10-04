@@ -2012,6 +2012,11 @@ ADR-0165
 > script-collapses-a-rendered-panel fallback below, but it **always starts closed and stores no
 > open/closed preference** — the third property below is retired. No page uses `filterToggle` any
 > more; active filters are additionally shown as `.filter-chips`.
+>
+> **Amended 2026-10-04 (phase 4):** the unused `components :: filterToggle` fragment and the stored
+> preference (`krt.filterPanel.<name>` in localStorage) are removed: `krt-filter-panel.js` treats every
+> `[data-filter-panel]` as the transient popover, so `data-filter-transient` on the markup only marks
+> that contract. The text below describes the toggle as first built.
 
 Every list page whose filter block carries **more than a single control** must render that block as
 a collapsible panel: the block gets `data-filter-panel="<page>"`, and the shared

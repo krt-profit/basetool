@@ -105,8 +105,8 @@
             returnFocus.set(overlay, document.activeElement);
         }
         overlay.style.removeProperty('display');
-        overlay.classList.remove('krtm-hidden');
-        overlay.classList.add('krtm-modal-open');
+        overlay.classList.remove('is-hidden');
+        overlay.classList.add('is-open');
         if (overlay instanceof HTMLDialogElement && !overlay.open && overlay.isConnected) {
             try {
                 overlay.showModal();
@@ -128,8 +128,8 @@
             return null;
         }
         overlay.style.removeProperty('display');
-        overlay.classList.remove('krtm-modal-open');
-        overlay.classList.add('krtm-hidden');
+        overlay.classList.remove('is-open');
+        overlay.classList.add('is-hidden');
         if (overlay instanceof HTMLDialogElement && overlay.open) {
             overlay.close();
         }
@@ -245,7 +245,7 @@
 
     window.krtModal = { open, close, isOpen, topmost, layerRoot };
 
-    document.querySelectorAll('dialog.krt-modal-overlay.krtm-modal-open').forEach(function (d) {
+    document.querySelectorAll('dialog.krt-modal-overlay.is-open').forEach(function (d) {
         open(d);
     });
 })();

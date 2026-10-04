@@ -57,8 +57,16 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *   <li>no element is cut off beyond the viewport outside a fitting scroll container;
  *   <li>wide tables scroll inside their own container;
  *   <li>form controls fit the viewport and reach the 44px touch floor by their effective hit area
- *       (dense row actions excepted).
+ *       (dense row actions excepted);
+ *   <li>on the phone class no {@code .card} is wider inside than its own box, a {@code
+ *       .table-responsive} scroller in it excepted;
+ *   <li>the page head's primary action lies within the first viewport;
+ *   <li>a {@code .page-actions} row shows at most one {@code .btn--cta};
+ *   <li>no {@code .hud-box} sits inside another;
+ *   <li>no visible text is drawn in the retired gray {@value #RETIRED_GRAY}.
  * </ol>
+ *
+ * <p>The last five are the page-pattern rules of REQ-UI-027.
  *
  * <p>Geometry is measured with bounding rectangles. All findings are collected before failing, and
  * only the Chromium run writes screenshots to {@code build/e2e-artifacts/touch-layout/}. The class
@@ -119,6 +127,18 @@ class TouchClassLayoutE2eTest {
 
   /** Sub-pixel slack, for the same reason the sibling layout guard carries one. */
   private static final double SLACK_PX = 1.0;
+
+  /**
+   * The computed text color of the retired {@code --color-gray-2} that failed contrast as text;
+   * DS-1 moved every text use to {@code --color-gray-2-text}.
+   */
+  private static final String RETIRED_GRAY = "rgb(100, 100, 100)";
+
+  /** Primary actions one {@code .page-actions} row may show (REQ-UI-027, one per context). */
+  private static final int MAX_PAGE_ACTION_CTAS = 1;
+
+  /** Offenders listed per page-pattern rule before the rest is only counted. */
+  private static final int MAX_LISTED_OFFENDERS = 6;
 
   /** The only engine that writes screenshots; every engine still measures and asserts. */
   private static final String SCREENSHOT_ENGINE = "chromium";
@@ -528,7 +548,21 @@ class TouchClassLayoutE2eTest {
     @SuppressWarnings("unchecked")
     Map<String, Object> probe =
         (Map<String, Object>)
-            page.evaluate(PROBE_JS, Map.of("slack", SLACK_PX, "deviceWidth", width));
+            page.evaluate(
+                PROBE_JS,
+                Map.of(
+                    "slack",
+                    SLACK_PX,
+                    "deviceWidth",
+                    width,
+                    "phoneMaxWidth",
+                    PHONE_MAX_WIDTH,
+                    "retiredGray",
+                    RETIRED_GRAY,
+                    "maxCtas",
+                    MAX_PAGE_ACTION_CTAS,
+                    "maxListed",
+                    MAX_LISTED_OFFENDERS));
 
     String slug = path.equals("/") ? "dashboard" : path.replaceAll("^/", "").replace('/', '-');
     screenshotSafely(
@@ -593,6 +627,7 @@ class TouchClassLayoutE2eTest {
     printDiagnostics(where, probe);
     findings.addAll(checkGeometry(where, probe, width, height));
     findings.addAll(collectOffenders(where, probe, width));
+    findings.addAll(checkPagePatterns(where, probe));
     return findings;
   }
 
@@ -625,6 +660,54 @@ class TouchClassLayoutE2eTest {
     if (modalCount > 0) {
       System.out.printf("[touch-layout] %-34s %d modal(s) measured%n", where, modalCount);
     }
+    System.out.printf(
+        "[touch-layout] %-22s patterns: primary %s | wide cards %.0f | crowded page-actions %.0f"
+            + " | nested hud-boxes %.0f | retired-gray texts %.0f%n",
+        where,
+        String.valueOf(probe.get("primaryAction")),
+        number(probe.get("cardOverflowCount")),
+        number(probe.get("ctaCrowdCount")),
+        number(probe.get("nestedHudCount")),
+        number(probe.get("retiredGrayCount")));
+  }
+
+  /**
+   * Applies the page-pattern rules of REQ-UI-027: cards that are wider inside than their box on the
+   * phone class, a page head's primary action below the first viewport, more than one primary
+   * action in a {@code .page-actions} row, nested {@code .hud-box}es and text in the retired gray.
+   *
+   * @param where {@code WxH /path}
+   * @param probe the page-side measurement
+   * @return one line per finding
+   */
+  private static List<String> checkPagePatterns(String where, Map<String, Object> probe) {
+    List<String> findings = new ArrayList<>();
+    for (Object offender : list(probe.get("cardOverflows"))) {
+      findings.add(where + ": card scrolls sideways — " + offender);
+    }
+    Object primaryIssue = probe.get("primaryIssue");
+    if (primaryIssue != null) {
+      findings.add(
+          where + ": page-head primary action outside the first viewport — " + primaryIssue);
+    }
+    for (Object offender : list(probe.get("ctaCrowds"))) {
+      findings.add(where + ": more than " + MAX_PAGE_ACTION_CTAS + " .btn--cta — " + offender);
+    }
+    for (Object offender : list(probe.get("nestedHudBoxes"))) {
+      findings.add(where + ": nested .hud-box — " + offender);
+    }
+    List<Object> gray = list(probe.get("retiredGrayTexts"));
+    for (Object offender : gray) {
+      findings.add(where + ": text in the retired gray " + RETIRED_GRAY + " — " + offender);
+    }
+    double grayCount = number(probe.get("retiredGrayCount"));
+    if (grayCount > gray.size()) {
+      findings.add(
+          String.format(
+              "%s: %.0f more text element(s) in the retired gray %s",
+              where, grayCount - gray.size(), RETIRED_GRAY));
+    }
+    return findings;
   }
 
   /**
@@ -801,7 +884,7 @@ class TouchClassLayoutE2eTest {
    */
   private static final String PROBE_JS =
       """
-      ({ slack, deviceWidth }) => {
+      ({ slack, deviceWidth, phoneMaxWidth, retiredGray, maxCtas, maxListed }) => {
         const vw = Math.min(window.innerWidth, deviceWidth);
         const layoutWidth = window.innerWidth;
         const vh = window.innerHeight;
@@ -1012,6 +1095,88 @@ class TouchClassLayoutE2eTest {
           if (opened) ov.classList.remove(opened);
         }
 
+        const shown = (el) => {
+          const cs = getComputedStyle(el);
+          if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+          const r = el.getBoundingClientRect();
+          return r.width > 0 && r.height > 0;
+        };
+        const clipsBetween = (el, root) => {
+          for (let n = el.parentElement; n && n !== root; n = n.parentElement) {
+            if (getComputedStyle(n).overflowX !== 'visible') return true;
+          }
+          return false;
+        };
+
+        const cardOverflows = [];
+        let cardOverflowCount = 0;
+        if (vw <= phoneMaxWidth) {
+          for (const card of document.querySelectorAll('.card')) {
+            if (!shown(card) || card.scrollWidth <= card.clientWidth + slack) continue;
+            cardOverflowCount++;
+            if (cardOverflows.length >= maxListed) continue;
+            const cr = card.getBoundingClientRect();
+            const edge = cr.left + card.clientLeft + card.clientWidth;
+            let culprit = '(none found outside a nested scroller)';
+            let culpritRight = edge;
+            for (const child of card.querySelectorAll('*')) {
+              if (!shown(child) || clipsBetween(child, card)) continue;
+              const r = child.getBoundingClientRect();
+              if (r.right > culpritRight + slack) { culpritRight = r.right; culprit = label(child); }
+            }
+            cardOverflows.push(label(card) + ' scrollWidth ' + card.scrollWidth + 'px > clientWidth '
+              + card.clientWidth + 'px | widest box ' + culprit + ' at ' + Math.round(culpritRight)
+              + 'px, card content edge ' + Math.round(edge) + 'px');
+          }
+        }
+
+        const explicitPrimary = Array.from(
+          document.querySelectorAll('[data-testid="page-head-primary"]')).find(shown);
+        const primary = explicitPrimary || Array.from(
+          document.querySelectorAll('.page-head .page-actions .btn--cta')).find(shown);
+        let primaryAction = '(none)';
+        let primaryIssue = null;
+        if (primary) {
+          const r = primary.getBoundingClientRect();
+          const top = r.top + window.scrollY;
+          const bottom = r.bottom + window.scrollY;
+          const floor = vh - tabbarHeight;
+          primaryAction = label(primary) + ' at ' + Math.round(r.left) + '..' + Math.round(r.right)
+            + ' x ' + Math.round(top) + '..' + Math.round(bottom) + 'px (first viewport '
+            + vw + ' x ' + Math.round(floor) + 'px)';
+          if (bottom > floor + slack || top < -slack || r.right > vw + slack || r.left < -slack) {
+            primaryIssue = primaryAction;
+          }
+        }
+
+        const ctaCrowds = [];
+        let ctaCrowdCount = 0;
+        for (const row of document.querySelectorAll('.page-actions')) {
+          const ctas = Array.from(row.querySelectorAll('.btn--cta')).filter(shown);
+          if (ctas.length <= maxCtas) continue;
+          ctaCrowdCount++;
+          if (ctaCrowds.length < maxListed) {
+            ctaCrowds.push(ctas.length + ' in one row: ' + ctas.map(label).join(', '));
+          }
+        }
+
+        const nested = Array.from(document.querySelectorAll('.hud-box .hud-box'));
+        const nestedHudBoxes = nested.slice(0, maxListed).map((el) =>
+          label(el) + (shown(el) ? '' : ' (hidden)') + ' inside '
+            + label(el.parentElement.closest('.hud-box')));
+
+        const retiredGrayTexts = [];
+        let retiredGrayCount = 0;
+        for (const el of document.body.querySelectorAll('*')) {
+          const ownText = Array.from(el.childNodes).some(
+            (n) => n.nodeType === Node.TEXT_NODE && n.textContent.trim() !== '');
+          if (!ownText) continue;
+          const color = getComputedStyle(el).color;
+          if (color !== retiredGray || !shown(el)) continue;
+          retiredGrayCount++;
+          if (retiredGrayTexts.length < maxListed) retiredGrayTexts.push(label(el));
+        }
+
         const docScrollWidth = Math.max(
           document.documentElement.scrollWidth, document.body.scrollWidth);
 
@@ -1024,6 +1189,9 @@ class TouchClassLayoutE2eTest {
                  footerPosition: footer ? getComputedStyle(footer).position : '(no footer)',
                  headerHeight, footerHeight, tabbarHeight, mainPaddingBottom, footerHeightVar,
                  cutOff, unscrollableTables, badControls, modalIssues, overlaps,
+                 cardOverflows, cardOverflowCount, primaryAction, primaryIssue,
+                 ctaCrowds, ctaCrowdCount, nestedHudBoxes, nestedHudCount: nested.length,
+                 retiredGrayTexts, retiredGrayCount,
                  modalCount: document.querySelectorAll('%s').length };
       }
       """

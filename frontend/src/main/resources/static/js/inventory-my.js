@@ -1082,8 +1082,8 @@ function openUmbuchenModal(
     targetEl.setAttribute('step', isScu ? '0.001' : '1');
     const targetHint = document.getElementById('umbuchen-target-scu-hint');
     const amountHint = document.getElementById('umbuchen-amount-scu-hint');
-    if (targetHint) targetHint.classList.toggle('krtm-hidden', !isScu);
-    if (amountHint) amountHint.classList.toggle('krtm-hidden', !isScu);
+    if (targetHint) targetHint.classList.toggle('is-hidden', !isScu);
+    if (amountHint) amountHint.classList.toggle('is-hidden', !isScu);
 
     const mergeRow = document.getElementById('umbuchenMergeRow');
     const mergeCheckbox = /** @type {HTMLInputElement | null} */ (

@@ -78,4 +78,30 @@ class AdminBankWipeModalRenderMvcTest {
     assertThat(html).contains("data-testid=\"bank-wipe-submit\"");
     assertThat(StringUtils.countOccurrencesOf(html, "data-bank-wipe")).isEqualTo(1);
   }
+
+  /**
+   * The page opens with the shared page head instead of a greeting banner, and a failed wipe
+   * reports through a danger {@code .alert}, not a recoloured HUD box.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void pageUsesThePageHeadAndReportsAFailureAsAnAlert() throws Exception {
+    String html =
+        mockMvc
+            .perform(get("/admin/bank").flashAttr("error", "admin.bank.wipe.error.failed"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String main = html.substring(html.indexOf("<main"));
+
+    assertThat(main)
+        .contains("class=\"page-head\"")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box")
+        .doesNotContainPattern("class=\"[^\"]*krtm-")
+        .containsPattern("class=\"alert alert-danger\"[^>]*data-testid=\"bank-wipe-error\"");
+  }
 }

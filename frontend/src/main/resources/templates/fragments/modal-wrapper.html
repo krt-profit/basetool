@@ -3,7 +3,7 @@
 <body>
 <dialog th:fragment="modal"
         class="krt-modal-overlay" th:id="${modalId}"
-        th:classappend="${open == true} ? 'krtm-modal-open'"
+        th:classappend="${open == true} ? 'is-open'"
         th:aria-labelledby="${titleId}"
         th:aria-label="${titleId == null} ? #{__${titleKey}__}">
   <div class="krt-modal" th:classappend="${variant}">
