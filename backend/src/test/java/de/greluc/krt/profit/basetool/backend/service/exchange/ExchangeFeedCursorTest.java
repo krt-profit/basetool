@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service.exchange;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.greluc.krt.profit.basetool.backend.exception.ExchangeProblemException;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

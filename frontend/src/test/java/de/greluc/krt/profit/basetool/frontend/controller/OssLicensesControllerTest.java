@@ -85,6 +85,31 @@ class OssLicensesControllerTest {
         .doesNotContain("org.aspectj:aspectjweaver");
   }
 
+  /**
+   * The page follows the legal text pattern: the page head with the legal eyebrow, the text on a
+   * card limited to the reading measure, one collapsible block per licence, and no HUD box.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  void rendersTheTextPagePattern() throws Exception {
+    String html =
+        mockMvc
+            .perform(get("/licenses").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("class=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Rechtliches<")
+        .contains("<h1>Open-Source-Lizenzen</h1>")
+        .contains("class=\"card legal-doc\"")
+        .contains("<details class=\"hud-details oss-group\">")
+        .doesNotContain("hud-box");
+  }
+
   @Test
   void theFooterLinksThePageBesideTheTerms() throws Exception {
     String html =

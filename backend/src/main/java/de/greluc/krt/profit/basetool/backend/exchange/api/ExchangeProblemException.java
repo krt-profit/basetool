@@ -17,9 +17,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.exception;
+package de.greluc.krt.profit.basetool.backend.exchange.api;
 
-import java.util.Locale;
+import de.greluc.krt.profit.basetool.backend.exception.DomainProblem;
 import java.util.Map;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
@@ -33,7 +33,7 @@ import org.springframework.http.HttpStatus;
  * <p>The status and code are per instance; the title and detail come from {@code
  * problem.<code>.title} and {@code .detail}.
  */
-public final class ExchangeProblemException extends AppException {
+public final class ExchangeProblemException extends DomainProblem {
 
   /** A feed cursor older than the retained changes, or not one the server issued. */
   public static final String CURSOR_EXPIRED = "CURSOR_EXPIRED";
@@ -204,23 +204,6 @@ public final class ExchangeProblemException extends AppException {
   @Override
   public String code() {
     return code;
-  }
-
-  @Override
-  public String typeSuffix() {
-    return code.toLowerCase(Locale.ROOT).replace('_', '-');
-  }
-
-  @NotNull
-  @Override
-  public String titleKey() {
-    return "problem." + code.toLowerCase(Locale.ROOT) + ".title";
-  }
-
-  @NotNull
-  @Override
-  public String detailKey() {
-    return "problem." + code.toLowerCase(Locale.ROOT) + ".detail";
   }
 
   @NotNull

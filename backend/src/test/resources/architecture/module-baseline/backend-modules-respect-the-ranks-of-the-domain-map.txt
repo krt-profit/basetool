@@ -84,8 +84,6 @@ inventory -> mission: InventoryItemMapper -> Mission
 inventory -> mission: InventoryItemService -> Mission
 inventory -> mission: InventoryItemService -> MissionRepository
 inventory -> mission: InventoryMissionAllocation -> Mission
-kernel -> platform: AppException -> ErrorDisclosurePolicy
-kernel -> platform: AppExceptionKind -> ErrorDisclosurePolicy
 mission -> operation: Mission -> Operation
 mission -> operation: MissionDto -> OperationDto
 mission -> operation: MissionListDto -> OperationDto

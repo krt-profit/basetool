@@ -93,6 +93,7 @@ class MaterialboardQuantityFieldExclusivityE2eTest {
         page.waitForLoadState();
         page.waitForFunction("() => typeof window.krtMaterialRelease === 'object'");
 
+        page.locator("[data-testid='mb-create-offer']").click();
         page.locator("[data-mb-open-release]").first().click();
         assertThat(page.locator("#mb-modal"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
@@ -104,6 +105,7 @@ class MaterialboardQuantityFieldExclusivityE2eTest {
         assertThat(page.locator("#mb-modal"))
             .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));
 
+        page.locator("[data-testid='mb-create-offer']").click();
         page.locator("[data-mb-open-item]").first().click();
         assertThat(page.locator("#mb-modal"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));

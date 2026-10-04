@@ -3,8 +3,9 @@
 > **Status:** Phase −1 done (merged 2026-10-01, PRs #2299–#2312); Phase 0 done (2026-10-03,
 > merged as one chain of pull requests, #2350 … #2353): the decision records (ADR-0231 … ADR-0239
 > and the amendments of §14) and every guard of §6.1 that Phase 0 owns; the app's re-read of the
-> version policy shipped with app v0.5.0 (basetool-android#209, published 2026-10-03). No class
-> has moved yet. Last reviewed: 2026-10-04.
+> version policy shipped with app v0.5.0 (basetool-android#209, published 2026-10-03). Phase 1:
+> the error model (P1-12) is done (2026-10-04) — the first classes moved into module packages.
+> Last reviewed: 2026-10-04.
 > **Owner area:** BE · FE · API · SEC · **Related ADRs:** ADR-0020, ADR-0028, ADR-0032, ADR-0047,
 > ADR-0060, ADR-0065, ADR-0069, ADR-0130, ADR-0135, ADR-0136, ADR-0205, ADR-0206, ADR-0212,
 > ADR-0214, ADR-0216, ADR-0219, ADR-0223, ADR-0229, ADR-0231 … ADR-0239 · **Specs:**
@@ -359,6 +360,22 @@ values as a documented list. `GlobalExceptionHandler` and `ErrorDisclosurePolicy
 place that decides what a response discloses. Rejected: keep every exception type in the kernel
 package and seal it (no domain ownership, no code documentation).
 
+**Implemented 2026-10-04 (P1-12).** `AppException` permits the eight existing generic kinds
+(`BadRequest`, `NotFound`, `BusinessConflict`, `DuplicateEntity`, `EntityInUse`, `ExternalService`,
+`ReportGeneration`, `RateLimitExceeded`) and `DomainProblem`; no new "access" kind was added,
+because nothing throws one — access refusals stay Spring Security's `AccessDeniedException`, which
+the handler maps. The six module exceptions moved, names unchanged, into
+`backend.<module>.api` (bank, exchange, inventory, joborder, refinery, scope — the layout of §5.2),
+with one `ProblemCode` enum each (`BankProblemCode`, `ExchangeProblemCode`, `InventoryProblemCode`,
+`JobOrderProblemCode`, `RefineryProblemCode`, `ScopeProblemCode`); `CoreProblemCode` keeps the 27
+kernel codes, wire values unchanged. `ACTING_MEMBER_REFUSED` went to the exchange enum, because its
+producer `ActingMemberFilter` belongs to the exchange module in the domain map. The documented list
+is now collected from every registry enum and sorted by code. Correction, 2026-10-04: the "six
+kernel → domain edges" of the sealed family were never in the ArchUnit baseline — `jdeps` counts a
+`PermittedSubclasses` attribute, ArchUnit does not (REQ-MOD-004 already said so); the baseline
+shrank instead by the two `kernel → platform` edges to `ErrorDisclosurePolicy`, which the domain
+map now assigns to the kernel as part of the exception contract (138 → 136 edges).
+
 ### 5.6 Persistence
 
 - **One schema, one Flyway location, one global `V<n>` sequence** in `backend`, also after the
@@ -635,17 +652,17 @@ Cheap moves that break many cycles without changing behaviour:
   now use `runInNewTransaction(Runnable)`.
 - The platform SPIs of §5.3 (`ActorHandleResolver`, `RetentionParticipant`, `RecipientDirectory`,
   `LiveSyncTopicAuthorizer`, `ActiveOrgUnitProvider`) — they remove 21 upward edges.
-  **Done 2026-10-04** (P1-8). The module baseline shrank from 138 to **123 edges** and from 42 to
-  36 module pairs: `ActorHandleResolver` 2 (`audit -> identity`), `RetentionParticipant` 2
+  **Done 2026-10-04** (P1-8). The module baseline shrank by 15 edges, from 136 (after the error
+  model, §5.5) to **121 edges**, and from 41 to 35 module pairs: `ActorHandleResolver` 2 (`audit -> identity`), `RetentionParticipant` 2
   (`audit -> bank`), the recipient directories 8 (`notification -> bank` 4, `-> identity` 3,
   `-> orgunit` 1), `LiveSyncTopicAuthorizer` 2 (`livesync -> scope`, `-> bank`),
   `ActiveOrgUnitProvider` 1 (`platform -> scope`). **Correction:** 15 edges, not 21. The 21 are
   all upward edges of the rank-0 and rank-1 modules in the baseline, and six of them are not SPI
   cases: `notification -> orgunit: OrgUnitRef -> OrgUnitKind` waits for a kernel `OrgUnitKind`
   (P1-11), `platform -> scope: AuthHelperService -> OwnerScopeService` leaves with the removal of
-  its four delegations, the two `platform -> exchange` edges of `ClientAttribution` and the two
-  `kernel -> platform` edges of the error model (§5.5) need their own moves. `RecipientDirectory` is three interfaces in `notification.api`, one per implementing
-  module (`RoleRecipientDirectory` identity, `OrgUnitRecipientDirectory` orgunit,
+  its four delegations, the two `platform -> exchange` edges of `ClientAttribution` need their
+  own move, and the two `kernel -> platform` edges left with the error model (§5.5).
+  `RecipientDirectory` is three interfaces in `notification.api`, one per implementing module (`RoleRecipientDirectory` identity, `OrgUnitRecipientDirectory` orgunit,
   `AccountRecipientDirectory` bank); the role-code check of `NotificationRuleService` uses the
   first, which removed two edges §5.3 had not listed. `ActiveOrgUnitProvider` lives in the
   `service` package beside `AuthHelperService` (a `logging` package would close a
@@ -656,7 +673,8 @@ Cheap moves that break many cycles without changing behaviour:
   `LikePatterns`, `ProblemResponseFactory`, `Roles`, `Permissions`) and per-domain internal packages;
   the ArchUnit leaf rule's message stops sending shared logic there.
 - `audit.api` created (enum and recorder moved, names unchanged); event records moved into their
-  publishers' `api.events` packages; the error model of §5.5.
+  publishers' `api.events` packages; the error model of §5.5 — **done 2026-10-04** (P1-12, see
+  §5.5).
   `audit.api` is **done 2026-10-04** (P1-10): `AuditEventType`, `AuditDomain` and `AuditDetails`
   moved unchanged; the recorder is the interface `audit.api.AuditRecorder` (`record`,
   `recordedSince`), implemented by `AuditService`, which stays internal with the entity, repository,
@@ -664,7 +682,7 @@ Cheap moves that break many cycles without changing behaviour:
   (actor handle) into the API; they leave with `ActorHandleResolver`. All 57 recording classes
   outside the audit module inject `AuditRecorder`; the listener and controller audit rules key on
   `AuditRecorder` as well, without which the move would have disarmed them. The module baseline
-  stays at 138 edges: the moved types were already assigned to `audit` by name, and audit's own
+  stayed at 138 edges: the moved types were already assigned to `audit` by name, and audit's own
   edges sit in `AuditService` and `AuditRetentionService`. No `@ApplicationModule` yet (P1-13):
   Spring Modulith is test-scope only, so a `package-info` annotation needs `spring-modulith-api` as
   a `compileOnly` dependency first.

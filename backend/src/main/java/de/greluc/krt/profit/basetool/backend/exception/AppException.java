@@ -26,34 +26,25 @@ import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.http.HttpStatus;
 
 /**
- * Sealed base of the backend's domain exceptions, carrying the RFC&nbsp;7807 error contract that
- * {@code GlobalExceptionHandler} dispatches on.
+ * Sealed root of the backend's exceptions, carrying the RFC&nbsp;7807 error contract that {@code
+ * GlobalExceptionHandler} dispatches on (ADR-0235).
  *
- * <p>Subtypes pass a fixed {@link AppExceptionKind} to {@link #AppException(AppExceptionKind,
- * String)} and inherit every accessor; only {@link BankConflictException} and {@link
- * ExchangeProblemException}, whose identity is per instance, use the kind-less constructor and
- * override every accessor.
+ * <p>It permits the kernel's generic kinds, which pass a fixed {@link AppExceptionKind} to {@link
+ * #AppException(AppExceptionKind, String)} and inherit every accessor, and the open {@link
+ * DomainProblem} base every module's exceptions extend.
  */
 public abstract sealed class AppException extends RuntimeException
     permits BadRequestException,
-        BankConflictException,
         BusinessConflictException,
+        DomainProblem,
         DuplicateEntityException,
         EntityInUseException,
-        ExchangeProblemException,
         ExternalServiceException,
-        MissionParticipantRequiredException,
         NotFoundException,
-        OverAllocationException,
-        OwnerOrgUnitRequiredException,
-        ProductionAllocationException,
         RateLimitExceededException,
         ReportGenerationException {
 
-  /**
-   * The fixed per-type identity for the ten subtypes that have one; {@code null} for {@link
-   * BankConflictException}, whose accessors are computed per-instance and therefore all overridden.
-   */
+  /** The fixed identity of a generic kind; {@code null} for a {@link DomainProblem}. */
   private final @Nullable AppExceptionKind kind;
 
   /**
@@ -81,29 +72,28 @@ public abstract sealed class AppException extends RuntimeException
   }
 
   /**
-   * Creates a kind-less exception for {@link BankConflictException}, which must override every
-   * accessor.
+   * Creates a kind-less exception for {@link DomainProblem}, which overrides every kind accessor.
    *
    * @param message verbatim {@code detail} or an i18n key
    */
-  protected AppException(String message) {
+  AppException(String message) {
     this(null, message);
   }
 
   /**
    * Creates a kind-less exception wrapping a cause kept for server-side logging only, for {@link
-   * BankConflictException}.
+   * DomainProblem}.
    *
    * @param message verbatim {@code detail} or an i18n key
    * @param cause underlying failure that triggered this exception
    */
-  protected AppException(String message, Throwable cause) {
+  AppException(String message, Throwable cause) {
     this(null, message, cause);
   }
 
   /**
    * The HTTP status the RFC&nbsp;7807 response carries. Delegates to the stored {@link
-   * AppExceptionKind} by default; {@link BankConflictException} overrides this directly.
+   * AppExceptionKind} by default; {@link DomainProblem} overrides this.
    *
    * @return the status for this exception
    */
@@ -114,7 +104,7 @@ public abstract sealed class AppException extends RuntimeException
   /**
    * The stable, machine-readable {@code code} extension property. Must never change once published
    * — the frontend selects its localized message by this value. Delegates to the stored {@link
-   * AppExceptionKind} by default; {@link BankConflictException} overrides this directly.
+   * AppExceptionKind} by default; {@link DomainProblem} overrides this.
    *
    * @return the code for this exception
    */
@@ -124,8 +114,7 @@ public abstract sealed class AppException extends RuntimeException
 
   /**
    * The {@code MessageSource} key resolved for the RFC&nbsp;7807 {@code title}. Delegates to the
-   * stored {@link AppExceptionKind} by default; {@link BankConflictException} overrides this
-   * directly.
+   * stored {@link AppExceptionKind} by default; {@link DomainProblem} overrides this.
    *
    * @return the title bundle key for this exception
    */
@@ -146,8 +135,8 @@ public abstract sealed class AppException extends RuntimeException
 
   /**
    * The suffix appended to {@code AppProblemProperties#getBaseUri()} for the RFC&nbsp;7807 {@code
-   * type}. Delegates to the stored {@link AppExceptionKind} by default; {@link
-   * BankConflictException} overrides this directly.
+   * type}. Delegates to the stored {@link AppExceptionKind} by default; {@link DomainProblem}
+   * overrides this.
    *
    * @return the problem-type suffix for this exception
    */
@@ -158,7 +147,7 @@ public abstract sealed class AppException extends RuntimeException
   /**
    * The short phrase the dispatch handler's WARN/ERROR log line names this exception by (e.g.
    * {@code "Duplicate entity"}, {@code "Upstream service error"}). Delegates to the stored {@link
-   * AppExceptionKind} by default; {@link BankConflictException} overrides this directly.
+   * AppExceptionKind} by default; {@link DomainProblem} overrides this.
    *
    * @return the log label for this exception
    */
@@ -170,8 +159,7 @@ public abstract sealed class AppException extends RuntimeException
    * Whether the dispatch handler suppresses {@code getMessage()} and logs at ERROR with the stack
    * trace instead of WARN.
    *
-   * <p>Falls back to {@link ErrorDisclosurePolicy#STANDARD} for the kind-less {@link
-   * BankConflictException}.
+   * <p>Falls back to {@link ErrorDisclosurePolicy#STANDARD} for a kind-less {@link DomainProblem}.
    *
    * @return the disclosure policy for this exception
    */
@@ -191,15 +179,15 @@ public abstract sealed class AppException extends RuntimeException
       throw new IllegalStateException(
           getClass().getName()
               + " has no fixed AppExceptionKind; its subclass must override this accessor"
-              + " directly (see BankConflictException)");
+              + " directly (see DomainProblem)");
     }
     return kind;
   }
 
   /**
    * Extension properties copied onto the RFC&nbsp;7807 response beyond {@code code} and {@code
-   * correlationId}, such as {@code BankConflictException}'s PII-free parameters; empty for every
-   * other subtype.
+   * correlationId}, such as a bank conflict's PII-free parameters; empty unless a subtype overrides
+   * it.
    *
    * @return extension properties for the problem response; never {@code null}
    */
@@ -222,8 +210,8 @@ public abstract sealed class AppException extends RuntimeException
   }
 
   /**
-   * Additional structured fields for the dispatch handler's WARN log line; {@code null} for every
-   * subtype except {@code BankConflictException}.
+   * Additional structured fields for the dispatch handler's WARN log line; {@code null} unless a
+   * subtype overrides it.
    *
    * @return extra fields for the WARN log line, or {@code null} for none
    */

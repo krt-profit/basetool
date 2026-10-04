@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -41,6 +42,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -257,9 +259,74 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
             });
   }
 
+  /**
+   * The page follows the hand-off draft: „Mein Inventar" with the „Persönlich" eyebrow, one primary
+   * action that opens the add dialog, „Importieren" as a ghost button, the extractor link and „Alle
+   * löschen" in the overflow menu, both tab counts, and exactly one search on the page — the
+   * catalogue search lives in the dialog.
+   */
   @Test
   @WithMockUser
-  void view_rendersCraftableOnlyFilter_nextToRefineryToggle() throws Exception {
+  void view_rendersThePageHeadToolbarAndAddDialog() throws Exception {
+    PersonalBlueprintDto bp =
+        new PersonalBlueprintDto(
+            UUID.randomUUID(),
+            "arclight pistol",
+            "Arclight Pistol",
+            null,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            null,
+            true,
+            0L,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2026-01-01T00:00:00Z"),
+            null,
+            null,
+            null);
+    PageResponse<PersonalBlueprintDto> owned =
+        new PageResponse<>(List.of(bp), 0, 500, 1, 1, List.of());
+    PageResponse<PersonalBlueprintDto> items =
+        new PageResponse<>(List.of(), 0, 1, 118, 118, List.of());
+    when(backendApiClient.get(startsWith("/api/v1/personal-blueprints?"), anyTypeRef()))
+        .thenReturn(owned);
+    when(backendApiClient.get(startsWith("/api/v1/personal-inventory?"), anyTypeRef()))
+        .thenReturn(items);
+
+    String html =
+        mockMvc
+            .perform(get("/personal-inventory/blueprints").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    String main = html.substring(html.indexOf("<main"), html.indexOf("</main>"));
+    String actions = main.substring(main.indexOf("page-actions"), main.indexOf("tab-nav"));
+    assertTrue(main.contains("data-testid=\"page-eyebrow\""), main);
+    assertTrue(main.contains("Mein Inventar"), main);
+    assertEquals(1, actions.split("btn--cta", -1).length - 1, "one primary action");
+    assertTrue(actions.contains("data-modal-id=\"krt-bp-add-modal\""), actions);
+    assertTrue(actions.contains("id=\"krt-bp-import-open\" class=\"btn btn-ghost\""), actions);
+    assertTrue(actions.contains("data-testid=\"overflow-menu-toggle\""), actions);
+    assertTrue(actions.contains("id=\"krt-bp-extractor-link\""), actions);
+    assertTrue(actions.contains("id=\"krt-bp-delete-all-open\""), actions);
+    assertTrue(main.contains("<span class=\"tab-count\">118</span>"), main);
+    assertTrue(main.contains("<span class=\"tab-count\">1</span>"), main);
+    assertEquals(1, main.split("data-testid=\"toolbar-search\"", -1).length - 1, "one search");
+    assertFalse(main.contains("id=\"krt-bp-search-input\""), "catalogue search is in the dialog");
+    assertTrue(html.contains("id=\"krt-bp-add-modal\""), html);
+    assertTrue(html.contains("id=\"krt-bp-search-input\""), html);
+    assertTrue(html.contains("id=\"krt-bp-staging-list\""), html);
+    assertTrue(html.contains("id=\"krt-bp-add-selected\""), html);
+    assertFalse(main.contains("hud-box"), "no HUD box");
+    assertFalse(main.contains("class=\"greeting"), "no greeting");
+    assertFalse(main.contains("krtm-"), "no migrated inline classes");
+    assertTrue(main.contains("class=\"krt-bp-dot\""), main);
+  }
+
+  @Test
+  @WithMockUser
+  void view_rendersCraftableSegment_andRefinerySwitch() throws Exception {
     PersonalBlueprintDto bp =
         new PersonalBlueprintDto(
             UUID.randomUUID(),
@@ -283,11 +350,29 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
         .perform(get("/personal-inventory/blueprints"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("id=\"krt-bp-refinery-toggle\"")))
-        .andExpect(content().string(containsString("id=\"krt-bp-craftable-toggle\"")))
         .andExpect(
-            content()
-                .string(
-                    containsString("class=\"krt-bp-refinery-toggle krt-bp-craftable-toggle\"")));
+            content().string(containsString("class=\"switch\" for=\"krt-bp-refinery-toggle\"")))
+        .andExpect(content().string(containsString("data-testid=\"segment-bpScope-all\"")))
+        .andExpect(content().string(containsString("data-testid=\"segment-bpScope-craftable\"")))
+        .andExpect(content().string(not(containsString("krt-bp-craftable-toggle"))));
+  }
+
+  /**
+   * The recipe script receives the shortfall label for a short ingredient (REQ-INV-048).
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser
+  void view_passesTheShortfallLabelToTheRecipeScript() throws Exception {
+    PageResponse<PersonalBlueprintDto> page =
+        new PageResponse<>(List.of(), 0, 200, 0, 0, List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+
+    mockMvc
+        .perform(get("/personal-inventory/blueprints").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("missing:          \"fehlt {0}\"")));
   }
 
   @Test

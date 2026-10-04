@@ -103,6 +103,7 @@ class MissionsListPatternRenderTest {
         null,
         "GrimHEX",
         6,
+        false,
         1L);
   }
 

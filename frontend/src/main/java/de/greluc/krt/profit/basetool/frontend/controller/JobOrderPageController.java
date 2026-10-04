@@ -25,6 +25,8 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ItemDerivationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderHandoverDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderHandoverItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockGroupDto;
@@ -103,11 +105,17 @@ public class JobOrderPageController {
   /** The list scope listing the orders the caller's own org units requested (REQ-UI-027). */
   static final String SCOPE_MINE = "MINE";
 
+  /**
+   * The list scope listing the orders one of the caller's own units processes, "Zu bearbeiten"
+   * (REQ-ORDERS-040).
+   */
+  static final String SCOPE_TO_PROCESS = "TO_PROCESS";
+
   /** The list scope listing the caller's whole visible order queue (REQ-UI-027). */
   static final String SCOPE_ALL = "ALL";
 
   /** The accepted values of the list's {@code scope} parameter. */
-  static final Set<String> ORDER_SCOPES = Set.of(SCOPE_MINE, SCOPE_ALL);
+  static final Set<String> ORDER_SCOPES = Set.of(SCOPE_MINE, SCOPE_TO_PROCESS, SCOPE_ALL);
 
   /**
    * Selectable page sizes for the order list, large enough that the default active queue fits on
@@ -182,14 +190,15 @@ public class JobOrderPageController {
    * Renders the job-order list ({@code /orders}), filtered by scope, status and squadron.
    *
    * <p>Invalid or missing statuses fall back to {@code OPEN} + {@code IN_PROGRESS}; an empty
-   * squadron selection means all squadrons (REQ-ORDERS-027). A caller who may see both the queue
-   * and their own unit's orders chooses between them with {@code scope}; the own-orders scope reads
-   * the requester-redacted list and ignores the squadron filter.
+   * squadron selection means all squadrons (REQ-ORDERS-027). A caller who may see the queue chooses
+   * its scope with {@code scope} (REQ-ORDERS-040): the own-orders scope reads the
+   * requester-redacted list, the to-process scope reads the queue of the caller's own units; both
+   * ignore the squadron filter.
    *
    * @param status optional explicit status filter
    * @param squadronId optional repeatable squadron display filter (empty = all squadrons)
-   * @param scope {@code MINE} or {@code ALL}; anything else, or a caller without both capabilities,
-   *     falls back to the caller's only list
+   * @param scope {@code MINE}, {@code TO_PROCESS} or {@code ALL}; anything else, or a scope the
+   *     caller lacks the capability for, falls back to the caller's default list
    * @param page zero-based page index, defaulted/clamped to 0 (REQ-ORDERS-020)
    * @param size requested page size; only {@link #PAGE_SIZES} are honoured, else {@link
    *     #DEFAULT_PAGE_SIZE}
@@ -215,14 +224,18 @@ public class JobOrderPageController {
     if (!canViewJobOrders && !canViewOwnJobOrders) {
       return "redirect:/orders/create";
     }
-    boolean scopeChoice = canViewJobOrders && canViewOwnJobOrders;
-    boolean ownScope =
-        requesterView
-            || (scopeChoice && SCOPE_MINE.equals(RelayParams.oneOfOrNull(scope, ORDER_SCOPES)));
+    boolean scopeChoice = canViewJobOrders;
+    boolean mineScopeOffered = canViewJobOrders && canViewOwnJobOrders;
+    String effectiveScope =
+        resolveScope(RelayParams.oneOfOrNull(scope, ORDER_SCOPES), requesterView, mineScopeOffered);
+    boolean ownScope = SCOPE_MINE.equals(effectiveScope);
+    boolean toProcessScope = SCOPE_TO_PROCESS.equals(effectiveScope);
     model.addAttribute("requesterView", requesterView);
     model.addAttribute("scopeChoice", scopeChoice);
+    model.addAttribute("mineScopeOffered", mineScopeOffered);
     model.addAttribute("ownScope", ownScope);
-    model.addAttribute("scope", ownScope ? SCOPE_MINE : SCOPE_ALL);
+    model.addAttribute("squadronFilterHidden", ownScope || toProcessScope);
+    model.addAttribute("scope", effectiveScope);
     List<String> requestedStatuses = (status == null) ? List.of() : status;
     List<String> validStatuses =
         requestedStatuses.stream().filter(VALID_STATUSES::contains).toList();
@@ -239,13 +252,15 @@ public class JobOrderPageController {
     int redDays = 90;
     try {
       String statusParam = String.join(",", status);
-      StringBuilder squadronParamBuilder = new StringBuilder();
-      if (!ownScope) {
+      StringBuilder scopeParamBuilder = new StringBuilder();
+      if (toProcessScope) {
+        scopeParamBuilder.append("&toProcess=true");
+      } else if (!ownScope) {
         for (UUID sid : selectedSquadronIds) {
-          squadronParamBuilder.append("&squadronId=").append(sid);
+          scopeParamBuilder.append("&squadronId=").append(sid);
         }
       }
-      String squadronParam = squadronParamBuilder.toString();
+      String scopeParam = scopeParamBuilder.toString();
       String listBase = ownScope ? "/api/v1/orders/requested" : "/api/v1/orders";
       p =
           backendApiClient.get(
@@ -256,7 +271,7 @@ public class JobOrderPageController {
                   + effectiveSize
                   + "&sort=priority,asc&status="
                   + statusParam
-                  + squadronParam,
+                  + scopeParam,
               PAGE_OF_JOB_ORDER);
       if (p != null && p.content() != null) {
         orders = new ArrayList<>(p.content());
@@ -304,7 +319,9 @@ public class JobOrderPageController {
     model.addAttribute(
         "paginationBaseUrl",
         buildPaginationBaseUrl(
-            status, ownScope ? List.of() : selectedSquadronIds, scopeChoice && ownScope));
+            status,
+            ownScope || toProcessScope ? List.of() : selectedSquadronIds,
+            scopeChoice && !SCOPE_ALL.equals(effectiveScope) ? effectiveScope : null));
     model.addAttribute("selectedStatuses", status);
     if (!requesterView) {
       model.addAttribute("squadrons", fetchActiveSquadrons());
@@ -319,19 +336,37 @@ public class JobOrderPageController {
   }
 
   /**
+   * Resolves the list scope the caller gets: a requester-only caller always reads their own orders,
+   * {@code MINE} needs both capabilities, and everything else falls back to {@code ALL}.
+   *
+   * @param requested the validated {@code scope} parameter, or {@code null} when absent or unknown
+   * @param requesterView whether the caller may only read their own unit's orders
+   * @param mineScopeOffered whether the caller may choose the own-orders scope
+   * @return {@link #SCOPE_MINE}, {@link #SCOPE_TO_PROCESS} or {@link #SCOPE_ALL}
+   */
+  @NotNull
+  private static String resolveScope(
+      @Nullable String requested, boolean requesterView, boolean mineScopeOffered) {
+    if (requesterView || (mineScopeOffered && SCOPE_MINE.equals(requested))) {
+      return SCOPE_MINE;
+    }
+    return SCOPE_TO_PROCESS.equals(requested) ? SCOPE_TO_PROCESS : SCOPE_ALL;
+  }
+
+  /**
    * Builds the pagination base URL carrying the active scope, status and squadron filters.
    *
    * @param status the resolved (never empty) status filter
    * @param squadronIds the selected squadron ids (empty = no squadron filter)
-   * @param mineScope whether the chosen own-orders scope is carried as {@code scope=MINE}
+   * @param scope the chosen scope carried as {@code scope=…}, or {@code null} to carry none
    * @return {@code /orders?status=...&squadronId=...} carrying the current filter
    */
   @NotNull
   private static String buildPaginationBaseUrl(
-      @NotNull List<String> status, @NotNull List<UUID> squadronIds, boolean mineScope) {
+      @NotNull List<String> status, @NotNull List<UUID> squadronIds, @Nullable String scope) {
     List<String> queryParts = new ArrayList<>();
-    if (mineScope) {
-      queryParts.add("scope=" + SCOPE_MINE);
+    if (scope != null) {
+      queryParts.add("scope=" + scope);
     }
     for (String s : status) {
       queryParts.add("status=" + s);
@@ -914,16 +949,21 @@ public class JobOrderPageController {
   }
 
   /**
-   * Computes the KPI strip values from the loaded order (REQ-ORDERS-026): fulfilment or delivery
-   * progress, the open quantity split into SCU and pieces, and the claim and handover counts.
+   * Computes the KPI strip values from the loaded order (REQ-ORDERS-026): the delivered-against-
+   * required progress head, fulfilment, the open quantity split into SCU and pieces, and the claim
+   * and handover counts.
    *
-   * <p>Missing stock or claims in the redacted requester view count as zero.
+   * <p>A material order's requirement is the still-open line amount plus what its handovers
+   * delivered, per unit; the progress is withheld when the order is redacted for its requester,
+   * whose view carries no handovers. Missing stock or claims in that view count as zero.
    *
    * @param order the loaded order (any kind)
    * @return an insertion-ordered map of KPI values keyed for the fragment ({@code fulfilled},
    *     {@code total}, {@code fulfilledPct}, {@code delivered}, {@code amount}, {@code
-   *     deliveredPct}, {@code openAmountScu}, {@code openAmountPiece}, {@code hasScuMaterial},
-   *     {@code hasPieceMaterial}, {@code claims}, {@code handovers})
+   *     deliveredPct}, {@code deliveredScu}, {@code requiredScu}, {@code deliveredPiece}, {@code
+   *     requiredPiece}, {@code progressPct}, {@code showProgress}, {@code openAmountScu}, {@code
+   *     openAmountPiece}, {@code hasScuMaterial}, {@code hasPieceMaterial}, {@code claims}, {@code
+   *     handovers}, {@code supportsClaims})
    */
   @NotNull
   private Map<String, Object> computeKpi(JobOrderDto order) {
@@ -934,6 +974,12 @@ public class JobOrderPageController {
     kpi.put("delivered", 0);
     kpi.put("amount", 0);
     kpi.put("deliveredPct", 0);
+    kpi.put("deliveredScu", 0.0);
+    kpi.put("requiredScu", 0.0);
+    kpi.put("deliveredPiece", 0.0);
+    kpi.put("requiredPiece", 0.0);
+    kpi.put("progressPct", 0);
+    kpi.put("showProgress", false);
     kpi.put("openAmountScu", 0.0);
     kpi.put("openAmountPiece", 0.0);
     kpi.put("hasScuMaterial", false);
@@ -981,8 +1027,11 @@ public class JobOrderPageController {
       kpi.put("delivered", delivered);
       kpi.put("amount", amount);
       kpi.put("deliveredPct", amount > 0 ? (delivered * 100 / amount) : 0);
+      kpi.put("progressPct", percentOf(delivered, amount));
+      kpi.put("showProgress", amount > 0);
       kpi.put("handovers", order.itemHandovers() != null ? order.itemHandovers().size() : 0);
     } else {
+      putMaterialProgress(kpi, order);
       int fulfilled = 0;
       int total = 0;
       if (order.materials() != null) {
@@ -1019,6 +1068,79 @@ public class JobOrderPageController {
     kpi.put("claims", claims);
     kpi.put("supportsClaims", supportsClaims);
     return kpi;
+  }
+
+  /**
+   * Puts a material order's delivered and required quantities per unit and its progress into the
+   * KPI map (REQ-ORDERS-026).
+   *
+   * <p>A handover lowers its line's amount, so the requirement is the open line amount plus the
+   * delivered amount. With both units present the progress is the mean of the two per-unit shares,
+   * because SCU and pieces are never summed.
+   *
+   * @param kpi the KPI map to fill
+   * @param order the loaded material order
+   */
+  private static void putMaterialProgress(
+      @NotNull Map<String, Object> kpi, @NotNull JobOrderDto order) {
+    double deliveredScu = 0.0;
+    double deliveredPiece = 0.0;
+    if (order.handovers() != null) {
+      for (JobOrderHandoverDto handover : order.handovers()) {
+        if (handover.items() == null) {
+          continue;
+        }
+        for (JobOrderHandoverItemDto line : handover.items()) {
+          double amount = line.amount() != null ? line.amount() : 0.0;
+          if (line.material() != null && "PIECE".equals(line.material().quantityType())) {
+            deliveredPiece += amount;
+          } else {
+            deliveredScu += amount;
+          }
+        }
+      }
+    }
+    double requiredScu = deliveredScu;
+    double requiredPiece = deliveredPiece;
+    if (order.materials() != null) {
+      for (JobOrderMaterialDto mat : order.materials()) {
+        double open = mat.amount() != null ? mat.amount() : 0.0;
+        if (mat.material() != null && "PIECE".equals(mat.material().quantityType())) {
+          requiredPiece += open;
+        } else {
+          requiredScu += open;
+        }
+      }
+    }
+    int progressPct;
+    if (requiredScu > 0 && requiredPiece > 0) {
+      progressPct =
+          (percentOf(deliveredScu, requiredScu) + percentOf(deliveredPiece, requiredPiece)) / 2;
+    } else if (requiredPiece > 0) {
+      progressPct = percentOf(deliveredPiece, requiredPiece);
+    } else {
+      progressPct = percentOf(deliveredScu, requiredScu);
+    }
+    kpi.put("deliveredScu", deliveredScu);
+    kpi.put("requiredScu", requiredScu);
+    kpi.put("deliveredPiece", deliveredPiece);
+    kpi.put("requiredPiece", requiredPiece);
+    kpi.put("progressPct", progressPct);
+    kpi.put("showProgress", !order.redacted() && (requiredScu > 0 || requiredPiece > 0));
+  }
+
+  /**
+   * Expresses a part of a whole as a whole-number percentage between 0 and 100.
+   *
+   * @param part the delivered quantity
+   * @param whole the required quantity
+   * @return the share in percent, floored and clamped; 0 when the whole is not positive
+   */
+  private static int percentOf(double part, double whole) {
+    if (whole <= 0) {
+      return 0;
+    }
+    return (int) Math.max(0, Math.min(100, Math.floor(part * 100.0 / whole + 1e-9)));
   }
 
   @NotNull

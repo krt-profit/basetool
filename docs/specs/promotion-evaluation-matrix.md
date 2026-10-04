@@ -49,7 +49,8 @@ keeps the page's established fail-soft-to-empty behaviour (empty matrix, no bann
 The read-only self-view (`/promotion/my-evaluations`) and the member-facing overview
 (`/promotion/overview`) are out of scope: they render the caller's own evaluations
 (`evaluations/my`, a bounded per-user list) and the rank-requirement catalogue, neither of which
-is the cross-member matrix this requirement governs.
+is the cross-member matrix this requirement governs. What those two pages and the two admin pages
+show is [`promotion-pages.md`](promotion-pages.md) (REQ-PROMO-002, REQ-PROMO-003).
 
 **Acceptance**
 

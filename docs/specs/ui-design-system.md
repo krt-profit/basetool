@@ -130,8 +130,9 @@ values exactly:
 > **Deprecated aliases — do not use as names.** Three earlier code names survive only as CSS
 > aliases so old code resolves: `--color-dept-combat` → Raumüberlegenheit, `--color-dept-research`
 > → Forschung, `--color-dept-marine` → Marinekorps (`styles.css` `:root`). Always use the official
-> names above; the last remaining consumer is `operation-detail.html`'s inline
-> `--color-dept-marine`.
+> names above. No stylesheet consumes the aliases any more: the last one, `operation-detail.css`'s
+> `--color-dept-marine`, went with the operation redesign of 2026-10-03, so the three aliases can go
+> in the phase-4 cleanup.
 
 **Acceptance**
 
@@ -392,10 +393,11 @@ clips it the overflow reads as "the spacing is wrong" rather than as a broken la
 non-shrinkable (10.5rem + `--space-2` + 7rem = an **18rem** floor). The measured defect is the
 participant edit modal: two groups in the 600px `.krt-modal--wide` frame get ~275px each, so the
 time part overflows by ~13px and "Endzeit" sits 3px from the modal border — at every desktop width
-from 1280px up. The mission Verwaltung form is the other multi-column user of the widget and is
-**not** affected today: its row keeps two groups per line at ≥18rem each across 1280–1800px, both
-before and after this rule. The rule is stated for the widget rather than scoped to the modal, so
-it also covers a future narrower row there.
+from 1280px up. The mission edit-mode form (formerly the Verwaltung tab) is the other multi-column
+user of the widget; since 2026-10-03 it lays its date/time groups out in an auto-fill grid
+(`.mission-time-grid`, columns of at least 18.5rem) rather than a `.form-row`, so it wraps by
+construction. The rule is stated for the widget rather than scoped to the modal, so it also covers
+a future narrower row there.
 
 Such a control declares its true minimum (`min-width: min(18rem, 100%)`) so the row **wraps** onto
 full-width lines instead of overflowing — where there is room the groups stay side by side, otherwise
@@ -510,17 +512,21 @@ space for a footer that is not there.
 **Two amendments to the dense-action exception, owner-approved 2026-09-13** after the first
 measured sweep of the touch classes found both:
 
-- **`.btn-xs2` is NOT exempt.** It is a page-local 32px variant declared in the page stylesheets
-  of `mission-detail.html` and `operation-detail.html` (inline `<style>` blocks until FE-PERF-02,
-  now `css/pages/mission-detail.css` / `operation-detail.css`, linked in the same place), and two of its instances are *form*
-  actions — „Ziel hinzufügen", „Schritt hinzufügen" on the Einsatz create form. The rule above is
+- **`.btn-xs2` is NOT exempt.** It is a page-local 32px variant declared in the page stylesheet of
+  `mission-detail.html` (an inline `<style>` block until FE-PERF-02, now
+  `css/pages/mission-detail.css`; `operation-detail.html` stopped using it on 2026-10-03), and three
+  of its instances are *form* actions — „Ziel hinzufügen", „Schritt hinzufügen" and „Frequenz
+  hinzufügen" in the mission's edit mode (the create form's own add buttons are plain `.btn`). The
+  rule above is
   explicit that a form button keeps the floor, so the whole variant is raised to 44px on the touch
   classes and keeps its density on desktop. The override is written `.btn.btn-xs2` because the
   page's inline rule is read *after* `styles.css`: at equal specificity the page would win and the
   fix would be silently inert — the same trap this requirement already records for `.btn.btn-xs`.
 - **`.master-row` IS exempt**, at 32px. The blueprint list rows on `/personal-inventory/blueprints`
   measured 33px; they are a scan-and-tap list where density is the point, and were ruled equivalent
-  to a repeated row action rather than a standalone control.
+  to a repeated row action rather than a standalone control. Since 2026-10-03 those rows declare
+  `min-height: 44px` themselves (`.krt-bp-md .master-row`, website overhaul phase 3); the exemption
+  stays for other master lists.
 
 **A third round of amendments, 2026-09-13**, after the guard first ran with *seeded* data. The
 first sweep could only measure what a fresh stack renders, and a fresh stack has empty lists: no
@@ -840,7 +846,7 @@ The mechanics follow the established idiom (REQ-ORDERS-027, REQ-UI-016):
   `null` = "no filter", so options added later stay included; on restore, stale values are dropped
   and an entirely stale subset falls back to the page's rendered no-filter default (all checked on
   the matrix/profit pages, all unchecked on the Lager views — semantically identical). Status
-  queues whose server default is a **subset** (orders, refinery: OPEN+IN_PROGRESS) store the
+  queues whose server default is a **subset** (orders: OPEN+IN_PROGRESS) store the
   checked list verbatim and collapse only zero-checked to `null`, so an explicit "show everything"
   choice survives (REQ-ORDERS-027 precedent).
 - The selection is persisted immediately on every change (never debounced with the re-fetch).
@@ -860,12 +866,15 @@ scope, and per view min quality, min amount, sort and „Ohne gestohlene"; key
 view), Raffinerie (the segment „Läuft · Abholbereit · Abgeschlossen · Alle" + only-mine, key
 `refinery_orders_filter`; a stored status list of the former checkboxes maps onto a segment),
 Profitberechnung (ship + systems), Missionen/Operationen (the period segment „Kommend · Vergangen ·
-Alle"; a stored `showPast` migrates), Aufträge scope „Meine · Alle" (`orders_scope_filter`,
+Alle"; a stored `showPast` migrates), Aufträge scope „Meine · Zu bearbeiten · Alle" (`orders_scope_filter`,
 REQ-ORDERS-040), Benachrichtigungen „Ungelesen · Alle" (`notifications_filter`, REQ-NOTIF-022),
 Meine Bewertungen
 (only-open), Persönliche Blueprints (refinery + craftable toggles), Beförderung verwalten
 (filters/sort/collapse, migrated sessionStorage → localStorage), Bank-Freigaben (view + account /
-employee selection), Bank-Kontodetail chart range (both detail pages) and the Org-Kontodetail tab,
+employee selection), Bank-Kontodetail chart range (both detail pages) and the Kontodetail tab (both
+detail pages: `bank_account_tab_<user>`, `org_unit_bank_account_tab_<user>`), the bank request
+queue's status segment (one stored segment since 2026-10-03; a stored checkbox list migrates onto
+it, REQ-BANK-023),
 Admin: Audit-Log event-type (per domain), Missionsdaten + SK include-inactive toggles, and the
 member selection of the personal-inventory/blueprints admin pages.
 
@@ -1539,8 +1548,10 @@ Systemeinstellungen, Information bearbeiten, the notification-rule editor, the q
 and the profile as one settings page (section navigation, one save bar that appears on a change and
 saves the changed sections one after another, REQ-FE-001). The hangar's insurance field is a
 segment „Keine · Monate · LTI" with a month field; the stored value stays `0` / `LTI` / `n`. The
-„Angemeldet" chip of the hand-off's home page is not built: no read says whether the member is signed
-up for a listed mission.
+hand-off's „Angemeldet" chip marks a home row the member is signed up for, read from the mission
+list's per-caller `signedUp` flag (REQ-MISSION-012).
+
+Amended 2026-10-04: the „Angemeldet" chip, left out of phase 2 for want of a read, is built.
 
 **On the areas (phase 3):** Hangar: one page with the tabs „Meine Schiffe" · „Org-Einheit" (the
 former Org-Einheitsübersicht, ship types as tree rows with a readiness bar); „Meine Schiffe" filters
@@ -1568,10 +1579,11 @@ wide data view with the „UEX · vor n min" chip, dropdown filters that summari
 von 42"), „+ Filter" chips, the best sale/purchase rings, the spread and the legend; the material
 detail with category/flag chips, four figures and the terminal table sorted by sale price (segment
 „Verkauf · Einkauf"); the profit calculation with one input card, the Hull C chip and results ranked
-by max. profit with a two-line route (prices only — the calculation names no terminals).
+by max. profit with a two-line route „Kauf <Terminal> · <Preis>" / „Verkauf <Terminal> · <Preis>",
+the terminal's location (planet or star system, then city, station or outpost) as its tooltip.
 Auftragsdetail: page head with kind and status badges and the admin overflow „Auftrag löschen", the
 progress tile „Geliefert / benötigt" leading the KPI grid, tabs filtered per kind (Material: Bedarf
-· Übergaben · Bearbeiter · Verknüpft; Item: Items · Materialien · Herstellung · Übergaben ·
+· Übergaben · Bearbeiter · Verknüpft; Item: Items · Materialien · Hersteller · Übergaben ·
 Bearbeiter · Verknüpft) with empty tabs hidden, and „Übergabe erfassen" as the one action of the
 handover tab (REQ-ORDERS-026). Einsatz and Operation detail: both heads are page heads with the back
 link, the title and a translated `.status-badge`. The Einsatz page keeps three tabs (Übersicht ·
@@ -1597,6 +1609,12 @@ org-unit bank names its tab „Anträge an unsere Konten", „Laufende Anträge"
 request's approval path, the staff request queue filters by the status segment „Ausstehend ·
 Bestätigt · Abgelehnt · Alle" with „n warten auf dich", and the KRT approval thresholds are drawn as
 a tier bar (REQ-BANK-023, REQ-BANK-047).
+
+*Amended 2026-10-04: the profit calculation's route names its terminals.
+`GET /api/v1/materials/profit-calculation` answers each row with `buyTerminalName`,
+`buyTerminalLocation`, `sellTerminalName` and `sellTerminalLocation` — the terminals of the chosen
+lowest purchase and highest sale price, the first by name on a price tie, a location `null` when the
+terminal names no place.*
 
 **Enforced by:** `PagePatternFragmentsRenderTest` (the fragments' markup and ARIA) · Stylelint
 `media-feature-name-value-allowed-list` (breakpoints) · `TouchClassLayoutE2eTest` (touch floors) ·

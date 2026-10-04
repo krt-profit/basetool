@@ -34,8 +34,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * E2E coverage for the Materialbörse Gesuche tabs (REQ-MARKET-015): the tabs relabel the CTAs, the
- * request modal opens visibly with its picker closed, the Material/Item radio switches the
+ * E2E coverage for the Materialbörse Gesuche tab (REQ-MARKET-015): the tab swaps the create menu,
+ * the request modal opens visibly with its picker closed, the Material/Item radio switches the
  * combobox, and quality and quantity fields are present for both kinds.
  */
 @Tag("e2e")
@@ -93,13 +93,14 @@ class MaterialboardRequestModalE2eTest {
         assertThat(page.locator("#mg-modal"))
             .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));
 
-        page.locator("[data-mb-mode='requests'][data-mb-tab='alle']").first().click();
+        page.locator("[data-testid='mb-tab-requests']").click();
 
-        assertThat(page.locator("[data-mg-open-request]"))
+        assertThat(page.locator("[data-testid='mb-create-request']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
-        assertThat(page.locator("[data-mb-open-release]"))
+        assertThat(page.locator("[data-testid='mb-create-offer']"))
             .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));
 
+        page.locator("[data-testid='mb-create-request']").click();
         page.locator("[data-mg-open-request]").first().click();
         assertThat(page.locator("#mg-modal"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));

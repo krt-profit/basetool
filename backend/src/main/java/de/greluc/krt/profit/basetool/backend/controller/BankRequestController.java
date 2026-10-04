@@ -63,13 +63,15 @@ public class BankRequestController {
   /**
    * Pages over the booking requests in the given lifecycle state the caller may act on
    * (REQ-BANK-023). Management sees every account; an employee sees only requests on accounts they
-   * are granted on. Defaults to the {@code PENDING} work queue, newest first.
+   * are granted on. Defaults to the {@code PENDING} work queue, newest first. Each row says in
+   * {@code callerMayConfirm} whether the caller may confirm it, by the confirm endpoint's own rule.
    *
    * @param status the lifecycle states to include (repeatable or comma-separated); defaults to
    *     {@code PENDING} when omitted
    * @param page zero-based page index
    * @param size page size
    * @param sort whitelisted sort spec
+   * @param authentication the current authentication (per-row confirm capability)
    * @return one page of requests visible to the caller in any of those states
    */
   @Operation(summary = "List booking requests for the bank-staff confirmation queue (paged)")
@@ -78,14 +80,15 @@ public class BankRequestController {
       @RequestParam(required = false) Set<BankBookingRequestStatus> status,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort) {
+      @RequestParam(required = false) String sort,
+      Authentication authentication) {
     Set<BankBookingRequestStatus> effectiveStatuses =
         status == null || status.isEmpty() ? Set.of(BankBookingRequestStatus.PENDING) : status;
     String effectiveSort = sort == null || sort.isBlank() ? "createdAt,desc" : sort;
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, effectiveSort, QUEUE_SORT_FIELDS, "createdAt");
     Page<BankBookingRequestDto> result =
-        bankBookingRequestService.listQueue(effectiveStatuses, pageable);
+        bankBookingRequestService.listQueue(effectiveStatuses, pageable, authentication);
     return PageResponse.of(result);
   }
 

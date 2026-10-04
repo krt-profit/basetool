@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -17,138 +18,106 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global krtAutocomplete */
+(function () {
+    'use strict';
 
-function sortTable(n) {
-    const table = document.getElementById('priceTable');
-    let rows, switching, i, x, y, shouldSwitch, dir;
-    switching = true;
-
-    dir = table.getAttribute('data-sort-dir') === 'asc' ? 'desc' : 'asc';
-    if (table.getAttribute('data-sort-col') !== n.toString()) {
-        dir = 'asc';
-    }
-    table.setAttribute('data-sort-dir', dir);
-    table.setAttribute('data-sort-col', n);
-
-    while (switching) {
-        switching = false;
-        rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
-
-        for (i = 0; i < rows.length - 1; i++) {
-            if (rows[i].id === 'noResultsRow' || rows[i].id === 'noDataRow') continue;
-            if (rows[i + 1].id === 'noResultsRow' || rows[i + 1].id === 'noDataRow') continue;
-
-            shouldSwitch = false;
-            x = rows[i].getElementsByTagName('td')[n];
-            y = rows[i + 1].getElementsByTagName('td')[n];
-
-            if (!x || !y) continue;
-
-            const valX = x.textContent || x.innerText;
-            const valY = y.textContent || y.innerText;
-
-            if (n === 1 || n === 2) {
-                let numX = parseFloat(valX.replace(/[^0-9,-]/g, '').replace(',', '.'));
-                let numY = parseFloat(valY.replace(/[^0-9,-]/g, '').replace(',', '.'));
-                if (isNaN(numX)) numX = -1;
-                if (isNaN(numY)) numY = -1;
-
-                if (dir === 'asc') {
-                    if (numX > numY) {
-                        shouldSwitch = true;
-                        break;
-                    }
-                } else {
-                    if (numX < numY) {
-                        shouldSwitch = true;
-                        break;
-                    }
-                }
-            } else {
-                if (dir === 'asc') {
-                    if (valX.toLowerCase() > valY.toLowerCase()) {
-                        shouldSwitch = true;
-                        break;
-                    }
-                } else {
-                    if (valX.toLowerCase() < valY.toLowerCase()) {
-                        shouldSwitch = true;
-                        break;
-                    }
-                }
-            }
-        }
-        if (shouldSwitch) {
-            rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
-            switching = true;
-        }
-    }
-    updateSortIndicators(n, dir);
-}
-
-function updateSortIndicators(columnIndex, direction) {
-    for (let i = 0; i <= 2; i++) {
-        const iconElement = document.getElementById('sort-icon-' + i);
-        if (iconElement) {
-            if (i === columnIndex) {
-                iconElement.textContent = direction === 'asc' ? '▲' : '▼';
-                iconElement.style.color = 'var(--color-primary)';
-            } else {
-                iconElement.textContent = '↕';
-                iconElement.style.color = 'var(--color-gray-2-text)';
-            }
-        }
-    }
-}
-
-document.addEventListener('DOMContentLoaded', function () {
-    const dataList = document.getElementById('terminalNames-data');
-    const terminalNames = dataList
-        ? Array.from(dataList.options).map(function (o) {
-              return o.value;
-          })
-        : [];
-    const uniqueTerminals = [...new Set(terminalNames)];
-    const inp = document.getElementById('terminalFilter');
-    if (inp) krtAutocomplete(inp, uniqueTerminals);
-});
-
-function filterTerminals() {
-    const input = document.getElementById('terminalFilter');
-    const filter = input.value.toUpperCase();
-    const table = document.getElementById('priceTable');
-    const tr = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
-    let visibleCount = 0;
-
-    for (let i = 0; i < tr.length; i++) {
-        if (tr[i].id === 'noResultsRow' || tr[i].id === 'noDataRow') continue;
-
-        const td = tr[i].getElementsByClassName('terminal-name')[0];
-        if (td) {
-            const txtValue = td.textContent || td.innerText;
-            if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                tr[i].style.display = '';
-                visibleCount++;
-            } else {
-                tr[i].style.display = 'none';
-            }
-        }
-    }
-
+    const table = /** @type {HTMLTableElement | null} */ (document.getElementById('priceTable'));
+    const input = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('terminalFilter')
+    );
     const noResults = document.getElementById('noResultsRow');
-    if (noResults) {
-        if (visibleCount === 0 && tr.length > (document.getElementById('noDataRow') ? 1 : 0)) {
-            noResults.classList.remove('krtm-display-none-5790');
-        } else {
-            noResults.classList.add('krtm-display-none-5790');
+    if (!table) {
+        return;
+    }
+    const priceTable = table;
+    const tbody = priceTable.tBodies[0];
+    if (!tbody) {
+        return;
+    }
+    const rowsBody = tbody;
+
+    /**
+     * A row's price on one side.
+     *
+     * @param {HTMLTableRowElement} row the terminal row
+     * @param {'sell' | 'buy'} side the side
+     * @returns {number | null} the price, or `null` when the terminal does not trade that side
+     */
+    function priceOf(row, side) {
+        const raw = row.getAttribute('data-' + side);
+        if (raw === null || raw === '') {
+            return null;
+        }
+        const n = Number(raw);
+        return isFinite(n) ? n : null;
+    }
+
+    /**
+     * Sorts the rows: by sale price, highest first, or by purchase price, lowest first; rows
+     * without that side go last, by terminal name.
+     *
+     * @param {'sell' | 'buy'} side the sort side
+     */
+    function sortBy(side) {
+        const rows = /** @type {HTMLTableRowElement[]} */ (
+            Array.prototype.slice.call(rowsBody.rows)
+        );
+        rows.sort(function (a, b) {
+            const pa = priceOf(a, side);
+            const pb = priceOf(b, side);
+            if (pa !== null && pb !== null && pa !== pb) {
+                return side === 'sell' ? pb - pa : pa - pb;
+            }
+            if (pa === null && pb !== null) return 1;
+            if (pa !== null && pb === null) return -1;
+            return String(a.getAttribute('data-terminal') || '').localeCompare(
+                String(b.getAttribute('data-terminal') || ''),
+                undefined,
+                { sensitivity: 'base' },
+            );
+        });
+        rows.forEach(function (row) {
+            rowsBody.appendChild(row);
+        });
+        priceTable.setAttribute('data-sort', side);
+        priceTable.querySelectorAll('th[data-sort-col]').forEach(function (th) {
+            const active = th.getAttribute('data-sort-col') === side;
+            th.setAttribute(
+                'aria-sort',
+                active ? (side === 'sell' ? 'descending' : 'ascending') : 'none',
+            );
+        });
+    }
+
+    /** Shows the rows whose terminal name contains the search text. */
+    function filterTerminals() {
+        const needle = input ? input.value.trim().toLocaleLowerCase() : '';
+        let visible = 0;
+        Array.prototype.forEach.call(
+            rowsBody.rows,
+            function (/** @type {HTMLTableRowElement} */ row) {
+                const name = (row.getAttribute('data-terminal') || '').toLocaleLowerCase();
+                const match = needle === '' || name.indexOf(needle) >= 0;
+                row.hidden = !match;
+                if (match) visible++;
+            },
+        );
+        priceTable.hidden = visible === 0;
+        if (noResults) {
+            noResults.hidden = visible !== 0;
         }
     }
-}
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('keyup', 'material-detail-filter-terminals', filterTerminals);
-    window.krtEvents.on('click', 'material-detail-sort', function (el) {
-        sortTable(parseInt(el.getAttribute('data-sort-column'), 10));
+    if (input) {
+        input.addEventListener('input', filterTerminals);
+    }
+
+    document.querySelectorAll('input[name="terminalSort"]').forEach(function (el) {
+        const radio = /** @type {HTMLInputElement} */ (el);
+        radio.addEventListener('change', function () {
+            if (radio.checked) {
+                sortBy(radio.value === 'buy' ? 'buy' : 'sell');
+            }
+        });
     });
-}
+})();

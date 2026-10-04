@@ -26,7 +26,7 @@
 <th:block th:fragment="stolenMarkBody(prefix)">
     <form id="stolenMarkForm">
     <div class="krt-modal-body">
-        <p id="stolenMarkMessage" class="krtm-color-var-color-gray-1-font-family-lato-sans-e55d"></p>
+        <p id="stolenMarkMessage" class="lager-modal-message"></p>
         <div class="form-group mb-1">
             <label for="stolenMarkAmount" class="form-label">
                 <span th:text="#{inventory.stolen.amount}">Menge</span>
@@ -34,7 +34,7 @@
             </label>
             <div class="flex-gap-sm">
                 <input type="text" inputmode="decimal" data-scu-decimal id="stolenMarkAmount" step="0.001" min="0" required class="w-full" data-testid="stolen-mark-amount">
-                <span id="stolenMarkAmountOfText" class="krtm-white-space-nowrap-color-var-color-gray-2-8309" th:data-template="#{inventory.bookout.amount.of('{0}')}"></span>
+                <span id="stolenMarkAmountOfText" class="lager-amount-of" th:data-template="#{inventory.bookout.amount.of('{0}')}"></span>
                 <button type="button" class="btn btn-ghost btn-xs" th:data-trigger="${prefix + '-stolen-all'}" data-testid="stolen-mark-all" th:text="#{inventory.stolen.all}">Alles</button>
             </div>
         </div>

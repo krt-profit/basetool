@@ -22,9 +22,13 @@
 
     <form id="orders-filter-form" class="no-track" method="get" th:action="@{/orders}">
         <div class="toolbar orders-toolbar">
-            <th:block th:if="${scopeChoice}">
+            <th:block th:if="${scopeChoice and mineScopeOffered}">
                 <th:block th:replace="~{fragments/components :: segmented(name='scope', labelKey='orders.index.scope.label', selected=${scope},
-                    options=${ {{value: 'MINE', labelKey: 'orders.index.scope.mine'}, {value: 'ALL', labelKey: 'filter.all'}} })}"></th:block>
+                    options=${ {{value: 'MINE', labelKey: 'orders.index.scope.mine'}, {value: 'TO_PROCESS', labelKey: 'orders.index.scope.toProcess'}, {value: 'ALL', labelKey: 'filter.all'}} })}"></th:block>
+            </th:block>
+            <th:block th:if="${scopeChoice and !mineScopeOffered}">
+                <th:block th:replace="~{fragments/components :: segmented(name='scope', labelKey='orders.index.scope.label', selected=${scope},
+                    options=${ {{value: 'TO_PROCESS', labelKey: 'orders.index.scope.toProcess'}, {value: 'ALL', labelKey: 'filter.all'}} })}"></th:block>
             </th:block>
             <th:block th:replace="~{fragments/components :: filterPopover(panelId='orders-filter-panel', panelName='orders',
                 testid='orders-filter-toggle', body=~{::orders-filter-body})}">
@@ -51,7 +55,7 @@
                         </div>
                     </fieldset>
                     <div th:unless="${requesterView}" id="ordersSquadronField" class="orders-filter-field" data-filter-chip-ignore
-                         th:hidden="${ownScope}">
+                         th:hidden="${squadronFilterHidden}">
                         <span class="orders-filter-label" th:text="#{orders.index.filter.squadron}">Staffel</span>
                         <div class="multi-select-container" id="squadronFilterContainer">
                             <div class="multi-select-header" data-trigger="ord-toggle-squadron-multi"

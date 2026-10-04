@@ -24,11 +24,11 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
 
 /**
- * Every problem code the backend emits, outside the exchange's frozen registry (REQ-API-019,
- * ADR-0235).
+ * The generic problem codes of the error kernel: the handler's, the generic kinds' and the request
+ * pipeline's (REQ-API-019, ADR-0235).
  *
- * <p>One kernel enum for now; the per-module enums of ADR-0235 split it when the modules exist. The
- * code string equals the constant's name. A constant documented as reserved is registered but not
+ * <p>Each module's own codes are a {@link ProblemCode} enum in its {@code api} package. The code
+ * string equals the constant's name. A constant documented as reserved is registered but not
  * emitted today.
  */
 @RequiredArgsConstructor
@@ -85,18 +85,6 @@ public enum CoreProblemCode implements ProblemCode {
   /** A business rule refused the change. */
   BUSINESS_CONFLICT(HttpStatus.CONFLICT),
 
-  /** An allocation exceeds what the stock holds. */
-  OVER_ALLOCATION(HttpStatus.UNPROCESSABLE_CONTENT),
-
-  /** A production booking exceeds what the order's stock holds. */
-  PRODUCTION_ALLOCATION(HttpStatus.UNPROCESSABLE_CONTENT),
-
-  /** The write needs an owning org unit. */
-  OWNER_ORG_UNIT_REQUIRED(HttpStatus.BAD_REQUEST),
-
-  /** The write needs the caller to be a participant of the mission. */
-  MISSION_PARTICIPANT_REQUIRED(HttpStatus.BAD_REQUEST),
-
   /** The entity is still referenced and cannot be removed. */
   ENTITY_IN_USE(HttpStatus.CONFLICT),
 
@@ -106,60 +94,6 @@ public enum CoreProblemCode implements ProblemCode {
   /** A report could not be generated. */
   REPORT_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR),
 
-  /** The booking would overdraw the account. */
-  BANK_OVERDRAFT(HttpStatus.CONFLICT),
-
-  /** Reserved, not emitted: a holder's custody would go negative (ADR-0039). */
-  BANK_HOLDER_OVERDRAFT(HttpStatus.CONFLICT),
-
-  /** The account still holds a balance. */
-  BANK_ACCOUNT_NOT_EMPTY(HttpStatus.CONFLICT),
-
-  /** The account is closed. */
-  BANK_ACCOUNT_CLOSED(HttpStatus.CONFLICT),
-
-  /** The grantee lacks the bank role the grant needs. */
-  BANK_GRANTEE_MISSING_ROLE(HttpStatus.CONFLICT),
-
-  /** Source and target are the same account. */
-  BANK_SELF_TRANSFER(HttpStatus.CONFLICT),
-
-  /** The transaction was reversed already. */
-  BANK_ALREADY_REVERSED(HttpStatus.CONFLICT),
-
-  /** The holder is inactive. */
-  BANK_HOLDER_INACTIVE(HttpStatus.CONFLICT),
-
-  /** The transaction cannot be reversed. */
-  BANK_NOT_REVERSIBLE(HttpStatus.CONFLICT),
-
-  /** The booking request is no longer pending. */
-  BANK_REQUEST_NOT_PENDING(HttpStatus.CONFLICT),
-
-  /** The booking request was approved already. */
-  BANK_REQUEST_ALREADY_APPROVED(HttpStatus.CONFLICT),
-
-  /** The account has pending booking requests. */
-  BANK_ACCOUNT_HAS_PENDING_REQUESTS(HttpStatus.CONFLICT),
-
-  /** The booking needs the owner's approval first. */
-  BANK_OWNER_APPROVAL_REQUIRED(HttpStatus.CONFLICT),
-
-  /** Reserved, not emitted: the cartel approval answers {@code 202} instead (ADR-0109). */
-  BANK_CARTEL_APPROVAL_REQUIRED(HttpStatus.CONFLICT),
-
-  /** A split booking has no targets. */
-  BANK_SPLIT_NO_TARGETS(HttpStatus.CONFLICT),
-
-  /** A split share would be too small. */
-  BANK_SPLIT_TOO_SMALL(HttpStatus.CONFLICT),
-
-  /** The booking needs a justification. */
-  BANK_JUSTIFICATION_REQUIRED(HttpStatus.CONFLICT),
-
-  /** The transfer fee exceeds the amount. */
-  BANK_FEE_EXCEEDS_AMOUNT(HttpStatus.CONFLICT),
-
   /** The caller has not accepted the current terms of use. */
   TERMS_NOT_ACCEPTED(HttpStatus.FORBIDDEN),
 
@@ -168,9 +102,6 @@ public enum CoreProblemCode implements ProblemCode {
 
   /** The caller holds no role. */
   NO_ROLE(HttpStatus.FORBIDDEN),
-
-  /** A relayed on-behalf-of request failed the acting-member checks. */
-  ACTING_MEMBER_REFUSED(HttpStatus.FORBIDDEN),
 
   /** The identity provider or the server is unavailable; retry later. */
   SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),

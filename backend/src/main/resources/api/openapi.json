@@ -15642,6 +15642,13 @@
           "schema" : {
             "type" : "string"
           }
+        }, {
+          "in" : "query",
+          "name" : "fitted",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
         } ],
         "responses" : {
           "200" : {
@@ -39566,7 +39573,7 @@
     },
     "/api/v1/orders" : {
       "get" : {
-        "description" : "Returns a paginated list of job orders.",
+        "description" : "Returns a paginated list of job orders. toProcess=true keeps only the orders whose profit-eligible responsible unit is one of the caller's own units.",
         "operationId" : "getAllJobOrders",
         "parameters" : [ {
           "in" : "query",
@@ -39589,6 +39596,14 @@
               "type" : "string",
               "format" : "uuid"
             }
+          }
+        }, {
+          "in" : "query",
+          "name" : "toProcess",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
           }
         }, {
           "in" : "query",
@@ -51895,7 +51910,7 @@
     },
     "/api/v1/personal-blueprints/overview" : {
       "get" : {
-        "description" : "Paginated; the optional product-name search filters before pagination so it spans every entry, not just the requested page.",
+        "description" : "Paginated; the optional search matches the product name or the display name of an in-scope owner and filters before pagination, so it spans every entry, not just the requested page.",
         "operationId" : "listAvailableBlueprints",
         "parameters" : [ {
           "in" : "query",
@@ -58205,6 +58220,20 @@
           }
         }, {
           "in" : "query",
+          "name" : "ready",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
+        }, {
+          "in" : "query",
+          "name" : "q",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
@@ -58713,6 +58742,20 @@
               "type" : "string",
               "enum" : [ "OPEN", "IN_PROGRESS", "COMPLETED", "CANCELED" ]
             }
+          }
+        }, {
+          "in" : "query",
+          "name" : "ready",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
+        }, {
+          "in" : "query",
+          "name" : "q",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
           }
         }, {
           "in" : "query",
@@ -71909,6 +71952,9 @@
           "applicableLimit" : {
             "type" : "number"
           },
+          "callerMayConfirm" : {
+            "type" : "boolean"
+          },
           "counterpartyHandle" : {
             "type" : "string"
           },
@@ -77519,6 +77565,9 @@
             "type" : "integer",
             "format" : "int64"
           },
+          "signedUp" : {
+            "type" : "boolean"
+          },
           "status" : {
             "type" : "string"
           },
@@ -81155,8 +81204,8 @@
         "properties" : {
           "code" : {
             "type" : "string",
-            "description" : "The stable reason, one of the values in x-problem-codes (registry CoreProblemCode, REQ-API-019). The exchange operations under /api/v1/exchange answer the codes of the frozen exchange contract instead (ExchangeProblemException). The list grows; a client treats an unknown code by its status.",
-            "x-problem-codes" : [ "OPTIMISTIC_LOCK", "PESSIMISTIC_LOCK", "ACCESS_DENIED", "UNAUTHENTICATED", "VALIDATION_FAILED", "CONSTRAINT_VIOLATION", "DUPLICATE_ENTITY", "ILLEGAL_ARGUMENT", "BAD_REQUEST", "TYPE_MISMATCH", "DATA_INTEGRITY_VIOLATION", "NOT_FOUND", "METHOD_NOT_ALLOWED", "UNSUPPORTED_MEDIA_TYPE", "NOT_ACCEPTABLE", "INTERNAL_ERROR", "BUSINESS_CONFLICT", "OVER_ALLOCATION", "PRODUCTION_ALLOCATION", "OWNER_ORG_UNIT_REQUIRED", "MISSION_PARTICIPANT_REQUIRED", "ENTITY_IN_USE", "EXTERNAL_SERVICE_ERROR", "REPORT_GENERATION_FAILED", "BANK_OVERDRAFT", "BANK_HOLDER_OVERDRAFT", "BANK_ACCOUNT_NOT_EMPTY", "BANK_ACCOUNT_CLOSED", "BANK_GRANTEE_MISSING_ROLE", "BANK_SELF_TRANSFER", "BANK_ALREADY_REVERSED", "BANK_HOLDER_INACTIVE", "BANK_NOT_REVERSIBLE", "BANK_REQUEST_NOT_PENDING", "BANK_REQUEST_ALREADY_APPROVED", "BANK_ACCOUNT_HAS_PENDING_REQUESTS", "BANK_OWNER_APPROVAL_REQUIRED", "BANK_CARTEL_APPROVAL_REQUIRED", "BANK_SPLIT_NO_TARGETS", "BANK_SPLIT_TOO_SMALL", "BANK_JUSTIFICATION_REQUIRED", "BANK_FEE_EXCEEDS_AMOUNT", "TERMS_NOT_ACCEPTED", "PENDING_APPROVAL", "NO_ROLE", "ACTING_MEMBER_REFUSED", "SERVICE_UNAVAILABLE", "RATE_LIMIT_EXCEEDED", "REQUEST_BODY_TOO_LARGE", "APP_UPDATE_REQUIRED" ]
+            "description" : "The stable reason, one of the values in x-problem-codes (the ProblemCode registry, REQ-API-019). The exchange operations under /api/v1/exchange answer the codes of the frozen exchange contract instead (ExchangeProblemException). The list grows; a client treats an unknown code by its status.",
+            "x-problem-codes" : [ "ACCESS_DENIED", "ACTING_MEMBER_REFUSED", "APP_UPDATE_REQUIRED", "BAD_REQUEST", "BANK_ACCOUNT_CLOSED", "BANK_ACCOUNT_HAS_PENDING_REQUESTS", "BANK_ACCOUNT_NOT_EMPTY", "BANK_ALREADY_REVERSED", "BANK_CARTEL_APPROVAL_REQUIRED", "BANK_FEE_EXCEEDS_AMOUNT", "BANK_GRANTEE_MISSING_ROLE", "BANK_HOLDER_INACTIVE", "BANK_HOLDER_OVERDRAFT", "BANK_JUSTIFICATION_REQUIRED", "BANK_NOT_REVERSIBLE", "BANK_OVERDRAFT", "BANK_OWNER_APPROVAL_REQUIRED", "BANK_REQUEST_ALREADY_APPROVED", "BANK_REQUEST_NOT_PENDING", "BANK_SELF_TRANSFER", "BANK_SPLIT_NO_TARGETS", "BANK_SPLIT_TOO_SMALL", "BUSINESS_CONFLICT", "CONSTRAINT_VIOLATION", "DATA_INTEGRITY_VIOLATION", "DUPLICATE_ENTITY", "ENTITY_IN_USE", "EXTERNAL_SERVICE_ERROR", "ILLEGAL_ARGUMENT", "INTERNAL_ERROR", "METHOD_NOT_ALLOWED", "MISSION_PARTICIPANT_REQUIRED", "NOT_ACCEPTABLE", "NOT_FOUND", "NO_ROLE", "OPTIMISTIC_LOCK", "OVER_ALLOCATION", "OWNER_ORG_UNIT_REQUIRED", "PENDING_APPROVAL", "PESSIMISTIC_LOCK", "PRODUCTION_ALLOCATION", "RATE_LIMIT_EXCEEDED", "REPORT_GENERATION_FAILED", "REQUEST_BODY_TOO_LARGE", "SERVICE_UNAVAILABLE", "TERMS_NOT_ACCEPTED", "TYPE_MISMATCH", "UNAUTHENTICATED", "UNSUPPORTED_MEDIA_TYPE", "VALIDATION_FAILED" ]
           },
           "correlationId" : {
             "type" : "string",
@@ -81209,6 +81258,12 @@
       "ProfitCalculationDto" : {
         "type" : "object",
         "properties" : {
+          "buyTerminalLocation" : {
+            "type" : "string"
+          },
+          "buyTerminalName" : {
+            "type" : "string"
+          },
           "fullLoadCost" : {
             "type" : "number"
           },
@@ -81233,6 +81288,12 @@
           },
           "profitPerScu" : {
             "type" : "number"
+          },
+          "sellTerminalLocation" : {
+            "type" : "string"
+          },
+          "sellTerminalName" : {
+            "type" : "string"
           }
         }
       },

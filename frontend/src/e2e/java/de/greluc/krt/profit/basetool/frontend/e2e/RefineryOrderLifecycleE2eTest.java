@@ -147,6 +147,7 @@ class RefineryOrderLifecycleE2eTest {
         page.evaluate(
             "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
                 + " 'none'; } }");
+        page.locator("#rod-actions-menu-toggle").click();
         page.locator("form[action$='/" + orderId + "/delete'] button[type='submit']").click();
         page.waitForResponse(
             response ->
@@ -165,7 +166,7 @@ class RefineryOrderLifecycleE2eTest {
    * Verifies that the status filter hides a {@code CANCELED} order under the default {@code
    * OPEN}+{@code IN_PROGRESS} view and shows it under an explicit {@code CANCELED} filter.
    *
-   * <p>Driven through the {@code ?status=…} URL, since the filter button is hidden by JS.
+   * <p>Driven through the {@code ?status=…} URL, which the list honours as an exact filter.
    */
   @Test
   void statusFilterRevealsCanceledOrders() {

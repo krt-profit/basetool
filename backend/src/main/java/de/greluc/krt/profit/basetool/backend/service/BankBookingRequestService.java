@@ -21,12 +21,12 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static de.greluc.krt.profit.basetool.backend.util.BankAmounts.plain;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCancelledEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestConfirmedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestRejectedEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
@@ -62,6 +62,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -495,20 +496,40 @@ public class BankBookingRequestService {
    * confirmation queue with the parallel status filter (REQ-BANK-023). Management sees every
    * account; an employee sees only requests on accounts they are granted on. This is a pure
    * bank-staff surface — it consults grants, never org-unit scope. An empty status set yields an
-   * empty page (the caller deselected every filter).
+   * empty page (the caller deselected every filter). Every row carries {@code callerMayConfirm},
+   * decided by {@link BankSecurityService#confirmCheck} with one grant read for the whole page.
    *
    * @param statuses the lifecycle states to include (any-of, e.g. {@code PENDING})
    * @param pageable page, size and whitelisted sort
+   * @param authentication the current authentication (per-row confirm capability)
    * @return one page of requests visible to the caller in any of those states
    */
   @NotNull
   public Page<BankBookingRequestDto> listQueue(
-      @NotNull Set<BankBookingRequestStatus> statuses, @NotNull Pageable pageable) {
+      @NotNull Set<BankBookingRequestStatus> statuses,
+      @NotNull Pageable pageable,
+      Authentication authentication) {
     if (statuses.isEmpty()) {
       return Page.empty(pageable);
     }
+    BiPredicate<BankBookingRequestType, UUID> confirmCheck =
+        bankSecurityService.confirmCheck(authentication);
+    return pageQueue(statuses, pageable)
+        .map(request -> toDto(request, callerMayConfirm(request, confirmCheck)));
+  }
+
+  /**
+   * Reads one page of the queue: every account for management, the granted accounts otherwise.
+   *
+   * @param statuses the non-empty lifecycle states to include
+   * @param pageable page, size and whitelisted sort
+   * @return one page of request entities visible to the caller
+   */
+  @NotNull
+  private Page<BankBookingRequest> pageQueue(
+      @NotNull Set<BankBookingRequestStatus> statuses, @NotNull Pageable pageable) {
     if (bankSecurityService.isManagement()) {
-      return requestRepository.findByStatusIn(statuses, pageable).map(this::toDto);
+      return requestRepository.findByStatusIn(statuses, pageable);
     }
     Optional<UUID> caller = authHelperService.currentUserId();
     if (caller.isEmpty()) {
@@ -521,9 +542,23 @@ public class BankBookingRequestService {
     if (grantedAccountIds.isEmpty()) {
       return Page.empty(pageable);
     }
-    return requestRepository
-        .findByStatusInAndAccountIdIn(statuses, grantedAccountIds, pageable)
-        .map(this::toDto);
+    return requestRepository.findByStatusInAndAccountIdIn(statuses, grantedAccountIds, pageable);
+  }
+
+  /**
+   * Whether the caller may confirm the request now: it is still {@code PENDING} and the caller
+   * holds the capability {@link #confirm} requires for it. The over-limit attestation stays a
+   * confirm-time input and is not part of this answer (REQ-BANK-041).
+   *
+   * @param request the request to judge
+   * @param confirmCheck the caller's confirm capability by request type and account
+   * @return {@code true} iff the confirm action applies to this row for this caller
+   */
+  private static boolean callerMayConfirm(
+      @NotNull BankBookingRequest request,
+      @NotNull BiPredicate<BankBookingRequestType, UUID> confirmCheck) {
+    return request.getStatus() == BankBookingRequestStatus.PENDING
+        && confirmCheck.test(request.getType(), request.getAccount().getId());
   }
 
   /**
@@ -781,7 +816,7 @@ public class BankBookingRequestService {
 
   /**
    * Enforces that the confirming employee holds the per-account capability matching the request
-   * type: {@code can_deposit} for a deposit, {@code can_withdraw} for a withdrawal (REQ-BANK-023).
+   * type, as decided by {@link BankSecurityService#canConfirm} (REQ-BANK-023).
    *
    * @param type the request type
    * @param accountId the target account
@@ -792,13 +827,7 @@ public class BankBookingRequestService {
       @NotNull BankBookingRequestType type,
       @NotNull UUID accountId,
       Authentication authentication) {
-    boolean allowed =
-        switch (type) {
-          case DEPOSIT -> bankSecurityService.canDeposit(accountId, authentication);
-          case WITHDRAWAL -> bankSecurityService.canWithdraw(accountId, authentication);
-          case TRANSFER -> bankSecurityService.canTransfer(accountId, authentication);
-        };
-    if (!allowed) {
+    if (!bankSecurityService.canConfirm(type, accountId, authentication)) {
       throw new AccessDeniedException(
           "The caller lacks the bank capability to confirm this request");
     }
@@ -876,15 +905,29 @@ public class BankBookingRequestService {
   }
 
   /**
-   * Maps a request entity to its wire shape, resolving the owning org unit, recorded holder and
-   * resulting transaction (all eagerly fetched on the list/queue reads, lazily resolvable within
-   * the single-row transactional paths).
+   * Maps a request entity to its wire shape on a read that does not judge the caller's confirm
+   * capability, so {@code callerMayConfirm} is {@code null}.
    *
    * @param request the request entity
    * @return the wire DTO
    */
   @NotNull
   private BankBookingRequestDto toDto(@NotNull BankBookingRequest request) {
+    return toDto(request, null);
+  }
+
+  /**
+   * Maps a request entity to its wire shape, resolving the owning org unit, recorded holder and
+   * resulting transaction (all eagerly fetched on the list/queue reads, lazily resolvable within
+   * the single-row transactional paths).
+   *
+   * @param request the request entity
+   * @param callerMayConfirm whether the caller may confirm it, or {@code null} when not judged
+   * @return the wire DTO
+   */
+  @NotNull
+  private BankBookingRequestDto toDto(
+      @NotNull BankBookingRequest request, @Nullable Boolean callerMayConfirm) {
     BankAccount account = request.getAccount();
     OrgUnit orgUnit = account.getOrgUnit();
     BankHolder holder = request.getHolder();
@@ -925,7 +968,8 @@ public class BankBookingRequestService {
         request.getCounterpartyHandle(),
         request.getCounterpartyOrgUnitId(),
         request.getCounterpartyOrgUnitName(),
-        request.getVersion());
+        request.getVersion(),
+        callerMayConfirm);
   }
 
   /**

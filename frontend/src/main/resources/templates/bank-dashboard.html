@@ -4,6 +4,7 @@
     <title th:text="#{bank.dashboard.title} + ' - ' + ${appTitle}">Kartellbank - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/bank.css}">
+        <link rel="stylesheet" th:href="@{/css/pages/bank-dashboard.css}">
     </th:block>
 </head>
 <body>
@@ -12,40 +13,8 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-approval-request-filed=#{bank.movement.approvalRequestFiled},data-bank-livesync-updates=#{livesync.updates_available},data-user-id=${#authentication.name},data-transfer-fee-rate=${transferFeeRate}">
-    <div class="greeting hud-box flex-between">
-        <div>
-            <h1 th:text="#{bank.dashboard.title}">Kartellbank</h1>
-            <p class="text-muted krtm-margin-0-25rem-0-0-font-size-0-8rem-cb15">
-                <span th:if="${dashboard != null and dashboard.management()}"
-                      th:text="#{bank.dashboard.subtitle.management(${#lists.size(dashboard.accounts())})}">Ansicht: Bankleitung · 7 Konten</span>
-                <span th:if="${dashboard != null and !dashboard.management()}"
-                      th:text="#{bank.dashboard.subtitle.employee(${#lists.size(dashboard.accounts())})}">Ansicht: Bank-Mitarbeiter · 3 berechtigte Konten</span>
-                <span class="utc-time" th:text="${now}">2026-06-12T14:02:00Z</span>
-            </p>
-        </div>
-        <div class="bank-head-actions">
-            <th:block th:if="${!#lists.isEmpty(cards)}">
-                <div class="bank-view-toggles" role="group" data-bank-view-toggles
-                     th:aria-label="#{bank.dashboard.view.aria}">
-                    <label class="bank-check-inline">
-                        <input type="checkbox" data-bank-view-layout data-testid="bank-view-layout"
-                               th:checked="${layout == 'table'}">
-                        <span th:text="#{bank.dashboard.view.tableToggle}">Tabellenansicht</span>
-                    </label>
-                    <label class="bank-check-inline">
-                        <input type="checkbox" data-bank-view-group data-testid="bank-view-group"
-                               th:checked="${group == 'bereich'}">
-                        <span th:text="#{bank.dashboard.view.groupToggle}">Nach Bereich gruppieren</span>
-                    </label>
-                </div>
-                <th:block th:replace="~{fragments/components :: bankAccSearch('bank-acc-filter', '#bank-grid-results', '#bank-acc-filter-empty')}"></th:block>
-            </th:block>
-            <button type="button" class="btn btn--cta" th:if="${canBook}"
-                    data-trigger="open-modal-display" data-modal-id="bank-movement-modal"
-                    data-testid="bank-movement-open">
-                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-swap"/></svg>
-                <span th:text="#{bank.action.movement}">Kontobewegung</span>
-            </button>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey=${dashboard == null ? 'nav.section.bank' : (dashboard.management() ? 'bank.dashboard.subtitle.management(' + #lists.size(dashboard.accounts()) + ')' : 'bank.dashboard.subtitle.employee(' + #lists.size(dashboard.accounts()) + ')')}, titleText=#{bank.dashboard.title}, actions=~{::bank-dashboard-actions})}">
+        <th:block th:ref="bank-dashboard-actions">
             <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)">
                 <button type="button" class="btn btn-ghost bank-download-btn"
                         data-download-url="/api/proxy/bank/export/three-month-report"
@@ -55,10 +24,40 @@
                     <span th:text="#{bank.dashboard.report}">3-Monats-Report</span>
                 </button>
             </th:block>
+            <button type="button" class="btn btn--cta" th:if="${canBook}"
+                    data-trigger="open-modal-display" data-modal-id="bank-movement-modal"
+                    data-testid="bank-movement-open">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-swap"/></svg>
+                <span th:text="#{bank.action.movement}">Kontobewegung</span>
+            </button>
+        </th:block>
+    </th:block>
+
+    <div class="toolbar" th:if="${!#lists.isEmpty(cards)}">
+        <th:block th:replace="~{fragments/components :: bankAccSearch('bank-acc-filter', '#bank-grid-results', '#bank-acc-filter-empty')}"></th:block>
+        <div class="bank-view-toggles" role="group" data-bank-view-toggles
+             th:aria-label="#{bank.dashboard.view.aria}">
+            <label class="switch" for="bank-view-layout">
+                <input type="checkbox" id="bank-view-layout" data-bank-view-layout data-testid="bank-view-layout"
+                       th:checked="${layout == 'table'}">
+                <span class="switch__track" aria-hidden="true"></span>
+                <span th:text="#{bank.dashboard.view.tableToggle}">Tabellenansicht</span>
+            </label>
+            <label class="switch" for="bank-view-group">
+                <input type="checkbox" id="bank-view-group" data-bank-view-group data-testid="bank-view-group"
+                       th:checked="${group == 'bereich'}">
+                <span class="switch__track" aria-hidden="true"></span>
+                <span th:text="#{bank.dashboard.view.groupToggle}">Nach Bereich gruppieren</span>
+            </label>
         </div>
+        <span class="toolbar__spacer"></span>
+        <span class="toolbar__count">
+            <span th:text="#{bank.dashboard.asOf}">Stand</span>
+            <span class="utc-time" th:text="${now}">2026-06-12T14:02:00Z</span>
+        </span>
     </div>
 
-    <div class="bank-totals mt-2" th:if="${dashboard != null and dashboard.totals() != null}"
+    <div class="bank-totals" th:if="${dashboard != null and dashboard.totals() != null}"
          data-testid="bank-totals">
         <div class="kpi-total">
             <div class="kpi-label" th:text="#{bank.dashboard.totals.balance}">Gesamtsaldo</div>
@@ -102,11 +101,9 @@
             </div>
         </th:block>
 
-        <div class="hud-box mt-2" th:if="${#lists.isEmpty(cards)}">
-            <p class="text-center" data-testid="bank-dashboard-empty" th:text="#{bank.dashboard.empty}">
-                Noch keine Konten sichtbar. Berechtigungen vergibt die Bankleitung.
-            </p>
-        </div>
+        <th:block th:if="${#lists.isEmpty(cards)}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='bank.dashboard.empty.title', textKey='bank.dashboard.empty', emptyId='bank-dashboard-empty')}"></th:block>
+        </th:block>
     </div>
 
     <th:block th:if="${canBook}">

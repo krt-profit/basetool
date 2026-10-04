@@ -151,7 +151,8 @@ class OrgUnitBankPageControllerMvcTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            null);
     BankAccountRefDto target =
         new BankAccountRefDto(accountId, "KB-0001", "Staffel IRIDIUM", "ORG_UNIT");
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
@@ -305,7 +306,8 @@ class OrgUnitBankPageControllerMvcTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            null);
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(BALANCES_URI), anyTypeRef()))
         .thenThrow(new RuntimeException("backend down"));
@@ -491,7 +493,7 @@ class OrgUnitBankPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("org-unit-bank-account-detail"))
         .andExpect(content().string(Matchers.containsString("Staffel IRIDIUM")))
-        .andExpect(content().string(Matchers.containsString("ou-facts")))
+        .andExpect(content().string(Matchers.containsString("bank-kpis")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-target")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-tab-history")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-tab-settings")))
@@ -506,7 +508,8 @@ class OrgUnitBankPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = {"KRT_MEMBER"})
-  void orgUnitBankAccount_plainViewerNoLimits_rendersHistoryWithoutTabs() throws Exception {
+  void orgUnitBankAccount_plainViewerNoLimits_rendersHistoryAndInfoTabsWithoutSettings()
+      throws Exception {
     UUID accountId = UUID.randomUUID();
     BankAccountDto account =
         new BankAccountDto(
@@ -551,14 +554,20 @@ class OrgUnitBankPageControllerMvcTest {
     mockMvc
         .perform(get("/org-unit-bank/accounts/" + accountId))
         .andExpect(status().isOk())
-        .andExpect(content().string(Matchers.containsString("ou-facts")))
+        .andExpect(content().string(Matchers.containsString("bank-kpis")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-bookings-panel")))
         .andExpect(
             content()
                 .string(Matchers.not(Matchers.containsString("org-unit-bank-detail-tab-settings"))))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-tab-history")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-tab-info")))
+        .andExpect(content().string(Matchers.containsString("data-testid=\"bank-info-panel\"")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-cartel-ladder")))
         .andExpect(
             content()
-                .string(Matchers.not(Matchers.containsString("org-unit-bank-detail-tab-history"))));
+                .string(
+                    Matchers.not(
+                        Matchers.containsString("data-testid=\"org-unit-bank-settings\""))));
   }
 
   @Test
@@ -611,6 +620,7 @@ class OrgUnitBankPageControllerMvcTest {
         .perform(get("/org-unit-bank/accounts/" + accountId))
         .andExpect(status().isOk())
         .andExpect(content().string(Matchers.containsString("bank-approval-limits-display")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-tab-info")))
         .andExpect(
             content()
                 .string(Matchers.not(Matchers.containsString("org-unit-bank-detail-tab-settings"))))
@@ -788,7 +798,8 @@ class OrgUnitBankPageControllerMvcTest {
         null,
         null,
         null,
-        0L);
+        0L,
+        null);
   }
 
   /**
@@ -836,7 +847,8 @@ class OrgUnitBankPageControllerMvcTest {
         null,
         null,
         null,
-        0L);
+        0L,
+        null);
   }
 
   /**

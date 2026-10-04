@@ -1,0 +1,172 @@
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    .ou-panel {
+        margin-top: var(--space-4);
+    }
+
+    .ou-konten-toolbar {
+        margin-bottom: 0;
+    }
+
+    .ou-panel .card + .card {
+        margin-top: 0;
+    }
+
+    .ou-acc-grid .ou-card {
+        position: relative;
+        gap: var(--space-2);
+        padding: var(--space-4);
+    }
+
+    .ou-acc-grid .ou-card[hidden] {
+        display: none;
+    }
+
+    .ou-acc-grid .ou-card-name {
+        font-family: var(--font-headline);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .ou-acc-grid .ou-card-name::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+    }
+
+    .ou-acc-grid .ou-card-name:focus-visible {
+        outline: none;
+    }
+
+    .ou-acc-grid .ou-card:has(.ou-card-name:focus-visible) {
+        outline: 2px solid var(--color-primary);
+        outline-offset: -2px;
+    }
+
+    .ou-card-chevron {
+        flex: 0 0 auto;
+        width: 16px;
+        height: 16px;
+        color: var(--color-gray-2-text);
+    }
+
+    .ou-acc-grid .ou-card-figures {
+        align-items: flex-end;
+    }
+
+    .ou-card-spark {
+        flex: 0 0 auto;
+    }
+
+    .ou-card-delta {
+        display: flex;
+        align-items: baseline;
+        gap: 0.35rem;
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-xs);
+    }
+
+    .ou-acc-grid .ou-target .meter {
+        margin-top: var(--space-1);
+    }
+
+    .ou-target-meta {
+        justify-content: flex-start;
+    }
+
+    .ou-open-head {
+        justify-content: flex-start;
+        margin: 0;
+        padding: var(--space-3) var(--space-4);
+        border-bottom: var(--border-hairline);
+    }
+
+    .ou-open-table .ou-open-type {
+        width: 1%;
+        white-space: nowrap;
+    }
+
+    .ou-open-amount .bank-amount {
+        font-family: var(--font-headline);
+        font-size: 1rem;
+        font-weight: var(--fw-bold);
+        white-space: nowrap;
+    }
+
+    .ou-steps {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem 0.9rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-xs);
+    }
+
+    .ou-step {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .ou-step-mark {
+        flex: 0 0 auto;
+        width: 9px;
+        height: 9px;
+        border: 1px solid var(--color-gray-2);
+    }
+
+    .ou-step--done {
+        color: var(--color-gray-1);
+    }
+
+    .ou-step--done .ou-step-mark {
+        background: var(--color-success);
+        border-color: var(--color-success);
+    }
+
+    .ou-step--current {
+        color: var(--color-white);
+        font-weight: var(--fw-bold);
+    }
+
+    .ou-step--current .ou-step-mark {
+        border-color: var(--color-warning);
+    }
+
+    .bank-inline-form {
+        display: inline;
+    }
+
+    @media (width <= 768px) {
+        .ou-open-table td.ou-open-type {
+            flex: 0 0 auto;
+            width: auto;
+        }
+
+        .ou-open-table td.ou-open-title {
+            order: 0;
+            flex: 1 1 0;
+            min-width: 0;
+            margin-right: 0;
+            color: var(--color-gray-1);
+            font-size: inherit;
+        }
+
+        .ou-open-table td.ou-open-amount {
+            order: 1;
+        }
+
+        .ou-open-table td.ou-open-steps {
+            order: 3;
+            flex: 1 1 100%;
+            margin-right: 0;
+        }
+
+        .ou-open-table td:is(.ou-open-title, .ou-open-steps)::after {
+            content: none;
+        }
+    }
+}

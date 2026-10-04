@@ -1,0 +1,136 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    .bank-kpis {
+        margin-bottom: var(--space-4);
+    }
+
+    .bank-kpis + .card {
+        margin-bottom: var(--space-4);
+    }
+
+    .bank-kpi-meter {
+        margin: var(--space-2) 0 var(--space-1);
+    }
+
+    .bank-kpi-empty {
+        color: var(--color-gray-2-text);
+        font-size: 1rem;
+    }
+
+    .bank-detail-tabs {
+        margin-bottom: var(--space-4);
+    }
+
+    .bank-detail-panel .card + .card,
+    .oud-settings-grid .card + .card {
+        margin-top: 0;
+    }
+
+    .bank-chart-head {
+        margin-bottom: var(--space-3);
+    }
+
+    .bank-bookings-card .bank-history-filter {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: var(--space-3);
+        margin: 0;
+        padding: var(--space-3) var(--space-4);
+        border-bottom: var(--border-hairline);
+    }
+
+    .bank-history-range {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: var(--space-3);
+    }
+
+    .bank-history-range[hidden] {
+        display: none;
+    }
+
+    .bank-bookings-table .bank-booking-date {
+        white-space: nowrap;
+    }
+
+    .bank-bookings-table .bank-party-none {
+        color: var(--color-gray-2-text);
+        font-weight: var(--fw-regular);
+    }
+
+    .bank-bookings-table .bank-sub-label {
+        margin-right: 0.25em;
+        font-weight: var(--fw-bold);
+    }
+
+    .bank-bookings-table .bank-balance-after {
+        color: var(--color-gray-1);
+    }
+
+    .bank-bookings-foot {
+        padding: var(--space-3) var(--space-4);
+    }
+
+    .bank-info-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(14rem, 100%), 1fr));
+        gap: var(--space-3) var(--space-4);
+        margin: 0;
+    }
+
+    .bank-info-list dt {
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-2xs);
+        font-weight: var(--fw-bold);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .bank-info-list dd {
+        margin: 0.15rem 0 0;
+        color: var(--color-white);
+    }
+
+    .bank-hint {
+        font-size: 0.8rem;
+    }
+
+    .bank-inline-form {
+        display: inline;
+    }
+
+    @media (width <= 768px) {
+        .bank-bookings-table td.bank-booking-party {
+            order: 3;
+            flex: 1 1 100%;
+            margin-right: 0;
+            color: var(--color-gray-1);
+            font-size: inherit;
+        }
+
+        .bank-bookings-table td.bank-booking-party::after {
+            content: none;
+        }
+
+        .bank-bookings-table td.bank-booking-amount {
+            order: 4;
+        }
+
+        .bank-bookings-table td.bank-balance-after {
+            order: 5;
+        }
+
+        .bank-bookings-table td.cell-actions {
+            order: 6;
+        }
+    }
+}

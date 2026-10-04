@@ -442,7 +442,7 @@ Hard invariants:
   only ever enlarges.
 
 > **Amended by [ADR-0048](../adr/0048-ol-sees-every-ship-in-the-unit-overview.md) (REQ-HANGAR-003):**
-> the hangar **unit overview** (`/hangar/squadron`, "Org-Einheitsübersicht") is the single, deliberate
+> the hangar **unit overview** (`/hangar/squadron`, the hangar tab „Org-Einheit", until 2026-10-03 the page "Org-Einheitsübersicht") is the single, deliberate
 > exception to the first hard invariant above. A non-pinned **OL member** is upgraded to
 > `adminAllScope=true` **for that one aggregation read alone** (`OwnerScopeService.currentUnitOverviewScope()`),
 > so the OL's fleet view also includes ownerless personal ships (`owningOrgUnit == null`) of
@@ -655,7 +655,7 @@ CHECKs — DB-side defence in depth) · **Issues:** #692, #695.
 ### REQ-ORG-018 — Mission owning-OrgUnit reassignment
 
 A mission's `owning_org_unit_id` is **no longer immutable after creation** (it is still create-time
-stamped per REQ-ORG-004). The mission Verwaltung tab exposes a "Verantwortliche Einheit" control that
+stamped per REQ-ORG-004). The mission edit mode (the former Verwaltung tab, REQ-MISSION-004) exposes a "Verantwortliche Einheit" control that
 re-homes an existing mission to a different OrgUnit — Staffel, Spezialkommando, Bereich or
 Organisationsleitung (REQ-ORG-016) — or to **ownerless** (`owning_org_unit_id = NULL`, the
 public-leadership form of REQ-ORG-009). The reassignment is `PUT
@@ -780,8 +780,8 @@ instruction nobody can act on — it names a JSON field, not the control on the 
 **The rule:** a service-layer rejection the member can fix carries a **stable problem code**, and the
 client renders its own localized wording from that code. Concretely for this one:
 
-- The backend throws `OwnerOrgUnitRequiredException` — its own sealed `AppException` subtype, its own
-  `AppExceptionKind`, code **`OWNER_ORG_UNIT_REQUIRED`**, still `400`. A pick the caller may *not*
+- The backend throws `OwnerOrgUnitRequiredException` — a `DomainProblem` of the scope module
+  (`scope.api`), code **`OWNER_ORG_UNIT_REQUIRED`** from `ScopeProblemCode`, still `400`. A pick the caller may *not*
   make stays an `AccessDeniedException`; this code means no pick was made at all.
 - The frontend renders it **centrally**, in `krt-fetch.js`, from `window.krtOwnerPickerI18n.required`
   (bundle key `ownerPicker.error.required`, DE + EN). The failure can arrive on any of the five
@@ -835,7 +835,7 @@ entry again restores the caller's options.
 pinned negative), `InventoryPageControllerMvcTest` (preselect, placeholder, hidden on-behalf picker),
 `InventoryOperationsE2eTest#onBehalfOwnerPickerFollowsTheChosenMember` · **Code:**
 `fragments/owner-picker.html`, `inventory-input.js`, `OrgUnitStampingService#resolveStampedOrgUnit` /
-`#resolveSquadronForPickerOutput`, `OwnerOrgUnitRequiredException`, `AppExceptionKind`,
+`#resolveSquadronForPickerOutput`, `scope/api/OwnerOrgUnitRequiredException`, `ScopeProblemCode`,
 `krt-fetch.js#ownerOrgUnitRequiredMessage`, `fragments/head.html` ·
 **Related:** REQ-ORG-016, REQ-ORG-017, REQ-API-* (RFC 7807), the i18n rule in the root `CLAUDE.md`
 

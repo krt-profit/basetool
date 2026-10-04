@@ -355,23 +355,19 @@
 
     function recountAndSync() {
         const rows = document.querySelectorAll('#krt-bp-master-rows .master-row');
-        let withNote = 0;
-        rows.forEach(function (r) {
-            const n = r.getAttribute('data-note');
-            if (n && n !== 'null' && n.trim() !== '') {
-                withNote++;
-            }
-        });
         const total = rows.length;
         const tabCount = document.querySelector('.tab-nav .tab.active .tab-count');
         if (tabCount) {
             tabCount.textContent = String(total);
         }
-        const subtitle = document.querySelector('.krt-personal-inventory-header .krt-subtitle');
-        const i = i18n();
-        if (subtitle && i.factsCount && i.factsWithNote) {
-            subtitle.textContent =
-                total + ' ' + i.factsCount + ' · ' + withNote + ' ' + i.factsWithNote;
+        const allCount = document.querySelector('[data-testid="segment-bpScope-all"] .seg-count');
+        if (allCount) {
+            allCount.textContent = String(total);
+        }
+        const toolbar = $('krt-bp-craft-toolbar');
+        if (toolbar) {
+            const q = $('krt-bp-q');
+            toolbar.classList.toggle('is-empty', total === 0 && !(q && q.value));
         }
         if (deleteAllBtn) {
             let removable = 0;
@@ -415,6 +411,10 @@
                     }
                     staged.clear();
                     renderStaging();
+                    const addModal = $('krt-bp-add-modal');
+                    if (addModal) {
+                        window.krtModal.close(addModal);
+                    }
                     afterListWrite();
                 },
             })

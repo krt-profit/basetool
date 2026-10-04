@@ -145,7 +145,7 @@ public class MissionController {
   /**
    * Pages the missions visible to the calling member.
    *
-   * @return paged mission list DTOs
+   * @return paged mission list DTOs, each saying whether the caller is signed up
    */
   @GetMapping
   @Operation(summary = "List all missions (paginated)")
@@ -171,7 +171,7 @@ public class MissionController {
             null,
             null,
             pageable);
-    return PageResponse.of(withRegisteredCounts(pageResult));
+    return PageResponse.of(toListRows(pageResult));
   }
 
   /**
@@ -202,7 +202,7 @@ public class MissionController {
    * @param end upper bound on planned start time
    * @param status status filter (one or more)
    * @param operationId optional operation filter
-   * @return paged mission list DTOs
+   * @return paged mission list DTOs, each saying whether the caller is signed up
    */
   @GetMapping("/search")
   @Operation(summary = "Search missions (paginated)")
@@ -228,7 +228,7 @@ public class MissionController {
             "plannedStartTime");
     Page<Mission> pageResult =
         missionService.searchMissions(query, start, end, status, null, operationId, pageable);
-    return PageResponse.of(withRegisteredCounts(pageResult));
+    return PageResponse.of(toListRows(pageResult));
   }
 
   /**
@@ -1423,18 +1423,23 @@ public class MissionController {
   }
 
   /**
-   * Maps a page of missions to list rows, loading all registration counts in one grouped query
-   * (REQ-DATA-003).
+   * Maps a page of missions to list rows, loading all registration counts in one grouped query and
+   * the caller's own sign-ups in one more (REQ-DATA-003, REQ-MISSION-012).
    *
    * @param missions the page as the service returned it.
-   * @return the same page as list DTOs, each carrying its registration count.
+   * @return the same page as list DTOs, each carrying its registration count and whether the caller
+   *     is signed up.
    */
-  private Page<MissionListDto> withRegisteredCounts(@NotNull Page<Mission> missions) {
-    Map<UUID, Long> counts =
-        missionService.registeredCounts(
-            missions.getContent().stream().map(Mission::getId).toList());
+  private Page<MissionListDto> toListRows(@NotNull Page<Mission> missions) {
+    List<UUID> missionIds = missions.getContent().stream().map(Mission::getId).toList();
+    Map<UUID, Long> counts = missionService.registeredCounts(missionIds);
+    Set<UUID> signedUp = missionService.signedUpMissionIds(missionIds);
     return missions.map(
-        mission -> missionMapper.toListDto(mission, counts.getOrDefault(mission.getId(), 0L)));
+        mission ->
+            missionMapper.toListDto(
+                mission,
+                counts.getOrDefault(mission.getId(), 0L),
+                signedUp.contains(mission.getId())));
   }
 
   /**

@@ -74,6 +74,9 @@ import org.jetbrains.annotations.Nullable;
  * @param counterpartyOrgUnitId the named Empf&auml;nger's chosen org unit, or {@code null}
  * @param counterpartyOrgUnitName name snapshot of that org unit, or {@code null}
  * @param version the optimistic-locking version echoed on cancel/confirm/reject
+ * @param callerMayConfirm on the bank-staff queue, whether the caller may confirm this request now
+ *     (pending, and the capability the confirm endpoint requires); {@code null} on every other read
+ *     (REQ-BANK-023)
  */
 public record BankBookingRequestDto(
     UUID id,
@@ -110,7 +113,8 @@ public record BankBookingRequestDto(
     @Nullable String counterpartyHandle,
     @Nullable UUID counterpartyOrgUnitId,
     @Nullable String counterpartyOrgUnitName,
-    Long version) {
+    Long version,
+    @Nullable Boolean callerMayConfirm) {
 
   /**
    * Returns this request with {@link #staffNote} blanked, the requester-facing projection
@@ -158,6 +162,7 @@ public record BankBookingRequestDto(
         counterpartyHandle,
         counterpartyOrgUnitId,
         counterpartyOrgUnitName,
-        version);
+        version,
+        callerMayConfirm);
   }
 }

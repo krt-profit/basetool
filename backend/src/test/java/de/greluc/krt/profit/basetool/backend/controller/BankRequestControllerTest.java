@@ -23,8 +23,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
@@ -47,6 +51,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 /**
  * Thin delegation tests for {@link BankRequestController}: the queue defaults to {@code PENDING}
@@ -63,13 +71,13 @@ class BankRequestControllerTest {
 
   @Test
   void getQueue_defaultsToPendingAndWrapsPageResponse() {
-    BankBookingRequestDto dto = requestDto();
+    BankBookingRequestDto dto = requestDto(null);
     Page<BankBookingRequestDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
     when(bankBookingRequestService.listQueue(
-            eq(Set.of(BankBookingRequestStatus.PENDING)), any(Pageable.class)))
+            eq(Set.of(BankBookingRequestStatus.PENDING)), any(Pageable.class), any()))
         .thenReturn(page);
 
-    PageResponse<BankBookingRequestDto> result = controller.getQueue(null, null, null, null);
+    PageResponse<BankBookingRequestDto> result = controller.getQueue(null, null, null, null, null);
 
     assertEquals(1, result.totalElements());
     assertSame(dto, result.content().getFirst());
@@ -78,22 +86,54 @@ class BankRequestControllerTest {
   @Test
   void getQueue_passesSelectedStatusesThrough() {
     Page<BankBookingRequestDto> page =
-        new PageImpl<>(List.of(requestDto()), PageRequest.of(0, 20), 1);
+        new PageImpl<>(List.of(requestDto(null)), PageRequest.of(0, 20), 1);
     Set<BankBookingRequestStatus> selected =
         Set.of(BankBookingRequestStatus.CONFIRMED, BankBookingRequestStatus.REJECTED);
-    when(bankBookingRequestService.listQueue(eq(selected), any(Pageable.class))).thenReturn(page);
+    when(bankBookingRequestService.listQueue(eq(selected), any(Pageable.class), any()))
+        .thenReturn(page);
 
-    PageResponse<BankBookingRequestDto> result = controller.getQueue(selected, null, null, null);
+    PageResponse<BankBookingRequestDto> result =
+        controller.getQueue(selected, null, null, null, null);
 
     assertEquals(1, result.totalElements());
-    verify(bankBookingRequestService).listQueue(eq(selected), any(Pageable.class));
+    verify(bankBookingRequestService).listQueue(eq(selected), any(Pageable.class), any());
+  }
+
+  /** The caller's authentication reaches the service, which judges every row's confirm action. */
+  @Test
+  void getQueue_relaysTheCallerAuthentication() {
+    Authentication caller = new TestingAuthenticationToken("employee", "n/a", "ROLE_BANK_EMPLOYEE");
+    when(bankBookingRequestService.listQueue(any(), any(Pageable.class), same(caller)))
+        .thenReturn(Page.empty());
+
+    controller.getQueue(null, null, null, null, caller);
+
+    verify(bankBookingRequestService).listQueue(any(), any(Pageable.class), same(caller));
+  }
+
+  /** Over HTTP, each queue row carries {@code callerMayConfirm} as the service decided it. */
+  @Test
+  void getQueue_serialisesCallerMayConfirmPerRow() throws Exception {
+    Authentication caller = new TestingAuthenticationToken("employee", "n/a", "ROLE_BANK_EMPLOYEE");
+    Page<BankBookingRequestDto> page =
+        new PageImpl<>(List.of(requestDto(true), requestDto(false)), PageRequest.of(0, 20), 2);
+    when(bankBookingRequestService.listQueue(
+            eq(Set.of(BankBookingRequestStatus.PENDING)), any(Pageable.class), same(caller)))
+        .thenReturn(page);
+    MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+
+    mockMvc
+        .perform(get("/api/v1/bank/requests").principal(caller))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].callerMayConfirm").value(true))
+        .andExpect(jsonPath("$.content[1].callerMayConfirm").value(false));
   }
 
   @Test
   void confirm_delegatesPayloadAndAuthentication() {
     UUID id = UUID.randomUUID();
     UUID holderId = UUID.randomUUID();
-    BankBookingRequestDto dto = requestDto();
+    BankBookingRequestDto dto = requestDto(null);
     when(bankBookingRequestService.confirm(
             eq(id), eq(holderId), eq(null), eq(false), eq(null), eq(2L), any()))
         .thenReturn(dto);
@@ -109,14 +149,20 @@ class BankRequestControllerTest {
   @Test
   void reject_delegatesReasonAndVersion() {
     UUID id = UUID.randomUUID();
-    BankBookingRequestDto dto = requestDto();
+    BankBookingRequestDto dto = requestDto(null);
     when(bankBookingRequestService.reject(eq(id), eq("duplicate"), eq(1L), any())).thenReturn(dto);
 
     assertSame(dto, controller.reject(id, new RejectBankBookingRequest("duplicate", 1L), null));
     verify(bankBookingRequestService).reject(eq(id), eq("duplicate"), eq(1L), any());
   }
 
-  private static BankBookingRequestDto requestDto() {
+  /**
+   * Builds a pending deposit request row.
+   *
+   * @param callerMayConfirm the row's confirm capability, or {@code null} when not judged
+   * @return the row
+   */
+  private static BankBookingRequestDto requestDto(Boolean callerMayConfirm) {
     return new BankBookingRequestDto(
         UUID.randomUUID(),
         UUID.randomUUID(),
@@ -152,6 +198,7 @@ class BankRequestControllerTest {
         null,
         null,
         null,
-        0L);
+        0L,
+        callerMayConfirm);
   }
 }

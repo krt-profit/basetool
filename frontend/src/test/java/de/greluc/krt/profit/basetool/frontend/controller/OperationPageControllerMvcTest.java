@@ -50,6 +50,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceSummaryDto
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationFinanceSummaryDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OperationMissionFinanceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutStatusDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutSummaryDto;
@@ -343,7 +344,7 @@ class OperationPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
-  void operationDetail_readOnlyUser_seesDisabledFormAndNoSaveButton() throws Exception {
+  void operationDetail_readOnlyUser_seesNoEditDialogAndNoActions() throws Exception {
     UUID opId = UUID.randomUUID();
     stubDetailEndpoints(
         opId, new OperationDto(opId, "Op Read", "ro", "PLANNED", null, 0L, null, null, null));
@@ -351,15 +352,16 @@ class OperationPageControllerMvcTest {
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("id=\"operation-form\"")))
-        .andExpect(content().string(containsString("id=\"op-name\"")))
-        .andExpect(content().string(containsString("disabled")))
-        .andExpect(content().string(not(containsString("form=\"operation-form\""))));
+        .andExpect(content().string(containsString("id=\"operation-title\"")))
+        .andExpect(content().string(not(containsString("id=\"operation-form\""))))
+        .andExpect(content().string(not(containsString("data-testid=\"operation-edit\""))))
+        .andExpect(content().string(not(containsString("class=\"page-actions\""))))
+        .andExpect(content().string(not(containsString("data-trigger=\"operation-open-delete\""))));
   }
 
   @Test
   @WithMockUser(roles = "MISSION_MANAGER")
-  void operationDetail_missionManager_seesEnabledFormAndSaveButton() throws Exception {
+  void operationDetail_missionManager_seesEditDialogButNoDelete() throws Exception {
     UUID opId = UUID.randomUUID();
     stubDetailEndpoints(
         opId, new OperationDto(opId, "Op Edit", "rw", "PLANNED", null, 0L, null, null, null));
@@ -367,8 +369,142 @@ class OperationPageControllerMvcTest {
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
         .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-testid=\"operation-edit\"")))
+        .andExpect(content().string(containsString("id=\"edit-operation-modal\"")))
         .andExpect(content().string(containsString("id=\"operation-form\"")))
-        .andExpect(content().string(containsString("form=\"operation-form\"")));
+        .andExpect(content().string(containsString("form=\"operation-form\"")))
+        .andExpect(content().string(not(containsString("data-trigger=\"operation-open-delete\""))));
+  }
+
+  /**
+   * The detail renders the 2026-10 layout: back eyebrow, title with translated status badge, the
+   * edit action and the admin's overflow delete, the four KPIs, four tabs without the edit tab,
+   * result rows linking each mission and the payout card.
+   */
+  @Test
+  @WithMockUser(roles = {"ADMIN", "MISSION_MANAGER"})
+  void operationDetail_rendersTheDetailLayout() throws Exception {
+    UUID opId = UUID.randomUUID();
+    UUID missionId = UUID.fromString("00000000-0000-0000-0000-000000000042");
+    stubDetailEndpoints(
+        opId, new OperationDto(opId, "Ironclad", "", "ACTIVE", null, 3L, null, null, null));
+    when(backendApiClient.get(
+            eq("/api/v1/operations/" + opId + "/finance-summary"),
+            eq(OperationFinanceSummaryDto.class)))
+        .thenReturn(
+            new OperationFinanceSummaryDto(
+                opId,
+                new BigDecimal("1284500"),
+                List.of(
+                    new OperationMissionFinanceDto(
+                        missionId, "Quantanium-Abbau", new BigDecimal("1284500"))),
+                false));
+    when(backendApiClient.get(
+            eq("/api/v1/operations/" + opId + "/payouts"), eq(OperationPayoutSummaryDto.class)))
+        .thenReturn(
+            new OperationPayoutSummaryDto(
+                new BigDecimal("128450"),
+                List.of(
+                    payoutRow("Pilot Paid", PayoutPreference.PAYOUT, "600000", true),
+                    payoutRow("Pilot Open", PayoutPreference.DONATE, "412880", false))));
+
+    String html =
+        mockMvc
+            .perform(get("/operations/" + opId).locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertTrue(
+        Pattern.compile("class=\"page-eyebrow\" href=\"/operations\"").matcher(html).find(),
+        "the eyebrow links back to the list");
+    assertTrue(Pattern.compile("id=\"operation-title\">Ironclad<").matcher(html).find(), "title");
+    assertTrue(
+        Pattern.compile("class=\"status-badge status-active\"[^>]*>AKTIV<").matcher(html).find(),
+        "translated status badge");
+    assertFalse(html.contains(">ACTIVE<"), "no raw status");
+    assertFalse(html.contains("hud-box"), "no hud-box");
+    assertFalse(
+        Pattern.compile("class=\"[^\"]*krtm-").matcher(html).find(), "no migrated one-off classes");
+    String head =
+        html.substring(html.indexOf("data-testid=\"page-head\""), html.indexOf("op-kpis"));
+    assertFalse(head.contains("btn--cta"), "the head's edit action is a ghost button");
+    assertTrue(head.contains("data-modal-id=\"edit-operation-modal\""), "edit opens the dialog");
+    assertTrue(head.contains("data-trigger=\"operation-open-delete\""), "delete in the menu");
+    assertTrue(head.contains("overflow-menu__item--danger"));
+    assertEquals(5, html.split("class=\"kpi-total\"", -1).length, "four KPIs");
+    assertTrue(html.contains("id=\"op-kpi-total\">1.284.500<"), "thousands separators");
+    assertTrue(html.contains("id=\"op-kpi-donated\">128.450<"));
+    assertTrue(html.contains("id=\"op-kpi-participants\">2<"));
+    assertFalse(html.contains("optab-verw"), "the edit tab is gone");
+    assertTrue(html.contains("id=\"optab-missions-count\""));
+    assertTrue(
+        Pattern.compile(
+                "class=\"op-result-row\"[^>]*href=\"/missions/"
+                    + "00000000-0000-0000-0000-000000000042\"")
+            .matcher(html)
+            .find(),
+        "a result row links its mission");
+    assertTrue(html.contains("data-krtm-width=\"100.0\""), "the largest result fills its bar");
+    assertTrue(
+        Pattern.compile("data-testid=\"op-payout-ratio\">1 / 2<").matcher(html).find(),
+        "payout ratio");
+    assertTrue(html.contains("412.880 aUEC"), "the open amount");
+    assertTrue(html.contains("1 Person"), "the donation wish");
+    assertTrue(html.contains("data-op-goto-tab=\"payout\""), "the card jumps to the payout tab");
+    assertTrue(html.contains("data-testid=\"operation-payout-sum\""), "sum row");
+    assertTrue(html.contains("id=\"op-payout-paid-count\">1 / 2<"));
+    assertTrue(html.contains("class=\"chip chip--success\">Spenden<"), "preference as chip");
+  }
+
+  /**
+   * One payout row for a render test.
+   *
+   * @param name participant name
+   * @param preference payout preference
+   * @param amount payout amount
+   * @param paidOut whether the row is marked paid out
+   * @return the row
+   */
+  private static OperationPayoutDto payoutRow(
+      String name, PayoutPreference preference, String amount, boolean paidOut) {
+    return new OperationPayoutDto(
+        UUID.randomUUID().toString(),
+        name,
+        50.0,
+        preference,
+        BigDecimal.ZERO,
+        BigDecimal.ZERO,
+        BigDecimal.ZERO,
+        BigDecimal.ZERO,
+        new BigDecimal(amount),
+        paidOut,
+        null,
+        null);
+  }
+
+  /** Without missions, results and participants every section shows its empty state. */
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationDetail_rendersEmptyStates() throws Exception {
+    UUID opId = UUID.randomUUID();
+    stubDetailEndpoints(
+        opId, new OperationDto(opId, "Op Empty", "", "PLANNED", null, 0L, null, null, null));
+
+    String html =
+        mockMvc
+            .perform(get("/operations/" + opId).locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertTrue(html.contains("Noch kein Ergebnis"), "results empty state");
+    assertTrue(html.contains("Keine Teilnehmenden"), "payout empty state");
+    assertTrue(html.contains("Keine Einsätze gefunden."), "missions empty state");
+    assertFalse(html.contains("data-table--stack"), "no empty tables");
+    assertFalse(html.contains("data-op-goto-tab"), "no payout jump without participants");
   }
 
   private void stubDetailEndpoints(UUID opId, OperationDto operation) {
@@ -413,6 +549,7 @@ class OperationPageControllerMvcTest {
             null,
             null,
             0L,
+            false,
             0L);
     PageResponse<MissionListDto> missionsPage =
         new PageResponse<>(List.of(mission), 0, 10, 1L, 1, List.of("plannedStartTime,asc"));
@@ -464,6 +601,7 @@ class OperationPageControllerMvcTest {
             null,
             null,
             0L,
+            false,
             0L);
     when(backendApiClient.get(
             contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef()))
@@ -499,7 +637,9 @@ class OperationPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("operation-detail :: overviewSection"))
         .andExpect(content().string(containsString("id=\"operation-head-meta\"")))
-        .andExpect(content().string(not(containsString("id=\"operation-head-sticky\""))));
+        .andExpect(content().string(containsString("data-kpi-participants=\"0\"")))
+        .andExpect(content().string(containsString("data-kpi-total-negative=\"false\"")))
+        .andExpect(content().string(not(containsString("data-testid=\"page-head\""))));
   }
 
   @Test
@@ -550,6 +690,10 @@ class OperationPageControllerMvcTest {
         .andExpect(content().string(not(containsString("id=\"pane-op-fin\""))));
 
     verify(backendApiClient, never()).get(eq("/api/v1/operations/" + opId), eq(OperationDto.class));
+    verify(backendApiClient, never())
+        .get(eq("/api/v1/operations/" + opId + "/payouts"), eq(OperationPayoutSummaryDto.class));
+    verify(backendApiClient, never())
+        .get(contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef());
   }
 
   @Test
@@ -707,7 +851,12 @@ class OperationPageControllerMvcTest {
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("alert-warning")))
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "class=\"alert alert-info\" role=\"status\""
+                            + " data-testid=\"operation-payout-preliminary\"")))
         .andExpect(content().string(containsString("Vorläufige Werte")));
   }
 
@@ -723,7 +872,7 @@ class OperationPageControllerMvcTest {
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
         .andExpect(status().isOk())
-        .andExpect(content().string(not(containsString("alert-warning"))));
+        .andExpect(content().string(not(containsString("operation-payout-preliminary"))));
   }
 
   @Test
@@ -736,7 +885,7 @@ class OperationPageControllerMvcTest {
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
         .andExpect(status().isOk())
-        .andExpect(content().string(not(containsString("alert-warning"))));
+        .andExpect(content().string(not(containsString("operation-payout-preliminary"))));
   }
 
   @Test

@@ -82,33 +82,28 @@ class Roles platform role-code constants
 class Permissions platform permission-string constants
 class AuthoritiesCacheProperties platform authorities-cache tuning of the JWT converter
 class PartialRoleScopeProperties platform clients with partial role claims (REQ-SEC-036)
-class OwnerOrgUnitRequiredException scope thrown by the stamping resolvers (REQ-ORG-023)
 class DatabaseActingMemberAuthorities exchange acting member's reduced exchange authorities (ADR-0129)
 class ChangeSourceTransactionManager exchange attributes writes for the change-feed triggers (ADR-0224)
 class TransactionManagerConfig exchange installs the change-source transaction manager (ADR-0224)
 class ChangeSource exchange writer attribution for the change-feed triggers
 class ChangeSourceProperties exchange change-feed writer attribution clients
 class SandboxProfileGuard exchange sandbox image guard (REQ-XCH-029)
-class ExchangeProblemException exchange exchange error registry
 class MissionAllocationDto inventory mission slice of an inventory entry (REQ-INV-027), mapped by InventoryItemMapper
 class MaterialCollectionEntryDto inventory produced by InventoryAggregationService
 class UpdateDeliveredRequest inventory delivered toggle of an inventory entry's job-order slice (REQ-INV-027)
 class InventoryCatalog inventory inventory read-family discriminator
 class AllocationReductions inventory deduct-from plans for inventory writes (REQ-INV-027)
 class InventoryAllocations inventory allocation slice helpers (REQ-INV-027)
-class OverAllocationException inventory inventory over-allocation (REQ-INV-027)
 class CheckoutType inventory book-out type
 class BulkRebookMode inventory bulk rebooking mode (REQ-INV-036)
 class InventoryProperties inventory Lager switches
 class JobOrderInventoryOwnerRedactor joborder redacts order-linked stock (REQ-ORDERS-029)
-class ProductionAllocationException joborder production booking error (REQ-ORDERS-025)
 class QualityBucketAllocator joborder distributes order-linked stock across quality buckets (REQ-ORDERS-037)
 class LinkedStockAttributionDto joborder per-row quality-bucket attribution (REQ-ORDERS-037)
 class AggregatedMaterialDto joborder item-order material view row
 class DerivedMaterialDto joborder item-order derivation preview row
 class ItemDerivationDto joborder item-order derivation preview
 class SubAssemblySuggestionDto joborder item-order sub-assembly suggestion
-class MissionParticipantRequiredException refinery thrown when a refinery order links a mission (REQ-SEC-042)
 class RefineryYield catalogue UEX refinery-yield matrix row, written by UexRefinerySyncService
 class RefineryYieldRepository catalogue repository of the UEX yield matrix
 class RefineryImportProperties refinery refinery screenshot import tuning
@@ -152,7 +147,7 @@ class LikePatterns kernel LIKE escaping
 class RequestMemo platform request-scoped memo
 class DtoConstraints kernel shared validation constants
 class OnUpdate kernel validation group
-class ProblemCode kernel the sealed problem-code contract every module's codes implement (ADR-0235)
+class ProblemCode kernel the problem-code contract every registry enum implements (ADR-0235)
 class CoreProblemCode kernel the generic problem codes of the error kernel (ADR-0235)
 class WholeNumber kernel validation constraint
 class WholeNumberValidator kernel validation constraint
@@ -162,8 +157,9 @@ class QuantityAware catalogue material/item amount validation contract
 class ValidQuantityAmount catalogue material/item amount constraint
 class ValidQuantityAmountValidator catalogue material/item amount constraint
 class MaterialPieceTypeLookup catalogue material piece-type lookup SPI (ADR-0047)
-class AppException kernel sealed base of domain exceptions
-class AppExceptionKind kernel RFC 7807 identities of AppException
+class AppException kernel sealed root of the generic kinds and DomainProblem (ADR-0235)
+class AppExceptionKind kernel RFC 7807 identities of the generic kinds
+class DomainProblem kernel open base of every module exception (ADR-0235)
 class BadRequestException kernel generic domain exception
 class BusinessConflictException kernel generic domain exception
 class DuplicateEntityException kernel generic domain exception
@@ -174,8 +170,7 @@ class NotFoundException kernel generic domain exception
 class ExternalServiceException kernel generic upstream failure
 class ReportGenerationException kernel generic report failure
 class GlobalExceptionHandler platform RFC 7807 handler
-class ErrorDisclosurePolicy platform RFC 7807 disclosure policy
-class BankConflictException bank bank problem codes
+class ErrorDisclosurePolicy kernel the disclosure policy every AppException carries (ADR-0235)
 class LiveSyncChangedRequest livesync app live-sync relay payload
 class PingResponse admin liveness probe payload of SystemController
 class SystemController admin liveness/version probe
@@ -229,6 +224,9 @@ package livesync livesync the live-sync module's package tree (plan 5.2)
 package materialexchange materialexchange the Materialboerse module's package tree (plan 5.2)
 package notification notification the notification module's package tree (plan 5.2)
 package privacy privacy the GDPR module's package tree, transitional (plan 5.1 rank 13, 7.6)
+package inventory inventory the inventory module's package tree (plan 5.2)
+package refinery refinery the refinery module's package tree (plan 5.2)
+package scope scope the scope module's package tree (plan 5.2)
 
 name ^OrgUnitBank bank
 name ^(Bank|CreateBank|CancelBank|ConfirmBank|RegisterBank|RejectBank|RenameBank|ReverseBank|SetBank|UpdateBank|SetCartel|OrgUnitBalanceTarget) bank

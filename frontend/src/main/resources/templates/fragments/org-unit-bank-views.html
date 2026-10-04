@@ -2,61 +2,58 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<div th:fragment="ouAccGrid(balances, sparks)" class="bank-acc-grid ou-acc-grid mt-2">
-    <div th:each="b : ${balances}" class="ou-card" th:with="spark=${sparks.get(b.accountId())}"
-         data-testid="org-unit-bank-card"
-         th:attr="data-account-no=${b.accountNo()},data-filter-name=${b.accountName()}">
+<div th:fragment="ouAccGrid(balances, sparks)" class="bank-acc-grid ou-acc-grid">
+    <article th:each="b : ${balances}" class="ou-card"
+             th:with="spark=${sparks.get(b.accountId())},
+                      hasTarget=${b.balanceTarget() != null and b.balanceTarget().signum() > 0}"
+             data-testid="org-unit-bank-card"
+             th:attr="data-account-no=${b.accountNo()},data-filter-name=${b.accountName()}">
         <div class="ou-card-top">
             <div class="ou-card-ident">
                 <a class="ou-card-name" th:href="@{/org-unit-bank/accounts/{id}(id=${b.accountId()})}"
-                   th:text="${b.accountName()}">Staffel IRIDIUM</a>
+                   data-testid="org-unit-bank-card-detail" th:text="${b.accountName()}">IRI Betriebskonto</a>
                 <div class="ou-card-sub">
                     <span th:text="${b.accountNo()}">KB-0001</span>
-                    <span> &middot; </span>
+                    <span aria-hidden="true"> &middot; </span>
                     <span th:if="${b.orgUnitId() != null}"
                           th:text="${b.orgUnitShorthand() != null ? b.orgUnitShorthand() : b.orgUnitName()}">IRI</span>
                     <span th:if="${b.orgUnitId() == null}"
                           th:text="#{'bank.account.type.' + ${b.type()}}">Sonderkonto</span>
                 </div>
             </div>
-            <svg th:if="${spark != null and spark.points() != null}" width="92" height="20" viewBox="0 0 96 26" aria-hidden="true">
+            <svg class="krt-icon ou-card-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+        </div>
+        <div class="ou-card-figures">
+            <div class="ou-card-bal">
+                <span th:text="${#numbers.formatInteger(@moneyFormat.round(b.balance()), 1, 'POINT')}">3.148.200</span>
+                <span class="unit">aUEC</span>
+            </div>
+            <svg th:if="${spark != null and spark.points() != null}" class="ou-card-spark" width="92" height="26"
+                 viewBox="0 0 96 26" aria-hidden="true">
                 <polyline th:attr="points=${spark.points()}"
                           th:classappend="${spark.flat()} ? ' kpi-sparkline--flat' : ''"
                           class="kpi-sparkline" fill="none" stroke-width="1.5"/>
             </svg>
         </div>
-        <div class="ou-card-figures">
-            <div class="ou-card-bal">
-                <span th:text="${#numbers.formatInteger(@moneyFormat.round(b.balance()), 1, 'POINT')}">1.850.000</span>
-                <span class="unit">aUEC</span>
-            </div>
+        <div class="ou-card-delta">
             <span class="kpi-delta"
                   th:classappend="${b.delta30d().signum() > 0} ? ' kpi-delta--pos' : (${b.delta30d().signum() < 0} ? ' kpi-delta--neg' : ' kpi-delta--flat')"
-                  th:text="${b.delta30d().signum() > 0 ? '&#9650; +' : (b.delta30d().signum() < 0 ? '&#9660; ' : '&#177; ')} + ${#numbers.formatInteger(@moneyFormat.round(b.delta30d()), 1, 'POINT')}">&#9650; +420.000</span>
+                  th:text="${b.delta30d().signum() > 0 ? '+ ' : (b.delta30d().signum() < 0 ? '&#8722; ' : '&#177; ')} + ${#numbers.formatInteger(@moneyFormat.round(b.delta30d().abs()), 1, 'POINT')}">+ 412.600</span>
+            <span class="ou-card-delta-label" th:text="'&middot; ' + #{bank.chart.range.30d}">&middot; 30 Tage</span>
         </div>
-        <div class="ou-target" data-testid="org-unit-bank-card-target"
-             th:if="${b.balanceTarget() != null and b.balanceTarget().signum() > 0}"
+        <div class="ou-target" data-testid="org-unit-bank-card-target" th:if="${hasTarget}"
              th:with="pct=${b.balance().doubleValue() / b.balanceTarget().doubleValue() * 100.0}">
-            <div class="bank-target-bar" aria-hidden="true">
-                <div class="bank-target-bar-fill"
-                     th:attr="data-krtm-width=${pct > 100 ? 100 : (pct < 0 ? 0 : pct)}"></div>
+            <div class="meter" aria-hidden="true">
+                <i class="meter__fill--warning" th:attr="data-krtm-width=${pct > 100 ? 100 : (pct < 0 ? 0 : pct)}"></i>
             </div>
-            <div class="ou-target-meta">
-                <b th:text="${#numbers.formatDecimal(pct, 1, 'NONE', 1, 'COMMA')} + ' %'">18,5 %</b>
-                <span th:text="${#numbers.formatInteger(@moneyFormat.round(b.balanceTarget()), 1, 'POINT')} + ' aUEC'">10.000.000 aUEC</span>
-            </div>
+            <div class="ou-target-meta"
+                 th:text="#{bank.orgUnit.card.targetOf(${#numbers.formatInteger(pct, 1, 'POINT')}, ${#numbers.formatInteger(@moneyFormat.round(b.balanceTarget()), 1, 'POINT')})}">63 % von 5.000.000</div>
         </div>
-        <div class="r-noziel" th:unless="${b.balanceTarget() != null and b.balanceTarget().signum() > 0}"
-             th:text="#{bank.orgUnit.noTarget}">&mdash; kein Ziel</div>
-        <div class="ou-card-act">
-            <a class="btn btn-ghost btn-xs" data-testid="org-unit-bank-card-detail"
-               th:href="@{/org-unit-bank/accounts/{id}(id=${b.accountId()})}"
-               th:text="${b.canManageSettings()} ? #{bank.orgUnit.detail.manage} : #{bank.orgUnit.detail.open}">Details</a>
-        </div>
-    </div>
+        <div class="r-noziel" th:unless="${hasTarget}" th:text="#{bank.orgUnit.noTarget}">&mdash; kein Ziel</div>
+    </article>
 </div>
 
-<div th:fragment="ouAccTable(balances, sparks)" class="ou-list mt-2">
+<div th:fragment="ouAccTable(balances, sparks)" class="ou-list">
     <div class="ou-rowhead" aria-hidden="true">
         <span th:text="#{bank.request.col.account}">Konto</span>
         <span th:text="#{bank.orgUnit.col.trend}">Trend &middot; 30 T</span>
@@ -98,9 +95,8 @@
         <div class="ou-target" data-testid="org-unit-bank-card-target"
              th:if="${b.balanceTarget() != null and b.balanceTarget().signum() > 0}"
              th:with="pct=${b.balance().doubleValue() / b.balanceTarget().doubleValue() * 100.0}">
-            <div class="bank-target-bar" aria-hidden="true">
-                <div class="bank-target-bar-fill"
-                     th:attr="data-krtm-width=${pct > 100 ? 100 : (pct < 0 ? 0 : pct)}"></div>
+            <div class="meter" aria-hidden="true">
+                <i class="meter__fill--warning" th:attr="data-krtm-width=${pct > 100 ? 100 : (pct < 0 ? 0 : pct)}"></i>
             </div>
             <div class="ou-target-meta">
                 <b th:text="${#numbers.formatDecimal(pct, 1, 'NONE', 1, 'COMMA')} + ' %'">18,5 %</b>
@@ -116,5 +112,108 @@
         </div>
     </div>
 </div>
+
+<th:block th:fragment="requestModal(refreshKey)">
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='org-unit-request-modal', titleKey='bank.request.modal.title', body=~{fragments/org-unit-bank-views :: org-unit-request-modal-body})}">
+</th:block>
+</th:block>
+
+<th:block th:fragment="org-unit-request-modal-body">
+    <form class="bank-ajax-form no-track" th:attr="data-refresh=${refreshKey}"
+          data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
+          data-endpoint="/api/proxy/org-units/bank/requests" data-method="POST">
+        <div class="krt-modal-body">
+            <div class="bank-form-row">
+                <label for="org-unit-request-account" th:text="#{bank.request.col.account}">Konto</label>
+                <select id="org-unit-request-account" name="sourceAccountId" required
+                        data-role="org-unit-request-account" data-testid="org-unit-request-account">
+                    <option th:each="t : ${requestSources}"
+                            th:value="${t.id()}"
+                            th:attr="data-can-debit=${debitableAccountIds.contains(t.id())},data-limit=${requestLimits.get(t.id())},data-exempt=${approvalExemptAccountIds.contains(t.id())},data-requires-justification=${t.type() == 'CARTEL' or t.type() == 'CARTEL_BANK' or t.type() == 'SPECIAL'}"
+                            th:text="${t.name()} + ' (' + ${t.accountNo()} + ')'">Staffel IRIDIUM (KB-0001)</option>
+                </select>
+                <span class="bank-field-hint" data-deposit-hint th:text="#{bank.orgUnit.request.deposit.accountHint}">Einzahlungen sind f&uuml;r jedes aktive Konto m&ouml;glich.</span>
+                <span class="bank-field-hint" data-debit-hint hidden th:text="#{bank.orgUnit.request.accountHint}">Nur Konten, f&uuml;r die du antragsberechtigt bist.</span>
+                <span class="bank-field-error" data-error-for="sourceAccountId"></span>
+            </div>
+            <div class="bank-form-row">
+                <label for="org-unit-request-type" th:text="#{bank.request.field.type}">Vorgang</label>
+                <select id="org-unit-request-type" name="type" required
+                        data-role="org-unit-request-type" data-testid="org-unit-request-type">
+                    <option value="DEPOSIT" th:text="#{bank.request.type.DEPOSIT}">Einzahlung</option>
+                    <option value="WITHDRAWAL" th:if="${anyCanRequest}" th:text="#{bank.request.type.WITHDRAWAL}">Auszahlung</option>
+                    <option value="TRANSFER" th:if="${anyCanRequest}" th:text="#{bank.request.type.TRANSFER}">Transfer</option>
+                </select>
+                <span class="bank-field-error" data-error-for="type"></span>
+            </div>
+            <div class="bank-form-row" data-request-transfer-only hidden>
+                <label for="org-unit-request-destination" th:text="#{bank.field.destinationAccount}">Zielkonto</label>
+                <select id="org-unit-request-destination" name="targetAccountId" disabled
+                        data-testid="org-unit-request-destination">
+                    <option value="" th:text="#{bank.field.destinationAccount.placeholder}">Zielkonto w&auml;hlen &hellip;</option>
+                    <option th:each="t : ${requestTransferTargets}" th:value="${t.id()}"
+                            th:text="${t.name()} + ' (' + ${t.accountNo()} + ')'">KRT (KB-0002)</option>
+                </select>
+                <span class="bank-field-error" data-error-for="targetAccountId"></span>
+            </div>
+            <div class="bank-form-row">
+                <label for="org-unit-request-amount" th:text="#{bank.field.amount}">Betrag (aUEC)</label>
+                <input type="number" id="org-unit-request-amount" name="amount" min="1" step="1" required
+                       data-testid="org-unit-request-amount" th:placeholder="#{bank.field.amount.placeholder}">
+                <span class="bank-field-hint" th:text="#{bank.field.amount.hint}">Nur ganze aUEC-Betr&auml;ge.</span>
+                <span class="bank-field-error" data-error-for="amount"></span>
+                <p class="bank-limit-warning" data-limit-warning hidden
+                   data-testid="org-unit-request-limit-warning"
+                   th:text="#{bank.approvalLimit.requesterWarning}">Der Betrag &uuml;berschreitet dein Freigabe-Limit.</p>
+            </div>
+            <div data-split-deposit-only>
+                <div class="bank-form-row">
+                    <label class="bank-check-label">
+                        <input type="checkbox" name="splitEnabled" value="true" disabled
+                               data-role="bank-split-toggle" data-testid="org-unit-request-split-toggle">
+                        <span th:text="#{bank.split.toggle}">Anteil auf alle Staffelkonten verteilen</span>
+                    </label>
+                </div>
+                <div class="bank-form-row" data-split-row hidden>
+                    <label for="org-unit-request-split-percent" th:text="#{bank.split.percent}">Prozentsatz (%)</label>
+                    <input type="number" id="org-unit-request-split-percent" name="splitPercent"
+                           min="1" max="100" step="1" disabled
+                           data-testid="org-unit-request-split-percent" th:placeholder="#{bank.split.percent.placeholder}">
+                    <span class="bank-field-hint" th:text="#{bank.split.hint}">Dieser Anteil wird gleichm&auml;&szlig;ig auf alle aktiven Staffelkonten verteilt; das Zielkonto erh&auml;lt den Rest.</span>
+                    <p class="bank-field-hint bank-split-preview" data-split-preview hidden
+                       data-testid="org-unit-request-split-preview">
+                        <span th:text="#{bank.split.preview.label}">Aufteilung:</span>
+                        <span data-split-slice>0</span>
+                        <span th:text="#{bank.split.preview.toSquadrons}">aUEC auf die Staffelkonten,</span>
+                        <span data-split-remainder>0</span>
+                        <span th:text="#{bank.split.preview.remainder}">aUEC verbleiben auf dem Zielkonto.</span>
+                    </p>
+                    <span class="bank-field-error" data-error-for="splitPercent"></span>
+                </div>
+            </div>
+            <div class="bank-form-row" data-request-justification-only hidden>
+                <label for="org-unit-request-justification" th:text="#{bank.field.justification}">Begr&uuml;ndung</label>
+                <input type="text" id="org-unit-request-justification" name="justification" maxlength="500" disabled
+                       data-testid="org-unit-request-justification" th:placeholder="#{bank.field.justification.placeholder}">
+                <span class="bank-field-hint" th:text="#{bank.field.justification.hint}">Pflicht bei Abrufen aus dem KRT-, Bank- oder Sonderkonto.</span>
+                <span class="bank-field-error" data-error-for="justification"></span>
+            </div>
+            <th:block th:replace="~{fragments/bank-counterparty :: requestCounterpartyBlock(${requesterId}, ${requesterHandle})}"></th:block>
+            <div class="bank-form-row">
+                <label for="org-unit-request-note" th:text="#{bank.field.note}">Notiz</label>
+                <input type="text" id="org-unit-request-note" name="note" maxlength="500"
+                       th:placeholder="#{bank.field.note.placeholder}">
+            </div>
+            <p class="bank-field-hint" th:text="#{bank.request.modal.hint}">Der Antrag wird erst verbucht, wenn ihn ein Bankmitarbeiter best&auml;tigt.</p>
+            <span class="bank-field-error" data-error-for="_global"></span>
+        </div>
+        <div class="krt-modal-foot">
+            <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                    data-modal-id="org-unit-request-modal" th:text="#{general.cancel}">Abbrechen</button>
+            <button type="submit" class="btn btn--cta" data-testid="org-unit-request-submit"
+                    th:text="#{bank.request.action.submit}">Antrag stellen</button>
+        </div>
+    </form>
+</th:block>
 </body>
 </html>

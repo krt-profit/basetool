@@ -1,256 +1,443 @@
 @layer base, components, page, migration, utilities;
 
 @layer page {
+    .mtx-toolbar {
+        align-items: center;
+    }
+
+    .mtx-dropdown__toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 40px;
+        padding: 0 0.75rem;
+        background: transparent;
+        border: var(--border-hairline);
+        color: var(--color-gray-1);
+        font-family: var(--font-body);
+        font-size: var(--fs-sm);
+        white-space: nowrap;
+        cursor: pointer;
+    }
+
+    .mtx-dropdown__toggle strong {
+        color: var(--color-white);
+        font-weight: var(--fw-bold);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .mtx-dropdown__toggle .krt-icon {
+        width: 12px;
+        height: 12px;
+        color: var(--color-primary);
+    }
+
+    .mtx-dropdown__toggle:hover,
+    .mtx-dropdown__toggle[aria-expanded='true'] {
+        border-color: var(--color-primary);
+    }
+
+    .mtx-dropdown__toggle:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 2px;
+    }
+
+    .mtx-dropdown__panel {
+        gap: 0;
+        max-height: min(60vh, 28rem);
+        overflow-y: auto;
+        padding: var(--space-2);
+    }
+
+    .mtx-option {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        min-height: 36px;
+        padding: 0 var(--space-2);
+        margin: 0;
+        color: var(--color-gray-1);
+        font-family: var(--font-body);
+        font-size: var(--fs-sm);
+        font-weight: var(--fw-regular);
+        text-transform: none;
+        cursor: pointer;
+    }
+
+    .mtx-option:hover {
+        background: var(--color-surface-input);
+        color: var(--color-white);
+    }
+
+    .mtx-option input {
+        margin: 0;
+    }
+
+    .mtx-option--all {
+        border-bottom: var(--border-hairline);
+        font-weight: var(--fw-bold);
+    }
+
+    .mtx-active-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+    }
+
+    .mtx-active-chips[hidden] {
+        display: none;
+    }
+
+    .mtx-legend {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-4);
+        font-size: var(--fs-xs);
+        color: var(--color-gray-1);
+    }
+
+    .mtx-legend__item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .mtx-legend__swatch {
+        width: 12px;
+        height: 12px;
+        border: 2px solid var(--color-gray-3);
+    }
+
+    .mtx-legend__swatch--sell {
+        border-color: var(--color-success);
+    }
+
+    .mtx-legend__swatch--buy {
+        border-color: var(--color-info);
+    }
+
+    .mtx-card {
+        overflow: hidden;
+    }
+
+    .table-wrapper {
+        overflow: auto;
+        max-height: max(20rem, calc(var(--krt-panel-viewport-rest) - 16rem));
+    }
+
+    .mtx-hint {
+        margin: var(--space-2) 0 0;
+        font-size: var(--fs-xs);
+        color: var(--color-gray-2-text);
+    }
+
+    .matrix-loading {
+        padding: var(--space-4) 0;
+        color: var(--color-gray-2-text);
+        font-family: var(--font-body);
+    }
+
+    .matrix-loading[hidden] {
+        display: none;
+    }
+
+    .planet-hurston {
+        --mtx-planet: var(--krt-planet-hurston);
+        --mtx-stripe: var(--krt-planet-hurston-stripe);
+    }
+    .planet-crusader {
+        --mtx-planet: var(--krt-planet-crusader);
+        --mtx-stripe: var(--krt-planet-crusader-stripe);
+    }
+    .planet-arccorp {
+        --mtx-planet: var(--krt-planet-arccorp);
+        --mtx-stripe: var(--krt-planet-arccorp-stripe);
+    }
+    .planet-microtech {
+        --mtx-planet: var(--krt-planet-microtech);
+        --mtx-stripe: var(--krt-planet-microtech-stripe);
+    }
+    .planet-pyro-1 {
+        --mtx-planet: var(--krt-planet-pyro-1);
+        --mtx-stripe: var(--krt-planet-pyro-1-stripe);
+    }
+    .planet-pyro-2 {
+        --mtx-planet: var(--krt-planet-pyro-2);
+        --mtx-stripe: var(--krt-planet-pyro-2-stripe);
+    }
+    .planet-pyro-3 {
+        --mtx-planet: var(--krt-planet-pyro-3);
+        --mtx-stripe: var(--krt-planet-pyro-3-stripe);
+    }
+    .planet-pyro-4 {
+        --mtx-planet: var(--krt-planet-pyro-4);
+        --mtx-stripe: var(--krt-planet-pyro-4-stripe);
+    }
+    .planet-pyro-5 {
+        --mtx-planet: var(--krt-planet-pyro-5);
+        --mtx-stripe: var(--krt-planet-pyro-5-stripe);
+    }
+    .planet-pyro-6 {
+        --mtx-planet: var(--krt-planet-pyro-6);
+        --mtx-stripe: var(--krt-planet-pyro-6-stripe);
+    }
+    .planet-terra {
+        --mtx-planet: var(--krt-planet-terra);
+        --mtx-stripe: var(--krt-planet-terra-stripe);
+    }
+    .planet-delamar {
+        --mtx-planet: var(--krt-planet-delamar);
+        --mtx-stripe: var(--krt-planet-delamar-stripe);
+    }
+    .planet-hash-0 {
+        --mtx-planet: var(--krt-planet-hash-0);
+        --mtx-stripe: var(--krt-planet-hash-0-stripe);
+    }
+    .planet-hash-1 {
+        --mtx-planet: var(--krt-planet-hash-1);
+        --mtx-stripe: var(--krt-planet-hash-1-stripe);
+    }
+    .planet-hash-2 {
+        --mtx-planet: var(--krt-planet-hash-2);
+        --mtx-stripe: var(--krt-planet-hash-2-stripe);
+    }
+    .planet-hash-3 {
+        --mtx-planet: var(--krt-planet-hash-3);
+        --mtx-stripe: var(--krt-planet-hash-3-stripe);
+    }
+    .planet-hash-4 {
+        --mtx-planet: var(--krt-planet-hash-4);
+        --mtx-stripe: var(--krt-planet-hash-4-stripe);
+    }
+    .planet-hash-5 {
+        --mtx-planet: var(--krt-planet-hash-5);
+        --mtx-stripe: var(--krt-planet-hash-5-stripe);
+    }
+    .planet-hash-6 {
+        --mtx-planet: var(--krt-planet-hash-6);
+        --mtx-stripe: var(--krt-planet-hash-6-stripe);
+    }
+    .planet-hash-7 {
+        --mtx-planet: var(--krt-planet-hash-7);
+        --mtx-stripe: var(--krt-planet-hash-7-stripe);
+    }
+    .planet-hash-8 {
+        --mtx-planet: var(--krt-planet-hash-8);
+        --mtx-stripe: var(--krt-planet-hash-8-stripe);
+    }
+    .planet-hash-9 {
+        --mtx-planet: var(--krt-planet-hash-9);
+        --mtx-stripe: var(--krt-planet-hash-9-stripe);
+    }
+    .planet-hash-10 {
+        --mtx-planet: var(--krt-planet-hash-10);
+        --mtx-stripe: var(--krt-planet-hash-10-stripe);
+    }
+    .planet-hash-11 {
+        --mtx-planet: var(--krt-planet-hash-11);
+        --mtx-stripe: var(--krt-planet-hash-11-stripe);
+    }
+
     .matrix-table {
         table-layout: fixed;
         width: 0;
+        margin: 0;
         border-collapse: separate;
         border-spacing: 0;
         white-space: nowrap;
-        margin-top: 0;
     }
 
     .matrix-table th,
     .matrix-table td {
-        padding: 0.75rem;
-        text-align: left;
-        border-bottom: 1px solid var(--color-gray-3);
-        border-right: 1px solid var(--color-gray-3);
+        padding: 0 0.6rem;
+        text-align: right;
+        border-bottom: var(--border-hairline);
+        border-left: var(--border-hairline);
     }
 
     .matrix-table th {
-        color: var(--color-primary);
-        font-family: var(--font-body);
-        font-size: var(--fs-sm);
         position: sticky;
-        background-color: var(--color-surface-input);
         z-index: 20;
+        background-color: var(--color-surface-input);
         background-clip: padding-box;
-    }
-
-    .matrix-table th.col-terminal.planet-hurston {
-        background-color: var(--krt-planet-hurston);
-    }
-    .matrix-table th.col-terminal.planet-crusader {
-        background-color: var(--krt-planet-crusader);
-    }
-    .matrix-table th.col-terminal.planet-arccorp {
-        background-color: var(--krt-planet-arccorp);
-    }
-    .matrix-table th.col-terminal.planet-microtech {
-        background-color: var(--krt-planet-microtech);
-    }
-    .matrix-table th.col-terminal.planet-pyro-1 {
-        background-color: var(--krt-planet-pyro-1);
-    }
-    .matrix-table th.col-terminal.planet-pyro-2 {
-        background-color: var(--krt-planet-pyro-2);
-    }
-    .matrix-table th.col-terminal.planet-pyro-3 {
-        background-color: var(--krt-planet-pyro-3);
-    }
-    .matrix-table th.col-terminal.planet-pyro-4 {
-        background-color: var(--krt-planet-pyro-4);
-    }
-    .matrix-table th.col-terminal.planet-pyro-5 {
-        background-color: var(--krt-planet-pyro-5);
-    }
-    .matrix-table th.col-terminal.planet-pyro-6 {
-        background-color: var(--krt-planet-pyro-6);
-    }
-    .matrix-table th.col-terminal.planet-terra {
-        background-color: var(--krt-planet-terra);
-    }
-    .matrix-table th.col-terminal.planet-delamar {
-        background-color: var(--krt-planet-delamar);
-    }
-    .matrix-table th.col-terminal.planet-hash-0 {
-        background-color: var(--krt-planet-hash-0);
-    }
-    .matrix-table th.col-terminal.planet-hash-1 {
-        background-color: var(--krt-planet-hash-1);
-    }
-    .matrix-table th.col-terminal.planet-hash-2 {
-        background-color: var(--krt-planet-hash-2);
-    }
-    .matrix-table th.col-terminal.planet-hash-3 {
-        background-color: var(--krt-planet-hash-3);
-    }
-    .matrix-table th.col-terminal.planet-hash-4 {
-        background-color: var(--krt-planet-hash-4);
-    }
-    .matrix-table th.col-terminal.planet-hash-5 {
-        background-color: var(--krt-planet-hash-5);
-    }
-    .matrix-table th.col-terminal.planet-hash-6 {
-        background-color: var(--krt-planet-hash-6);
-    }
-    .matrix-table th.col-terminal.planet-hash-7 {
-        background-color: var(--krt-planet-hash-7);
-    }
-    .matrix-table th.col-terminal.planet-hash-8 {
-        background-color: var(--krt-planet-hash-8);
-    }
-    .matrix-table th.col-terminal.planet-hash-9 {
-        background-color: var(--krt-planet-hash-9);
-    }
-    .matrix-table th.col-terminal.planet-hash-10 {
-        background-color: var(--krt-planet-hash-10);
-    }
-    .matrix-table th.col-terminal.planet-hash-11 {
-        background-color: var(--krt-planet-hash-11);
-    }
-
-    .matrix-table td.col-terminal.planet-hurston {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-hurston-stripe);
-    }
-    .matrix-table td.col-terminal.planet-crusader {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-crusader-stripe);
-    }
-    .matrix-table td.col-terminal.planet-arccorp {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-arccorp-stripe);
-    }
-    .matrix-table td.col-terminal.planet-microtech {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-microtech-stripe);
-    }
-    .matrix-table td.col-terminal.planet-pyro-1 {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-1-stripe);
-    }
-    .matrix-table td.col-terminal.planet-pyro-2 {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-2-stripe);
-    }
-    .matrix-table td.col-terminal.planet-pyro-3 {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-3-stripe);
-    }
-    .matrix-table td.col-terminal.planet-pyro-4 {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-4-stripe);
-    }
-    .matrix-table td.col-terminal.planet-pyro-5 {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-5-stripe);
-    }
-    .matrix-table td.col-terminal.planet-pyro-6 {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-6-stripe);
-    }
-    .matrix-table td.col-terminal.planet-terra {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-terra-stripe);
-    }
-    .matrix-table td.col-terminal.planet-delamar {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-delamar-stripe);
-    }
-    .matrix-table td.col-terminal.planet-hash-0 {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-0-stripe);
-    }
-    .matrix-table td.col-terminal.planet-hash-1 {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-1-stripe);
-    }
-    .matrix-table td.col-terminal.planet-hash-2 {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-2-stripe);
-    }
-    .matrix-table td.col-terminal.planet-hash-3 {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-3-stripe);
-    }
-    .matrix-table td.col-terminal.planet-hash-4 {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-4-stripe);
-    }
-    .matrix-table td.col-terminal.planet-hash-5 {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-5-stripe);
-    }
-    .matrix-table td.col-terminal.planet-hash-6 {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-6-stripe);
-    }
-    .matrix-table td.col-terminal.planet-hash-7 {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-7-stripe);
-    }
-    .matrix-table td.col-terminal.planet-hash-8 {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-8-stripe);
-    }
-    .matrix-table td.col-terminal.planet-hash-9 {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-9-stripe);
-    }
-    .matrix-table td.col-terminal.planet-hash-10 {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-10-stripe);
-    }
-    .matrix-table td.col-terminal.planet-hash-11 {
-        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-11-stripe);
+        color: var(--color-gray-1);
+        font-family: var(--font-body);
+        font-size: var(--fs-2xs);
+        font-weight: var(--fw-bold);
+        text-align: left;
     }
 
     .matrix-table .row-system th {
         top: 0;
-        height: 40px;
+        height: 28px;
         box-sizing: border-box;
-        border-bottom: 1px solid var(--color-gray-3);
-        text-align: center;
-        font-family: var(--font-headline);
-        font-weight: var(--fw-bold);
-        font-size: var(--fs-xs);
-        padding: 0.5rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--color-gray-2-text);
     }
 
     .matrix-table .row-terminal th {
-        top: 40px;
+        top: 28px;
+        height: 44px;
+        box-sizing: border-box;
         border-bottom: 2px solid var(--color-primary);
     }
 
-    .matrix-table th.col-terminal,
-    .matrix-table td.col-terminal {
-        width: 120px;
-        min-width: 120px;
-        max-width: 120px;
-        text-align: right;
-    }
-
     .matrix-table th.col-terminal {
+        text-transform: none;
+        letter-spacing: 0;
+        background-color: var(--mtx-planet, var(--color-surface-input));
         overflow: hidden;
         text-overflow: ellipsis;
+    }
+
+    .mtx-term__name,
+    .mtx-term__planet {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .mtx-term__name {
+        color: var(--color-white);
+        font-size: var(--fs-xs);
+    }
+
+    .mtx-term__planet {
+        color: var(--color-gray-1);
+        font-size: 0.65rem;
+        font-weight: var(--fw-regular);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .matrix-table th.col-terminal,
+    .matrix-table td.col-terminal,
+    .matrix-table col.mtx-col-term {
+        width: 128px;
+        min-width: 128px;
+        max-width: 128px;
+    }
+
+    .matrix-table th:first-child,
+    .matrix-table td:first-child,
+    .matrix-table col.mtx-col-first {
+        width: 220px;
+        min-width: 220px;
+        max-width: 220px;
     }
 
     .matrix-table th:first-child,
     .matrix-table td:first-child {
         position: sticky;
         left: 0;
-        background-color: var(--color-surface-input);
         z-index: 11;
-        font-weight: bold;
-        color: var(--color-primary);
-        border-right: 2px solid var(--color-primary);
+        border-left: 0;
+        border-right: var(--border-hairline);
+        background-color: var(--color-bg-dark-gray);
         background-clip: padding-box;
-        width: 250px;
-        min-width: 250px;
-        max-width: 250px;
         text-align: left;
     }
 
-    .matrix-table .row-system th:first-child,
-    .matrix-table .row-terminal th:first-child {
+    .matrix-table th.mtx-corner {
         z-index: 30;
-    }
-
-    .matrix-table td {
-        color: var(--color-gray-1);
-        font-family: var(--font-mono);
-        font-variant-numeric: tabular-nums;
-        text-align: right;
-        font-size: var(--fs-sm);
+        background-color: var(--color-surface-input);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
     }
 
     .matrix-table tbody td {
-        height: 42px;
-        padding-top: 0.2rem;
-        padding-bottom: 0.2rem;
+        height: 52px;
+        box-sizing: border-box;
         vertical-align: middle;
+        font-variant-numeric: tabular-nums;
     }
 
-    .matrix-table td .price-sell,
-    .matrix-table td .price-buy {
-        line-height: 1.15;
+    .matrix-table td.col-terminal {
+        box-shadow: inset 2px 0 0 0 var(--mtx-stripe, transparent);
     }
 
-    .matrix-table td .price-sell {
-        color: var(--color-success);
+    .matrix-table td.col-terminal.is-best-buy {
+        box-shadow: inset 0 0 0 2px var(--color-info);
     }
 
-    .matrix-table td .price-buy {
+    .matrix-table td.col-terminal.is-best-sell {
+        box-shadow: inset 0 0 0 2px var(--color-success);
+    }
+
+    .matrix-table .price-sell,
+    .matrix-table .price-buy {
+        display: block;
+        line-height: 1.2;
+    }
+
+    .matrix-table .price-sell {
+        color: var(--color-white);
+        font-size: var(--fs-sm);
+        font-weight: var(--fw-bold);
+    }
+
+    .matrix-table .price-buy {
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-xs);
+    }
+
+    .matrix-table td.is-best-sell .price-sell {
+        color: var(--color-success-text);
+    }
+
+    .matrix-table td.is-best-buy .price-buy {
+        color: var(--color-info-text);
+    }
+
+    .matrix-table .mtx-empty {
+        color: var(--color-gray-3);
+    }
+
+    .matrix-table td.mtx-name-cell {
+        padding-left: var(--space-4);
+    }
+
+    .mtx-name {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        min-width: 0;
+    }
+
+    .mtx-name__text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: var(--color-white);
+        font-size: var(--fs-sm);
+        font-weight: var(--fw-bold);
+    }
+
+    .mtx-spread {
+        display: block;
+        color: var(--color-success-text);
+        font-size: var(--fs-xs);
+        font-weight: var(--fw-bold);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .mtx-warn {
+        display: inline-flex;
+        flex: none;
+    }
+
+    .mtx-warn .krt-icon {
+        width: 14px;
+        height: 14px;
+    }
+
+    .mtx-warn--danger {
         color: var(--color-danger-text);
+    }
+
+    .mtx-warn--warning {
+        color: var(--color-warning);
     }
 
     .matrix-table tbody tr.row-spacer td {
@@ -259,97 +446,73 @@
         padding: 0;
         border: 0;
         background: transparent;
+        box-shadow: none;
     }
 
-    .matrix-table tbody tr.row-kind {
+    .matrix-table tbody tr.row-kind td.mtx-kind-cell {
+        height: 40px;
+        padding: 0;
         background-color: var(--color-surface-input);
+        text-align: left;
+    }
+
+    .mtx-kind-toggle {
+        position: sticky;
+        left: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 40px;
+        padding: 0 var(--space-4);
+        background: none;
+        border: 0;
+        color: var(--color-primary);
+        font-family: var(--font-body);
+        font-size: var(--fs-xs);
+        font-weight: var(--fw-bold);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
         cursor: pointer;
     }
 
-    .matrix-table td.mtx-kind-cell {
-        font-weight: bold;
-        color: var(--color-primary);
-        font-family: var(--font-headline);
-        padding-left: 1rem;
-        text-align: left;
+    .mtx-kind-toggle .krt-icon {
+        width: 14px;
+        height: 14px;
     }
 
-    .matrix-table td.mtx-kind-cell .toggle-icon {
-        display: inline-block;
-        width: 1.5rem;
-        text-align: center;
+    .mtx-kind-toggle:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: -2px;
     }
 
-    .matrix-table td.mtx-name-cell {
-        padding-left: 2rem;
-        text-align: left;
+    @media (width <= 1024px) {
+        .mtx-dropdown__toggle,
+        .mtx-option,
+        .mtx-kind-toggle {
+            min-height: var(--touch-target);
+        }
     }
 
-    .matrix-table .mtx-warn {
-        margin-right: 0.5rem;
-        font-weight: bold;
-    }
+    @media (width <= 768px) {
+        .mtx-toolbar > .mtx-active-chips {
+            order: 3;
+        }
 
-    .matrix-table col.mtx-col-first {
-        width: 250px;
-    }
+        .mtx-toolbar > .switch {
+            order: 4;
+        }
 
-    .matrix-table col.mtx-col-term {
-        width: 120px;
-    }
+        .mtx-legend {
+            order: 5;
+            flex-basis: 100%;
+        }
 
-    .matrix-loading {
-        padding: 1rem;
-        color: var(--color-gray-2-text);
-        font-family: var(--font-body);
-    }
-
-    .matrix-table td.mtx-no-results {
-        text-align: center;
-        font-style: italic;
-        color: var(--color-gray-2-text);
-    }
-
-    .filters-container {
-        display: flex;
-        gap: 1.5rem;
-        margin-bottom: 1.5rem;
-        flex-wrap: wrap;
-    }
-
-    .materials-overview-main .form-group {
-        margin-bottom: 0;
-        flex: 1;
-        min-width: 150px;
-        max-width: 250px;
-    }
-
-    .materials-overview-main .form-group > label {
-        display: block;
-        margin-bottom: 0.25rem;
-        color: var(--color-primary);
-        font-family: var(--font-body);
-        font-size: var(--fs-sm);
-    }
-
-    .materials-overview-main .form-group input:not([type='checkbox']),
-    .materials-overview-main .form-group select {
-        width: 100%;
-        padding: 0.5rem;
-        background-color: var(--color-surface-input);
-        border: 1px solid var(--color-gray-3);
-        color: var(--color-gray-1);
-        font-family: var(--font-body);
-        box-sizing: border-box;
-    }
-
-    .table-wrapper {
-        overflow: auto;
-        max-height: max(16rem, calc(var(--krt-panel-viewport-rest) - 25rem));
-        border: 1px solid var(--color-gray-3);
-    }
-
-    main.materials-overview-main {
-        max-width: none;
+        .matrix-table th:first-child,
+        .matrix-table td:first-child,
+        .matrix-table col.mtx-col-first {
+            width: 150px;
+            min-width: 150px;
+            max-width: 150px;
+        }
     }
 }

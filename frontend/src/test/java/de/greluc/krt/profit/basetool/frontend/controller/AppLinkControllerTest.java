@@ -101,6 +101,21 @@ class AppLinkControllerTest {
   }
 
   @Test
+  @DisplayName("the help page puts its three blocks on cards under the page head")
+  void helpPageUsesCards() throws Exception {
+    String body =
+        mvc().perform(get("/app/link-help")).andReturn().getResponse().getContentAsString();
+
+    Assertions.assertThat(body)
+        .contains("class=\"page-head\"")
+        .contains("data-testid=\"app-link-intro\"")
+        .contains("<section class=\"card\" data-testid=\"app-link-android\">")
+        .contains("<section class=\"card\" data-testid=\"app-link-desktop\">")
+        .doesNotContain("hud-box");
+    Assertions.assertThat(body.split("btn--cta", -1)).hasSize(2);
+  }
+
+  @Test
   @DisplayName("the help page resolves its text, rather than printing the keys")
   void helpPageResolvesItsMessages() throws Exception {
     String body =

@@ -121,4 +121,19 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
       FROM MissionParticipant p WHERE p.mission.id IN :missionIds GROUP BY p.mission.id
       """)
   List<MissionParticipantCount> countByMissions(@Param("missionIds") Collection<UUID> missionIds);
+
+  /**
+   * Returns which of the given missions the given member holds a participant row on, in one query.
+   *
+   * @param userId the member whose participations to look up.
+   * @param missionIds the missions on the page; an empty collection yields an empty list.
+   * @return the ids of the missions among {@code missionIds} the member is signed up for.
+   */
+  @Query(
+      """
+      SELECT p.mission.id FROM MissionParticipant p
+      WHERE p.user.id = :userId AND p.mission.id IN :missionIds
+      """)
+  List<UUID> findMissionIdsSignedUpBy(
+      @Param("userId") UUID userId, @Param("missionIds") Collection<UUID> missionIds);
 }

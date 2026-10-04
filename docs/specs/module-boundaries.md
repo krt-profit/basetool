@@ -115,9 +115,11 @@ sealed `AppException` (ArchUnit does not import a `PermittedSubclasses` attribut
 and nine types that appear only in the descriptor of a called member or in an inlined constant,
 while ArchUnit additionally sees one annotation class value (`@Mapper(uses = SquadronMapper.class)`
 in `UserMapper`) and the two `kernel → platform` edges of `AppException` and `AppExceptionKind` to
-`ErrorDisclosurePolicy`, which the plan's count left out as same-rank edges.
+`ErrorDisclosurePolicy`, which the plan's count left out as same-rank edges. Those two left on
+2026-10-04, when the domain map assigned `ErrorDisclosurePolicy` to the kernel with the rest of the
+exception contract (ADR-0235): **136 edges**.
 
-After the platform SPIs (plan §7.3, P1-8, 2026-10-04): **123 class edges in 36 module pairs**.
+After the platform SPIs (plan §7.3, P1-8, 2026-10-04): **121 class edges in 35 module pairs**.
 
 **Acceptance**
 

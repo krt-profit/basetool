@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <th:block th:fragment="movementModal(modalId, refreshTarget, accountId, accountSelectable, justificationRequired, canDeposit, canWithdraw, canTransfer)">
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId=${modalId}, titleKey='bank.modal.movement.title', body=~{fragments/bank-movement-modal :: bank-movement-modal-body})}">
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId=${modalId}, titleKey='bank.modal.movement.title', variant='krt-modal--wide', body=~{fragments/bank-movement-modal :: bank-movement-modal-body})}">
     <th:block th:ref="bank-movement-modal-body">
         <form class="bank-ajax-form no-track" data-method="POST"
               data-livesync="bank:@account/account,bookings,chart bank:@destination/account,bookings,chart bank/grid orgunit-bank/orgUnitBank"
@@ -10,7 +10,8 @@
               th:attr="data-refresh=${refreshTarget},data-account-id=${accountId},data-justification-required=${justificationRequired},data-endpoint=${initEndpoint},data-account-id-field=${initAccountField}">
             <div class="krt-modal-body">
 
-                <div class="bank-form-row">
+                <div class="form-grid bank-mv-grid">
+                <div class="bank-form-row" th:classappend="${accountSelectable} ? '' : 'span-all'">
                     <label for="bank-mv-type" th:text="#{bank.request.field.type}">Vorgang</label>
                     <select id="bank-mv-type" data-role="bank-movement-type"
                             data-testid="bank-movement-type">
@@ -35,6 +36,7 @@
                     </select>
                     <span class="bank-field-error" data-error-for="accountId"></span>
                     <span class="bank-field-error" data-error-for="sourceAccountId"></span>
+                </div>
                 </div>
 
                 <div class="bank-form-row" data-movement-types="TRANSFER" hidden>
@@ -104,6 +106,7 @@
                     </div>
                 </div>
 
+                <div class="form-grid bank-mv-grid">
                 <div class="bank-form-row" data-movement-types="DEPOSIT">
                     <label for="bank-mv-deposit-holder" th:text="#{bank.field.holder}">Halter</label>
                     <select id="bank-mv-deposit-holder" name="holderId" required data-krt-combobox
@@ -151,6 +154,7 @@
                     </select>
                     <span class="bank-field-error" data-error-for="destinationHolderId"></span>
                 </div>
+                </div>
 
                 <th:block th:replace="~{fragments/bank-counterparty :: counterpartyBlock('DEPOSIT', 'bank-mv-cp-deposit', 'bank.field.counterparty.depositor', 'bank.field.counterparty.depositor.hint')}"></th:block>
                 <th:block th:replace="~{fragments/bank-counterparty :: counterpartyBlock('WITHDRAWAL', 'bank-mv-cp-withdraw', 'bank.field.counterparty.recipient', 'bank.field.counterparty.recipient.hint')}"></th:block>
@@ -171,6 +175,7 @@
                     <span class="bank-field-error" data-error-for="justification"></span>
                 </div>
 
+                <div class="form-grid bank-mv-grid">
                 <div class="bank-form-row">
                     <label for="bank-mv-note" th:text="#{bank.field.note}">Notiz</label>
                     <input type="text" id="bank-mv-note" name="note" maxlength="500"
@@ -185,6 +190,7 @@
                     <input type="text" id="bank-mv-staff-note" name="staffNote" maxlength="500"
                            data-testid="bank-movement-staff-note">
                     <span class="bank-field-error" data-error-for="staffNote"></span>
+                </div>
                 </div>
                 <span class="bank-field-error" data-error-for="_global"></span>
             </div>
