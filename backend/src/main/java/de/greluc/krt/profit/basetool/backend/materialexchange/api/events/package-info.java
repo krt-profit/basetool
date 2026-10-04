@@ -17,16 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.event;
-
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
-import java.util.UUID;
-
 /**
- * Immutable reference to an org unit carried by a {@link NotificationEvent}. Only scalars are
- * passed across the transaction/thread boundary, never a managed entity.
- *
- * @param id the org unit id
- * @param kind the org unit kind (squadron or special command)
+ * The Materialbörse module's published events: an interest registered and a request's fulfilment
+ * signalled, fanned out as notifications after commit (plan §5.3).
  */
-public record OrgUnitRef(UUID id, OrgUnitKind kind) {}
+package de.greluc.krt.profit.basetool.backend.materialexchange.api.events;

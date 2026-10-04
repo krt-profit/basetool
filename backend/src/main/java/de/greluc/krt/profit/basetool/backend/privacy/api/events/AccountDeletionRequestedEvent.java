@@ -17,10 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.event;
+package de.greluc.krt.profit.basetool.backend.privacy.api.events;
 
 import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -29,32 +31,29 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published when a member registers interest in a Materialbörse offer
- * (REQ-MARKET-011), directed at the offer's owner via {@link #contextRecipientUserId()}.
+ * Domain event published when a member raises an Art. 17 erasure request (REQ-SEC-061); the default
+ * rule notifies every admin.
  *
- * <p>Carries only immutable scalars; the interested member's name is disclosed to the owner only.
+ * <p>Carries no e-mail address, Discord id or the member's reasoning.
  *
- * @param offerId the offer (also the notification's loose entity id)
- * @param materialName the offered material's name, for rendering
- * @param interestedUserName the registering member's effective name, for rendering (owner-only)
- * @param ownerUserId the offer owner's sub; the directed recipient
- * @param actorSub the registering member's sub
+ * @param userId the requesting member's id, also the notification's loose entity id
+ * @param handle the requesting member's effective name, for rendering; may be {@code null}
  */
-public record MaterialExchangeInterestRegisteredEvent(
-    UUID offerId,
-    String materialName,
-    String interestedUserName,
-    @Nullable UUID ownerUserId,
-    @Nullable UUID actorSub)
+public record AccountDeletionRequestedEvent(UUID userId, @Nullable String handle)
     implements NotificationEvent {
 
-  /** Loose entity-type tag stored on the produced notification for deep-linking to the board. */
-  public static final String ENTITY_TYPE = "MATERIAL_EXCHANGE_OFFER";
+  /** Loose entity-type tag stored on the produced notifications for deep-linking. */
+  public static final String ENTITY_TYPE = "DELETION_REQUEST";
 
   @NotNull
   @Override
   public NotificationEventType eventType() {
-    return NotificationEventType.MATERIAL_EXCHANGE_INTEREST_REGISTERED;
+    return NotificationEventType.ACCOUNT_DELETION_REQUESTED;
+  }
+
+  @Override
+  public UUID actorSub() {
+    return userId;
   }
 
   @NotNull
@@ -62,11 +61,6 @@ public record MaterialExchangeInterestRegisteredEvent(
   @Override
   public Map<NotificationContextRole, OrgUnitRef> contextOrgUnits() {
     return Map.of();
-  }
-
-  @Override
-  public UUID contextRecipientUserId() {
-    return ownerUserId;
   }
 
   @NotNull
@@ -77,15 +71,16 @@ public record MaterialExchangeInterestRegisteredEvent(
 
   @Override
   public UUID entityId() {
-    return offerId;
+    return userId;
   }
 
   @NotNull
   @Override
   public Map<String, String> renderParams() {
     Map<String, String> params = new LinkedHashMap<>();
-    params.put("interessent", interestedUserName);
-    params.put("material", materialName);
+    if (handle != null && !handle.isBlank()) {
+      params.put("handle", handle);
+    }
     return params;
   }
 }

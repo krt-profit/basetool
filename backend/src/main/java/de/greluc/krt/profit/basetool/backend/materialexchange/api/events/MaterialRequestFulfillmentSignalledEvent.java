@@ -17,10 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.event;
+package de.greluc.krt.profit.basetool.backend.materialexchange.api.events;
 
 import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -29,30 +31,32 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published when a new Discord registration is persisted in the {@code PENDING} state
- * (REQ-NOTIF-012); the default rule notifies every admin.
+ * Domain event published when a member signals they can supply a Materialbörse request (Gesuch,
+ * REQ-MARKET-020), directed at the request's owner via {@link #contextRecipientUserId()}.
  *
- * <p>Carries no Discord id or other PII.
+ * <p>Carries only immutable scalars; the supplier's name is disclosed to the owner only.
  *
- * @param userId the new user's id (also the notification's loose entity id)
- * @param username the new user's username, for rendering; may be {@code null}
+ * @param requestId the request (also the notification's loose entity id)
+ * @param subjectName the requested material's or item's name, for rendering
+ * @param fulfillerName the signalling member's effective name, for rendering (owner-only)
+ * @param requesterSub the request owner's sub; the directed recipient
+ * @param actorSub the signalling member's sub
  */
-public record DiscordRegistrationPendingEvent(UUID userId, @Nullable String username)
+public record MaterialRequestFulfillmentSignalledEvent(
+    UUID requestId,
+    String subjectName,
+    String fulfillerName,
+    @Nullable UUID requesterSub,
+    @Nullable UUID actorSub)
     implements NotificationEvent {
 
-  /** Loose entity-type tag stored on the produced notifications for deep-linking. */
-  public static final String ENTITY_TYPE = "DISCORD_REGISTRATION";
+  /** Loose entity-type tag stored on the produced notification for deep-linking to the board. */
+  public static final String ENTITY_TYPE = "MATERIAL_EXCHANGE_REQUEST";
 
   @NotNull
   @Override
   public NotificationEventType eventType() {
-    return NotificationEventType.DISCORD_REGISTRATION_PENDING;
-  }
-
-  @Nullable
-  @Override
-  public UUID actorSub() {
-    return null;
+    return NotificationEventType.MATERIAL_REQUEST_FULFILLMENT_SIGNALLED;
   }
 
   @NotNull
@@ -60,6 +64,11 @@ public record DiscordRegistrationPendingEvent(UUID userId, @Nullable String user
   @Override
   public Map<NotificationContextRole, OrgUnitRef> contextOrgUnits() {
     return Map.of();
+  }
+
+  @Override
+  public UUID contextRecipientUserId() {
+    return requesterSub;
   }
 
   @NotNull
@@ -70,16 +79,15 @@ public record DiscordRegistrationPendingEvent(UUID userId, @Nullable String user
 
   @Override
   public UUID entityId() {
-    return userId;
+    return requestId;
   }
 
   @NotNull
   @Override
   public Map<String, String> renderParams() {
     Map<String, String> params = new LinkedHashMap<>();
-    if (username != null && !username.isBlank()) {
-      params.put("username", username);
-    }
+    params.put("lieferant", fulfillerName);
+    params.put("material", subjectName);
     return params;
   }
 }

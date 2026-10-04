@@ -17,14 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.event;
+package de.greluc.krt.profit.basetool.backend.bank.api.events;
 
 import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
-import de.greluc.krt.profit.basetool.backend.util.BankAmounts;
-import java.math.BigDecimal;
-import java.util.LinkedHashMap;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -33,32 +31,23 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published when a bank employee confirms a booking request (REQ-BANK-026).
+ * Domain event published when a requester cancels their own pending bank booking request
+ * (REQ-BANK-022, REQ-NOTIF-018).
  *
- * <p>Directed at the requester via {@link #contextRecipientUserId()}; {@link #contextAccountId()}
- * lets the {@code ACCOUNT_RESPONSIBLE} selector notify the account's responsible holder
- * (REQ-BANK-034). Carries only scalars.
+ * <p>Directed at nobody: it only {@linkplain #resolvesNotificationTypes() clears} the stale {@code
+ * BANK_BOOKING_REQUEST_CREATED} items shown to the bank staff. Carries only scalars.
  *
- * @param requestId the confirmed request's id (also the notification's loose entity id)
- * @param accountId the target bank account id ({@code ACCOUNT_RESPONSIBLE} selector input)
- * @param accountNo the target account's human-readable number, for rendering
- * @param amount the requested whole-aUEC amount, for rendering
- * @param requesterSub the requesting officer/lead's sub; the directed recipient
- * @param actorSub the confirming employee's sub
+ * @param requestId the cancelled request's id (also the notification's loose entity id)
+ * @param accountId the target bank account id
+ * @param actorSub the withdrawing requester's sub
  */
-public record BankBookingRequestConfirmedEvent(
-    UUID requestId,
-    UUID accountId,
-    String accountNo,
-    BigDecimal amount,
-    @Nullable UUID requesterSub,
-    @Nullable UUID actorSub)
-    implements BankBookingRequestEvent {
+public record BankBookingRequestCancelledEvent(
+    UUID requestId, UUID accountId, @Nullable UUID actorSub) implements BankBookingRequestEvent {
 
   @NotNull
   @Override
   public NotificationEventType eventType() {
-    return NotificationEventType.BANK_BOOKING_REQUEST_CONFIRMED;
+    return NotificationEventType.BANK_BOOKING_REQUEST_CANCELLED;
   }
 
   @NotNull
@@ -66,11 +55,6 @@ public record BankBookingRequestConfirmedEvent(
   @Override
   public Map<NotificationContextRole, OrgUnitRef> contextOrgUnits() {
     return Map.of();
-  }
-
-  @Override
-  public UUID contextRecipientUserId() {
-    return requesterSub;
   }
 
   @Override
@@ -84,17 +68,15 @@ public record BankBookingRequestConfirmedEvent(
   }
 
   @NotNull
+  @Unmodifiable
   @Override
   public Map<String, String> renderParams() {
-    Map<String, String> params = new LinkedHashMap<>();
-    params.put("accountNo", accountNo);
-    params.put("amount", BankAmounts.plain(amount));
-    return params;
+    return Map.of();
   }
 
   /**
-   * Confirming the request settles its lifecycle, so the "new booking request" items the bank staff
-   * were shown are now stale and get cleared (REQ-NOTIF-018).
+   * Withdrawing the request settles its lifecycle, so the "new booking request" items the bank
+   * staff were shown are now stale and get cleared (REQ-NOTIF-018).
    *
    * @return the singleton {@link NotificationType#BANK_BOOKING_REQUEST_CREATED}
    */
