@@ -168,7 +168,7 @@ function updateDemandMaterialHeaderText() {
         text.textContent = span && span.textContent ? span.textContent : selectedLabel;
         return;
     }
-    text.textContent = checked.length + ' ' + selectedLabel;
+    text.textContent = `${checked.length} ${selectedLabel}`;
 }
 
 /**
@@ -301,7 +301,7 @@ function demandSortValue(row, key) {
     if (key === 'material') {
         return row.getAttribute('data-material-name') || '';
     }
-    const raw = parseFloat(row.getAttribute('data-' + key) || '');
+    const raw = parseFloat(row.getAttribute(`data-${key}`) || '');
     return isNaN(raw) ? 0 : raw;
 }
 
@@ -347,7 +347,7 @@ function applyDemandSort() {
             body.appendChild(row);
             if (bucketKey) {
                 const drill = body.querySelector(
-                    '[data-bucket-orders="' + escapeSelectorValue(bucketKey) + '"]',
+                    `[data-bucket-orders="${escapeSelectorValue(bucketKey)}"]`,
                 );
                 if (drill) body.appendChild(drill);
             }
@@ -490,12 +490,12 @@ function escapeSelectorValue(value) {
  */
 function applyBucketState(bucketKey, expanded) {
     const escaped = escapeSelectorValue(bucketKey);
-    const row = document.querySelector('[data-bucket-orders="' + escaped + '"]');
+    const row = document.querySelector(`[data-bucket-orders="${escaped}"]`);
     const bucketRow = document.querySelector(
-        'tr[data-testid="demand-row"][data-bucket-key="' + escaped + '"]',
+        `tr[data-testid="demand-row"][data-bucket-key="${escaped}"]`,
     );
     const btn = document.querySelector(
-        '[data-trigger="demand-toggle-orders"][data-bucket-key="' + escaped + '"]',
+        `[data-trigger="demand-toggle-orders"][data-bucket-key="${escaped}"]`,
     );
     if (row) {
         const filteredOut = bucketRow !== null && bucketRow.hasAttribute('hidden');
@@ -565,7 +565,7 @@ document.addEventListener('click', (e) => {
     }
 });
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     readDemandState();
     restoreDemandControls();
     if (window.krtFilterPanel) {
@@ -608,6 +608,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
-document.addEventListener('krt:swapped', function () {
+document.addEventListener('krt:swapped', () => {
     applyDemandView();
 });

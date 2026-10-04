@@ -20,7 +20,7 @@
 /* global MSG_OWNER_UPDATED, MSG_LOCATION_UPDATED, MSG_DELIVERED_UPDATED, MSG_ERROR_GENERIC */
 
 function collectionRow(inventoryId) {
-    return document.querySelector('tr[data-inventory-id="' + inventoryId + '"]');
+    return document.querySelector(`tr[data-inventory-id="${inventoryId}"]`);
 }
 
 /**
@@ -51,7 +51,7 @@ function renderCollectionProgress(el, delivered, total) {
     const fill = el.querySelector('.collection-progress__fill');
     if (fill instanceof HTMLElement) {
         fill.setAttribute('data-krtm-width', String(percent));
-        fill.style.width = percent + '%';
+        fill.style.width = `${percent}%`;
     }
     const label = el.querySelector('.collection-progress__label');
     const template = el.getAttribute('data-progress-template');
@@ -74,10 +74,10 @@ function updateCollectionProgress() {
     if (!table) return;
     let delivered = 0;
     let total = 0;
-    table.querySelectorAll('tbody[data-collection-group]').forEach(function (group) {
+    table.querySelectorAll('tbody[data-collection-group]').forEach((group) => {
         let groupDelivered = 0;
         let groupTotal = 0;
-        group.querySelectorAll('tr[data-allocated]').forEach(function (row) {
+        group.querySelectorAll('tr[data-allocated]').forEach((row) => {
             const amount = parseFloat(row.getAttribute('data-allocated') || '') || 0;
             const checkbox = row.querySelector('.delivered-checkbox');
             groupTotal += amount;
@@ -106,7 +106,7 @@ function broadcastCollectionChanged() {
         window.krtLiveSync &&
         typeof window.krtLiveSync.sendChanged === 'function'
     ) {
-        window.krtLiveSync.sendChanged('order:' + window.orderId, ['materials', 'aggregated']);
+        window.krtLiveSync.sendChanged(`order:${window.orderId}`, ['materials', 'aggregated']);
     }
 }
 
@@ -115,12 +115,12 @@ async function collectionTransfer(inventoryId, target, successMessage) {
     if (!window.krtFetch || !row) return;
     const amount = parseFloat(row.getAttribute('data-amount'));
     const version = parseInt(row.getAttribute('data-version'), 10);
-    row.querySelectorAll('select').forEach(function (s) {
+    row.querySelectorAll('select').forEach((s) => {
         s.disabled = true;
     });
     const _result = await window.krtFetch.write({
         method: 'POST',
-        url: '/inventory/' + inventoryId + '/transfer',
+        url: `/inventory/${inventoryId}/transfer`,
         payload: {
             amount,
             targetUserId: target.targetUserId || null,
@@ -139,7 +139,7 @@ async function collectionTransfer(inventoryId, target, successMessage) {
                 if (body.version != null) {
                     row.setAttribute('data-version', body.version);
                 }
-                row.querySelectorAll('[data-inventory-id]').forEach(function (el) {
+                row.querySelectorAll('[data-inventory-id]').forEach((el) => {
                     el.setAttribute('data-inventory-id', body.id);
                 });
                 const deliveredCheckbox = row.querySelector('.delivered-checkbox');
@@ -150,13 +150,13 @@ async function collectionTransfer(inventoryId, target, successMessage) {
             broadcastCollectionChanged();
         },
     });
-    row.querySelectorAll('select').forEach(function (s) {
+    row.querySelectorAll('select').forEach((s) => {
         s.disabled = false;
     });
     updateCollectionProgress();
 }
 
-document.addEventListener('change', function (e) {
+document.addEventListener('change', (e) => {
     const el = e.target;
     if (!el || !el.matches) return;
     if (el.matches('[data-role="owner-select"]')) {
@@ -183,13 +183,13 @@ async function onDeliveredToggle(cb) {
     const previous = !cb.checked;
     const result = await window.krtFetch.write({
         method: 'PATCH',
-        url: '/inventory/' + inventoryId + '/delivered',
+        url: `/inventory/${inventoryId}/delivered`,
         payload: {
             delivered: cb.checked,
             jobOrderId: cb.getAttribute('data-job-order-id'),
             version: parseInt(row.getAttribute('data-version'), 10),
         },
-        containerSelector: 'tr[data-inventory-id="' + inventoryId + '"]',
+        containerSelector: `tr[data-inventory-id="${inventoryId}"]`,
         toast: false,
         errorMessage: MSG_ERROR_GENERIC,
         onSuccess() {
@@ -207,7 +207,7 @@ const MATERIAL_COLLECTION_SECTIONS = {
     materials: { container: '#material-collection-results', fragmentValue: 'results' },
 };
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     if (
         window.orderId &&
         window.krtLiveSync &&
@@ -217,12 +217,12 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('material-collection-results')
     ) {
         window.krtLiveSync.createReceiver({
-            topic: 'order:' + window.orderId,
+            topic: `order:${window.orderId}`,
             sections: MATERIAL_COLLECTION_SECTIONS,
             coalesceMs: 1500,
             refresh() {
                 window.krtFetch.swap({
-                    url: '/orders/' + window.orderId + '/material-collection',
+                    url: `/orders/${window.orderId}/material-collection`,
                     container: '#material-collection-results',
                     fragmentValue: MATERIAL_COLLECTION_SECTIONS.materials.fragmentValue,
                     history: false,

@@ -22,7 +22,7 @@ const INVENTORY_MATERIAL_SECTIONS = {
     stock: { container: '#inventory-material-results', fragmentValue: 'results' },
 };
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     if (window.krtFetch) {
         window.krtFetch.bindSwap({ container: '#inventory-material-results', history: true });
     }

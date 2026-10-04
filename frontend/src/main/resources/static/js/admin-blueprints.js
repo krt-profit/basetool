@@ -73,7 +73,7 @@
             qOut.textContent = String(Math.round(q));
         }
         if (vOut) {
-            vOut.textContent = '×' + (value === null ? '?' : value.toFixed(2));
+            vOut.textContent = `×${value === null ? '?' : value.toFixed(2)}`;
         }
     }
 
@@ -86,7 +86,7 @@
         }
     }
 
-    document.addEventListener('input', function (e) {
+    document.addEventListener('input', (e) => {
         const t = e.target;
         if (t && t.classList && t.classList.contains('bp-range')) {
             const slider = t.closest('.bp-slider');
@@ -100,9 +100,9 @@
         const input = form.querySelector('input[name="search"]');
         const term = input ? input.value.trim() : '';
         const url =
-            form.getAttribute('action') + (term ? '?search=' + encodeURIComponent(term) : '');
+            form.getAttribute('action') + (term ? `?search=${encodeURIComponent(term)}` : '');
         if (window.krtFetch) {
-            window.krtFetch.swap({ url, container: '#' + RESULTS_ID, history: true });
+            window.krtFetch.swap({ url, container: `#${RESULTS_ID}`, history: true });
         } else {
             window.location.assign(url);
         }
@@ -110,7 +110,7 @@
 
     let searchTimer = null;
 
-    document.addEventListener('submit', function (e) {
+    document.addEventListener('submit', (e) => {
         const form = e.target;
         if (!form || form.id !== 'admin-bp-filter') {
             return;
@@ -122,9 +122,9 @@
 
     const filterForm = document.getElementById('admin-bp-filter');
     if (filterForm && window.krtFetch) {
-        filterForm.addEventListener('input', function () {
+        filterForm.addEventListener('input', () => {
             clearTimeout(searchTimer);
-            searchTimer = setTimeout(function () {
+            searchTimer = setTimeout(() => {
                 search(filterForm);
             }, 300);
         });
@@ -132,9 +132,9 @@
 
     computeAll(document);
     if (window.krtFetch) {
-        window.krtFetch.bindSwap({ container: '#' + RESULTS_ID, history: true });
+        window.krtFetch.bindSwap({ container: `#${RESULTS_ID}`, history: true });
     }
-    document.addEventListener('krt:swapped', function (e) {
+    document.addEventListener('krt:swapped', (e) => {
         const c = e.detail && e.detail.container;
         if (c && c.id === RESULTS_ID) {
             computeAll(c);

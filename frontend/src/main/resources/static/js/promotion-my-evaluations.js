@@ -40,7 +40,7 @@
      * @returns {boolean} true when "Offen" is selected
      */
     function onlyOpen() {
-        const checked = filterRadios().find(function (r) {
+        const checked = filterRadios().find((r) => {
             return r.checked;
         });
         return !!checked && checked.value === 'OPEN';
@@ -72,9 +72,9 @@
     function applyFilter() {
         const open = onlyOpen();
         let visible = 0;
-        document.querySelectorAll('#me-requirements tbody.me-step').forEach(function (step) {
+        document.querySelectorAll('#me-requirements tbody.me-step').forEach((step) => {
             let stepVisible = 0;
-            step.querySelectorAll('tr[data-me-satisfied]').forEach(function (row) {
+            step.querySelectorAll('tr[data-me-satisfied]').forEach((row) => {
                 const hide = open && row.getAttribute('data-me-satisfied') === 'true';
                 /** @type {HTMLElement} */ (row).hidden = hide;
                 if (!hide) stepVisible++;
@@ -91,16 +91,16 @@
         const saved = readPref();
         if (!saved || typeof saved.onlyOpen !== 'boolean') return;
         const want = saved.onlyOpen ? 'OPEN' : 'ALL';
-        filterRadios().forEach(function (r) {
+        filterRadios().forEach((r) => {
             r.checked = r.value === want;
         });
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', () => {
         restore();
         applyFilter();
-        filterRadios().forEach(function (r) {
-            r.addEventListener('change', function () {
+        filterRadios().forEach((r) => {
+            r.addEventListener('change', () => {
                 writePref();
                 applyFilter();
             });

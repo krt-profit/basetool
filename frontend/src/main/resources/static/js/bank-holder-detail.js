@@ -46,11 +46,11 @@
         } else if (reserved > 0) {
             reservedPercent = 100;
         }
-        reservedSeg.style.width = reservedPercent + '%';
-        ownSeg.style.width = 100 - reservedPercent + '%';
+        reservedSeg.style.width = `${reservedPercent}%`;
+        ownSeg.style.width = `${100 - reservedPercent}%`;
     }
 
-    document.addEventListener('input', function (event) {
+    document.addEventListener('input', (event) => {
         const target = event.target;
         if (target instanceof HTMLInputElement && target.hasAttribute('data-balance-input')) {
             renderBar(target);

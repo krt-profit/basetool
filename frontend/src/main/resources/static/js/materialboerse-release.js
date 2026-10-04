@@ -86,15 +86,12 @@
             return String(amount);
         }
         if (quantityType === 'PIECE') {
-            return (
-                n.toLocaleString('de-DE', { maximumFractionDigits: 0 }) +
-                ' ' +
-                window.krtI18nText(i18n.unitPiece, 'materialboerseI18n.unitPiece')
-            );
+            return `${n.toLocaleString('de-DE', { maximumFractionDigits: 0 })} ${window.krtI18nText(
+                i18n.unitPiece,
+                'materialboerseI18n.unitPiece',
+            )}`;
         }
-        return (
-            n.toLocaleString('de-DE', { maximumFractionDigits: 3 }) + ' ' + (i18n.unitScu || 'SCU')
-        );
+        return `${n.toLocaleString('de-DE', { maximumFractionDigits: 3 })} ${i18n.unitScu || 'SCU'}`;
     }
 
     function setFacts(material, quality) {
@@ -198,7 +195,7 @@
      *        the dialog is dismissed without submitting (e.g. to revert a Lager checkbox).
      */
     function open(mode, ctx, doneOrOpts) {
-        ctx = ctx || {};
+        ctx ||= {};
         let onDone = null;
         let onCancel = null;
         if (typeof doneOrOpts === 'function') {
@@ -324,25 +321,19 @@
 
     function loadPicker(query) {
         const seq = ++pickerSeq;
-        const url =
-            '/materialboerse/releasable-items?kind=' +
-            encodeURIComponent(pickerKind) +
-            (query ? '&q=' + encodeURIComponent(query) : '');
-        fetch(url, {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            credentials: 'same-origin',
-        })
-            .then(function (r) {
-                return r.ok ? r.json() : [];
-            })
-            .then(function (items) {
+        const url = `/materialboerse/releasable-items?kind=${encodeURIComponent(
+            pickerKind,
+        )}${query ? `&q=${encodeURIComponent(query)}` : ''}`;
+        window.krtFetch
+            .getJson(url)
+            .then((items) => {
                 if (seq !== pickerSeq) {
                     return;
                 }
                 pickerItems = Array.isArray(items) ? items : [];
                 renderPicker();
             })
-            .catch(function () {
+            .catch(() => {
                 if (seq !== pickerSeq) {
                     return;
                 }
@@ -356,7 +347,7 @@
         if (pickerSearchTimer) {
             clearTimeout(pickerSearchTimer);
         }
-        pickerSearchTimer = setTimeout(function () {
+        pickerSearchTimer = setTimeout(() => {
             loadPicker(query);
         }, PICKER_SEARCH_DEBOUNCE_MS);
     }
@@ -407,51 +398,37 @@
             return;
         }
         if (!pickerItems.length) {
-            list.innerHTML =
-                '<li class="krt-combobox__notice">' + escapeHtml(i18n.pickerEmpty || '') + '</li>';
+            list.innerHTML = `<li class="krt-combobox__notice">${escapeHtml(i18n.pickerEmpty || '')}</li>`;
             list.hidden = !pickerListOpen;
             return;
         }
         let html = '';
-        pickerItems.forEach(function (it) {
+        pickerItems.forEach((it) => {
             const isItem = it.kind === 'ITEM';
             let meta = escapeHtml(
-                (isItem ? '' : 'Q ' + it.quality + ' · ') +
-                    formatAmount(it.amount, it.quantityType),
+                (isItem ? '' : `Q ${it.quality} · `) + formatAmount(it.amount, it.quantityType),
             );
             if (it.locationName) {
-                meta += ' · ' + escapeHtml(it.locationName);
+                meta += ` · ${escapeHtml(it.locationName)}`;
             }
             if (it.alreadyReleased) {
-                meta += ' · ' + escapeHtml(i18n.pickerAlready || '');
+                meta += ` · ${escapeHtml(i18n.pickerAlready || '')}`;
             }
             let stolenChip = '';
             if (it.stolen) {
-                stolenChip =
-                    '<span class="chip chip--danger" data-testid="stolen-chip">' +
-                    escapeHtml(i18n.pickerStolen || '') +
-                    '</span> ';
+                stolenChip = `<span class="chip chip--danger" data-testid="stolen-chip">${escapeHtml(
+                    i18n.pickerStolen || '',
+                )}</span> `;
             }
-            html +=
-                '<li class="krt-combobox__option" role="option" data-item-id="' +
-                escapeAttr(it.inventoryItemId) +
-                '" data-kind="' +
-                escapeAttr(it.kind) +
-                '" data-material="' +
-                escapeAttr(it.materialName) +
-                '" data-quantity-type="' +
-                escapeAttr(it.quantityType) +
-                '" data-quality="' +
-                escapeAttr(isItem ? '' : it.quality) +
-                '" data-amount="' +
-                escapeAttr(it.amount) +
-                '"><strong>' +
-                escapeHtml(it.materialName) +
-                '</strong> ' +
-                stolenChip +
-                '<small>' +
-                meta +
-                '</small></li>';
+            html += `<li class="krt-combobox__option" role="option" data-item-id="${escapeAttr(
+                it.inventoryItemId,
+            )}" data-kind="${escapeAttr(it.kind)}" data-material="${escapeAttr(
+                it.materialName,
+            )}" data-quantity-type="${escapeAttr(it.quantityType)}" data-quality="${escapeAttr(
+                isItem ? '' : it.quality,
+            )}" data-amount="${escapeAttr(it.amount)}"><strong>${escapeHtml(
+                it.materialName,
+            )}</strong> ${stolenChip}<small>${meta}</small></li>`;
         });
         list.innerHTML = html;
         list.hidden = !pickerListOpen;
@@ -479,23 +456,17 @@
 
     function loadItemPicker(query) {
         const seq = ++itemPickerSeq;
-        const url =
-            '/materialboerse/offerable-products' + (query ? '?q=' + encodeURIComponent(query) : '');
-        fetch(url, {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            credentials: 'same-origin',
-        })
-            .then(function (r) {
-                return r.ok ? r.json() : [];
-            })
-            .then(function (items) {
+        const url = `/materialboerse/offerable-products${query ? `?q=${encodeURIComponent(query)}` : ''}`;
+        window.krtFetch
+            .getJson(url)
+            .then((items) => {
                 if (seq !== itemPickerSeq) {
                     return;
                 }
                 productItems = Array.isArray(items) ? items : [];
                 renderItemPicker();
             })
-            .catch(function () {
+            .catch(() => {
                 if (seq !== itemPickerSeq) {
                     return;
                 }
@@ -509,7 +480,7 @@
         if (itemPickerSearchTimer) {
             clearTimeout(itemPickerSearchTimer);
         }
-        itemPickerSearchTimer = setTimeout(function () {
+        itemPickerSearchTimer = setTimeout(() => {
             loadItemPicker(query);
         }, PICKER_SEARCH_DEBOUNCE_MS);
     }
@@ -538,25 +509,19 @@
             return;
         }
         if (!productItems.length) {
-            list.innerHTML =
-                '<li class="krt-combobox__notice">' +
-                escapeHtml(i18n.itemPickerEmpty || '') +
-                '</li>';
+            list.innerHTML = `<li class="krt-combobox__notice">${escapeHtml(
+                i18n.itemPickerEmpty || '',
+            )}</li>`;
             list.hidden = !itemPickerListOpen;
             return;
         }
         let html = '';
-        productItems.forEach(function (it) {
-            html +=
-                '<li class="krt-combobox__option" role="option" data-product-key="' +
-                escapeAttr(it.productKey) +
-                '" data-name="' +
-                escapeAttr(it.name) +
-                '"><strong>' +
-                escapeHtml(it.name) +
-                '</strong>';
+        productItems.forEach((it) => {
+            html += `<li class="krt-combobox__option" role="option" data-product-key="${escapeAttr(
+                it.productKey,
+            )}" data-name="${escapeAttr(it.name)}"><strong>${escapeHtml(it.name)}</strong>`;
             if (it.manufacturerName) {
-                html += ' <small>' + escapeHtml(it.manufacturerName) + '</small>';
+                html += ` <small>${escapeHtml(it.manufacturerName)}</small>`;
             }
             html += '</li>';
         });
@@ -582,7 +547,7 @@
             }
             window.krtFetch.write({
                 method: 'PUT',
-                url: '/materialboerse/offers/' + state.offerId + '/remark/ajax',
+                url: `/materialboerse/offers/${state.offerId}/remark/ajax`,
                 payload: {
                     offeredAmount,
                     remark,
@@ -666,7 +631,7 @@
         }
     }
 
-    document.addEventListener('click', function (e) {
+    document.addEventListener('click', (e) => {
         if (!isModalOpen()) {
             if (
                 e.target.closest('[data-mb-picker-list] .krt-combobox__option') ||
@@ -718,7 +683,7 @@
         }
     });
 
-    document.addEventListener('input', function (e) {
+    document.addEventListener('input', (e) => {
         if (e.target.matches('[data-mb-remark]')) {
             updateCharCount();
         } else if (e.target.matches('[data-mb-picker-input]')) {
@@ -732,13 +697,13 @@
         }
     });
 
-    document.addEventListener('change', function (e) {
+    document.addEventListener('change', (e) => {
         if (e.target.matches('[data-mb-kind-radio]')) {
             setPickerKind(e.target.value);
         }
     });
 
-    document.addEventListener('keydown', function (e) {
+    document.addEventListener('keydown', (e) => {
         if (!isModalOpen()) {
             return;
         }
@@ -759,7 +724,7 @@
         const focusable = modal.querySelectorAll(
             'button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])',
         );
-        const visible = Array.prototype.filter.call(focusable, function (el) {
+        const visible = Array.prototype.filter.call(focusable, (el) => {
             return el.offsetParent !== null && !el.hidden;
         });
         if (!visible.length) {

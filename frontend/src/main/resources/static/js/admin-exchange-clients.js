@@ -108,7 +108,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
             const data = holder ? holder.dataset : /** @type {DOMStringMap} */ ({});
             /** @param {string} key */
             const text = function (key) {
-                const attribute = 'data-' + key.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
+                const attribute = `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
                 return window.krtI18nText(data[key], attribute);
             };
             return {
@@ -225,10 +225,8 @@ const EXCHANGE_CLIENTS_SECTIONS = {
 
         /** @param {string} id */
         function editClient(id) {
-            fetch(BASE + '/' + encodeURIComponent(id), {
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-            })
-                .then((res) => (res.ok ? res.json() : null))
+            window.krtFetch
+                .getJson(`${BASE}/${encodeURIComponent(id)}`)
                 .then((client) => {
                     if (client) {
                         prefillForm(client);
@@ -282,7 +280,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
             const save = function () {
                 window.krtFetch.write({
                     method: id ? 'PUT' : 'POST',
-                    url: BASE + (id ? '/' + encodeURIComponent(id) : ''),
+                    url: BASE + (id ? `/${encodeURIComponent(id)}` : ''),
                     payload: buildPayload(),
                     successMessage: i18n.saved,
                     errorMessage: i18n.error,
@@ -316,7 +314,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
             const send = function () {
                 window.krtFetch.write({
                     method: 'POST',
-                    url: BASE + '/' + encodeURIComponent(id) + '/' + action,
+                    url: `${BASE}/${encodeURIComponent(id)}/${action}`,
                     payload: { version: rowVersion == null ? null : Number(rowVersion) },
                     successMessage: action === 'suspend' ? i18n.suspended : i18n.activated,
                     errorMessage: i18n.error,
@@ -345,10 +343,10 @@ const EXCHANGE_CLIENTS_SECTIONS = {
             confirmThen(
                 enabled ? i18n.confirmOffTitle : i18n.confirmOnTitle,
                 enabled ? i18n.confirmOffBody : i18n.confirmOnBody,
-                function () {
+                () => {
                     window.krtFetch.write({
                         method: 'PUT',
-                        url: BASE + '/settings',
+                        url: `${BASE}/settings`,
                         payload: {
                             enabled: !enabled,
                             version: boxVersion == null ? null : Number(boxVersion),
@@ -371,7 +369,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
             cancel.addEventListener('click', resetForm);
         }
 
-        document.addEventListener('click', function (event) {
+        document.addEventListener('click', (event) => {
             const target = event.target;
             if (!(target instanceof Element)) {
                 return;
@@ -473,7 +471,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
              * @param {string} key
              */
             const text = function (source, key) {
-                const attribute = 'data-' + key.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
+                const attribute = `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
                 return window.krtI18nText(source[key], attribute);
             };
             return {
@@ -514,7 +512,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
          * @param {Array<string | number>} values
          */
         function format(template, values) {
-            return template.replace(/\{(\d)\}/g, function (match, index) {
+            return template.replace(/\{(\d)\}/g, (match, index) => {
                 const value = values[Number(index)];
                 return value === undefined ? match : String(value);
             });
@@ -564,15 +562,12 @@ const EXCHANGE_CLIENTS_SECTIONS = {
             if (!id || !iso) {
                 return;
             }
-            fetch(
-                BASE +
-                    '/' +
-                    encodeURIComponent(id) +
-                    '/undo/installations?since=' +
-                    encodeURIComponent(iso),
-                { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } },
-            )
-                .then((res) => (res.ok ? res.json() : []))
+            window.krtFetch
+                .getJson(
+                    `${BASE}/${encodeURIComponent(id)}/undo/installations?since=${encodeURIComponent(
+                        iso,
+                    )}`,
+                )
                 .then((/** @type {ApiDto<'ExchangeBulkUndoInstallationDto'>[]} */ rows) => {
                     rows.forEach((row) => {
                         const option = document.createElement('option');
@@ -583,7 +578,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
                             when(row.lastSeenAt),
                         ]);
                         if (row.revoked) {
-                            label += ' ' + i18n.installationRevoked;
+                            label += ` ${i18n.installationRevoked}`;
                         }
                         option.textContent = label;
                         installation.appendChild(option);
@@ -630,7 +625,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
             }
             window.krtFetch.write({
                 method: 'POST',
-                url: BASE + '/' + encodeURIComponent(id) + '/undo/preview',
+                url: `${BASE}/${encodeURIComponent(id)}/undo/preview`,
                 payload: scope(),
                 toast: false,
                 errorMessage: i18n.error,
@@ -643,7 +638,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
                             ? i18n.previewEmpty
                             : format(i18n.preview, [members, entries, when(result.since)]);
                     if (entries > 0 && result.clientActive) {
-                        text += ' ' + i18n.previewActive;
+                        text += ` ${i18n.previewActive}`;
                     }
                     preview.textContent = text;
                     preview.hidden = false;
@@ -661,7 +656,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
             const send = function () {
                 window.krtFetch.write({
                     method: 'POST',
-                    url: BASE + '/' + encodeURIComponent(id) + '/undo',
+                    url: `${BASE}/${encodeURIComponent(id)}/undo`,
                     payload: scope(),
                     successMessage: i18n.started,
                     errorMessage: i18n.error,
@@ -727,7 +722,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
             }
             const list = document.getElementById('xc-undo-runs');
             if (list && list.getAttribute('data-xc-running') === 'true') {
-                pollTimer = window.setTimeout(function () {
+                pollTimer = window.setTimeout(() => {
                     pollTimer = null;
                     refreshRuns();
                 }, RUN_POLL_MS);
@@ -739,10 +734,8 @@ const EXCHANGE_CLIENTS_SECTIONS = {
          * @param {string} runId
          */
         function showRun(runId) {
-            fetch(BASE + '/undo-runs/' + encodeURIComponent(runId), {
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-            })
-                .then((res) => (res.ok ? res.json() : null))
+            window.krtFetch
+                .getJson(`${BASE}/undo-runs/${encodeURIComponent(runId)}`)
                 .then((/** @type {ApiDto<'ExchangeBulkUndoRunDetailDto'> | null} */ detail) => {
                     const body = document.getElementById('xc-undo-run-body');
                     if (!detail || !detail.run || !body) {
@@ -775,16 +768,11 @@ const EXCHANGE_CLIENTS_SECTIONS = {
                             const who = entry.memberName || i18n.unnamed;
                             if (entry.resource) {
                                 const what = i18n.resources[entry.resource] || entry.resource;
-                                item.textContent =
-                                    who +
-                                    ' \u2013 ' +
-                                    what +
-                                    ': ' +
-                                    (entry.label || i18n.unnamed) +
-                                    ' \u2013 ' +
-                                    reason;
+                                item.textContent = `${who} \u2013 ${what}: ${
+                                    entry.label || i18n.unnamed
+                                } \u2013 ${reason}`;
                             } else {
-                                item.textContent = who + ' \u2013 ' + reason;
+                                item.textContent = `${who} \u2013 ${reason}`;
                             }
                             list.appendChild(item);
                         });
@@ -806,19 +794,19 @@ const EXCHANGE_CLIENTS_SECTIONS = {
                 });
         }
 
-        since.addEventListener('change', function () {
+        since.addEventListener('change', () => {
             resetCheck();
             loadInstallations();
         });
         resource.addEventListener('change', resetCheck);
         installation.addEventListener('change', resetCheck);
         check.addEventListener('click', runCheck);
-        form.addEventListener('submit', function (event) {
+        form.addEventListener('submit', (event) => {
             event.preventDefault();
             start();
         });
 
-        document.addEventListener('click', function (event) {
+        document.addEventListener('click', (event) => {
             const target = event.target;
             if (!(target instanceof Element)) {
                 return;

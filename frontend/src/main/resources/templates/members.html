@@ -176,11 +176,7 @@
             krtAutocomplete(searchInput, async (query) => {
                 if (query.length < 2) return [];
                 try {
-                    const resp = await fetch(`/members/api/search?query=${encodeURIComponent(query)}`, {
-                        headers: { 'Accept': 'application/json' }
-                    });
-                    if (!resp.ok) return [];
-                    const data = await resp.json();
+                    const data = await window.krtFetch.getJson(`/members/api/search?query=${encodeURIComponent(query)}`);
                     return [...new Set((data || []).map(u => u.effectiveName).filter(Boolean))].slice(0, 10);
                 } catch (_err) {
                     return [];

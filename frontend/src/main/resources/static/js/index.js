@@ -39,7 +39,7 @@
     }
 
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('click', 'index-toggle-info', function (toggle) {
+        window.krtEvents.on('click', 'index-toggle-info', (toggle) => {
             toggleInfo(toggle);
         });
     }
@@ -62,9 +62,9 @@
         if (!list) return;
         list.replaceChildren();
         const shown = items.slice(0, NOTIFICATION_LIMIT);
-        shown.forEach(function (item) {
+        shown.forEach((item) => {
             const li = document.createElement('li');
-            li.className = 'home-notif' + (item.read ? '' : ' is-unread');
+            li.className = `home-notif${item.read ? '' : ' is-unread'}`;
             const safe =
                 item.href && typeof window.safeSameOriginUrl === 'function'
                     ? window.safeSameOriginUrl(item.href)
@@ -84,7 +84,7 @@
             list.appendChild(li);
         });
         if (empty) empty.hidden = shown.length > 0;
-        const unread = items.filter(function (item) {
+        const unread = items.filter((item) => {
             return !item.read;
         }).length;
         if (count) {
@@ -96,27 +96,22 @@
     /** Loads the newest notifications from the bell's endpoint. */
     function loadNotifications() {
         if (!document.querySelector('[data-home-notif-list]')) return;
-        fetch('/notifications/recent', {
-            headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
-            credentials: 'same-origin',
-        })
-            .then(function (res) {
-                return res.ok ? res.json() : [];
-            })
-            .then(function (items) {
+        window.krtFetch
+            .getJson('/notifications/recent')
+            .then((items) => {
                 renderNotifications(Array.isArray(items) ? items : []);
             })
-            .catch(function () {
+            .catch(() => {
                 renderNotifications([]);
             });
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', () => {
         loadNotifications();
 
         const announcementForm = document.getElementById('announcement-read-form');
         if (announcementForm && window.krtFetch) {
-            announcementForm.addEventListener('submit', function (event) {
+            announcementForm.addEventListener('submit', (event) => {
                 event.preventDefault();
                 const idInput = /** @type {HTMLInputElement | null} */ (
                     announcementForm.querySelector('input[name="id"]')
@@ -124,7 +119,7 @@
                 const announcementId = idInput ? idInput.value : '';
                 window.krtFetch.write({
                     method: 'POST',
-                    url: '/announcement/read?id=' + encodeURIComponent(announcementId),
+                    url: `/announcement/read?id=${encodeURIComponent(announcementId)}`,
                     toast: false,
                     onSuccess() {
                         announcementForm.remove();

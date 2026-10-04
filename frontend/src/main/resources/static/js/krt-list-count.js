@@ -26,7 +26,7 @@
      * `data-list-count-for` names the results container, whose `[data-list-total]` carries the
      * total; a list without one (an empty result) counts zero.
      */
-    document.addEventListener('krt:swapped', function (event) {
+    document.addEventListener('krt:swapped', (event) => {
         const detail = /** @type {CustomEvent} */ (event).detail;
         const container = detail && detail.container instanceof Element ? detail.container : null;
         if (!container || !container.id) return;

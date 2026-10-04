@@ -32,14 +32,14 @@
         if (searchInput) {
             searchInput.addEventListener('input', onSearchInput);
             searchInput.addEventListener('focus', onSearchInput);
-            document.addEventListener('click', function (e) {
+            document.addEventListener('click', (e) => {
                 if (!resultsEl) return;
                 if (e.target !== searchInput && !resultsEl.contains(e.target)) {
                     resultsEl.hidden = true;
                 }
             });
         }
-        document.addEventListener('keydown', function (e) {
+        document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 closeModal();
                 closeDelete();
@@ -65,7 +65,7 @@
                 }
             } catch (_e) {}
         }
-        document.addEventListener('change', function (e) {
+        document.addEventListener('change', (e) => {
             const sel = e.target;
             if (sel.matches && sel.matches('form.krt-pi-userform [name="userSub"]')) {
                 persistMember(sel.value);
@@ -86,7 +86,7 @@
         }
         if (saved) {
             window.location.replace(
-                window.location.pathname + '?userSub=' + encodeURIComponent(saved),
+                `${window.location.pathname}?userSub=${encodeURIComponent(saved)}`,
             );
         }
     }
@@ -95,7 +95,7 @@
         if (!window.krtFetch) {
             return;
         }
-        document.addEventListener('submit', function (e) {
+        document.addEventListener('submit', (e) => {
             if (e.target === form) {
                 e.preventDefault();
                 submitItemForm();
@@ -129,7 +129,7 @@
         if (!form) {
             return '';
         }
-        const el = form.querySelector('[name="' + name + '"]');
+        const el = form.querySelector(`[name="${name}"]`);
         return el ? el.value : '';
     }
 
@@ -187,7 +187,7 @@
                     reswapResults();
                 },
             })
-            .then(function () {
+            .then(() => {
                 if (submitBtn) {
                     submitBtn.disabled = false;
                 }
@@ -216,7 +216,7 @@
                     reswapResults();
                 },
             })
-            .then(function () {
+            .then(() => {
                 if (btn) {
                     btn.disabled = false;
                 }
@@ -234,10 +234,10 @@
                 return;
             }
             const params = new URLSearchParams(new FormData(formEl)).toString();
-            const url = formEl.getAttribute('action') + (params ? '?' + params : '');
+            const url = formEl.getAttribute('action') + (params ? `?${params}` : '');
             window.krtFetch.swap({ url, container: '#pi-results', history: true });
         }
-        document.addEventListener('submit', function (e) {
+        document.addEventListener('submit', (e) => {
             if (!e.target.classList || !e.target.classList.contains('krt-pi-filter')) {
                 return;
             }
@@ -248,7 +248,7 @@
             }
             swapFromForm(e.target);
         });
-        document.addEventListener('input', function (e) {
+        document.addEventListener('input', (e) => {
             const t = e.target;
             if (!t.matches || !t.matches('form.krt-pi-filter input[type="search"]')) {
                 return;
@@ -257,19 +257,19 @@
             if (timer) {
                 clearTimeout(timer);
             }
-            timer = setTimeout(function () {
+            timer = setTimeout(() => {
                 timer = null;
                 swapFromForm(formEl);
             }, 300);
         });
-        document.addEventListener('change', function (e) {
+        document.addEventListener('change', (e) => {
             const sel = e.target;
             if (!sel.matches || !sel.matches('form.krt-pi-userform [name="userSub"]')) {
                 return;
             }
             swapFromForm(sel.form);
         });
-        document.addEventListener('krt:swapped', function (e) {
+        document.addEventListener('krt:swapped', (e) => {
             const c = e.detail && e.detail.container;
             if (c && c.id === 'pi-results') {
                 syncCounts(c);
@@ -330,7 +330,7 @@
         if (msgEl && name) {
             msgEl.textContent =
                 window.krtPersonalInventoryI18n && window.krtPersonalInventoryI18n.confirmBody
-                    ? window.krtPersonalInventoryI18n.confirmBody + ' (' + name + ')'
+                    ? `${window.krtPersonalInventoryI18n.confirmBody} (${name})`
                     : msgEl.textContent;
         }
         window.krtModal.open(deleteModal);
@@ -342,13 +342,13 @@
 
     function setField(name, value) {
         if (!form) return;
-        const el = form.querySelector('[name="' + name + '"]');
+        const el = form.querySelector(`[name="${name}"]`);
         if (el) el.value = value == null ? '' : value;
     }
 
     function clearForm() {
         if (!form) return;
-        ['id', 'version', 'name', 'note', 'quantity'].forEach(function (n) {
+        ['id', 'version', 'name', 'note', 'quantity'].forEach((n) => {
             setField(n, '');
         });
         if (hiddenUexId) hiddenUexId.value = '';
@@ -365,28 +365,20 @@
         if (!searchInput || !resultsEl) return;
         const q = searchInput.value || '';
         const endpoints = window.krtPersonalInventoryEndpoints || {};
-        const url =
-            (endpoints.uexSearch || '/personal-inventory/uex-search') +
-            '?q=' +
-            encodeURIComponent(q) +
-            '&limit=' +
-            SEARCH_LIMIT;
+        const url = `${
+            endpoints.uexSearch || '/personal-inventory/uex-search'
+        }?q=${encodeURIComponent(q)}&limit=${SEARCH_LIMIT}`;
         resultsEl.hidden = false;
-        resultsEl.innerHTML =
-            '<div class="krt-pi-typeahead-loading">' +
-            escapeHtml(
-                window.krtI18nText(
-                    (window.krtPersonalInventoryI18n || {}).searching,
-                    'krtPersonalInventoryI18n.searching',
-                ),
-            ) +
-            '</div>';
-        fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-            .then(function (resp) {
-                return resp.ok ? resp.json() : [];
-            })
+        resultsEl.innerHTML = `<div class="krt-pi-typeahead-loading">${escapeHtml(
+            window.krtI18nText(
+                (window.krtPersonalInventoryI18n || {}).searching,
+                'krtPersonalInventoryI18n.searching',
+            ),
+        )}</div>`;
+        window.krtFetch
+            .getJson(url)
             .then(renderResults)
-            .catch(function () {
+            .catch(() => {
                 renderResults([]);
             });
     }
@@ -394,58 +386,41 @@
     function renderResults(items) {
         if (!resultsEl) return;
         if (!items || items.length === 0) {
-            resultsEl.innerHTML =
-                '<div class="krt-pi-typeahead-empty">' +
-                escapeHtml(
-                    window.krtI18nText(
-                        (window.krtPersonalInventoryI18n || {}).noResults,
-                        'krtPersonalInventoryI18n.noResults',
-                    ),
-                ) +
-                '</div>';
+            resultsEl.innerHTML = `<div class="krt-pi-typeahead-empty">${escapeHtml(
+                window.krtI18nText(
+                    (window.krtPersonalInventoryI18n || {}).noResults,
+                    'krtPersonalInventoryI18n.noResults',
+                ),
+            )}</div>`;
             return;
         }
         let html = '';
-        items.forEach(function (it) {
+        items.forEach((it) => {
             const typeClass = it.type === 'CITY' ? 'krt-pi-loc-city' : 'krt-pi-loc-station';
             html +=
-                '<button type="button" class="krt-pi-typeahead-item" ' +
-                'data-uex-id="' +
-                escapeAttr(it.uexId) +
-                '" ' +
-                'data-type="' +
-                escapeAttr(it.type) +
-                '" ' +
-                'data-name="' +
-                escapeAttr(it.name) +
-                '">' +
-                '<span class="krt-pi-location-marker ' +
-                escapeAttr(typeClass) +
-                '"></span>' +
-                '<span class="krt-pi-typeahead-name">' +
-                escapeHtml(it.name || '') +
-                '</span>' +
-                '<span class="krt-pi-typeahead-meta">' +
-                escapeHtml(it.parentName || '');
+                `<button type="button" class="krt-pi-typeahead-item" ` +
+                `data-uex-id="${escapeAttr(it.uexId)}" ` +
+                `data-type="${escapeAttr(it.type)}" ` +
+                `data-name="${escapeAttr(it.name)}">` +
+                `<span class="krt-pi-location-marker ${escapeAttr(typeClass)}"></span>` +
+                `<span class="krt-pi-typeahead-name">${escapeHtml(it.name || '')}</span>` +
+                `<span class="krt-pi-typeahead-meta">${escapeHtml(it.parentName || '')}`;
             if (it.starSystemName) {
-                html += ' / ' + escapeHtml(it.starSystemName);
+                html += ` / ${escapeHtml(it.starSystemName)}`;
             }
             html += '</span></button>';
         });
         if (items.length >= SEARCH_LIMIT) {
-            html +=
-                '<div class="krt-pi-typeahead-more">' +
-                escapeHtml(
-                    window.krtI18nText(
-                        (window.krtPersonalInventoryI18n || {}).moreResults,
-                        'krtPersonalInventoryI18n.moreResults',
-                    ),
-                ) +
-                '</div>';
+            html += `<div class="krt-pi-typeahead-more">${escapeHtml(
+                window.krtI18nText(
+                    (window.krtPersonalInventoryI18n || {}).moreResults,
+                    'krtPersonalInventoryI18n.moreResults',
+                ),
+            )}</div>`;
         }
         resultsEl.innerHTML = html;
-        resultsEl.querySelectorAll('.krt-pi-typeahead-item').forEach(function (btn) {
-            btn.addEventListener('click', function () {
+        resultsEl.querySelectorAll('.krt-pi-typeahead-item').forEach((btn) => {
+            btn.addEventListener('click', () => {
                 if (hiddenUexId) hiddenUexId.value = btn.getAttribute('data-uex-id') || '';
                 if (hiddenLocationType)
                     hiddenLocationType.value = btn.getAttribute('data-type') || '';

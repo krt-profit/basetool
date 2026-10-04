@@ -42,7 +42,7 @@
     function storageKey() {
         const main = document.querySelector('main[data-user-id]');
         const uid = main ? main.getAttribute('data-user-id') : 'unknown';
-        return 'bank_request_status_filter_' + uid;
+        return `bank_request_status_filter_${uid}`;
     }
 
     /**
@@ -64,7 +64,7 @@
      */
     function selectSegment(segment) {
         if (!form) return;
-        form.querySelectorAll('input[name="status"]').forEach(function (el) {
+        form.querySelectorAll('input[name="status"]').forEach((el) => {
             const input = /** @type {HTMLInputElement} */ (el);
             input.checked = input.value === segment;
         });
@@ -83,7 +83,7 @@
             return SEGMENTS.indexOf(saved) >= 0 ? saved : null;
         }
         if (Array.isArray(saved)) {
-            const known = saved.filter(function (s) {
+            const known = saved.filter((s) => {
                 return typeof s === 'string' && (COUNTED.indexOf(s) >= 0 || s === 'CANCELLED');
             });
             if (known.length === 0) return 'PENDING';
@@ -125,12 +125,12 @@
      */
     function load(segment) {
         if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
-            window.location.assign('/bank/requests?status=' + encodeURIComponent(segment));
+            window.location.assign(`/bank/requests?status=${encodeURIComponent(segment)}`);
             return;
         }
         window.krtFetch.swap({
-            url: '/bank/requests?status=' + encodeURIComponent(segment),
-            container: '#' + RESULTS_ID,
+            url: `/bank/requests?status=${encodeURIComponent(segment)}`,
+            container: `#${RESULTS_ID}`,
             fragmentValue: 'requestQueue',
             history: true,
         });
@@ -141,11 +141,11 @@
      * counter, which sit outside the swapped container.
      */
     function applyCounts() {
-        const source = document.querySelector('#' + RESULTS_ID + ' [data-bank-request-counts]');
+        const source = document.querySelector(`#${RESULTS_ID} [data-bank-request-counts]`);
         if (!source || !form) return;
-        COUNTED.forEach(function (segment) {
-            const value = source.getAttribute('data-count-' + segment.toLowerCase());
-            const input = form.querySelector('input[name="status"][value="' + segment + '"]');
+        COUNTED.forEach((segment) => {
+            const value = source.getAttribute(`data-count-${segment.toLowerCase()}`);
+            const input = form.querySelector(`input[name="status"][value="${segment}"]`);
             const label = input ? input.closest('label') : null;
             const badge = label ? label.querySelector('.seg-count') : null;
             if (badge && value !== null) badge.textContent = value;
@@ -158,24 +158,24 @@
         }
     }
 
-    form.addEventListener('submit', function (event) {
+    form.addEventListener('submit', (event) => {
         event.preventDefault();
     });
 
-    form.addEventListener('change', function (event) {
+    form.addEventListener('change', (event) => {
         const target = event.target;
         if (!(target instanceof HTMLInputElement) || target.name !== 'status') return;
         writeSaved(target.value);
         load(target.value);
     });
 
-    document.addEventListener('krt:swapped', function (event) {
+    document.addEventListener('krt:swapped', (event) => {
         const detail = /** @type {CustomEvent} */ (event).detail;
         const container = detail && detail.container instanceof Element ? detail.container : null;
         if (container && container.id === RESULTS_ID) applyCounts();
     });
 
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', () => {
         if (/[?&]status=/.test(window.location.search)) {
             writeSaved(currentSegment());
             return;
