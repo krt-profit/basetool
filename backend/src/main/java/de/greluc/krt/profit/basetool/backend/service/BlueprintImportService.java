@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintExternalAlias;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintExternalAliasSource;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintSource;
@@ -40,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintReposit
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -83,7 +85,7 @@ public class BlueprintImportService {
   private final ObjectMapper objectMapper;
   private final BlueprintProductService blueprintProductService;
   private final BlueprintNameNormalizer normalizer;
-  private final BlueprintFuzzyMatcher fuzzyMatcher;
+  private final FuzzyNameMatcher fuzzyMatcher;
   private final BlueprintExternalAliasRepository aliasRepository;
   private final PersonalBlueprintRepository personalBlueprintRepository;
   private final GameItemRepository gameItemRepository;
@@ -405,11 +407,11 @@ public class BlueprintImportService {
     }
 
     List<BlueprintImportSuggestionDto> suggestions =
-        fuzzyMatcher.topSuggestions(
+        topSuggestions(
             untagged != null ? normalizer.normalize(untagged) : normalized,
             allProducts,
-            BlueprintFuzzyMatcher.DEFAULT_LIMIT,
-            BlueprintFuzzyMatcher.DEFAULT_THRESHOLD);
+            FuzzyNameMatcher.DEFAULT_LIMIT,
+            FuzzyNameMatcher.DEFAULT_THRESHOLD);
     return new Resolution(
         entry.externalName(),
         suggestions.isEmpty() ? BlueprintImportStatus.UNMATCHED : BlueprintImportStatus.SUGGESTED,
@@ -587,4 +589,37 @@ public class BlueprintImportService {
       @NotNull BlueprintImportStatus status,
       @Nullable ResolvedProduct product,
       @NotNull List<BlueprintImportSuggestionDto> suggestions) {}
+
+  /**
+   * Returns the best {@code limit} products scoring at least {@code threshold}, highest first, ties
+   * broken by product name; a domain wrapper over {@link FuzzyNameMatcher#topMatches}.
+   *
+   * @param normalizedQuery the normalized external name
+   * @param candidates the master products to score
+   * @param limit maximum number of suggestions ({@code <= 0} yields an empty list)
+   * @param threshold minimum score in {@code [0.0, 1.0]}
+   * @return the top suggestions, highest score first
+   */
+  @NotNull
+  private List<BlueprintImportSuggestionDto> topSuggestions(
+      @NotNull String normalizedQuery,
+      @NotNull List<ResolvedProduct> candidates,
+      int limit,
+      double threshold) {
+    return fuzzyMatcher
+        .topMatches(
+            normalizedQuery,
+            candidates,
+            ResolvedProduct::productKey,
+            Comparator.comparing(
+                ResolvedProduct::productName, Comparator.nullsLast(String::compareToIgnoreCase)),
+            limit,
+            threshold)
+        .stream()
+        .map(
+            match ->
+                new BlueprintImportSuggestionDto(
+                    match.candidate().productKey(), match.candidate().productName(), match.score()))
+        .toList();
+  }
 }

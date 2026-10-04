@@ -17,17 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+/** The notification module: notification rules, their fan-out and delivery. */
+@ApplicationModule(allowedDependencies = {"kernel"})
+package de.greluc.krt.profit.basetool.backend.notification;
 
-import jakarta.validation.constraints.Size;
-import java.util.UUID;
-
-/**
- * Payload for designating an Organisationsleitung's Grand Admiral (REQ-ORG-021): exactly one of an
- * account or a free-text name.
- *
- * @param userId the account to designate, or {@code null} for a free-text holder
- * @param displayName the free-text holder name, or {@code null} when designating an account; at
- *     most 120 chars
- */
-public record GrandAdmiralRequest(UUID userId, @Size(max = 120) String displayName) {}
+import org.springframework.modulith.ApplicationModule;

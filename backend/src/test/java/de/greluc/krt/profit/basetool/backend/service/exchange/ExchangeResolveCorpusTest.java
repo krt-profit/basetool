@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintExternalAlias;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintExternalAliasSource;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportEntryDto;
@@ -45,7 +46,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintFuzzyMatcher;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintNameNormalizer;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService;
@@ -123,7 +123,7 @@ class ExchangeResolveCorpusTest {
             mapper,
             blueprintProductService,
             new BlueprintNameNormalizer(),
-            new BlueprintFuzzyMatcher(),
+            new FuzzyNameMatcher(),
             blueprintAliasRepository,
             personalBlueprintRepository,
             gameItemRepository,
@@ -133,7 +133,7 @@ class ExchangeResolveCorpusTest {
             blueprintProductService,
             importService,
             new BlueprintNameNormalizer(),
-            new BlueprintFuzzyMatcher(),
+            new FuzzyNameMatcher(),
             blueprintRepository,
             gameItemRepository,
             materialRepository,

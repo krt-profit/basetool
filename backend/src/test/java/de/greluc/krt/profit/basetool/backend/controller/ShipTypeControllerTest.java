@@ -24,7 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
-import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipTypeDto;
@@ -44,7 +44,7 @@ import org.springframework.data.domain.Pageable;
 class ShipTypeControllerTest {
 
   @Mock private ShipTypeService service;
-  @Mock private ShipMapper mapper;
+  @Mock private ShipTypeMapper mapper;
 
   @InjectMocks private ShipTypeController controller;
 
@@ -64,13 +64,13 @@ class ShipTypeControllerTest {
     ShipTypeDto dto = new ShipTypeDto(UUID.randomUUID(), "Cutlass Black", null, null, 46, false);
     when(service.getAllShipTypes(any(Pageable.class), eq(false)))
         .thenReturn(new PageImpl<>(List.of(entity)));
-    when(mapper.shipTypeToDto(entity)).thenReturn(dto);
+    when(mapper.toDto(entity)).thenReturn(dto);
 
     PageResponse<ShipTypeDto> resp = controller.getAllShipTypes(null, null, null, false);
 
     assertEquals(1, resp.totalElements());
     assertSame(dto, resp.content().getFirst());
-    verify(mapper).shipTypeToDto(entity);
+    verify(mapper).toDto(entity);
   }
 
   @Test
@@ -79,7 +79,7 @@ class ShipTypeControllerTest {
     ShipType entity = new ShipType();
     ShipTypeDto dto = new ShipTypeDto(id, "x", null, null, 1, false);
     when(service.getShipType(id)).thenReturn(entity);
-    when(mapper.shipTypeToDto(entity)).thenReturn(dto);
+    when(mapper.toDto(entity)).thenReturn(dto);
 
     ShipTypeDto result = controller.getShipType(id);
 
@@ -93,7 +93,7 @@ class ShipTypeControllerTest {
     ShipTypeDto dto = new ShipTypeDto(id, "x", null, null, 1, true);
 
     when(service.updateShipTypeVisibility(id, true)).thenReturn(updated);
-    when(mapper.shipTypeToDto(updated)).thenReturn(dto);
+    when(mapper.toDto(updated)).thenReturn(dto);
 
     ShipTypeDto result = controller.updateShipTypeVisibility(id, true);
 
@@ -105,7 +105,7 @@ class ShipTypeControllerTest {
   void updateVisibility_falsePathForwardsFalse() {
     UUID id = UUID.randomUUID();
     when(service.updateShipTypeVisibility(id, false)).thenReturn(new ShipType());
-    when(mapper.shipTypeToDto(any())).thenReturn(new ShipTypeDto(id, "x", null, null, 1, false));
+    when(mapper.toDto(any())).thenReturn(new ShipTypeDto(id, "x", null, null, 1, false));
 
     controller.updateShipTypeVisibility(id, false);
 

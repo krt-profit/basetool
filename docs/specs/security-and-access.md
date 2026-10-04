@@ -4602,7 +4602,7 @@ data is no more disclosable to an admin serving somebody's Art. 15 request than 
 `DataExportScrubCoverageTest`, `DataExportPdfFieldLabelCoverageTest`,
 `DataExportPdfSectionLabelCoverageTest`, `GdprParticipantCoverageTest`, `HandleScrubberTest`,
 `DataExportControllerSecurityTest` · **Code:** `support/DataExportSections`,
-`support/HandleScrubber`, `service/DataExportService`, `service/DataExportReportService`,
+`kernel/HandleScrubber`, `service/DataExportService`, `service/DataExportReportService`,
 `service/pdf/DataExportPdfFormat`, `controller/DataExportController`,
 `controller/AdminDataExportController`, frontend `controller/DataExportProxyController`,
 `templates/profile.html` (`#profile-export-card` — the member's export buttons are plain `GET`
@@ -5049,7 +5049,7 @@ it.
 - [x] Nothing is deleted: row counts, timestamps, event types, amounts and subjects are unchanged.
 
 **Enforced by:** `HandleAnonymisationServiceTest`, `HandleErasureCoverageTest` · **Code:**
-`service/HandleAnonymisationService`, `support/HandleAnonymisation`, `support/HandleErasureCoverage`,
+`service/HandleAnonymisationService`, `kernel/HandleAnonymisation`, `support/HandleErasureCoverage`,
 `repository/AuditEventRepository#anonymiseActorHandle`,
 `repository/BankAuditEventRepository#anonymiseActorHandle`,
 `repository/BankTransactionRepository#anonymiseCounterpartyHandle`,

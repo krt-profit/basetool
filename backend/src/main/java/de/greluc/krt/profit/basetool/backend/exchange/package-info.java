@@ -17,17 +17,24 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
-
-import jakarta.validation.constraints.NotNull;
-import java.util.UUID;
-
 /**
- * Request body to add a Bereichsleitung member or change their role (REQ-ORG-017). The user must
- * hold no Staffel membership; an existing membership on this Bereich is updated in place, otherwise
- * one is created.
- *
- * @param userId the user to grant the Bereichsleitung role to; required
- * @param role the Bereichsleitung role (Leiter / Koordinator / Operator); required
+ * The exchange module: the external client exchange the ingest gateway relays to (REQ-INGEST-*).
  */
-public record AddBereichLeaderRequest(@NotNull UUID userId, @NotNull BereichLeadershipRole role) {}
+@ApplicationModule(
+    allowedDependencies = {
+      "audit::api",
+      "bank::api",
+      "identity::api",
+      "inventory::api",
+      "joborder::api",
+      "kernel",
+      "livesync::api",
+      "materialexchange::api",
+      "notification::api",
+      "orgunit::api",
+      "refinery::api",
+      "scope::api"
+    })
+package de.greluc.krt.profit.basetool.backend.exchange;
+
+import org.springframework.modulith.ApplicationModule;

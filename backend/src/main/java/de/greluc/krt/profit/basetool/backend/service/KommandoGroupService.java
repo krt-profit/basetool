@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateKommandoGroupRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.KommandoGroupDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateKommandoGroupRequest;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipChangeObserver;
 import de.greluc.krt.profit.basetool.backend.repository.KommandoGroupRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
@@ -67,7 +68,7 @@ public class KommandoGroupService {
   private final OrgUnitRepository orgUnitRepository;
   private final OrgUnitMembershipRepository membershipRepository;
   private final AuditRecorder auditRecorder;
-  private final OrgChartService orgChartService;
+  private final MembershipChangeObserver membershipChangeObserver;
   private final KommandoGroupMapper kommandoGroupMapper;
 
   /**
@@ -112,7 +113,7 @@ public class KommandoGroupService {
             .sortIndex((int) existing)
             .build();
     KommandoGroup saved = kommandoGroupRepository.saveAndFlush(group);
-    orgChartService.mirrorCreateKommandoGroup(saved);
+    membershipChangeObserver.onKommandoGroupCreated(saved);
     auditRecorder.record(
         AuditEventType.KOMMANDO_GROUP_CREATED,
         saved.getId(),
@@ -141,7 +142,7 @@ public class KommandoGroupService {
     group.setName(request.name().strip());
     group.setSortIndex(request.sortIndex());
     KommandoGroup saved = kommandoGroupRepository.saveAndFlush(group);
-    orgChartService.mirrorUpdateKommandoGroup(saved);
+    membershipChangeObserver.onKommandoGroupUpdated(saved);
     auditRecorder.record(
         AuditEventType.KOMMANDO_GROUP_UPDATED, saved.getId(), saved.getName(), null, null);
     return kommandoGroupMapper.toDto(saved);
@@ -163,7 +164,7 @@ public class KommandoGroupService {
           "Kommandogruppe still has assigned members — reassign them before deleting it");
     }
     String name = group.getName();
-    orgChartService.mirrorDeleteKommandoGroup(groupId);
+    membershipChangeObserver.onKommandoGroupDeleted(groupId);
     kommandoGroupRepository.delete(group);
     auditRecorder.record(AuditEventType.KOMMANDO_GROUP_DELETED, groupId, name, null, null);
   }

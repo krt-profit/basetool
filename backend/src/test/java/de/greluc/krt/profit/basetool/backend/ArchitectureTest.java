@@ -1079,7 +1079,7 @@ class ArchitectureTest {
   @Test
   void exchangeDtosStayInTheExchangeLayer() {
     DescribedPredicate<JavaClass> selection = exchangeDtos();
-    assertClassFloor("exchangeDtosStayInTheExchangeLayer", selection, 37);
+    assertClassFloor("exchangeDtosStayInTheExchangeLayer", selection, 34);
     exchangeDtosStayInTheExchangeLayerRule(selection).check(CLASSES);
   }
 
@@ -1127,7 +1127,7 @@ class ArchitectureTest {
 
   @Test
   void supportPackageMustStayADependencyLeaf() {
-    assertClassFloor("supportPackageMustStayADependencyLeaf", SUPPORT_CODE, 63);
+    assertClassFloor("supportPackageMustStayADependencyLeaf", SUPPORT_CODE, 61);
     supportPackageMustStayADependencyLeafRule(
             SUPPORT_CODE, SUPPORT_CODE.or(MODEL_CODE).or(REPOSITORY_CODE), ROOT_PACKAGE)
         .check(CLASSES);
@@ -1687,7 +1687,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 610);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 604);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 

@@ -45,6 +45,24 @@
         z-index: 60;
     }
 
+    @media (768px < width <= 1024px) {
+        .bank-req-table :is(th, td) {
+            padding-inline: var(--space-3);
+        }
+
+        .bank-req-row > td:not(.cell-actions) {
+            overflow-wrap: anywhere;
+        }
+
+        .bank-req-row > td.cell-actions {
+            white-space: normal;
+        }
+
+        .bank-req-actions {
+            flex-wrap: wrap;
+        }
+    }
+
     @media (width <= 768px) {
         .bank-req-head {
             gap: var(--space-1) var(--space-2);

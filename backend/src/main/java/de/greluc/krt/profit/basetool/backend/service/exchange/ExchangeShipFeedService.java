@@ -27,10 +27,10 @@ import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeItemRefD
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeLocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeShipDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeShipPageDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeShipRow;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeTombstoneDto;
 import de.greluc.krt.profit.basetool.backend.repository.ExchangeShipLinkRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
+import de.greluc.krt.profit.basetool.backend.repository.ShipRepository.ExchangeShipRow;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;

@@ -31,7 +31,7 @@ authorization chain, the scope predicate, the audited areas, the aggregates and 
 
 The backend is being cut by domain (ADR-0231, `docs/DOMAIN_MODULARISATION_PLAN.md`). Until the
 domain packages exist, `src/test/resources/architecture/domain-map.txt` assigns every main class to
-its target module, first matching rule wins (REQ-MOD-001…005).
+its target module, first matching rule wins (REQ-MOD-001…006).
 
 - **A new class must match a rule.** `DomainMapTest` fails on an unassigned class, a dead rule, an
   empty module and a duplicate simple name. Add an explicit `class` rule with its reason when no name
@@ -45,6 +45,14 @@ its target module, first matching rule wins (REQ-MOD-001…005).
   `AuditDomain` and `AuditDetails` from the same package. `AuditService` and the rest of the audit
   trail are the audit module's internals; the listener and controller audit rules key on all three
   recorder types, so a new recorder type is added there too.
+- **A lower module reacts upward only through an observer it owns** (plan §5.3). The org-unit
+  services report leadership and Kommandogruppe changes to `orgunit.api.MembershipChangeObserver`;
+  `OrgChartService` implements it. An implementation is `@Transactional(propagation = MANDATORY)`
+  and the interface carries `@ObserverSpi` (`ListenerAndObserverRulesTest` fails otherwise); never
+  call a higher module's service from `orgunit` directly.
+- **Domain-free helpers go to `kernel`**, not to `support`, when they need nothing but the JDK
+  (`HandleAnonymisation`, `HandleScrubber`, `FuzzyNameMatcher`). A helper that reads an entity is
+  not domain-free.
 - **A domain event goes into its publisher's `<module>.api.events` package** — the module of the
   service that calls `publishEvent` with it; there is no central `event` package. A
   notification-producing event implements `notification.api.events.NotificationEvent`. A new
@@ -59,6 +67,15 @@ its target module, first matching rule wins (REQ-MOD-001…005).
   audit trail outside the audit module joins retention as a `RetentionParticipant`. A platform SPI
   in a layer package sits in a package its implementations already live in (`ActiveOrgUnitProvider`
   in `service`, not `logging`), or the implementation closes a layer cycle.
+- **A new module package gets its Spring Modulith declarations in the same PR** (REQ-MOD-006,
+  ADR-0233 amendment 1). Its root `package-info` carries `@ApplicationModule(allowedDependencies =
+  {…})`, its `api` package **and every package below `api`** carry `@NamedInterface("api")` (a
+  package-level `@NamedInterface` does not cover sub-packages), and the module is added to
+  `ModularityTest.DECLARED_MODULES`. `allowedDependencies` is derived, not chosen: the `"<m>::api"`
+  of every declared module the domain map's ranks and `allow` rows permit — a bare `"<m>"` admits
+  only the unnamed interface. Declaring a module also adds it to the lists of the declared modules
+  above it. `ModularityTest` fails until all of this matches. The annotations come from
+  `spring-modulith-api`, `compileOnly`; never move Spring Modulith's engine out of test scope.
 
 ## Concurrency — read this before touching multi-step transactions
 

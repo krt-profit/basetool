@@ -17,26 +17,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto.exchange;
-
-import java.util.UUID;
-
 /**
- * The identifiers of one game item, for resolving an item reference (REQ-XCH-012).
- *
- * @param id the item's id
- * @param name the item's display name
- * @param className the item's DataForge class name, or {@code null}
- * @param externalUuid the item's Wiki UUID, or {@code null}
- * @param p4kUuid the item's game-file UUID, or {@code null}
- * @param uexId the item's UEX id, or {@code null}
- * @param nameKey the item's {@code global.ini} name key, or {@code null}
+ * The Materialbörse module's published API: in {@code events}, the interest and fulfilment events
+ * (plan §5.2).
  */
-public record ExchangeItemKeyRow(
-    UUID id,
-    String name,
-    String className,
-    UUID externalUuid,
-    UUID p4kUuid,
-    Integer uexId,
-    String nameKey) {}
+@NamedInterface("api")
+package de.greluc.krt.profit.basetool.backend.materialexchange.api;
+
+import org.springframework.modulith.NamedInterface;

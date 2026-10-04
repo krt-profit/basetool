@@ -113,7 +113,8 @@ class JobOrderServicePriorityAndStatusTest {
             null,
             jobOrderStockProjectionService,
             jobOrderPriorityService,
-            qualityTierService);
+            qualityTierService,
+            ownerScopeService);
     lenient()
         .when(jobOrderMapper.toDto(any(JobOrder.class)))
         .thenAnswer(

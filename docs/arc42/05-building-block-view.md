@@ -105,6 +105,15 @@ The publishing services and the listeners still sit in `service`. `OrgUnitRef` s
 notification contract rather than the kernel, because it carries the org-unit module's
 `OrgUnitKind`.
 
+The Phase 1 re-homings (plan §7.3) added three more: `kernel` (handle anonymisation, the handle
+scrubber and the generic `FuzzyNameMatcher`), `orgunit.api` (`BereichLeadershipRole` and the observer SPI `MembershipChangeObserver`) and
+`orgunit.web` (the Bereich-leader and Grand-Admiral request bodies). The org chart mirrors the
+leadership ranks as that observer, inside the transaction of the rank change, so the org-unit
+services no longer know `OrgChartService`. The exchange's row records are nested in the
+repositories that produce them, the catalogue's `ShipTypeMapper` maps ship types, and
+`AuthHelperService` no longer delegates to `OwnerScopeService`: callers ask the scope API
+directly.
+
 The platform modules reach the domains only through SPIs they own and the domains implement
 (plan §5.3); Spring injects the implementations, so the platform names no domain class:
 

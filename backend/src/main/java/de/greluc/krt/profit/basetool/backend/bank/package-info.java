@@ -17,21 +17,24 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
-
 /**
- * The role a member holds within a Bereichsleitung (REQ-ORG-017), each mapping to one flag on the
- * member's {@code org_unit_membership} row. All three confer the same cascading officer-equivalent
- * reach (REQ-ORG-015).
+ * The bank module: the Kartellbank's accounts, bookings and booking requests, org-unit-blind by
+ * design (ADR-0020).
  */
-public enum BereichLeadershipRole {
+@ApplicationModule(
+    allowedDependencies = {
+      "audit::api",
+      "identity::api",
+      "inventory::api",
+      "joborder::api",
+      "kernel",
+      "livesync::api",
+      "materialexchange::api",
+      "notification::api",
+      "orgunit::api",
+      "refinery::api",
+      "scope::api"
+    })
+package de.greluc.krt.profit.basetool.backend.bank;
 
-  /** Bereichsleiter — the head of the Bereich ({@code is_bereichsleiter}). */
-  LEITER,
-
-  /** Bereichskoordinator — an area coordinator ({@code is_bereichskoordinator}). */
-  KOORDINATOR,
-
-  /** Bereichsoperator — an area operator ({@code is_bereichsoperator}). */
-  OPERATOR
-}
+import org.springframework.modulith.ApplicationModule;

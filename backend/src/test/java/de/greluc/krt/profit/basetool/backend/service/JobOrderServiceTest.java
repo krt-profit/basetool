@@ -142,7 +142,8 @@ class JobOrderServiceTest {
             jobOrderItemService,
             jobOrderStockProjectionService,
             jobOrderPriorityService,
-            qualityTierService);
+            qualityTierService,
+            ownerScopeService);
     jobOrderQueryService =
         new JobOrderQueryService(
             jobOrderRepository,
@@ -1588,7 +1589,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(targetId)).thenReturn(Optional.of(target));
     when(authHelperService.isAdmin()).thenReturn(false);
-    when(authHelperService.canEditOrgUnit(currentId)).thenReturn(true);
+    when(ownerScopeService.canEditOrgUnit(currentId)).thenReturn(true);
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
     when(materialClaimService.getClaimBucketsForOrder(any(JobOrder.class)))
@@ -1617,7 +1618,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(targetId)).thenReturn(Optional.of(target));
     when(authHelperService.isAdmin()).thenReturn(false);
-    when(authHelperService.canEditOrgUnit(currentId)).thenReturn(true);
+    when(ownerScopeService.canEditOrgUnit(currentId)).thenReturn(true);
 
     assertThrows(
         org.springframework.security.access.AccessDeniedException.class,
@@ -1642,7 +1643,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(targetId)).thenReturn(Optional.of(target));
     when(authHelperService.isAdmin()).thenReturn(false);
-    when(authHelperService.canEditOrgUnit(currentId)).thenReturn(true);
+    when(ownerScopeService.canEditOrgUnit(currentId)).thenReturn(true);
 
     assertThrows(
         org.springframework.security.access.AccessDeniedException.class,
@@ -1667,7 +1668,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(targetId)).thenReturn(Optional.of(target));
     when(authHelperService.isAdmin()).thenReturn(false);
-    when(authHelperService.canEditOrgUnit(currentId)).thenReturn(false);
+    when(ownerScopeService.canEditOrgUnit(currentId)).thenReturn(false);
 
     assertThrows(
         org.springframework.security.access.AccessDeniedException.class,

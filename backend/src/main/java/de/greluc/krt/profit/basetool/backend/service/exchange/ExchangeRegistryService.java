@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.repository.ExchangeClientRepository
 import de.greluc.krt.profit.basetool.backend.repository.ExchangeInstallationRepository;
 import de.greluc.krt.profit.basetool.backend.support.KnownExchangeClients;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
@@ -49,7 +50,6 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -166,8 +166,8 @@ public class ExchangeRegistryService {
     client.setDisplayName(displayName);
     client.setStatus(ExchangeClientStatus.ACTIVE);
     client.setCapabilities(EnumSet.copyOf(request.capabilities()));
-    client.setMinClientVersion(blankToNull(request.minClientVersion()));
-    client.setContactUrl(blankToNull(request.contactUrl()));
+    client.setMinClientVersion(StringNormalization.trimToNull(request.minClientVersion()));
+    client.setContactUrl(StringNormalization.trimToNull(request.contactUrl()));
     client.setRequestsPerMinute(request.requestsPerMinute());
     client.setWritesPerDay(request.writesPerDay());
     ExchangeClient saved = clientRepository.saveAndFlush(client);
@@ -340,12 +340,12 @@ public class ExchangeRegistryService {
   private static List<String> applyLimits(
       @NotNull ExchangeClient client, @NotNull ExchangeClientUpdateRequest request) {
     List<String> changed = new ArrayList<>();
-    String minClientVersion = blankToNull(request.minClientVersion());
+    String minClientVersion = StringNormalization.trimToNull(request.minClientVersion());
     if (!Objects.equals(minClientVersion, client.getMinClientVersion())) {
       client.setMinClientVersion(minClientVersion);
       changed.add("minClientVersion");
     }
-    String contactUrl = blankToNull(request.contactUrl());
+    String contactUrl = StringNormalization.trimToNull(request.contactUrl());
     if (!Objects.equals(contactUrl, client.getContactUrl())) {
       client.setContactUrl(contactUrl);
       changed.add("contactUrl");
@@ -402,17 +402,6 @@ public class ExchangeRegistryService {
         .sorted()
         .map(ExchangeCapability::getScope)
         .collect(Collectors.joining(","));
-  }
-
-  /**
-   * Strips a value and maps a blank one to {@code null}.
-   *
-   * @param value the raw value
-   * @return the stripped value, or {@code null}
-   */
-  @Nullable
-  private static String blankToNull(@Nullable String value) {
-    return value == null || value.isBlank() ? null : value.strip();
   }
 
   /**

@@ -19,14 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.service.exchange;
 
+import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExternalAlias;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportSuggestionDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeBlueprintKeyRow;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeCatalogKind;
-import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeItemKeyRow;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeItemRef;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeResolveRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeResolveResponse;
@@ -35,11 +34,12 @@ import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeResolveR
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeResolveResponse.Status;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeResolveResponse.Warning;
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository.ExchangeBlueprintKeyRow;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
+import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository.ExchangeItemKeyRow;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExternalAliasRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintFuzzyMatcher;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService.NameResolution;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintNameNormalizer;
@@ -96,7 +96,7 @@ public class ExchangeResolveService {
   private final BlueprintProductService blueprintProductService;
   private final BlueprintImportService blueprintImportService;
   private final BlueprintNameNormalizer normalizer;
-  private final BlueprintFuzzyMatcher fuzzyMatcher;
+  private final FuzzyNameMatcher fuzzyMatcher;
   private final BlueprintRepository blueprintRepository;
   private final GameItemRepository gameItemRepository;
   private final MaterialRepository materialRepository;
@@ -473,8 +473,8 @@ public class ExchangeResolveService {
                     Objects.requireNonNullElse(MaterialNameCanonicalizer.fuzzyKey(m.getName()), ""),
                 Comparator.comparing(
                     Material::getName, Comparator.nullsLast(String::compareToIgnoreCase)),
-                BlueprintFuzzyMatcher.DEFAULT_LIMIT,
-                BlueprintFuzzyMatcher.DEFAULT_THRESHOLD)
+                FuzzyNameMatcher.DEFAULT_LIMIT,
+                FuzzyNameMatcher.DEFAULT_THRESHOLD)
             .stream()
             .map(scored -> toEntry(scored.candidate()))
             .toList());

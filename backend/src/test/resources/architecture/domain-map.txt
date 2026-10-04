@@ -47,7 +47,6 @@ class PersonSearchService privacy GDPR orchestration, transitional module (plan 
 class PersonSearchTargets privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class PersonSearchHitDto privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class HandleErasureCoverage privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
-class HandleScrubber privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class HandleSpellings privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class DataExportController privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class AdminDataExportController privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
@@ -63,7 +62,6 @@ class CreateDeletionRequestRequest privacy GDPR orchestration, transitional modu
 class DecideDeletionRequestRequest privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class ConsolidateAccountRequest privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class MergeAccountRequest privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
-class HandleAnonymisation kernel handle anonymisation sentinel (plan 5.1 kernel)
 class PayoutPreference identity member preference on User (plan 7.3)
 class AccessGateService scope per-aggregate can* gate slab for mission/joborder/inventory/refinery/operation/ship (ADR-0065)
 class OwnerScopeService scope scope facade referenced by 64+ SpEL strings (ADR-0065)
@@ -178,8 +176,6 @@ class StaffelMembershipResolver orgunit resolves SQUADRON memberships to squadro
 class OrgUnitLabels orgunit org-unit audit label
 class Department orgunit Bereich brand colour
 class MembershipRole orgunit rank on an OrgUnitMembership
-class BereichLeadershipRole orgunit Bereichsleitung role of an appointment
-class GrandAdmiralRequest orgunit Grand Admiral appointment (REQ-ORG-021)
 class AreaLeadershipDto orgchart org chart tier
 class FinanceType mission mission finance entry type
 class RefineryMissionProfitAggregate refinery refinery profit per mission projection
@@ -227,6 +223,8 @@ package privacy privacy the GDPR module's package tree, transitional (plan 5.1 r
 package inventory inventory the inventory module's package tree (plan 5.2)
 package refinery refinery the refinery module's package tree (plan 5.2)
 package scope scope the scope module's package tree (plan 5.2)
+package kernel kernel the kernel's package tree (plan 5.1 rank 0)
+package orgunit orgunit the org-unit module's package tree (plan 5.2)
 
 name ^OrgUnitBank bank
 name ^(Bank|CreateBank|CancelBank|ConfirmBank|RegisterBank|RejectBank|RenameBank|ReverseBank|SetBank|UpdateBank|SetCartel|OrgUnitBalanceTarget) bank
@@ -236,7 +234,7 @@ name ^(MaterialClaim|ClaimBucket|ClaimDto|CreateClaim|MaterialDemand) joborder
 name ^(JobOrder|CreateJobOrder|UpdateJobOrder|HandoverReport) joborder
 name ^PersonalInventory personalinventory
 name ^(Inventory|BulkCheckout|BulkRebook|BulkStolenMark|BulkOrgUnitChange|AggregatedInventory|GroupedInventory|AllocationReduction|StockViewerAccess|OwnedStockSlice) inventory
-name ^(PersonalBlueprint|DefaultBlueprint|BlueprintImport|BlueprintExport|BlueprintCraftability|Craftability|BlueprintOverview|BlueprintProduct|BlueprintUploadPreview|BlueprintFuzzy|BlueprintOwner|BlueprintModifierMath|BlueprintVariant|BlueprintSource|BlueprintExternalAlias) blueprint
+name ^(PersonalBlueprint|DefaultBlueprint|BlueprintImport|BlueprintExport|BlueprintCraftability|Craftability|BlueprintOverview|BlueprintProduct|BlueprintUploadPreview|BlueprintOwner|BlueprintModifierMath|BlueprintVariant|BlueprintSource|BlueprintExternalAlias) blueprint
 name ^(Blueprint) catalogue
 name ^(Mission|AddCrew|AddExternalParticipant|AddParticipantById|AddUnit|JoinMission|UpdateCrew|UpdateParticipant|UpdatePayoutPreference|UpdateUnit|AddCustomFrequency|AddFrequency|UpdateCustomFrequency|CreateMission|PatchMission|ReorderMission|SetPartyLead|ToggleMissionStep|UpdateMission|AddMission|ParticipantTargetResolver) mission
 name ^Operation operation
@@ -247,7 +245,8 @@ name ^(Notification|LocalNotification|RedisNotification|RuleEvaluation|Recipient
 name ^Audit audit
 name ^(Promotion|RankRequirement|MemberEvaluation) promotion
 name ^(OrgChart|BereichChart|CommandChart|OlChart|SpecialCommandChart|SquadronChart) orgchart
-name ^(Leitung|OrgRoleManagement|AddBereichLeader|AddOlMember|SquadronRole|AssignSquadronRank) orgunit leadership merged into orgunit (plan 7.3)
+name ^Leitung orgchart the Leitung view belongs to the org chart (plan 7.3)
+name ^(OrgRoleManagement|AddOlMember|SquadronRole|AssignSquadronRank) orgunit leadership writes merged into orgunit (plan 7.3)
 name ^(OrgUnit|Squadron|SpecialCommand|Bereich|Organisationsleitung|KommandoGroup|CreateKommandoGroup|UpdateKommandoGroup|OrgHierarchy|Membership) orgunit
 name ^(User|Role|Registration|PendingRegistration|ApproveRegistration|RejectRegistration|ReopenRegistration|LinkRegistration|MyRegistration|Discord|Keycloak|Terms|DeletionRequest|CreateDeletionRequest|DecideDeletionRequest|DataExport|AdminDataExport|AccountDeletion|AccountConsolidation|ConsolidateAccount|MergeAccount|Handle|PersonSearch|AdminPersonSearch|AdminTerms|AdminDeletion|RejectedRegistration|ApprovalDecision|ApprovalStatus|AdminController$) identity
 name ^AdminPersonalInventory personalinventory

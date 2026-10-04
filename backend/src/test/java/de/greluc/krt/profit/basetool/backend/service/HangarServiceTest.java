@@ -30,7 +30,7 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
@@ -67,7 +67,7 @@ class HangarServiceTest {
   @Mock private EntityManager entityManager;
   @Mock private de.greluc.krt.profit.basetool.backend.repository.UserRepository userRepository;
   @Mock private de.greluc.krt.profit.basetool.backend.service.OwnerScopeService ownerScopeService;
-  @Mock private ShipMapper shipMapper;
+  @Mock private ShipTypeMapper shipTypeMapper;
   @Mock private AuditService auditService;
 
   @InjectMocks private HangarService hangarService;
@@ -399,7 +399,7 @@ class HangarServiceTest {
     inScopeShip.setFitted(true);
     when(shipRepository.findByShipTypeInScoped(List.of(fighter), false, squadronId, Set.of()))
         .thenReturn(List.of(inScopeShip));
-    when(shipMapper.shipTypeToDto(any())).thenReturn(null);
+    when(shipTypeMapper.toDto(any())).thenReturn(null);
 
     var page = hangarService.getSquadronOverview(pageable, true, null);
 

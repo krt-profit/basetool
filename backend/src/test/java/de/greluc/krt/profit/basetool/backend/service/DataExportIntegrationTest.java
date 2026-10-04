@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.kernel.HandleScrubber;
 import de.greluc.krt.profit.basetool.backend.model.AuditEvent;
 import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryLocationType;
@@ -30,7 +31,6 @@ import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalInventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.DataExportSections;
-import de.greluc.krt.profit.basetool.backend.support.HandleScrubber;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;

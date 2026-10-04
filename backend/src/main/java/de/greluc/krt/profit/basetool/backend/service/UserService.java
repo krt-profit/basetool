@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -33,7 +34,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchReque
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
-import de.greluc.krt.profit.basetool.backend.support.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
@@ -85,6 +85,25 @@ public class UserService {
   private final OwnerScopeService ownerScopeService;
   private final OrgUnitMembershipService orgUnitMembershipService;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
+
+  /**
+   * Returns whether the caller is a non-admin who can see none of the user's Staffeln through the
+   * scope API; a user without any Staffel counts as cross-squadron.
+   *
+   * @param userId the target user's id
+   * @return {@code true} if the caller is a non-admin and shares none of the user's Staffeln
+   */
+  public boolean isCrossSquadronForNonAdmin(@NotNull UUID userId) {
+    if (authHelperService.isAdmin()) {
+      return false;
+    }
+    List<UUID> targetSquadronIds =
+        orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(userId);
+    if (targetSquadronIds.isEmpty()) {
+      return true;
+    }
+    return targetSquadronIds.stream().noneMatch(ownerScopeService::canSeeSquadron);
+  }
 
   /**
    * Checks whether any user has this exact name, case-insensitively, as username or display name.

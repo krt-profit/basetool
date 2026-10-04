@@ -22,18 +22,16 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
-import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.ShipTypeDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 /** MapStruct mapper between Ship entities and DTOs. */
 @Mapper(
     config = CentralMapperConfig.class,
-    uses = {UserMapper.class, SquadronMapper.class})
+    uses = {UserMapper.class, SquadronMapper.class, ShipTypeMapper.class})
 public interface ShipMapper {
   /**
    * Maps a {@link Ship} to its DTO, publishing the owning org unit as {@code owningSquadron}.
@@ -49,15 +47,4 @@ public interface ShipMapper {
 
   /** Nested mapping for the ship's {@link Manufacturer}. */
   ManufacturerDto manufacturerToDto(Manufacturer manufacturer);
-
-  /**
-   * Maps the ship's {@link ShipType} to a narrow nested DTO, with {@code description} taken from
-   * {@code descriptionDe}, falling back to {@code descriptionEn}.
-   */
-  @Mapping(
-      target = "description",
-      expression =
-          "java(shipType.getDescriptionDe() != null ? shipType.getDescriptionDe()"
-              + " : shipType.getDescriptionEn())")
-  ShipTypeDto shipTypeToDto(ShipType shipType);
 }

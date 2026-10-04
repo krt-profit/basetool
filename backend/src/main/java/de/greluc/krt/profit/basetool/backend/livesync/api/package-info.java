@@ -22,4 +22,7 @@
  * de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicAuthorizer}, through which the
  * owning modules decide who may join their rooms (ADR-0143, plan §5.3).
  */
+@NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.livesync.api;
+
+import org.springframework.modulith.NamedInterface;

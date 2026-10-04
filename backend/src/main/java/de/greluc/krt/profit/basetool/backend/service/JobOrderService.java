@@ -98,6 +98,7 @@ public class JobOrderService {
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
   private final JobOrderPriorityService jobOrderPriorityService;
   private final QualityTierService qualityTierService;
+  private final OwnerScopeService ownerScopeService;
 
   /**
    * Persists a new job order in the next free priority slot (1 is highest), taking each material's
@@ -1009,7 +1010,7 @@ public class JobOrderService {
    *   <li>Admins may reassign to any profit-eligible squadron or SK, in any direction.
    *   <li>A non-admin Logistician/Officer may only escalate a squadron-responsible order to an SK,
    *       and only if they may edit its current squadron ({@link
-   *       AuthHelperService#canEditOrgUnit}).
+   *       OwnerScopeService#canEditOrgUnit}).
    * </ul>
    *
    * @param id job order id
@@ -1043,7 +1044,7 @@ public class JobOrderService {
       OrgUnit current = jobOrder.getResponsibleOrgUnit();
       boolean currentIsSquadron = current != null && current.getKind() == OrgUnitKind.SQUADRON;
       boolean targetIsSpecialCommand = target.getKind() == OrgUnitKind.SPECIAL_COMMAND;
-      boolean mayEditCurrent = current != null && authHelperService.canEditOrgUnit(current.getId());
+      boolean mayEditCurrent = current != null && ownerScopeService.canEditOrgUnit(current.getId());
       if (!(currentIsSquadron && targetIsSpecialCommand && mayEditCurrent)) {
         throw new AccessDeniedException(
             "Only an admin may reassign freely; a squadron logistician/officer may only escalate"

@@ -38,7 +38,7 @@
         <th:block th:fragment="requestQueue">
         <span hidden data-bank-request-counts
               th:attr="data-count-pending=${statusCounts['PENDING']},data-count-confirmed=${statusCounts['CONFIRMED']},data-count-rejected=${statusCounts['REJECTED']},data-count-waiting=${waitingForYouCount}"></span>
-        <table class="data-table data-table--stack" data-testid="bank-requests-table"
+        <table class="data-table data-table--stack bank-req-table" data-testid="bank-requests-table"
                th:if="${requests != null and !#lists.isEmpty(requests.content())}">
             <thead>
             <tr>

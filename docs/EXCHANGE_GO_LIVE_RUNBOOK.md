@@ -434,7 +434,7 @@ yes).
     module `http_401`), both flapping until the new ingest is up; **dashboards** — new „Exchange"
     (`basetool-exchange`, 22 panels), „Basetool operations" 64 → 76 panels; **Alloy** attaches
     `client_id` and `route` as structured metadata, not labels. Images: Grafana moves from
-    `grafana/grafana-oss:13.0.2` to `grafana/grafana:13.2.2` (it migrates `grafana.db` at start),
+    `grafana/grafana-oss:13.0.2` to `grafana/grafana:13.2.3` (it migrates `grafana.db` at start),
     Prometheus 3.15.0, redis-exporter 1.92.0, lego 5.5.2.
   - **The edge** is recreated for the new `api.*` allowlist entries („Mein Lager", org unit,
     „gestohlen", RSI handle); `edge-deny-probe.yml`'s new rows turn green once the release is live.

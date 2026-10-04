@@ -17,10 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.kernel;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportSuggestionDto;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -32,14 +30,14 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * Dependency-free fuzzy matcher that suggests master products for an unmatched external blueprint
- * name.
+ * Dependency-free fuzzy matcher that ranks candidates by the similarity of their normalized name
+ * key to a normalized query.
  *
  * <p>A candidate's score is the larger of the Levenshtein ratio and the token-set Jaccard
- * similarity over normalized keys (see {@link BlueprintNameNormalizer}).
+ * similarity of the two keys; the caller normalizes both.
  */
 @Component
-public class BlueprintFuzzyMatcher {
+public class FuzzyNameMatcher {
 
   /** Default minimum score for a candidate to be offered as a suggestion. */
   public static final double DEFAULT_THRESHOLD = 0.5;
@@ -48,43 +46,11 @@ public class BlueprintFuzzyMatcher {
   public static final int DEFAULT_LIMIT = 5;
 
   /**
-   * Returns the best {@code limit} products scoring at least {@code threshold}, highest first, ties
-   * broken by product name; a domain wrapper over {@link #topMatches}.
-   *
-   * @param normalizedQuery the normalized external name
-   * @param candidates the master products to score
-   * @param limit maximum number of suggestions ({@code <= 0} yields an empty list)
-   * @param threshold minimum score in {@code [0.0, 1.0]}
-   * @return the top suggestions, highest score first
-   */
-  @NotNull
-  public List<BlueprintImportSuggestionDto> topSuggestions(
-      @NotNull String normalizedQuery,
-      @NotNull List<ResolvedProduct> candidates,
-      int limit,
-      double threshold) {
-    return topMatches(
-            normalizedQuery,
-            candidates,
-            ResolvedProduct::productKey,
-            Comparator.comparing(
-                ResolvedProduct::productName, Comparator.nullsLast(String::compareToIgnoreCase)),
-            limit,
-            threshold)
-        .stream()
-        .map(
-            match ->
-                new BlueprintImportSuggestionDto(
-                    match.candidate().productKey(), match.candidate().productName(), match.score()))
-        .toList();
-  }
-
-  /**
    * Returns the best {@code limit} candidates scoring at least {@code threshold}, highest rounded
    * score first, ties broken by {@code tieBreak}.
    *
    * @param <T> the candidate type
-   * @param normalizedQuery the normalized external name
+   * @param normalizedQuery the normalized query
    * @param candidates the candidates to score
    * @param keyExtractor extracts each candidate's normalized key; {@code null} or empty keys are
    *     skipped

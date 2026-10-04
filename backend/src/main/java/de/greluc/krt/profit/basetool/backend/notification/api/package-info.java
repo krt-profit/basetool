@@ -18,11 +18,15 @@
  */
 
 /**
- * The notification module's SPIs: the recipient directories through which rule selectors resolve
- * their recipients in the modules that own the data (plan §5.3). {@link
+ * The notification module's published API: in {@code events}, the event contract every
+ * notification-producing event implements; here, the recipient directories through which rule
+ * selectors resolve their recipients in the modules that own the data (plan §5.2, §5.3). {@link
  * de.greluc.krt.profit.basetool.backend.notification.api.RoleRecipientDirectory} is implemented by
  * identity, {@link
  * de.greluc.krt.profit.basetool.backend.notification.api.OrgUnitRecipientDirectory} by orgunit and
  * {@link de.greluc.krt.profit.basetool.backend.notification.api.AccountRecipientDirectory} by bank.
  */
+@NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.notification.api;
+
+import org.springframework.modulith.NamedInterface;

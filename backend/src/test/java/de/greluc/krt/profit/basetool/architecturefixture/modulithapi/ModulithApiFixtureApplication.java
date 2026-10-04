@@ -17,13 +17,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto.exchange;
+package de.greluc.krt.profit.basetool.architecturefixture.modulithapi;
 
-/**
- * One non-hidden location as the exchange catalogue reads it from the database.
- *
- * @param name the location name
- * @param uexCityId the UEX id of the linked city, or {@code null}
- * @param uexSpaceStationId the UEX id of the linked space station, or {@code null}
- */
-public record ExchangeLocationRow(String name, Integer uexCityId, Integer uexSpaceStationId) {}
+import org.springframework.modulith.Modulithic;
+
+/** Root of the planted Spring Modulith fixture whose modules publish an {@code api} interface. */
+@Modulithic(systemName = "api-fixture")
+public final class ModulithApiFixtureApplication {
+
+  private ModulithApiFixtureApplication() {}
+}
