@@ -126,7 +126,7 @@ class OperationMissionCrossPublishLiveSyncE2eTest {
 
         pageA.locator("[data-testid='mission-name-input']").fill(RENAMED);
         pageA.locator("button[type='submit'][form='mission-form']").click();
-        assertThat(pageA.locator(".mission-head-title h1"))
+        assertThat(pageA.locator("#mission-title"))
             .containsText(RENAMED, new LocatorAssertions.ContainsTextOptions().setTimeout(20_000));
 
         assertThat(pageB.locator("#op-missions-results"))

@@ -351,8 +351,11 @@ The operations area (#576) combines the patterns through a set of `X-Requested-W
 (`createOperationAjax` / `updateOperationAjax` / `deleteOperationAjax`) beside the classic
 POST→redirect fallbacks. Creating or deleting from the list re-renders `#operations-results` via the
 existing `GET /operations?fragment=results` swap (the page exposes `window.krtOperationsReload` so the
-write handlers reuse the active filter query); editing on the detail page patches the version input
-and the title in place from the twin's `{version, name, status}` (the backend PUT echoes the
+write handlers reuse the active filter query); editing on the detail page — since 2026-10-03 in
+the „Bearbeiten" dialog — patches the version input from the twin's `{version, name, status}`,
+adopts the saved values as the form's defaults, closes the dialog and re-renders the overview
+fragment, whose head meta repaints the title, the status badge and the KPI bar (the backend PUT
+echoes the
 persisted operation in-transaction, so no second round-trip can observe a concurrent writer's
 `version+2` or mask an already-committed write — no navigation); deleting
 from the detail page navigates back to the list (the entity is gone — REQ-FE-006). The payout
@@ -828,8 +831,8 @@ notification SSE registry carries the same two fixes (#1157 / #1156, see REQ-NOT
 - [ ] With the same mission open in two sessions, a mutation by user A (participant add, crew move,
   finance entry, manager/owner change, core/schedule/status/party-lead edit, Ablauf-step,
   Ziele-objective or frequency/custom-frequency edit) appears on user B's view within a short delay
-  without a manual reload — including the Verwaltung steps/objectives/frequencies editors, not only
-  their Übersicht mirrors.
+  without a manual reload — including the edit mode's (formerly Verwaltung)
+  steps/objectives/frequencies editors, not only their Übersicht mirrors.
 - [ ] No mission data crosses the socket — a peer viewer's auto-refresh still renders the
   PII-redacted fragment and the member-only finance section stays gated per viewer.
 - [ ] An incoming change while user B has a modal open (or is editing the affected section) does not
@@ -1317,7 +1320,9 @@ itself, while `missions` (the embedded child-missions table) and `finance` (the 
 `overview → missions` / `finance → finance` onto its parent `operation:{id}` (publishing needs no
 subscription), so an operation viewer refreshes those two sections in place without a reload (#1241).
 The mission page reads its parent operation id from `window.missionOperationId`; a mission with no
-operation forwards nothing.
+operation forwards nothing. The operation page adds `overview` to every section it re-renders for a
+peer, and its own paid-out toggle refreshes `overview` too, because the head, the KPI bar and the
+payout card read their values from the overview fragment (`#operation-head-meta`, 2026-10-03).
 
 **Authorization is asymmetric by design (ADR-0094).** *Subscribing* to a topic requires the same
 authenticated read the page itself performs (table above), checked asynchronously off the WS
