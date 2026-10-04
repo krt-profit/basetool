@@ -17,24 +17,26 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/**
- * The bank module: the Kartellbank's accounts, bookings and booking requests, org-unit-blind by
- * design (ADR-0020).
- */
-@ApplicationModule(
-    allowedDependencies = {
-      "audit::api",
-      "identity::api",
-      "inventory::api",
-      "joborder::api",
-      "kernel",
-      "livesync::api",
-      "materialexchange::api",
-      "notification::api",
-      "orgunit::api",
-      "refinery::api",
-      "scope::api"
-    })
-package de.greluc.krt.profit.basetool.backend.bank;
+package de.greluc.krt.profit.basetool.backend.audit.api;
 
-import org.springframework.modulith.ApplicationModule;
+import java.util.Optional;
+import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
+
+/**
+ * Resolves the handle an audit row snapshots for its acting user (REQ-AUDIT-001, plan §5.3).
+ *
+ * <p>Owned by the audit module and implemented by the identity module. It runs inside the
+ * recorder's transaction and joins it.
+ */
+public interface ActorHandleResolver {
+
+  /**
+   * The display handle of a user at the time of the call.
+   *
+   * @param userId the acting user's {@code sub}
+   * @return the handle, or empty when no such user exists
+   */
+  @NotNull
+  Optional<String> handleOf(@NotNull UUID userId);
+}

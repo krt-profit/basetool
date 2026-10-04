@@ -131,6 +131,15 @@ class BankAuditServiceTest {
   }
 
   @Test
+  void asRetentionParticipant_namesTheTrailAndAsksTheRepositoryForOldRows() {
+    Instant cutoff = Instant.parse("2024-01-01T00:00:00Z");
+    when(auditEventRepository.existsByOccurredAtBefore(cutoff)).thenReturn(true);
+
+    assertEquals("the bank audit trail", bankAuditService.retentionLabel());
+    assertTrue(bankAuditService.holdsRowsBefore(cutoff));
+  }
+
+  @Test
   void purgeBefore_deletesRowsAndRecordsPurgeMarker() {
     Instant before = Instant.parse("2026-01-01T00:00:00Z");
     when(authHelperService.currentUserId()).thenReturn(Optional.empty());

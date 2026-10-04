@@ -20,15 +20,21 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.support.LiveSyncAuthorization;
 import de.greluc.krt.profit.basetool.backend.support.LiveSyncTopic;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -54,9 +60,53 @@ class LiveSyncSubscriptionAuthorizerTest {
   void setUp() {
     meterRegistry = new SimpleMeterRegistry();
     authorizer =
-        new LiveSyncSubscriptionAuthorizer(
-            ownerScopeService, authHelperService, orgUnitBankAccessService, meterRegistry);
+        new LiveSyncSubscriptionAuthorizer(authHelperService, meterRegistry, moduleAuthorizers());
     lenient().when(authHelperService.isMemberOrAbove()).thenReturn(true);
+  }
+
+  private List<LiveSyncTopicAuthorizer> moduleAuthorizers() {
+    return List.of(
+        new MissionLiveSyncTopicAuthorizer(ownerScopeService),
+        new OperationLiveSyncTopicAuthorizer(ownerScopeService),
+        new JobOrderLiveSyncTopicAuthorizer(ownerScopeService),
+        new RefineryLiveSyncTopicAuthorizer(ownerScopeService),
+        new OrgUnitBankLiveSyncTopicAuthorizer(orgUnitBankAccessService));
+  }
+
+  @Test
+  @DisplayName("every kind but member and self is delegated to exactly one module authorizer")
+  void startupRefusesAGapOrAnOverlap() {
+    List<LiveSyncTopicAuthorizer> complete = moduleAuthorizers();
+    List<LiveSyncTopicAuthorizer> missingBank = complete.subList(0, complete.size() - 1);
+    List<LiveSyncTopicAuthorizer> twoMission = new ArrayList<>(complete);
+    twoMission.add(new MissionLiveSyncTopicAuthorizer(ownerScopeService));
+    LiveSyncTopicAuthorizer claimsSelf =
+        new LiveSyncTopicAuthorizer() {
+          @Override
+          public Set<LiveSyncAuthorization> authorizations() {
+            return Set.of(LiveSyncAuthorization.SELF);
+          }
+
+          @Override
+          public boolean mayJoin(LiveSyncTopic topic) {
+            return true;
+          }
+        };
+    List<LiveSyncTopicAuthorizer> withSelf = new ArrayList<>(complete);
+    withSelf.add(claimsSelf);
+
+    assertThatThrownBy(
+            () -> new LiveSyncSubscriptionAuthorizer(authHelperService, meterRegistry, missingBank))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("BANK_ACCOUNT");
+    assertThatThrownBy(
+            () -> new LiveSyncSubscriptionAuthorizer(authHelperService, meterRegistry, twoMission))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("MISSION");
+    assertThatThrownBy(
+            () -> new LiveSyncSubscriptionAuthorizer(authHelperService, meterRegistry, withSelf))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("SELF");
   }
 
   @Test

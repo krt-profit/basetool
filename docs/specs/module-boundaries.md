@@ -127,6 +127,8 @@ Shrunk the same day to **127 class edges in 37 module pairs** by the Phase 1 re-
 `ShipTypeMapper` (−1), the org chart behind the org-unit module's `MembershipChangeObserver` (−2)
 and `AuthHelperService` without its delegations to `OwnerScopeService` (−1).
 
+After the platform SPIs (plan §7.3, P1-8, 2026-10-04): **112 class edges in 30 module pairs**.
+
 **Acceptance**
 
 - [x] The backend's frozen baseline equals the rule's current violations.
@@ -186,13 +188,13 @@ module that may depend on no declared module says so with `allowedDependencies =
 annotation's default is Spring Modulith's "everything allowed" sentinel, not an empty list.
 
 Declared on `main`: `audit`, `bank`, `exchange`, `identity`, `inventory`, `joborder`, `kernel`,
-`materialexchange`, `notification`, `orgunit`, `privacy`, `refinery`, `scope` (floor 13).
+`livesync`, `materialexchange`, `notification`, `orgunit`, `privacy`, `refinery`, `scope` (floor 14).
 `orgunit.web` is internal to `orgunit`.
 
 **Acceptance**
 
 - [x] The module packages found in the compiled backend equal `ModularityTest.DECLARED_MODULES`,
-      which equals the detected Modulith modules, with a floor of 13.
+      which equals the detected Modulith modules, with a floor of 14.
 - [x] Each declared module's only named interface is `api`, and it contains every top-level type
       of the module's `api` package tree and nothing outside it.
 - [x] Each declaration's `allowedDependencies` equals the set the domain map derives.

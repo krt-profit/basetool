@@ -1893,7 +1893,10 @@ registry: the admin area is web-only permanently, so a room there would have no 
 - [x] Both buckets bound what they are meant to, and one member's flood does not cost another theirs
   (`LiveSyncRelayServiceTest`).
 - [x] Each room's gate is its own read's gate; a throwing check refuses
-  (`LiveSyncSubscriptionAuthorizerTest`).
+  (`LiveSyncSubscriptionAuthorizerTest`). The owning module asks it through its
+  `livesync.api.LiveSyncTopicAuthorizer`; every kind but the member and self rooms has exactly one,
+  or the backend does not start (`LiveSyncSubscriptionAuthorizerTest`,
+  `LiveSyncTopicAuthorizersTest`).
 - [x] The backend registry is a subset of the frontend's, staff rooms excluded
   (`LiveSyncTopicRegistryParityTest`).
 - [x] **A Redis that is unreachable at startup does not stop the backend from starting**; the
@@ -1919,7 +1922,8 @@ registry: the admin area is web-only permanently, so a room there would have no 
 > anyway, in the keyspace-notification initializer, before any `SmartLifecycle` runs.
 >
 > **Code:** `backend/…/controller/LiveSyncController`, `backend/…/service/LiveSyncStreamService`,
-> `LiveSyncRelayService`, `LiveSyncSubscriptionAuthorizer`, `RedisLiveSyncFanout`,
+> `LiveSyncRelayService`, `LiveSyncSubscriptionAuthorizer`, `backend/…/livesync/api/LiveSyncTopicAuthorizer`
+> and its `*LiveSyncTopicAuthorizer` implementations, `RedisLiveSyncFanout`,
 > `LocalLiveSyncFanout`, `LiveSyncRedisConfig`, `NotificationRedisConfig`,
 > `backend/…/support/ResilientRedisMessageListenerContainer`, `backend/…/support/LiveSyncTopic`,
 > `LiveSyncTopicClass`, `LiveSyncAuthorization` · **ADR:** ADR-0143 (ADR-0094 unchanged) ·

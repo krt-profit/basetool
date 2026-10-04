@@ -18,23 +18,9 @@
  */
 
 /**
- * The bank module: the Kartellbank's accounts, bookings and booking requests, org-unit-blind by
- * design (ADR-0020).
+ * The live-sync module: the topic rooms, their relay and fan-out, and who may join them (ADR-0143).
  */
-@ApplicationModule(
-    allowedDependencies = {
-      "audit::api",
-      "identity::api",
-      "inventory::api",
-      "joborder::api",
-      "kernel",
-      "livesync::api",
-      "materialexchange::api",
-      "notification::api",
-      "orgunit::api",
-      "refinery::api",
-      "scope::api"
-    })
-package de.greluc.krt.profit.basetool.backend.bank;
+@ApplicationModule(allowedDependencies = {"kernel"})
+package de.greluc.krt.profit.basetool.backend.livesync;
 
 import org.springframework.modulith.ApplicationModule;

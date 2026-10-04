@@ -22,18 +22,22 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDomain;
+import de.greluc.krt.profit.basetool.backend.audit.api.RetentionParticipant;
 import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankAuditEventRepository;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -42,8 +46,9 @@ import org.mockito.quality.Strictness;
 /**
  * Unit tests for {@link AuditRetentionService} (REQ-AUDIT-006).
  *
- * <p>Covers that every activity domain and the bank trail are swept, a domain with nothing old
- * enough is skipped, and one failing domain does not abort the run.
+ * <p>Covers that every activity domain and every retention participant are swept, in that order, a
+ * domain or trail with nothing old enough is skipped, and one failing domain or trail does not
+ * abort the run.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -52,43 +57,49 @@ class AuditRetentionServiceTest {
   private static final Instant CUTOFF = Instant.now().minus(730, ChronoUnit.DAYS);
 
   @Mock private AuditService auditService;
-  @Mock private BankAuditService bankAuditService;
   @Mock private AuditEventRepository auditEventRepository;
-  @Mock private BankAuditEventRepository bankAuditEventRepository;
+  @Mock private RetentionParticipant bankTrail;
 
-  @InjectMocks private AuditRetentionService service;
+  private AuditRetentionService service;
+
+  @BeforeEach
+  void setUp() {
+    when(bankTrail.retentionLabel()).thenReturn("the bank audit trail");
+    service = new AuditRetentionService(auditService, auditEventRepository, List.of(bankTrail));
+  }
 
   @Test
-  void purgesEveryActivityDomainAndTheBankTrail() {
+  void purgesEveryActivityDomainAndThenTheParticipantTrail() {
     when(auditEventRepository.existsByDomainAndOccurredAtBefore(any(), eq(CUTOFF)))
         .thenReturn(true);
     when(auditService.purgeBefore(any(), eq(CUTOFF))).thenReturn(2);
-    when(bankAuditEventRepository.existsByOccurredAtBefore(CUTOFF)).thenReturn(true);
-    when(bankAuditService.purgeBefore(CUTOFF)).thenReturn(5);
+    when(bankTrail.holdsRowsBefore(CUTOFF)).thenReturn(true);
+    when(bankTrail.purgeBefore(CUTOFF)).thenReturn(5);
 
     int deleted = service.purgeOlderThan(CUTOFF);
 
+    InOrder order = inOrder(auditService, bankTrail);
     for (AuditDomain domain : AuditDomain.values()) {
-      verify(auditService).purgeBefore(domain, CUTOFF);
+      order.verify(auditService).purgeBefore(domain, CUTOFF);
     }
-    verify(bankAuditService).purgeBefore(CUTOFF);
+    order.verify(bankTrail).purgeBefore(CUTOFF);
     assertThat(deleted).isEqualTo(AuditDomain.values().length * 2 + 5);
   }
 
   @Test
-  void skipsDomainsThatHoldNothingOlderThanTheCutoff() {
+  void skipsDomainsAndTrailsThatHoldNothingOlderThanTheCutoff() {
     when(auditEventRepository.existsByDomainAndOccurredAtBefore(any(), eq(CUTOFF)))
         .thenReturn(false);
     when(auditEventRepository.existsByDomainAndOccurredAtBefore(AuditDomain.INVENTORY, CUTOFF))
         .thenReturn(true);
     when(auditService.purgeBefore(AuditDomain.INVENTORY, CUTOFF)).thenReturn(3);
-    when(bankAuditEventRepository.existsByOccurredAtBefore(CUTOFF)).thenReturn(false);
+    when(bankTrail.holdsRowsBefore(CUTOFF)).thenReturn(false);
 
     int deleted = service.purgeOlderThan(CUTOFF);
 
     verify(auditService).purgeBefore(AuditDomain.INVENTORY, CUTOFF);
     verify(auditService, never()).purgeBefore(AuditDomain.JOB_ORDER, CUTOFF);
-    verify(bankAuditService, never()).purgeBefore(any());
+    verify(bankTrail, never()).purgeBefore(any());
     assertThat(deleted).isEqualTo(3);
   }
 
@@ -99,28 +110,36 @@ class AuditRetentionServiceTest {
     when(auditService.purgeBefore(any(), eq(CUTOFF))).thenReturn(1);
     when(auditService.purgeBefore(AuditDomain.INVENTORY, CUTOFF))
         .thenThrow(new RuntimeException("deadlock"));
-    when(bankAuditEventRepository.existsByOccurredAtBefore(CUTOFF)).thenReturn(true);
-    when(bankAuditService.purgeBefore(CUTOFF)).thenReturn(4);
+    when(bankTrail.holdsRowsBefore(CUTOFF)).thenReturn(true);
+    when(bankTrail.purgeBefore(CUTOFF)).thenReturn(4);
 
     int deleted = service.purgeOlderThan(CUTOFF);
 
     for (AuditDomain domain : AuditDomain.values()) {
       verify(auditService).purgeBefore(domain, CUTOFF);
     }
-    verify(bankAuditService).purgeBefore(CUTOFF);
+    verify(bankTrail).purgeBefore(CUTOFF);
     assertThat(deleted).isEqualTo(AuditDomain.values().length - 1 + 4);
   }
 
   @Test
-  void continuesAfterABankTrailThatCannotBePurged() {
+  void continuesAfterATrailThatCannotBePurged() {
+    RetentionParticipant secondTrail = mock(RetentionParticipant.class);
+    when(secondTrail.holdsRowsBefore(CUTOFF)).thenReturn(true);
+    when(secondTrail.purgeBefore(CUTOFF)).thenReturn(7);
+    service =
+        new AuditRetentionService(
+            auditService, auditEventRepository, List.of(bankTrail, secondTrail));
     when(auditEventRepository.existsByDomainAndOccurredAtBefore(any(), eq(CUTOFF)))
         .thenReturn(true);
     when(auditService.purgeBefore(any(), eq(CUTOFF))).thenReturn(1);
-    when(bankAuditEventRepository.existsByOccurredAtBefore(CUTOFF)).thenReturn(true);
-    when(bankAuditService.purgeBefore(CUTOFF)).thenThrow(new RuntimeException("db down"));
+    when(bankTrail.holdsRowsBefore(CUTOFF)).thenReturn(true);
+    when(bankTrail.purgeBefore(CUTOFF)).thenThrow(new RuntimeException("db down"));
 
     int deleted = service.purgeOlderThan(CUTOFF);
 
-    assertThat(deleted).isEqualTo(AuditDomain.values().length);
+    verify(bankTrail).retentionLabel();
+    verify(secondTrail).purgeBefore(CUTOFF);
+    assertThat(deleted).isEqualTo(AuditDomain.values().length + 7);
   }
 }

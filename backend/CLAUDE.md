@@ -58,6 +58,15 @@ its target module, first matching rule wins (REQ-MOD-001…006).
   notification-producing event implements `notification.api.events.NotificationEvent`. A new
   module package needs a `package <module> <module>` rule in the domain map. Event payloads are
   data only: `eventLayerShouldNotDependOnServiceLayer` selects every `api.events` package tree.
+- **The platform modules (`audit`, `notification`, `livesync`, `platform`) never name a domain
+  class.** When they need a domain's data, they own an SPI and the domain implements it (plan
+  §5.3): `ActorHandleResolver` and `RetentionParticipant` (audit), the three
+  `*RecipientDirectory` interfaces (notification), `LiveSyncTopicAuthorizer` (livesync),
+  `ActiveOrgUnitProvider` (platform). A new live-sync room kind needs exactly one
+  `LiveSyncTopicAuthorizer` that asks the module's read gate, or the backend refuses to start; a new
+  audit trail outside the audit module joins retention as a `RetentionParticipant`. A platform SPI
+  in a layer package sits in a package its implementations already live in (`ActiveOrgUnitProvider`
+  in `service`, not `logging`), or the implementation closes a layer cycle.
 - **A new module package gets its Spring Modulith declarations in the same PR** (REQ-MOD-006,
   ADR-0233 amendment 1). Its root `package-info` carries `@ApplicationModule(allowedDependencies =
   {…})`, its `api` package **and every package below `api`** carry `@NamedInterface("api")` (a

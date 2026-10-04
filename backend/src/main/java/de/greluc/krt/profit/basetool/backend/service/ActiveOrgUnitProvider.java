@@ -17,24 +17,26 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/**
- * The bank module: the Kartellbank's accounts, bookings and booking requests, org-unit-blind by
- * design (ADR-0020).
- */
-@ApplicationModule(
-    allowedDependencies = {
-      "audit::api",
-      "identity::api",
-      "inventory::api",
-      "joborder::api",
-      "kernel",
-      "livesync::api",
-      "materialexchange::api",
-      "notification::api",
-      "orgunit::api",
-      "refinery::api",
-      "scope::api"
-    })
-package de.greluc.krt.profit.basetool.backend.bank;
+package de.greluc.krt.profit.basetool.backend.service;
 
-import org.springframework.modulith.ApplicationModule;
+import java.util.Optional;
+import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
+
+/**
+ * Supplies the org unit the current request acts in, for the {@code orgUnitId} MDC field (plan
+ * §5.3).
+ *
+ * <p>Owned by the platform and implemented by the scope module. It is asked only for an
+ * authenticated request.
+ */
+public interface ActiveOrgUnitProvider {
+
+  /**
+   * The org unit the current caller acts in: an admin's active selection, else the home org unit.
+   *
+   * @return the org unit id, or empty for an admin without a selection or an unassigned member
+   */
+  @NotNull
+  Optional<UUID> activeOrgUnitId();
+}

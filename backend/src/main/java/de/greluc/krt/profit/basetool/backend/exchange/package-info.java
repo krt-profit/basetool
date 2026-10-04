@@ -28,6 +28,7 @@
       "inventory::api",
       "joborder::api",
       "kernel",
+      "livesync::api",
       "materialexchange::api",
       "notification::api",
       "orgunit::api",

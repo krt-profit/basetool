@@ -63,6 +63,7 @@ class ModularityTest {
           "inventory",
           "joborder",
           "kernel",
+          "livesync",
           "materialexchange",
           "notification",
           "orgunit",
@@ -70,7 +71,7 @@ class ModularityTest {
           "refinery",
           "scope");
 
-  private static final int DECLARED_MODULE_FLOOR = 13;
+  private static final int DECLARED_MODULE_FLOOR = 14;
 
   /**
    * Modules without an {@code api} package: their types lie in the base package, which is their
