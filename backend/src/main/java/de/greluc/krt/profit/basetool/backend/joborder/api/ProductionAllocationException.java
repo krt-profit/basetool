@@ -17,16 +17,20 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.exception;
+package de.greluc.krt.profit.basetool.backend.joborder.api;
+
+import de.greluc.krt.profit.basetool.backend.exception.DomainProblem;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.http.HttpStatus;
 
 /**
  * Thrown when a production booking (REQ-ORDERS-025) exceeds the item line's remaining amount or its
  * consumption plan does not exactly cover the required material.
  *
- * <p>Mapped to {@code 422 Unprocessable Entity} with code {@code PRODUCTION_ALLOCATION} via {@link
- * AppExceptionKind#PRODUCTION_ALLOCATION}.
+ * <p>Mapped to {@code 422 Unprocessable Entity} with code {@link
+ * JobOrderProblemCode#PRODUCTION_ALLOCATION}.
  */
-public final class ProductionAllocationException extends AppException {
+public final class ProductionAllocationException extends DomainProblem {
 
   /**
    * Creates a {@code ProductionAllocationException} whose client-visible {@code detail} resolves
@@ -35,6 +39,39 @@ public final class ProductionAllocationException extends AppException {
    * Accept-Language} rather than leaking a hard-coded English string).
    */
   public ProductionAllocationException() {
-    super(AppExceptionKind.PRODUCTION_ALLOCATION, "problem.production_allocation.detail");
+    super("problem.production_allocation.detail");
+  }
+
+  /**
+   * The status the refusal is answered with.
+   *
+   * @return {@code 422}
+   */
+  @NotNull
+  @Override
+  public HttpStatus status() {
+    return JobOrderProblemCode.PRODUCTION_ALLOCATION.status();
+  }
+
+  /**
+   * The stable code of the refusal.
+   *
+   * @return {@code PRODUCTION_ALLOCATION}
+   */
+  @NotNull
+  @Override
+  public String code() {
+    return JobOrderProblemCode.PRODUCTION_ALLOCATION.code();
+  }
+
+  /**
+   * The label the handler's log line names the refusal by.
+   *
+   * @return {@code "Production allocation"}
+   */
+  @NotNull
+  @Override
+  public String logLabel() {
+    return "Production allocation";
   }
 }

@@ -17,35 +17,46 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.exception;
+package de.greluc.krt.profit.basetool.backend.refinery.api;
 
+import de.greluc.krt.profit.basetool.backend.exception.ProblemCode;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
 
 /**
- * One stable value of the {@code code} property of an RFC 7807 problem body (REQ-API-004,
- * REQ-API-019, ADR-0235).
+ * The problem codes of the refinery (REQ-API-019, ADR-0235).
  *
- * <p>Every code the backend emits is a constant of an enum implementing this interface: {@link
- * CoreProblemCode} for the error kernel and one enum per module in the module's {@code api}
- * package. The code string is the contract, the Java name is not. The frozen exchange contract's
- * own codes stay on the exchange's {@code ExchangeProblemException}.
+ * <p>The code string equals the constant's name.
  */
-public interface ProblemCode {
+@RequiredArgsConstructor
+public enum RefineryProblemCode implements ProblemCode {
+
+  /** The write needs the caller to be a participant of the mission. */
+  MISSION_PARTICIPANT_REQUIRED(HttpStatus.BAD_REQUEST);
+
+  /** The status the code is answered with. */
+  private final HttpStatus status;
 
   /**
-   * Returns the wire value of the code.
+   * Returns the wire value, which is the constant's name.
    *
-   * @return the upper-snake-case string a client compares against
+   * @return the code string
    */
   @NotNull
-  String code();
+  @Override
+  public String code() {
+    return name();
+  }
 
   /**
-   * Returns the HTTP status the code is answered with.
+   * Returns the status the code is answered with.
    *
-   * @return the status of the response that carries the code
+   * @return the HTTP status
    */
   @NotNull
-  HttpStatus status();
+  @Override
+  public HttpStatus status() {
+    return status;
+  }
 }

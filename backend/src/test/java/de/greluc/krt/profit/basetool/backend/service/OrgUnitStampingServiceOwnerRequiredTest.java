@@ -25,13 +25,13 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.AppExceptionKind;
-import de.greluc.krt.profit.basetool.backend.exception.OwnerOrgUnitRequiredException;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerOrgUnitRequiredException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
