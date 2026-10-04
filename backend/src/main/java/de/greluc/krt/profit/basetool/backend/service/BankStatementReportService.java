@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
@@ -34,7 +35,6 @@ import de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingReposit
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.service.pdf.BankPdfFormat;
 import de.greluc.krt.profit.basetool.backend.service.pdf.KrtPdfSupport;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.HandleAnonymisation;
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;

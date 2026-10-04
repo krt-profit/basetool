@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkOrgUnitChangeRequest;
@@ -31,7 +33,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemOrgUnitChangeDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.ArrayList;
@@ -63,7 +64,7 @@ public class InventoryOrgUnitChangeService {
   private final OrgUnitMembershipQueryService membershipQueryService;
   private final InventoryCheckoutService inventoryCheckoutService;
   private final InventoryItemMapper inventoryItemMapper;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Changes the org unit of one personal row owned by the caller, then merges it into an existing
@@ -99,7 +100,7 @@ public class InventoryOrgUnitChangeService {
     OrgUnit previous = item.getOwningOrgUnit();
     item.setOwningOrgUnit(target);
     InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.INVENTORY_ORG_UNIT_CHANGED,
         saved.getId(),
         InventoryAuditLabels.label(saved),
@@ -153,7 +154,7 @@ public class InventoryOrgUnitChangeService {
     }
     int skipped = rows.size() - changed;
     if (changed > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.INVENTORY_BULK_ORG_UNIT_CHANGED,
           null,
           null,
