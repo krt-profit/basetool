@@ -302,6 +302,11 @@
 
 ### Fixed
 
+- **Startseite und Buchungsanträge passen wieder auf Smartphone und Tablet.** Auf der Startseite
+  brechen Status, „Angemeldet" und „Meine Einheit" am Smartphone in eine zweite Zeile um, statt die
+  Seite zu verbreitern; die Antragsliste der Kartellbank stapelt am Tablet die Entscheidungsknöpfe,
+  statt seitlich zu scrollen (CSS, REQ-UI-009).
+
 - **Blueprints: Seite scrollt nicht mehr seitlich.** Die unsichtbare Hinweisblase neben
   „Raffinerie einrechnen" verbreiterte die Seite am Smartphone auf 487 px und am Tablet um 104 px;
   verborgene Hinweisblasen belegen jetzt keinen Platz mehr (CSS, REQ-UI-009).
