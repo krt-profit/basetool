@@ -218,12 +218,9 @@
             if (c.checked) params.append('starSystemNames', c.value);
         });
         try {
-            const response = await fetch(
+            const data = await window.krtFetch.getJson(
                 `/api/proxy/materials/profit-calculation?${params.toString()}`,
-                { headers: { 'X-Requested-With': 'XMLHttpRequest' } },
             );
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const data = await response.json();
             if (token !== requestToken) return;
             if (!Array.isArray(data) || data.length === 0) {
                 if (body) body.innerHTML = '';

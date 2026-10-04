@@ -218,13 +218,8 @@
             return;
         }
         running++;
-        fetch(ownersUrl(productKey), {
-            credentials: 'same-origin',
-            headers: { Accept: 'application/json' },
-        })
-            .then((resp) => {
-                return resp.ok ? resp.json() : null;
-            })
+        window.krtFetch
+            .getJson(ownersUrl(productKey))
             .then((owners) => {
                 if (!Array.isArray(owners)) {
                     renderState(cell, 'error');

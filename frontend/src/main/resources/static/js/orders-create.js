@@ -281,14 +281,10 @@ function updateCounter(area) {
 
 async function findJobOrderMaterialByName(normalizedName) {
     try {
-        const res = await fetch(
-            `/catalog/material-search?jobOrder=true&q=${encodeURIComponent(normalizedName)}`,
-            { headers: { Accept: 'application/json' } },
-        );
-        if (!res.ok) {
-            return null;
-        }
-        const list = (await res.json()) || [];
+        const list =
+            (await window.krtFetch.getJson(
+                `/catalog/material-search?jobOrder=true&q=${encodeURIComponent(normalizedName)}`,
+            )) || [];
         return list.find((m) => (m.name || '').trim().toLowerCase() === normalizedName) || null;
     } catch (_e) {
         return null;
@@ -426,12 +422,8 @@ function addMaterialRow() {
 let itemLineIndex = 0;
 
 function fetchItemOptions(query) {
-    return fetch(`/orders/item-search?q=${encodeURIComponent(query || '')}`, {
-        headers: { Accept: 'application/json' },
-    })
-        .then((r) => {
-            return r.ok ? r.json() : [];
-        })
+    return window.krtFetch
+        .getJson(`/orders/item-search?q=${encodeURIComponent(query || '')}`)
         .then((list) => {
             return (list || []).map((gi) => {
                 return { value: gi.id, label: gi.name };
@@ -553,10 +545,9 @@ function loadBlueprints(row, preselectBpId, qualities) {
         bpSelect.innerHTML = '';
         return;
     }
-    fetch(`/orders/item-blueprints/${encodeURIComponent(gameItemId)}`, {
-        headers: { Accept: 'application/json' },
-    })
-        .then((r) => (r.ok ? r.json() : []))
+    window.krtFetch
+        .getJson(`/orders/item-blueprints/${encodeURIComponent(gameItemId)}`)
+        .catch(() => [])
         .then((list) => {
             list ||= [];
             bpSelect.replaceChildren(
@@ -593,10 +584,8 @@ function loadDerivation(row, qualities) {
     const derived = row.querySelector('[data-role="derived"]');
     const unresolved = row.querySelector('[data-role="unresolved"]');
     const subs = row.querySelector('[data-role="subassemblies"]');
-    fetch(`/orders/item-derivation/${encodeURIComponent(blueprintId)}?amount=${amount}`, {
-        headers: { Accept: 'application/json' },
-    })
-        .then((r) => (r.ok ? r.json() : null))
+    window.krtFetch
+        .getJson(`/orders/item-derivation/${encodeURIComponent(blueprintId)}?amount=${amount}`)
         .then((d) => {
             if (!d) {
                 clearDerived(row);

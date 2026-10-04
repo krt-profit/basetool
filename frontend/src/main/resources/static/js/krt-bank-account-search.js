@@ -36,12 +36,8 @@
     }
 
     function fetchAccounts(query) {
-        return fetch(`/api/proxy/bank/accounts/search?query=${encodeURIComponent(query || '')}`, {
-            headers: { Accept: 'application/json' },
-        })
-            .then((response) => {
-                return response.ok ? response.json() : [];
-            })
+        return window.krtFetch
+            .getJson(`/api/proxy/bank/accounts/search?query=${encodeURIComponent(query || '')}`)
             .then((list) => {
                 return (list || []).map(toOption);
             })

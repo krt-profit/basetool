@@ -160,15 +160,8 @@
     /** Fetches the grid for the current filter selection; a newer request wins. */
     function fetchGrid() {
         const token = ++fetchToken;
-        fetch(DATA_URL + buildFilterQuery(), {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        })
-            .then((res) => {
-                if (!res.ok) {
-                    throw new Error(`HTTP ${res.status}`);
-                }
-                return res.json();
-            })
+        window.krtFetch
+            .getJson(DATA_URL + buildFilterQuery())
             .then((data) => {
                 if (token !== fetchToken) {
                     return;

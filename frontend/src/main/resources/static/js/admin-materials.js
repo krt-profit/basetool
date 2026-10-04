@@ -324,14 +324,10 @@ function replaceFromDocument(fresh, selector) {
 }
 
 function refreshMaterialsTable() {
-    return fetch(window.location.pathname + window.location.search, {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-    })
+    return window.krtFetch
+        .get(window.location.pathname + window.location.search)
         .then((res) => {
-            if (window.krtFetch && window.krtFetch.maybeReauthenticate(res)) {
-                return null;
-            }
-            return res.redirected || !res.ok ? null : res.text();
+            return !res || !res.ok ? null : res.text();
         })
         .then((html) => {
             if (html === null) {

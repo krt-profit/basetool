@@ -69,13 +69,8 @@
     }
 
     function poll() {
-        fetch(statusUrl, {
-            credentials: 'same-origin',
-            headers: { Accept: 'application/json' },
-        })
-            .then((response) => {
-                return response.ok ? response.json() : null;
-            })
+        window.krtFetch
+            .getJson(statusUrl)
             .then((data) => {
                 const status = data ? data.approvalStatus : null;
                 if (status === STATE_ACTIVE) {

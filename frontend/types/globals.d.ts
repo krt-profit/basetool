@@ -187,6 +187,32 @@ interface KrtSubmitFormOpts extends KrtSendOpts {
     sectionKey?: string;
 }
 
+/** Options for {@linkcode KrtFetchApi.get} and {@linkcode KrtFetchApi.getJson}. */
+interface KrtReadOpts {
+    /** Accept header value; `getJson` always sends `application/json`. */
+    accept?: string;
+    /** Extra request headers; `X-Requested-With` is always set and cannot be overridden. */
+    headers?: Record<string, string>;
+    /** Aborts the read when it fires; the promise then rejects with an `AbortError`. */
+    signal?: AbortSignal;
+    /** Supersede key: a later read with the same key aborts the earlier one still in flight. */
+    key?: string;
+}
+
+/**
+ * Rejection of {@linkcode KrtFetchApi.getJson} for an answer that is not the JSON it asked for. A
+ * transport failure or an abort rejects with the browser's own error instead.
+ */
+interface KrtReadError extends Error {
+    name: 'KrtReadError';
+    /** The HTTP status; 0 when a gate took over or the answer came through a redirect. */
+    status: number;
+    /** Why the answer was refused. */
+    reason: 'refused' | 'status' | 'not-json';
+    /** The parsed `problem+json` / JSON body of a non-2xx answer, else null. */
+    problem: any;
+}
+
 /** Options for the fragment-swap helpers. */
 interface KrtSwapOpts {
     /** The container to replace in place, or a selector for it. */
@@ -262,6 +288,18 @@ interface KrtSectionWriter {
  * sync, re-auth, RFC 7807 problem handling and toasts for every write (REQ-FE-001…010).
  */
 interface KrtFetchApi {
+    /**
+     * The one read path (REQ-FE-031): a same-origin GET marked as background traffic, run past the
+     * re-authentication and terms gates. Resolves the response, ok or not, or null when a gate
+     * navigated away or the answer came through a redirect; rejects like `fetch` on a transport
+     * failure or an abort.
+     */
+    get(url: string, opts?: KrtReadOpts): Promise<Response | null>;
+    /**
+     * Reads JSON through {@linkcode KrtFetchApi.get}: resolves the parsed body of a 2xx JSON answer
+     * (null for a 204), rejects with a {@linkcode KrtReadError} for any other answer.
+     */
+    getJson(url: string, opts?: KrtReadOpts): Promise<any>;
     /** Sends a JSON write and handles the response, returning the parsed outcome. */
     write(opts: KrtWriteOpts): Promise<KrtWriteResult>;
     /** Submits a form as multipart/form-encoded data through the same pipeline. */

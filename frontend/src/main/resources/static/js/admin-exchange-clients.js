@@ -225,10 +225,8 @@ const EXCHANGE_CLIENTS_SECTIONS = {
 
         /** @param {string} id */
         function editClient(id) {
-            fetch(`${BASE}/${encodeURIComponent(id)}`, {
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-            })
-                .then((res) => (res.ok ? res.json() : null))
+            window.krtFetch
+                .getJson(`${BASE}/${encodeURIComponent(id)}`)
                 .then((client) => {
                     if (client) {
                         prefillForm(client);
@@ -564,13 +562,12 @@ const EXCHANGE_CLIENTS_SECTIONS = {
             if (!id || !iso) {
                 return;
             }
-            fetch(
-                `${BASE}/${encodeURIComponent(id)}/undo/installations?since=${encodeURIComponent(
-                    iso,
-                )}`,
-                { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } },
-            )
-                .then((res) => (res.ok ? res.json() : []))
+            window.krtFetch
+                .getJson(
+                    `${BASE}/${encodeURIComponent(id)}/undo/installations?since=${encodeURIComponent(
+                        iso,
+                    )}`,
+                )
                 .then((/** @type {ApiDto<'ExchangeBulkUndoInstallationDto'>[]} */ rows) => {
                     rows.forEach((row) => {
                         const option = document.createElement('option');
@@ -737,10 +734,8 @@ const EXCHANGE_CLIENTS_SECTIONS = {
          * @param {string} runId
          */
         function showRun(runId) {
-            fetch(`${BASE}/undo-runs/${encodeURIComponent(runId)}`, {
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-            })
-                .then((res) => (res.ok ? res.json() : null))
+            window.krtFetch
+                .getJson(`${BASE}/undo-runs/${encodeURIComponent(runId)}`)
                 .then((/** @type {ApiDto<'ExchangeBulkUndoRunDetailDto'> | null} */ detail) => {
                     const body = document.getElementById('xc-undo-run-body');
                     if (!detail || !detail.run || !body) {

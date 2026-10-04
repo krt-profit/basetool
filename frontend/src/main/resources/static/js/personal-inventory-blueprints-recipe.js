@@ -306,13 +306,8 @@
                 window.krtI18nText(i18n().loading, 'krtBlueprintsRecipeI18n.loading'),
             ),
         );
-        fetch(resolveUrl(endpoints().recipe, id), {
-            credentials: 'same-origin',
-            headers: { Accept: 'application/json' },
-        })
-            .then((resp) => {
-                return resp.ok ? resp.json() : null;
-            })
+        window.krtFetch
+            .getJson(resolveUrl(endpoints().recipe, id))
             .then((recipe) => {
                 if (!recipe) {
                     showError();
@@ -646,10 +641,9 @@
         const target = window.safeSameOriginUrl
             ? window.safeSameOriginUrl(`${url + sep}includeRefinery=true`, url)
             : `${url + sep}includeRefinery=true`;
-        fetch(target, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-            .then((resp) => {
-                return resp.ok ? resp.json() : null;
-            })
+        window.krtFetch
+            .getJson(target)
+            .catch(() => null)
             .then((list) => {
                 craftabilityById.clear();
                 if (Array.isArray(list)) {

@@ -214,14 +214,7 @@ function fetchAllMatchingEntryIds() {
     if (nonPersonalOnly) url.searchParams.append('nonPersonalOnly', 'true');
     appendMyStolenFilter(url.searchParams, myStolenFilterValue());
 
-    return fetch(url, {
-        method: 'GET',
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        credentials: 'same-origin',
-    }).then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-    });
+    return window.krtFetch.getJson(url.toString());
 }
 
 async function toggleSelectAllInView() {
@@ -359,13 +352,8 @@ function refreshBulkRebookOrgUnitPicker() {
             ? userSelect.value
             : currentInventoryUserId();
     if (!ownerId) return;
-    fetch(`/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true`, {
-        headers: { Accept: 'application/json' },
-        credentials: 'same-origin',
-    })
-        .then((r) => {
-            return r.ok ? r.json() : [];
-        })
+    window.krtFetch
+        .getJson(`/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true`)
         .then((memberships) => {
             if (!Array.isArray(memberships) || memberships.length < 1) return;
             memberships.forEach((opt) => {
@@ -811,8 +799,14 @@ function filterMyInventory() {
         window.history.replaceState({}, '', visibleUrl.toString());
     } catch {}
 
-    fetch(url, { method: 'GET', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then((response) => response.text())
+    window.krtFetch
+        .get(url.toString())
+        .then((response) => {
+            if (!response || !response.ok) {
+                throw new Error(`Inventory fragment refused (${response ? response.status : 0})`);
+            }
+            return response.text();
+        })
         .then((html) => {
             window.krtFetch.replaceWithTrustedHtml(container, html);
             myLager.restoreExpandedTree();
@@ -990,13 +984,8 @@ function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
     select.innerHTML = '';
     wrapper.hidden = true;
     if (!ownerId) return;
-    fetch(`/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true`, {
-        headers: { Accept: 'application/json' },
-        credentials: 'same-origin',
-    })
-        .then((r) => {
-            return r.ok ? r.json() : [];
-        })
+    window.krtFetch
+        .getJson(`/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true`)
         .then((memberships) => {
             if (!Array.isArray(memberships) || memberships.length < 1) return;
             memberships.forEach((opt) => {
@@ -1260,13 +1249,8 @@ function fillOrgUnitChangePicker(currentOrgUnitId) {
     select.appendChild(none);
     const me = currentInventoryUserId();
     if (!me) return;
-    fetch(`/users/${encodeURIComponent(me)}/memberships?allKinds=true`, {
-        headers: { Accept: 'application/json' },
-        credentials: 'same-origin',
-    })
-        .then((r) => {
-            return r.ok ? r.json() : [];
-        })
+    window.krtFetch
+        .getJson(`/users/${encodeURIComponent(me)}/memberships?allKinds=true`)
         .then((memberships) => {
             if (!Array.isArray(memberships)) return;
             memberships.forEach((opt) => {

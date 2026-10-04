@@ -302,10 +302,8 @@
         const url = `${
             endpoints().search || '/personal-inventory/blueprints/search'
         }?q=${encodeURIComponent(q)}&limit=10`;
-        fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-            .then((resp) => {
-                return resp.ok ? resp.json() : [];
-            })
+        window.krtFetch
+            .getJson(url)
             .then((items) => {
                 renderRowResults(results, row, items);
             })

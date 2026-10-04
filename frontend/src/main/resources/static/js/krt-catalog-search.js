@@ -45,15 +45,10 @@
     }
 
     function fetchCatalog(path, query, toOption) {
-        return fetch(
-            `${path + (path.indexOf('?') >= 0 ? '&' : '?')}q=${encodeURIComponent(query || '')}`,
-            {
-                headers: { Accept: 'application/json' },
-            },
-        )
-            .then((response) => {
-                return response.ok ? response.json() : [];
-            })
+        return window.krtFetch
+            .getJson(
+                `${path + (path.indexOf('?') >= 0 ? '&' : '?')}q=${encodeURIComponent(query || '')}`,
+            )
             .then((list) => {
                 return (list || []).map(toOption);
             })

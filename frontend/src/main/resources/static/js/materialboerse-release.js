@@ -324,13 +324,8 @@
         const url = `/materialboerse/releasable-items?kind=${encodeURIComponent(
             pickerKind,
         )}${query ? `&q=${encodeURIComponent(query)}` : ''}`;
-        fetch(url, {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            credentials: 'same-origin',
-        })
-            .then((r) => {
-                return r.ok ? r.json() : [];
-            })
+        window.krtFetch
+            .getJson(url)
             .then((items) => {
                 if (seq !== pickerSeq) {
                     return;
@@ -462,13 +457,8 @@
     function loadItemPicker(query) {
         const seq = ++itemPickerSeq;
         const url = `/materialboerse/offerable-products${query ? `?q=${encodeURIComponent(query)}` : ''}`;
-        fetch(url, {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            credentials: 'same-origin',
-        })
-            .then((r) => {
-                return r.ok ? r.json() : [];
-            })
+        window.krtFetch
+            .getJson(url)
             .then((items) => {
                 if (seq !== itemPickerSeq) {
                     return;

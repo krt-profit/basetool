@@ -375,10 +375,8 @@
                 'krtPersonalInventoryI18n.searching',
             ),
         )}</div>`;
-        fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-            .then((resp) => {
-                return resp.ok ? resp.json() : [];
-            })
+        window.krtFetch
+            .getJson(url)
             .then(renderResults)
             .catch(() => {
                 renderResults([]);

@@ -91,11 +91,13 @@ export default [
         "error",
         ...ABOVE_BASELINE_GLOBALS,
         ...XHR_GLOBALS,
+        ...FETCH_GLOBALS,
       ],
       "no-restricted-properties": [
         "error",
         ...ABOVE_BASELINE_PROPERTIES,
         ...XHR_PROPERTIES,
+        ...FETCH_PROPERTIES,
       ],
     },
   },

@@ -1759,11 +1759,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             debounceTimer = setTimeout(() => {
-                fetch(`/users/search?query=${encodeURIComponent(val)}`)
-                    .then((response) => {
-                        if (!response.ok) throw new Error('Network response was not ok');
-                        return response.json();
-                    })
+                window.krtFetch
+                    .getJson(`/users/search?query=${encodeURIComponent(val)}`)
                     .then((users) => {
                         closeAllLists();
                         if (!users || users.length === 0) return;
@@ -1847,11 +1844,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         partyLeadDebounce = setTimeout(() => {
-            fetch(`/users/search?query=${encodeURIComponent(val)}`)
-                .then((response) => {
-                    if (!response.ok) throw new Error('Network response was not ok');
-                    return response.json();
-                })
+            window.krtFetch
+                .getJson(`/users/search?query=${encodeURIComponent(val)}`)
                 .then((users) => {
                     partyLeadCloseLists();
                     if (!users || users.length === 0) return;

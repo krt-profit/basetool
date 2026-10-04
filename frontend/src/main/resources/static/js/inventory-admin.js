@@ -267,13 +267,14 @@ function filterInventory() {
         window.history.replaceState({}, '', visibleUrl.toString());
     } catch {}
 
-    fetch(url, {
-        method: 'GET',
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-        },
-    })
-        .then((response) => response.text())
+    window.krtFetch
+        .get(url.toString())
+        .then((response) => {
+            if (!response || !response.ok) {
+                throw new Error(`Inventory fragment refused (${response ? response.status : 0})`);
+            }
+            return response.text();
+        })
         .then((html) => {
             window.krtFetch.replaceWithTrustedHtml(container, html);
             adminLager.restoreExpandedTree();

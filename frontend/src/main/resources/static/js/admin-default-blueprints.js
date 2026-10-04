@@ -210,11 +210,8 @@
         }
         renderMessage(window.krtI18nText(i18n.searching, 'krtDefaultBlueprints.i18n.searching'));
         const url = `${cfg.searchUrl}?q=${encodeURIComponent(q.trim())}&limit=25`;
-        window
-            .fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
-            .then((resp) => {
-                return resp.ok ? resp.json() : [];
-            })
+        window.krtFetch
+            .getJson(url)
             .then(renderResults)
             .catch(() => {
                 renderMessage(

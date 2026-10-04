@@ -44,30 +44,18 @@
     }
 
     /**
-     * The headers every read of the jobs proxy carries.
-     *
-     * X-Requested-With makes the consent and re-auth gates answer with a status code instead of a
-     * redirect (REQ-SEC-028, REQ-SEC-012).
-     *
-     * @returns {Record<string, string>} a fresh header object for the job-list poll
-     */
-    function ajaxHeaders() {
-        return { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
-    }
-
-    /**
      * Reads a jobs-proxy answer as JSON, or resolves to null when the answer is not job data.
      *
-     * The re-auth and consent gates are honoured first; a redirected, non-OK or unparseable answer
-     * yields null, which makes the callers disarm the poll.
+     * A null response means `krtFetch.get` handed the answer to the re-auth or consent gate or
+     * refused it as redirected; that and a non-OK or unparseable answer yield null, which makes the
+     * callers disarm the poll.
      *
-     * @param {Response} resp the jobs-proxy response
+     * @param {Response | null} resp the jobs-proxy response
      * @returns {Promise<any> | null} the parsed body, or null when the answer is not job data
      */
     function readJson(resp) {
-        if (window.krtReauth && window.krtReauth.check(resp)) return gateTookOver();
-        if (window.krtTermsGate && window.krtTermsGate.check(resp)) return gateTookOver();
-        if (resp.redirected || !resp.ok) return null;
+        if (!resp) return gateTookOver();
+        if (!resp.ok) return null;
         return resp.json().catch(() => {
             return null;
         });
@@ -207,11 +195,8 @@
     }
 
     function loadJobs() {
-        fetch(jobsUrl(), {
-            method: 'GET',
-            credentials: 'same-origin',
-            headers: ajaxHeaders(),
-        })
+        window.krtFetch
+            .get(jobsUrl(), { accept: 'application/json' })
             .then(readJson)
             .then((jobs) => {
                 if (!Array.isArray(jobs)) {

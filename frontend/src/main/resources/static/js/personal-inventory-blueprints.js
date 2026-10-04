@@ -160,10 +160,8 @@
         resultsEl.innerHTML = `<div class="krt-pi-typeahead-loading">${escapeHtml(
             window.krtI18nText(i18n().searching, 'krtBlueprintsI18n.searching'),
         )}</div>`;
-        fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-            .then((resp) => {
-                return resp.ok ? resp.json() : [];
-            })
+        window.krtFetch
+            .getJson(url)
             .then(renderResults)
             .catch(() => {
                 renderResults([]);

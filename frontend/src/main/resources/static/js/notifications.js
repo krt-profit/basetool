@@ -52,35 +52,38 @@
         };
     }
 
-    function csrfRequestInit() {
-        return {
-            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        };
+    /**
+     * Reads one of this module's JSON endpoints through the shared read path (REQ-FE-031).
+     *
+     * @param {string} url the endpoint
+     * @returns {Promise<Response | null>} the response, or null when a gate took over
+     */
+    function readNotifications(url) {
+        return window.krtFetch.get(url, { accept: 'application/json' });
     }
 
     /**
      * Reads the JSON payload of one of this module's GETs, or resolves to `fallback` when the
      * answer is not that payload.
      *
-     * The re-auth (REQ-SEC-012) and consent (REQ-SEC-028) gates navigate the page; a redirected
-     * answer is never parsed.
+     * A null response means `krtFetch.get` handed the answer to the re-auth (REQ-SEC-012) or
+     * consent (REQ-SEC-028) gate or refused it as redirected; the stream and the badge poll then
+     * stop, because the page is leaving or the session is unusable.
      *
-     * @param {Response} res the response to read
+     * @param {Response | null} res the response to read
      * @param {any} fallback the value to resolve to when the answer is not the payload
      * @returns {any} the parsed body, or the fallback
      */
     function readJson(res, fallback) {
-        if (res.status === 401) {
+        if (!res) {
             stopSse();
-        }
-        if (window.krtReauth && window.krtReauth.check(res)) {
-            return fallback;
-        }
-        if (window.krtTermsGate && window.krtTermsGate.check(res)) {
             stopPolling();
             return fallback;
         }
-        if (res.redirected || !res.ok) {
+        if (res.status === 401) {
+            stopSse();
+        }
+        if (!res.ok) {
             return fallback;
         }
         return res.json();
@@ -100,7 +103,7 @@
     }
 
     function refreshUnreadCount() {
-        return fetch('/notifications/unread-count', csrfRequestInit())
+        return readNotifications('/notifications/unread-count')
             .then((res) => {
                 return readJson(res, null);
             })
@@ -215,7 +218,7 @@
         if (empty) {
             empty.classList.add('notification-badge-hidden');
         }
-        fetch('/notifications/recent', csrfRequestInit())
+        readNotifications('/notifications/recent')
             .then((res) => {
                 return readJson(res, []);
             })
@@ -401,7 +404,7 @@
         }
         const page = parseInt(btn.getAttribute('data-notif-next-page'), 10) || 1;
         btn.disabled = true;
-        fetch(`/notifications/page-items?page=${page}`, csrfRequestInit())
+        readNotifications(`/notifications/page-items?page=${page}`)
             .then((res) => {
                 return readJson(res, null);
             })

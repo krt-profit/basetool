@@ -149,7 +149,7 @@
         }
         let response;
         try {
-            response = await fetch(url, { method: 'GET', headers });
+            response = await window.krtFetch.get(url, { headers });
         } catch {
             response = null;
         }

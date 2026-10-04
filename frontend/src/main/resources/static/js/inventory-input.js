@@ -109,12 +109,8 @@ function startOrderNeedsLiveSync() {
 }
 
 function refreshOrderNeeds() {
-    fetch('/inventory/order-needs', {
-        headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
-    })
-        .then((response) => {
-            return response.ok ? response.json() : null;
-        })
+    window.krtFetch
+        .getJson('/inventory/order-needs')
         .then((needs) => {
             if (!needs) return;
             orderNeeds = needs;
@@ -270,12 +266,8 @@ function scheduleMergeProbe() {
         return;
     }
     mergeProbeTimer = window.setTimeout(() => {
-        fetch(`/inventory/merge-candidates?${query}`, {
-            headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
-        })
-            .then((response) => {
-                return response.ok ? response.json() : { exists: true };
-            })
+        window.krtFetch
+            .getJson(`/inventory/merge-candidates?${query}`)
             .then((answer) => {
                 if (sequence !== mergeProbeSequence) return;
                 setMergeOptInVisible(!!(answer && answer.exists));
@@ -401,12 +393,8 @@ function reloadOwnerPickerForUser() {
         scheduleMergeProbe();
         return;
     }
-    fetch(`/users/${encodeURIComponent(userId)}/memberships?allKinds=true`, {
-        headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
-    })
-        .then((response) => {
-            return response.ok ? response.json() : [];
-        })
+    window.krtFetch
+        .getJson(`/users/${encodeURIComponent(userId)}/memberships?allKinds=true`)
         .catch(() => {
             return [];
         })

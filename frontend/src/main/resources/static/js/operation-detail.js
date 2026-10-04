@@ -627,11 +627,9 @@ document.addEventListener('change', (ev) => {
         if (!missionId) return;
         body.setAttribute('data-loaded', 'loading');
         const url = `/operations/${encodeURIComponent(opId)}/finance/${encodeURIComponent(missionId)}`;
-        fetch(url, {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            credentials: 'same-origin',
-        })
-            .then((r) => (r.ok ? r.text() : Promise.reject(r.status)))
+        window.krtFetch
+            .get(url)
+            .then((r) => (r && r.ok ? r.text() : Promise.reject(r ? r.status : 0)))
             .then((html) => {
                 window.krtFetch.setTrustedHtml(body, html);
                 body.setAttribute('data-loaded', 'true');

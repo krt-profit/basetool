@@ -213,13 +213,12 @@ async function _loadHandoverTierSuggestions(materialIds, orderId) {
         const tiers = _orderTiersForMaterial(materialId);
         if (tiers.length < 2) continue;
         try {
-            const res = await fetch(`/orders/${orderId}/materials/${materialId}/attribution`, {
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-            });
-            if (!res.ok) continue;
+            const entries = await window.krtFetch.getJson(
+                `/orders/${orderId}/materials/${materialId}/attribution`,
+            );
             /** @type {Map<string, {code: string, amount: number}>} */
             const best = new Map();
-            for (const entry of await res.json()) {
+            for (const entry of entries) {
                 const tier = tiers.find((t) => t.id === entry.qualityTierId);
                 if (!tier) continue;
                 const current = best.get(entry.inventoryItemId);
@@ -285,9 +284,9 @@ async function openHandoverModal() {
                 const orderId = row.dataset.orderId;
                 const matId = row.dataset.materialId;
                 if (orderId && matId) {
-                    return fetch(`/orders/${orderId}/materials/${matId}/inventory`).then((res) =>
-                        res.json(),
-                    );
+                    return window.krtFetch
+                        .getJson(`/orders/${orderId}/materials/${matId}/inventory`)
+                        .catch(() => []);
                 }
                 return Promise.resolve([]);
             });
@@ -1271,11 +1270,11 @@ async function downloadHandoverReport(btn) {
         if (userTimeZone) {
             downloadHeaders['X-User-Time-Zone'] = userTimeZone;
         }
-        const response = await fetch(`/api/v1/orders/${orderId}/handovers/${handoverId}/report`, {
-            method: 'GET',
-            headers: downloadHeaders,
-        });
-        if (!response.ok) {
+        const response = await window.krtFetch.get(
+            `/api/v1/orders/${orderId}/handovers/${handoverId}/report`,
+            { headers: downloadHeaders },
+        );
+        if (!response || !response.ok) {
             showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
             return;
         }
@@ -1324,14 +1323,11 @@ async function downloadItemHandoverReport(btn) {
         if (userTimeZone) {
             downloadHeaders['X-User-Time-Zone'] = userTimeZone;
         }
-        const response = await fetch(
+        const response = await window.krtFetch.get(
             `/api/v1/orders/${orderId}/item-handovers/${handoverId}/report`,
-            {
-                method: 'GET',
-                headers: downloadHeaders,
-            },
+            { headers: downloadHeaders },
         );
-        if (!response.ok) {
+        if (!response || !response.ok) {
             showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
             return;
         }
@@ -1490,11 +1486,9 @@ async function previewHandoverReport(btn) {
 async function _loadStockAttribution(orderId, materialId, tierId) {
     if (!tierId || !orderId || !materialId) return null;
     try {
-        const res = await fetch(`/orders/${orderId}/materials/${materialId}/attribution`, {
-            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        });
-        if (!res.ok) return null;
-        const list = await res.json();
+        const list = await window.krtFetch.getJson(
+            `/orders/${orderId}/materials/${materialId}/attribution`,
+        );
         /** @type {Map<string, number>} */
         const here = new Map();
         /** @type {Set<string>} */
@@ -1545,9 +1539,9 @@ async function toggleInventory(row) {
     row.parentNode.insertBefore(detailsRow, row.nextSibling);
 
     try {
-        const response = await fetch(`/orders/${orderId}/materials/${materialId}/inventory`);
-        if (!response.ok) throw new Error('Network response was not ok');
-        const allItems = await response.json();
+        const allItems = await window.krtFetch.getJson(
+            `/orders/${orderId}/materials/${materialId}/inventory`,
+        );
         const attribution = await _loadStockAttribution(
             orderId,
             materialId,
@@ -1968,9 +1962,9 @@ function openProductionModal(button) {
             skipCb.addEventListener('change', _prodReconcile);
         }
         Promise.all([
-            fetch(`/orders/${orderId}/materials/${mat.materialId}/inventory`).then((r) => {
-                return r.ok ? r.json() : [];
-            }),
+            window.krtFetch
+                .getJson(`/orders/${orderId}/materials/${mat.materialId}/inventory`)
+                .catch(() => []),
             _prodLoadHigherAttribution(orderId, mat),
         ])
             .then((results) => {
@@ -2089,11 +2083,10 @@ async function _prodLoadHigherAttribution(orderId, mat) {
     });
     if (tiers.size < 2 || !orderId) return higher;
     try {
-        const res = await fetch(`/orders/${orderId}/materials/${mat.materialId}/attribution`, {
-            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        });
-        if (!res.ok) return higher;
-        for (const entry of await res.json()) {
+        const entries = await window.krtFetch.getJson(
+            `/orders/${orderId}/materials/${mat.materialId}/attribution`,
+        );
+        for (const entry of entries) {
             const tier = tiers.get(entry.qualityTierId);
             if (tier && tier.floor > mat.floor && entry.amount > 0) {
                 higher.set(entry.inventoryItemId, tier.label);
@@ -2207,13 +2200,8 @@ function _prodRefreshOrgUnitPicker() {
         wrapper.hidden = true;
         return;
     }
-    fetch(`/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true`, {
-        headers: { Accept: 'application/json' },
-        credentials: 'same-origin',
-    })
-        .then((r) => {
-            return r.ok ? r.json() : [];
-        })
+    window.krtFetch
+        .getJson(`/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true`)
         .then((memberships) => {
             if (!Array.isArray(memberships) || memberships.length < 1) {
                 wrapper.hidden = true;

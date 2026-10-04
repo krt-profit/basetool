@@ -369,12 +369,8 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             }
             select.dispatchEvent(new Event('change', { bubbles: true }));
         }
-        fetch(`/catalog/material-search?raw=true&q=${encodeURIComponent(materialName)}`, {
-            headers: { Accept: 'application/json' },
-        })
-            .then((r) => {
-                return r.ok ? r.json() : [];
-            })
+        window.krtFetch
+            .getJson(`/catalog/material-search?raw=true&q=${encodeURIComponent(materialName)}`)
             .then((list) => {
                 const rows = Array.isArray(list) ? list : [];
                 const match =

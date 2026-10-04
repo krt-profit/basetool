@@ -308,10 +308,8 @@ document.addEventListener('change', (e) => {
     const index = sel.id.substring('storeUser_'.length);
     const orgSelect = document.getElementById(`storeOrgUnit_${index}`);
     if (!orgSelect || !sel.value) return;
-    fetch(`/refinery-orders/users/${encodeURIComponent(sel.value)}/org-units`, {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-    })
-        .then((r) => (r.ok ? r.json() : []))
+    window.krtFetch
+        .getJson(`/refinery-orders/users/${encodeURIComponent(sel.value)}/org-units`)
         .then((opts) => rebuildOrgUnitOptions(orgSelect, Array.isArray(opts) ? opts : []))
         .catch(() => rebuildOrgUnitOptions(orgSelect, []));
 });

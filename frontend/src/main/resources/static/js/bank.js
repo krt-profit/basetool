@@ -389,17 +389,11 @@
         if (!userId) {
             return;
         }
-        let memberships = [];
+        let memberships;
         try {
-            const response = await fetch(
+            memberships = await window.krtFetch.getJson(
                 `/users/${encodeURIComponent(userId)}/memberships?allKinds=true`,
-                {
-                    headers: { Accept: 'application/json' },
-                },
             );
-            if (response.ok) {
-                memberships = await response.json();
-            }
         } catch {
             memberships = [];
         }
@@ -1604,7 +1598,7 @@
         }
         let response;
         try {
-            response = await fetch(url, { method: 'GET', headers });
+            response = await window.krtFetch.get(url, { headers });
         } catch {
             response = null;
         }

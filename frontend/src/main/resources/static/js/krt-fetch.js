@@ -252,6 +252,148 @@
         }
     }
 
+    /** @type {Map<string, AbortController>} */
+    const readAborters = new Map();
+
+    /**
+     * Combines the caller's signal with a supersede controller for `key`, aborting the read still
+     * in flight under the same key.
+     *
+     * @param {KrtReadOpts} options the read options
+     * @returns {{ signal: AbortSignal | undefined, controller: AbortController | null }} the signal
+     *     to pass to fetch and the supersede controller to release afterwards
+     */
+    function readSignal(options) {
+        /** @type {AbortSignal[]} */
+        const signals = [];
+        if (options.signal) {
+            signals.push(options.signal);
+        }
+        /** @type {AbortController | null} */
+        let controller = null;
+        if (options.key) {
+            const previous = readAborters.get(options.key);
+            if (previous) {
+                previous.abort();
+            }
+            controller = new AbortController();
+            readAborters.set(options.key, controller);
+            signals.push(controller.signal);
+        }
+        if (signals.length === 0) {
+            return { signal: undefined, controller };
+        }
+        return { signal: signals.length === 1 ? signals[0] : AbortSignal.any(signals), controller };
+    }
+
+    /**
+     * Sends a same-origin GET marked as background traffic and runs the answer past the
+     * re-authentication and terms gates (REQ-FE-031).
+     *
+     * @param {string} url the same-origin URL to read
+     * @param {KrtReadOpts} [opts] accept, extra headers, signal and supersede key
+     * @returns {Promise<Response | null>} the response, ok or not; null when a gate navigated away
+     *     or the answer came through a redirect, which for a background read is a login or consent
+     *     page rather than the resource
+     */
+    async function get(url, opts) {
+        const options = opts || {};
+        /** @type {Record<string, string>} */
+        const headers = Object.assign({}, options.headers);
+        if (options.accept) {
+            headers.Accept = options.accept;
+        }
+        headers['X-Requested-With'] = 'XMLHttpRequest';
+        const { signal, controller } = readSignal(options);
+        let response;
+        try {
+            response = await fetch(url, {
+                method: 'GET',
+                headers,
+                credentials: 'same-origin',
+                signal,
+            });
+        } finally {
+            if (controller && options.key && readAborters.get(options.key) === controller) {
+                readAborters.delete(options.key);
+            }
+        }
+        if (maybeReauthenticate(response) || maybeTermsGate(response)) {
+            return null;
+        }
+        if (response.redirected) {
+            devWarn('krtFetch.get refused a redirected answer', { url, status: response.status });
+            return null;
+        }
+        return response;
+    }
+
+    /**
+     * Whether the response declares a JSON body (`application/json` or `application/problem+json`).
+     *
+     * @param {Response} response the response to inspect
+     * @returns {boolean} true for a JSON content type
+     */
+    function isJsonResponse(response) {
+        const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
+        return (
+            contentType.includes('application/json') ||
+            contentType.includes('application/problem+json')
+        );
+    }
+
+    /**
+     * Builds the rejection of {@link getJson}.
+     *
+     * @param {string} url the URL that was read
+     * @param {number} status the HTTP status, 0 when there was no usable answer
+     * @param {'refused' | 'status' | 'not-json'} reason why the answer was refused
+     * @param {any} problem the parsed error body, or null
+     * @returns {KrtReadError} the error to reject with
+     */
+    function readError(url, status, reason, problem) {
+        const error = /** @type {KrtReadError} */ (
+            new Error(`krtFetch.getJson ${reason} (${status}) for ${url}`)
+        );
+        error.name = 'KrtReadError';
+        error.status = status;
+        error.reason = reason;
+        error.problem = problem;
+        return error;
+    }
+
+    /**
+     * Reads JSON through {@link get}.
+     *
+     * @param {string} url the same-origin URL to read
+     * @param {KrtReadOpts} [opts] extra headers, signal and supersede key; Accept is always JSON
+     * @returns {Promise<any>} the parsed body of a 2xx JSON answer, or null for a 204; rejects with
+     *     a KrtReadError for a gated, redirected, non-2xx or non-JSON answer, and with the browser's
+     *     own error on a transport failure or an abort
+     */
+    async function getJson(url, opts) {
+        const response = await get(url, Object.assign({}, opts, { accept: 'application/json' }));
+        if (!response) {
+            throw readError(url, 0, 'refused', null);
+        }
+        if (!response.ok) {
+            let problem = null;
+            if (isJsonResponse(response)) {
+                try {
+                    problem = await response.json();
+                } catch (_unparsable) {}
+            }
+            throw readError(url, response.status, 'status', problem);
+        }
+        if (response.status === 204) {
+            return null;
+        }
+        if (!isJsonResponse(response)) {
+            throw readError(url, response.status, 'not-json', null);
+        }
+        return response.json();
+    }
+
     /** @type {Element | null} */
     let pendingSubmitter = null;
     document.addEventListener(
@@ -723,18 +865,12 @@
         if (indicator) {
             indicator.style.display = 'block';
         }
-        return fetch(url, {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            signal: aborter ? aborter.signal : undefined,
-        })
+        return get(url, { signal: aborter ? aborter.signal : undefined })
             .then((res) => {
-                if (maybeReauthenticate(res)) {
+                if (!res) {
                     return null;
                 }
-                if (maybeTermsGate(res)) {
-                    return null;
-                }
-                if (res.redirected || !res.ok) {
+                if (!res.ok) {
                     devWarn('krtFetch.swap bailed: response is not a fragment', {
                         url,
                         status: res.status,
@@ -917,6 +1053,8 @@
     }
 
     window.krtFetch = {
+        get,
+        getJson,
         write,
         submitForm,
         swap,

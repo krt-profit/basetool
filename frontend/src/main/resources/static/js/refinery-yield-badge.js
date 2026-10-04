@@ -79,13 +79,8 @@
             refreshAll();
             return Promise.resolve();
         }
-        return fetch(`/refinery-orders/locations/${encodeURIComponent(locationId)}/yields`, {
-            headers: { Accept: 'application/json' },
-            credentials: 'same-origin',
-        })
-            .then((resp) => {
-                return resp.ok ? resp.json() : {};
-            })
+        return window.krtFetch
+            .getJson(`/refinery-orders/locations/${encodeURIComponent(locationId)}/yields`)
             .catch(() => {
                 return {};
             })

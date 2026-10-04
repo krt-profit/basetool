@@ -241,13 +241,8 @@
     function loadMaterialPicker(query) {
         const seq = ++materialSeq;
         const url = `/materialboerse/request-materials${query ? `?q=${encodeURIComponent(query)}` : ''}`;
-        fetch(url, {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            credentials: 'same-origin',
-        })
-            .then((r) => {
-                return r.ok ? r.json() : null;
-            })
+        window.krtFetch
+            .getJson(url)
             .then((page) => {
                 if (seq !== materialSeq) {
                     return;
@@ -328,13 +323,8 @@
     function loadItemPicker(query) {
         const seq = ++itemSeq;
         const url = `/materialboerse/offerable-products${query ? `?q=${encodeURIComponent(query)}` : ''}`;
-        fetch(url, {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            credentials: 'same-origin',
-        })
-            .then((r) => {
-                return r.ok ? r.json() : [];
-            })
+        window.krtFetch
+            .getJson(url)
             .then((items) => {
                 if (seq !== itemSeq) {
                     return;

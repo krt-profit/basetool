@@ -373,11 +373,10 @@
             );
             if (!content) return;
             setStackEntriesStatus(content, stackEntriesI18n.loading, false);
-            fetch(buildStackEntriesUrl(headerRow, page), {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            })
+            window.krtFetch
+                .get(buildStackEntriesUrl(headerRow, page))
                 .then((r) => {
-                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                    if (!r || !r.ok) throw new Error(`HTTP ${r ? r.status : 0}`);
                     return r.text();
                 })
                 .then((html) => {
@@ -743,11 +742,8 @@
                 if (reason) reason.hidden = false;
                 return;
             }
-            fetch(`/api/proxy/materials/${encodeURIComponent(materialId)}/terminals`)
-                .then((r) => {
-                    if (!r.ok) throw new Error('Network response was not ok');
-                    return r.json();
-                })
+            window.krtFetch
+                .getJson(`/api/proxy/materials/${encodeURIComponent(materialId)}/terminals`)
                 .then((data) => {
                     if (data && data.length > 0) {
                         setPlaceholderOption(terminalSelect, bookOutI18n.terminalChoose);
@@ -1097,13 +1093,8 @@
                 wrapper.hidden = true;
                 return;
             }
-            fetch(`/users/${encodeURIComponent(targetUserId)}/memberships?allKinds=true`, {
-                headers: { Accept: 'application/json' },
-                credentials: 'same-origin',
-            })
-                .then((r) => {
-                    return r.ok ? r.json() : [];
-                })
+            window.krtFetch
+                .getJson(`/users/${encodeURIComponent(targetUserId)}/memberships?allKinds=true`)
                 .then(
                     /** @param {Array<{ orgUnitId: string, orgUnitName: string }>} memberships */
                     (memberships) => {

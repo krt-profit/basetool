@@ -231,12 +231,8 @@
                 return;
             }
             const select = rowSelect(row, 'userId');
-            fetch(`/users/${encodeURIComponent(userId)}`, {
-                headers: { Accept: 'application/json' },
-            })
-                .then((response) => {
-                    return response.ok ? response.json() : null;
-                })
+            window.krtFetch
+                .getJson(`/users/${encodeURIComponent(userId)}`)
                 .catch(() => {
                     return null;
                 })
@@ -337,12 +333,8 @@
 
         /** @param {string} id */
         function editRule(id) {
-            fetch(`/admin/notification-rules/${encodeURIComponent(id)}`, {
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-            })
-                .then((res) => {
-                    return res.ok ? res.json() : null;
-                })
+            window.krtFetch
+                .getJson(`/admin/notification-rules/${encodeURIComponent(id)}`)
                 .then((rule) => {
                     if (rule) {
                         prefillForm(rule);

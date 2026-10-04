@@ -96,13 +96,8 @@
     /** Loads the newest notifications from the bell's endpoint. */
     function loadNotifications() {
         if (!document.querySelector('[data-home-notif-list]')) return;
-        fetch('/notifications/recent', {
-            headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
-            credentials: 'same-origin',
-        })
-            .then((res) => {
-                return res.ok ? res.json() : [];
-            })
+        window.krtFetch
+            .getJson('/notifications/recent')
             .then((items) => {
                 renderNotifications(Array.isArray(items) ? items : []);
             })
