@@ -45,6 +45,11 @@ its target module, first matching rule wins (REQ-MOD-001…005).
   `AuditDomain` and `AuditDetails` from the same package. `AuditService` and the rest of the audit
   trail are the audit module's internals; the listener and controller audit rules key on all three
   recorder types, so a new recorder type is added there too.
+- **A domain event goes into its publisher's `<module>.api.events` package** — the module of the
+  service that calls `publishEvent` with it; there is no central `event` package. A
+  notification-producing event implements `notification.api.events.NotificationEvent`. A new
+  module package needs a `package <module> <module>` rule in the domain map. Event payloads are
+  data only: `eventLayerShouldNotDependOnServiceLayer` selects every `api.events` package tree.
 
 ## Concurrency — read this before touching multi-step transactions
 
