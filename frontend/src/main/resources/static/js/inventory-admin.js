@@ -486,6 +486,8 @@ function filterJobOrdersByMaterial(matId) {
 /** @type {string | null} */
 let adminUmbuchenItemId = null;
 let adminUmbuchenInFlight = false;
+/** @type {{ userId: string | null, locationId: string | null }} */
+let adminUmbuchenSource = { userId: null, locationId: null };
 
 /**
  * An Umbuchen form control by id.
@@ -522,6 +524,7 @@ function openUmbuchenModal(
     owningOrgUnitId,
 ) {
     adminUmbuchenItemId = id;
+    adminUmbuchenSource = { userId: userId || null, locationId: locationId || null };
     adminLager.setUmbuchenCurrentOwningOrgUnit(owningOrgUnitId || null);
     const isScu = quantityType !== 'PIECE';
     const amountEl = adminUmbuchenInput('umbuchenAmount');
@@ -603,6 +606,17 @@ function submitUmbuchen(event) {
         document.getElementById('umbuchenSubmitBtn')
     );
     const mergeCheckbox = adminUmbuchenInput('umbuchenMergeStock');
+    const targetUserId = targetUserEl.value || null;
+    const targetLocationId = targetLocationEl.value || null;
+    if (
+        (targetUserId === null || targetUserId === adminUmbuchenSource.userId) &&
+        (targetLocationId === null || targetLocationId === adminUmbuchenSource.locationId)
+    ) {
+        if (typeof window.showFrontendErrorToast === 'function') {
+            window.showFrontendErrorToast(umbuchenI18n.unchanged);
+        }
+        return;
+    }
     if (window.krtHerkunft && !window.krtHerkunft.isValid('umbuchen')) {
         if (typeof window.showFrontendErrorToast === 'function') {
             window.showFrontendErrorToast(assocI18n.overallocated);
@@ -615,8 +629,8 @@ function submitUmbuchen(event) {
     const payload = {
         amount,
         type: 'TRANSFER',
-        targetUserId: targetUserEl.value || null,
-        targetLocationId: targetLocationEl.value || null,
+        targetUserId,
+        targetLocationId,
         targetOwningOrgUnitId: targetOrgUnitEl.value || null,
         version: parseInt(versionEl.value, 10),
         mergeStock: !!(mergeCheckbox && mergeCheckbox.checked),

@@ -337,7 +337,7 @@ public class InventoryCheckoutService {
 
     if (targetUser.getId().equals(item.getUser().getId())
         && targetLocation.getId().equals(item.getLocation().getId())) {
-      throw new BadRequestException("Transfer must change either the user or the location");
+      throw new BadRequestException("error.inventory.transfer.unchanged");
     }
 
     final OrgUnit targetOwningOrgUnit =

@@ -979,6 +979,8 @@ document.addEventListener('change', function (event) {
 let umbuchenItemId = null;
 let umbuchenCurrentOwningOrgUnitId = null;
 let umbuchenInFlight = false;
+/** @type {{ userId: string | null, locationId: string | null }} */
+let umbuchenSource = { userId: null, locationId: null };
 
 /**
  * Fills the de-personalize org-unit picker with the row owner's memberships of all four org-unit
@@ -1068,6 +1070,7 @@ function openUmbuchenModal(
     owningOrgUnitId,
 ) {
     umbuchenItemId = id;
+    umbuchenSource = { userId: userId || null, locationId: locationId || null };
     umbuchenCurrentOwningOrgUnitId = owningOrgUnitId || null;
     myLager.setUmbuchenCurrentOwningOrgUnit(umbuchenCurrentOwningOrgUnitId);
     const isScu = quantityType !== 'PIECE';
@@ -1190,6 +1193,17 @@ function submitUmbuchen(event) {
             mergeStock,
         };
     } else {
+        const targetUserId = myFieldValue('umbuchenTargetUserId') || null;
+        const targetLocationId = myFieldValue('umbuchenTargetLocationId') || null;
+        if (
+            (targetUserId === null || targetUserId === umbuchenSource.userId) &&
+            (targetLocationId === null || targetLocationId === umbuchenSource.locationId)
+        ) {
+            if (typeof window.showFrontendErrorToast === 'function') {
+                window.showFrontendErrorToast(umbuchenI18n.unchanged);
+            }
+            return;
+        }
         if (window.krtHerkunft && !window.krtHerkunft.isValid('umbuchen')) {
             if (typeof window.showFrontendErrorToast === 'function') {
                 window.showFrontendErrorToast(assocI18n.overallocated);
@@ -1203,8 +1217,8 @@ function submitUmbuchen(event) {
         payload = {
             amount,
             type: 'TRANSFER',
-            targetUserId: myFieldValue('umbuchenTargetUserId') || null,
-            targetLocationId: myFieldValue('umbuchenTargetLocationId') || null,
+            targetUserId,
+            targetLocationId,
             targetOwningOrgUnitId: myFieldValue('umbuchenTargetOwningOrgUnitId') || null,
             version,
             mergeStock,
