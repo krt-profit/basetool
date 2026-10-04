@@ -702,10 +702,12 @@ service layer via the active Staffel context
 
 ² Non-admins switch between their memberships; admins additionally „Alle Staffeln" (all Staffeln). ³ SK member management
 is **admin or SK-Lead of this SK** — not tied
-to the global Officer role. The web page for it is **„Leitung" → „Mitglieder verwalten"**
-(`/organisation/special-commands/{id}`, frontend gate `ADMIN_OR_OFFICER`, the backend's per-SK
-verdict decides), not the admin area; `/admin/special-commands/{id}` only redirects there. An SK
-lead cannot change the lead seat on that page — the lead column renders for admins only.
+to the global Officer role. The web surface for it is the SK's **„Mitglieder"** tab on the
+**„Leitung"** page (`/organisation/leitung?unit={id}`, since 2026-10-03), and the SK member page
+`/organisation/special-commands/{id}` that the admin list opens (frontend gate `ADMIN_OR_OFFICER`
+on both, the backend's per-SK verdict decides), not the admin area; `/admin/special-commands/{id}`
+only redirects there. An SK lead cannot change the lead seat on either — the lead toggle is offered
+only to whoever may appoint the lead (on the member page: admins only).
 ⁴ Besides the admin, the **Bereichsleiter of the SK's parent Bereich** sets the lead, on the
 „Leitung" page (`OrgRoleManagementSecurityService.canAppointSkLead`, REQ-ROLE-004) — never the SK
 lead itself. *(Corrected 2026-09-22: this row said `hasRole('ADMIN')` only.)*

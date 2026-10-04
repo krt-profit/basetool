@@ -530,7 +530,18 @@ Two later changes on the same pages (2026-09-22). The SK **detail page** moved o
 area to `/organisation/special-commands/{id}` (`SpecialCommandMembersPageController`, ADR-0198),
 because an SK lead manages the roster there too; its member twins and the
 `organisation/special-command-detail :: membersResults` swap moved with it unchanged, and only the
-admin-only lead toggle still posts to `/admin/special-commands/{id}/members/{userId}/lead`. And
+admin-only lead toggle still posts to `/admin/special-commands/{id}/members/{userId}/lead`. Since
+2026-10-03 the roster is one fragment, `organisation/unit-detail :: skRoster`, rendered both there
+and in the selected SK on „Leitung" (REQ-ROLE-004): the same member twins write it, and each
+rendering names its own re-render in `data-refresh-url` / `-container` / `-fragment` — the member
+page swaps `#members-results`, „Leitung" swaps `#leitung-sections`
+(`?unit=<id>&fragment=leitungSections`), and on „Leitung" the lead toggle posts to the delegated
+`/organisation/leitung/special-commands/{id}/members/{userId}/lead/ajax` proxy. The flag toggles,
+the removal and the member page's admin lead toggle stay `<form method="post">` that the script
+intercepts, so their classic handlers keep the no-JS path; the delegated lead toggle on „Leitung"
+is a script-only button, like the rest of that page. The Leitung page's rank and Kommandogruppe
+selects save on `change` through `krtFetch.write` with the row `version` (no save button),
+conflicts through the shared reload-confirm. And
 **notification-rules** dropped its `location.reload()` after save / delete: it re-swaps its
 `admin/notification-rules :: rules` table fragment (`?fragment=rules`) instead (REQ-NOTIF-007).
 Neither page takes part in the live multi-user sync — no admin catalogue page does, except the org
