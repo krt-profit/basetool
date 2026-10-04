@@ -102,3 +102,26 @@ not. `dco.yml` therefore lists `basetool-release[bot]` among its bot authors.
 
 - A Dependabot-triggered run reads **Dependabot secrets** only, so `RELEASE_APP_PRIVATE_KEY` is also
   stored there. Rotating the key updates both the Actions and the Dependabot secret.
+
+## Amendment 3 (2026-10-04) — the key moves into a `main`-only `release` environment
+
+The App's private key was a repository-wide secret, so any workflow on any branch could read it
+(audit item CI-SEC-16). `release-prepare.yml` (dispatched on `main`) and `refresh-versions.yml`
+(scheduled, so on `main`) now declare `environment: release` on the job that mints the token. An
+environment secret of the same name takes precedence over the repository secret, so the jobs keep
+working before and after the owner's one-time step:
+
+1. *Settings → Environments → New environment* `release`; *Deployment branches and tags* →
+   *Selected branches and tags* → add the branch rule `main`. No reviewers, no wait timer.
+2. In that environment add the secret `RELEASE_APP_PRIVATE_KEY` with the App's PEM.
+
+- **`release-publish.yml` is not confined yet.** It runs on `pull_request: closed`, and GitHub
+  evaluates an environment's branch rule against `GITHUB_REF`, which for that event is
+  `refs/pull/<n>/merge`; a `main`-only rule refuses it, and admitting `refs/pull/*/merge` would admit
+  every pull request. Confining it needs a trigger whose ref is `main` — a `push` to `main` that
+  recognises the release merge, or `pull_request_target` — which is a decision of its own. Until
+  then the repository secret stays, and deleting it would stop the publish job.
+- The Dependabot secret store's copy (Amendment 2) is unaffected: Dependabot-triggered runs read
+  only that store.
+- A key rotation now updates up to three copies: the `release` environment, the repository secret
+  while it exists, and the Dependabot secret.
