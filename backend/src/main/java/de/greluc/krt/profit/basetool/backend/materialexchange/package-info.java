@@ -23,7 +23,9 @@
       "audit::api",
       "identity::api",
       "inventory::api",
+      "kernel",
       "notification::api",
+      "orgunit::api",
       "scope::api"
     })
 package de.greluc.krt.profit.basetool.backend.materialexchange;

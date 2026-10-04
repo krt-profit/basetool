@@ -47,14 +47,14 @@ final class RoleGateFixture {
   private RoleGateFixture() {}
 
   /**
-   * Builds the helper the production context wires: the real {@link SecurityConfig#roleHierarchy()}
-   * and no application context, which none of the role predicates touch.
+   * Builds the helper the production context wires, over the real {@link
+   * SecurityConfig#roleHierarchy()}.
    *
    * @return a real {@link AuthHelperService} over the production role hierarchy
    */
   @NotNull
   static AuthHelperService realAuthHelper() {
-    return new AuthHelperService(SecurityConfig.roleHierarchy(), null);
+    return new AuthHelperService(SecurityConfig.roleHierarchy());
   }
 
   /**

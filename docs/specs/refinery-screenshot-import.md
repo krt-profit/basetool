@@ -72,7 +72,7 @@ stripped, qualifier words `raw/ore/refined/pure/r` dropped, non-alphanumerics fo
    in the canonicalized `REFINERY_SCREEN` alias names (gate-passing targets only);
    the union must resolve to exactly one material — an alias and the name of the same
    material count as one hit, two different materials mean no match,
-4. fuzzy fallback via the reused `BlueprintFuzzyMatcher`; a hit at or above the
+4. fuzzy fallback via the kernel's `FuzzyNameMatcher`; a hit at or above the
    configurable accept threshold (`krt.refinery-import.fuzzy-accept-threshold`,
    default 0.9) is applied **and** flagged `LOW_CONFIDENCE_MATERIAL`; below the
    threshold the row stays unmatched with ranked `suggestions` attached.

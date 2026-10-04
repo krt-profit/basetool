@@ -19,7 +19,14 @@
 
 /** The inventory module (Lager): stock, holders, allocations, checkout and rebooking. */
 @ApplicationModule(
-    allowedDependencies = {"audit::api", "identity::api", "notification::api", "scope::api"})
+    allowedDependencies = {
+      "audit::api",
+      "identity::api",
+      "kernel",
+      "notification::api",
+      "orgunit::api",
+      "scope::api"
+    })
 package de.greluc.krt.profit.basetool.backend.inventory;
 
 import org.springframework.modulith.ApplicationModule;

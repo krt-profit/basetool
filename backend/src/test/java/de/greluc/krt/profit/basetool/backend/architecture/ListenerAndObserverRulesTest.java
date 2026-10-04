@@ -84,10 +84,10 @@ class ListenerAndObserverRulesTest {
   private static final int LISTENER_FLOOR = 14;
 
   /**
-   * Observer SPIs today: none exist yet, so the floor is zero by design; the fixtures prove the
-   * rule fails on a non-compliant implementation.
+   * Observer SPIs today: {@code MembershipChangeObserver}; the fixtures prove the rule fails on a
+   * non-compliant implementation.
    */
-  private static final int OBSERVER_SPI_FLOOR = 0;
+  private static final int OBSERVER_SPI_FLOOR = 1;
 
   /** The audit recorders whose rows must be written inside the business transaction. */
   private static final Set<String> AUDIT_RECORDERS =
@@ -168,7 +168,7 @@ class ListenerAndObserverRulesTest {
   @DisplayName("every observer SPI implementation is MANDATORY")
   void everyObserverImplementationIsMandatory() {
     assertThat(observerSpis(PRODUCTION))
-        .as("observer SPIs; none exist yet, so the floor is zero by design")
+        .as("observer SPIs")
         .hasSizeGreaterThanOrEqualTo(OBSERVER_SPI_FLOOR);
     assertThat(nonMandatoryObserverMethods(PRODUCTION))
         .as(

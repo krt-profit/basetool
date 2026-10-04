@@ -23,8 +23,10 @@
       "audit::api",
       "identity::api",
       "inventory::api",
+      "kernel",
       "materialexchange::api",
       "notification::api",
+      "orgunit::api",
       "scope::api"
     })
 package de.greluc.krt.profit.basetool.backend.joborder;

@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.support;
+package de.greluc.krt.profit.basetool.backend.kernel;
 
 import java.util.ArrayList;
 import java.util.Collection;

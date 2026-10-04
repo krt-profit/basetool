@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Test;
  */
 class MissionMapperJobTypeTest {
 
-  private final MissionMapper mapper = new MissionMapperImpl(null, null, null, null);
+  private final MissionMapper mapper = new MissionMapperImpl(null, null, null, null, null);
 
   private static JobType jobType(boolean missionLead, boolean leadershipRole) {
     JobType jobType = new JobType();

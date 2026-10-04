@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
-import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeShipRow;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
@@ -45,7 +44,8 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   /** A member's ships with their type and location, as the exchange reads them (REQ-XCH-017). */
   String EXCHANGE_SHIPS =
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeShipRow(
+      SELECT new
+      de.greluc.krt.profit.basetool.backend.repository.ShipRepository$ExchangeShipRow(
       s.id, s.version, s.name, t.id, t.name, s.insurance, l.name, c.idCity, st.idSpaceStation,
       s.fitted) FROM Ship s JOIN s.shipType t LEFT JOIN s.location l LEFT JOIN l.city c
       LEFT JOIN l.spaceStation st WHERE s.owner.id = :member
@@ -383,4 +383,31 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
+
+  /**
+   * One of a member's ships as the exchange reads it in one query, with its type and location
+   * (REQ-XCH-017).
+   *
+   * @param id the ship's id
+   * @param version the ship's optimistic-lock version, or {@code null} before its first write
+   * @param name the member's name for it, or {@code null}
+   * @param shipTypeId the ship type's id
+   * @param shipTypeName the ship type's name
+   * @param insurance {@code LTI} or the insurance months as digits, or {@code null}
+   * @param locationName the location's name, or {@code null} when the ship has none
+   * @param uexCityId the UEX id of the location's city, or {@code null}
+   * @param uexSpaceStationId the UEX id of the location's space station, or {@code null}
+   * @param fitted whether the ship is fitted
+   */
+  record ExchangeShipRow(
+      UUID id,
+      Long version,
+      String name,
+      UUID shipTypeId,
+      String shipTypeName,
+      String insurance,
+      String locationName,
+      Integer uexCityId,
+      Integer uexSpaceStationId,
+      boolean fitted) {}
 }

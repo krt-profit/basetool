@@ -381,7 +381,7 @@ alias-learning path then persists for everyone.
 
 **Enforced by:** `V228GermanAmmoAliasSeedMigrationTest` (executes the shipped migration file against
 fixtures — derivation, case variants, one-row-per-product, skip rules, idempotency, curated-alias
-precedence), `BlueprintFuzzyMatcherTest#topSuggestions_stillCatchesAGermanCapacitySuffixTheV228SeedDidNotCover`
+precedence), `FuzzyNameMatcherTest#topMatches_stillCatchesAGermanCapacitySuffixTheV228SeedDidNotCover`
 · **Code:**
 [`V228__seed_german_ammo_capacity_blueprint_aliases.sql`](../../backend/src/main/resources/db/migration/V228__seed_german_ammo_capacity_blueprint_aliases.sql),
 `BlueprintImportService#resolveViaAlias` (unchanged) · **Issue:** [#1485](https://github.com/krt-profit/basetool/issues/1485)

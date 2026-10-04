@@ -21,7 +21,7 @@
  * The audit module: the unified trail of every audited area's state-mutating activity, recorded in
  * the business transaction (REQ-AUDIT-001).
  */
-@ApplicationModule(allowedDependencies = {})
+@ApplicationModule(allowedDependencies = {"kernel"})
 package de.greluc.krt.profit.basetool.backend.audit;
 
 import org.springframework.modulith.ApplicationModule;

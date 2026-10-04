@@ -21,7 +21,14 @@
  * The scope module: the request-scoped org-unit scope kernel that filters and stamps tenant data
  * (REQ-ORG-*).
  */
-@ApplicationModule(allowedDependencies = {"audit::api", "identity::api", "notification::api"})
+@ApplicationModule(
+    allowedDependencies = {
+      "audit::api",
+      "identity::api",
+      "kernel",
+      "notification::api",
+      "orgunit::api"
+    })
 package de.greluc.krt.profit.basetool.backend.scope;
 
 import org.springframework.modulith.ApplicationModule;

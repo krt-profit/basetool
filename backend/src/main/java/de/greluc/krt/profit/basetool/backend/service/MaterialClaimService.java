@@ -574,7 +574,7 @@ public class MaterialClaimService {
     UUID responsibleSkId = order.getResponsibleOrgUnit().getId();
     boolean managesResponsibleSk =
         ownerScopeService.hasRoleInOrgUnit(responsibleSkId, "LOGISTICIAN");
-    boolean managesOwnSquadron = authHelperService.canEditOrgUnit(claimingOrgUnitId);
+    boolean managesOwnSquadron = ownerScopeService.canEditOrgUnit(claimingOrgUnitId);
     if (!managesResponsibleSk && !managesOwnSquadron) {
       throw new AccessDeniedException(
           "You may only manage claims for your own squadron, or any claim as a logistician or lead"

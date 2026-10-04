@@ -17,17 +17,21 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
-
-import jakarta.validation.constraints.Size;
-import java.util.UUID;
+package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
 /**
- * Payload for designating an Organisationsleitung's Grand Admiral (REQ-ORG-021): exactly one of an
- * account or a free-text name.
- *
- * @param userId the account to designate, or {@code null} for a free-text holder
- * @param displayName the free-text holder name, or {@code null} when designating an account; at
- *     most 120 chars
+ * The role a member holds within a Bereichsleitung (REQ-ORG-017), each mapping to one flag on the
+ * member's {@code org_unit_membership} row. All three confer the same cascading officer-equivalent
+ * reach (REQ-ORG-015).
  */
-public record GrandAdmiralRequest(UUID userId, @Size(max = 120) String displayName) {}
+public enum BereichLeadershipRole {
+
+  /** Bereichsleiter — the head of the Bereich ({@code is_bereichsleiter}). */
+  LEITER,
+
+  /** Bereichskoordinator — an area coordinator ({@code is_bereichskoordinator}). */
+  KOORDINATOR,
+
+  /** Bereichsoperator — an area operator ({@code is_bereichsoperator}). */
+  OPERATOR
+}

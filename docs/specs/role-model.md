@@ -246,8 +246,9 @@ The functional rank on `org_unit_membership` is the source of truth. The org cha
 (REQ-ORG-010); free-text / account-less chart holders stay chart-only. Account-linked chart seats are
 derived from the ranks; the authority cascade never reads the chart.
 
-The mirror is written in the same transaction as the rank change, by `OrgChartService.mirror*`
-called from the appointment flow (never by giving the chart scope awareness): the flat seats
+The mirror is written in the same transaction as the rank change, by `OrgChartService` through
+the org-unit module's `orgunit.api.MembershipChangeObserver` SPI (`MANDATORY`), called from the
+appointment flow (never by giving the chart scope awareness): the flat seats
 (Bereichsleiter / -koordinator / -operator, OL member, SK-Leiter, Staffelleiter) map 1:1 onto a
 chart position keyed by org unit (singletons are reassigned, not duplicated, so the partial unique
 indexes hold), while the in-Kommando ranks project onto the Kommando sub-tree — a `COMMAND_LEAD`
@@ -289,7 +290,7 @@ an OL member's by construction.
   assign-lead / add-child), and creating a child under it is rejected with
   `problem.org_chart.account_managed_in_leitung`.
 
-**Enforced by:** `OrgChartServiceTest` (the `mirror*` cases, `getOrgChart_groupLinkedCommand_projectsKommandoGroupId`, `createPosition_childUnderGroupLinkedKommando_isRejected`), `OrgChartPageRenderTest#groupLinkedCommand_admin_rendersReadOnlyHeadWithNoEditAffordances`, `OrgChartDtoDeserializationTest`, `OrgUnitMembershipServiceTest` / `KommandoGroupServiceTest` (mirror wiring), `OrgHierarchyMigrationTest` (V186), `ArchitectureTest` · **Code:** `OrgChartService#mirror*`, `OrgChartReadService#buildCommand`, `OrgChartService#createPosition`, `CommandChartDto#kommandoGroupId`, `OrgUnitMembershipService`, `KommandoGroupService`, `OrgChartPosition#kommandoGroup`, `V186__org_chart_kommando_group_link.sql` · **Decision:** ADR-0042 · **Issues:** #800
+**Enforced by:** `OrgChartServiceTest` (the `mirror*` cases of the `MembershipChangeObserver` methods, `getOrgChart_groupLinkedCommand_projectsKommandoGroupId`, `createPosition_childUnderGroupLinkedKommando_isRejected`), `OrgChartPageRenderTest#groupLinkedCommand_admin_rendersReadOnlyHeadWithNoEditAffordances`, `OrgChartDtoDeserializationTest`, `OrgUnitMembershipServiceTest` / `KommandoGroupServiceTest` (mirror wiring), `OrgHierarchyMigrationTest` (V186), `ArchitectureTest` · **Code:** `OrgChartService#mirror*`, `OrgChartReadService#buildCommand`, `OrgChartService#createPosition`, `CommandChartDto#kommandoGroupId`, `OrgUnitMembershipService`, `KommandoGroupService`, `OrgChartPosition#kommandoGroup`, `V186__org_chart_kommando_group_link.sql` · **Decision:** ADR-0042 · **Issues:** #800
 
 ## Out of scope
 

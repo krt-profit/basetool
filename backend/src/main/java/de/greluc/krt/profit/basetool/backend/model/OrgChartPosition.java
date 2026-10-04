@@ -137,7 +137,8 @@ public class OrgChartPosition extends AbstractEntity<UUID> {
   /**
    * The {@link KommandoGroup} this Kommando node mirrors (REQ-ROLE-006), or {@code null} for an
    * admin-authored Kommando. Set only on a {@link OrgChartPositionType#COMMAND_LEAD} row, at most
-   * one node per group, and written solely by {@code OrgChartService.mirror*}.
+   * one node per group, and written solely by {@code OrgChartService} as the org-unit module's
+   * {@code MembershipChangeObserver}.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "kommando_group_id")

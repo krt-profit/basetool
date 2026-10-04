@@ -36,10 +36,13 @@ assigns every top-level backend production type to exactly one module. It is lin
 A nested, local or anonymous class belongs to its top-level class, and a generated MapStruct
 `XMapperImpl` to the `@Mapper` type `XMapper` it implements. The rules are a faithful port of the
 audit's classification (`docs/archive/domain-modularisation-audit-2026-09/scripts/10-backend-domains-classify.py`)
-with the behaviour-free re-homings of plan §7.3 applied (leadership into `orgunit`, the access core
-into `platform`, the scope kernel into `scope`, the 31 GDPR classes into `privacy`,
+with the behaviour-free re-homings of plan §7.3 applied (the leadership writes into `orgunit` and
+the Leitung view into `orgchart` — corrected 2026-10-04, the view was first mapped to `orgunit` —,
+the access core into `platform`, the scope kernel into `scope`, the 31 GDPR classes into `privacy`,
 `HandleAnonymisation` into `kernel`, `PayoutPreference` into `identity`, the composition root into
-`app`). Changing a class's target module is a reviewed edit of this file.
+`app`). Changing a class's target module is a reviewed edit of this file. Once a module's package
+exists, a `package` rule assigns its tree (for example `audit`, `kernel`, `orgunit`) and the
+`class` rules of the classes that moved into it are removed.
 
 **Acceptance**
 
@@ -119,6 +122,11 @@ in `UserMapper`) and the two `kernel → platform` edges of `AppException` and `
 2026-10-04, when the domain map assigned `ErrorDisclosurePolicy` to the kernel with the rest of the
 exception contract (ADR-0235): **136 edges**.
 
+Shrunk the same day to **127 class edges in 37 module pairs** by the Phase 1 re-homings of plan
+§7.3: the exchange row records nested in the repositories that produce them (−5), the catalogue
+`ShipTypeMapper` (−1), the org chart behind the org-unit module's `MembershipChangeObserver` (−2)
+and `AuthHelperService` without its delegations to `OwnerScopeService` (−1).
+
 **Acceptance**
 
 - [x] The backend's frozen baseline equals the rule's current violations.
@@ -171,13 +179,20 @@ declared in the same pull request that creates it (plan §5.2, §5.7, step P1-13
   modules above it in the same pull request, since Spring Modulith rejects an allowed dependency on
   an undeclared module.
 
-Declared on `main`: `audit`, `bank`, `exchange`, `identity`, `inventory`, `joborder`,
-`materialexchange`, `notification`, `privacy`, `refinery`, `scope` (floor 11).
+A module without an `api` package keeps all its types in its base package, which is its unnamed
+interface: `kernel` today. Its dependents allow it by bare name (`"kernel"`, not
+`"kernel::api"`), it publishes no named interface, and no type lies below its base package. A
+module that may depend on no declared module says so with `allowedDependencies = {}`: the
+annotation's default is Spring Modulith's "everything allowed" sentinel, not an empty list.
+
+Declared on `main`: `audit`, `bank`, `exchange`, `identity`, `inventory`, `joborder`, `kernel`,
+`materialexchange`, `notification`, `orgunit`, `privacy`, `refinery`, `scope` (floor 13).
+`orgunit.web` is internal to `orgunit`.
 
 **Acceptance**
 
 - [x] The module packages found in the compiled backend equal `ModularityTest.DECLARED_MODULES`,
-      which equals the detected Modulith modules, with a floor of 11.
+      which equals the detected Modulith modules, with a floor of 13.
 - [x] Each declared module's only named interface is `api`, and it contains every top-level type
       of the module's `api` package tree and nothing outside it.
 - [x] Each declaration's `allowedDependencies` equals the set the domain map derives.

@@ -34,6 +34,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintExternalAlias;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintExternalAliasSource;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
@@ -82,7 +83,7 @@ class BlueprintImportServiceTest {
             JsonMapper.builder().build(),
             blueprintProductService,
             new BlueprintNameNormalizer(),
-            new BlueprintFuzzyMatcher(),
+            new FuzzyNameMatcher(),
             aliasRepository,
             personalBlueprintRepository,
             gameItemRepository,

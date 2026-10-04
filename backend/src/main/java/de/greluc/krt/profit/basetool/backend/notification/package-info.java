@@ -18,7 +18,7 @@
  */
 
 /** The notification module: notification rules, their fan-out and delivery. */
-@ApplicationModule(allowedDependencies = {})
+@ApplicationModule(allowedDependencies = {"kernel"})
 package de.greluc.krt.profit.basetool.backend.notification;
 
 import org.springframework.modulith.ApplicationModule;

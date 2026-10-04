@@ -62,13 +62,21 @@ class ModularityTest {
           "identity",
           "inventory",
           "joborder",
+          "kernel",
           "materialexchange",
           "notification",
+          "orgunit",
           "privacy",
           "refinery",
           "scope");
 
-  private static final int DECLARED_MODULE_FLOOR = 11;
+  private static final int DECLARED_MODULE_FLOOR = 13;
+
+  /**
+   * Modules without an {@code api} package: their types lie in the base package, which is their
+   * unnamed interface, and a dependent allows them by bare module name.
+   */
+  private static final Set<String> BASE_PACKAGE_MODULES = Set.of("kernel");
 
   private static final String API = "api";
 
@@ -106,6 +114,10 @@ class ModularityTest {
     BACKEND.forEach(
         module -> {
           String id = module.getIdentifier().toString();
+          if (BASE_PACKAGE_MODULES.contains(id)) {
+            assertBasePackageIsTheOnlyInterface(module, classes);
+            return;
+          }
           String apiPackage = module.getBasePackage().getName() + "." + API;
           Set<String> named =
               module.getNamedInterfaces().stream()
@@ -130,6 +142,28 @@ class ModularityTest {
         });
   }
 
+  private static void assertBasePackageIsTheOnlyInterface(
+      org.springframework.modulith.core.ApplicationModule module, JavaClasses classes) {
+    String id = module.getIdentifier().toString();
+    String basePackage = module.getBasePackage().getName();
+    Set<String> named =
+        module.getNamedInterfaces().stream()
+            .filter(NamedInterface::isNamed)
+            .map(NamedInterface::getName)
+            .collect(Collectors.toUnmodifiableSet());
+    List<String> moduleTree =
+        ModuleSubjects.topLevelClasses(classes)
+            .map(JavaClass::getName)
+            .filter(name -> name.startsWith(basePackage + "."))
+            .toList();
+
+    assertThat(named).as(id).isEmpty();
+    assertThat(moduleTree).as(id).isNotEmpty();
+    assertThat(moduleTree)
+        .as(id + " keeps every type in its base package")
+        .allMatch(name -> name.substring(0, name.lastIndexOf('.')).equals(basePackage));
+  }
+
   @Test
   void everyDeclarationAllowsExactlyTheApisOfTheDeclaredModulesTheDomainMapPermits()
       throws ClassNotFoundException {
@@ -141,7 +175,7 @@ class ModularityTest {
       Set<String> permitted =
           DECLARED_MODULES.stream()
               .filter(target -> !target.equals(module) && map.mayDependOn(module, target))
-              .map(target -> target + "::" + API)
+              .map(target -> BASE_PACKAGE_MODULES.contains(target) ? target : target + "::" + API)
               .collect(Collectors.toCollection(TreeSet::new));
 
       assertThat(declaration).as(module).isNotNull();

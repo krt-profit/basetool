@@ -29,8 +29,10 @@
       "identity::api",
       "inventory::api",
       "joborder::api",
+      "kernel",
       "materialexchange::api",
       "notification::api",
+      "orgunit::api",
       "refinery::api",
       "scope::api"
     })

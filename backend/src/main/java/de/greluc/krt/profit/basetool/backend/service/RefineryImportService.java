@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.RefineryImportProperties;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
 import de.greluc.krt.profit.basetool.backend.mapper.LocationMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.RefiningMethodMapper;
@@ -75,7 +76,7 @@ import org.springframework.util.StringUtils;
  *
  * <p>Envelope problems throw {@link BadRequestException}; content problems yield a draft with
  * {@link ImportIssueDto}s. Materials are matched by canonical name, curated {@code REFINERY_SCREEN}
- * alias, truncation match, then {@link BlueprintFuzzyMatcher}; fuzzy hits are always flagged.
+ * alias, truncation match, then {@link FuzzyNameMatcher}; fuzzy hits are always flagged.
  */
 @Slf4j
 @Service
@@ -106,7 +107,7 @@ public class RefineryImportService {
   private final LocationRepository locationRepository;
   private final UserRepository userRepository;
   private final MaterialExternalAliasService materialExternalAliasService;
-  private final BlueprintFuzzyMatcher fuzzyMatcher;
+  private final FuzzyNameMatcher fuzzyMatcher;
   private final RefineryImportProperties properties;
   private final MaterialMapper materialMapper;
   private final LocationMapper locationMapper;
@@ -318,7 +319,7 @@ public class RefineryImportService {
    * <ol>
    *   <li>exact case-insensitive name;
    *   <li>unique canonical-core fold;
-   *   <li>best {@link BlueprintFuzzyMatcher} candidate at or above {@link
+   *   <li>best {@link FuzzyNameMatcher} candidate at or above {@link
    *       RefineryImportProperties#getMethodFuzzyAcceptThreshold()}.
    * </ol>
    *
@@ -355,7 +356,7 @@ public class RefineryImportService {
     if (fuzzyKey == null || fuzzyKey.isEmpty()) {
       return Optional.empty();
     }
-    List<BlueprintFuzzyMatcher.Scored<RefiningMethod>> ranked =
+    List<FuzzyNameMatcher.Scored<RefiningMethod>> ranked =
         fuzzyMatcher.topMatches(
             fuzzyKey,
             candidates,
@@ -540,7 +541,7 @@ public class RefineryImportService {
     if (fuzzyKey == null || fuzzyKey.isEmpty()) {
       return MaterialMatch.unmatched(null);
     }
-    List<BlueprintFuzzyMatcher.Scored<Material>> ranked =
+    List<FuzzyNameMatcher.Scored<Material>> ranked =
         fuzzyMatcher.topMatches(
             fuzzyKey,
             context.candidates(),

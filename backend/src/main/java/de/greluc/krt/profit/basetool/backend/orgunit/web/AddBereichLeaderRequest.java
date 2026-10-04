@@ -17,26 +17,18 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto.exchange;
+package de.greluc.krt.profit.basetool.backend.orgunit.web;
 
+import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichLeadershipRole;
+import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 /**
- * The identifiers of one game item, for resolving an item reference (REQ-XCH-012).
+ * Request body to add a Bereichsleitung member or change their role (REQ-ORG-017). The user must
+ * hold no Staffel membership; an existing membership on this Bereich is updated in place, otherwise
+ * one is created.
  *
- * @param id the item's id
- * @param name the item's display name
- * @param className the item's DataForge class name, or {@code null}
- * @param externalUuid the item's Wiki UUID, or {@code null}
- * @param p4kUuid the item's game-file UUID, or {@code null}
- * @param uexId the item's UEX id, or {@code null}
- * @param nameKey the item's {@code global.ini} name key, or {@code null}
+ * @param userId the user to grant the Bereichsleitung role to; required
+ * @param role the Bereichsleitung role (Leiter / Koordinator / Operator); required
  */
-public record ExchangeItemKeyRow(
-    UUID id,
-    String name,
-    String className,
-    UUID externalUuid,
-    UUID p4kUuid,
-    Integer uexId,
-    String nameKey) {}
+public record AddBereichLeaderRequest(@NotNull UUID userId, @NotNull BereichLeadershipRole role) {}

@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.GameItemSourceSystem;
-import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeItemKeyRow;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -180,7 +179,8 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeItemKeyRow(
+      SELECT new
+      de.greluc.krt.profit.basetool.backend.repository.GameItemRepository$ExchangeItemKeyRow(
       gi.id, gi.name, gi.className, gi.externalUuid, gi.p4kUuid, gi.uexItemId, gi.nameKey)
       FROM GameItem gi
       WHERE gi.id IN :ids OR LOWER(gi.className) IN :classNames OR gi.externalUuid IN :guids
@@ -194,4 +194,24 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
       @Param("uexIds") Collection<Integer> uexIds,
       @Param("names") Collection<String> names,
       @Param("nameKeys") Collection<String> nameKeys);
+
+  /**
+   * The identifiers of one game item, for resolving an item reference (REQ-XCH-012).
+   *
+   * @param id the item's id
+   * @param name the item's display name
+   * @param className the item's DataForge class name, or {@code null}
+   * @param externalUuid the item's Wiki UUID, or {@code null}
+   * @param p4kUuid the item's game-file UUID, or {@code null}
+   * @param uexId the item's UEX id, or {@code null}
+   * @param nameKey the item's {@code global.ini} name key, or {@code null}
+   */
+  record ExchangeItemKeyRow(
+      UUID id,
+      String name,
+      String className,
+      UUID externalUuid,
+      UUID p4kUuid,
+      Integer uexId,
+      String nameKey) {}
 }

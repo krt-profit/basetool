@@ -9,14 +9,9 @@ blueprint -> exchange: PersonalBlueprintService -> ExchangeClientRepository
 blueprint -> inventory: BlueprintCraftabilityService -> InventoryItemService
 blueprint -> inventory: BlueprintCraftabilityService -> OwnedStockSlice
 blueprint -> refinery: BlueprintCraftabilityService -> RefineryOrderService
-catalogue -> exchange: BlueprintRepository -> ExchangeBlueprintKeyRow
-catalogue -> exchange: GameItemRepository -> ExchangeItemKeyRow
-catalogue -> exchange: LocationRepository -> ExchangeLocationRow
 catalogue -> hangar: LocationService -> ShipRepository
-catalogue -> hangar: ShipTypeController -> ShipMapper
 catalogue -> mission: JobTypeService -> MissionParticipantRepository
 catalogue -> refinery: LocationService -> RefineryOrderRepository
-hangar -> exchange: ShipRepository -> ExchangeShipRow
 hangar -> mission: HangarService -> Mission
 hangar -> mission: HangarService -> MissionUnit
 hangar -> mission: HangarService -> MissionUnitRepository
@@ -53,7 +48,6 @@ identity -> privacy: UserController -> UserDeletionService
 identity -> privacy: UserRegistrationService -> UserDeletionService
 identity -> scope: MeController -> OwnerScopeService
 identity -> scope: UserService -> OwnerScopeService
-inventory -> exchange: InventoryItemRepository -> ExchangeStockLotRow
 inventory -> joborder: AllocationReductions -> JobOrder
 inventory -> joborder: InventoryAggregationService -> JobOrder
 inventory -> joborder: InventoryAggregationService -> JobOrderItem
@@ -111,11 +105,8 @@ notification -> orgunit: OrgUnitRef -> OrgUnitKind
 notification -> orgunit: RecipientResolutionService -> OrgUnitMembershipRepository
 orgunit -> bank: OrgUnitMembershipService -> OrgUnitBankResponsibilityService
 orgunit -> inventory: OrgUnitMembershipService -> InventoryOrgUnitReconciler
-orgunit -> orgchart: KommandoGroupService -> OrgChartService
-orgunit -> orgchart: OrgUnitMembershipService -> OrgChartService
 platform -> exchange: ClientAttribution -> IngestGatewayProperties
 platform -> exchange: ClientAttribution -> KnownExchangeClients
-platform -> scope: AuthHelperService -> OwnerScopeService
 platform -> scope: CorrelationIdFilter -> OwnerScopeService
 scope -> exchange: CustomJwtGrantedAuthoritiesConverter -> IngestGatewayProperties
 scope -> hangar: AccessGateService -> Ship

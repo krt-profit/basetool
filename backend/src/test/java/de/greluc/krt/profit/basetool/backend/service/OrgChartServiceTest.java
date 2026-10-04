@@ -46,13 +46,13 @@ import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.BereichChartDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.model.dto.CommandChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronChartDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.repository.OrgChartPositionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -1442,7 +1442,7 @@ class OrgChartServiceTest {
         .thenReturn(Optional.of(existing));
     when(userRepository.getReferenceById(newUserId)).thenReturn(newUser);
 
-    service().mirrorBereichRole(bereichId, newUserId, BereichLeadershipRole.LEITER);
+    service().onBereichRoleGranted(bereichId, newUserId, BereichLeadershipRole.LEITER);
 
     assertSame(newUser, existing.getUser(), "the single Bereichsleiter seat is reassigned");
     assertNull(existing.getDisplayName(), "a free-text holder is cleared on reassign");
@@ -1463,7 +1463,7 @@ class OrgChartServiceTest {
     when(userRepository.getReferenceById(userId)).thenReturn(u);
     when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-    service().mirrorBereichRole(bereichId, userId, BereichLeadershipRole.KOORDINATOR);
+    service().onBereichRoleGranted(bereichId, userId, BereichLeadershipRole.KOORDINATOR);
 
     OrgChartPosition saved = captureSaved();
     assertEquals(OrgChartPositionType.BEREICHSKOORDINATOR, saved.getPositionType());
@@ -1492,7 +1492,7 @@ class OrgChartServiceTest {
         .thenReturn(List.of(placeholder));
     when(userRepository.getReferenceById(userId)).thenReturn(u);
 
-    service().mirrorBereichRole(bereichId, userId, BereichLeadershipRole.KOORDINATOR);
+    service().onBereichRoleGranted(bereichId, userId, BereichLeadershipRole.KOORDINATOR);
 
     assertSame(u, placeholder.getUser());
     assertNull(placeholder.getDisplayName());
@@ -1517,7 +1517,7 @@ class OrgChartServiceTest {
     when(userRepository.getReferenceById(userId)).thenReturn(user(userId, "u"));
     when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-    service().mirrorBereichRole(bereichId, userId, BereichLeadershipRole.LEITER);
+    service().onBereichRoleGranted(bereichId, userId, BereichLeadershipRole.LEITER);
 
     verify(positionRepository).delete(priorKoord);
     assertEquals(OrgChartPositionType.BEREICHSLEITER, captureSaved().getPositionType());
@@ -1539,7 +1539,7 @@ class OrgChartServiceTest {
     when(userRepository.getReferenceById(userId)).thenReturn(user(userId, "lead"));
     when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-    service().mirrorSquadronRank(squadronId, userId, MembershipRole.STAFFELLEITER, null);
+    service().onSquadronRankAssigned(squadronId, userId, MembershipRole.STAFFELLEITER, null);
 
     OrgChartPosition saved = captureSaved();
     assertEquals(OrgChartPositionType.SQUADRON_LEAD, saved.getPositionType());
@@ -1559,7 +1559,7 @@ class OrgChartServiceTest {
     when(positionRepository.findByKommandoGroupId(group.getId())).thenReturn(Optional.of(command));
     when(userRepository.getReferenceById(userId)).thenReturn(u);
 
-    service().mirrorSquadronRank(squadronId, userId, MembershipRole.KOMMANDOLEITER, group);
+    service().onSquadronRankAssigned(squadronId, userId, MembershipRole.KOMMANDOLEITER, group);
 
     assertSame(u, command.getUser(), "the group's Kommando node now carries the Kommandoleiter");
     assertNull(command.getDisplayName());
@@ -1579,7 +1579,7 @@ class OrgChartServiceTest {
     when(userRepository.getReferenceById(userId)).thenReturn(u);
     when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-    service().mirrorSquadronRank(squadronId, userId, MembershipRole.KOMMANDOLEITER, group);
+    service().onSquadronRankAssigned(squadronId, userId, MembershipRole.KOMMANDOLEITER, group);
 
     OrgChartPosition saved = captureSaved();
     assertEquals(OrgChartPositionType.COMMAND_LEAD, saved.getPositionType());
@@ -1604,7 +1604,8 @@ class OrgChartServiceTest {
     when(userRepository.getReferenceById(userId)).thenReturn(user(userId, "stellv"));
     when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-    service().mirrorSquadronRank(squadronId, userId, MembershipRole.STELLV_KOMMANDOLEITER, group);
+    service()
+        .onSquadronRankAssigned(squadronId, userId, MembershipRole.STELLV_KOMMANDOLEITER, group);
 
     OrgChartPosition saved = captureSaved();
     assertEquals(OrgChartPositionType.DEPUTY_COMMAND_LEAD, saved.getPositionType());
@@ -1627,7 +1628,7 @@ class OrgChartServiceTest {
     when(userRepository.getReferenceById(userId)).thenReturn(user(userId, "ens"));
     when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-    service().mirrorSquadronRank(squadronId, userId, MembershipRole.ENSIGN, group);
+    service().onSquadronRankAssigned(squadronId, userId, MembershipRole.ENSIGN, group);
 
     OrgChartPosition saved = captureSaved();
     assertEquals(OrgChartPositionType.ENSIGN, saved.getPositionType());
@@ -1648,7 +1649,7 @@ class OrgChartServiceTest {
     when(userRepository.getReferenceById(userId)).thenReturn(user(userId, "ens"));
     when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-    service().mirrorSquadronRank(squadronId, userId, MembershipRole.ENSIGN, null);
+    service().onSquadronRankAssigned(squadronId, userId, MembershipRole.ENSIGN, null);
 
     OrgChartPosition saved = captureSaved();
     assertEquals(OrgChartPositionType.ENSIGN, saved.getPositionType());
@@ -1674,7 +1675,7 @@ class OrgChartServiceTest {
     when(userRepository.getReferenceById(userId)).thenReturn(user(userId, "lead"));
     when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-    service().mirrorSquadronRank(squadronId, userId, MembershipRole.STAFFELLEITER, null);
+    service().onSquadronRankAssigned(squadronId, userId, MembershipRole.STAFFELLEITER, null);
 
     assertNull(priorCommand.getUser(), "the former Kommando node is vacated, not removed");
     verify(positionRepository, never()).delete(priorCommand);
@@ -1689,7 +1690,7 @@ class OrgChartServiceTest {
     when(positionRepository.findByOrgUnitIdAndUserId(squadronId, userId))
         .thenReturn(List.of(ensign));
 
-    service().mirrorRemoveSquadronRank(squadronId, userId);
+    service().onSquadronRankCleared(squadronId, userId);
 
     verify(positionRepository).delete(ensign);
   }
@@ -1702,7 +1703,7 @@ class OrgChartServiceTest {
         pos(OrgChartPositionType.OL_MEMBER, organisationsleitung(olId, "OL", "OL"), null);
     when(positionRepository.findByOrgUnitIdAndUserId(olId, userId)).thenReturn(List.of(existing));
 
-    service().mirrorOlMember(olId, userId);
+    service().onOlMemberAdded(olId, userId);
 
     verify(positionRepository, never()).save(any());
   }
@@ -1720,7 +1721,7 @@ class OrgChartServiceTest {
     when(userRepository.getReferenceById(userId)).thenReturn(user(userId, "skl"));
     when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-    service().mirrorSkLead(skId, userId, true);
+    service().onSkLeadChanged(skId, userId, true);
 
     assertEquals(OrgChartPositionType.SK_COMMANDER, captureSaved().getPositionType());
   }
@@ -1733,7 +1734,7 @@ class OrgChartServiceTest {
         pos(OrgChartPositionType.SK_COMMANDER, specialCommand(skId, "Alpha SK", "ASK"), null);
     when(positionRepository.findByOrgUnitIdAndUserId(skId, userId)).thenReturn(List.of(seat));
 
-    service().mirrorSkLead(skId, userId, false);
+    service().onSkLeadChanged(skId, userId, false);
 
     verify(positionRepository).delete(seat);
   }
@@ -1744,7 +1745,7 @@ class OrgChartServiceTest {
     KommandoGroup group = group(s, "Alpha", 2);
     when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-    service().mirrorCreateKommandoGroup(group);
+    service().onKommandoGroupCreated(group);
 
     OrgChartPosition saved = captureSaved();
     assertEquals(OrgChartPositionType.COMMAND_LEAD, saved.getPositionType());
@@ -1765,7 +1766,7 @@ class OrgChartServiceTest {
     node.setSortIndex(0);
     when(positionRepository.findByKommandoGroupId(group.getId())).thenReturn(Optional.of(node));
 
-    service().mirrorUpdateKommandoGroup(group);
+    service().onKommandoGroupUpdated(group);
 
     assertEquals("Bravo", node.getName());
     assertEquals(3, node.getSortIndex());
@@ -1779,7 +1780,7 @@ class OrgChartServiceTest {
         pos(OrgChartPositionType.COMMAND_LEAD, squadron(UUID.randomUUID(), "IRIDIUM", "IRI"), null);
     when(positionRepository.findByKommandoGroupId(groupId)).thenReturn(Optional.of(node));
 
-    service().mirrorDeleteKommandoGroup(groupId);
+    service().onKommandoGroupDeleted(groupId);
 
     verify(positionRepository).delete(node);
   }

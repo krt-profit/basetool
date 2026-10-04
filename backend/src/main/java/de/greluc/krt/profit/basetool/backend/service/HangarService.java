@@ -25,7 +25,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
@@ -79,7 +79,7 @@ public class HangarService {
   private final ShipTypeRepository shipTypeRepository;
   private final LocationRepository locationRepository;
   private final MissionUnitRepository missionUnitRepository;
-  private final ShipMapper shipMapper;
+  private final ShipTypeMapper shipTypeMapper;
   private final EntityManager entityManager;
   private final OwnerScopeService ownerScopeService;
   private final AuditRecorder auditRecorder;
@@ -258,7 +258,7 @@ public class HangarService {
           }
 
           return new SquadronShipOverviewDto(
-              shipMapper.shipTypeToDto(type),
+              shipTypeMapper.toDto(type),
               ((Number) obj[1]).longValue(),
               obj[2] != null ? ((Number) obj[2]).longValue() : 0L,
               details);

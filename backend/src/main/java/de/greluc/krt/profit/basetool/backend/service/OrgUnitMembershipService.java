@@ -37,11 +37,12 @@ import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichLeadershipRole;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipChangeObserver;
 import de.greluc.krt.profit.basetool.backend.repository.KommandoGroupRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
@@ -91,7 +92,7 @@ public class OrgUnitMembershipService {
   private final KommandoGroupRepository kommandoGroupRepository;
   private final InventoryOrgUnitReconciler inventoryReconciler;
   private final AuditRecorder auditRecorder;
-  private final OrgChartService orgChartService;
+  private final MembershipChangeObserver membershipChangeObserver;
   private final OrgUnitMembershipMapper orgUnitMembershipMapper;
 
   /**
@@ -159,7 +160,7 @@ public class OrgUnitMembershipService {
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankResponsibilityServiceProvider.getObject().snapshotResponsibleHolders(sc.getId());
     membershipRepository.deleteById(id);
-    orgChartService.mirrorRemoveUnitSeat(sc.getId(), userId);
+    membershipChangeObserver.onUnitMembershipRemoved(sc.getId(), userId);
 
     if (membershipRepository.countByIdUserId(userId) == 0) {
       inventoryReconciler.onUserLostLastOrgUnit(userId);
@@ -221,7 +222,7 @@ public class OrgUnitMembershipService {
           case OPERATOR -> MembershipRole.BEREICHSOPERATOR;
         });
     OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    orgChartService.mirrorBereichRole(bereich.getId(), userId, role);
+    membershipChangeObserver.onBereichRoleGranted(bereich.getId(), userId, role);
     final boolean firstGrant = previousRole == null || previousRole == MembershipRole.MEMBER;
     auditRecorder.record(
         firstGrant ? AuditEventType.ROLE_GRANTED : AuditEventType.ROLE_CHANGED,
@@ -251,7 +252,7 @@ public class OrgUnitMembershipService {
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankResponsibilityServiceProvider.getObject().snapshotResponsibleHolders(bereichId);
     membershipRepository.delete(m);
-    orgChartService.mirrorRemoveUnitSeat(bereichId, userId);
+    membershipChangeObserver.onUnitMembershipRemoved(bereichId, userId);
     auditRecorder.record(
         AuditEventType.ROLE_REVOKED,
         bereichId,
@@ -303,7 +304,7 @@ public class OrgUnitMembershipService {
             .snapshotResponsibleHolders(organisationsleitungId);
     m.setRole(MembershipRole.OL_MEMBER);
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    orgChartService.mirrorOlMember(ol.getId(), userId);
+    membershipChangeObserver.onOlMemberAdded(ol.getId(), userId);
     auditRecorder.record(
         AuditEventType.ROLE_GRANTED,
         ol.getId(),
@@ -335,7 +336,7 @@ public class OrgUnitMembershipService {
             .getObject()
             .snapshotResponsibleHolders(organisationsleitungId);
     membershipRepository.delete(m);
-    orgChartService.mirrorRemoveUnitSeat(organisationsleitungId, userId);
+    membershipChangeObserver.onUnitMembershipRemoved(organisationsleitungId, userId);
     orgUnitRepository
         .findById(organisationsleitungId)
         .map(u -> Hibernate.unproxy(u, OrgUnit.class))
@@ -606,7 +607,8 @@ public class OrgUnitMembershipService {
       membershipRepository.flush();
       for (OrgUnitMembership removed : toRemove) {
         recordStaffelMembershipRevoked(removed.getId().getOrgUnitId(), user.getId());
-        orgChartService.mirrorRemoveSquadronRank(removed.getId().getOrgUnitId(), user.getId());
+        membershipChangeObserver.onSquadronRankCleared(
+            removed.getId().getOrgUnitId(), user.getId());
       }
       orgUnitBankResponsibilityServiceProvider
           .getObject()
@@ -687,7 +689,7 @@ public class OrgUnitMembershipService {
             .snapshotResponsibleHolders(specialCommandId);
     m.setRole(request.isLead() ? MembershipRole.SK_LEAD : MembershipRole.MEMBER);
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    orgChartService.mirrorSkLead(specialCommandId, userId, request.isLead());
+    membershipChangeObserver.onSkLeadChanged(specialCommandId, userId, request.isLead());
     auditRecorder.record(
         request.isLead() ? AuditEventType.ROLE_GRANTED : AuditEventType.ROLE_REVOKED,
         specialCommandId,
@@ -746,7 +748,7 @@ public class OrgUnitMembershipService {
     m.setRole(rank);
     m.setKommandoGroup(group);
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    orgChartService.mirrorSquadronRank(squadronId, userId, rank, group);
+    membershipChangeObserver.onSquadronRankAssigned(squadronId, userId, rank, group);
 
     final boolean firstGrant = previousRole == MembershipRole.MEMBER;
     auditRecorder.record(
@@ -790,7 +792,7 @@ public class OrgUnitMembershipService {
     m.setRole(MembershipRole.MEMBER);
     m.setKommandoGroup(null);
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    orgChartService.mirrorRemoveSquadronRank(squadronId, userId);
+    membershipChangeObserver.onSquadronRankCleared(squadronId, userId);
     auditRecorder.record(
         AuditEventType.ROLE_REVOKED,
         squadronId,

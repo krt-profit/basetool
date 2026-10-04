@@ -61,7 +61,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 /** MapStruct mapper between Mission entities and DTOs. */
 @Mapper(
     config = CentralMapperConfig.class,
-    uses = {ShipMapper.class, UserMapper.class, OperationMapper.class, SquadronMapper.class})
+    uses = {
+      ShipMapper.class,
+      ShipTypeMapper.class,
+      UserMapper.class,
+      OperationMapper.class,
+      SquadronMapper.class
+    })
 public abstract class MissionMapper {
 
   @Autowired protected MissionViewerAccess missionViewerAccess;

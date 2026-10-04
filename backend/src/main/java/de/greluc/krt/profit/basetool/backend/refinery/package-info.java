@@ -24,7 +24,9 @@
       "identity::api",
       "inventory::api",
       "joborder::api",
+      "kernel",
       "notification::api",
+      "orgunit::api",
       "scope::api"
     })
 package de.greluc.krt.profit.basetool.backend.refinery;
