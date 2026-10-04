@@ -1548,8 +1548,10 @@ Systemeinstellungen, Information bearbeiten, the notification-rule editor, the q
 and the profile as one settings page (section navigation, one save bar that appears on a change and
 saves the changed sections one after another, REQ-FE-001). The hangar's insurance field is a
 segment „Keine · Monate · LTI" with a month field; the stored value stays `0` / `LTI` / `n`. The
-„Angemeldet" chip of the hand-off's home page is not built: no read says whether the member is signed
-up for a listed mission.
+hand-off's „Angemeldet" chip marks a home row the member is signed up for, read from the mission
+list's per-caller `signedUp` flag (REQ-MISSION-012).
+
+Amended 2026-10-04: the „Angemeldet" chip, left out of phase 2 for want of a read, is built.
 
 **On the areas (phase 3):** Hangar: one page with the tabs „Meine Schiffe" · „Org-Einheit" (the
 former Org-Einheitsübersicht, ship types as tree rows with a readiness bar); „Meine Schiffe" filters

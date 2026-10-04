@@ -549,6 +549,7 @@ class OperationPageControllerMvcTest {
             null,
             null,
             0L,
+            false,
             0L);
     PageResponse<MissionListDto> missionsPage =
         new PageResponse<>(List.of(mission), 0, 10, 1L, 1, List.of("plannedStartTime,asc"));
@@ -600,6 +601,7 @@ class OperationPageControllerMvcTest {
             null,
             null,
             0L,
+            false,
             0L);
     when(backendApiClient.get(
             contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef()))

@@ -4,6 +4,10 @@
 
 ### Added
 
+- **Startseite: „Angemeldet" bei den nächsten Einsätzen.** In „Nächste 7 Tage" trägt jeder Einsatz,
+  für den man selbst angemeldet ist, den Chip „Angemeldet". Die Missionsliste der API liefert dafür
+  pro Zeile das Feld `signedUp` für den Aufrufer (REQ-MISSION-012).
+
 - **Profitberechnung nennt die Terminals der Route.** Jede Zeile zeigt „Kauf <Terminal> · <Preis>"
   und „Verkauf <Terminal> · <Preis>", der Ort des Terminals erscheint als Tooltip. Die API liefert
   dafür vier neue Felder je Zeile (REQ-UI-027).

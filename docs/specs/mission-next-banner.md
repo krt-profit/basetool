@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-04.
 > **Owner area:** MISSION · **Related ADRs:** ADR-0159
 
 # Home-page upcoming-missions overview
@@ -136,6 +136,14 @@ next-mission banner; the first row is the soonest upcoming mission.
   (a Bereichs-/OL-leader's subordinate units are not "their unit" here), and a member with no
   memberships never sees the chip. The chip stands in the row's status column, under the status, so
   it never shifts the row's title.
+- **Signed-up chip.** A row the viewer holds a participant row on carries the „Angemeldet" chip
+  (`home.upcoming.signed_up`, EN „Signed up", the square `.chip--success` of the detail page's „Du
+  bist angemeldet"), directly under the status and above „Meine Einheit". It reads the boolean
+  `signedUp` on `MissionListDto`, which `GET /api/v1/missions` and `GET /api/v1/missions/search`
+  compute **for the caller only**: one batched query for the caller's own participations among the
+  missions of the returned page (`MissionParticipantRepository#findMissionIdsSignedUpBy`), never one
+  per row (REQ-DATA-003). It widens nothing — the page is already scoped, and the flag answers only
+  about the caller's own rows; a guest row and another member's row never set it.
 - **Eligibility & redaction.** Only `PLANNED` / `ACTIVE` missions appear (terminal ones are excluded
   by the status filter). The outsider tier that hid the description from anonymous and role-less
   callers is gone with its audience (ADR-0159); what remains is REQ-SEC-007's peer redaction, which
@@ -157,6 +165,9 @@ Amended 2026-10-03 (website overhaul phase 2, recorded in phase 3): the tile gri
 „Einsatz öffnen" button and three-line description preview became the row list above, and the
 information panel moved beside it.
 
+Amended 2026-10-04: the „Angemeldet" chip of the redesign's hand-off is built on the new per-caller
+`signedUp` flag of the mission list rows.
+
 **Acceptance**
 
 - [ ] The home page lists every `PLANNED`/`ACTIVE` mission with a planned start in `[now, now+7d]` as a row link, nearest planned start first.
@@ -165,6 +176,7 @@ information panel moved beside it.
 - [ ] An unauthenticated visitor gets the landing page and no mission row at all (REQ-SEC-052).
 - [ ] A row carries no call to action of its own; the whole row opens the mission.
 - [ ] An own-unit mission's row shows the "Meine Einheit" chip; a foreign mission's row does not.
+- [ ] A row the viewer is signed up for shows the „Angemeldet" chip; any other row does not, and the page's sign-ups are read in one query.
 - [ ] The own-unit match covers every direct membership kind — a Spezialkommando, a directly-assigned Bereich and a directly-assigned Organisationsleitung mission are flagged, not only Staffel missions — while a subordinate unit reached only via the leadership cascade is **not**.
 
 **Enforced by:** `HomeControllerMvcTest`
@@ -172,16 +184,22 @@ information panel moved beside it.
 `home_ShouldShowOwnerlessLabel_WhenUpcomingMissionHasNoOrgUnit`,
 `home_ShouldShowMyUnitChip_WhenUpcomingMissionIsOwnedByViewersStaffel`,
 `home_ShouldShowMyUnitChip_WhenUpcomingMissionIsOwnedByViewersSpecialCommand`,
-`home_ShouldNotShowMyUnitChip_WhenUpcomingMissionIsForeign`),
+`home_ShouldNotShowMyUnitChip_WhenUpcomingMissionIsForeign`,
+`home_ShouldShowSignedUpChip_OnlyOnMissionsTheViewerIsSignedUpFor`,
+`home_ShouldTranslateSignedUpChip_ForAnEnglishViewer`),
+`MissionControllerLifecycleTest` (`listRows_flagTheCallersOwnSignUpsFromOneBatchedRead`),
+`MissionServiceTest` (`signedUpMissionIds_readsTheCallersOwnRowsOnceAndSkipsWithoutCallerOrPage`),
+`MissionParticipantSignedUpQueryDataTest` (PostgreSQL),
 `OrgUnitMembershipServiceTest` (`findDirectMembershipOrgUnitIds_returnsEveryKindWithoutCascade`,
 `findDirectMembershipOrgUnitIds_noMemberships_returnsEmpty`),
 `UserControllerTest` (`getMyOrgUnitIds_derivesCallerFromJwt_andDelegatesToService`).
 **Code:** `frontend/.../HomeController#home` (the next-7-days `/api/v1/missions/search` call + the
 `/api/v1/users/me/org-unit-ids` own-unit lookup), `templates/index.html` (the `upcomingMissions`
-row list `.home-missions` + the `myOrgUnitIds` chip gate), `static/css/pages/index.css`; backend `UserController#getMyOrgUnitIds` +
+row list `.home-missions` + the `myOrgUnitIds` chip gate + the `signedUp` chip), `static/css/pages/index.css`; backend `UserController#getMyOrgUnitIds` +
+`MissionController#toListRows` + `MissionService#signedUpMissionIds` +
 `OrgUnitMembershipService#findDirectMembershipOrgUnitIds`. The mission grid reuses the existing
-`MissionController` `/api/v1/missions/search` endpoint; the only new backend surface is the
-kind-agnostic own-membership id lookup.
+`MissionController` `/api/v1/missions/search` endpoint; the only new backend surfaces are the
+kind-agnostic own-membership id lookup and the per-caller `signedUp` field on its rows.
 
 ## Out of scope
 

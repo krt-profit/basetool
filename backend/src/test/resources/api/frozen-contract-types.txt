@@ -1030,6 +1030,7 @@ MissionListDto.owningSquadron=$SquadronReferenceDto
 MissionListDto.plannedEndTime=string/date-time
 MissionListDto.plannedStartTime=string/date-time
 MissionListDto.registeredCount=integer/int64
+MissionListDto.signedUp=boolean
 MissionListDto.status=string
 MissionListDto.version=integer/int64
 MissionObjectiveDto.id=string/uuid

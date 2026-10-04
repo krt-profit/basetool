@@ -157,6 +157,28 @@ public class MissionService {
   }
 
   /**
+   * Resolves which of the given missions the calling member is signed up for, in one query.
+   *
+   * @param missionIds the missions on the page; an empty collection runs no query.
+   * @return the ids among {@code missionIds} the caller holds a participant row on; empty for an
+   *     empty page or a caller without a member id.
+   */
+  @NotNull
+  @Transactional(readOnly = true)
+  public Set<UUID> signedUpMissionIds(@NotNull Collection<UUID> missionIds) {
+    if (missionIds.isEmpty()) {
+      return Set.of();
+    }
+    return authHelperService
+        .currentUserId()
+        .map(
+            userId ->
+                Set.copyOf(
+                    missionParticipantRepository.findMissionIdsSignedUpBy(userId, missionIds)))
+        .orElse(Set.of());
+  }
+
+  /**
    * Free-text search over mission name, description, location and operation name. Optional filters
    * narrow by status, time window and operation. Used by the mission list page.
    *
