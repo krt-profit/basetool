@@ -316,6 +316,11 @@
 
 ### Fixed
 
+- **Lager: `canEdit` sagt die ganze Wahrheit.** Das Feld war für ein einfaches Mitglied auch auf den
+  Zeilen anderer Mitglieder seiner Einheit `true`, obwohl jede Zeilenaktion dort mit 403 abgelehnt
+  wird; die App bot deshalb Aktionen an, die scheiterten. Jetzt gilt: Besitzer oder Logistiker und
+  höher, im eigenen Bereich (API, REQ-SEC-047).
+
 - **Startseite und Buchungsanträge passen wieder auf Smartphone und Tablet.** Auf der Startseite
   brechen Status, „Angemeldet" und „Meine Einheit" am Smartphone in eine zweite Zeile um, statt die
   Seite zu verbreitern; die Antragsliste der Kartellbank stapelt am Tablet die Entscheidungsknöpfe,

@@ -31,13 +31,15 @@ import java.util.UUID;
 public interface StockViewerAccess {
 
   /**
-   * Reports whether the current caller may write to one Lager row: they own it or hold edit rights
-   * on its org unit.
+   * Reports whether the current caller may write to one Lager row, applying both gates the per-row
+   * write endpoints enforce: the row's org-unit scope (or the owner escape), and then owner or
+   * Logistician-or-above.
    *
    * @param inventoryItemId the Lager row to test.
+   * @param ownerId the row's owner, or {@code null} when unknown, which counts as not the caller.
    * @return {@code true} iff the current caller may write to it.
    */
-  boolean canEditInventoryItem(UUID inventoryItemId);
+  boolean mayEditInventoryItem(UUID inventoryItemId, UUID ownerId);
 
   /**
    * Reports whether the current caller may edit one job order, applying both the {@code

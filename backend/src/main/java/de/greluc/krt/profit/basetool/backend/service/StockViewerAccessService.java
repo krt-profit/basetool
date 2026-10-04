@@ -25,24 +25,37 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * Implementation of {@link StockViewerAccess} that delegates entirely to {@link AccessGateService},
- * the same gate the write endpoints use.
+ * Implementation of {@link StockViewerAccess} built from {@link AccessGateService} and {@link
+ * AuthHelperService}, the same gates the write endpoints use.
  */
 @Service
 @RequiredArgsConstructor
 public class StockViewerAccessService implements StockViewerAccess {
 
   private final AccessGateService accessGateService;
+  private final AuthHelperService authHelperService;
 
   /** {@inheritDoc} */
   @Override
-  public boolean canEditInventoryItem(UUID inventoryItemId) {
-    return inventoryItemId != null && accessGateService.canEditInventoryItem(inventoryItemId);
+  public boolean mayEditInventoryItem(UUID inventoryItemId, UUID ownerId) {
+    return inventoryItemId != null
+        && accessGateService.canEditInventoryItem(inventoryItemId)
+        && (isCaller(ownerId) || authHelperService.isLogisticianOrAbove());
   }
 
   /** {@inheritDoc} */
   @Override
   public boolean mayEditJobOrder(UUID jobOrderId) {
     return jobOrderId != null && accessGateService.mayEditJobOrder(jobOrderId);
+  }
+
+  /**
+   * Reports whether {@code userId} is the authenticated caller.
+   *
+   * @param userId the user to compare; {@code null} never matches.
+   * @return {@code true} iff the caller is authenticated and has that id.
+   */
+  private boolean isCaller(UUID userId) {
+    return userId != null && authHelperService.currentUserId().filter(userId::equals).isPresent();
   }
 }

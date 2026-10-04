@@ -81,7 +81,8 @@ class JobOrderMapperTest {
         "stockAccess",
         new de.greluc.krt.profit.basetool.backend.support.StockViewerAccess() {
           @Override
-          public boolean canEditInventoryItem(java.util.UUID inventoryItemId) {
+          public boolean mayEditInventoryItem(
+              java.util.UUID inventoryItemId, java.util.UUID ownerId) {
             return true;
           }
 
