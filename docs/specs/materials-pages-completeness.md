@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
 > **Owner area:** UI · **Related ADRs:** ADR-0105 (builds on ADR-0102/0103)
 
 # Materials pages — complete lists + server-filtered matrix
@@ -38,6 +38,21 @@ materials that have a price row inside the filtered slice (no all-empty columns)
 behaviour, not a defect. The category-grouping toggle and category collapse remain pure client-side
 presentation and trigger no re-fetch.
 
+The page is a wide data view (up to `--content-max-data`, REQ-UI-027). Its toolbar holds the two
+multi-selects as dropdown buttons that name their selection („Materialien: Alle", „System: Stanton",
+„Materialien: 6 von 42"), the boolean filters behind „+ Filter" with one removable chip each, the
+„Nach Kategorie gruppieren" switch and the legend („bester Verkauf" / „bester Einkauf"). In every
+material row the cell with the highest sale price is ringed in the success colour and the cell with
+the lowest purchase price in the info colour (ties mark every tied cell); the material cell shows
+„Spanne <best sale − best purchase>" and the warning flags. Terminal heads carry their planet tint
+and each cell a planet stripe; the material column and the head stay put while scrolling. The page
+title carries the freshness chip „UEX · vor n min" (minutes, hours or days since the newest
+`uexSyncedAt` of the cached terminal catalogue; absent when that catalogue is unavailable).
+
+*Amended 2026-10-03 (website overhaul phase 3): page head with the UEX freshness chip, filters as
+dropdown buttons with a selection summary plus „+ Filter" chips, best-sale/best-purchase markers,
+the spread and the legend.*
+
 **Acceptance**
 
 - [ ] `GET /api/v1/materials/matrix` accepts optional `materialNames`, `starSystems`,
@@ -72,8 +87,11 @@ defaults: everything checked, booleans off). On restore, saved values whose opti
 exists are dropped; a saved subset none of whose values still exist falls back to the "all"
 default. The preference is a pure client-side concern — nothing is stored server-side, and a
 storage-denying privacy mode degrades to the defaults without breaking the page (same guard as
-REQ-UI-010). The select-all checkbox and the dropdown header text ("Alle …" / "N ausgewählt")
-are synchronised with the restored state.
+REQ-UI-010). The select-all checkbox and the dropdown button's selection summary („Alle", the one
+picked name, or „n von N") are synchronised with the restored state.
+
+*Amended 2026-10-03 (website overhaul phase 3): the dropdown summary reads „n von N" instead of „N
+ausgewählt"; the boolean filters also appear as removable chips.*
 
 **Acceptance**
 
@@ -97,6 +115,19 @@ pagination, so the assembled list must be whole: a material traded at more termi
 page holds must still show all of them. A backend failure degrades to the existing empty "not
 available" placeholder rather than a partial list.
 
+Above the table the page head names the material with chips for its category and flags (illegal as
+a danger chip, the two volatility flags as warning chips), followed by four figures: „Bester
+Verkauf" (highest sale price and its terminal), „Bester Einkauf" (lowest purchase price and its
+terminal), „Ø Verkauf" (mean of the positive sale prices, with the number of buying terminals) and
+„Aktualisiert" (age of the last UEX sweep). The table lists Terminal · Ort · Verkauf · Einkauf; the
+location and the planet stripe come from the cached price matrix's rows of the same material (a
+matrix failure only empties the location). Zero or negative prices show as „–". The rows are sorted
+by sale price, highest first, terminals buying nothing last by name; the segment „Verkauf ·
+Einkauf" re-sorts in the browser (purchase ascending) and the search narrows the rows by terminal.
+
+*Amended 2026-10-03 (website overhaul phase 3): chips, the four figures, the location column, the
+sale-price sort with the „Verkauf · Einkauf" segment.*
+
 **Acceptance**
 
 - [ ] The controller fetches the price list via the page-walk, not a single fixed-`size` page.
@@ -105,8 +136,10 @@ available" placeholder rather than a partial list.
   list.
 
 **Enforced by:** `MaterialsPageControllerTest` /
-`MaterialsPageControllerMvcTest.getMaterialDetail_*` · **Code:**
-`MaterialsPageController.getMaterialDetail`, `CatalogPages.fetchAll` · **Issues:** —
+`MaterialsPageControllerMvcTest.getMaterialDetail_*` / `MaterialTerminalPricesTest` / `UexAgeTest` ·
+**Code:** `MaterialsPageController.getMaterialDetail`, `CatalogPages.fetchAll`,
+`MaterialTerminalPrices`, `UexAge`, `material-detail.html`, `static/js/material-detail.js` ·
+**Issues:** —
 
 ## Out of scope
 

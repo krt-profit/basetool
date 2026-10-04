@@ -1,36 +1,150 @@
 @layer base, components, page, migration, utilities;
 
 @layer page {
-    .material-title {
-        font-family: var(--font-body);
-        font-weight: 700;
-        color: var(--color-primary);
-        font-size: 1.5rem;
-        margin: 0;
-        text-transform: uppercase;
-    }
-
-    .data-section {
-        margin-top: 2rem;
-    }
-
-    .number-cell {
-        text-align: right;
-        font-family: var(--font-mono);
-        font-variant-numeric: tabular-nums;
-    }
-
-    .form-group {
-        margin-bottom: 1rem;
-        max-width: 400px;
-    }
-    .form-group input:where(:not([type='checkbox']):not([type='radio'])) {
-        width: 100%;
-        padding: 0.5rem;
-        background-color: var(--color-surface-input);
-        border: 1px solid var(--color-gray-3);
+    .md-description {
+        max-width: var(--measure);
+        margin: 0 0 var(--space-4);
         color: var(--color-gray-1);
-        font-family: var(--font-body);
-        box-sizing: border-box;
+    }
+
+    .md-kpis {
+        margin-bottom: var(--space-6);
+    }
+
+    .md-kpi--sell {
+        border-left-color: var(--color-success);
+    }
+
+    .md-kpi--buy {
+        border-left-color: var(--color-info);
+    }
+
+    .md-kpi--neutral {
+        border-left-color: var(--color-gray-3);
+    }
+
+    .md-section-title {
+        margin: 0 0 var(--space-3);
+        font-size: var(--fs-h3);
+    }
+
+    .md-terminals th[data-sort-col] {
+        white-space: nowrap;
+    }
+
+    .md-sort-mark {
+        display: none;
+        margin-left: 0.25rem;
+        color: var(--color-primary);
+    }
+
+    .md-terminals th[aria-sort='descending'] .md-sort-mark,
+    .md-terminals th[aria-sort='ascending'] .md-sort-mark {
+        display: inline;
+    }
+
+    .md-terminals td.md-price-sell {
+        color: var(--color-success-text);
+        font-weight: var(--fw-bold);
+    }
+
+    .md-terminals td.md-price-buy {
+        color: var(--color-white);
+    }
+
+    .md-terminals td.md-price--none {
+        color: var(--color-gray-2-text);
+        font-weight: var(--fw-regular);
+    }
+
+    .md-terminal-row {
+        --md-stripe: transparent;
+    }
+
+    .md-terminal-row > td:first-child {
+        box-shadow: inset 3px 0 0 var(--md-stripe);
+    }
+
+    .md-terminal-row.planet-hurston {
+        --md-stripe: var(--krt-planet-hurston-stripe);
+    }
+    .md-terminal-row.planet-crusader {
+        --md-stripe: var(--krt-planet-crusader-stripe);
+    }
+    .md-terminal-row.planet-arccorp {
+        --md-stripe: var(--krt-planet-arccorp-stripe);
+    }
+    .md-terminal-row.planet-microtech {
+        --md-stripe: var(--krt-planet-microtech-stripe);
+    }
+    .md-terminal-row.planet-pyro-1 {
+        --md-stripe: var(--krt-planet-pyro-1-stripe);
+    }
+    .md-terminal-row.planet-pyro-2 {
+        --md-stripe: var(--krt-planet-pyro-2-stripe);
+    }
+    .md-terminal-row.planet-pyro-3 {
+        --md-stripe: var(--krt-planet-pyro-3-stripe);
+    }
+    .md-terminal-row.planet-pyro-4 {
+        --md-stripe: var(--krt-planet-pyro-4-stripe);
+    }
+    .md-terminal-row.planet-pyro-5 {
+        --md-stripe: var(--krt-planet-pyro-5-stripe);
+    }
+    .md-terminal-row.planet-pyro-6 {
+        --md-stripe: var(--krt-planet-pyro-6-stripe);
+    }
+    .md-terminal-row.planet-terra {
+        --md-stripe: var(--krt-planet-terra-stripe);
+    }
+    .md-terminal-row.planet-delamar {
+        --md-stripe: var(--krt-planet-delamar-stripe);
+    }
+    .md-terminal-row.planet-hash-0 {
+        --md-stripe: var(--krt-planet-hash-0-stripe);
+    }
+    .md-terminal-row.planet-hash-1 {
+        --md-stripe: var(--krt-planet-hash-1-stripe);
+    }
+    .md-terminal-row.planet-hash-2 {
+        --md-stripe: var(--krt-planet-hash-2-stripe);
+    }
+    .md-terminal-row.planet-hash-3 {
+        --md-stripe: var(--krt-planet-hash-3-stripe);
+    }
+    .md-terminal-row.planet-hash-4 {
+        --md-stripe: var(--krt-planet-hash-4-stripe);
+    }
+    .md-terminal-row.planet-hash-5 {
+        --md-stripe: var(--krt-planet-hash-5-stripe);
+    }
+    .md-terminal-row.planet-hash-6 {
+        --md-stripe: var(--krt-planet-hash-6-stripe);
+    }
+    .md-terminal-row.planet-hash-7 {
+        --md-stripe: var(--krt-planet-hash-7-stripe);
+    }
+    .md-terminal-row.planet-hash-8 {
+        --md-stripe: var(--krt-planet-hash-8-stripe);
+    }
+    .md-terminal-row.planet-hash-9 {
+        --md-stripe: var(--krt-planet-hash-9-stripe);
+    }
+    .md-terminal-row.planet-hash-10 {
+        --md-stripe: var(--krt-planet-hash-10-stripe);
+    }
+    .md-terminal-row.planet-hash-11 {
+        --md-stripe: var(--krt-planet-hash-11-stripe);
+    }
+
+    @media (width <= 768px) {
+        .md-terminal-row {
+            box-shadow: inset 3px 0 0 var(--md-stripe);
+        }
+
+        .md-terminal-row > td:first-child {
+            box-shadow: none;
+        }
     }
 }
