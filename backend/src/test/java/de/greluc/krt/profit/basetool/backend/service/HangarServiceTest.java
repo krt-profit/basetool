@@ -96,16 +96,16 @@ class HangarServiceTest {
   }
 
   @Test
-  void getMyShipsFiltered_delegatesToRepositoryWithTrimmedSearch() {
+  void getMyShipsFiltered_delegatesToRepositoryWithTrimmedSearchAndFittedFilter() {
     UUID userId = UUID.randomUUID();
     Pageable pageable = PageRequest.of(0, 50);
     Page<Ship> page = new PageImpl<>(List.of(new Ship()));
-    when(shipRepository.findByOwnerIdFiltered(userId, "Cutlass", pageable)).thenReturn(page);
+    when(shipRepository.findByOwnerIdFiltered(userId, "Cutlass", true, pageable)).thenReturn(page);
 
-    Page<Ship> result = hangarService.getMyShipsFiltered(userId, "  Cutlass  ", pageable);
+    Page<Ship> result = hangarService.getMyShipsFiltered(userId, "  Cutlass  ", true, pageable);
 
     assertEquals(page, result);
-    verify(shipRepository).findByOwnerIdFiltered(userId, "Cutlass", pageable);
+    verify(shipRepository).findByOwnerIdFiltered(userId, "Cutlass", true, pageable);
   }
 
   @Test
@@ -113,11 +113,11 @@ class HangarServiceTest {
     UUID userId = UUID.randomUUID();
     Pageable pageable = PageRequest.of(0, 50);
     Page<Ship> page = new PageImpl<>(List.of());
-    when(shipRepository.findByOwnerIdFiltered(userId, null, pageable)).thenReturn(page);
+    when(shipRepository.findByOwnerIdFiltered(userId, null, null, pageable)).thenReturn(page);
 
-    hangarService.getMyShipsFiltered(userId, "   ", pageable);
+    hangarService.getMyShipsFiltered(userId, "   ", null, pageable);
 
-    verify(shipRepository).findByOwnerIdFiltered(userId, null, pageable);
+    verify(shipRepository).findByOwnerIdFiltered(userId, null, null, pageable);
   }
 
   @Test

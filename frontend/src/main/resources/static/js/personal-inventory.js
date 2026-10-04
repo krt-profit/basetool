@@ -287,11 +287,6 @@
         if (tabCount) {
             tabCount.textContent = total;
         }
-        const subtitle = document.querySelector('.krt-personal-inventory-header .krt-subtitle');
-        const i18n = window.krtPersonalInventoryI18n || {};
-        if (subtitle && i18n.factsCount) {
-            subtitle.textContent = total + ' ' + i18n.factsCount;
-        }
     }
 
     function openCreate(btn) {

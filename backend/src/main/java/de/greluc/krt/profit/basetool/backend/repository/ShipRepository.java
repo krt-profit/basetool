@@ -236,6 +236,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * @param ownerId the owning user id; only this user's ships are returned
    * @param search optional case-insensitive ship-type/manufacturer name filter; {@code null}/blank
    *     returns every ship the user owns
+   * @param fitted optional fitted filter; {@code null} returns fitted and unfitted ships
    * @param pageable page and size only; the ordering lives in the query, so pass it unsorted
    * @return one ordered page of the user's ships
    */
@@ -249,6 +250,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
           LEFT JOIN FETCH s.owner
           LEFT JOIN FETCH s.owningOrgUnit
           WHERE s.owner.id = :ownerId
+          AND (:fitted IS NULL OR s.fitted = :fitted)
           AND (cast(:search as string) IS NULL
           OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
           OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
@@ -271,13 +273,17 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
           LEFT JOIN s.shipType st
           LEFT JOIN st.manufacturer m
           WHERE s.owner.id = :ownerId
+          AND (:fitted IS NULL OR s.fitted = :fitted)
           AND (cast(:search as string) IS NULL
           OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
           OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
           )
           """)
   Page<Ship> findByOwnerIdFiltered(
-      @Param("ownerId") UUID ownerId, @Param("search") String search, Pageable pageable);
+      @Param("ownerId") UUID ownerId,
+      @Param("search") String search,
+      @Param("fitted") Boolean fitted,
+      Pageable pageable);
 
   /**
    * Returns every ship owned by any of the given users, eagerly fetching the relations needed for
