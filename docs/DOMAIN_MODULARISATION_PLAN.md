@@ -792,7 +792,7 @@ JSpecify stays out for now (ADR-0192).
 
 Typed per-module build settings now; an included `build-logic` with convention plugins before the
 first Gradle extraction (it also prepares Gradle's isolated projects); `java-test-fixtures` for
-module-owned test fixtures; the configuration cache on for local builds; a decision whether CI reuses
+module-owned test fixtures; the configuration cache on for local builds (done 2026-10-04, #2387); a decision whether CI reuses
 configuration-cache entries (it never does today, because `setup-gradle` gets no encryption key).
 
 ## 9 Defects found along the way — fixed first, in separate pull requests
@@ -997,9 +997,9 @@ same session as this plan, and in the repository where this plan touches the doc
 | `docs/specs/security-and-access.md` REQ-SEC-031 | a member record is the only personal data the API serves | admin export, person search and registrations serve personal data and are not in the `no-store` families |
 | `docs/specs/frontend-ajax-mutations.md` REQ-FE-018, `docs/TYPESCRIPT_MIGRATION_PLAN.md` | 40 of 96 files type-checked; `type=module` would change the execution order | 44 of 100; 120 of 121 scripts are already `defer` — **corrected 2026-10-02** in both |
 | ADR-0223 | see §8.1 | **corrected 2026-10-02** (amendment) |
-| ADR-0069, ADR-0130, ADR-0212 | "no IIFE wrapping"; `scripts/**/*.mjs` in the lint globs; "with a comment naming what it beats" | half the scripts are IIFE-wrapped; the Gradle lint tasks do not read `scripts/`; ADR-0214 forbids the comment — **corrected 2026-10-02** (an amendment each; the `scripts/` lint gate itself is still open) |
+| ADR-0069, ADR-0130, ADR-0212 | "no IIFE wrapping"; `scripts/**/*.mjs` in the lint globs; "with a comment naming what it beats" | half the scripts are IIFE-wrapped; the Gradle lint tasks do not read `scripts/`; ADR-0214 forbids the comment — **corrected 2026-10-02** (an amendment each); the `scripts/` lint gate is done too — `lintJs` reads `scripts/**/*.mjs` (`frontend/build.gradle.kts`, checked 2026-10-04) |
 | backend `ArchitectureTest` messages | ask for "a code comment" in three places | ADR-0214 |
-| `config/owasp/dependency-check-suppressions.xml` | its header described how a suppression is renewed | the header went with the ADR-0214 sweep; no document describes the renewal now, and all nine suppressions expire on the same day |
+| `config/owasp/dependency-check-suppressions.xml` | its header described how a suppression is renewed | the header went with the ADR-0214 sweep; no document describes the renewal now, and all nine suppressions expire on the same day — **corrected 2026-10-04** (#2387): CONTRIBUTING → *OWASP suppressions expire* |
 
 ## 16 Method, sources and limits
 

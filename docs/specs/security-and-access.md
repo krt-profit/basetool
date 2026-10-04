@@ -5330,7 +5330,10 @@ production rollout reaches step by step:
   (`WebClientConfig`), its backend readiness probe (`BackendHealthIndicator`) and the ingest relay
   (`RestClientConfig`) verify the backend's hostname, which ADR-0204 §6 had switched off for the
   relay. The backend's Keycloak client, the edge, Prometheus and the blackbox exporter verified
-  already. `dev` and `test` are unaffected.
+  already. `dev` and `test` are unaffected. The ingest jar defaults the check to on
+  (`app.ingest.verify-backend-hostname: ${INTERNAL_TLS_VERIFY_HOSTNAME:true}`, and its `dev` profile
+  sets `false` explicitly), so a jar started outside compose or Quadlet under `prod` checks the name
+  too (ING-SEC-04); the frontend jar's default is still `false`.
 - **Shipped in two releases.** The first was inert: every per-service mount fell back to the shared
   keystore and `INTERNAL_TLS_VERIFY_HOSTNAME` defaulted to `false`. The second — rollout step 3 —
   bakes the Quadlet units to `/var/iri/secrets/tls/<service>.p12` and the CA-only truststore and

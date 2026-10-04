@@ -47,7 +47,7 @@ app:
     structured-enabled: false
   ingest:
     backend-base-url: ${BACKEND_URL:https://backend:11261}
-    verify-backend-hostname: ${INTERNAL_TLS_VERIFY_HOSTNAME:false}
+    verify-backend-hostname: ${INTERNAL_TLS_VERIFY_HOSTNAME:true}
     frontend-base-url: ${FRONTEND_URL:https://app.profit-base.online}
     public-base-url: ${APP_INGEST_PUBLIC_BASE_URL:}
     service-account:
