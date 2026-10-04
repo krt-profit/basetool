@@ -128,6 +128,15 @@ viewer-access SPI are internal, and no other module may depend on it. The helper
 dependency leaves — they may use only each other, the entity model and the repositories
 (`ArchitectureTest.LEAF_HELPER_CLASSES`).
 
+Phase 2 (plan §7.4) moves whole domains. `orgchart` was the first: its two controllers
+(`/api/v1/org-chart`, `/api/v1/leitung`) sit in `orgchart.web`; the position entity, its repository,
+the chart, read and Leitung services, the mapper and the REST DTOs in `orgchart.internal`. The
+module publishes nothing — no other module calls it; the org-unit module reaches it only through
+`orgunit.api.MembershipChangeObserver`, which `OrgChartService` implements inside the transaction
+of the rank change. A moved domain's `web` depends on its `internal`, never the reverse, as long as
+its services return the REST DTOs ([`module-boundaries.md`](../specs/module-boundaries.md),
+REQ-MOD-006).
+
 The platform modules reach the domains only through SPIs they own and the domains implement
 (plan §5.3); Spring injects the implementations, so the platform names no domain class:
 

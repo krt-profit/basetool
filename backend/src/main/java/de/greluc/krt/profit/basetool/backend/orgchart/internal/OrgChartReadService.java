@@ -17,24 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.orgchart.internal;
 
-import de.greluc.krt.profit.basetool.backend.mapper.OrgChartPositionMapper;
-import de.greluc.krt.profit.basetool.backend.model.OrgChartPosition;
-import de.greluc.krt.profit.basetool.backend.model.OrgChartPositionType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.AreaLeadershipDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BereichChartDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.CommandChartDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OlChartDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartNodeDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.SpecialCommandChartDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.SquadronChartDto;
-import de.greluc.krt.profit.basetool.backend.repository.OrgChartPositionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import java.util.Comparator;
 import java.util.HashSet;

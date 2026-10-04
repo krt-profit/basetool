@@ -17,8 +17,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model;
+package de.greluc.krt.profit.basetool.backend.orgchart.internal;
 
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 

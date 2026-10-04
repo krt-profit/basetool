@@ -17,7 +17,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model;
+package de.greluc.krt.profit.basetool.backend.orgchart.internal;
+
+import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 
 /**
  * The three places a {@link OrgChartPosition} can live in the Profit-Bereich org chart. Every

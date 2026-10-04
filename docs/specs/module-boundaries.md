@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-04.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-05.
 > **Owner area:** MOD · **Related ADRs:** ADR-0231, ADR-0233
 
 # Backend module boundaries
@@ -191,21 +191,26 @@ declared in the same pull request that creates it (plan §5.2, §5.7, step P1-13
 A module without an `api` package keeps all its types in its base package, which is its unnamed
 interface: `kernel` today. A module that publishes nothing yet keeps every type below its base
 package and outside an `api` package, so it exposes no type at all; no declaration allows it,
-and Spring Modulith reports any module that reaches into it: `mission` today, until its module
-API exists (plan §7.5). Its dependents allow it by bare name (`"kernel"`, not
+and Spring Modulith reports any module that reaches into it: `mission` and `orgchart` today,
+until their module API exists (plan §7.4, §7.5). Its dependents allow it by bare name (`"kernel"`, not
 `"kernel::api"`), it publishes no named interface, and no type lies below its base package. A
 module that may depend on no declared module says so with `allowedDependencies = {}`: the
 annotation's default is Spring Modulith's "everything allowed" sentinel, not an empty list.
 
 Declared on `main`: `audit`, `bank`, `catalogue`, `exchange`, `identity`, `inventory`, `joborder`,
-`kernel`, `livesync`, `materialexchange`, `mission`, `notification`, `orgunit`, `platform`,
-`privacy`, `refinery`, `scope` (floor 17). `orgunit.web` and every `<module>.internal` package are
-internal to their module.
+`kernel`, `livesync`, `materialexchange`, `mission`, `notification`, `orgchart`, `orgunit`,
+`platform`, `privacy`, `refinery`, `scope` (floor 18). Every `<module>.web` and `<module>.internal`
+package is internal to its module.
+
+A domain that moves whole (plan §7.4) puts its controllers in `<module>.web` and everything else —
+services, repositories, entities, mappers and the REST DTOs its services still return — in
+`<module>.internal`, so `web` depends on `internal` and never the other way: the layers inside a
+module stay acyclic (ADR-0047) until the module API returns its own records (plan §5.2).
 
 **Acceptance**
 
 - [x] The module packages found in the compiled backend equal `ModularityTest.DECLARED_MODULES`,
-      which equals the detected Modulith modules, with a floor of 17.
+      which equals the detected Modulith modules, with a floor of 18.
 - [x] Each declared module's only named interface is `api`, and it contains every top-level type
       of the module's `api` package tree and nothing outside it — except `kernel`, whose types all
       lie in its base package, and a module that publishes nothing, which has no named interface

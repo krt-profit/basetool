@@ -803,6 +803,21 @@ hub where it has one: `dashboard` (0 inbound edges), `admin` (4), `promotion` (1
 mission detach command), then `exchange` (11) and `bank` (18) as packages. Exchange and bank enter
 their "must stay green" period here (D-01).
 
+- `orgchart` — **done 2026-10-05.** All 24 classes moved: the controllers `OrgChartController` and
+  `LeitungController` into `orgchart.web`, the rest (entity `OrgChartPosition`, its repository, the
+  enums, `OrgChartService`, `OrgChartReadService`, `LeitungViewService`, `OrgChartPositionMapper`
+  and the 14 DTOs, `AreaLeadershipDto` with them as §7.3 P1-1 deferred) into `orgchart.internal`.
+  The module is declared (floor 18) and publishes nothing: no other module uses it, and orgunit
+  reaches it only through `MembershipChangeObserver`. The domain map trades its two `name` rules
+  and the `AreaLeadershipDto` class rule for one `package` rule. No access policy left the scope
+  hub — the org chart has none: its reads are `isAuthenticated()`, its writes `hasRole('ADMIN')`,
+  and neither touches `OwnerScopeService` or `AccessGateService`. The module baseline is unchanged
+  at 110 edges: the org chart had no frozen edge left after P1-1. `OrgChartModuleContractTest`
+  pins its endpoints and the observer before and after the move. **Correction to §5.2:** the
+  `web` package cannot hold the REST DTOs yet — the services return them, so `internal -> web`
+  would close a layer cycle inside the module (ADR-0047); they stay in `internal` until the module
+  API returns its own records.
+
 ### 7.5 Phase 3 — the business core
 
 In dependency order, each with its command API, its observer SPIs, its access policy and its REST
