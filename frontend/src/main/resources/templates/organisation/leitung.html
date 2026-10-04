@@ -299,31 +299,33 @@
                             <th:block th:if="${#lists.isEmpty(u.groups())}">
                                 <th:block th:replace="~{fragments/components :: emptyState(titleKey='leitung.groups.emptyTitle', textKey='leitung.groups.empty')}"></th:block>
                             </th:block>
-                            <table th:unless="${#lists.isEmpty(u.groups())}" class="data-table unit-roster leitung-groups" data-testid="leitung-groups">
-                                <thead>
-                                    <tr>
-                                        <th th:text="#{leitung.groups.name}">Gruppenname</th>
-                                        <th class="cell-actions"><span class="visually-hidden" th:text="#{leitung.column.action}">Aktion</span></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr th:each="g : ${u.groups()}" class="leitung-group"
-                                        th:data-group-id="${g.id()}" th:data-group-version="${g.version()}" th:data-group-sort="${g.sortIndex()}">
-                                        <td>
-                                            <input th:if="${u.canManageRoster()}" type="text" class="leitung-group-name" maxlength="100"
-                                                   th:value="${g.name()}" th:data-original="${g.name()}" th:aria-label="#{leitung.groups.name}"/>
-                                            <span th:unless="${u.canManageRoster()}" class="cell-title" th:text="${g.name()}">Alpha</span>
-                                        </td>
-                                        <td class="cell-actions">
-                                            <button type="button" class="btn btn-quiet-danger btn-icon" th:if="${u.canManageRoster()}"
-                                                    data-leitung-action="delete-group" th:data-group-name="${g.name()}"
-                                                    th:title="#{leitung.action.delete}" th:aria-label="#{leitung.action.delete} + ': ' + ${g.name()}">
-                                                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                            <div class="table-responsive" th:unless="${#lists.isEmpty(u.groups())}">
+                                <table class="data-table unit-roster leitung-groups" data-testid="leitung-groups">
+                                    <thead>
+                                        <tr>
+                                            <th th:text="#{leitung.groups.name}">Gruppenname</th>
+                                            <th class="cell-actions"><span class="visually-hidden" th:text="#{leitung.column.action}">Aktion</span></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr th:each="g : ${u.groups()}" class="leitung-group"
+                                            th:data-group-id="${g.id()}" th:data-group-version="${g.version()}" th:data-group-sort="${g.sortIndex()}">
+                                            <td>
+                                                <input th:if="${u.canManageRoster()}" type="text" class="leitung-group-name" maxlength="100"
+                                                       th:value="${g.name()}" th:data-original="${g.name()}" th:aria-label="#{leitung.groups.name}"/>
+                                                <span th:unless="${u.canManageRoster()}" class="cell-title" th:text="${g.name()}">Alpha</span>
+                                            </td>
+                                            <td class="cell-actions">
+                                                <button type="button" class="btn btn-quiet-danger btn-icon" th:if="${u.canManageRoster()}"
+                                                        data-leitung-action="delete-group" th:data-group-name="${g.name()}"
+                                                        th:title="#{leitung.action.delete}" th:aria-label="#{leitung.action.delete} + ': ' + ${g.name()}">
+                                                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                             <div class="cluster gap-2 leitung-group-add" th:if="${u.canManageRoster() and #lists.size(u.groups()) < 4}">
                                 <input type="text" class="leitung-new-group-name" maxlength="100"
                                        th:placeholder="#{leitung.groups.name}" th:aria-label="#{leitung.groups.name}"/>
