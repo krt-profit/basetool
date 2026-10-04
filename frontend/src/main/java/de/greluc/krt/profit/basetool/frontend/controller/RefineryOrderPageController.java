@@ -44,12 +44,16 @@ import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
+import de.greluc.krt.profit.basetool.frontend.view.RefineryListRow;
+import de.greluc.krt.profit.basetool.frontend.view.RefineryProgress;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -75,6 +79,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -93,6 +98,28 @@ public class RefineryOrderPageController {
 
   /** Page size applied when the request carries none (or a non-whitelisted one). */
   private static final int DEFAULT_PAGE_SIZE = 50;
+
+  /** List segment of every open order, ready ones included; the default. */
+  private static final String VIEW_RUNNING = "RUNNING";
+
+  /** List segment of the open orders whose end has passed. */
+  private static final String VIEW_READY = "READY";
+
+  /** List segment of the stored orders. */
+  private static final String VIEW_COMPLETED = "COMPLETED";
+
+  /** List segment of every order, canceled ones included. */
+  private static final String VIEW_ALL = "ALL";
+
+  /** The list segments, in the order the toolbar shows them. */
+  private static final List<String> VIEWS =
+      List.of(VIEW_RUNNING, VIEW_READY, VIEW_COMPLETED, VIEW_ALL);
+
+  /** Backend sort of the open segments: by the run's end, the next to finish first. */
+  private static final String SORT_BY_END = "endsAt,asc";
+
+  /** Backend sort of the closed segments and of an exact status filter: newest start first. */
+  private static final String SORT_BY_START = "startedAt,desc";
 
   /**
    * The detail page's {@code ?fragment=} selector for the edit form / goods editor + action row.
@@ -146,18 +173,27 @@ public class RefineryOrderPageController {
   private final ParallelPageLoader parallelPageLoader;
 
   /**
-   * Renders one page of the refinery-order list ({@code /refinery-orders}), filtered to {@code
-   * OPEN} and {@code IN_PROGRESS} by default and sorted by {@code startedAt} descending
-   * (REQ-REFINERY-019).
+   * Renders one page of the refinery-order list ({@code /refinery-orders}) for one segment of the
+   * run (REQ-REFINERY-019, REQ-UI-027).
    *
-   * @param status optional list of statuses to include
+   * <p>Every segment is one backend page. {@code RUNNING} (the default) lists every open order and
+   * {@code READY} only the open orders whose end has passed or is unknown, both by end ascending;
+   * {@code COMPLETED} and {@code ALL} list by start descending. The search is passed to the backend
+   * as {@code q}. A {@code status} list without a {@code view} is honoured as an exact filter; the
+   * default subsets map onto their segment. The segment counters are the totals of four one-row
+   * requests without the search.
+   *
+   * @param view the segment: {@code RUNNING}, {@code READY}, {@code COMPLETED} or {@code ALL}
+   * @param status optional exact status filter, used only when {@code view} is absent
+   * @param q optional search over material, refinery, method and owner names
    * @param onlyMine whether to restrict to the caller's own orders
    * @param page zero-based page index, clamped to 0
    * @param size requested page size; only {@link #PAGE_SIZES} are honoured, else the default
-   * @param fragment {@code "results"} renders only the results-table fragment (REQ-FE-005)
-   * @param model model populated with the orders, the page envelope, page sizes, pagination base
-   *     URL and filter state
-   * @param principal authenticated OIDC user, used for the logistician hint
+   * @param fragment {@code "results"} renders only the results fragment (REQ-FE-005)
+   * @param locale the request locale the SCU figures are formatted in
+   * @param model model populated with the rows, the page envelope, page sizes, pagination base URL,
+   *     the segment counters and the filter state
+   * @param principal authenticated OIDC user, for the viewer id and the logistician flag
    * @return the {@code refinery-orders-index} view name, or its {@code refineryOrdersResults}
    *     fragment selector
    */
@@ -165,52 +201,67 @@ public class RefineryOrderPageController {
   @GetMapping
   @PreAuthorize("isAuthenticated()")
   public String viewOrders(
+      @RequestParam(required = false) String view,
       @RequestParam(required = false) List<String> status,
+      @RequestParam(required = false) String q,
       @RequestParam(required = false) Boolean onlyMine,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String fragment,
+      Locale locale,
       Model model,
       @AuthenticationPrincipal OidcUser principal) {
-    if (status == null || status.isEmpty()) {
-      status = List.of("OPEN", "IN_PROGRESS");
-    }
-    int effectivePage = page == null || page < 0 ? 0 : page;
-    int effectiveSize = size != null && PAGE_SIZES.contains(size) ? size : DEFAULT_PAGE_SIZE;
+    final List<String> exactStatuses = view == null ? exactStatusFilter(status) : null;
+    final String segment = resolveView(view, status);
+    final String query = q == null || q.isBlank() ? null : q.strip();
+    final boolean mine = Boolean.TRUE.equals(onlyMine);
+    final int effectivePage = page == null || page < 0 ? 0 : page;
+    final int effectiveSize = size != null && PAGE_SIZES.contains(size) ? size : DEFAULT_PAGE_SIZE;
+    final String endpoint =
+        mine ? "/api/v1/refinery-orders/my-orders" : "/api/v1/refinery-orders/all";
+    final ListQuery listQuery =
+        exactStatuses != null
+            ? new ListQuery(exactStatuses, false, query, SORT_BY_START)
+            : segmentQuery(segment, query);
 
-    boolean isLogistician = isLogistician(principal);
+    CompletableFuture<PageResponse<RefineryOrderListDto>> listFuture =
+        parallelPageLoader.loadAsync(
+            () -> fetchOrderPage(endpoint, listQuery, effectivePage, effectiveSize));
+    CompletableFuture<Long> runningFuture =
+        parallelPageLoader.loadAsync(() -> countOrders(endpoint, segmentQuery(VIEW_RUNNING, null)));
+    CompletableFuture<Long> readyFuture =
+        parallelPageLoader.loadAsync(() -> countOrders(endpoint, segmentQuery(VIEW_READY, null)));
+    CompletableFuture<Long> completedFuture =
+        parallelPageLoader.loadAsync(
+            () -> countOrders(endpoint, segmentQuery(VIEW_COMPLETED, null)));
+    CompletableFuture<Long> allFuture =
+        parallelPageLoader.loadAsync(() -> countOrders(endpoint, segmentQuery(VIEW_ALL, null)));
+    CompletableFuture.allOf(listFuture, runningFuture, readyFuture, completedFuture, allFuture)
+        .join();
+    model.addAttribute(
+        "refineryCounts",
+        new RefineryProgress.Counts(
+            runningFuture.join(), readyFuture.join(), completedFuture.join(), allFuture.join()));
 
-    List<RefineryOrderListDto> orders = new ArrayList<>();
-    PageResponse<RefineryOrderListDto> p = null;
-    try {
-      String statusParam = String.join(",", status);
-      String endpoint =
-          Boolean.TRUE.equals(onlyMine)
-              ? "/api/v1/refinery-orders/my-orders"
-              : "/api/v1/refinery-orders/all";
-      String url =
-          endpoint
-              + "?page="
-              + effectivePage
-              + "&size="
-              + effectiveSize
-              + "&sort=startedAt,desc&status="
-              + statusParam;
-      p = backendApiClient.get(url, REFINERY_ORDER_LIST_PAGE);
-      if (p != null && p.content() != null) {
-        orders = new ArrayList<>(p.content());
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch refinery orders", e);
+    PageResponse<RefineryOrderListDto> shown = listFuture.join();
+    if (shown == null) {
       model.addAttribute("errorToast", "error.refineryorder.load");
     }
-    model.addAttribute("orders", orders);
-    model.addAttribute("ordersPage", p);
+    final Instant now = Instant.now();
+    final UUID viewerId = getCurrentUserId(principal);
+    final boolean manager = isLogistician(principal);
+    List<RefineryListRow> rows =
+        contentOf(shown).stream()
+            .map(o -> RefineryListRow.of(o, now, viewerId, manager, locale))
+            .toList();
+    model.addAttribute("orderRows", rows);
+    model.addAttribute("ordersPage", shown);
     model.addAttribute("pageSizes", PAGE_SIZES);
-    model.addAttribute("paginationBaseUrl", buildPaginationBaseUrl(status, onlyMine));
-    model.addAttribute("selectedStatuses", status);
-    model.addAttribute("onlyMine", Boolean.TRUE.equals(onlyMine));
-    model.addAttribute("allStatuses", List.of("OPEN", "IN_PROGRESS", "COMPLETED", "CANCELED"));
+    model.addAttribute(
+        "paginationBaseUrl", buildPaginationBaseUrl(segment, exactStatuses, mine, query));
+    model.addAttribute("view", segment);
+    model.addAttribute("searchQuery", query);
+    model.addAttribute("onlyMine", mine);
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
       return "refinery-orders-index :: refineryOrdersResults";
     }
@@ -218,22 +269,205 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * Builds the pagination base URL that preserves the active status and own-orders filter.
+   * Resolves the list segment from the {@code view} parameter, else from a legacy status filter.
    *
-   * @param status the resolved, non-empty status filter
-   * @param onlyMine the resolved own-orders toggle
-   * @return {@code /refinery-orders?status=...&onlyMine=true} carrying the current filter
+   * @param view the requested segment, case-insensitive; an unknown value is ignored
+   * @param status the legacy status filter, or {@code null}
+   * @return {@code COMPLETED} for a completed-only filter, {@code RUNNING} for an open-only one,
+   *     {@code ALL} for any other filter, and {@code RUNNING} when neither parameter is given
    */
   @NotNull
-  private static String buildPaginationBaseUrl(List<String> status, Boolean onlyMine) {
-    List<String> queryParts = new ArrayList<>();
-    for (String s : status) {
-      queryParts.add("status=" + s);
+  static String resolveView(@Nullable String view, @Nullable List<String> status) {
+    if (view != null) {
+      String upper = view.strip().toUpperCase(Locale.ROOT);
+      if (VIEWS.contains(upper)) {
+        return upper;
+      }
     }
-    if (Boolean.TRUE.equals(onlyMine)) {
-      queryParts.add("onlyMine=true");
+    List<String> statuses = knownStatuses(status);
+    if (statuses.isEmpty() || RefineryProgress.ACTIVE_STATUSES.containsAll(statuses)) {
+      return VIEW_RUNNING;
     }
-    return "/refinery-orders?" + String.join("&", queryParts);
+    if (statuses.equals(List.of("COMPLETED"))) {
+      return VIEW_COMPLETED;
+    }
+    return VIEW_ALL;
+  }
+
+  /**
+   * The legacy status filter to honour exactly, or {@code null} when it maps onto a segment.
+   *
+   * <p>The former default ({@code OPEN} + {@code IN_PROGRESS}), {@code COMPLETED} alone and every
+   * status together are segments; any other subset, e.g. {@code CANCELED}, stays an exact filter.
+   *
+   * @param status the {@code status} request parameter, or {@code null}
+   * @return the known statuses in canonical order, or {@code null}
+   */
+  @Nullable
+  static List<String> exactStatusFilter(@Nullable List<String> status) {
+    List<String> statuses = knownStatuses(status);
+    if (statuses.isEmpty()
+        || statuses.equals(RefineryProgress.ACTIVE_STATUSES)
+        || statuses.equals(List.of("COMPLETED"))
+        || statuses.equals(RefineryProgress.ALL_STATUSES)) {
+      return null;
+    }
+    return statuses;
+  }
+
+  /**
+   * The known statuses of a status parameter, upper-cased, deduplicated, in canonical order.
+   *
+   * @param status the raw parameter values; each may hold a comma-separated list
+   * @return the known statuses; empty when none is given or known
+   */
+  @NotNull
+  private static List<String> knownStatuses(@Nullable List<String> status) {
+    if (status == null) {
+      return List.of();
+    }
+    Set<String> given = new LinkedHashSet<>();
+    for (String raw : status) {
+      if (raw == null) {
+        continue;
+      }
+      for (String part : raw.split(",")) {
+        given.add(part.strip().toUpperCase(Locale.ROOT));
+      }
+    }
+    return RefineryProgress.ALL_STATUSES.stream().filter(given::contains).toList();
+  }
+
+  /**
+   * The backend list filter of one request (REQ-REFINERY-019).
+   *
+   * @param statuses the statuses to include
+   * @param ready whether only orders whose end has passed or is unknown are listed
+   * @param query the search text passed as {@code q}, or {@code null}
+   * @param sort the backend {@code sort} value
+   */
+  record ListQuery(
+      @NotNull List<String> statuses,
+      boolean ready,
+      @Nullable String query,
+      @NotNull String sort) {}
+
+  /**
+   * The backend filter of a segment: {@code RUNNING} and {@code READY} take the open statuses by
+   * end ascending, {@code READY} with the ready filter; {@code COMPLETED} and {@code ALL} take
+   * their statuses by start descending.
+   *
+   * @param segment the resolved segment
+   * @param query the search text, or {@code null}
+   * @return the filter
+   */
+  @NotNull
+  static ListQuery segmentQuery(@NotNull String segment, @Nullable String query) {
+    return switch (segment) {
+      case VIEW_READY -> new ListQuery(RefineryProgress.ACTIVE_STATUSES, true, query, SORT_BY_END);
+      case VIEW_COMPLETED -> new ListQuery(List.of("COMPLETED"), false, query, SORT_BY_START);
+      case VIEW_ALL -> new ListQuery(RefineryProgress.ALL_STATUSES, false, query, SORT_BY_START);
+      default -> new ListQuery(RefineryProgress.ACTIVE_STATUSES, false, query, SORT_BY_END);
+    };
+  }
+
+  /**
+   * The backend URL of one list request; the search, when present, is the {@code {q}} template
+   * variable so the client encodes it.
+   *
+   * @param endpoint the list endpoint, own or scoped
+   * @param listQuery the filter
+   * @param page the zero-based page index
+   * @param size the page size
+   * @return the URL template
+   */
+  @NotNull
+  static String orderPageUri(
+      @NotNull String endpoint, @NotNull ListQuery listQuery, int page, int size) {
+    return endpoint
+        + "?page="
+        + page
+        + "&size="
+        + size
+        + "&sort="
+        + listQuery.sort()
+        + "&status="
+        + String.join(",", listQuery.statuses())
+        + (listQuery.ready() ? "&ready=true" : "")
+        + (listQuery.query() != null ? "&q={q}" : "");
+  }
+
+  /**
+   * Loads one page of refinery orders; a failure is logged and yields {@code null}.
+   *
+   * @param endpoint the list endpoint, own or scoped
+   * @param listQuery the filter
+   * @param page the zero-based page index
+   * @param size the page size
+   * @return the page, or {@code null} on a backend failure
+   */
+  @Nullable
+  private PageResponse<RefineryOrderListDto> fetchOrderPage(
+      @NotNull String endpoint, @NotNull ListQuery listQuery, int page, int size) {
+    String uri = orderPageUri(endpoint, listQuery, page, size);
+    try {
+      return listQuery.query() == null
+          ? backendApiClient.get(uri, REFINERY_ORDER_LIST_PAGE)
+          : backendApiClient.get(uri, REFINERY_ORDER_LIST_PAGE, listQuery.query());
+    } catch (Exception e) {
+      log.error("Failed to fetch refinery orders", e);
+      return null;
+    }
+  }
+
+  /**
+   * Counts the orders of a filter with a one-row request.
+   *
+   * @param endpoint the list endpoint, own or scoped
+   * @param listQuery the filter
+   * @return the total, or {@code null} on a backend failure
+   */
+  @Nullable
+  private Long countOrders(@NotNull String endpoint, @NotNull ListQuery listQuery) {
+    PageResponse<RefineryOrderListDto> page = fetchOrderPage(endpoint, listQuery, 0, 1);
+    return page == null ? null : page.totalElements();
+  }
+
+  @NotNull
+  private static List<RefineryOrderListDto> contentOf(
+      @Nullable PageResponse<RefineryOrderListDto> page) {
+    return page == null || page.content() == null ? List.of() : page.content();
+  }
+
+  /**
+   * Builds the pagination base URL that keeps the segment (or exact status filter), the own-orders
+   * toggle and the search.
+   *
+   * @param segment the resolved segment
+   * @param exactStatuses the exact status filter, or {@code null} when the segment applies
+   * @param onlyMine the resolved own-orders toggle
+   * @param query the search text, or {@code null}
+   * @return the encoded {@code /refinery-orders?...} URL
+   */
+  @NotNull
+  static String buildPaginationBaseUrl(
+      @NotNull String segment,
+      @Nullable List<String> exactStatuses,
+      boolean onlyMine,
+      @Nullable String query) {
+    UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/refinery-orders");
+    if (exactStatuses != null) {
+      exactStatuses.forEach(s -> builder.queryParam("status", s));
+    } else {
+      builder.queryParam("view", segment);
+    }
+    if (onlyMine) {
+      builder.queryParam("onlyMine", "true");
+    }
+    if (query != null) {
+      builder.queryParam("q", query);
+    }
+    return builder.encode().build().toUriString();
   }
 
   /**
@@ -505,6 +739,7 @@ public class RefineryOrderPageController {
         boolean canEdit = isLogistician || isOwner;
         model.addAttribute("canEdit", canEdit);
         model.addAttribute("order", orderDto);
+        addOrderProgress(model, orderDto);
 
         model.addAttribute("storeOrgUnitOptions", fetchUserOrgUnitOptions(currentUserId));
         model.addAttribute("orderOwningOrgUnitId", orderDto.owningOrgUnitId());
@@ -661,6 +896,27 @@ public class RefineryOrderPageController {
       return "refinery-orders-details :: refineryStoreSection";
     }
     return "refinery-orders-details";
+  }
+
+  /**
+   * Adds the run state of an order the detail's status badge, steps and store action draw from.
+   *
+   * @param model the model to enrich with {@code orderState}, {@code orderEndsAt} and {@code
+   *     orderReadySince}
+   * @param order the loaded order
+   */
+  private static void addOrderProgress(@NotNull Model model, @NotNull RefineryOrderDto order) {
+    Instant now = Instant.now();
+    Instant endsAt = order.getEndsAt();
+    RefineryProgress.State state =
+        RefineryProgress.state(order.status() == null ? null : order.status().name(), endsAt, now);
+    model.addAttribute("orderState", state);
+    model.addAttribute("orderEndsAt", endsAt);
+    model.addAttribute(
+        "orderReadySince",
+        state == RefineryProgress.State.READY && endsAt != null
+            ? RefineryProgress.formatDuration(RefineryProgress.minutesSince(endsAt, now))
+            : null);
   }
 
   /**

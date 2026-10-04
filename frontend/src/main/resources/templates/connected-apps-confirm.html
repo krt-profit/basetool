@@ -15,26 +15,23 @@
     <span id="cac-i18n" hidden
           th:attr="data-error=#{notification.error.title},data-summary=#{connectedApps.confirmMass.summary},data-done=#{connectedApps.confirmMass.done},data-discarded=#{connectedApps.confirmMass.discarded},data-refused=#{connectedApps.confirmMass.refused},data-resource-blueprints=#{connectedApps.confirmMass.resource.blueprints},data-resource-stock=#{connectedApps.confirmMass.resource.stock},data-resource-ships=#{connectedApps.confirmMass.resource.ships}"></span>
 
-    <div class="greeting hud-box">
-        <h1 th:text="#{connectedApps.confirmMass.title}">Gro&szlig;e &Auml;nderung best&auml;tigen</h1>
-        <p th:text="#{connectedApps.confirmMass.subtitle}">Eine verbundene Anwendung wollte auf einmal viele Eintr&auml;ge entfernen.</p>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='connectedApps.title', eyebrowHref=@{/connected-apps}, titleText=#{connectedApps.confirmMass.title})}"></th:block>
 
-    <div class="hud-box mt-2" id="cac-box" data-testid="cac-box" th:attr="data-handoff-id=${pendingHandoffId}" aria-live="polite">
+    <div class="form-layout card cac-card" id="cac-box" data-testid="cac-box" th:attr="data-handoff-id=${pendingHandoffId}" aria-live="polite">
+        <p class="cac-context" th:text="#{connectedApps.confirmMass.subtitle}">Eine verbundene Anwendung wollte auf einmal viele Eintr&auml;ge entfernen.</p>
         <p id="cac-loading" th:text="#{connectedApps.confirmMass.loading}">Wird geladen &hellip;</p>
-        <div id="cac-preview" hidden>
-            <p id="cac-summary" data-testid="cac-summary"></p>
-            <p th:text="#{connectedApps.confirmMass.hint}">Du kannst die &Auml;nderung sp&auml;ter zur&uuml;cknehmen.</p>
-            <div class="ca-app-actions">
-                <button type="button" class="btn btn-danger" id="cac-confirm" data-testid="cac-confirm"
-                        th:text="#{connectedApps.confirmMass.confirm}">Best&auml;tigen</button>
+        <div id="cac-preview" class="cac-preview" hidden>
+            <p id="cac-summary" class="cac-summary" data-testid="cac-summary"></p>
+            <p class="form-hint" th:text="#{connectedApps.confirmMass.hint}">Du kannst die &Auml;nderung sp&auml;ter zur&uuml;cknehmen.</p>
+            <div class="cac-actions">
                 <button type="button" class="btn btn-ghost" id="cac-discard" data-testid="cac-discard"
                         th:text="#{connectedApps.confirmMass.discard}">Verwerfen</button>
+                <button type="button" class="btn btn-danger" id="cac-confirm" data-testid="cac-confirm"
+                        th:text="#{connectedApps.confirmMass.confirm}">Best&auml;tigen</button>
             </div>
         </div>
-        <p id="cac-missing" hidden th:text="#{connectedApps.confirmMass.missing}">Diese &Auml;nderung ist abgelaufen.</p>
-        <p id="cac-outcome" hidden data-testid="cac-outcome"></p>
-        <p class="mt-2"><a th:href="@{/connected-apps}" th:text="#{connectedApps.confirmMass.back}">Zur&uuml;ck zu Verbundene Anwendungen</a></p>
+        <div id="cac-missing" class="alert alert-warning" hidden th:text="#{connectedApps.confirmMass.missing}">Diese &Auml;nderung ist abgelaufen.</div>
+        <div id="cac-outcome" class="alert alert-info" hidden data-testid="cac-outcome"></div>
     </div>
 </main>
 

@@ -375,12 +375,16 @@ function initRefineryOrderSection() {
 document.addEventListener('DOMContentLoaded', function () {
     initRefineryOrderSection();
     initRefineryStoreSection();
+    openStoreFromLink();
+    window.setInterval(revealRefineryStoreWhenReady, 30000);
 });
 
 document.addEventListener('krt:swapped', function (ev) {
     const container = ev && ev.detail && ev.detail.container;
     if (!container) return;
     if (container.id === 'refinery-order-results') {
+        syncRefineryStatusBadge();
+        revealRefineryStoreWhenReady();
         initRefineryOrderSection();
         window.krtRefineryYield.onLocationChange(
             /** @type {KrtRefineryControl | null} */ (document.getElementById('locationId')),
@@ -451,18 +455,17 @@ function addMaterialRow() {
     }
 
     if (!template.querySelector('.remove-btn')) {
-        const header = template.querySelector('.material-entry-header');
-        if (header) {
+        const actions = template.querySelector('.rod-good__actions');
+        if (actions) {
             const removeBtn = document.createElement('button');
             removeBtn.type = 'button';
-            removeBtn.className = 'btn btn-quiet-danger remove-btn btn-icon';
-            removeBtn.style.cssText = 'padding: 0.25rem 0.5rem; font-size: 0.8rem;';
+            removeBtn.className = 'btn btn-ghost btn-icon remove-btn';
             removeBtn.setAttribute('data-trigger', 'rod-remove-material');
             removeBtn.setAttribute('title', MATERIAL_REMOVE_LABEL);
             removeBtn.setAttribute('aria-label', MATERIAL_REMOVE_LABEL);
             removeBtn.innerHTML =
                 '<svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>';
-            header.appendChild(removeBtn);
+            actions.appendChild(removeBtn);
         }
     }
 
@@ -584,9 +587,9 @@ function updateMethodRatings() {
             speedVal.innerText =
                 SPEED_LEVELS[selectedOption.getAttribute('data-speed') || ''] || '-';
         }
-        ratingsDiv.style.display = 'flex';
+        ratingsDiv.hidden = false;
     } else {
-        ratingsDiv.style.display = 'none';
+        ratingsDiv.hidden = true;
     }
 }
 
@@ -632,8 +635,22 @@ function updateEndsAt() {
 }
 
 /**
- * Updates the read-only profit/loss preview as oreSales - expenses - otherExpenses; the server
- * computes the stored value.
+ * Fills the `{0}`, `{1,number,integer}`, ... placeholders of a message pattern.
+ *
+ * @param {string} pattern the raw message pattern
+ * @param {string[]} args the values in placeholder order
+ * @returns {string} the filled message
+ */
+function fillRefineryPattern(pattern, args) {
+    return pattern.replace(/\{(\d+)(?:,[^}]*)?\}/g, function (match, index) {
+        const value = args[Number(index)];
+        return value === undefined ? match : value;
+    });
+}
+
+/**
+ * Updates the profit/loss card as oreSales - expenses - otherExpenses with its calculation line;
+ * the server computes the stored value.
  */
 function updateProfitPreview() {
     const expensesEl = /** @type {HTMLInputElement | null} */ (document.getElementById('expenses'));
@@ -641,18 +658,91 @@ function updateProfitPreview() {
         document.getElementById('otherExpenses')
     );
     const oreSalesEl = /** @type {HTMLInputElement | null} */ (document.getElementById('oreSales'));
-    const preview = /** @type {HTMLInputElement | null} */ (
-        document.getElementById('profitPreview')
-    );
+    const preview = document.getElementById('profitPreview');
     if (!preview) return;
     const expenses = parseFloat((expensesEl && expensesEl.value) || '') || 0;
     const otherExpenses = parseFloat((otherExpensesEl && otherExpensesEl.value) || '') || 0;
     const oreSales = parseFloat((oreSalesEl && oreSalesEl.value) || '') || 0;
+    const locale = document.documentElement.lang || undefined;
     const profit = Math.round(oreSales - expenses - otherExpenses);
-    preview.value = profit.toLocaleString();
-    preview.classList.toggle('text-danger', profit < 0);
-    preview.classList.toggle('text-muted', profit >= 0);
+    const sign = profit > 0 ? '+ ' : profit < 0 ? '− ' : '';
+    preview.textContent = sign + Math.abs(profit).toLocaleString(locale);
+    preview.classList.toggle('rod-profit--neg', profit < 0);
+    preview.classList.toggle('rod-profit--pos', profit >= 0);
+    const breakdown = document.getElementById('profitBreakdown');
+    const template = breakdown ? breakdown.getAttribute('data-template') : null;
+    if (breakdown && template) {
+        breakdown.textContent = fillRefineryPattern(template, [
+            Math.round(oreSales).toLocaleString(locale),
+            Math.round(expenses + otherExpenses).toLocaleString(locale),
+        ]);
+    }
 }
+
+/**
+ * Copies the run state of the swapped order section into the page head's status badge.
+ */
+function syncRefineryStatusBadge() {
+    const badge = document.getElementById('rod-status-badge');
+    const layout = document.querySelector('#refinery-order-results .rod-layout');
+    if (!badge || !layout) return;
+    const label = layout.getAttribute('data-rod-state-label');
+    const stateClass = layout.getAttribute('data-rod-state-class');
+    if (!label || !stateClass) return;
+    badge.textContent = label;
+    badge.className = 'status-badge ' + stateClass;
+}
+
+/**
+ * Reveals the store action once the run's end has passed.
+ */
+function revealRefineryStoreWhenReady() {
+    const store = /** @type {HTMLElement | null} */ (
+        document.querySelector('[data-trigger="rod-open-store"][data-ready-at]')
+    );
+    if (!store || !store.hidden) return;
+    const readyAt = Number(store.getAttribute('data-ready-at'));
+    if (isFinite(readyAt) && Date.now() >= readyAt) store.hidden = false;
+}
+
+/**
+ * Opens the store dialog when the page was reached through a list row's "Einlagern"
+ * (`?store=open`), then drops the parameter from the address bar.
+ */
+function openStoreFromLink() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('store') !== 'open') return;
+    params.delete('store');
+    const query = params.toString();
+    try {
+        window.history.replaceState(
+            null,
+            '',
+            window.location.pathname + (query ? '?' + query : '') + window.location.hash,
+        );
+    } catch (_e) {}
+    const store = /** @type {HTMLElement | null} */ (
+        document.querySelector('[data-trigger="rod-open-store"]')
+    );
+    if (store && !store.hidden) openStoreModal();
+}
+
+/**
+ * Shows the unsaved-changes hint of the sticky action bar while the order form holds edits.
+ *
+ * @param {Event} event the input or change event
+ */
+function markRefineryFormDirty(event) {
+    const target = /** @type {Element | null} */ (
+        event.target instanceof Element ? event.target : null
+    );
+    if (!target || !target.closest('#refineryOrderMainForm')) return;
+    const hint = document.getElementById('rod-unsaved');
+    if (hint) hint.hidden = false;
+}
+
+document.addEventListener('input', markRefineryFormDirty);
+document.addEventListener('change', markRefineryFormDirty);
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('input', 'rod-update-profit', updateProfitPreview);
@@ -679,6 +769,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         calcScu(el.getAttribute('data-index'));
     });
     window.krtEvents.on('click', 'rod-open-store', openStoreModal);
+    window.krtEvents.on('click', 'rod-discard', discardRefineryEdits);
     window.krtEvents.on('click', 'rod-close-store', closeStoreModal);
     window.krtEvents.on('click', 'rod-duplicate-store', function (el) {
         duplicateStoreItem(el);
@@ -697,6 +788,14 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             }
         }
     });
+}
+
+/**
+ * Drops the unsaved edits of the order form by re-rendering its section from the server.
+ */
+function discardRefineryEdits() {
+    if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+    if (refinerySeam) refinerySeam.refresh(['order'], { broadcast: false });
 }
 
 function submitRefineryMainForm(form, submitter) {
