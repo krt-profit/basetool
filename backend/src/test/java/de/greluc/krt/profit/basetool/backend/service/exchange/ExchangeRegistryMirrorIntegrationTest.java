@@ -26,8 +26,8 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDomain;
 import de.greluc.krt.profit.basetool.backend.exception.ExternalServiceException;
-import de.greluc.krt.profit.basetool.backend.model.AuditDomain;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeClientStatus;

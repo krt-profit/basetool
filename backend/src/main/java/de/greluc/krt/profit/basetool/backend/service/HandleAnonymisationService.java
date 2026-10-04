@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAuditEventRepository;
@@ -29,7 +31,6 @@ import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepositor
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.HandleAnonymisation;
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -65,7 +66,7 @@ public class HandleAnonymisationService {
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   private final JobOrderRepository jobOrderRepository;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final BankAuditService bankAuditService;
 
   /**
@@ -171,7 +172,7 @@ public class HandleAnonymisationService {
             materialHandovers,
             itemHandovers);
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.HANDLE_SNAPSHOTS_ANONYMISED,
         userId,
         null,

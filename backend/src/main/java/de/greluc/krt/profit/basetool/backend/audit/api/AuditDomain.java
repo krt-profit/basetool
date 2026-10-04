@@ -17,10 +17,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model;
+package de.greluc.krt.profit.basetool.backend.audit.api;
 
 /**
- * The functional area an {@link AuditEvent} belongs to, keeping the per-area logs in the shared
+ * The functional area an {@code AuditEvent} belongs to, keeping the per-area logs in the shared
  * {@code audit_event} table logically separate (REQ-AUDIT-001, ADR-0037). The bank trail is not a
  * value here; it has its own {@code bank_audit_event} table.
  */

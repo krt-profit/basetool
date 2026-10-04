@@ -19,8 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintExternalAlias;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintExternalAliasSource;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintSource;
@@ -36,7 +38,6 @@ import de.greluc.krt.profit.basetool.backend.repository.BlueprintExternalAliasRe
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -86,7 +87,7 @@ public class BlueprintImportService {
   private final BlueprintExternalAliasRepository aliasRepository;
   private final PersonalBlueprintRepository personalBlueprintRepository;
   private final GameItemRepository gameItemRepository;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Parses an uploaded export and previews how each unique blueprint resolves for {@code
@@ -266,7 +267,7 @@ public class BlueprintImportService {
     }
 
     if (added + aliasesLearned + acquiredAtUpdated > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.BLUEPRINT_IMPORTED,
           null,
           null,

@@ -144,7 +144,7 @@ class PersonalInventoryItemServiceTest {
     verify(auditService)
         .record(
             eq(
-                de.greluc.krt.profit.basetool.backend.model.AuditEventType
+                de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType
                     .PERSONAL_INVENTORY_CREATED),
             any(),
             any(),
