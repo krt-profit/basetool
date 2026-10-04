@@ -357,6 +357,24 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
         .andExpect(content().string(not(containsString("krt-bp-craftable-toggle"))));
   }
 
+  /**
+   * The recipe script receives the shortfall label for a short ingredient (REQ-INV-048).
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser
+  void view_passesTheShortfallLabelToTheRecipeScript() throws Exception {
+    PageResponse<PersonalBlueprintDto> page =
+        new PageResponse<>(List.of(), 0, 200, 0, 0, List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+
+    mockMvc
+        .perform(get("/personal-inventory/blueprints").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("missing:          \"fehlt {0}\"")));
+  }
+
   @Test
   @WithMockUser
   void view_fragmentList_rendersOnlyTheCollectionCardFragment() throws Exception {

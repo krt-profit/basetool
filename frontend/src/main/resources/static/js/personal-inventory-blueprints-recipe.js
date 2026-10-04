@@ -936,6 +936,12 @@
                 fmtAmount(avail, qt) + unit,
             );
             stock.setAttribute('data-label', dict.colStock || '');
+            if (missing > 0) {
+                const missingText = window
+                    .krtI18nText(dict.missing, 'krtBlueprintsRecipeI18n.missing')
+                    .replace('{0}', fmtAmount(missing, qt) + unit);
+                stock.appendChild(el('span', 'krt-bp-ing-missing', missingText));
+            }
             row.appendChild(stock);
             const quality = el('td', 'krt-bp-ing-quality');
             quality.setAttribute('data-label', dict.colQuality || '');

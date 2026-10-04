@@ -1581,7 +1581,7 @@ by max. profit with a two-line route „Kauf <Terminal> · <Preis>" / „Verkauf
 the terminal's location (planet or star system, then city, station or outpost) as its tooltip.
 Auftragsdetail: page head with kind and status badges and the admin overflow „Auftrag löschen", the
 progress tile „Geliefert / benötigt" leading the KPI grid, tabs filtered per kind (Material: Bedarf
-· Übergaben · Bearbeiter · Verknüpft; Item: Items · Materialien · Herstellung · Übergaben ·
+· Übergaben · Bearbeiter · Verknüpft; Item: Items · Materialien · Hersteller · Übergaben ·
 Bearbeiter · Verknüpft) with empty tabs hidden, and „Übergabe erfassen" as the one action of the
 handover tab (REQ-ORDERS-026). Einsatz and Operation detail: both heads are page heads with the back
 link, the title and a translated `.status-badge`. The Einsatz page keeps three tabs (Übersicht ·
