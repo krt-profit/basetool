@@ -140,7 +140,26 @@ class TermsControllerTest {
     String html = mockMvc.perform(get("/terms")).andReturn().getResponse().getContentAsString();
 
     assertThat(html)
-        .doesNotContain("<ul class=\"krtm-list-style-type-disc-margin-left-2rem-a571\"></ul>");
+        .contains("<ul class=\"legal-list\">")
+        .doesNotContainPattern("<ul class=\"legal-list\">\\s*</ul>");
+  }
+
+  /**
+   * The terms read as a legal text page: the page head with the legal eyebrow, the text on a card
+   * limited to the reading measure, and no HUD box (REQ-UI-027).
+   */
+  @Test
+  void rendersTheTextPagePattern() throws Exception {
+    String html = mockMvc.perform(get("/terms")).andReturn().getResponse().getContentAsString();
+
+    assertThat(html)
+        .contains("class=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Rechtliches<")
+        .contains("<h1>Nutzungsbedingungen</h1>")
+        .contains("class=\"card legal-doc\"")
+        .contains("/css/legal")
+        .doesNotContain("hud-box")
+        .doesNotContain("krtm-");
   }
 
   /**

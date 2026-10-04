@@ -201,12 +201,12 @@ class OrgChartKeyboardA11yE2eTest {
    */
   @Test
   void successfulEditPreservesHorizontalScrollPosition() {
-    try (BrowserContext context = authedContext(500, 900)) {
+    try (BrowserContext context = authedContext(800, 900)) {
       Page page = context.newPage();
       try {
         E2eSupport.navigate(page, STACK.baseUrl() + "/org-chart");
 
-        for (int i = 0; i < 4 && (i == 0 || maxScrollLeft(page) <= 0); i++) {
+        for (int i = 0; i < 6 && (i == 0 || maxScrollLeft(page) <= 0); i++) {
           createLeaderlessKommando(page, "E2E Breite " + i);
         }
         assertTrue(
@@ -237,6 +237,32 @@ class OrgChartKeyboardA11yE2eTest {
             "restored scrollLeft " + restored + " should match the pre-save value " + target);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "org-chart-scroll-preserve");
+        throw failure;
+      }
+    }
+  }
+
+  /**
+   * On a phone the chart is an indented list: nothing scrolls sideways, and the child rows stack in
+   * a column instead of fanning out.
+   */
+  @Test
+  void phoneShowsTheChartAsAnIndentedList() {
+    try (BrowserContext context = authedContext(375, 800)) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.navigate(page, STACK.baseUrl() + "/org-chart");
+        page.waitForSelector(TABBABLE_ITEM);
+
+        assertEquals(0, maxScrollLeft(page), "the phone list must not scroll sideways");
+        assertEquals(
+            "column",
+            page.evaluate(
+                "() => { const fan = document.querySelector('#oc-chart .oc-fan');"
+                    + " return fan ? getComputedStyle(fan).flexDirection : null; }"),
+            "child rows stack in a column on a phone");
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "org-chart-phone-list");
         throw failure;
       }
     }

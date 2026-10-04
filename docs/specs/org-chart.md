@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
 > **Owner area:** ORG · **Related ADRs:** ADR-0029
 
 # Organisation org chart (Funktionsränge)
@@ -167,8 +167,17 @@ wide chart is usually also tall, its own horizontal scrollbar would sit far down
 fixed footer); a **sticky proxy scrollbar** (`#oc-scrollbar`, org-chart.js) is therefore pinned just
 above the footer and kept in sync with the chart's horizontal scroll, so panning is always reachable
 without scrolling the whole page down — the chart's own bar is suppressed while the proxy is active. The
-"Bearbeiten" toggle — admins only, on the trailing edge of the page title box — exposes its
-state via `aria-pressed` and reveals a legend while editing. The transitional "seats are managed
+"Bearbeiten" toggle — admins only, a ghost button in the page head's actions (REQ-UI-027) — exposes its
+state via `aria-pressed` and reveals a legend while editing. **On the Smartphone class
+(`width <= 768px`) the chart is an indented list instead of a horizontal chart**: every tier and
+every fan stacks vertically, each level indented behind one connector line on its left, the boxes
+take the full width, and nothing scrolls sideways — so the proxy scrollbar is not shown there. The
+tree roles, levels and keyboard model are the same on every class.
+
+Amended 2026-10-03 (website overhaul phase 3): the page wears the page head („Organisation" /
+„Organigramm") instead of the greeting box with its subtitle, the toggle moved into the head, an
+empty chart shows an `.empty-state`, and the phone layout became the indented list above
+(`OrgChartKeyboardA11yE2eTest.phoneShowsTheChartAsAnIndentedList`, `OrgChartPageRenderTest`). The transitional "seats are managed
 under Leitung" banner that once sat above the chart is gone, and the per-node "managed under Leitung"
 marker (REQ-ROLE-006, REQ-ORG-010 amendment) has since been retired too — a mirror-managed
 (account-held or `kommando_group`-linked) seat now reads read-only purely from its absent inline-edit
