@@ -19,11 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.service.exchange;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeClientStatus;
@@ -33,8 +35,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.ExchangeClientUpdateReque
 import de.greluc.krt.profit.basetool.backend.model.dto.ExchangeClientUsageDto;
 import de.greluc.krt.profit.basetool.backend.repository.ExchangeClientRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ExchangeInstallationRepository;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.KnownExchangeClients;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -67,7 +67,7 @@ public class ExchangeRegistryService {
 
   private final ExchangeClientRepository clientRepository;
   private final ExchangeRegistryMirrorSync mirrorSync;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final MeterRegistry meterRegistry;
   private final KnownExchangeClients knownExchangeClients;
 
@@ -172,7 +172,7 @@ public class ExchangeRegistryService {
     client.setWritesPerDay(request.writesPerDay());
     ExchangeClient saved = clientRepository.saveAndFlush(client);
     mirrorSync.mirrorChange(before, mirrorSync.load());
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.EXCHANGE_CLIENT_CREATED,
         saved.getId(),
         saved.getClientId(),
@@ -224,7 +224,7 @@ public class ExchangeRegistryService {
     added.removeAll(oldCapabilities);
     Set<ExchangeCapability> removed = EnumSet.copyOf(oldCapabilities);
     removed.removeAll(newCapabilities);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.EXCHANGE_CLIENT_UPDATED,
         saved.getId(),
         saved.getClientId(),
@@ -283,7 +283,7 @@ public class ExchangeRegistryService {
     settings.setEnabled(enabled);
     final ExchangeSettings saved = mirrorSync.saveSettings(settings);
     mirrorSync.mirrorChange(before, mirrorSync.load());
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.EXCHANGE_SWITCH_CHANGED,
         null,
         null,
@@ -316,7 +316,7 @@ public class ExchangeRegistryService {
     ExchangeClient saved = clientRepository.saveAndFlush(client);
     mirrorSync.mirrorChange(before, mirrorSync.load());
     boolean suspended = status == ExchangeClientStatus.SUSPENDED;
-    auditService.record(
+    auditRecorder.record(
         suspended
             ? AuditEventType.EXCHANGE_CLIENT_SUSPENDED
             : AuditEventType.EXCHANGE_CLIENT_ACTIVATED,

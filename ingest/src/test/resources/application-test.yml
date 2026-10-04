@@ -14,6 +14,7 @@ app:
   ingest:
     backend-base-url: http://localhost:19999
     frontend-base-url: http://localhost:18081
+    verify-backend-hostname: false
     handoff-ttl: PT1M
     max-payload-bytes: 1048576
   rate-limit:

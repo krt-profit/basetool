@@ -19,9 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import java.util.UUID;
@@ -44,7 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RefiningMethodService {
 
   private final RefiningMethodRepository refiningMethodRepository;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Returns cached page of refining methods.
@@ -79,7 +80,7 @@ public class RefiningMethodService {
   @CacheEvict(cacheNames = CacheConfig.REFINING_METHODS_CACHE, allEntries = true)
   public RefiningMethod createRefiningMethod(@NotNull RefiningMethod refiningMethod) {
     RefiningMethod saved = refiningMethodRepository.save(refiningMethod);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.REFINERY_METHOD_CREATED,
         saved.getId(),
         saved.getName(),
@@ -107,7 +108,7 @@ public class RefiningMethodService {
     refiningMethod.setDescription(refiningMethodDetails.getDescription());
 
     RefiningMethod saved = refiningMethodRepository.save(refiningMethod);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.REFINERY_METHOD_UPDATED,
         saved.getId(),
         saved.getName(),
@@ -128,6 +129,6 @@ public class RefiningMethodService {
     RefiningMethod refiningMethod = getRefiningMethod(id);
     String name = refiningMethod.getName();
     refiningMethodRepository.delete(refiningMethod);
-    auditService.record(AuditEventType.REFINERY_METHOD_DELETED, id, name, null, "name=" + name);
+    auditRecorder.record(AuditEventType.REFINERY_METHOD_DELETED, id, name, null, "name=" + name);
   }
 }

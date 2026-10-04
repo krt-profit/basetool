@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.support;
+package de.greluc.krt.profit.basetool.backend.audit.api;
 
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -25,7 +25,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Fluent composer for the space-separated {@code key=value} {@code details} payload passed to
- * {@code AuditService.record(...)} / {@code BankAuditService.record(...)}.
+ * {@link AuditRecorder#record} / {@code BankAuditService.record(...)}.
  *
  * <p>Implements {@link CharSequence} so it can be passed directly. Values are stringified with
  * {@link String#valueOf(Object)}, so the output is identical to {@code "a=" + x + " b=" + y}. Only

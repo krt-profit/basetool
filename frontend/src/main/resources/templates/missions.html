@@ -50,49 +50,51 @@
 
     <div id="missions-results" class="card card--flush">
         <th:block th:fragment="missionsResults">
-        <table th:if="${missions != null and !missions.isEmpty()}" class="data-table data-table--stack">
-            <thead>
-                <tr>
-                    <th th:text="#{mission.name}">Name</th>
-                    <th class="cell-status" th:text="#{mission.status}">Status</th>
-                    <th th:text="#{mission.planned_start}">Planned Start</th>
-                    <th th:if="${isAllSquadronsMode}" th:text="#{mission.owning_squadron}">Staffel</th>
-                    <th class="num" th:text="#{mission.list.registeredHeader}">Angemeldet</th>
-                    <th class="cell-actions"><span class="visually-hidden" th:text="#{general.open}">Open</span></th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr th:each="m : ${missions}" data-testid="mission-row"
-                    th:with="days=${@relativeDays.days(m.plannedStartTime)}">
-                    <td>
-                        <a class="row-link" data-testid="row-link" th:href="@{/missions/{id}(id=${m.id})}">
-                            <span class="cell-title" th:text="${m.name}">Name</span>
-                            <span class="cell-sub" th:if="${m.meetingPoint != null and !#strings.isEmpty(m.meetingPoint)}"
-                                  th:text="#{mission.meeting_point} + ': ' + ${m.meetingPoint}">Treffpunkt</span>
-                        </a>
-                    </td>
-                    <td class="cell-status">
-                        <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(m.status)}"
-                              th:text="#{${'mission.status.' + #strings.toLowerCase(m.status)}}">Status</span>
-                    </td>
-                    <td>
-                        <span class="cell-title utc-time" data-format="short" th:text="${m.plannedStartTime}">Start</span>
-                        <span class="cell-sub" th:if="${days != null}"
-                              th:text="${m.status == 'ACTIVE'} ? #{list.relative.running}
-                                       : (${days == 0} ? #{list.relative.today}
-                                       : (${days > 0} ? #{list.relative.inDays(${days})} : #{list.relative.daysAgo(${-days})}))">in 5 Tagen</span>
-                    </td>
-                    <td th:if="${isAllSquadronsMode}" th:attr="data-label=#{mission.owning_squadron}">
-                        <span th:if="${m.owningSquadron != null}" class="squadron-badge"
-                              th:title="${m.owningSquadron.name()}"
-                              th:text="${m.owningSquadron.shorthand()}">IRI</span>
-                        <span th:if="${m.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
-                    </td>
-                    <td class="num" th:text="#{mission.list.registered(${m.registeredCount})}">6 angemeldet</td>
-                    <td class="cell-actions"><svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg></td>
-                </tr>
-            </tbody>
-        </table>
+        <div class="table-responsive" th:if="${missions != null and !missions.isEmpty()}">
+            <table class="data-table data-table--stack">
+                <thead>
+                    <tr>
+                        <th th:text="#{mission.name}">Name</th>
+                        <th class="cell-status" th:text="#{mission.status}">Status</th>
+                        <th th:text="#{mission.planned_start}">Planned Start</th>
+                        <th th:if="${isAllSquadronsMode}" th:text="#{mission.owning_squadron}">Staffel</th>
+                        <th class="num" th:text="#{mission.list.registeredHeader}">Angemeldet</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{general.open}">Open</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="m : ${missions}" data-testid="mission-row"
+                        th:with="days=${@relativeDays.days(m.plannedStartTime)}">
+                        <td>
+                            <a class="row-link" data-testid="row-link" th:href="@{/missions/{id}(id=${m.id})}">
+                                <span class="cell-title" th:text="${m.name}">Name</span>
+                                <span class="cell-sub" th:if="${m.meetingPoint != null and !#strings.isEmpty(m.meetingPoint)}"
+                                      th:text="#{mission.meeting_point} + ': ' + ${m.meetingPoint}">Treffpunkt</span>
+                            </a>
+                        </td>
+                        <td class="cell-status">
+                            <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(m.status)}"
+                                  th:text="#{${'mission.status.' + #strings.toLowerCase(m.status)}}">Status</span>
+                        </td>
+                        <td>
+                            <span class="cell-title utc-time" data-format="short" th:text="${m.plannedStartTime}">Start</span>
+                            <span class="cell-sub" th:if="${days != null}"
+                                  th:text="${m.status == 'ACTIVE'} ? #{list.relative.running}
+                                           : (${days == 0} ? #{list.relative.today}
+                                           : (${days > 0} ? #{list.relative.inDays(${days})} : #{list.relative.daysAgo(${-days})}))">in 5 Tagen</span>
+                        </td>
+                        <td th:if="${isAllSquadronsMode}" th:attr="data-label=#{mission.owning_squadron}">
+                            <span th:if="${m.owningSquadron != null}" class="squadron-badge"
+                                  th:title="${m.owningSquadron.name()}"
+                                  th:text="${m.owningSquadron.shorthand()}">IRI</span>
+                            <span th:if="${m.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
+                        </td>
+                        <td class="num" th:text="#{mission.list.registered(${m.registeredCount})}">6 angemeldet</td>
+                        <td class="cell-actions"><svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
 
         <th:block th:if="${missions == null or missions.isEmpty()}">
             <th:block th:replace="~{fragments/components :: emptyState(titleKey='mission.empty', textKey='mission.empty.text')}"></th:block>
