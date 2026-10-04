@@ -84,7 +84,7 @@ in its [`INDEX.md`](docs/specs/INDEX.md)), and architecture/design decisions in
   **every** state-mutating
   activity (REQ-AUDIT-001, [`docs/specs/audit.md`](docs/specs/audit.md)). When you add, change or
   remove such an activity, adapt its audit logging in the **same PR**: add or adjust the
-  `AuditEventType` and the `auditService.record(...)` call (honouring the optimistic-locking
+  `AuditEventType` and the `auditRecorder.record(...)` call (honouring the optimistic-locking
   landmines below and the "no user free text / no PII in the details payload" rule), extend the
   unified viewer's per-area event-type filter and the DE/EN i18n labels, and reconcile the
   REQ-AUDIT-001 coverage list. A new mutation in an audited area with no matching audit event is

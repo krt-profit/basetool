@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.service.exchange;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.ExternalServiceException;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeInstallation;
@@ -37,9 +39,7 @@ import de.greluc.krt.profit.basetool.backend.repository.ExchangeClientRevocation
 import de.greluc.krt.profit.basetool.backend.repository.ExchangeInstallationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ExchangeJournalRepository;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.KeycloakService;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import java.time.Clock;
@@ -78,7 +78,7 @@ public class ConnectedAppsService {
   private final ExchangeClientRevocationRepository revocationRepository;
   private final ExchangeRevocationMirror revocationMirror;
   private final KeycloakService keycloakService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final MeterRegistry meterRegistry;
 
   /** Reads and clears the new-connection notifications that mark an installation unseen. */
@@ -205,7 +205,7 @@ public class ConnectedAppsService {
     mirror(() -> revocationMirror.deny(installation.getKeyThumbprint(), now));
     installation.setRevokedAt(now);
     installationRepository.saveAndFlush(installation);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.EXCHANGE_INSTALLATION_DISCONNECTED,
         installation.getId(),
         installation.getClient().getClientId(),
@@ -236,7 +236,7 @@ public class ConnectedAppsService {
     Instant now = clock.instant();
     mirror(() -> revocationMirror.revoke(clientId, member, now));
     revocationRepository.upsert(client.getId(), member, now);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.EXCHANGE_CLIENT_DISCONNECTED,
         client.getId(),
         client.getClientId(),

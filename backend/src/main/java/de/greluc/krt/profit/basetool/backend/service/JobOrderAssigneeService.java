@@ -19,16 +19,17 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderAssignee;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
@@ -55,7 +56,7 @@ public class JobOrderAssigneeService {
   private final UserRepository userRepository;
 
   /** Records the state-mutating assignee activities into the audit log (REQ-AUDIT-001). */
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /** Projects the updated order back to its stock/claim DTO. */
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
@@ -84,7 +85,7 @@ public class JobOrderAssigneeService {
         Entities.require(userRepository.findById(userId), () -> "User not found: " + userId);
     jobOrder.addAssignee(JobOrderAssignee.builder().user(user).build());
     JobOrder saved = jobOrderRepository.saveAndFlush(jobOrder);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.JOB_ORDER_ASSIGNEE_ADDED,
         saved.getId(),
         orderLabel(saved),
@@ -111,7 +112,7 @@ public class JobOrderAssigneeService {
             .removeIf(a -> a.getUser() != null && a.getUser().getId().equals(userId));
     JobOrder saved = jobOrderRepository.saveAndFlush(jobOrder);
     if (removed) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.JOB_ORDER_ASSIGNEE_REMOVED,
           saved.getId(),
           orderLabel(saved),
@@ -182,14 +183,14 @@ public class JobOrderAssigneeService {
     assignee.setNote(trimmed);
     JobOrder saved = jobOrderRepository.saveAndFlush(jobOrder);
     if (trimmed != null) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.JOB_ORDER_ASSIGNEE_NOTE_SET,
           saved.getId(),
           orderLabel(saved),
           userId,
           AuditDetails.of("assignee", userId).with("noteLength", trimmed.length()));
     } else {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.JOB_ORDER_ASSIGNEE_NOTE_CLEARED,
           saved.getId(),
           orderLabel(saved),

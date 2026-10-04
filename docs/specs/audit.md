@@ -318,7 +318,7 @@ snapshotted, exactly as the bank trail snapshots holder handles).
 
 **Details payload format & the `AuditDetails` builder (S8, #914).** The common `details` shape is a
 space-separated list of `key=value` pairs (e.g. `section=full status=PLANNED`). Those payloads are
-composed through the shared [`support.AuditDetails`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/support/AuditDetails.java)
+composed through the shared [`audit.api.AuditDetails`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/audit/api/AuditDetails.java)
 builder — `AuditDetails.of("section", "full").with("status", status)` — instead of being
 hand-concatenated at each call site. The builder fixes the one-space separator and the `key=value`
 grammar in one place and validates that keys carry no `=` or whitespace, so a copy-paste can no
@@ -374,8 +374,9 @@ by reading the `AuditEventDto.eventType` enum out of the committed `openapi.json
 
 **Enforced by:** `AuditServiceTest`, `AuditQueryIntegrationTest`, `AuditAdminControllerSecurityTest`,
 `RoleServiceTest`, `AdminAuditLogPageControllerTest`,
-per-domain emission assertions in the service tests · **Code:** `service/AuditService`,
-`model/AuditEvent`, `model/AuditDomain`, `model/AuditEventType`, `controller/AuditAdminController`,
+per-domain emission assertions in the service tests · **Code:** `audit/api/AuditRecorder`,
+`service/AuditService`, `model/AuditEvent`, `audit/api/AuditDomain`, `audit/api/AuditEventType`,
+`controller/AuditAdminController`,
 `db/migration/V179` · **Decision:** [ADR-0037](../adr/0037-shared-multi-domain-activity-audit-log.md)
 
 ### REQ-AUDIT-002 — Unified admin audit viewer

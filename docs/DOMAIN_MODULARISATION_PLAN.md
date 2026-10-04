@@ -623,7 +623,9 @@ Cheap moves that break many cycles without changing behaviour:
   into `identity`; handle anonymisation into the kernel; the exchange row records into their owners'
   repositories; a catalogue `ShipTypeMapper`; `AuthHelperService`'s four delegations to
   `OwnerScopeService` removed (callers use the scope API); `AuditService.record` returns nothing
-  instead of the entity.
+  instead of the entity — **done 2026-10-04** (P1-7): no caller used the row; the two
+  `UexRefinerySyncService` calls that handed it through `SyncChunkWriter.inNewTransaction(Supplier)`
+  now use `runInNewTransaction(Runnable)`.
 - The platform SPIs of §5.3 (`ActorHandleResolver`, `RetentionParticipant`, `RecipientDirectory`,
   `LiveSyncTopicAuthorizer`, `ActiveOrgUnitProvider`) — they remove 21 upward edges.
 - `support` split into the kernel (`RequestMemo`, `StringNormalization`, `OptimisticLock`,
@@ -631,6 +633,17 @@ Cheap moves that break many cycles without changing behaviour:
   the ArchUnit leaf rule's message stops sending shared logic there.
 - `audit.api` created (enum and recorder moved, names unchanged); event records moved into their
   publishers' `api.events` packages; the error model of §5.5.
+  `audit.api` is **done 2026-10-04** (P1-10): `AuditEventType`, `AuditDomain` and `AuditDetails`
+  moved unchanged; the recorder is the interface `audit.api.AuditRecorder` (`record`,
+  `recordedSince`), implemented by `AuditService`, which stays internal with the entity, repository,
+  viewer and purge. Moving the class itself would have carried its two `audit -> identity` edges
+  (actor handle) into the API; they leave with `ActorHandleResolver`. All 57 recording classes
+  outside the audit module inject `AuditRecorder`; the listener and controller audit rules key on
+  `AuditRecorder` as well, without which the move would have disarmed them. The module baseline
+  stays at 138 edges: the moved types were already assigned to `audit` by name, and audit's own
+  edges sit in `AuditService` and `AuditRetentionService`. No `@ApplicationModule` yet (P1-13):
+  Spring Modulith is test-scope only, so a `package-info` annotation needs `spring-modulith-api` as
+  a `compileOnly` dependency first.
 
 **Pros** many cycles gone before any domain moves; each step is small. **Cons** broad, shallow
 churn. **Risks** SpEL bean names and FQCN references (guards G-01, G-04 catch them). **Effort** M.

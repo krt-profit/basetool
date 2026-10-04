@@ -17,13 +17,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model;
+package de.greluc.krt.profit.basetool.backend.audit.api;
 
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Classifies an {@link AuditEvent} row (REQ-AUDIT-001). Each constant carries its {@link
+ * Classifies an {@code AuditEvent} row (REQ-AUDIT-001). Each constant carries its {@link
  * AuditDomain}, so the persisted domain and type always agree; the set is not mirrored by a
  * database CHECK constraint.
  */

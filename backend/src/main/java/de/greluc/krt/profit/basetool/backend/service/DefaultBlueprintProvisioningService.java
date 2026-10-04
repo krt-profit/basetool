@@ -19,9 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,7 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class DefaultBlueprintProvisioningService {
 
   private final PersonalBlueprintRepository personalBlueprintRepository;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Grants every default blueprint the given user does not yet own. Idempotent.
@@ -54,7 +55,7 @@ public class DefaultBlueprintProvisioningService {
   public int grantDefaultsToUser(@NotNull UUID ownerUserId) {
     int granted = personalBlueprintRepository.grantDefaultBlueprintsToUser(ownerUserId);
     if (granted > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.BLUEPRINT_DEFAULTS_GRANTED,
           null,
           null,
@@ -76,7 +77,7 @@ public class DefaultBlueprintProvisioningService {
   public int grantDefaultsToAllUsers() {
     int granted = personalBlueprintRepository.grantDefaultBlueprintsToAllUsers();
     if (granted > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.BLUEPRINT_DEFAULTS_GRANTED,
           null,
           null,

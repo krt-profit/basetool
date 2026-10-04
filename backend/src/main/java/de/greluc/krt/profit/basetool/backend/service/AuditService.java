@@ -19,16 +19,17 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDomain;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.mapper.AuditEventMapper;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.model.AuditDomain;
 import de.greluc.krt.profit.basetool.backend.model.AuditEvent;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AuditEventDto;
 import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.ClientAttribution;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
@@ -51,12 +52,13 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Each row snapshots the actor (via {@link AuthHelperService}) so it survives user deletion,
  * derives its {@link AuditDomain} from the event type, and records the originating client through
- * {@link ClientAttribution} (REQ-AUDIT-005).
+ * {@link ClientAttribution} (REQ-AUDIT-005). Other modules reach it only as the {@link
+ * AuditRecorder}.
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class AuditService {
+public class AuditService implements AuditRecorder {
 
   private final AuditEventRepository auditEventRepository;
   private final AuthHelperService authHelperService;
@@ -75,10 +77,10 @@ public class AuditService {
    * @param targetUserId the affected user for user-centric events, or {@code null}
    * @param details compact {@code key=value} payload without user free text, typically an {@link
    *     AuditDetails}; or {@code null}
-   * @return the persisted audit row
    */
+  @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public AuditEvent record(
+  public void record(
       @NotNull AuditEventType eventType,
       @Nullable UUID subjectId,
       @Nullable String subjectLabel,
@@ -101,11 +103,10 @@ public class AuditService {
             .clientId(
                 clientAttribution.labelOf(authHelperService.currentAuthentication().orElse(null)))
             .build();
-    AuditEvent saved = auditEventRepository.save(event);
+    auditEventRepository.save(event);
     meterRegistry
         .counter(MetricNames.AUDIT_EVENTS, MetricNames.TAG_DOMAIN, eventType.domain().name())
         .increment();
-    return saved;
   }
 
   /**
@@ -116,6 +117,7 @@ public class AuditService {
    * @param since the inclusive lower bound
    * @return {@code true} when such an event exists
    */
+  @Override
   @Transactional(readOnly = true)
   public boolean recordedSince(
       @NotNull AuditEventType eventType, @NotNull UUID subjectId, @NotNull Instant since) {
