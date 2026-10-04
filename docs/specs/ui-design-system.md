@@ -1577,7 +1577,8 @@ wide data view with the „UEX · vor n min" chip, dropdown filters that summari
 von 42"), „+ Filter" chips, the best sale/purchase rings, the spread and the legend; the material
 detail with category/flag chips, four figures and the terminal table sorted by sale price (segment
 „Verkauf · Einkauf"); the profit calculation with one input card, the Hull C chip and results ranked
-by max. profit with a two-line route (prices only — the calculation names no terminals).
+by max. profit with a two-line route „Kauf <Terminal> · <Preis>" / „Verkauf <Terminal> · <Preis>",
+the terminal's location (planet or star system, then city, station or outpost) as its tooltip.
 Auftragsdetail: page head with kind and status badges and the admin overflow „Auftrag löschen", the
 progress tile „Geliefert / benötigt" leading the KPI grid, tabs filtered per kind (Material: Bedarf
 · Übergaben · Bearbeiter · Verknüpft; Item: Items · Materialien · Hersteller · Übergaben ·
@@ -1606,6 +1607,12 @@ org-unit bank names its tab „Anträge an unsere Konten", „Laufende Anträge"
 request's approval path, the staff request queue filters by the status segment „Ausstehend ·
 Bestätigt · Abgelehnt · Alle" with „n warten auf dich", and the KRT approval thresholds are drawn as
 a tier bar (REQ-BANK-023, REQ-BANK-047).
+
+*Amended 2026-10-04: the profit calculation's route names its terminals.
+`GET /api/v1/materials/profit-calculation` answers each row with `buyTerminalName`,
+`buyTerminalLocation`, `sellTerminalName` and `sellTerminalLocation` — the terminals of the chosen
+lowest purchase and highest sale price, the first by name on a price tie, a location `null` when the
+terminal names no place.*
 
 **Enforced by:** `PagePatternFragmentsRenderTest` (the fragments' markup and ARIA) · Stylelint
 `media-feature-name-value-allowed-list` (breakpoints) · `TouchClassLayoutE2eTest` (touch floors) ·
