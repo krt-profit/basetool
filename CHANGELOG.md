@@ -178,10 +178,15 @@
 
 ### Changed
 
+- **Monitoring-Images aktualisiert.** Alloy v1.20.1, Tempo 3.1.0 (neue Blöcke im Format vParquet5) und
+  redis_exporter v1.93.0, jeweils per Digest gepinnt. Konfiguration und Dashboards bleiben unverändert;
+  Compose und Quadlet-Units sind nachgezogen.
+
 - **Aufräumen nach der Website-Überarbeitung (Phase 4).** `inline-migration.css` ist entfernt, die
   letzten `krtm-*`-Klassen sind Design-System-Bausteine oder Seitenregeln; Bank-Administration hat
   Seitenkopf und Hinweis-Boxen. Tote CSS-Regeln, Skripte und 205 Sprachschlüssel sind weg; das
   Bank-Kontodetail ist auf großen Bildschirmen so breit wie die übrigen Seiten (REQ-UI-027).
+  
 - **Kartellbank: „Bestätigen" nur, wo du bestätigen darfst.** Die Antragswarteschlange zeigt die
   Bestätigen-Aktion nur noch bei Anträgen, für die dir die passende Konto-Berechtigung zusteht; sonst
   steht dort „wartet auf berechtigte Bankmitarbeiter". Die Queue-API liefert dafür pro Antrag
@@ -189,6 +194,7 @@
 
 - **Blueprints: Fehlmenge wieder sichtbar.** Ist der Vorrat einer Zutat zu knapp, steht unter dem
   Vorrat wieder „fehlt n“ (REQ-INV-048).
+  
 - **Auftragsdetail: Reiter „Hersteller“.** Der Reiter, der zeigt, wer ein Item craften kann, hieß
   „Herstellung“ wie das Buchen der Herstellung im Reiter „Items“; er heißt jetzt „Hersteller“
   (REQ-ORDERS-026).
@@ -197,12 +203,15 @@
   `--no-configuration-cache` schaltet ihn für einen Lauf ab (BLD-PERF-04).
 - **CI: Cache-Janitor behält je Gradle-Job nur den neuesten Cache** und warnt, wenn der Actions-Cache
   nach dem Aufräumen über 8 GiB liegt (CI-01).
+  
 - **Tests: PostgreSQL-Testcontainer per Digest.** Die Backend-Tests starten genau das Produktions-Image
   (`TestImages.POSTGRES`, gegen Compose und Quadlet-Unit geprüft; TST-18).
 - **CI: Dependabot-Digest-Bumps von Redis und PostgreSQL ziehen `TestImages` mit.** Der Compose-Follow-up
   setzt die Digest-Konstanten auf den Compose-Pin, statt `TestImagesTest` rot zu lassen (REQ-OPS-035,
   ADR-0215).
+  
 - **Doku: Verlängerung der OWASP-Suppressions beschrieben** (CONTRIBUTING, SEC-16).
+  
 - **Modularisierung: die Entscheidungen sind festgehalten.** ADR-0231 bis ADR-0239 (Modulschnitt,
   Zusammenspiel der Module, Prüfwerkzeuge, harter API-Schnitt mit erzwungenem App-Update, Fehlermodell,
   Zugriffsregeln je Fachbereich, NullAway, `switch` ohne `default`, Browser-Baseline 2025), dazu
