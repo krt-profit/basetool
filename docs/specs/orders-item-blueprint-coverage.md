@@ -10,8 +10,9 @@ specific SC Wiki blueprint. To plan who can actually build the order, the proces
 squadron/SK needs to know **which of its members already own the blueprints** for the
 ordered items — and, per member, **which** of those blueprints they hold.
 
-This spec governs the **blueprint-coverage view** rendered in the item-order detail page,
-directly after the *Bearbeiter* (assignees) section. It bridges three existing concepts: the
+This spec governs the **blueprint-coverage view** rendered in the item-order detail page as its
+own tab *Herstellung* (between *Materialien* and *Übergaben*, `REQ-ORDERS-026`; until 2026-10-03 the
+tab was called *Blaupausen*). It bridges three existing concepts: the
 order's required item lines (`JobOrderItem.blueprint` → output name), the per-user blueprint
 ownership of the personal-inventory feature (`PersonalBlueprint`, keyed by the normalized
 `product_key`, see [`blueprint-import-name-matching.md`](blueprint-import-name-matching.md)),

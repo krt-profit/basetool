@@ -8,12 +8,11 @@
             <h2 class="card-title" th:text="#{profile.deletion.title}">Delete account</h2>
         </div>
 
-        <div class="hud-box krtm-border-color-var-color-warning-display-flex-1b12" role="alert"
+        <div class="alert alert-warning profile-deletion-warning" role="alert"
              th:if="${deletionRequestUnavailable}"
              data-testid="profile-deletion-unavailable">
-            <svg class="krt-icon krtm-flex-0-0-auto-margin-top-0-1rem-f087" aria-hidden="true">
-                <use href="#krt-icon-warning"/></svg>
-            <p class="krtm-margin-0-2a0c" th:text="#{profile.deletion.unavailable}">Your deletion
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg>
+            <p th:text="#{profile.deletion.unavailable}">Your deletion
                 request could not be loaded. Please try again later.</p>
         </div>
 
@@ -23,24 +22,22 @@
             <span th:text="#{profile.deletion.hint}">You can request that your account be deleted. An administrator decides the request.</span>
         </p>
 
-        <div class="hud-box krtm-border-color-var-color-warning-display-flex-1b12" role="status"
+        <div class="alert alert-warning profile-deletion-warning" role="status"
              th:if="${deletionRequest != null and deletionRequest.status == 'PENDING'}"
              data-testid="profile-deletion-pending">
-            <svg class="krt-icon krtm-flex-0-0-auto-margin-top-0-1rem-f087" aria-hidden="true">
-                <use href="#krt-icon-warning"/></svg>
-            <p class="krtm-margin-0-2a0c">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg>
+            <p>
                 <span th:text="#{profile.deletion.pending}">Your deletion request is awaiting a decision.</span>
                 <span th:if="${deletionRequest.eraseHistoryRequested}"
                       th:text="' ' + #{profile.deletion.pending.withHistory}"> You also asked for your entries in the logs and the booking history to be anonymised.</span>
             </p>
         </div>
 
-        <div class="hud-box krtm-border-color-var-color-warning-display-flex-1b12" role="status"
+        <div class="alert alert-warning profile-deletion-warning" role="status"
              th:if="${deletionRequest != null and deletionRequest.status == 'DECLINED'}"
              data-testid="profile-deletion-declined">
-            <svg class="krt-icon krtm-flex-0-0-auto-margin-top-0-1rem-f087" aria-hidden="true">
-                <use href="#krt-icon-info"/></svg>
-            <p class="krtm-margin-0-2a0c">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg>
+            <p>
                 <span th:text="#{profile.deletion.declined}">Your deletion request was declined.</span>
                 <br>
                 <span class="data-value" th:text="${deletionRequest.decisionNote}">Reason</span>
@@ -57,7 +54,7 @@
                 <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
                 <span th:text="#{profile.deletion.open}">Request deletion</span>
             </button>
-            <button type="button" class="btn btn-outline" id="profile-deletion-withdraw"
+            <button type="button" class="btn btn-ghost" id="profile-deletion-withdraw"
                     th:if="${deletionRequest != null and deletionRequest.status == 'PENDING'}"
                     data-testid="profile-deletion-withdraw">
                 <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"/></svg>

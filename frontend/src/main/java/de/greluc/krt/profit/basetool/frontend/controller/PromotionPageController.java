@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionCategoryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionEligibilityDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionLevelContentDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionRequirementCheckDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionTopicDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RankRequirementDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -137,7 +138,8 @@ public class PromotionPageController {
    * Renders the promotion-system overview for every signed-in user.
    *
    * <p>Passes the caller's current rank, or {@code null} when unknown, so the template can mark the
-   * caller's next rank step.
+   * caller's next rank step, and {@code rankSteps}, the requirements per rank step in career order
+   * (highest {@code fromRank} first).
    */
   @NotNull
   @GetMapping("/overview")
@@ -172,8 +174,15 @@ public class PromotionPageController {
     model.addAttribute("topics", topics);
     model.addAttribute("topicCategoryMap", topicCategoryMap);
     model.addAttribute("categoryContentMap", categoryContentMap);
+    List<List<RankRequirementDto>> rankSteps = new ArrayList<>(groupedRankRequirements.values());
+    rankSteps.sort(
+        java.util.Comparator.comparingInt(
+                (List<RankRequirementDto> step) -> step.getFirst().fromRank())
+            .reversed());
+
     model.addAttribute("rankRequirements", rankRequirements);
     model.addAttribute("groupedRankRequirements", groupedRankRequirements);
+    model.addAttribute("rankSteps", rankSteps);
     model.addAttribute("currentUserRank", fetchCurrentUserRank());
     return "promotion-overview";
   }
@@ -217,14 +226,77 @@ public class PromotionPageController {
     }
 
     List<PromotionEligibilityDto> eligibilities = fetchMyEligibility();
+    Integer currentUserRank = fetchCurrentUserRank();
+    PromotionEligibilityDto nextEligibility = findNextStep(eligibilities, currentUserRank);
+    List<PromotionEligibilityDto> eligibilitySteps = new ArrayList<>();
+    if (nextEligibility != null) {
+      eligibilitySteps.add(nextEligibility);
+    }
+    for (PromotionEligibilityDto eligibility : eligibilities) {
+      if (eligibility != nextEligibility) {
+        eligibilitySteps.add(eligibility);
+      }
+    }
 
     model.addAttribute("topics", topics);
     model.addAttribute("topicCategoryMap", topicCategoryMap);
     model.addAttribute("evaluationByCategoryId", evaluationByCategoryId);
     model.addAttribute("eligibilities", eligibilities);
+    model.addAttribute("eligibilitySteps", eligibilitySteps);
+    model.addAttribute("nextEligibility", nextEligibility);
+    model.addAttribute("nextProgressPercent", progressPercent(nextEligibility));
     model.addAttribute("requiredLevelByCategory", requiredLevelByCategory);
-    model.addAttribute("currentUserRank", fetchCurrentUserRank());
+    model.addAttribute("currentUserRank", currentUserRank);
     return "promotion-my-evaluations";
+  }
+
+  /**
+   * Finds the eligibility of the rank step the caller takes next, the one starting at their rank.
+   *
+   * @param eligibilities the caller's eligibility per configured rank step
+   * @param currentUserRank the caller's rank, or {@code null} when unknown
+   * @return the next step's eligibility, or {@code null} when the rank is unknown or no step starts
+   *     at it
+   */
+  @Nullable
+  static PromotionEligibilityDto findNextStep(
+      @NotNull List<PromotionEligibilityDto> eligibilities, @Nullable Integer currentUserRank) {
+    if (currentUserRank == null) {
+      return null;
+    }
+    for (PromotionEligibilityDto eligibility : eligibilities) {
+      if (eligibility != null && eligibility.fromRank() == currentUserRank) {
+        return eligibility;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Computes how far a rank step's requirements are met, counting each check at most up to its
+   * required count.
+   *
+   * @param eligibility the rank step, or {@code null}
+   * @return the share of the required counts achieved, 0 to 100; 100 for an eligible step without
+   *     checks, 0 for a missing step
+   */
+  static int progressPercent(@Nullable PromotionEligibilityDto eligibility) {
+    if (eligibility == null) {
+      return 0;
+    }
+    long required = 0;
+    long achieved = 0;
+    if (eligibility.checks() != null) {
+      for (PromotionRequirementCheckDto check : eligibility.checks()) {
+        int needed = Math.max(0, check.requiredCount());
+        required += needed;
+        achieved += Math.min(needed, Math.max(0, check.achievedCount()));
+      }
+    }
+    if (required == 0) {
+      return eligibility.eligible() ? 100 : 0;
+    }
+    return (int) (achieved * 100 / required);
   }
 
   /**
@@ -328,13 +400,24 @@ public class PromotionPageController {
     return "promotion-manage";
   }
 
-  /** Schritt 8: Admin-Bereich – Themenbereiche, Kategorien & Stufeninhalte verwalten. */
+  /**
+   * Renders the topic editor: topics as the master list, the selected topic's categories and level
+   * contents as the detail pane.
+   *
+   * @param promotionFeatureEnabled per-squadron feature flag; {@code false} answers 403
+   * @param fragment {@code "topicsResults"} renders only the master-detail fragment
+   * @param selectedTopic the {@code topic} parameter, id of the topic to select; an unknown or
+   *     missing id selects the first topic
+   * @param model model populated with the topics, their categories and level contents
+   * @return the view name, or its fragment selector
+   */
   @NotNull
   @GetMapping("/admin/topics")
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public String adminTopics(
       @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled,
       @RequestParam(required = false) String fragment,
+      @RequestParam(name = "topic", required = false) @Nullable String selectedTopic,
       Model model) {
     requirePromotionFeature(promotionFeatureEnabled);
     List<PromotionTopicDto> topics = fetchTopics();
@@ -351,6 +434,7 @@ public class PromotionPageController {
     model.addAttribute("topics", topics);
     model.addAttribute("topicCategoryMap", topicCategoryMap);
     model.addAttribute("categoryContentMap", categoryContentMap);
+    model.addAttribute("selectedTopicId", selectTopicId(topics, selectedTopic));
     if ("topicsResults".equals(fragment)) {
       return "promotion-admin-topics :: topicsResults";
     }
@@ -393,8 +477,22 @@ public class PromotionPageController {
       categoriesByTopic.put(topic.id().toString(), fetchCategoriesByTopic(topic.id().toString()));
     }
 
+    Map<String, List<RankRequirementDto>> requirementsByCell = new LinkedHashMap<>();
+    Map<String, String> highestLevelByCell = new LinkedHashMap<>();
+    for (RankRequirementDto req : requirements) {
+      String cell = matrixCellKey(req);
+      requirementsByCell.computeIfAbsent(cell, k -> new ArrayList<>()).add(req);
+      String existing = highestLevelByCell.get(cell);
+      if (req.minimumLevel() != null
+          && (existing == null || compareLevels(req.minimumLevel(), existing) > 0)) {
+        highestLevelByCell.put(cell, req.minimumLevel());
+      }
+    }
+
     model.addAttribute("requirements", requirements);
     model.addAttribute("groupedRequirements", groupedRequirements);
+    model.addAttribute("requirementsByCell", requirementsByCell);
+    model.addAttribute("highestLevelByCell", highestLevelByCell);
     model.addAttribute("topics", topics);
     model.addAttribute("categories", fetchAllCategories());
     model.addAttribute("categoriesByTopic", categoriesByTopic);
@@ -402,6 +500,46 @@ public class PromotionPageController {
       return "promotion-admin-rank-requirements :: ranksResults";
     }
     return "promotion-admin-rank-requirements";
+  }
+
+  /**
+   * Builds the key of a requirement's cell in the rank-step × topic matrix.
+   *
+   * @param req the requirement
+   * @return {@code "<from>_<to>_<topicId>"}, or {@code "<from>_<to>_global"} for a rule without a
+   *     topic
+   */
+  @NotNull
+  static String matrixCellKey(@NotNull RankRequirementDto req) {
+    return req.fromRank()
+        + "_"
+        + req.toRank()
+        + "_"
+        + (req.topicId() != null ? req.topicId().toString() : "global");
+  }
+
+  /**
+   * Resolves the topic the editor shows: the requested one when it is in the list, otherwise the
+   * first topic.
+   *
+   * @param topics the topics in display order
+   * @param requested the requested topic id, as the browser sent it
+   * @return the selected topic's id, or {@code null} when there are no topics
+   */
+  @Nullable
+  static String selectTopicId(@NotNull List<PromotionTopicDto> topics, @Nullable String requested) {
+    if (topics.isEmpty()) {
+      return null;
+    }
+    if (requested != null) {
+      for (PromotionTopicDto topic : topics) {
+        if (topic.id() != null && topic.id().toString().equals(requested)) {
+          return requested;
+        }
+      }
+    }
+    PromotionTopicDto first = topics.getFirst();
+    return first.id() != null ? first.id().toString() : null;
   }
 
   private List<PromotionTopicDto> fetchTopics() {

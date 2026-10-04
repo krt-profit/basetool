@@ -3,6 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{refineryorder.detail.title} + ' - ' + ${appTitle}">Raffinerieauftrag Details - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/refinery-order-form.css}">
         <link rel="stylesheet" th:href="@{/css/pages/refinery-orders-details.css}">
         <script th:src="@{/js/refinery-yield-badge.js}" defer th:attr="nonce=${cspNonce}"></script>
     </th:block>
@@ -12,23 +13,186 @@
 
 <th:block th:replace="~{fragments/header :: header}" />
 
-<main>
-    <div class="greeting hud-box flex-between">
-        <h1 th:text="#{refineryorder.detail.title}">Raffinerieauftrag Details</h1>
+<main class="refinery-order">
+    <div class="page-head" data-testid="page-head"
+         th:with="headState=${orderState != null ? orderState.name() : null},
+                  headStateKeys=${ {'RUNNING': 'refinery.status.running', 'READY': 'refinery.status.ready', 'COMPLETED': 'refinery.status.stored', 'CANCELED': 'refineryorder.status.CANCELED'} },
+                  headStateClasses=${ {'RUNNING': 'status-planned', 'READY': 'status-active', 'COMPLETED': 'status-completed', 'CANCELED': 'status-canceled'} }">
+        <div class="page-head__main">
+            <a class="page-eyebrow" th:href="@{/refinery-orders}" data-testid="page-eyebrow"
+              ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"/></svg
+              ><span th:text="#{refineryorder.index.title}">Raffinerie</span></a>
+            <div class="page-title">
+                <h1 th:text="#{refineryorder.detail.heading(${#strings.substring(orderId.toString(), 32)})}">Auftrag #1042</h1>
+                <span th:if="${headState != null}" id="rod-status-badge" class="status-badge" data-testid="refinery-status-badge"
+                      th:classappend="${headStateClasses.get(headState)}"
+                      th:text="#{${headStateKeys.get(headState)}}">Abholbereit</span>
+            </div>
+        </div>
     </div>
 
-    <div class="hud-box mt-2">
-        <div th:if="${errorToast}" class="hud-box hud-box-error">
-            <p th:text="#{__${errorToast}__}">Fehler</p>
-        </div>
+    <div th:if="${errorToast}" class="alert alert-danger" role="alert" th:text="#{__${errorToast}__}">Fehler</div>
 
-        <div class="form-container" id="refinery-order-results">
-        <th:block th:fragment="refineryOrderSection">
-            <form id="refineryOrderMainForm" th:action="@{/refinery-orders/{id}(id=${orderId})}" method="post" th:object="${refineryOrderForm}">
-                <input type="hidden" th:field="*{version}" />
-                
-                <div class="material-row mt-1-5">
-                    <div class="form-group flex-2 mb-0">
+    <div id="refinery-order-results">
+    <th:block th:fragment="refineryOrderSection">
+    <div class="rod-layout"
+         th:with="stateName=${orderState != null ? orderState.name() : null},
+                  stateKeys=${ {'RUNNING': 'refinery.status.running', 'READY': 'refinery.status.ready', 'COMPLETED': 'refinery.status.stored', 'CANCELED': 'refineryorder.status.CANCELED'} },
+                  stateClasses=${ {'RUNNING': 'status-planned', 'READY': 'status-active', 'COMPLETED': 'status-completed', 'CANCELED': 'status-canceled'} },
+                  openRun=${stateName == 'RUNNING' or stateName == 'READY'},
+                  sales=${refineryOrderForm.oreSales ?: 0},
+                  costs=${(refineryOrderForm.expenses ?: 0) + (refineryOrderForm.otherExpenses ?: 0)}"
+         th:attr="data-rod-state=${stateName},data-rod-state-class=${stateName != null ? stateClasses.get(stateName) : null},data-rod-state-label=${stateName != null ? #messages.msg(stateKeys.get(stateName)) : null}">
+        <form id="refineryOrderMainForm" class="form-layout card rod-form" th:action="@{/refinery-orders/{id}(id=${orderId})}" method="post" th:object="${refineryOrderForm}">
+            <input type="hidden" th:field="*{version}" />
+
+            <fieldset class="form-section">
+                <legend class="form-section__head" th:text="|1 · #{refineryorder.form.location}|">1 · Raffinerie</legend>
+                <div class="form-grid form-grid--3">
+                    <div class="form-group">
+                        <label for="locationId" th:text="#{refineryorder.form.location}">Raffinerie</label>
+                        <select id="locationId" th:field="*{locationId}" required th:disabled="${!canEdit}" data-trigger="rod-location-change">
+                            <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
+                            <option th:each="loc : ${locations}" th:value="${loc.id}" th:text="${loc.name}"></option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="refiningMethodId" th:text="#{refineryorder.form.method}">Raffiniermethode</label>
+                        <select id="refiningMethodId" th:field="*{refiningMethodId}" data-trigger="rod-update-method" th:disabled="${!canEdit}">
+                            <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
+                            <option th:each="method : ${methods}" th:value="${method.id}" th:text="${method.name}"
+                                th:attr="data-yield=${method.ratingYield},data-cost=${method.ratingCost},data-speed=${method.ratingSpeed}"></option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="missionId" th:text="#{refineryorder.form.mission}">Einsatz (Optional)</label>
+                        <select id="missionId" th:field="*{missionId}" th:disabled="${!canEdit}">
+                            <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
+                            <option th:each="mis : ${missions}" th:value="${mis.id}"
+                                    th:text="${mis.plannedStartTime != null} ? |${mis.name} - ${#temporals.format(mis.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mis.name}"></option>
+                        </select>
+                    </div>
+                </div>
+                <div id="methodRatings" class="rod-ratings" hidden>
+                    <span class="stat-label"><span th:text="#{refineryorder.rating.yield}">Ertrag</span> <span id="ratingYieldVal" class="stat-value">-</span></span>
+                    <span class="stat-label"><span th:text="#{refineryorder.rating.cost}">Kosten</span> <span id="ratingCostVal" class="stat-value">-</span></span>
+                    <span class="stat-label"><span th:text="#{refineryorder.rating.speed}">Dauer</span> <span id="ratingSpeedVal" class="stat-value">-</span></span>
+                </div>
+            </fieldset>
+
+            <fieldset class="form-section">
+                <legend class="form-section__head" th:text="|2 · #{refineryorder.form.section.time}|">2 · Zeit</legend>
+                <div class="form-grid form-grid--3">
+                    <div class="form-group datetime-split-group" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}">
+                        <label for="startedAtDate" th:text="#{refineryorder.form.startedAt}">Startdatum</label>
+                        <div class="rod-start">
+                            <input type="hidden" id="startedAt" th:field="*{startedAt}">
+                            <div class="datetime-split-inputs">
+                                <input type="date" id="startedAtDate" class="date-part" th:aria-label="#{a11y.datetime.date}" th:readonly="${!canEdit}">
+                                <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" th:readonly="${!canEdit}">
+                            </div>
+                            <button th:if="${canEdit}" type="button" class="btn btn-ghost btn-xs" data-trigger="rod-set-started-now" th:text="#{refineryorder.form.now}">Jetzt</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="durationHours" th:text="#{refineryorder.form.duration}">Dauer</label>
+                        <div class="rod-duration">
+                            <input type="number" id="durationHours" th:field="*{durationHours}" min="0" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.hours}" th:aria-label="#{refineryorder.form.duration.hours}" th:readonly="${!canEdit}">
+                            <span class="rod-unit" aria-hidden="true" th:text="#{refineryorder.form.duration.hours}">h</span>
+                            <input type="number" id="durationMinutes" th:field="*{durationMinutes}" min="0" max="59" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.minutes}" th:aria-label="#{refineryorder.form.duration.minutes}" th:readonly="${!canEdit}">
+                            <span class="rod-unit" aria-hidden="true" th:text="#{refineryorder.form.duration.minutes}">min</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <span class="form-label"><span th:text="#{refineryorder.form.endsAt}">Fertig am</span> <span class="opt" th:text="|· #{form.computed}|">· berechnet</span></span>
+                        <div id="endsAtDisplay" class="field-computed"><span>-</span></div>
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="form-section">
+                <legend class="form-section__head" th:text="|3 · #{refineryorder.form.materials.title}|">3 · Materialien</legend>
+                <div class="rod-good rod-good--head" aria-hidden="true">
+                    <span th:text="#{refineryorder.goods.input}">Eingang (Erz)</span>
+                    <span th:text="#{refineryorder.form.material.quality}">Qualität</span>
+                    <span class="num" th:text="#{refineryorder.goods.units}">Units</span>
+                    <span></span>
+                    <span th:text="#{refineryorder.goods.output}">Ausgang</span>
+                    <span class="num" th:text="#{refineryorder.goods.units}">Units</span>
+                    <span class="num" th:text="#{material.quantity.scu}">SCU</span>
+                    <span></span>
+                </div>
+                <div id="materials-container" class="rod-goods">
+                    <div th:each="good, stat : *{goods}" class="material-entry rod-good">
+                        <div class="form-group rod-good__in">
+                            <label class="rod-good__label" th:for="'inputMaterialId_' + ${stat.index}"><span class="rod-good__label-text" th:text="#{refineryorder.form.material.input}">Eingangsmaterial</span></label>
+                            <select th:id="'inputMaterialId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputMaterialId}" required data-trigger="rod-update-output" data-krt-combobox="remote-materials-raw" th:disabled="${!canEdit}">
+                                <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
+                                <option th:each="mat : ${materials}" th:if="${mat.id == good.inputMaterialId}" th:value="${mat.id}" th:text="${mat.name}" th:attr="data-refined-id=${mat.refinedMaterial != null ? mat.refinedMaterial.id : ''},data-refined-name=${mat.refinedMaterial != null ? mat.refinedMaterial.name : ''}"></option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="rod-good__label" th:for="'quality_' + ${stat.index}"><span class="rod-good__label-text" th:text="#{refineryorder.form.material.quality}">Qualität</span></label>
+                            <input type="number" th:id="'quality_' + ${stat.index}" th:field="*{goods[__${stat.index}__].quality}" min="0" max="1000" th:readonly="${!canEdit}">
+                        </div>
+                        <div class="form-group">
+                            <label class="rod-good__label" th:for="'inputQuantity_' + ${stat.index}"><span class="rod-good__label-text" th:text="#{refineryorder.form.material.inputQty}">Eingangsmenge (Units)</span></label>
+                            <input type="text" inputmode="numeric" class="rod-num" th:id="'inputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputQuantity}" required th:readonly="${!canEdit}">
+                        </div>
+                        <span class="rod-good__arrow" aria-hidden="true"><svg class="krt-icon"><use href="#krt-icon-arrow-right"/></svg></span>
+                        <div class="form-group rod-good__out">
+                            <span class="rod-good__label"><span class="rod-good__label-text" th:text="#{refineryorder.form.material.output}">Ausgangsmaterial</span></span>
+                            <div class="field-computed output-material-display"><span th:id="'outputMaterialDisplay_' + ${stat.index}">-</span></div>
+                        </div>
+                        <div class="form-group">
+                            <label class="rod-good__label" th:for="'outputQuantity_' + ${stat.index}">
+                                <span class="rod-good__label-text" th:text="#{refineryorder.form.material.outputQty}">Ausgangsmenge (Units)</span>
+                                <span class="yield-bonus-badge"
+                                      th:id="'yieldBonus_' + ${stat.index}"
+                                      th:with="bonus=${(order != null and order.goods != null and stat.index &lt; #lists.size(order.goods)) ? order.goods[__${stat.index}__].yieldBonusPercent : null}"
+                                      th:if="${bonus != null}"
+                                      th:classappend="${bonus > 0} ? ' yield-positive' : (${bonus &lt; 0} ? ' yield-negative' : ' yield-zero')"
+                                      th:title="#{refineryorder.form.material.yieldBonus.help}"
+                                      th:text="${(bonus > 0 ? '+' : '') + bonus + '%'}">+5%</span>
+                            </label>
+                            <input type="text" inputmode="numeric" class="rod-num" th:id="'outputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].outputQuantity}" th:data-index="${stat.index}" data-trigger="rod-calc-scu" required th:readonly="${!canEdit}">
+                        </div>
+                        <div class="form-group">
+                            <label class="rod-good__label" th:for="'outputQuantityScu_' + ${stat.index}"><span class="rod-good__label-text" th:text="#{refineryorder.form.material.outputQtyScu}">Ausgangsmenge (SCU)</span></label>
+                            <input type="text" class="rod-num rod-good__scu" th:id="'outputQuantityScu_' + ${stat.index}" readonly tabindex="-1">
+                        </div>
+                        <div class="rod-good__actions">
+                            <button th:if="${canEdit and stat.index > 0}" type="button" class="btn btn-ghost btn-icon remove-btn" data-trigger="rod-remove-material" th:title="#{refineryorder.form.material.remove}" th:aria-label="#{refineryorder.form.material.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                        </div>
+                    </div>
+                </div>
+                <button th:if="${canEdit}" type="button" class="btn btn-ghost rod-add" data-trigger="rod-add-material"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{refineryorder.form.material.add}">Material hinzufügen</span></button>
+            </fieldset>
+
+            <fieldset class="form-section">
+                <legend class="form-section__head" th:text="|4 · #{refineryorder.form.section.finance}|">4 · Finanzen</legend>
+                <div class="form-grid form-grid--3">
+                    <div class="form-group">
+                        <label for="expenses" th:text="#{refineryorder.form.expenses}">Auftragskosten</label>
+                        <input type="number" id="expenses" class="rod-num" th:field="*{expenses}" min="0" th:readonly="${!canEdit}" data-trigger="rod-update-profit">
+                    </div>
+                    <div class="form-group">
+                        <label for="otherExpenses" th:text="#{refineryorder.form.otherExpenses}">Sonstige Kosten</label>
+                        <input type="number" id="otherExpenses" class="rod-num" th:field="*{otherExpenses}" min="0" step="1"
+                               th:title="#{refineryorder.form.otherExpenses.help}"
+                               th:readonly="${!canEdit}" data-trigger="rod-update-profit">
+                    </div>
+                    <div class="form-group">
+                        <label for="oreSales" th:text="#{refineryorder.form.oreSales}">Ore Sales</label>
+                        <input type="number" id="oreSales" class="rod-num" th:field="*{oreSales}" min="0" step="1" th:readonly="${!canEdit}" data-trigger="rod-update-profit">
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="form-section">
+                <legend class="form-section__head" th:text="|5 · #{refineryorder.form.section.ownerStatus}|">5 · Besitzer &amp; Status</legend>
+                <div class="form-grid">
+                    <div class="form-group">
                         <label for="ownerId" th:text="#{refineryorder.form.owner}">Besitzer</label>
                         <select id="ownerId" th:field="*{ownerId}" required th:disabled="${!isLogistician}"
                                 th:attr="data-krt-combobox=${isLogistician ? 'remote-users' : null}">
@@ -37,84 +201,9 @@
                         </select>
                         <input type="hidden" th:field="*{ownerId}" th:if="${!isLogistician}" />
                     </div>
-
-                    <div class="form-group flex-1 mb-0">
-                        <label for="expenses" th:text="#{refineryorder.form.expenses}">Auftragskosten (aUEC)</label>
-                        <input type="number" id="expenses" th:field="*{expenses}" min="0" th:readonly="${!canEdit}" data-trigger="rod-update-profit">
-                    </div>
-
-                    <div class="form-group flex-1 mb-0">
-                        <label for="otherExpenses" th:text="#{refineryorder.form.otherExpenses}">Sonstige Kosten (aUEC)</label>
-                        <input type="number" id="otherExpenses" th:field="*{otherExpenses}" min="0" step="1"
-                               th:title="#{refineryorder.form.otherExpenses.help}"
-                               th:readonly="${!canEdit}" data-trigger="rod-update-profit">
-                    </div>
-
-                    <div class="form-group flex-1 mb-0">
-                        <label for="oreSales" th:text="#{refineryorder.form.oreSales}">Ore Sales (aUEC)</label>
-                        <input type="number" id="oreSales" th:field="*{oreSales}" min="0" step="1" th:readonly="${!canEdit}" data-trigger="rod-update-profit">
-                    </div>
-
-                    <div class="form-group flex-1 mb-0">
-                        <label for="profitPreview" th:text="#{refineryorder.form.profit}">Gewinn/Verlust (aUEC)</label>
-                        <input type="text" id="profitPreview" readonly tabindex="-1"
-                               th:title="#{refineryorder.form.profit.help}"
-                               class="krtm-background-color-var-color-gray-4-color-var-deb9">
-                    </div>
-                </div>
-
-                <div class="material-row mt-1-5">
-                    <div class="form-group datetime-split-group flex-1 mb-0" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}">
-                        <label for="startedAtLocal" th:text="#{refineryorder.form.startedAt}">Startdatum</label>
-                        <div class="flex-gap-xs">
-                            <input type="hidden" id="startedAt" th:field="*{startedAt}">
-                            <div class="datetime-split-inputs flex-1">
-                                <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" th:readonly="${!canEdit}">
-                                <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" th:readonly="${!canEdit}">
-                            </div>
-                            <button th:if="${canEdit}" type="button" class="btn btn-ghost krtm-padding-0-5rem-1rem-c865" data-trigger="rod-set-started-now" th:text="#{refineryorder.form.now}">Jetzt</button>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group flex-1 mb-0">
-                        <label th:text="#{refineryorder.form.duration}">Dauer</label>
-                        <div class="flex-gap-sm">
-                            <input type="number" id="durationHours" th:field="*{durationHours}" min="0" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.hours}" class="flex-1" th:readonly="${!canEdit}">
-                            <span class="text-muted">h</span>
-                            <input type="number" id="durationMinutes" th:field="*{durationMinutes}" min="0" max="59" step="1" inputmode="numeric" th:placeholder="#{refineryorder.form.duration.minutes}" class="flex-1" th:readonly="${!canEdit}">
-                            <span class="text-muted">m</span>
-                        </div>
-                    </div>
-
-                    <div class="form-group flex-1 mb-0">
-                        <label th:text="#{refineryorder.form.endsAt}">Fertig am</label>
-                        <div id="endsAtDisplay" class="krtm-padding-0-75rem-background-color-var-color-g-3181">
-                            <span>-</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="material-row mt-1-5">
-                    <div class="form-group flex-2 mb-0">
-                        <label for="locationId" th:text="#{refineryorder.form.location}">Raffinerie</label>
-                        <select id="locationId" th:field="*{locationId}" required th:disabled="${!canEdit}" data-trigger="rod-location-change">
-                            <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                            <option th:each="loc : ${locations}" th:value="${loc.id}" th:text="${loc.name}"></option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group flex-2 mb-0">
-                        <label for="missionId" th:text="#{refineryorder.form.mission}">Einsatz (Optional)</label>
-                        <select id="missionId" th:field="*{missionId}" th:disabled="${!canEdit}">
-                            <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                            <option th:each="mis : ${missions}" th:value="${mis.id}"
-                                    th:text="${mis.plannedStartTime != null} ? |${mis.name} - ${#temporals.format(mis.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mis.name}"></option>
-                        </select>
-                    </div>
-
-                    <div class="form-group flex-2 mb-0">
+                    <div class="form-group">
                         <label for="status" th:text="#{refineryorder.form.status}">Status</label>
-                        <select id="status" th:field="*{status}">
+                        <select id="status" th:field="*{status}" th:disabled="${!canEdit}">
                             <option value="OPEN" th:text="#{refineryorder.status.OPEN}">Offen</option>
                             <option value="IN_PROGRESS" th:text="#{refineryorder.status.IN_PROGRESS}">In Bearbeitung</option>
                             <option value="COMPLETED" th:text="#{refineryorder.status.COMPLETED}">Abgeschlossen</option>
@@ -122,134 +211,106 @@
                         </select>
                     </div>
                 </div>
+            </fieldset>
 
-                <div class="material-row mt-1-5">
-                    <div class="form-group flex-2 mb-0">
-                        <label for="refiningMethodId" th:text="#{refineryorder.form.method}">Raffiniermethode</label>
-                        <select id="refiningMethodId" th:field="*{refiningMethodId}" data-trigger="rod-update-method" th:disabled="${!canEdit}">
-                            <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                            <option th:each="method : ${methods}" th:value="${method.id}" th:text="${method.name}" 
-                                th:attr="data-yield=${method.ratingYield},data-cost=${method.ratingCost},data-speed=${method.ratingSpeed}"></option>
-                        </select>
-                    </div>
-                    <div id="methodRatings" class="krtm-flex-3-display-none-align-items-center-gap-1-5b34">
-                        <div class="stat-label">
-                            <span th:text="#{refineryorder.rating.yield}">Ertrag</span>
-                            <span id="ratingYieldVal" class="stat-value">-</span>
-                        </div>
-                        <div class="stat-label">
-                            <span th:text="#{refineryorder.rating.cost}">Kosten</span>
-                            <span id="ratingCostVal" class="stat-value">-</span>
-                        </div>
-                        <div class="stat-label">
-                            <span th:text="#{refineryorder.rating.speed}">Dauer</span>
-                            <span id="ratingSpeedVal" class="stat-value">-</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="krtm-margin-top-2rem-margin-bottom-1rem-72de">
-                    <h3 class="krtm-color-var-color-gray-1-font-family-var-font-1f0d" th:text="#{refineryorder.form.materials.title}">Materialien</h3>
-                </div>
-
-                <div id="materials-container">
-                    <div th:each="good, stat : *{goods}" class="material-entry krtm-border-1px-solid-var-color-gray-3-padding-1r-ae8b">
-                        <div class="material-entry-header">
-                            <span class="material-entry-title" th:text="#{refineryorder.form.material.entryTitle} + ' #' + ${stat.index + 1}">Material #1</span>
-                            <button th:if="${canEdit and stat.index > 0}" type="button" class="btn btn-quiet-danger remove-btn btn-icon krtm-padding-0-25rem-0-5rem-font-size-0-8rem-ba3b" data-trigger="rod-remove-material" th:title="#{refineryorder.form.material.remove}" th:aria-label="#{refineryorder.form.material.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                        </div>
-
-                        <div class="material-row">
-                            <div class="form-group flex-2 mb-0">
-                                <label th:for="'inputMaterialId_' + ${stat.index}" th:text="#{refineryorder.form.material.input}">Eingangsmaterial</label>
-                                <select th:id="'inputMaterialId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputMaterialId}" required data-trigger="rod-update-output" data-krt-combobox="remote-materials-raw" th:disabled="${!canEdit}">
-                                    <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                                    <option th:each="mat : ${materials}" th:if="${mat.id == good.inputMaterialId}" th:value="${mat.id}" th:text="${mat.name}" th:attr="data-refined-id=${mat.refinedMaterial != null ? mat.refinedMaterial.id : ''},data-refined-name=${mat.refinedMaterial != null ? mat.refinedMaterial.name : ''}"></option>
-                                </select>
-                            </div>
-
-                            <div class="form-group flex-1 mb-0">
-                                <label th:for="'quality_' + ${stat.index}" th:text="#{refineryorder.form.material.quality}">Qualität</label>
-                                <input type="number" th:id="'quality_' + ${stat.index}" th:field="*{goods[__${stat.index}__].quality}" min="0" max="1000" th:readonly="${!canEdit}">
-                            </div>
-
-                            <div class="form-group flex-1 mb-0">
-                                <label th:for="'inputQuantity_' + ${stat.index}" th:text="#{refineryorder.form.material.inputQty}">Eingangsmenge</label>
-                                <input type="text" inputmode="numeric" th:id="'inputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputQuantity}" required th:readonly="${!canEdit}">
-                            </div>
-                        </div>
-
-                        <div class="material-row mt-1-5">
-                            <div class="form-group flex-2 mb-0">
-                                <label th:text="#{refineryorder.form.material.output}">Ausgangsmaterial</label>
-                                <div class="output-material-display krtm-padding-0-75rem-background-color-var-color-b-8925">
-                                    <span th:id="'outputMaterialDisplay_' + ${stat.index}" class="krtm-opacity-0-7-ffc8">-</span>
-                                </div>
-                            </div>
-
-                            <div class="form-group flex-1 mb-0">
-                                <label th:for="'outputQuantity_' + ${stat.index}">
-                                    <span th:text="#{refineryorder.form.material.outputQty}">Erwartete Ausgangsmenge (Units)</span>
-                                    <span class="yield-bonus-badge"
-                                          th:id="'yieldBonus_' + ${stat.index}"
-                                          th:with="bonus=${(order != null and order.goods != null and stat.index &lt; #lists.size(order.goods)) ? order.goods[__${stat.index}__].yieldBonusPercent : null}"
-                                          th:if="${bonus != null}"
-                                          th:classappend="${bonus > 0} ? ' yield-positive' : (${bonus &lt; 0} ? ' yield-negative' : ' yield-zero')"
-                                          th:title="#{refineryorder.form.material.yieldBonus.help}"
-                                          th:text="${(bonus > 0 ? '+' : '') + bonus + '%'}">+5%</span>
-                                </label>
-                                <input type="text" inputmode="numeric" th:id="'outputQuantity_' + ${stat.index}" th:field="*{goods[__${stat.index}__].outputQuantity}" th:data-index="${stat.index}" data-trigger="rod-calc-scu" required th:readonly="${!canEdit}">
-                            </div>
-
-                            <div class="form-group flex-1 mb-0">
-                                <label th:for="'outputQuantityScu_' + ${stat.index}" th:text="#{refineryorder.form.material.outputQtyScu}">Erwartete Ausgangsmenge (SCU)</label>
-                                <input type="text" th:id="'outputQuantityScu_' + ${stat.index}" readonly class="krtm-background-color-var-color-gray-4-cursor-not-108c">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <button th:if="${canEdit}" type="button" class="btn-add-row" data-trigger="rod-add-material" th:text="#{refineryorder.form.material.add}">Material hinzufügen</button>
-
-            </form>
-
-            <div class="mt-2-flex-gap krtm-align-items-center-6a4e">
-                <th:block th:if="${canEdit}">
-                    <button type="submit" form="refineryOrderMainForm" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.create.save}">Speichern</span></button>
-                </th:block>
-                <th:block th:if="${canEdit and (refineryOrderForm.status.name() == 'OPEN' or refineryOrderForm.status.name() == 'IN_PROGRESS')}">
-                    <button type="button" class="btn btn-outline" data-trigger="rod-open-store" th:text="#{refineryorder.action.store}">Einlagern</button>
-                    <form id="refineryCancelForm" th:action="@{/refinery-orders/{id}/delete(id=${orderId})}" method="post" class="m-0">
-                        <th:block th:replace="~{fragments/components :: button(label=#{refineryorder.action.cancel}, variant='danger', type='submit', extraClass=null)}"></th:block>
-                    </form>
-                </th:block>
-                <a th:href="@{/refinery-orders}" class="btn btn-ghost krtm-text-align-center-display-flex-align-items-c-a651" th:text="#{profile.back}">Zurück</a>
+            <div th:if="${canEdit}" class="form-actions--sticky">
+                <span class="form-actions__summary" id="rod-unsaved" data-testid="refinery-unsaved" hidden
+                      th:text="#{refineryorder.form.unsaved}">Ungespeicherte Änderungen</span>
+                <button type="button" class="btn btn-ghost" data-trigger="rod-discard" data-testid="refinery-discard"
+                        th:text="#{refineryorder.form.discard}">Verwerfen</button>
+                <button type="submit" form="refineryOrderMainForm" class="btn btn-outline" data-testid="refinery-save"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.create.save}">Speichern</span></button>
             </div>
-        </th:block>
-        </div>
+        </form>
+
+        <aside class="rod-side">
+            <div class="card card--accent rod-status" data-testid="refinery-status-card">
+                <div class="rod-status__head">
+                    <ol class="ablauf rod-steps">
+                        <li class="step" th:classappend="${stateName == 'RUNNING'} ? 'step--now' : (${stateName == 'READY' or stateName == 'COMPLETED'} ? 'step--done')">
+                            <span class="step-num" aria-hidden="true"></span>
+                            <span class="step-body">
+                                <span class="step-title" th:text="#{refinery.status.running}">Läuft</span>
+                                <span class="step-meta" th:if="${order != null and order.startedAt != null}"
+                                      th:text="#{refineryorder.step.start(${#temporals.format(@relativeDays.local(order.startedAt), 'dd.MM. HH:mm')})}">Start 02.10. 18:40</span>
+                            </span>
+                        </li>
+                        <li class="step" th:classappend="${stateName == 'READY'} ? 'step--now' : (${stateName == 'COMPLETED'} ? 'step--done')">
+                            <span class="step-num" aria-hidden="true"></span>
+                            <span class="step-body">
+                                <span class="step-title" th:text="#{refinery.status.ready}">Abholbereit</span>
+                                <span class="step-meta" th:if="${stateName == 'READY' and orderReadySince != null}"
+                                      th:text="#{refinery.readyFor(${orderReadySince})}">abholbereit seit 1 h</span>
+                                <span class="step-meta" th:if="${stateName != 'READY' and orderEndsAt != null}"
+                                      th:text="#{refineryorder.step.end(${#temporals.format(@relativeDays.local(orderEndsAt), 'dd.MM. HH:mm')})}">Fertig 03.10. 09:00</span>
+                            </span>
+                        </li>
+                        <li class="step" th:classappend="${stateName == 'COMPLETED'} ? 'step--done'">
+                            <span class="step-num" aria-hidden="true"></span>
+                            <span class="step-body">
+                                <span class="step-title" th:text="#{refinery.status.stored}">Eingelagert</span>
+                            </span>
+                        </li>
+                    </ol>
+                    <th:block th:if="${canEdit and openRun}">
+                        <th:block th:replace="~{fragments/components :: overflowMenu(id='rod-actions-menu', items=~{::rod-menu-items})}">
+                            <th:block th:ref="rod-menu-items">
+                                <form id="refineryCancelForm" th:action="@{/refinery-orders/{id}/delete(id=${orderId})}" method="post" class="rod-cancel-form">
+                                    <button type="submit" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
+                                            data-testid="refinery-cancel" th:text="#{refineryorder.action.cancel}">Auftrag Abbrechen</button>
+                                </form>
+                            </th:block>
+                        </th:block>
+                    </th:block>
+                </div>
+
+                <div class="rod-profit">
+                    <span class="kpi-label" th:text="#{refineryorder.profit.label}">Gewinn / Verlust</span>
+                    <p class="rod-profit__value">
+                        <span id="profitPreview" th:title="#{refineryorder.form.profit.help}"
+                              th:classappend="${sales - costs &lt; 0} ? 'rod-profit--neg' : 'rod-profit--pos'"
+                              th:text="${#numbers.formatInteger(sales - costs, 1, 'DEFAULT')}">486.300</span>
+                        <span class="rod-profit__unit" th:text="#{inventory.herkunft.auec}">aUEC</span>
+                    </p>
+                    <p id="profitBreakdown" class="rod-profit__calc" th:attr="data-template=#{refineryorder.profit.breakdown}"
+                       th:text="#{refineryorder.profit.breakdown(${sales}, ${costs})}">Verkauf 612.000 – Kosten 125.700</p>
+                </div>
+
+                <button th:if="${canEdit and openRun}" th:hidden="${stateName == 'RUNNING'}" type="button" class="btn btn--cta rod-store"
+                        data-trigger="rod-open-store" data-testid="refinery-store-open"
+                        th:attr="data-ready-at=${orderEndsAt != null ? orderEndsAt.toEpochMilli() : null}"
+                        th:text="#{refineryorder.action.storeYield}">Ausbeute einlagern</button>
+            </div>
+
+            <div th:if="${order != null}" class="card rod-assigned" data-testid="refinery-assigned">
+                <span class="kpi-label" th:text="#{refineryorder.assigned.title}">Zugeordnet</span>
+                <p class="rod-assigned__title" th:text="${order.mission != null ? order.mission.name : #messages.msg('refineryorder.assigned.noMission')}">Quantanium-Abbau</p>
+                <p class="rod-assigned__meta"><span th:text="#{refineryorder.assigned.owner(${order.owner != null ? order.owner.effectiveName : '—'})}">Besitzer greluc</span><th:block th:if="${order.owningSquadron != null}"> &middot; <span th:text="${order.owningSquadron.name}">IRIDIUM</span></th:block></p>
+            </div>
+        </aside>
+    </div>
+    </th:block>
     </div>
 
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='storeModal', titleKey='refineryorder.action.store', variant='krt-modal--wide', open=${showStoreModal}, closeTrigger='rod-close-store', body=~{::storeModal-body})}">
         <th:block th:ref="storeModal-body">
-            
             <div id="refinery-store-results" class="krt-modal-flow">
             <th:block th:fragment="refineryStoreSection">
             <form id="storeForm" th:action="@{/refinery-orders/{id}/store(id=${orderId})}" method="post" th:object="${storeForm}" data-trigger="rod-disable-submit">
                 <div class="krt-modal-body">
-                <div id="storeItemsContainer">
-                    <div th:each="item, stat : *{items}" class="store-item-block krtm-border-1px-solid-var-color-gray-3-padding-1r-0499">
-                        <div class="flex-between-mb">
-                            <h4 class="krtm-margin-0-color-var-color-gray-1-font-family-a861" th:text="${item.materialName}"></h4>
-                            <button type="button" class="btn btn-ghost krtm-padding-0-2rem-0-5rem-55b2" data-trigger="rod-duplicate-store" th:title="#{refineryorder.action.split}" th:if="${!item.amountFixed}">+</button>
+                <div id="storeItemsContainer" class="stack gap-3">
+                    <div th:each="item, stat : *{items}" class="store-item-block card card--inset">
+                        <div class="store-item-head">
+                            <h4 class="store-item-title" th:text="${item.materialName}"></h4>
+                            <button type="button" class="btn btn-ghost btn-xs" data-trigger="rod-duplicate-store" th:title="#{refineryorder.action.split}" th:aria-label="#{refineryorder.action.split}" th:if="${!item.amountFixed}">+</button>
                         </div>
-                        
+
                         <input type="hidden" th:field="*{items[__${stat.index}__].materialId}" />
                         <input type="hidden" th:field="*{items[__${stat.index}__].materialName}" />
                         <input type="hidden" th:field="*{items[__${stat.index}__].amountFixed}" />
                         <input type="hidden" th:field="*{items[__${stat.index}__].quantityType}" />
-                        
-                        <div class="material-row">
-                            <div class="form-group flex-1 mb-0">
+
+                        <div class="form-grid">
+                            <div class="form-group">
                                 <label th:for="'storeAmount_' + ${stat.index}">
                                     <span th:text="#{inventory.form.amount}">Menge</span>
                                     <span th:if="*{items[__${stat.index}__].quantityType == 'PIECE'}" th:text="'(' + #{material.quantity.piece} + ')'"></span>
@@ -260,20 +321,18 @@
                                 </label>
                                 <input type="text" data-scu-decimal th:id="'storeAmount_' + ${stat.index}" th:field="*{items[__${stat.index}__].amount}" th:step="*{items[__${stat.index}__].quantityType == 'PIECE' ? '1' : '0.001'}" min="0" inputmode="decimal" required>
                             </div>
-                            <div class="form-group flex-1 mb-0">
+                            <div class="form-group">
                                 <label th:for="'storeQuality_' + ${stat.index}" th:text="#{inventory.form.quality}">Qualität</label>
                                 <input type="number" th:id="'storeQuality_' + ${stat.index}" th:field="*{items[__${stat.index}__].quality}" required min="0" max="1000">
                             </div>
-                        </div>
-                        <div class="material-row mt-1">
-                            <div class="form-group flex-1 mb-0">
+                            <div class="form-group">
                                 <label th:for="'storeLocation_' + ${stat.index}" th:text="#{inventory.form.location}">Lagerort</label>
                                 <select th:id="'storeLocation_' + ${stat.index}" th:field="*{items[__${stat.index}__].locationId}" required>
                                     <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
                                     <option th:each="loc : ${allLocations}" th:value="${loc.id}" th:text="${loc.name}"></option>
                                 </select>
                             </div>
-                            <div class="form-group flex-1 mb-0">
+                            <div class="form-group">
                                 <label th:for="${isLogistician ? 'storeUser_' + stat.index : 'storeUserFixed_' + stat.index}" th:text="#{refineryorder.store.user}">Mitglied</label>
                                 <select th:if="${isLogistician}" th:id="'storeUser_' + ${stat.index}" th:field="*{items[__${stat.index}__].userId}" required data-krt-combobox="remote-users">
                                     <option th:if="${item.userId != null}" th:value="${item.userId}" th:text="${seedUserNames.get(item.userId)}"></option>
@@ -282,39 +341,39 @@
                                     <option th:text="${item.userId != null ? seedUserNames.get(item.userId) : ''}"></option>
                                 </select>
                             </div>
-                        </div>
-                        <div class="form-group krtm-margin-bottom-0-margin-top-1rem-7579">
-                            <label th:for="'storeOrgUnit_' + ${stat.index}" th:text="#{refineryorder.store.orgUnit}">Org-Einheit</label>
-                            <select th:id="'storeOrgUnit_' + ${stat.index}" class="store-org-unit-select" th:field="*{items[__${stat.index}__].owningOrgUnitId}">
-                                <option value="" th:text="#{refineryorder.store.orgUnit.placeholder}">-- Org-Einheit w&#228;hlen --</option>
-                                <option th:each="ou : ${storeOrgUnitOptions}" th:value="${ou.orgUnitId()}" th:text="${ou.orgUnitName()}"></option>
-                            </select>
-                        </div>
-                        <div class="form-group krtm-margin-bottom-0-margin-top-1rem-7579">
-                            <label th:for="'storeJobOrder_' + ${stat.index}" th:text="#{refineryorder.store.joborder}">Auftrag (Optional)</label>
-                            <select th:id="'storeJobOrder_' + ${stat.index}" th:field="*{items[__${stat.index}__].jobOrderId}">
-                                <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                                <option th:each="jo : ${jobOrders}" th:if="${(item.jobOrderId != null and item.jobOrderId == jo.id) or (jo.requiredMaterialIds != null and #lists.contains(jo.requiredMaterialIds, item.materialId))}" th:value="${jo.id}" th:text="${jo.displayId + ' - ' + (jo.requestingOrgUnit != null ? jo.requestingOrgUnit.name() : '—')}"></option>
-                            </select>
-                        </div>
-                        <div class="form-group check-row krtm-margin-bottom-0-margin-top-1rem-7579">
-                            <input type="checkbox" th:id="'storePersonal_' + ${stat.index}" th:field="*{items[__${stat.index}__].personal}">
-                            <div>
-                                <label th:for="'storePersonal_' + ${stat.index}" th:text="#{refineryorder.store.personal}">Als persönlichen Eintrag einlagern</label>
-                                <p class="form-hint" th:text="#{refineryorder.store.personal.help}">Persönliche Einträge sind nur für dich sichtbar und können keinem Auftrag und keinem Einsatz zugeordnet werden.</p>
+                            <div class="form-group">
+                                <label th:for="'storeOrgUnit_' + ${stat.index}" th:text="#{refineryorder.store.orgUnit}">Org-Einheit</label>
+                                <select th:id="'storeOrgUnit_' + ${stat.index}" class="store-org-unit-select" th:field="*{items[__${stat.index}__].owningOrgUnitId}">
+                                    <option value="" th:text="#{refineryorder.store.orgUnit.placeholder}">-- Org-Einheit w&#228;hlen --</option>
+                                    <option th:each="ou : ${storeOrgUnitOptions}" th:value="${ou.orgUnitId()}" th:text="${ou.orgUnitName()}"></option>
+                                </select>
                             </div>
-                        </div>
-                        <div class="form-group krtm-margin-bottom-0-margin-top-1rem-7579">
-                            <label th:for="'storeNote_' + ${stat.index}" th:text="#{refineryorder.store.note}">Notiz (Optional)</label>
-                            <textarea th:id="'storeNote_' + ${stat.index}" th:field="*{items[__${stat.index}__].note}" maxlength="1000" rows="2" th:placeholder="#{refineryorder.store.note.placeholder}"></textarea>
+                            <div class="form-group">
+                                <label th:for="'storeJobOrder_' + ${stat.index}" th:text="#{refineryorder.store.joborder}">Auftrag (Optional)</label>
+                                <select th:id="'storeJobOrder_' + ${stat.index}" th:field="*{items[__${stat.index}__].jobOrderId}">
+                                    <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
+                                    <option th:each="jo : ${jobOrders}" th:if="${(item.jobOrderId != null and item.jobOrderId == jo.id) or (jo.requiredMaterialIds != null and #lists.contains(jo.requiredMaterialIds, item.materialId))}" th:value="${jo.id}" th:text="${jo.displayId + ' - ' + (jo.requestingOrgUnit != null ? jo.requestingOrgUnit.name() : '—')}"></option>
+                                </select>
+                            </div>
+                            <div class="form-group check-row span-all">
+                                <input type="checkbox" th:id="'storePersonal_' + ${stat.index}" th:field="*{items[__${stat.index}__].personal}">
+                                <div>
+                                    <label th:for="'storePersonal_' + ${stat.index}" th:text="#{refineryorder.store.personal}">Als persönlichen Eintrag einlagern</label>
+                                    <p class="form-hint" th:text="#{refineryorder.store.personal.help}">Persönliche Einträge sind nur für dich sichtbar und können keinem Auftrag und keinem Einsatz zugeordnet werden.</p>
+                                </div>
+                            </div>
+                            <div class="form-group span-all">
+                                <label th:for="'storeNote_' + ${stat.index}" th:text="#{refineryorder.store.note}">Notiz (Optional)</label>
+                                <textarea th:id="'storeNote_' + ${stat.index}" th:field="*{items[__${stat.index}__].note}" maxlength="1000" rows="2" th:placeholder="#{refineryorder.store.note.placeholder}"></textarea>
+                            </div>
                         </div>
                     </div>
                 </div>
-                
+
                 </div>
                 <div class="krt-modal-foot">
                     <button type="button" class="btn btn-ghost" data-trigger="rod-close-store" th:text="#{orders.create.cancel}">Abbrechen</button>
-                    <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.create.save}">Speichern</span></button>
+                    <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{refineryorder.action.storeYield}">Ausbeute einlagern</span></button>
                 </div>
             </form>
             </th:block>
@@ -323,7 +382,7 @@
     </th:block>
 
     <template id="refinery-fragment-error-tpl">
-        <p th:fragment="fragmentError" class="desc krtm-color-danger"
+        <p th:fragment="fragmentError" class="alert alert-danger"
            th:text="#{refineryorder.section.refresh.error}">Abschnitt konnte nicht geladen werden.</p>
     </template>
 

@@ -137,9 +137,10 @@ class OperationWritesInPlaceE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        E2eSupport.navigate(page, baseUrl + "/operations/" + operationId + "?tab=verw");
+        E2eSupport.navigate(page, baseUrl + "/operations/" + operationId);
         page.waitForLoadState();
 
+        page.locator("[data-testid='operation-edit']").click();
         page.locator("#op-name").fill(firstName);
         page.evaluate("window.__krtNoReload = true;");
         page.waitForResponse(
@@ -153,6 +154,7 @@ class OperationWritesInPlaceE2eTest {
             "the save must update in place — no full-page reload cleared the marker");
         assertEquals(firstName, operationName(operationId), "the first edit must persist");
 
+        page.locator("[data-testid='operation-edit']").click();
         page.locator("#op-name").fill(secondName);
         page.waitForResponse(
             response ->
@@ -186,9 +188,10 @@ class OperationWritesInPlaceE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        E2eSupport.navigate(page, baseUrl + "/operations/" + operationId + "?tab=verw");
+        E2eSupport.navigate(page, baseUrl + "/operations/" + operationId);
         page.waitForLoadState();
 
+        page.locator("#operation-menu-toggle").click();
         page.locator("[data-trigger='operation-open-delete']").click();
         page.locator("#delete-operation-form button[type='submit']").click();
         page.waitForURL(java.util.regex.Pattern.compile(".*/operations$"));

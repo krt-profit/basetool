@@ -19,8 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.matchesPattern;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -55,5 +59,24 @@ class ImpressumControllerTest {
         .perform(get("/impressum"))
         .andExpect(status().isOk())
         .andExpect(view().name("impressum"));
+  }
+
+  /**
+   * The imprint follows the legal text pattern: the page head with the legal eyebrow, the text on a
+   * card limited to the reading measure, and no HUD box.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  void rendersTheTextPagePattern() throws Exception {
+    mockMvc
+        .perform(get("/impressum"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("class=\"page-head\"")))
+        .andExpect(
+            content().string(matchesPattern("(?s).*class=\"page-eyebrow\"[^>]*>Rechtliches<.*")))
+        .andExpect(content().string(containsString("class=\"card legal-doc\"")))
+        .andExpect(content().string(containsString("/css/legal")))
+        .andExpect(content().string(not(containsString("hud-box"))));
   }
 }
