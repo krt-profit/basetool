@@ -198,7 +198,8 @@ reference DTOs).
 - **URIs.** Of 624 `BackendApiClient` call sites, 356 build the backend path by string
   concatenation and 41 through URI templates.
 - **Package-keyed couplings.** The session deserializer admits application classes by the prefix
-  `…frontend.model.` (production enforces it since 2026-09-25); 172 `T(…support.Roles)` references in
+  `…frontend.model.` (production enforces it since 2026-09-25; replaced by the exact list on
+  2026-10-04, F2); 172 `T(…support.Roles)` references in
   22 templates resolve only at render time; three DTO contract tests are keyed on the `model.dto`
   package; the authorization gate test checks classes, not handlers.
 - **Assets.** 100 scripts, 64 stylesheets and 120 templates map onto the domains (19 core + 81 domain
@@ -688,6 +689,24 @@ Cheap moves that break many cycles without changing behaviour:
     `identity -> scope` edge.
 - The platform SPIs of §5.3 (`ActorHandleResolver`, `RetentionParticipant`, `RecipientDirectory`,
   `LiveSyncTopicAuthorizer`, `ActiveOrgUnitProvider`) — they remove 21 upward edges.
+  **Done 2026-10-04** (P1-8). The module baseline shrank by 15 edges, from 127 (after the error
+  model and the re-homings) to **112 edges**, and from 37 to 30 module pairs (`platform -> scope`
+  left entirely, its other edge having gone with the `AuthHelperService` delegations): `ActorHandleResolver` 2 (`audit -> identity`), `RetentionParticipant` 2
+  (`audit -> bank`), the recipient directories 8 (`notification -> bank` 4, `-> identity` 3,
+  `-> orgunit` 1), `LiveSyncTopicAuthorizer` 2 (`livesync -> scope`, `-> bank`),
+  `ActiveOrgUnitProvider` 1 (`platform -> scope`). **Correction:** 15 edges, not 21. The 21 are
+  all upward edges of the rank-0 and rank-1 modules in the baseline, and six of them are not SPI
+  cases: `notification -> orgunit: OrgUnitRef -> OrgUnitKind` waits for a kernel `OrgUnitKind`
+  (P1-11), `platform -> scope: AuthHelperService -> OwnerScopeService` leaves with the removal of
+  its four delegations, the two `platform -> exchange` edges of `ClientAttribution` need their
+  own move, and the two `kernel -> platform` edges left with the error model (§5.5).
+  `RecipientDirectory` is three interfaces in `notification.api`, one per implementing module (`RoleRecipientDirectory` identity, `OrgUnitRecipientDirectory` orgunit,
+  `AccountRecipientDirectory` bank); the role-code check of `NotificationRuleService` uses the
+  first, which removed two edges §5.3 had not listed. `ActiveOrgUnitProvider` lives in the
+  `service` package beside `AuthHelperService` (a `logging` package would close a
+  `logging -> service -> logging` layer cycle). None of the SPIs is an observer, so the G-12 rules
+  do not select them; the audit and retention calls keep their transactions (`record` stays
+  `MANDATORY`, each purge its own transaction).
 - `support` split into the kernel (`RequestMemo`, `StringNormalization`, `OptimisticLock`,
   `LikePatterns`, `ProblemResponseFactory`, `Roles`, `Permissions`) and per-domain internal packages;
   the ArchUnit leaf rule's message stops sending shared logic there.
@@ -789,7 +808,7 @@ domain stays a package.
 | --- | --- |
 | F0 | Guards (Phase 0.4) |
 | F1 — **done 2026-10-04** | Kernel extraction: `BackendErrorMapper` (a sealed outcome type with a pattern switch), template overloads for write verbs, the eleven bypassing controllers moved onto the kernel, the `WebClient` confinement rule at zero |
-| F2 | Exact session allow-list in its own release (D-10) |
+| F2 — **done 2026-10-04** | Exact session allow-list in its own release (D-10): `SessionTypeAllowList.SESSION_BOUND_TYPES`, 21 exact names; the `…frontend.model.` prefix is gone, `SessionBoundTypeClosureTest` holds the list equal to the derived set in both directions. Corrections: the list lives in the security class, not in the G-16 golden file (`session-bound-types.txt` is deleted, so `-PupdateSnapshots` can no longer widen the allow-list); the admitted application classes fall from 325 to 21, not "about 20" of "about eleven" forms — the 21 are 10 flashed forms and DTOs with their nested types and enums |
 | F3 | Typed client per domain, small domains first (audit, notification, settings, dashboard, exchange, orgchart), then the large four; untyped `Map` relays typed in the same step |
 | F4 | Package-by-domain move in one pull request; route/gate snapshot byte-identical |
 | F5 | Templates and assets per domain (§8.2), with the page chrome as one layout fragment |

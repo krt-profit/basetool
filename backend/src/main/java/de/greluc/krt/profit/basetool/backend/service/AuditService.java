@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.ActorHandleResolver;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDomain;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
@@ -26,10 +27,8 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.mapper.AuditEventMapper;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.AuditEvent;
-import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AuditEventDto;
 import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.ClientAttribution;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
@@ -62,7 +61,7 @@ public class AuditService implements AuditRecorder {
 
   private final AuditEventRepository auditEventRepository;
   private final AuthHelperService authHelperService;
-  private final UserRepository userRepository;
+  private final ActorHandleResolver actorHandleResolver;
   private final AuditEventMapper auditEventMapper;
   private final ClientAttribution clientAttribution;
   private final MeterRegistry meterRegistry;
@@ -87,8 +86,7 @@ public class AuditService implements AuditRecorder {
       @Nullable UUID targetUserId,
       @Nullable CharSequence details) {
     Optional<UUID> actorId = authHelperService.currentUserId();
-    String actorHandle =
-        actorId.flatMap(userRepository::findById).map(User::getEffectiveName).orElse("system");
+    String actorHandle = actorId.flatMap(actorHandleResolver::handleOf).orElse("system");
     AuditEvent event =
         AuditEvent.builder()
             .occurredAt(Instant.now())

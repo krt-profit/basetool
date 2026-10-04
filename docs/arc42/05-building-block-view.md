@@ -114,6 +114,19 @@ repositories that produce them, the catalogue's `ShipTypeMapper` maps ship types
 `AuthHelperService` no longer delegates to `OwnerScopeService`: callers ask the scope API
 directly.
 
+The platform modules reach the domains only through SPIs they own and the domains implement
+(plan §5.3); Spring injects the implementations, so the platform names no domain class:
+
+| SPI (owner) | Asked for | Implemented by |
+| --- | --- | --- |
+| `audit.api.ActorHandleResolver` | the actor handle an audit row snapshots | identity (`UserActorHandleResolver`) |
+| `audit.api.RetentionParticipant` | the audit trails outside the audit module that the retention run also purges, after the activity domains | bank (`BankAuditService`) |
+| `notification.api.RoleRecipientDirectory` | global-role holders, role holders within an org unit, the catalogue spelling of a role code | identity (`UserRoleRecipientDirectory`) |
+| `notification.api.OrgUnitRecipientDirectory` | the Lead, Logistician and Mission Manager flags of an org unit | orgunit (`OrgUnitMembershipRecipientDirectory`) |
+| `notification.api.AccountRecipientDirectory` | grant holders and responsible holders of a bank account | bank, org-unit side (`OrgUnitBankRecipientDirectory`) |
+| `livesync.api.LiveSyncTopicAuthorizer` | whether the caller may join a room, through the owning module's read gate; one implementation per kind, checked at startup | mission, operation, joborder, refinery, bank (`OrgUnitBankLiveSyncTopicAuthorizer`); the member and self rooms stay with livesync |
+| `service.ActiveOrgUnitProvider` (platform) | the org unit for the `orgUnitId` MDC field | scope (`ScopeActiveOrgUnitProvider`) |
+
 ## 5.3 Level 2 — inside `frontend`
 
 | Package | What lives there |

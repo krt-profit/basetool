@@ -1035,6 +1035,35 @@ the same request (REQ-SEC-050) — the member keeps the login.
 touched either way: the mode governs reading only. `off` restores the pre-list validator exactly, for
 the case where the reporting itself misbehaves.
 
+#### The exact list of application types (D-10)
+
+The release that narrows the application entry from the prefix `…frontend.model.` to the exact
+`SessionTypeAllowList.SESSION_BOUND_TYPES` (21 forms, DTOs, nested types and enums; REQ-FE-027)
+**ships in its own frontend release, before any frontend class moves to a per-domain package** (plan
+§7.8 F2). It changes no configuration and needs no step beyond the ordinary frontend deploy; the
+mode stays `enforce`.
+
+**Sessions written by the previous release.** That release can only have stored types its own code
+stores, and the list is derived from that same code, so nothing in a live session becomes unreadable
+by the switch. If a value were refused anyway, it takes the ordinary `enforce` path: that one
+attribute is dropped (`FaultTolerantSessionSerializer`), logged once by class name and repaired on
+the same request (REQ-SEC-050). The security context and the authorized clients are Spring Security
+and JDK types, still admitted, so **no member is signed out and login is unaffected**; the worst case
+is one redirect's lost flash attributes (a toast or a re-shown form).
+
+**Watch for an hour after the deploy** (read-only): `SessionTypeOutsideAllowList` and
+`SessionValueDropsSustained` stay silent, and
+
+```text
+sum by (mode) (increase(basetool_session_type_refused_total[1h]))
+{app="frontend"} |= "not on the session type allow-list"
+```
+
+return nothing. A hit names a class: if it is one of ours, add it to `SESSION_BOUND_TYPES` in a PR
+(and teach `SessionBoundTypeClosureTest` why the derivation missed it). Until it lands, the rollback
+is the previous frontend image, or `APP_SESSION_TYPE_ALLOW_LIST=report` as above — a production
+write, so it waits for the owner's yes.
+
 ### Internal JWKS for the backend
 
 The backend can fetch the keys that sign access tokens from the **internal** Keycloak

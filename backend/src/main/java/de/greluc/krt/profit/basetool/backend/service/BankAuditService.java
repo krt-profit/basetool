@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.RetentionParticipant;
 import de.greluc.krt.profit.basetool.backend.mapper.BankAuditEventMapper;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
@@ -59,7 +60,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class BankAuditService {
+public class BankAuditService implements RetentionParticipant {
 
   private final BankAuditEventRepository auditEventRepository;
   private final AuthHelperService authHelperService;
@@ -162,12 +163,35 @@ public class BankAuditService {
   }
 
   /**
+   * Names the bank audit trail in the retention log line.
+   *
+   * @return {@code the bank audit trail}
+   */
+  @Override
+  @NotNull
+  public String retentionLabel() {
+    return "the bank audit trail";
+  }
+
+  /**
+   * Whether any bank audit row is older than the cutoff (REQ-AUDIT-006).
+   *
+   * @param cutoff the exclusive cutoff
+   * @return {@code true} when at least one bank audit row occurred strictly before {@code cutoff}
+   */
+  @Override
+  public boolean holdsRowsBefore(@NotNull Instant cutoff) {
+    return auditEventRepository.existsByOccurredAtBefore(cutoff);
+  }
+
+  /**
    * Purges bank audit rows older than a cutoff (REQ-AUDIT-004) and then records an {@code
    * AUDIT_LOG_PURGED} marker carrying the deleted count and cutoff.
    *
    * @param before the exclusive cutoff; rows older than this are removed
    * @return the number of bank audit rows deleted, excluding the purge marker
    */
+  @Override
   @Transactional
   public int purgeBefore(@NotNull Instant before) {
     int deleted = auditEventRepository.deleteByOccurredAtBefore(before);

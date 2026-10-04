@@ -28,16 +28,21 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /**
- * Keeps every entry of the session type allow-list no broader than a model or session package
- * (REQ-FE-027, ADR-0206): an application prefix must name a {@code model} or {@code session}
- * package of the frontend, the other prefixes and the name patterns stay exactly the reviewed ones,
- * and an exact name is a plain class name.
+ * Keeps every entry of the session type allow-list exactly as broad as reviewed (REQ-FE-027,
+ * ADR-0206): no application class is admitted by a prefix, the only prefix is Spring Security's,
+ * the name patterns stay the reviewed ones, and every exact name is a plain class name.
  */
 class SessionTypeAllowListBreadthTest {
 
-  /** The non-application prefixes admitted wholesale by review. */
+  /** The only prefix admitted wholesale by review. */
   private static final Set<String> REVIEWED_FOREIGN_PREFIXES =
       Set.of("org.springframework.security.");
+
+  /** The application's root package; no allow-list prefix may start with it. */
+  private static final String APPLICATION_ROOT = "de.greluc.";
+
+  /** The package every session-bound application type lives in. */
+  private static final String FRONTEND_PACKAGE = "de.greluc.krt.profit.basetool.frontend.";
 
   /** The reviewed name patterns, as their source strings. */
   private static final Set<String> REVIEWED_PATTERNS =
@@ -46,23 +51,40 @@ class SessionTypeAllowListBreadthTest {
           "java\\.lang\\.(?:Boolean|Byte|Character|Double|Float|Integer|Long|Short|String)",
           "org\\.springframework\\.validation\\.[\\w$]+");
 
-  /**
-   * An application prefix at least as narrow as a {@code model} or {@code session} package of the
-   * frontend, e.g. {@code …frontend.model.} or {@code …frontend.mission.model.}.
-   */
-  private static final Pattern MODEL_OR_SESSION_PREFIX =
-      Pattern.compile(
-          "de\\.greluc\\.krt\\.profit\\.basetool\\.frontend\\.(?:[a-z0-9_]+\\.)*"
-              + "(?:model|session)\\.(?:[a-z0-9_]+\\.)*");
-
   /** A plain binary class name. */
   private static final Pattern CLASS_NAME =
       Pattern.compile("[A-Za-z_][\\w]*(?:\\.[A-Za-z_][\\w]*)*(?:\\$[\\w]+)*");
 
   @Test
-  void noPrefixIsBroaderThanAModelOrSessionPackage() {
+  void theOnlyPrefixIsTheReviewedSpringSecurityOne() {
     assertThat(SessionTypeAllowList.ALLOWED_PREFIXES).isNotEmpty();
     assertThat(tooBroad(SessionTypeAllowList.ALLOWED_PREFIXES)).isEmpty();
+    assertThat(SessionTypeAllowList.ALLOWED_PREFIXES)
+        .noneMatch(prefix -> prefix.startsWith(APPLICATION_ROOT));
+  }
+
+  @Test
+  void everySessionBoundTypeIsOnePlainFrontendClassName() {
+    assertThat(SessionTypeAllowList.SESSION_BOUND_TYPES)
+        .isNotEmpty()
+        .allMatch(name -> CLASS_NAME.matcher(name).matches())
+        .allMatch(name -> name.startsWith(FRONTEND_PACKAGE));
+  }
+
+  @Test
+  void aWildcardOrForeignSessionBoundTypeIsReported() {
+    assertThat(
+            List.of(
+                "de.greluc.krt.profit.basetool.frontend.model.form.ShipForm",
+                "de.greluc.krt.profit.basetool.frontend.model.*",
+                "de.greluc.krt.profit.basetool.frontend.model.",
+                "java.util.concurrent.ConcurrentHashMap"))
+        .filteredOn(
+            name -> !CLASS_NAME.matcher(name).matches() || !name.startsWith(FRONTEND_PACKAGE))
+        .containsExactly(
+            "de.greluc.krt.profit.basetool.frontend.model.*",
+            "de.greluc.krt.profit.basetool.frontend.model.",
+            "java.util.concurrent.ConcurrentHashMap");
   }
 
   @Test
@@ -99,6 +121,9 @@ class SessionTypeAllowListBreadthTest {
                     "org.springframework.security.",
                     "de.greluc.krt.profit.basetool.frontend.modelx.")))
         .containsExactly(
+            "de.greluc.krt.profit.basetool.frontend.model.",
+            "de.greluc.krt.profit.basetool.frontend.mission.model.",
+            "de.greluc.krt.profit.basetool.frontend.kernel.session.",
             "de.greluc.krt.profit.basetool.frontend.",
             "de.greluc.krt.profit.basetool.frontend.mission.",
             "de.greluc.",
@@ -115,15 +140,12 @@ class SessionTypeAllowListBreadthTest {
   }
 
   /**
-   * The prefixes broader than a model or session package of the frontend and not reviewed.
+   * The prefixes that are not the reviewed Spring Security prefix.
    *
    * @param prefixes the allow-list's prefixes
    * @return the offending prefixes, in input order
    */
   private static List<String> tooBroad(List<String> prefixes) {
-    return prefixes.stream()
-        .filter(prefix -> !REVIEWED_FOREIGN_PREFIXES.contains(prefix))
-        .filter(prefix -> !MODEL_OR_SESSION_PREFIX.matcher(prefix).matches())
-        .toList();
+    return prefixes.stream().filter(prefix -> !REVIEWED_FOREIGN_PREFIXES.contains(prefix)).toList();
   }
 }

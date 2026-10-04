@@ -19,31 +19,51 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.support.LiveSyncAuthorization;
 import de.greluc.krt.profit.basetool.backend.support.LiveSyncTopic;
 import io.micrometer.core.instrument.MeterRegistry;
-import java.util.UUID;
-import lombok.RequiredArgsConstructor;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 /**
  * Decides whether the current caller may join one live-sync room (ADR-0143), asking the same
  * question the equivalent read asks.
  *
- * <p>A check that throws is treated as a refusal.
+ * <p>The member and self rooms are decided here; every other kind by the one {@link
+ * LiveSyncTopicAuthorizer} its owning module registers. A check that throws is treated as a
+ * refusal.
  */
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class LiveSyncSubscriptionAuthorizer {
 
-  private final OwnerScopeService ownerScopeService;
   private final AuthHelperService authHelperService;
-  private final OrgUnitBankAccessService orgUnitBankAccessService;
   private final MeterRegistry meterRegistry;
+  private final Map<LiveSyncAuthorization, LiveSyncTopicAuthorizer> topicAuthorizers;
+
+  /**
+   * Indexes the module authorizers by the kinds they decide.
+   *
+   * @param authHelperService the caller's identity and roles
+   * @param meterRegistry where the verdicts are counted
+   * @param topicAuthorizers the module authorizers
+   * @throws IllegalStateException if a kind other than {@code MEMBER} and {@code SELF} has no
+   *     authorizer or more than one, or an authorizer claims {@code MEMBER} or {@code SELF}
+   */
+  public LiveSyncSubscriptionAuthorizer(
+      @NotNull AuthHelperService authHelperService,
+      @NotNull MeterRegistry meterRegistry,
+      @NotNull List<LiveSyncTopicAuthorizer> topicAuthorizers) {
+    this.authHelperService = authHelperService;
+    this.meterRegistry = meterRegistry;
+    this.topicAuthorizers = index(topicAuthorizers);
+  }
 
   /**
    * Answers whether the current caller may subscribe to a topic, and counts the verdict.
@@ -86,16 +106,14 @@ public class LiveSyncSubscriptionAuthorizer {
       return Verdict.refuse(MetricNames.SUBSCRIBE_DENY_AUTHZ);
     }
     try {
+      LiveSyncAuthorization kind = topic.topicClass().authorization();
       boolean allowed =
-          switch (topic.topicClass().authorization()) {
+          switch (kind) {
             case MEMBER -> true;
-            case MISSION -> ownerScopeService.canSeeMission(required(topic));
-            case OPERATION -> ownerScopeService.canSeeOperation(required(topic));
-            case JOB_ORDER -> ownerScopeService.canSeeJobOrder(required(topic));
-            case JOB_ORDER_QUEUE -> ownerScopeService.canViewJobOrders();
-            case REFINERY_ORDER -> ownerScopeService.canSeeRefineryOrder(required(topic));
-            case BANK_ACCOUNT -> canSeeOrgUnitBankAccount(required(topic));
-            case SELF -> required(topic).equals(authHelperService.currentUserId().orElse(null));
+            case SELF ->
+                topic.requiredResourceId().equals(authHelperService.currentUserId().orElse(null));
+            case MISSION, OPERATION, JOB_ORDER, JOB_ORDER_QUEUE, REFINERY_ORDER, BANK_ACCOUNT ->
+                topicAuthorizers.get(kind).mayJoin(topic);
           };
       return allowed ? Verdict.permit() : Verdict.refuse(MetricNames.SUBSCRIBE_DENY_AUTHZ);
     } catch (RuntimeException e) {
@@ -105,33 +123,43 @@ public class LiveSyncSubscriptionAuthorizer {
   }
 
   /**
-   * Answers whether the caller may read one org-unit bank account via the member-facing detail read
-   * (REQ-APP-BANK-007).
+   * Maps every delegated kind to its one authorizer.
    *
-   * @param accountId the account named by the topic
-   * @return {@code true} if the detail read succeeds
-   */
-  private boolean canSeeOrgUnitBankAccount(@NotNull UUID accountId) {
-    orgUnitBankAccessService.getViewableAccountDetail(accountId);
-    return true;
-  }
-
-  /**
-   * Returns the topic's resource id, which a per-resource class always has.
-   *
-   * @param topic the room
-   * @return the id
-   * @throws IllegalStateException if a per-resource topic carries no id (registry and parser
-   *     disagree)
+   * @param authorizers the module authorizers
+   * @return the index, covering every kind except {@code MEMBER} and {@code SELF}
+   * @throws IllegalStateException if the authorizers do not cover the delegated kinds exactly once
    */
   @NotNull
-  private static UUID required(@NotNull LiveSyncTopic topic) {
-    @Nullable UUID id = topic.resourceId();
-    if (id == null) {
-      throw new IllegalStateException(
-          "Per-resource topic class " + topic.topicClass() + " parsed without a resource id");
+  private static Map<LiveSyncAuthorization, LiveSyncTopicAuthorizer> index(
+      @NotNull List<LiveSyncTopicAuthorizer> authorizers) {
+    Map<LiveSyncAuthorization, LiveSyncTopicAuthorizer> index =
+        new EnumMap<>(LiveSyncAuthorization.class);
+    for (LiveSyncTopicAuthorizer authorizer : authorizers) {
+      for (LiveSyncAuthorization kind : authorizer.authorizations()) {
+        if (kind == LiveSyncAuthorization.MEMBER || kind == LiveSyncAuthorization.SELF) {
+          throw new IllegalStateException(
+              authorizer.getClass().getName() + " claims " + kind + ", which is decided centrally");
+        }
+        LiveSyncTopicAuthorizer previous = index.putIfAbsent(kind, authorizer);
+        if (previous != null) {
+          throw new IllegalStateException(
+              "Two live-sync authorizers decide "
+                  + kind
+                  + ": "
+                  + previous.getClass().getName()
+                  + " and "
+                  + authorizer.getClass().getName());
+        }
+      }
     }
-    return id;
+    for (LiveSyncAuthorization kind : LiveSyncAuthorization.values()) {
+      if (kind != LiveSyncAuthorization.MEMBER
+          && kind != LiveSyncAuthorization.SELF
+          && !index.containsKey(kind)) {
+        throw new IllegalStateException("No live-sync authorizer decides " + kind);
+      }
+    }
+    return index;
   }
 
   /**

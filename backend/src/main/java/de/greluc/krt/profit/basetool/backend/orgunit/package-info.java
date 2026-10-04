@@ -22,7 +22,13 @@
  * memberships and the leadership appointments.
  */
 @ApplicationModule(
-    allowedDependencies = {"audit::api", "identity::api", "kernel", "notification::api"})
+    allowedDependencies = {
+      "audit::api",
+      "identity::api",
+      "kernel",
+      "livesync::api",
+      "notification::api"
+    })
 package de.greluc.krt.profit.basetool.backend.orgunit;
 
 import org.springframework.modulith.ApplicationModule;

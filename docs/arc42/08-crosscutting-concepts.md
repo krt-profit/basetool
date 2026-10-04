@@ -29,8 +29,10 @@ Beyond roles there are three mechanisms that are easy to miss:
 - **The session store is not a trust boundary** — a session value names its own class, so the
   frontend reads only classes on `SessionTypeAllowList` (REQ-SEC-067, ADR-0206). Shipped in
   `report` mode, enforced in the E2E stack; production switches to `enforce` by one `.env` value,
-  and has run `enforce` since 2026-09-25. The types the frontend can put into a session are derived
-  from its bytecode and must be admitted by that list (REQ-FE-027).
+  and has run `enforce` since 2026-09-25; `enforce` is also the code default. The types the
+  frontend can put into a session are derived from its bytecode, and the list names exactly those
+  application types, by class name — no application package is admitted by prefix (REQ-FE-027,
+  D-10, since 2026-10-04).
 - **The frontend's security checks key on what it serves, not on packages** — a committed
   route/gate snapshot pins every mapping with its effective `@PreAuthorize`, every handler carries a
   gate of its own or its class's (nine public handlers excepted), and the template `T(…)`

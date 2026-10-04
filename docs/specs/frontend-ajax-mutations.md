@@ -1893,7 +1893,10 @@ registry: the admin area is web-only permanently, so a room there would have no 
 - [x] Both buckets bound what they are meant to, and one member's flood does not cost another theirs
   (`LiveSyncRelayServiceTest`).
 - [x] Each room's gate is its own read's gate; a throwing check refuses
-  (`LiveSyncSubscriptionAuthorizerTest`).
+  (`LiveSyncSubscriptionAuthorizerTest`). The owning module asks it through its
+  `livesync.api.LiveSyncTopicAuthorizer`; every kind but the member and self rooms has exactly one,
+  or the backend does not start (`LiveSyncSubscriptionAuthorizerTest`,
+  `LiveSyncTopicAuthorizersTest`).
 - [x] The backend registry is a subset of the frontend's, staff rooms excluded
   (`LiveSyncTopicRegistryParityTest`).
 - [x] **A Redis that is unreachable at startup does not stop the backend from starting**; the
@@ -1919,7 +1922,8 @@ registry: the admin area is web-only permanently, so a room there would have no 
 > anyway, in the keyspace-notification initializer, before any `SmartLifecycle` runs.
 >
 > **Code:** `backend/…/controller/LiveSyncController`, `backend/…/service/LiveSyncStreamService`,
-> `LiveSyncRelayService`, `LiveSyncSubscriptionAuthorizer`, `RedisLiveSyncFanout`,
+> `LiveSyncRelayService`, `LiveSyncSubscriptionAuthorizer`, `backend/…/livesync/api/LiveSyncTopicAuthorizer`
+> and its `*LiveSyncTopicAuthorizer` implementations, `RedisLiveSyncFanout`,
 > `LocalLiveSyncFanout`, `LiveSyncRedisConfig`, `NotificationRedisConfig`,
 > `backend/…/support/ResilientRedisMessageListenerContainer`, `backend/…/support/LiveSyncTopic`,
 > `LiveSyncTopicClass`, `LiveSyncAuthorization` · **ADR:** ADR-0143 (ADR-0094 unchanged) ·
@@ -2202,10 +2206,12 @@ and planted fixtures) · **Code:** `support/Roles`
 
 ### REQ-FE-027 — Every session-bound type is derived from the code and admitted by the allow-list
 
-The session type allow-list of REQ-SEC-067 admits the application's classes by the prefix
-`de.greluc.krt.profit.basetool.frontend.model.`. A flashed form moved out of that package would be
-refused under `enforce` and its flash attribute dropped after the redirect, silently in the UI. The
-set of types the frontend can store in the session is therefore derived from the compiled code:
+The session type allow-list of REQ-SEC-067 admits the application's classes by exact name only,
+from `SessionTypeAllowList.SESSION_BOUND_TYPES` (D-10, since 2026-10-04; before that by the prefix
+`de.greluc.krt.profit.basetool.frontend.model.`, which admitted all 325 classes of that package). A
+session-bound type without an entry would be refused under `enforce` and its flash attribute dropped
+after the redirect, silently in the UI. The set of types the frontend can store in the session is
+therefore derived from the compiled code, and the list must equal it:
 
 - Every call of `RedirectAttributes.addFlashAttribute` / `addAllFlashAttributes`, a `FlashMap`
   write, `HttpSession.setAttribute` and `WebUtils.setSessionAttribute` is resolved to the static type
@@ -2218,24 +2224,29 @@ set of types the frontend can store in the session is therefore derived from the
   application type, transitively — must be admitted by the enforcing validator as production builds
   it. `@SessionAttributes` and session-scoped beans are absent; one appearing fails the build until
   the scan learns about it.
-- The application part of the closure is the **exact list** the allow-list narrows to in its own
-  release (D-10): `frontend/src/test/resources/session/session-bound-types.txt`, 21 types on
-  2026-10-02 (10 flashed forms and DTOs plus their nested types and enums), rewritten with
-  `-PupdateSnapshots`.
-- **No allow-list entry is broader than a model or session package**: an application prefix must
-  name a `model` or `session` package of the frontend, the non-application prefixes stay
-  `org.springframework.security.`, the three name patterns stay the reviewed ones, and an exact name
-  is a plain class name.
+- The application part of the closure **equals** `SessionTypeAllowList.SESSION_BOUND_TYPES`, the
+  exact list the allow-list admits: 21 types on 2026-10-04 (10 flashed forms and DTOs plus their
+  nested types and enums). A derived type without an entry fails the build, and so does an entry no
+  session write reaches; the fix is an edit of that list in the same change, which a reviewer sees
+  in the security class itself. The list replaced the golden file
+  `frontend/src/test/resources/session/session-bound-types.txt` of 2026-10-02, which is gone.
+- **No allow-list entry admits an application class wholesale**: the only prefix is
+  `org.springframework.security.`, the three name patterns stay the reviewed ones, every exact name
+  is a plain class name, and every `SESSION_BOUND_TYPES` entry is one class of the frontend.
 
 **Acceptance**
 
 - [x] 317 session writes are resolved, every type of the closure is admitted, and the exact list
   matches the committed file (2026-10-02).
+- [x] The allow-list admits exactly the derived list: `SESSION_BOUND_TYPES` equals the closure's
+  application types, and a planted session-bound form and row without an entry, plus a stale entry,
+  are each reported, with the enforcing validator refusing the unlisted pair (2026-10-04).
 - [x] A planted flash of a form outside `frontend.model`, a nested row type and a
   `java.util.concurrent` map are each refused; a raw list and an `Object` value are reported as
   unresolved; a planted `@SessionAttributes` is reported.
 - [x] A prefix such as `…frontend.`, `…frontend.mission.`, `de.greluc.` or `java.` is reported as too
-  broad.
+  broad; since 2026-10-04 so is any application prefix, `…frontend.model.` included, and a wildcard
+  or non-frontend `SESSION_BOUND_TYPES` entry.
 
 **Enforced by:** `SessionBoundTypeClosureTest`, `SessionTypeAllowListBreadthTest` · **Code:**
 `config/SessionTypeAllowList`, `config/RedisSessionConfig` · **Related:** REQ-SEC-067 · **ADR:**
