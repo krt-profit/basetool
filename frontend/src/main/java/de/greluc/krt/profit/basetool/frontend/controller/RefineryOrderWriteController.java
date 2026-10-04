@@ -192,7 +192,7 @@ public class RefineryOrderWriteController {
         redirectAttributes.addFlashAttribute("refineryOrderForm", form);
         return "redirect:/refinery-orders/" + id;
       }
-      backendApiClient.put("/api/v1/refinery-orders/" + id, orderDto, RefineryOrderDto.class);
+      backendApiClient.put("/api/v1/refinery-orders/{id}", orderDto, RefineryOrderDto.class, id);
       liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.update");
     } catch (BackendServiceException e) {
@@ -238,7 +238,7 @@ public class RefineryOrderWriteController {
   @PreAuthorize("isAuthenticated()")
   public String deleteOrder(@PathVariable UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/refinery-orders/" + id, Void.class);
+      backendApiClient.delete("/api/v1/refinery-orders/{id}", Void.class, id);
       liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.cancel");
     } catch (BackendServiceException e) {
@@ -286,7 +286,7 @@ public class RefineryOrderWriteController {
     }
     try {
       RefineryOrderStoreDto dto = buildStoreDto(form);
-      backendApiClient.post("/api/v1/refinery-orders/" + id + "/store", dto, Void.class);
+      backendApiClient.post("/api/v1/refinery-orders/{id}/store", dto, Void.class, id);
       liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
       liveSyncLocalBus.publish("inventory", INVENTORY_STOCK_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.store");
@@ -472,7 +472,7 @@ public class RefineryOrderWriteController {
       return org.springframework.http.ResponseEntity.badRequest().build();
     }
     try {
-      backendApiClient.put("/api/v1/refinery-orders/" + id, orderDto, RefineryOrderDto.class);
+      backendApiClient.put("/api/v1/refinery-orders/{id}", orderDto, RefineryOrderDto.class, id);
       liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
       return org.springframework.http.ResponseEntity.ok(
           java.util.Map.of("targetUrl", "/refinery-orders"));
@@ -508,7 +508,7 @@ public class RefineryOrderWriteController {
     }
     try {
       backendApiClient.post(
-          "/api/v1/refinery-orders/" + id + "/store", buildStoreDto(form), Void.class);
+          "/api/v1/refinery-orders/{id}/store", buildStoreDto(form), Void.class, id);
       liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
       liveSyncLocalBus.publish("inventory", INVENTORY_STOCK_SECTION);
       return org.springframework.http.ResponseEntity.ok(
@@ -535,7 +535,7 @@ public class RefineryOrderWriteController {
   @org.springframework.web.bind.annotation.ResponseBody
   public org.springframework.http.ResponseEntity<Object> deleteOrderAjax(@PathVariable UUID id) {
     try {
-      backendApiClient.delete("/api/v1/refinery-orders/" + id, Void.class);
+      backendApiClient.delete("/api/v1/refinery-orders/{id}", Void.class, id);
       liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
       return org.springframework.http.ResponseEntity.ok(
           java.util.Map.of("targetUrl", "/refinery-orders"));

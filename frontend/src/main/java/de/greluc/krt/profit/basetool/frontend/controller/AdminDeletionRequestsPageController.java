@@ -122,7 +122,7 @@ public class AdminDeletionRequestsPageController {
         "declining deletion request " + id,
         () -> {
           backendApiClient.post(
-              "/api/v1/admin/deletion-requests/" + id + "/decline", body, Object.class);
+              "/api/v1/admin/deletion-requests/{id}/decline", body, Object.class, id);
           return ResponseEntity.ok().build();
         });
   }
@@ -149,7 +149,7 @@ public class AdminDeletionRequestsPageController {
         "executing deletion request " + id,
         () -> {
           backendApiClient.post(
-              "/api/v1/admin/deletion-requests/" + id + "/execute", body, Object.class);
+              "/api/v1/admin/deletion-requests/{id}/execute", body, Object.class, id);
           return ResponseEntity.ok().build();
         });
   }

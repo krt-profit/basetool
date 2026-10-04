@@ -116,11 +116,11 @@ class MissionCoreEditAjaxControllerTest {
         .andExpect(jsonPath("$.flagsVersion").value(44));
 
     verify(backendApiClient)
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/schedule"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/schedule"), any(), eq(Void.class), eq(MISSION_ID));
     verify(backendApiClient)
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/core"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/core"), any(), eq(Void.class), eq(MISSION_ID));
     verify(backendApiClient)
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/flags"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/flags"), any(), eq(Void.class), eq(MISSION_ID));
   }
 
   @Test
@@ -147,9 +147,10 @@ class MissionCoreEditAjaxControllerTest {
     ArgumentCaptor<Map<String, Object>> scheduleBody = ArgumentCaptor.captor();
     verify(backendApiClient)
         .patch(
-            eq("/api/v1/missions/" + MISSION_ID + "/schedule"),
+            eq("/api/v1/missions/{id}/schedule"),
             scheduleBody.capture(),
-            eq(Void.class));
+            eq(Void.class),
+            eq(MISSION_ID));
     assertEquals(
         Instant.parse("2026-06-21T09:59:58.222717Z"),
         scheduleBody.getValue().get("plannedStartTime"),
@@ -183,11 +184,11 @@ class MissionCoreEditAjaxControllerTest {
         .andExpect(status().isOk());
 
     verify(backendApiClient)
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/core"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/core"), any(), eq(Void.class), eq(MISSION_ID));
     verify(backendApiClient, never())
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/schedule"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/schedule"), any(), eq(Void.class), eq(MISSION_ID));
     verify(backendApiClient, never())
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/flags"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/flags"), any(), eq(Void.class), eq(MISSION_ID));
   }
 
   @Test
@@ -216,11 +217,11 @@ class MissionCoreEditAjaxControllerTest {
         .andExpect(status().isOk());
 
     verify(backendApiClient)
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/schedule"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/schedule"), any(), eq(Void.class), eq(MISSION_ID));
     verify(backendApiClient, never())
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/core"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/core"), any(), eq(Void.class), eq(MISSION_ID));
     verify(backendApiClient, never())
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/flags"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/flags"), any(), eq(Void.class), eq(MISSION_ID));
   }
 
   @Test
@@ -245,11 +246,11 @@ class MissionCoreEditAjaxControllerTest {
         .andExpect(status().isOk());
 
     verify(backendApiClient)
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/schedule"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/schedule"), any(), eq(Void.class), eq(MISSION_ID));
     verify(backendApiClient)
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/core"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/core"), any(), eq(Void.class), eq(MISSION_ID));
     verify(backendApiClient)
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/flags"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/flags"), any(), eq(Void.class), eq(MISSION_ID));
   }
 
   @Test
@@ -278,7 +279,7 @@ class MissionCoreEditAjaxControllerTest {
             new BackendServiceException(
                 "conflict", null, 409, "OPTIMISTIC_LOCK", null, Collections.emptyList(), null))
         .when(backendApiClient)
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/schedule"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/schedule"), any(), eq(Void.class), eq(MISSION_ID));
 
     mockMvc
         .perform(

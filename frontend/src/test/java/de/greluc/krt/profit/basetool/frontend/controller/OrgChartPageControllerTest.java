@@ -140,7 +140,7 @@ class OrgChartPageControllerTest {
     BackendApiClient backend = mock(BackendApiClient.class);
     OrgChartPageController controller = new OrgChartPageController(backend);
     UUID id = UUID.randomUUID();
-    when(backend.put(eq("/api/v1/org-chart/positions/" + id), any(), eq(Object.class)))
+    when(backend.put(eq("/api/v1/org-chart/positions/{id}"), any(), eq(Object.class), eq(id)))
         .thenThrow(
             new BackendServiceException(
                 "conflict", null, 409, "OPTIMISTIC_LOCK", null, List.of(), "Stale."));
@@ -161,7 +161,7 @@ class OrgChartPageControllerTest {
     ResponseEntity<Object> response = controller.deletePosition(id);
 
     assertEquals(200, response.getStatusCode().value());
-    verify(backend).delete("/api/v1/org-chart/positions/" + id, Void.class);
+    verify(backend).delete("/api/v1/org-chart/positions/{id}", Void.class, id);
   }
 
   @Test
@@ -169,7 +169,7 @@ class OrgChartPageControllerTest {
     BackendApiClient backend = mock(BackendApiClient.class);
     OrgChartPageController controller = new OrgChartPageController(backend);
     UUID id = UUID.randomUUID();
-    when(backend.delete("/api/v1/org-chart/positions/" + id, Void.class))
+    when(backend.delete("/api/v1/org-chart/positions/{id}", Void.class, id))
         .thenThrow(
             new BackendServiceException(
                 "missing", null, 404, "NOT_FOUND", null, List.of(), "Gone."));
@@ -189,7 +189,8 @@ class OrgChartPageControllerTest {
     ResponseEntity<Object> response = controller.vacateLeader(id, 3L);
 
     assertEquals(200, response.getStatusCode().value());
-    verify(backend).delete("/api/v1/org-chart/positions/" + id + "/leader?version=3", Void.class);
+    verify(backend)
+        .delete("/api/v1/org-chart/positions/{id}/leader?version={version}", Void.class, id, 3L);
   }
 
   @Test
@@ -197,7 +198,8 @@ class OrgChartPageControllerTest {
     BackendApiClient backend = mock(BackendApiClient.class);
     OrgChartPageController controller = new OrgChartPageController(backend);
     UUID id = UUID.randomUUID();
-    when(backend.delete("/api/v1/org-chart/positions/" + id + "/leader?version=3", Void.class))
+    when(backend.delete(
+            "/api/v1/org-chart/positions/{id}/leader?version={version}", Void.class, id, 3L))
         .thenThrow(
             new BackendServiceException(
                 "bad", null, 400, "BAD_REQUEST", null, List.of(), "Not a Kommando."));

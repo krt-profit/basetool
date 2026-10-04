@@ -288,9 +288,10 @@ class AdminExchangeClientsPageControllerMvcTest {
 
     verify(backendApiClient)
         .post(
-            "/api/v1/admin/exchange-clients/" + ID + "/suspend",
+            "/api/v1/admin/exchange-clients/{id}/suspend",
             new ExchangeClientStatusRequest(3L),
-            ExchangeClientDto.class);
+            ExchangeClientDto.class,
+            ID);
   }
 
   @Test
@@ -408,12 +409,13 @@ class AdminExchangeClientsPageControllerMvcTest {
     ExchangeBulkUndoRequest scope =
         new ExchangeBulkUndoRequest(Instant.parse("2026-09-27T12:00:00Z"), null, "SHIP");
     when(backendApiClient.post(
-            "/api/v1/admin/exchange-clients/" + ID + "/undo/preview",
+            "/api/v1/admin/exchange-clients/{id}/undo/preview",
             scope,
-            ExchangeBulkUndoPreviewDto.class))
+            ExchangeBulkUndoPreviewDto.class,
+            ID))
         .thenReturn(new ExchangeBulkUndoPreviewDto(scope.since(), 3, 12L, true));
     when(backendApiClient.post(
-            "/api/v1/admin/exchange-clients/" + ID + "/undo", scope, ExchangeBulkUndoRunDto.class))
+            "/api/v1/admin/exchange-clients/{id}/undo", scope, ExchangeBulkUndoRunDto.class, ID))
         .thenReturn(run("RUNNING"));
     String body = "{\"since\":\"2026-09-27T12:00:00Z\",\"resource\":\"SHIP\"}";
 
@@ -442,9 +444,10 @@ class AdminExchangeClientsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void aSecondRunIsRelayedAsAConflict() throws Exception {
     when(backendApiClient.post(
-            eq("/api/v1/admin/exchange-clients/" + ID + "/undo"),
+            eq("/api/v1/admin/exchange-clients/{id}/undo"),
             any(),
-            eq(ExchangeBulkUndoRunDto.class)))
+            eq(ExchangeBulkUndoRunDto.class),
+            eq(ID)))
         .thenThrow(new BackendServiceException("running", null, 409));
 
     mockMvc

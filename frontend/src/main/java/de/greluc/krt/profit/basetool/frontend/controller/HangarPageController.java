@@ -658,7 +658,7 @@ public class HangarPageController {
               form.isFitted(),
               form.getVersion(),
               null);
-      backendApiClient.put("/api/v1/hangar/ships/" + id, request, ShipDto.class);
+      backendApiClient.put("/api/v1/hangar/ships/{id}", request, ShipDto.class, id);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.ship_update");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "PUT /api/v1/hangar/ships", id, e);
@@ -681,7 +681,7 @@ public class HangarPageController {
   @PostMapping("/{id}/delete")
   public String deleteShip(@PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/hangar/ships/" + id, Void.class);
+      backendApiClient.delete("/api/v1/hangar/ships/{id}", Void.class, id);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.ship_delete");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "DELETE /api/v1/hangar/ships", id, e);
@@ -772,7 +772,7 @@ public class HangarPageController {
         "update ship (ajax)",
         () -> {
           backendApiClient.put(
-              "/api/v1/hangar/ships/" + id,
+              "/api/v1/hangar/ships/{id}",
               new ShipRequestDto(
                   request.name(),
                   request.shipTypeId(),
@@ -781,7 +781,8 @@ public class HangarPageController {
                   request.fitted(),
                   request.version(),
                   null),
-              ShipDto.class);
+              ShipDto.class,
+              id);
           return ResponseEntity.noContent().build();
         });
   }
@@ -799,7 +800,7 @@ public class HangarPageController {
         log,
         "delete ship (ajax)",
         () -> {
-          backendApiClient.delete("/api/v1/hangar/ships/" + id, Void.class);
+          backendApiClient.delete("/api/v1/hangar/ships/{id}", Void.class, id);
           return ResponseEntity.noContent().build();
         });
   }

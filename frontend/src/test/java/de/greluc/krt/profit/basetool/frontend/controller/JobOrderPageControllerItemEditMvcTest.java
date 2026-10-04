@@ -237,9 +237,10 @@ class JobOrderPageControllerItemEditMvcTest {
     doReturn(order(id, "ITEM", List.of()))
         .when(backendApiClient)
         .put(
-            eq("/api/v1/orders/" + id + "/items"),
+            eq("/api/v1/orders/{id}/items"),
             any(CreateJobOrderItemRequestDto.class),
-            eq(JobOrderDto.class));
+            eq(JobOrderDto.class),
+            eq(id));
 
     mockMvc
         .perform(
@@ -257,9 +258,10 @@ class JobOrderPageControllerItemEditMvcTest {
 
     verify(backendApiClient)
         .put(
-            eq("/api/v1/orders/" + id + "/items"),
+            eq("/api/v1/orders/{id}/items"),
             any(CreateJobOrderItemRequestDto.class),
-            eq(JobOrderDto.class));
+            eq(JobOrderDto.class),
+            eq(id));
   }
 
   @Test

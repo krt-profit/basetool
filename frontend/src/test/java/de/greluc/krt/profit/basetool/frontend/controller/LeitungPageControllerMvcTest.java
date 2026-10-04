@@ -314,7 +314,11 @@ class LeitungPageControllerMvcTest {
     UUID squadronId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/squadrons/" + squadronId + "/ranks/" + userId), any(), eq(Object.class)))
+            eq("/api/v1/squadrons/{squadronId}/ranks/{userId}"),
+            any(),
+            eq(Object.class),
+            eq(squadronId),
+            eq(userId)))
         .thenReturn(new Object());
 
     mockMvc

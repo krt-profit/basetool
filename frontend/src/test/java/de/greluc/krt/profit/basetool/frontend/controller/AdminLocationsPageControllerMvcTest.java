@@ -194,7 +194,7 @@ class AdminLocationsPageControllerMvcTest {
     LocationDto after = new LocationDto(id, "ARC-L1", "desc", true, false, 1L);
     when(backendApiClient.get(eq("/api/v1/locations/" + id), eq(LocationDto.class)))
         .thenReturn(before, after);
-    when(backendApiClient.put(eq("/api/v1/locations/" + id), any(), eq(Void.class)))
+    when(backendApiClient.put(eq("/api/v1/locations/{id}"), any(), eq(Void.class), eq(id)))
         .thenReturn(null);
 
     mockMvc
@@ -212,7 +212,7 @@ class AdminLocationsPageControllerMvcTest {
     UUID id = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/locations/" + id), eq(LocationDto.class)))
         .thenReturn(new LocationDto(id, "ARC-L1", "desc", false, false, 0L));
-    when(backendApiClient.put(eq("/api/v1/locations/" + id), any(), eq(Void.class)))
+    when(backendApiClient.put(eq("/api/v1/locations/{id}"), any(), eq(Void.class), eq(id)))
         .thenThrow(
             new BackendServiceException(
                 "conflict", null, 409, "OPTIMISTIC_LOCK", null, java.util.List.of(), "conflict"));
@@ -231,7 +231,7 @@ class AdminLocationsPageControllerMvcTest {
     UUID id = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/locations/" + id), eq(LocationDto.class)))
         .thenReturn(new LocationDto(id, "ARC-L1", "desc", false, false, 0L));
-    when(backendApiClient.put(eq("/api/v1/locations/" + id), any(), eq(Void.class)))
+    when(backendApiClient.put(eq("/api/v1/locations/{id}"), any(), eq(Void.class), eq(id)))
         .thenReturn(null);
 
     mockMvc

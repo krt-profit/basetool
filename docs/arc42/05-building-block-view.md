@@ -119,7 +119,7 @@ directly.
 | Package | What lives there |
 | --- | --- |
 | `controller` | Thymeleaf page and fragment endpoints; AJAX mutation endpoints that return fragments; the domain-specific view shaping (`MissionDetailModelBuilder`, `BankDashboardViewAssembler`, …) |
-| `service` | `BackendApiClient` and its catalogue cache, `ParallelPageLoader`, the ingest handoff, live-sync presence, Markdown rendering |
+| `service` | The backend kernel — `BackendApiClient` with its catalogue cache and URI-template verbs, `BackendErrorMapper` (the one mapping of a failed call, a sealed `Outcome`), `BackendSideChannels` (the SSE relay and the live-sync probe) — plus `ParallelPageLoader`, the ingest handoff, live-sync presence, Markdown rendering |
 | `model` | The hand-mirrored DTO records (`model.dto`) and the form objects (`model.form`) |
 | `view` | `MoneyFormat` |
 | `websocket` | `/ws/sync`, the handler and the Redis fanout |

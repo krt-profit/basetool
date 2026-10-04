@@ -63,7 +63,7 @@ class HomeControllerTest {
 
     assertEquals(200, response.getStatusCode().value());
     verify(backendApiClient)
-        .put("/api/v1/users/me/read-announcement/" + ANNOUNCEMENT_ID, null, Void.class);
+        .put("/api/v1/users/me/read-announcement/{id}", null, Void.class, ANNOUNCEMENT_ID);
   }
 
   @Test
@@ -72,7 +72,7 @@ class HomeControllerTest {
     HomeController controller = new HomeController(backendApiClient);
     doThrow(new RuntimeException("backend down"))
         .when(backendApiClient)
-        .put(anyString(), any(), any());
+        .put(anyString(), any(), any(), any(Object[].class));
 
     var response = controller.markAnnouncementAsReadAjax(ANNOUNCEMENT_ID);
 

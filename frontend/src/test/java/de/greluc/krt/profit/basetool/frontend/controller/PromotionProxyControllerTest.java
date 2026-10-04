@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyClass;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
@@ -69,24 +70,24 @@ class PromotionProxyControllerTest {
   void updateTopic_appendsPathVariableAndForwardsBody() {
     UUID id = UUID.randomUUID();
     Map<String, Object> body = Map.of("version", 0, "name", "Renamed");
-    when(backendApiClient.put(eq("/api/v1/promotion/topics/" + id), eq(body), eq(Map.class)))
+    when(backendApiClient.put(eq("/api/v1/promotion/topics/{id}"), eq(body), eq(Map.class), eq(id)))
         .thenReturn(body);
 
     Map<?, ?> result = controller.updateTopic(id, body);
 
     assertEquals(body, result);
-    verify(backendApiClient).put("/api/v1/promotion/topics/" + id, body, Map.class);
+    verify(backendApiClient).put("/api/v1/promotion/topics/{id}", body, Map.class, id);
   }
 
   @Test
   void deleteTopic_returnsNoContent_andDelegatesToBackend() {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.delete(anyString(), anyClass())).thenReturn(null);
+    when(backendApiClient.delete(anyString(), anyClass(), any(Object[].class))).thenReturn(null);
 
     ResponseEntity<Void> response = controller.deleteTopic(id);
 
     assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-    verify(backendApiClient).delete("/api/v1/promotion/topics/" + id, Void.class);
+    verify(backendApiClient).delete("/api/v1/promotion/topics/{id}", Void.class, id);
   }
 
   @Test
@@ -104,22 +105,23 @@ class PromotionProxyControllerTest {
   void updateCategory_appendsPathVariable() {
     UUID id = UUID.randomUUID();
     Map<String, Object> body = Map.of("version", 0, "name", "Renamed");
-    when(backendApiClient.put(anyString(), eq(body), eq(Map.class))).thenReturn(body);
+    when(backendApiClient.put(anyString(), eq(body), eq(Map.class), any(Object[].class)))
+        .thenReturn(body);
 
     controller.updateCategory(id, body);
 
-    verify(backendApiClient).put("/api/v1/promotion/categories/" + id, body, Map.class);
+    verify(backendApiClient).put("/api/v1/promotion/categories/{id}", body, Map.class, id);
   }
 
   @Test
   void deleteCategory_returnsNoContent() {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.delete(anyString(), anyClass())).thenReturn(null);
+    when(backendApiClient.delete(anyString(), anyClass(), any(Object[].class))).thenReturn(null);
 
     ResponseEntity<Void> response = controller.deleteCategory(id);
 
     assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-    verify(backendApiClient).delete("/api/v1/promotion/categories/" + id, Void.class);
+    verify(backendApiClient).delete("/api/v1/promotion/categories/{id}", Void.class, id);
   }
 
   @Test
@@ -136,22 +138,23 @@ class PromotionProxyControllerTest {
   void updateRankRequirement_appendsPathVariable() {
     UUID id = UUID.randomUUID();
     Map<String, Object> body = Map.of("version", 0, "fromRank", 20, "toRank", 19);
-    when(backendApiClient.put(anyString(), eq(body), eq(Map.class))).thenReturn(body);
+    when(backendApiClient.put(anyString(), eq(body), eq(Map.class), any(Object[].class)))
+        .thenReturn(body);
 
     controller.updateRankRequirement(id, body);
 
-    verify(backendApiClient).put("/api/v1/promotion/rank-requirements/" + id, body, Map.class);
+    verify(backendApiClient).put("/api/v1/promotion/rank-requirements/{id}", body, Map.class, id);
   }
 
   @Test
   void deleteRankRequirement_returnsNoContent() {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.delete(anyString(), anyClass())).thenReturn(null);
+    when(backendApiClient.delete(anyString(), anyClass(), any(Object[].class))).thenReturn(null);
 
     ResponseEntity<Void> response = controller.deleteRankRequirement(id);
 
     assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-    verify(backendApiClient).delete("/api/v1/promotion/rank-requirements/" + id, Void.class);
+    verify(backendApiClient).delete("/api/v1/promotion/rank-requirements/{id}", Void.class, id);
   }
 
   @Test
@@ -169,22 +172,23 @@ class PromotionProxyControllerTest {
   void updateLevelContent_appendsPathVariable() {
     UUID id = UUID.randomUUID();
     Map<String, Object> body = Map.of("version", 0, "description", "updated");
-    when(backendApiClient.put(anyString(), eq(body), eq(Map.class))).thenReturn(body);
+    when(backendApiClient.put(anyString(), eq(body), eq(Map.class), any(Object[].class)))
+        .thenReturn(body);
 
     controller.updateLevelContent(id, body);
 
-    verify(backendApiClient).put("/api/v1/promotion/level-contents/" + id, body, Map.class);
+    verify(backendApiClient).put("/api/v1/promotion/level-contents/{id}", body, Map.class, id);
   }
 
   @Test
   void deleteLevelContent_returnsNoContent() {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.delete(anyString(), anyClass())).thenReturn(null);
+    when(backendApiClient.delete(anyString(), anyClass(), any(Object[].class))).thenReturn(null);
 
     ResponseEntity<Void> response = controller.deleteLevelContent(id);
 
     assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-    verify(backendApiClient).delete("/api/v1/promotion/level-contents/" + id, Void.class);
+    verify(backendApiClient).delete("/api/v1/promotion/level-contents/{id}", Void.class, id);
   }
 
   @Test

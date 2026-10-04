@@ -60,10 +60,10 @@ class BackendCallExistenceTest {
    */
   private static final Map<String, String> UNRESOLVED_EXCEPTIONS =
       Map.of(
-          "LiveSyncSubscriptionAuthorizer#probeOne GET uri",
+          "BackendSideChannels#probeStatus GET uri",
           "a LiveSyncTopicClass probe template with the topic id filled in; covered by"
               + " everyLiveSyncProbeTemplateIsAnExistingGet",
-          "LiveSyncSubscriptionAuthorizer#probeCapability GET path",
+          "BackendSideChannels#probeBody GET path",
           "the LiveSyncTopicClass capability probe template; covered by"
               + " everyLiveSyncProbeTemplateIsAnExistingGet");
 
@@ -150,7 +150,7 @@ class BackendCallExistenceTest {
         .isEmpty();
     assertThat(
             UNRESOLVED_EXCEPTIONS.keySet().stream()
-                .filter(k -> k.startsWith("LiveSyncSubscriptionAuthorizer#"))
+                .filter(k -> k.startsWith("BackendSideChannels#probe"))
                 .allMatch(k -> k.contains(" GET ")))
         .as("the authorizer sends every probe as a GET")
         .isTrue();

@@ -191,9 +191,10 @@ class AdminDiscordRegistrationsNicknameRenderTest {
     UUID id = UUID.randomUUID();
     UUID target = UUID.randomUUID();
     when(backendApiClient.post(
-            eq("/api/v1/admin/registrations/" + id + "/link"),
+            eq("/api/v1/admin/registrations/{id}/link"),
             any(),
-            eq(PendingRegistrationDto.class)))
+            eq(PendingRegistrationDto.class),
+            eq(id)))
         .thenReturn(
             new PendingRegistrationDto(
                 target,
@@ -338,9 +339,10 @@ class AdminDiscordRegistrationsNicknameRenderTest {
   void reopenAjax_forwardsToBackend_andReturnsOk() throws Exception {
     UUID id = UUID.randomUUID();
     when(backendApiClient.post(
-            eq("/api/v1/admin/registrations/" + id + "/reopen"),
+            eq("/api/v1/admin/registrations/{id}/reopen"),
             any(),
-            eq(PendingRegistrationDto.class)))
+            eq(PendingRegistrationDto.class),
+            eq(id)))
         .thenReturn(
             new PendingRegistrationDto(
                 id,

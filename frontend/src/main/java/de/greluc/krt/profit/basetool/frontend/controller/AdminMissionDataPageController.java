@@ -367,7 +367,7 @@ public class AdminMissionDataPageController {
               form.isLeadershipRole(),
               form.isMissionLead(),
               form.version());
-      backendApiClient.put("/api/v1/job-types/" + id, body, Void.class);
+      backendApiClient.put("/api/v1/job-types/{id}", body, Void.class, id);
       backendApiClient.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
@@ -400,7 +400,7 @@ public class AdminMissionDataPageController {
   public String deleteJobType(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/job-types/" + id, Void.class);
+      backendApiClient.delete("/api/v1/job-types/{id}", Void.class, id);
       backendApiClient.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
@@ -430,7 +430,7 @@ public class AdminMissionDataPageController {
   public String activateJobType(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.post("/api/v1/job-types/" + id + "/activate", null, Void.class);
+      backendApiClient.post("/api/v1/job-types/{id}/activate", null, Void.class, id);
       backendApiClient.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
@@ -519,7 +519,7 @@ public class AdminMissionDataPageController {
               true,
               false,
               form.version());
-      backendApiClient.put("/api/v1/squadrons/" + id, body, Void.class);
+      backendApiClient.put("/api/v1/squadrons/{id}", body, Void.class, id);
       backendApiClient.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
@@ -552,7 +552,7 @@ public class AdminMissionDataPageController {
   public String deleteSquadron(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/squadrons/" + id, Void.class);
+      backendApiClient.delete("/api/v1/squadrons/{id}", Void.class, id);
       backendApiClient.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
@@ -582,7 +582,7 @@ public class AdminMissionDataPageController {
   public String activateSquadron(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.post("/api/v1/squadrons/" + id + "/activate", null, Void.class);
+      backendApiClient.post("/api/v1/squadrons/{id}/activate", null, Void.class, id);
       backendApiClient.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
@@ -660,7 +660,7 @@ public class AdminMissionDataPageController {
       body.put("description", form.description());
       body.put("active", active != null ? active : true);
       body.put("version", form.version());
-      backendApiClient.put("/api/v1/frequency-types/" + id, body, Void.class);
+      backendApiClient.put("/api/v1/frequency-types/{id}", body, Void.class, id);
       backendApiClient.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
@@ -689,7 +689,7 @@ public class AdminMissionDataPageController {
   public String deleteFrequencyType(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/frequency-types/" + id, Void.class);
+      backendApiClient.delete("/api/v1/frequency-types/{id}", Void.class, id);
       backendApiClient.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
@@ -719,7 +719,7 @@ public class AdminMissionDataPageController {
   public String activateFrequencyType(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.post("/api/v1/frequency-types/" + id + "/activate", null, Void.class);
+      backendApiClient.post("/api/v1/frequency-types/{id}/activate", null, Void.class, id);
       backendApiClient.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
@@ -802,7 +802,7 @@ public class AdminMissionDataPageController {
     return okOrRelay(
         () ->
             backendApiClient.put(
-                "/api/v1/job-types/" + id,
+                "/api/v1/job-types/{id}",
                 new JobTypeDto(
                     id,
                     form.name(),
@@ -813,7 +813,8 @@ public class AdminMissionDataPageController {
                     form.isLeadershipRole(),
                     form.isMissionLead(),
                     form.version()),
-                Void.class));
+                Void.class,
+                id));
   }
 
   /**
@@ -825,7 +826,7 @@ public class AdminMissionDataPageController {
   @ResponseBody
   @PostMapping(value = "/job-types/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> deleteJobTypeAjax(@PathVariable @NotNull UUID id) {
-    return okOrRelay(() -> backendApiClient.delete("/api/v1/job-types/" + id, Void.class));
+    return okOrRelay(() -> backendApiClient.delete("/api/v1/job-types/{id}", Void.class, id));
   }
 
   /**
@@ -839,7 +840,7 @@ public class AdminMissionDataPageController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> activateJobTypeAjax(@PathVariable @NotNull UUID id) {
     return okOrRelay(
-        () -> backendApiClient.post("/api/v1/job-types/" + id + "/activate", null, Void.class));
+        () -> backendApiClient.post("/api/v1/job-types/{id}/activate", null, Void.class, id));
   }
 
   /**
@@ -887,7 +888,7 @@ public class AdminMissionDataPageController {
     return okOrRelay(
         () ->
             backendApiClient.put(
-                "/api/v1/squadrons/" + id,
+                "/api/v1/squadrons/{id}",
                 new SquadronDto(
                     id,
                     form.name(),
@@ -897,7 +898,8 @@ public class AdminMissionDataPageController {
                     true,
                     false,
                     form.version()),
-                Void.class));
+                Void.class,
+                id));
   }
 
   /**
@@ -909,7 +911,7 @@ public class AdminMissionDataPageController {
   @ResponseBody
   @PostMapping(value = "/squadrons/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> deleteSquadronAjax(@PathVariable @NotNull UUID id) {
-    return okOrRelay(() -> backendApiClient.delete("/api/v1/squadrons/" + id, Void.class));
+    return okOrRelay(() -> backendApiClient.delete("/api/v1/squadrons/{id}", Void.class, id));
   }
 
   /**
@@ -923,7 +925,7 @@ public class AdminMissionDataPageController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> activateSquadronAjax(@PathVariable @NotNull UUID id) {
     return okOrRelay(
-        () -> backendApiClient.post("/api/v1/squadrons/" + id + "/activate", null, Void.class));
+        () -> backendApiClient.post("/api/v1/squadrons/{id}/activate", null, Void.class, id));
   }
 
   /**
@@ -979,7 +981,7 @@ public class AdminMissionDataPageController {
           body.put("description", form.description());
           body.put("active", active != null ? active : true);
           body.put("version", form.version());
-          backendApiClient.put("/api/v1/frequency-types/" + id, body, Void.class);
+          backendApiClient.put("/api/v1/frequency-types/{id}", body, Void.class, id);
         });
   }
 
@@ -992,7 +994,7 @@ public class AdminMissionDataPageController {
   @ResponseBody
   @PostMapping(value = "/frequency-types/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> deleteFrequencyTypeAjax(@PathVariable @NotNull UUID id) {
-    return okOrRelay(() -> backendApiClient.delete("/api/v1/frequency-types/" + id, Void.class));
+    return okOrRelay(() -> backendApiClient.delete("/api/v1/frequency-types/{id}", Void.class, id));
   }
 
   /**
@@ -1007,8 +1009,7 @@ public class AdminMissionDataPageController {
       headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> activateFrequencyTypeAjax(@PathVariable @NotNull UUID id) {
     return okOrRelay(
-        () ->
-            backendApiClient.post("/api/v1/frequency-types/" + id + "/activate", null, Void.class));
+        () -> backendApiClient.post("/api/v1/frequency-types/{id}/activate", null, Void.class, id));
   }
 
   /**

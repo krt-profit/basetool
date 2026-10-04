@@ -606,7 +606,8 @@ class InventoryPageControllerTest {
     when(bindingResult.hasErrors()).thenReturn(false);
     RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
 
-    when(backendApiClient.post(anyString(), any(), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.post(anyString(), any(), eq(Void.class), any(Object[].class)))
+        .thenReturn(null);
 
     String view =
         writeController.bookOutInventoryItem(
@@ -625,7 +626,7 @@ class InventoryPageControllerTest {
     when(bindingResult.hasErrors()).thenReturn(false);
     RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
 
-    when(backendApiClient.post(anyString(), any(), eq(Void.class)))
+    when(backendApiClient.post(anyString(), any(), eq(Void.class), any(Object[].class)))
         .thenThrow(new RuntimeException("Update error"));
 
     String view =
@@ -647,7 +648,8 @@ class InventoryPageControllerTest {
     when(bindingResult.hasErrors()).thenReturn(false);
     RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
 
-    when(backendApiClient.post(anyString(), any(), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.post(anyString(), any(), eq(Void.class), any(Object[].class)))
+        .thenReturn(null);
 
     String referer =
         "https://example.org/inventory/my?materialIds=11111111-1111-1111-1111-111111111111&minQuality=50&jobOrderIds=22222222-2222-2222-2222-222222222222&fragment=true";
@@ -731,7 +733,7 @@ class InventoryPageControllerTest {
             null,
             null);
     when(backendApiClient.put(
-            eq("/api/v1/inventory/" + id + "/note"), eq(request), eq(InventoryItemDto.class)))
+            eq("/api/v1/inventory/{id}/note"), eq(request), eq(InventoryItemDto.class), eq(id)))
         .thenReturn(updated);
 
     org.springframework.http.ResponseEntity<InventoryItemDto> response =
@@ -748,7 +750,8 @@ class InventoryPageControllerTest {
     de.greluc.krt.profit.basetool.frontend.service.BackendServiceException ex =
         new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
             "Backend service returned error: 409 CONFLICT", null, 409);
-    when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(ex);
+    when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class), any(Object[].class)))
+        .thenThrow(ex);
 
     org.springframework.http.ResponseEntity<InventoryItemDto> response =
         writeController.updateInventoryItemNote(id, request);
@@ -763,7 +766,8 @@ class InventoryPageControllerTest {
     de.greluc.krt.profit.basetool.frontend.service.BackendServiceException ex =
         new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
             "Backend service returned error: 403 FORBIDDEN", null, 403);
-    when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(ex);
+    when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class), any(Object[].class)))
+        .thenThrow(ex);
 
     org.springframework.http.ResponseEntity<InventoryItemDto> response =
         writeController.updateInventoryItemNote(id, request);
@@ -775,7 +779,7 @@ class InventoryPageControllerTest {
   void updateInventoryItemNote_shouldReturn500OnGenericException() {
     UUID id = UUID.randomUUID();
     InventoryItemNoteUpdateRequest request = new InventoryItemNoteUpdateRequest("hello", 1L);
-    when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class)))
+    when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class), any(Object[].class)))
         .thenThrow(new RuntimeException("boom"));
 
     org.springframework.http.ResponseEntity<InventoryItemDto> response =
@@ -801,7 +805,7 @@ class InventoryPageControllerTest {
             null,
             null);
     when(backendApiClient.post(
-            eq("/api/v1/inventory/" + id + "/book-out"), eq(dto), eq(InventoryItemDto.class)))
+            eq("/api/v1/inventory/{id}/book-out"), eq(dto), eq(InventoryItemDto.class), eq(id)))
         .thenReturn(null);
 
     org.springframework.http.ResponseEntity<Object> response =
@@ -848,7 +852,7 @@ class InventoryPageControllerTest {
             null,
             null);
     when(backendApiClient.post(
-            eq("/api/v1/inventory/" + id + "/book-out"), eq(dto), eq(InventoryItemDto.class)))
+            eq("/api/v1/inventory/{id}/book-out"), eq(dto), eq(InventoryItemDto.class), eq(id)))
         .thenReturn(remaining);
 
     org.springframework.http.ResponseEntity<Object> response =
@@ -883,7 +887,8 @@ class InventoryPageControllerTest {
             null,
             java.util.List.of(),
             null);
-    when(backendApiClient.post(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(ex);
+    when(backendApiClient.post(anyString(), any(), eq(InventoryItemDto.class), any(Object[].class)))
+        .thenThrow(ex);
 
     org.springframework.http.ResponseEntity<Object> response =
         writeController.transferInventoryItem(id, dto);
@@ -922,7 +927,10 @@ class InventoryPageControllerTest {
             null,
             null);
     when(backendApiClient.patch(
-            eq("/api/v1/inventory/" + id + "/delivered"), eq(request), eq(InventoryItemDto.class)))
+            eq("/api/v1/inventory/{id}/delivered"),
+            eq(request),
+            eq(InventoryItemDto.class),
+            eq(id)))
         .thenReturn(updated);
 
     org.springframework.http.ResponseEntity<Object> response =
@@ -946,7 +954,9 @@ class InventoryPageControllerTest {
             null,
             java.util.List.of(),
             null);
-    when(backendApiClient.patch(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(ex);
+    when(backendApiClient.patch(
+            anyString(), any(), eq(InventoryItemDto.class), any(Object[].class)))
+        .thenThrow(ex);
 
     org.springframework.http.ResponseEntity<Object> response =
         writeController.updateDelivered(id, request);
@@ -985,9 +995,10 @@ class InventoryPageControllerTest {
             null,
             null);
     when(backendApiClient.post(
-            eq("/api/v1/inventory/" + id + "/personal-rebook"),
+            eq("/api/v1/inventory/{id}/personal-rebook"),
             eq(dto),
-            eq(InventoryItemDto.class)))
+            eq(InventoryItemDto.class),
+            eq(id)))
         .thenReturn(newRow);
 
     org.springframework.http.ResponseEntity<Object> response =
@@ -997,9 +1008,10 @@ class InventoryPageControllerTest {
     assertSame(newRow, response.getBody());
     verify(backendApiClient)
         .post(
-            eq("/api/v1/inventory/" + id + "/personal-rebook"),
+            eq("/api/v1/inventory/{id}/personal-rebook"),
             eq(dto),
-            eq(InventoryItemDto.class));
+            eq(InventoryItemDto.class),
+            eq(id));
   }
 
   @Test
@@ -1015,7 +1027,8 @@ class InventoryPageControllerTest {
             null,
             java.util.List.of(),
             null);
-    when(backendApiClient.post(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(ex);
+    when(backendApiClient.post(anyString(), any(), eq(InventoryItemDto.class), any(Object[].class)))
+        .thenThrow(ex);
 
     org.springframework.http.ResponseEntity<Object> response =
         writeController.rebookPersonalInventoryItem(id, dto);

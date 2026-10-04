@@ -282,7 +282,11 @@ class LeitungPageControllerTest {
     UUID squadronId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     when(backend.put(
-            eq("/api/v1/squadrons/" + squadronId + "/ranks/" + userId), any(), eq(Object.class)))
+            eq("/api/v1/squadrons/{squadronId}/ranks/{userId}"),
+            any(),
+            eq(Object.class),
+            eq(squadronId),
+            eq(userId)))
         .thenReturn(new Object());
 
     ResponseEntity<Object> response =
@@ -298,7 +302,11 @@ class LeitungPageControllerTest {
     UUID squadronId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     when(backend.put(
-            eq("/api/v1/squadrons/" + squadronId + "/ranks/" + userId), any(), eq(Object.class)))
+            eq("/api/v1/squadrons/{squadronId}/ranks/{userId}"),
+            any(),
+            eq(Object.class),
+            eq(squadronId),
+            eq(userId)))
         .thenThrow(
             new BackendServiceException(
                 "conflict", null, 409, "OPTIMISTIC_LOCK", null, List.of(), "Stale."));
@@ -323,7 +331,11 @@ class LeitungPageControllerTest {
     assertEquals(200, response.getStatusCode().value());
     verify(backend)
         .delete(
-            "/api/v1/squadrons/" + squadronId + "/ranks/" + userId + "?version=4", Object.class);
+            "/api/v1/squadrons/{squadronId}/ranks/{userId}?version={version}",
+            Object.class,
+            squadronId,
+            userId,
+            4L);
   }
 
   @Test
@@ -332,7 +344,10 @@ class LeitungPageControllerTest {
     LeitungPageController controller = new LeitungPageController(backend);
     UUID squadronId = UUID.randomUUID();
     when(backend.post(
-            eq("/api/v1/squadrons/" + squadronId + "/kommando-groups"), any(), eq(Object.class)))
+            eq("/api/v1/squadrons/{squadronId}/kommando-groups"),
+            any(),
+            eq(Object.class),
+            eq(squadronId)))
         .thenReturn(new Object());
 
     ResponseEntity<Object> response =
@@ -347,9 +362,10 @@ class LeitungPageControllerTest {
     LeitungPageController controller = new LeitungPageController(backend);
     UUID bereichId = UUID.randomUUID();
     when(backend.post(
-            eq("/api/v1/org-hierarchy/bereiche/" + bereichId + "/members"),
+            eq("/api/v1/org-hierarchy/bereiche/{bereichId}/members"),
             any(),
-            eq(Object.class)))
+            eq(Object.class),
+            eq(bereichId)))
         .thenThrow(
             new BackendServiceException(
                 "denied", null, 403, "ACCESS_DENIED", null, List.of(), "No."));
@@ -369,9 +385,11 @@ class LeitungPageControllerTest {
     UUID skId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     when(backend.patch(
-            eq("/api/v1/special-commands/" + skId + "/members/" + userId + "/lead"),
+            eq("/api/v1/special-commands/{skId}/members/{userId}/lead"),
             any(),
-            eq(Object.class)))
+            eq(Object.class),
+            eq(skId),
+            eq(userId)))
         .thenReturn(new Object());
 
     ResponseEntity<Object> response =
@@ -392,7 +410,9 @@ class LeitungPageControllerTest {
     assertEquals(200, response.getStatusCode().value());
     verify(backend)
         .delete(
-            "/api/v1/org-hierarchy/organisationsleitung/" + olId + "/members/" + userId,
-            Object.class);
+            "/api/v1/org-hierarchy/organisationsleitung/{olId}/members/{userId}",
+            Object.class,
+            olId,
+            userId);
   }
 }

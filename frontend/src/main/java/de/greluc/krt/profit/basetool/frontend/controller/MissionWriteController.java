@@ -196,7 +196,7 @@ public class MissionWriteController {
       }
       body.put("comment", form.comment());
 
-      backendApiClient.post("/api/v1/missions/" + id + "/participants/add", body, Void.class);
+      backendApiClient.post("/api/v1/missions/{id}/participants/add", body, Void.class, id);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Add participant failed with status {}: {}", e.getStatusCode(), e.getMessage());
@@ -242,7 +242,7 @@ public class MissionWriteController {
         body.put("guestName", guestName);
       }
       body.put("version", version != null ? version : 0L);
-      backendApiClient.put("/api/v1/missions/" + id + "/party-lead", body, Void.class);
+      backendApiClient.put("/api/v1/missions/{id}/party-lead", body, Void.class, id);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Set party lead failed with status {}: {}", e.getStatusCode(), e.getMessage());
@@ -285,7 +285,7 @@ public class MissionWriteController {
             out.put("guestName", guestName);
           }
           out.put("version", body.get("version") != null ? body.get("version") : 0L);
-          backendApiClient.put("/api/v1/missions/" + id + "/party-lead", out, Void.class);
+          backendApiClient.put("/api/v1/missions/{id}/party-lead", out, Void.class, id);
           MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION);
           return ResponseEntity.ok(mission);
         });
@@ -305,9 +305,11 @@ public class MissionWriteController {
       RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.post(
-          "/api/v1/missions/" + id + "/participants/" + participantId + "/check-in/slim",
+          "/api/v1/missions/{id}/participants/{participantId}/check-in/slim",
           null,
-          Void.class);
+          Void.class,
+          id,
+          participantId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "checkInParticipant", participantId, e);
@@ -333,9 +335,11 @@ public class MissionWriteController {
       RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.post(
-          "/api/v1/missions/" + id + "/participants/" + participantId + "/check-out/slim",
+          "/api/v1/missions/{id}/participants/{participantId}/check-out/slim",
           null,
-          Void.class);
+          Void.class,
+          id,
+          participantId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "checkOutParticipant", participantId, e);
@@ -371,13 +375,11 @@ public class MissionWriteController {
         () -> {
           Object updatedParticipant =
               backendApiClient.put(
-                  "/api/v1/missions/"
-                      + id
-                      + "/participants/"
-                      + participantId
-                      + "/payout-preference/slim",
+                  "/api/v1/missions/{id}/participants/{participantId}/payout-preference/slim",
                   request,
-                  Object.class);
+                  Object.class,
+                  id,
+                  participantId);
           return ResponseEntity.ok(updatedParticipant);
         });
   }
@@ -415,7 +417,7 @@ public class MissionWriteController {
       schedulePatch.put("actualEndTime", newEnd);
       schedulePatch.put("version", request.version());
 
-      backendApiClient.patch("/api/v1/missions/" + id + "/schedule", schedulePatch, Void.class);
+      backendApiClient.patch("/api/v1/missions/{id}/schedule", schedulePatch, Void.class, id);
       MissionDto refreshed = backendApiClient.get("/api/v1/missions/" + id, MissionDto.class);
       return ResponseEntity.ok(refreshed);
     } catch (BackendServiceException e) {
@@ -448,7 +450,7 @@ public class MissionWriteController {
       RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.delete(
-          "/api/v1/missions/" + id + "/participants/" + participantId + "/slim", Void.class);
+          "/api/v1/missions/{id}/participants/{participantId}/slim", Void.class, id, participantId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "deleteParticipant", participantId, e);
@@ -512,7 +514,11 @@ public class MissionWriteController {
       }
 
       backendApiClient.put(
-          "/api/v1/missions/" + id + "/participants/" + participantId + "/slim", body, Void.class);
+          "/api/v1/missions/{id}/participants/{participantId}/slim",
+          body,
+          Void.class,
+          id,
+          participantId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Update participant failed", e);
@@ -550,7 +556,7 @@ public class MissionWriteController {
       body.put("responsibleUserId", responsibleUserId);
       body.put("note", note);
 
-      backendApiClient.post("/api/v1/missions/" + id + "/units/slim", body, Void.class);
+      backendApiClient.post("/api/v1/missions/{id}/units/slim", body, Void.class, id);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Add unit failed", e);
@@ -590,7 +596,7 @@ public class MissionWriteController {
       body.put("note", note);
 
       backendApiClient.put(
-          "/api/v1/missions/" + id + "/units/" + unitId + "/slim", body, Void.class);
+          "/api/v1/missions/{id}/units/{unitId}/slim", body, Void.class, id, unitId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Update unit failed", e);
@@ -612,7 +618,7 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID unitId,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/missions/" + id + "/units/" + unitId + "/slim", Void.class);
+      backendApiClient.delete("/api/v1/missions/{id}/units/{unitId}/slim", Void.class, id, unitId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (Exception e) {
       log.error("Delete unit failed", e);
@@ -648,7 +654,7 @@ public class MissionWriteController {
       }
 
       backendApiClient.post(
-          "/api/v1/missions/" + id + "/units/" + unitId + "/crew/slim", body, Void.class);
+          "/api/v1/missions/{id}/units/{unitId}/crew/slim", body, Void.class, id, unitId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Add crew failed", e);
@@ -687,9 +693,12 @@ public class MissionWriteController {
       }
 
       backendApiClient.put(
-          "/api/v1/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/slim",
+          "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim",
           body,
-          Void.class);
+          Void.class,
+          id,
+          unitId,
+          crewId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Update crew failed", e);
@@ -713,7 +722,11 @@ public class MissionWriteController {
       RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.delete(
-          "/api/v1/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/slim", Void.class);
+          "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim",
+          Void.class,
+          id,
+          unitId,
+          crewId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (Exception e) {
       log.error("Delete crew failed", e);
@@ -897,7 +910,7 @@ public class MissionWriteController {
       schedulePatch.put("actualStartTime", actualStartTime);
       schedulePatch.put("actualEndTime", actualEndTime);
       schedulePatch.put("version", form.scheduleVersion());
-      backendApiClient.patch("/api/v1/missions/" + id + "/schedule", schedulePatch, Void.class);
+      backendApiClient.patch("/api/v1/missions/{id}/schedule", schedulePatch, Void.class, id);
     }
 
     if (saveCore) {
@@ -913,14 +926,14 @@ public class MissionWriteController {
       corePatch.put("operationId", operationId);
       corePatch.put("meetingPoint", form.meetingPoint());
       corePatch.put("version", form.coreVersion());
-      backendApiClient.patch("/api/v1/missions/" + id + "/core", corePatch, Void.class);
+      backendApiClient.patch("/api/v1/missions/{id}/core", corePatch, Void.class, id);
     }
 
     if (saveFlags) {
       Map<String, Object> flagsPatch = new LinkedHashMap<>();
       flagsPatch.put("isInternal", form.isInternal() != null && form.isInternal());
       flagsPatch.put("version", form.flagsVersion());
-      backendApiClient.patch("/api/v1/missions/" + id + "/flags", flagsPatch, Void.class);
+      backendApiClient.patch("/api/v1/missions/{id}/flags", flagsPatch, Void.class, id);
     }
   }
 
@@ -987,7 +1000,7 @@ public class MissionWriteController {
   public String deleteMission(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/missions/" + id, Void.class);
+      backendApiClient.delete("/api/v1/missions/{id}", Void.class, id);
       liveSyncLocalBus.publish("missions", MISSIONS_LIST_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.mission_delete");
     } catch (Exception e) {
@@ -1031,9 +1044,11 @@ public class MissionWriteController {
       log.debug("CALLING BACKEND - Mission: {}, User: {}", missionUuid, userUuid);
       try {
         backendApiClient.post(
-            "/api/v1/missions/" + missionUuid + "/managers/" + userUuid + "/slim",
+            "/api/v1/missions/{missionUuid}/managers/{userUuid}/slim",
             null,
-            String.class);
+            String.class,
+            missionUuid,
+            userUuid);
         log.debug("SUCCESS - Manager {} added to mission {}", userUuid, missionUuid);
         return ResponseEntity.ok().build();
       } catch (BackendServiceException e) {
@@ -1100,7 +1115,10 @@ public class MissionWriteController {
 
           log.debug("CALLING BACKEND DELETE - Mission: {}, User: {}", missionUuid, userUuid);
           backendApiClient.delete(
-              "/api/v1/missions/" + missionUuid + "/managers/" + userUuid + "/slim", Object.class);
+              "/api/v1/missions/{missionUuid}/managers/{userUuid}/slim",
+              Object.class,
+              missionUuid,
+              userUuid);
           log.debug("SUCCESS DELETE - Manager {} removed from mission {}", userUuid, missionUuid);
           return ResponseEntity.ok().build();
         });
@@ -1137,7 +1155,7 @@ public class MissionWriteController {
       Map<String, Object> out = new HashMap<>();
       out.put("userId", userId);
       out.put("version", body.get("version") != null ? body.get("version") : 0L);
-      backendApiClient.put("/api/v1/missions/" + id + "/owner", out, Void.class);
+      backendApiClient.put("/api/v1/missions/{id}/owner", out, Void.class, id);
       MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION);
       return ResponseEntity.ok(mission);
     } catch (BackendServiceException e) {
@@ -1178,7 +1196,7 @@ public class MissionWriteController {
                   ? owningOrgUnitId
                   : null);
           out.put("version", body.get("version") != null ? body.get("version") : 0L);
-          backendApiClient.put("/api/v1/missions/" + id + "/owning-org-unit", out, Void.class);
+          backendApiClient.put("/api/v1/missions/{id}/owning-org-unit", out, Void.class, id);
           MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION);
           return ResponseEntity.ok(mission);
         });
@@ -1203,7 +1221,7 @@ public class MissionWriteController {
       body.put("frequencyTypeId", frequencyTypeId);
       body.put("value", value);
 
-      backendApiClient.post("/api/v1/missions/" + id + "/frequencies/slim", body, Void.class);
+      backendApiClient.post("/api/v1/missions/{id}/frequencies/slim", body, Void.class, id);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Add or update frequency failed", e);
@@ -1226,7 +1244,7 @@ public class MissionWriteController {
       RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.delete(
-          "/api/v1/missions/" + id + "/frequencies/" + frequencyId + "/slim", Void.class);
+          "/api/v1/missions/{id}/frequencies/{frequencyId}/slim", Void.class, id, frequencyId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (Exception e) {
       log.error("Delete frequency failed", e);
@@ -1252,7 +1270,7 @@ public class MissionWriteController {
         () -> {
           Object result =
               backendApiClient.post(
-                  "/api/v1/missions/" + id + "/frequencies/slim", body, Object.class);
+                  "/api/v1/missions/{id}/frequencies/slim", body, Object.class, id);
           return ResponseEntity.ok(result);
         });
   }
@@ -1274,7 +1292,10 @@ public class MissionWriteController {
         () -> {
           Object result =
               backendApiClient.delete(
-                  "/api/v1/missions/" + id + "/frequencies/" + frequencyId + "/slim", Object.class);
+                  "/api/v1/missions/{id}/frequencies/{frequencyId}/slim",
+                  Object.class,
+                  id,
+                  frequencyId);
           return ResponseEntity.ok(result);
         });
   }
@@ -1297,7 +1318,7 @@ public class MissionWriteController {
         () -> {
           Object result =
               backendApiClient.post(
-                  "/api/v1/missions/" + id + "/frequencies/custom/slim", body, Object.class);
+                  "/api/v1/missions/{id}/frequencies/custom/slim", body, Object.class, id);
           return ResponseEntity.ok(result);
         });
   }
@@ -1326,9 +1347,11 @@ public class MissionWriteController {
         () -> {
           Object result =
               backendApiClient.put(
-                  "/api/v1/missions/" + id + "/frequencies/custom/" + frequencyId + "/slim",
+                  "/api/v1/missions/{id}/frequencies/custom/{frequencyId}/slim",
                   body,
-                  Object.class);
+                  Object.class,
+                  id,
+                  frequencyId);
           return ResponseEntity.ok(result);
         });
   }
@@ -1347,7 +1370,7 @@ public class MissionWriteController {
         "add unit (ajax) for mission " + id,
         () -> {
           Object result =
-              backendApiClient.post("/api/v1/missions/" + id + "/units/slim", body, Object.class);
+              backendApiClient.post("/api/v1/missions/{id}/units/slim", body, Object.class, id);
           return ResponseEntity.ok(result);
         });
   }
@@ -1368,7 +1391,7 @@ public class MissionWriteController {
         () -> {
           Object result =
               backendApiClient.put(
-                  "/api/v1/missions/" + id + "/units/" + unitId + "/slim", body, Object.class);
+                  "/api/v1/missions/{id}/units/{unitId}/slim", body, Object.class, id, unitId);
           return ResponseEntity.ok(result);
         });
   }
@@ -1383,7 +1406,7 @@ public class MissionWriteController {
         "delete unit (ajax) for mission " + id + " unit " + unitId,
         () -> {
           backendApiClient.delete(
-              "/api/v1/missions/" + id + "/units/" + unitId + "/slim", Void.class);
+              "/api/v1/missions/{id}/units/{unitId}/slim", Void.class, id, unitId);
           return ResponseEntity.noContent().build();
         });
   }
@@ -1404,7 +1427,7 @@ public class MissionWriteController {
         "add step (ajax) for mission " + id,
         () -> {
           Object result =
-              backendApiClient.post("/api/v1/missions/" + id + "/steps/slim", body, Object.class);
+              backendApiClient.post("/api/v1/missions/{id}/steps/slim", body, Object.class, id);
           return ResponseEntity.ok(result);
         });
   }
@@ -1429,7 +1452,7 @@ public class MissionWriteController {
         () -> {
           Object result =
               backendApiClient.put(
-                  "/api/v1/missions/" + id + "/steps/" + stepId + "/slim", body, Object.class);
+                  "/api/v1/missions/{id}/steps/{stepId}/slim", body, Object.class, id, stepId);
           return ResponseEntity.ok(result);
         });
   }
@@ -1454,13 +1477,11 @@ public class MissionWriteController {
         () -> {
           Object result =
               backendApiClient.delete(
-                  "/api/v1/missions/"
-                      + id
-                      + "/steps/"
-                      + stepId
-                      + "/slim?stepsVersion="
-                      + stepsVersion,
-                  Object.class);
+                  "/api/v1/missions/{id}/steps/{stepId}/slim?stepsVersion={stepsVersion}",
+                  Object.class,
+                  id,
+                  stepId,
+                  stepsVersion);
           return ResponseEntity.ok(result);
         });
   }
@@ -1482,7 +1503,7 @@ public class MissionWriteController {
         () -> {
           Object result =
               backendApiClient.put(
-                  "/api/v1/missions/" + id + "/steps/reorder/slim", body, Object.class);
+                  "/api/v1/missions/{id}/steps/reorder/slim", body, Object.class, id);
           return ResponseEntity.ok(result);
         });
   }
@@ -1509,7 +1530,7 @@ public class MissionWriteController {
         () -> {
           Object result =
               backendApiClient.patch(
-                  "/api/v1/missions/" + id + "/steps/" + stepId + "/done/slim", body, Object.class);
+                  "/api/v1/missions/{id}/steps/{stepId}/done/slim", body, Object.class, id, stepId);
           return ResponseEntity.ok(result);
         });
   }
@@ -1531,7 +1552,7 @@ public class MissionWriteController {
         () -> {
           Object result =
               backendApiClient.post(
-                  "/api/v1/missions/" + id + "/objectives/slim", body, Object.class);
+                  "/api/v1/missions/{id}/objectives/slim", body, Object.class, id);
           return ResponseEntity.ok(result);
         });
   }
@@ -1558,9 +1579,11 @@ public class MissionWriteController {
         () -> {
           Object result =
               backendApiClient.put(
-                  "/api/v1/missions/" + id + "/objectives/" + objectiveId + "/slim",
+                  "/api/v1/missions/{id}/objectives/{objectiveId}/slim",
                   body,
-                  Object.class);
+                  Object.class,
+                  id,
+                  objectiveId);
           return ResponseEntity.ok(result);
         });
   }
@@ -1587,13 +1610,11 @@ public class MissionWriteController {
         () -> {
           Object result =
               backendApiClient.delete(
-                  "/api/v1/missions/"
-                      + id
-                      + "/objectives/"
-                      + objectiveId
-                      + "/slim?objectivesVersion="
-                      + objectivesVersion,
-                  Object.class);
+                  "/api/v1/missions/{id}/objectives/{objectiveId}/slim?objectivesVersion={version}",
+                  Object.class,
+                  id,
+                  objectiveId,
+                  objectivesVersion);
           return ResponseEntity.ok(result);
         });
   }
@@ -1615,7 +1636,7 @@ public class MissionWriteController {
         () -> {
           Object result =
               backendApiClient.put(
-                  "/api/v1/missions/" + id + "/objectives/reorder/slim", body, Object.class);
+                  "/api/v1/missions/{id}/objectives/reorder/slim", body, Object.class, id);
           return ResponseEntity.ok(result);
         });
   }
@@ -1638,7 +1659,7 @@ public class MissionWriteController {
         () -> {
           Object result =
               backendApiClient.post(
-                  "/api/v1/missions/" + id + "/participants/slim", body, Object.class);
+                  "/api/v1/missions/{id}/participants/slim", body, Object.class, id);
           return ResponseEntity.ok(result);
         });
   }
@@ -1662,9 +1683,11 @@ public class MissionWriteController {
         () -> {
           Object result =
               backendApiClient.put(
-                  "/api/v1/missions/" + id + "/participants/" + participantId + "/slim",
+                  "/api/v1/missions/{id}/participants/{participantId}/slim",
                   body,
-                  Object.class);
+                  Object.class,
+                  id,
+                  participantId);
           return ResponseEntity.ok(result);
         });
   }
@@ -1686,7 +1709,10 @@ public class MissionWriteController {
         "delete participant (ajax) for mission " + id + " participant " + participantId,
         () -> {
           backendApiClient.delete(
-              "/api/v1/missions/" + id + "/participants/" + participantId + "/slim", Void.class);
+              "/api/v1/missions/{id}/participants/{participantId}/slim",
+              Void.class,
+              id,
+              participantId);
           return ResponseEntity.noContent().build();
         });
   }
@@ -1709,9 +1735,11 @@ public class MissionWriteController {
         () -> {
           Object result =
               backendApiClient.post(
-                  "/api/v1/missions/" + id + "/participants/" + participantId + "/check-in/slim",
+                  "/api/v1/missions/{id}/participants/{participantId}/check-in/slim",
                   null,
-                  Object.class);
+                  Object.class,
+                  id,
+                  participantId);
           return ResponseEntity.ok(result);
         });
   }
@@ -1734,9 +1762,11 @@ public class MissionWriteController {
         () -> {
           Object result =
               backendApiClient.post(
-                  "/api/v1/missions/" + id + "/participants/" + participantId + "/check-out/slim",
+                  "/api/v1/missions/{id}/participants/{participantId}/check-out/slim",
                   null,
-                  Object.class);
+                  Object.class,
+                  id,
+                  participantId);
           return ResponseEntity.ok(result);
         });
   }
@@ -1759,7 +1789,7 @@ public class MissionWriteController {
         () -> {
           Object result =
               backendApiClient.post(
-                  "/api/v1/missions/" + id + "/units/" + unitId + "/crew/slim", body, Object.class);
+                  "/api/v1/missions/{id}/units/{unitId}/crew/slim", body, Object.class, id, unitId);
           return ResponseEntity.ok(result);
         });
   }
@@ -1783,9 +1813,12 @@ public class MissionWriteController {
         () -> {
           Object result =
               backendApiClient.put(
-                  "/api/v1/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/slim",
+                  "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim",
                   body,
-                  Object.class);
+                  Object.class,
+                  id,
+                  unitId,
+                  crewId);
           return ResponseEntity.ok(result);
         });
   }
@@ -1807,8 +1840,11 @@ public class MissionWriteController {
         "delete crew (ajax) for mission " + id + " unit " + unitId + " crew " + crewId,
         () -> {
           backendApiClient.delete(
-              "/api/v1/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/slim",
-              Void.class);
+              "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim",
+              Void.class,
+              id,
+              unitId,
+              crewId);
           return ResponseEntity.noContent().build();
         });
   }

@@ -270,7 +270,11 @@ class SpecialCommandMembersPageControllerMvcTest {
   void addMemberAjax_officer_returns200WithoutEviction() throws Exception {
     UUID userId = UUID.randomUUID();
     when(backendApiClient.post(
-            eq("/api/v1/special-commands/" + skId + "/members/" + userId), any(), eq(Void.class)))
+            eq("/api/v1/special-commands/{id}/members/{userId}"),
+            any(),
+            eq(Void.class),
+            eq(skId),
+            eq(userId)))
         .thenReturn(null);
 
     mockMvc
@@ -288,7 +292,10 @@ class SpecialCommandMembersPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void removeMemberAjax_backendRefuses_relays403() throws Exception {
     when(backendApiClient.delete(
-            eq("/api/v1/special-commands/" + skId + "/members/" + memberId), eq(Void.class)))
+            eq("/api/v1/special-commands/{id}/members/{userId}"),
+            eq(Void.class),
+            eq(skId),
+            eq(memberId)))
         .thenThrow(new BackendServiceException("forbidden", null, 403));
 
     mockMvc

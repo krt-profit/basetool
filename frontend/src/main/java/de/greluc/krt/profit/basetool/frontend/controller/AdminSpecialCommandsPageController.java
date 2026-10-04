@@ -230,7 +230,7 @@ public class AdminSpecialCommandsPageController {
       SpecialCommandDto body =
           new SpecialCommandDto(
               id, form.name(), form.shorthand(), form.description(), true, false, form.version());
-      backendApiClient.put("/api/v1/special-commands/" + id, body, Void.class);
+      backendApiClient.put("/api/v1/special-commands/{id}", body, Void.class, id);
       evictOrgUnitCatalogueCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
@@ -263,7 +263,7 @@ public class AdminSpecialCommandsPageController {
   public String deleteSpecialCommand(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/special-commands/" + id, Void.class);
+      backendApiClient.delete("/api/v1/special-commands/{id}", Void.class, id);
       evictOrgUnitCatalogueCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
@@ -292,7 +292,7 @@ public class AdminSpecialCommandsPageController {
   public String activateSpecialCommand(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.post("/api/v1/special-commands/" + id + "/activate", null, Void.class);
+      backendApiClient.post("/api/v1/special-commands/{id}/activate", null, Void.class, id);
       evictOrgUnitCatalogueCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
@@ -339,7 +339,7 @@ public class AdminSpecialCommandsPageController {
       body.put("isLead", isLead);
       body.put("version", version);
       backendApiClient.patch(
-          "/api/v1/special-commands/" + id + "/members/" + userId + "/lead", body, Void.class);
+          "/api/v1/special-commands/{id}/members/{userId}/lead", body, Void.class, id, userId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Toggle SpecialCommand member lead failed", e);
@@ -403,7 +403,7 @@ public class AdminSpecialCommandsPageController {
     return okOrRelay(
         () -> {
           backendApiClient.put(
-              "/api/v1/special-commands/" + id,
+              "/api/v1/special-commands/{id}",
               new SpecialCommandDto(
                   id,
                   form.name(),
@@ -412,7 +412,8 @@ public class AdminSpecialCommandsPageController {
                   true,
                   false,
                   form.version()),
-              Void.class);
+              Void.class,
+              id);
           evictOrgUnitCatalogueCache();
         });
   }
@@ -428,7 +429,7 @@ public class AdminSpecialCommandsPageController {
   public ResponseEntity<Object> deleteSpecialCommandAjax(@PathVariable @NotNull UUID id) {
     return okOrRelay(
         () -> {
-          backendApiClient.delete("/api/v1/special-commands/" + id, Void.class);
+          backendApiClient.delete("/api/v1/special-commands/{id}", Void.class, id);
           evictOrgUnitCatalogueCache();
         });
   }
@@ -444,7 +445,7 @@ public class AdminSpecialCommandsPageController {
   public ResponseEntity<Object> activateSpecialCommandAjax(@PathVariable @NotNull UUID id) {
     return okOrRelay(
         () -> {
-          backendApiClient.post("/api/v1/special-commands/" + id + "/activate", null, Void.class);
+          backendApiClient.post("/api/v1/special-commands/{id}/activate", null, Void.class, id);
           evictOrgUnitCatalogueCache();
         });
   }
@@ -471,7 +472,7 @@ public class AdminSpecialCommandsPageController {
           body.put("isLead", isLead);
           body.put("version", version);
           backendApiClient.patch(
-              "/api/v1/special-commands/" + id + "/members/" + userId + "/lead", body, Void.class);
+              "/api/v1/special-commands/{id}/members/{userId}/lead", body, Void.class, id, userId);
         });
   }
 

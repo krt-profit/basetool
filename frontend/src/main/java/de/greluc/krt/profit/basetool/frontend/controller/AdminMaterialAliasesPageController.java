@@ -196,7 +196,7 @@ public class AdminMaterialAliasesPageController {
               StringNormalization.trimToNull(externalCode),
               StringNormalization.trimToNull(note),
               version);
-      backendApiClient.put(BACKEND_BASE + "/" + id, body, MaterialExternalAliasDto.class);
+      backendApiClient.put(BACKEND_BASE + "/{id}", body, MaterialExternalAliasDto.class, id);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "PUT /api/v1/material-external-aliases", id, e);
@@ -219,7 +219,7 @@ public class AdminMaterialAliasesPageController {
   @PostMapping("/{id}/delete")
   public String delete(@PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
+      backendApiClient.delete(BACKEND_BASE + "/{id}", Void.class, id);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "DELETE /api/v1/material-external-aliases", id, e);
@@ -289,7 +289,8 @@ public class AdminMaterialAliasesPageController {
                   StringNormalization.trimToNull(request.note()),
                   request.version());
           return ResponseEntity.ok(
-              backendApiClient.put(BACKEND_BASE + "/" + id, body, MaterialExternalAliasDto.class));
+              backendApiClient.put(
+                  BACKEND_BASE + "/{id}", body, MaterialExternalAliasDto.class, id));
         });
   }
 
@@ -307,7 +308,7 @@ public class AdminMaterialAliasesPageController {
         log,
         "delete alias " + id + " (ajax)",
         () -> {
-          backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
+          backendApiClient.delete(BACKEND_BASE + "/{id}", Void.class, id);
           return ResponseEntity.ok().build();
         });
   }

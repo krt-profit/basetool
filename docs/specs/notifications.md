@@ -466,7 +466,8 @@ events + clean timeout completion), `DisconnectedClientHandlingTest`,
 `service/NotificationStreamService`, `service/NotificationFanout` / `RedisNotificationFanout` /
 `LocalNotificationFanout`, `support/NotificationFanoutProperties`,
 `controller/NotificationController#stream`, frontend
-`controller/NotificationPageController#stream`, `config/WebClientConfig#sseWebClient`,
+`controller/NotificationPageController#stream`, `service/BackendSideChannels#notificationStream`,
+`config/WebClientConfig#sseWebClient`,
 `exception/GlobalExceptionHandler#handleDisconnectedClient`, `static/js/notifications.js`
 
 ### REQ-NOTIF-011 — UC2/UC3: notify on the bank booking-request lifecycle

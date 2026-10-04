@@ -51,10 +51,8 @@ import org.springframework.ui.Model;
 class AdminDeletionRequestsPageControllerTest {
 
   private static final UUID REQUEST_ID = UUID.fromString("00000000-0000-0000-0000-0000000000aa");
-  private static final String DECLINE_URI =
-      "/api/v1/admin/deletion-requests/00000000-0000-0000-0000-0000000000aa/decline";
-  private static final String EXECUTE_URI =
-      "/api/v1/admin/deletion-requests/00000000-0000-0000-0000-0000000000aa/execute";
+  private static final String DECLINE_URI = "/api/v1/admin/deletion-requests/{id}/decline";
+  private static final String EXECUTE_URI = "/api/v1/admin/deletion-requests/{id}/execute";
 
   @Test
   void decline_withoutTheNoteKey_is400AndNoBackendCall() {
@@ -111,7 +109,7 @@ class AdminDeletionRequestsPageControllerTest {
   @Test
   void decline_relaysTheBackendStatusRatherThanFlatteningItTo500() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.post(any(String.class), any(), eq(Object.class)))
+    when(client.post(any(String.class), any(), eq(Object.class), any(Object[].class)))
         .thenThrow(new BackendServiceException("gone", new RuntimeException(), 404));
     AdminDeletionRequestsPageController controller =
         new AdminDeletionRequestsPageController(client);
@@ -124,7 +122,7 @@ class AdminDeletionRequestsPageControllerTest {
   @Test
   void decline_anUnexpectedFailureIs500() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.post(any(String.class), any(), eq(Object.class)))
+    when(client.post(any(String.class), any(), eq(Object.class), any(Object[].class)))
         .thenThrow(new IllegalStateException("boom"));
     AdminDeletionRequestsPageController controller =
         new AdminDeletionRequestsPageController(client);
@@ -173,7 +171,7 @@ class AdminDeletionRequestsPageControllerTest {
   @Test
   void execute_relaysTheBackendStatusRatherThanFlatteningItTo500() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.post(any(String.class), any(), eq(Object.class)))
+    when(client.post(any(String.class), any(), eq(Object.class), any(Object[].class)))
         .thenThrow(new BackendServiceException("conflict", new RuntimeException(), 409));
     AdminDeletionRequestsPageController controller =
         new AdminDeletionRequestsPageController(client);
@@ -186,7 +184,7 @@ class AdminDeletionRequestsPageControllerTest {
   @Test
   void execute_anUnexpectedFailureIs500() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.post(any(String.class), any(), eq(Object.class)))
+    when(client.post(any(String.class), any(), eq(Object.class), any(Object[].class)))
         .thenThrow(new IllegalStateException("boom"));
     AdminDeletionRequestsPageController controller =
         new AdminDeletionRequestsPageController(client);
@@ -247,19 +245,27 @@ class AdminDeletionRequestsPageControllerTest {
   private static void verifyNoPost(BackendApiClient client) {
     verify(client, never())
         .post(ArgumentMatchers.<String>any(), any(), ArgumentMatchers.<Class<Object>>any());
+    verify(client, never())
+        .post(ArgumentMatchers.<String>any(), any(), ArgumentMatchers.<Class<Object>>any());
+    verify(client, never())
+        .post(
+            ArgumentMatchers.<String>any(),
+            any(),
+            ArgumentMatchers.<Class<Object>>any(),
+            any(Object[].class));
   }
 
   /**
    * Captures the body the controller posted to one URI.
    *
    * @param client the mocked client
-   * @param uri the expected backend URI
+   * @param uri the expected backend URI template, expanded with {@link #REQUEST_ID}
    * @return the posted body
    */
   @SuppressWarnings("unchecked")
   private static Map<String, Object> capturePostedBody(BackendApiClient client, String uri) {
     ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
-    verify(client).post(eq(uri), captor.capture(), eq(Object.class));
+    verify(client).post(eq(uri), captor.capture(), eq(Object.class), eq(REQUEST_ID));
     return (Map<String, Object>) captor.getValue();
   }
 }

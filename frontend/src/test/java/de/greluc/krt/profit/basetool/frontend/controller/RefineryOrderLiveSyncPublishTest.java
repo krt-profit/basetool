@@ -84,7 +84,9 @@ class RefineryOrderLiveSyncPublishTest {
 
   @Test
   void deleteOrder_onBackendFailure_doesNotPublish() {
-    doThrow(new RuntimeException("backend down")).when(backendApiClient).delete(anyString(), any());
+    doThrow(new RuntimeException("backend down"))
+        .when(backendApiClient)
+        .delete(anyString(), any(), any(Object[].class));
 
     controller.deleteOrder(UUID.randomUUID(), redirectAttributes);
 
@@ -100,7 +102,9 @@ class RefineryOrderLiveSyncPublishTest {
 
   @Test
   void deleteOrderAjax_onBackendFailure_doesNotPublish() {
-    doThrow(new RuntimeException("backend down")).when(backendApiClient).delete(anyString(), any());
+    doThrow(new RuntimeException("backend down"))
+        .when(backendApiClient)
+        .delete(anyString(), any(), any(Object[].class));
 
     controller.deleteOrderAjax(UUID.randomUUID());
 
@@ -132,7 +136,7 @@ class RefineryOrderLiveSyncPublishTest {
     UUID id = UUID.randomUUID();
     doThrow(new RuntimeException("backend down"))
         .when(backendApiClient)
-        .post(anyString(), any(), eq(Void.class));
+        .post(anyString(), any(), eq(Void.class), any(Object[].class));
 
     controller.storeOrderAjax(id, storeForm(), noErrors());
 

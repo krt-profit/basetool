@@ -144,7 +144,7 @@ public class AdminDiscordRegistrationsPageController {
         () -> {
           return ResponseEntity.ok(
               backendApiClient.post(
-                  BACKEND_BASE + "/" + id + "/approve", body, PendingRegistrationDto.class));
+                  BACKEND_BASE + "/{id}/approve", body, PendingRegistrationDto.class, id));
         });
   }
 
@@ -166,7 +166,7 @@ public class AdminDiscordRegistrationsPageController {
         () -> {
           return ResponseEntity.ok(
               backendApiClient.post(
-                  BACKEND_BASE + "/" + id + "/reject", body, PendingRegistrationDto.class));
+                  BACKEND_BASE + "/{id}/reject", body, PendingRegistrationDto.class, id));
         });
   }
 
@@ -188,7 +188,7 @@ public class AdminDiscordRegistrationsPageController {
         () -> {
           return ResponseEntity.ok(
               backendApiClient.post(
-                  BACKEND_BASE + "/" + id + "/reopen", body, PendingRegistrationDto.class));
+                  BACKEND_BASE + "/{id}/reopen", body, PendingRegistrationDto.class, id));
         });
   }
 
@@ -211,7 +211,7 @@ public class AdminDiscordRegistrationsPageController {
         () -> {
           return ResponseEntity.ok(
               backendApiClient.post(
-                  BACKEND_BASE + "/" + id + "/merge", body, PendingRegistrationDto.class));
+                  BACKEND_BASE + "/{id}/merge", body, PendingRegistrationDto.class, id));
         });
   }
 
@@ -234,7 +234,7 @@ public class AdminDiscordRegistrationsPageController {
         () -> {
           return ResponseEntity.ok(
               backendApiClient.post(
-                  BACKEND_BASE + "/" + id + "/link", body, PendingRegistrationDto.class));
+                  BACKEND_BASE + "/{id}/link", body, PendingRegistrationDto.class, id));
         });
   }
 }

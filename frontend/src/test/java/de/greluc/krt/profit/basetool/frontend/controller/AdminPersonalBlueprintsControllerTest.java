@@ -23,7 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -91,9 +90,10 @@ class AdminPersonalBlueprintsControllerTest {
   @Test
   void addSelected_relaysToAdminBatchEndpointForTargetUser() {
     when(backendApiClient.post(
-            contains("/api/v1/admin/personal-blueprints/" + TARGET + "/batch"),
+            eq("/api/v1/admin/personal-blueprints/{userSub}/batch"),
             any(PersonalBlueprintBatchCreateRequest.class),
-            eq(PersonalBlueprintBatchResultDto.class)))
+            eq(PersonalBlueprintBatchResultDto.class),
+            eq(TARGET)))
         .thenReturn(new PersonalBlueprintBatchResultDto(2, 0, 0));
 
     PersonalBlueprintBatchResultDto result = controller.addSelected(TARGET, List.of("a", "b"));
@@ -110,7 +110,7 @@ class AdminPersonalBlueprintsControllerTest {
 
     assertEquals("redirect:/admin/personal-blueprints?userSub=" + TARGET, view);
     verify(backendApiClient)
-        .put(contains("/api/v1/admin/personal-blueprints/items/" + id), any(), any());
+        .put(eq("/api/v1/admin/personal-blueprints/items/{id}"), any(), any(), eq(id));
     assertEquals(
         "personalInventory.blueprints.toast.noteUpdated",
         flash.getFlashAttributes().get("successToast"));
@@ -125,7 +125,7 @@ class AdminPersonalBlueprintsControllerTest {
 
     assertEquals("redirect:/admin/personal-blueprints?userSub=" + TARGET, view);
     verify(backendApiClient)
-        .delete(contains("/api/v1/admin/personal-blueprints/items/" + id), eq(Void.class));
+        .delete(eq("/api/v1/admin/personal-blueprints/items/{id}"), eq(Void.class), eq(id));
   }
 
   @Test
@@ -210,9 +210,10 @@ class AdminPersonalBlueprintsControllerTest {
   @Test
   void applyImport_relaysToAdminApplyEndpoint() {
     when(backendApiClient.post(
-            contains("/api/v1/admin/personal-blueprints/" + TARGET + "/import/apply"),
+            eq("/api/v1/admin/personal-blueprints/{userSub}/import/apply"),
             any(),
-            eq(BlueprintImportResultDto.class)))
+            eq(BlueprintImportResultDto.class),
+            eq(TARGET)))
         .thenReturn(new BlueprintImportResultDto(1, 1, 0, 0, 0));
 
     BlueprintImportResultDto result =
@@ -225,7 +226,8 @@ class AdminPersonalBlueprintsControllerTest {
 
   @Test
   void applyImport_onABackendRefusal_relaysItsLocalisedDetail() {
-    when(backendApiClient.post(any(), any(), eq(BlueprintImportResultDto.class)))
+    when(backendApiClient.post(
+            any(), any(), eq(BlueprintImportResultDto.class), any(Object[].class)))
         .thenThrow(
             new BackendServiceException(
                 "Backend returned 400",
@@ -244,7 +246,8 @@ class AdminPersonalBlueprintsControllerTest {
 
   @Test
   void applyImport_onAnUnexpectedError_answersAnEmpty500() {
-    when(backendApiClient.post(any(), any(), eq(BlueprintImportResultDto.class)))
+    when(backendApiClient.post(
+            any(), any(), eq(BlueprintImportResultDto.class), any(Object[].class)))
         .thenThrow(new RuntimeException("boom"));
 
     ResponseEntity<Object> failed = controller.applyImport(TARGET, List.of());

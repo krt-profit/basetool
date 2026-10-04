@@ -2294,10 +2294,18 @@ the breaker, the error mapping.
 
 - **Only `WebClientConfig` builds a client** — calls `WebClient.builder()`, `create` or `mutate`,
   or uses `WebClient.Builder`.
-- **Only the kernel and two named exceptions hold one**: a `WebClient` field, constructor parameter
-  or `@Bean` exists only in `WebClientConfig`, `BackendApiClient`, the SSE relay
-  `NotificationPageController` and the live-sync probe `LiveSyncSubscriptionAuthorizer`. Everything
-  else calls `BackendApiClient`.
+- **Only the backend kernel holds one, with no exception outside it** (since 2026-10-04, plan F1):
+  a `WebClient` field, constructor parameter or `@Bean` exists only in `WebClientConfig`,
+  `BackendApiClient` and `BackendSideChannels`. `BackendSideChannels` offers exactly the two calls
+  that skip the resilience pass and the error mapping by design — the notification SSE stream and
+  the live-sync subscribe probe — so `NotificationPageController` and
+  `LiveSyncSubscriptionAuthorizer` no longer hold a client. Everything else calls `BackendApiClient`.
+- **One error mapping.** Every failure of a `BackendApiClient` call goes through
+  `BackendErrorMapper`: `classify` turns it into one case of the sealed `Outcome` (`Problem` for an
+  error status with its RFC 7807 `code`, `Reauthentication` for an unusable token, `CircuitOpen`,
+  `BulkheadFull`, `Timeout`, `Unexpected`), and one exhaustive pattern switch writes the log line,
+  increments `basetool_backend_client_errors_total` and builds the exception the caller sees.
+  `BackendErrorResponses` parses a raw backend refusal through the same mapper.
 - **HTTP-interface clients** (Spring `@HttpExchange`, none yet) are created only by the kernel,
   over the `webClient` bean (`HttpServiceProxyFactory`/`WebClientAdapter` used nowhere else), and
   never take a `java.net.URI` or `UriBuilderFactory` parameter (it replaces the whole request URL),
@@ -2324,10 +2332,15 @@ the breaker, the error mapping.
   the guard placed last instead of first the token is resolved, and the test fails.
 - [x] A planted class that holds, builds and wraps its own `WebClient` and a planted HTTP interface
   breaking each client rule are reported.
+- [x] No class outside the kernel holds a `WebClient`, and no controller does.
+- [x] Each `Outcome` maps to the status, problem code, log level and metric label it had before
+  the mapper was extracted (`BackendErrorMapperTest`, and the unchanged `BackendApiClient*Test`).
 
-**Enforced by:** `WebClientConfinementTest`, `WebClientBackendSeamTest`, `BackendOriginGuardTest` ·
-**Code:** `config/WebClientConfig`, `config/BackendOriginGuard` · **Related:** REQ-SEC-012,
-REQ-FE-028, ADR-0032
+**Enforced by:** `WebClientConfinementTest`, `ArchitectureTest#noControllerHoldsARawWebClient`,
+`WebClientBackendSeamTest`, `BackendOriginGuardTest`, `BackendErrorMapperTest` · **Code:**
+`config/WebClientConfig`, `config/BackendOriginGuard`, `service/BackendApiClient`,
+`service/BackendErrorMapper`, `service/BackendSideChannels` · **Related:** REQ-SEC-012,
+REQ-FE-028, REQ-SEC-051, ADR-0032
 
 ### REQ-FE-030 — A parallel page section relays the same request context as the page
 
