@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.event.DiscordRegistrationPendingEvent;
-import de.greluc.krt.profit.basetool.backend.event.MemberDepartedEvent;
+import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationPendingEvent;
+import de.greluc.krt.profit.basetool.backend.identity.api.events.MemberDepartedEvent;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.Role;

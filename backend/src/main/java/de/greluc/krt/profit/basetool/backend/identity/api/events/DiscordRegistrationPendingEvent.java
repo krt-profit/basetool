@@ -17,10 +17,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.event;
+package de.greluc.krt.profit.basetool.backend.identity.api.events;
 
 import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -28,28 +31,24 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published when an exchange client is first seen with a new installation of a member
- * (REQ-XCH-032); the default rule notifies that member, so a connection they did not make is
- * noticed.
+ * Domain event published when a new Discord registration is persisted in the {@code PENDING} state
+ * (REQ-NOTIF-012); the default rule notifies every admin.
  *
- * <p>Only the registry's display name rides the event: the client-supplied label arrives later and
- * could pose as the Basetool, so it never enters a notification.
+ * <p>Carries no Discord id or other PII.
  *
- * @param userId the member whose account the installation connected to, the single recipient
- * @param installationId the new installation
- * @param clientName the registry display name of the client
+ * @param userId the new user's id (also the notification's loose entity id)
+ * @param username the new user's username, for rendering; may be {@code null}
  */
-public record ExchangeInstallationConnectedEvent(
-    @NotNull UUID userId, @NotNull UUID installationId, @NotNull String clientName)
+public record DiscordRegistrationPendingEvent(UUID userId, @Nullable String username)
     implements NotificationEvent {
 
-  /** Loose entity-type tag stored on the produced notifications. */
-  public static final String ENTITY_TYPE = "EXCHANGE_INSTALLATION";
+  /** Loose entity-type tag stored on the produced notifications for deep-linking. */
+  public static final String ENTITY_TYPE = "DISCORD_REGISTRATION";
 
   @NotNull
   @Override
   public NotificationEventType eventType() {
-    return NotificationEventType.EXCHANGE_INSTALLATION_CONNECTED;
+    return NotificationEventType.DISCORD_REGISTRATION_PENDING;
   }
 
   @Nullable
@@ -73,23 +72,16 @@ public record ExchangeInstallationConnectedEvent(
 
   @Override
   public UUID entityId() {
-    return installationId;
+    return userId;
   }
 
   @NotNull
-  @Unmodifiable
   @Override
   public Map<String, String> renderParams() {
-    return Map.of("client", clientName);
-  }
-
-  /**
-   * The single recipient the {@code EVENT_RECIPIENT} selector resolves to — the connected member.
-   *
-   * @return the member's id
-   */
-  @Override
-  public UUID contextRecipientUserId() {
-    return userId;
+    Map<String, String> params = new LinkedHashMap<>();
+    if (username != null && !username.isBlank()) {
+      params.put("username", username);
+    }
+    return params;
   }
 }
