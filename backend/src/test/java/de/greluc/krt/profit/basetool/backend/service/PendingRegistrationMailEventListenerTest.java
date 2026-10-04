@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
-import de.greluc.krt.profit.basetool.backend.event.DiscordRegistrationPendingEvent;
+import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationPendingEvent;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
