@@ -367,8 +367,12 @@ Such a request is **rejected with HTTP 400** up front — before any decrement, 
 write. It must never fall through to the consume/discard tail: doing so would silently destroy the
 source stock and record it as `INVENTORY_ITEM_CONSUMED` with `type = TRANSFER`, an audit lie about
 a mutation the caller never requested. (The complementary no-op guard — a `TRANSFER` whose target
-resolves to the source's own user *and* location — likewise 400s; the append-only move of
-REQ-INV-001 is defined only for a target that actually differs.) A rejected book-out writes **no**
+resolves to the source's own user *and* location — likewise 400s with the localized
+`error.inventory.transfer.unchanged`; the append-only move of REQ-INV-001 is defined only for a
+target that actually differs.) Both Umbuchen dialogs (`/inventory/my`, `/inventory/all`) preset the
+target to the row's own user and location, so they refuse that no-op themselves: a submit whose
+target user and location both still equal the source shows `error.inventory.rebook.unchanged` as a
+toast, keeps the dialog open and sends nothing. A rejected book-out writes **no**
 audit event, consistent with the audit contract that only committed state mutations are logged
 (REQ-AUDIT-001).
 
@@ -386,10 +390,14 @@ and `ExternalContractTest` does not pin it.
   (REQ-INV-001).
 - [ ] An absent `type` with no target is still inferred as `DISCARD` (unchanged) and consumes the
   stock, logging `INVENTORY_ITEM_CONSUMED` with `type = DISCARD`.
+- [ ] An Umbuchen submit with the preset (unchanged) user and location sends no request and shows
+  the localized "unchanged" toast; the stack stays intact.
 
-**Enforced by:** `InventoryItemServiceBookOutTest` · **Code:**
+**Enforced by:** `InventoryItemServiceBookOutTest`,
+`InventoryOperationsE2eTest#edgeCaseTransferToSameLocationLeavesStockUnchanged` · **Code:**
 `InventoryCheckoutService#bookOutInventoryItem` (public façade
-`InventoryItemService#bookOutInventoryItem`) · **Issues:** —
+`InventoryItemService#bookOutInventoryItem`), `inventory-my.js` / `inventory-admin.js`
+`submitUmbuchen` · **Issues:** —
 
 ### REQ-INV-026 — Write-time stock merge for PIECE (auto) and SCU (per-action opt-in)
 
