@@ -60,6 +60,7 @@ jackson3 = "3.1.7"
 
 [libraries]
 
+testcontainers-core = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
 testcontainers-junit = { module = "org.testcontainers:testcontainers-junit-jupiter", version.ref = "testcontainers" }
 testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql", version.ref = "testcontainers" }
 flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }

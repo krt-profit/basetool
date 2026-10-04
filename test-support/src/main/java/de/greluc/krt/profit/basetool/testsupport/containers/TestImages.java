@@ -38,4 +38,13 @@ public final class TestImages {
    */
   public static final String REDIS =
       "redis:8-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0";
+
+  /**
+   * The production PostgreSQL image: the {@code 18-alpine} tag pinned to its multi-arch index
+   * digest, as {@code docker-compose.yml} and the database Quadlet units declare it. The
+   * Testcontainers JDBC URL cannot carry a digest, so {@link PinnedImageSubstitutor} maps the URL's
+   * {@code postgres:18-alpine} onto this reference.
+   */
+  public static final String POSTGRES =
+      "postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873";
 }

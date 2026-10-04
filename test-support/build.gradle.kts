@@ -19,6 +19,7 @@ dependencies {
   api("org.springframework:spring-test")
   api("ch.qos.logback:logback-classic")
   api(libs.archunit.core) { exclude(group = "org.slf4j") }
+  implementation(libs.testcontainers.core)
 
   testImplementation("jakarta.servlet:jakarta.servlet-api")
   testImplementation(libs.junit.jupiter)
@@ -32,7 +33,10 @@ tasks.named<Test>("test") {
     .files(
       rootProject.file("docker-compose.yml"),
       rootProject.file("quadlet/systemd/redis.container"),
+      rootProject.file("quadlet/systemd/db-backend.container"),
+      rootProject.file("backend/src/test/resources/application-test.yml"),
+      rootProject.file("backend/src/test/resources/testcontainers.properties"),
     )
-    .withPropertyName("productionRedisImageSources")
+    .withPropertyName("productionImageSources")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 }

@@ -30,8 +30,9 @@ import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
 /**
- * Verifies that {@link TestImages#REDIS} equals the {@code x-redis} image in {@code
- * docker-compose.yml}, which production runs.
+ * Verifies that the {@link TestImages} constants equal the images {@code docker-compose.yml} and
+ * the Quadlet units run in production, and that the backend's JDBC URL is pinned through {@link
+ * PinnedImageSubstitutor}.
  */
 class TestImagesTest {
 
@@ -69,6 +70,59 @@ class TestImagesTest {
   @Test
   void theRedisConstantIsPinnedByDigest() {
     assertThat(TestImages.REDIS).startsWith("redis:8-alpine@sha256:").hasSize(86);
+  }
+
+  /**
+   * Both database anchors of the compose file name exactly the PostgreSQL constant's image
+   * reference.
+   *
+   * @throws IOException if {@code docker-compose.yml} cannot be read
+   */
+  @Test
+  void thePostgresConstantIsTheComposeFilesImage() throws IOException {
+    assertThat(imageLines(repositoryRoot().resolve("docker-compose.yml"), "image: postgres:"))
+        .as("docker-compose.yml must pin exactly the PostgreSQL image TestImages.POSTGRES names")
+        .containsExactly("image: " + TestImages.POSTGRES, "image: " + TestImages.POSTGRES);
+  }
+
+  /**
+   * The generated backend-database Quadlet unit names the PostgreSQL constant's image reference,
+   * qualified with the registry the host pulls from.
+   *
+   * @throws IOException if the Quadlet unit cannot be read
+   */
+  @Test
+  void thePostgresConstantIsTheQuadletUnitsImage() throws IOException {
+    assertThat(
+            imageLines(
+                repositoryRoot().resolve("quadlet/systemd/db-backend.container"),
+                "Image=docker.io/postgres:"))
+        .as("quadlet/systemd/db-backend.container must pin exactly TestImages.POSTGRES")
+        .containsExactly("Image=docker.io/" + TestImages.POSTGRES);
+  }
+
+  /** The PostgreSQL constant is digest-pinned. */
+  @Test
+  void thePostgresConstantIsPinnedByDigest() {
+    assertThat(TestImages.POSTGRES).startsWith("postgres:18-alpine@sha256:").hasSize(90);
+  }
+
+  /**
+   * The backend's Testcontainers JDBC URL names the tag {@link PinnedImageSubstitutor} replaces,
+   * and the backend's test classpath activates the substitutor, so the tests run the pinned image.
+   *
+   * @throws IOException if a backend test resource cannot be read
+   */
+  @Test
+  void theBackendJdbcUrlIsSubstitutedWithThePinnedImage() throws IOException {
+    Path resources = repositoryRoot().resolve("backend/src/test/resources");
+    String tag = PinnedImageSubstitutor.TAGGED_POSTGRES.substring("postgres:".length());
+    assertThat(imageLines(resources.resolve("application-test.yml"), "url: jdbc:tc:"))
+        .as("the backend's JDBC URL must start the tag PinnedImageSubstitutor pins")
+        .containsExactly("url: jdbc:tc:postgresql:" + tag + ":///testdb?TC_DAEMON=true");
+    assertThat(imageLines(resources.resolve("testcontainers.properties"), "image.substitutor="))
+        .as("the backend's testcontainers.properties must activate PinnedImageSubstitutor")
+        .containsExactly("image.substitutor=" + PinnedImageSubstitutor.class.getName());
   }
 
   /**
