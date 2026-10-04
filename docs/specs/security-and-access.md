@@ -3840,6 +3840,11 @@ proxy seam, it is a `400` from Spring's type conversion, handled by `GlobalExcep
   body) has a URI-template twin that encodes each variable, and every write call passes its runtime
   values through it; the only reviewed concatenation is the UEX override's entity kind, narrowed to
   its allow-list first (`WriteUriTemplateTest`, 2026-10-04).
+- [x] Every `BackendApiClient` read (`get`, with a `Class` or a `ParameterizedTypeReference`
+  response) and every `execute(…)` request passes its runtime values as URI-template variables,
+  with no reviewed exception; a value with reserved characters keeps its
+  `UriComponentsBuilder.queryParam` encoding with only the path variable left in the template
+  (`ReadUriTemplateTest`, plan F3, 2026-10-05).
 - [ ] The mission and operation list pages relay `search`, `start` and `end` as `WebClient`
   URI-template variables, never concatenated into the URI: a search carrying `&`, `#`, `+`, `{…}` or
   `%` reaches the backend as one decoded `query`, and a period reaches it decoded exactly once so it
@@ -3861,7 +3866,8 @@ allowlist, `MARKET` included) · `MaterialProxyControllerTest` (a star-system na
 `AdminPersonalBlueprintsPageController`, `AdminSyncReportsPageController`,
 `MaterialboersePageController`, `MissionPageController#listMissions`,
 `OperationPageController#listOperations` · **Enforced also by:** `ListSearchRelayParamsTest` (exact
-template + variables, and the query a `MockWebServer` backend actually receives) · **ADR:**
+template + variables, and the query a `MockWebServer` backend actually receives) ·
+`WriteUriTemplateTest`, `ReadUriTemplateTest` (no verb concatenates a runtime value) · **ADR:**
 [ADR-0158](../adr/0158-a-relayed-request-parameter-is-bound-to-the-backends-own-type.md)
 
 **The active-OrgUnit switcher redirects only on-site (FE-SEC-02, 2026-09-22).** `POST

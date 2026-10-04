@@ -141,13 +141,14 @@ class OrgUnitBankVisibilityAudienceLabelMvcTest {
             false,
             noLimits);
 
-    String detailUri = "/api/v1/org-units/bank/accounts/" + accountId;
+    String detailUri = "/api/v1/org-units/bank/accounts/{id}";
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
-    when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class)))
+    when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class), eq(accountId)))
         .thenReturn(detail);
-    when(backendApiClient.get(eq(detailUri + "/settings"), eq(OrgUnitBankAccountSettingsDto.class)))
+    when(backendApiClient.get(
+            eq(detailUri + "/settings"), eq(OrgUnitBankAccountSettingsDto.class), eq(accountId)))
         .thenReturn(settings);
-    when(backendApiClient.get(contains(detailUri + "/transactions"), anyTypeRef()))
+    when(backendApiClient.get(contains(detailUri + "/transactions"), anyTypeRef(), eq(accountId)))
         .thenReturn(new PageResponse<BankBookingDto>(List.of(), 0, 20, 0L, 0, List.of()));
   }
 

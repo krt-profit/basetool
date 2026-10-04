@@ -78,6 +78,7 @@ class InventoryIndexListPatternRenderTest {
   private @NotNull String render(
       @NotNull PageResponse<AggregatedInventoryDto> page, @NotNull String query) throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
     MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();

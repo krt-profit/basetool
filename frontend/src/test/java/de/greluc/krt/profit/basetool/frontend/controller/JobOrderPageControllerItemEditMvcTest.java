@@ -112,7 +112,7 @@ class JobOrderPageControllerItemEditMvcTest {
     UUID id = UUID.randomUUID();
     doReturn(order(id, "ITEM", List.of()))
         .when(backendApiClient)
-        .get(eq("/api/v1/orders/" + id), eq(JobOrderDto.class));
+        .get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id));
 
     mockMvc
         .perform(get("/orders/" + id + "/items/edit"))
@@ -151,7 +151,9 @@ class JobOrderPageControllerItemEditMvcTest {
             1L,
             null,
             false);
-    doReturn(order).when(backendApiClient).get(eq("/api/v1/orders/" + id), eq(JobOrderDto.class));
+    doReturn(order)
+        .when(backendApiClient)
+        .get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id));
     doReturn(
             List.of(
                 new OrgUnitMembershipOptionDto(
@@ -201,7 +203,7 @@ class JobOrderPageControllerItemEditMvcTest {
     UUID id = UUID.randomUUID();
     doReturn(order(id, "MATERIAL", List.of()))
         .when(backendApiClient)
-        .get(eq("/api/v1/orders/" + id), eq(JobOrderDto.class));
+        .get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id));
 
     mockMvc
         .perform(get("/orders/" + id + "/items/edit"))
@@ -219,7 +221,7 @@ class JobOrderPageControllerItemEditMvcTest {
             UUID.randomUUID(), id, Instant.now(), "R", null, null, List.of(), 1L);
     doReturn(order(id, "ITEM", List.of(handover)))
         .when(backendApiClient)
-        .get(eq("/api/v1/orders/" + id), eq(JobOrderDto.class));
+        .get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id));
 
     mockMvc
         .perform(get("/orders/" + id + "/items/edit"))
@@ -304,7 +306,9 @@ class JobOrderPageControllerItemEditMvcTest {
             1L,
             null,
             false);
-    doReturn(order).when(backendApiClient).get(eq("/api/v1/orders/" + id), eq(JobOrderDto.class));
+    doReturn(order)
+        .when(backendApiClient)
+        .get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id));
 
     mockMvc
         .perform(get("/orders/" + id + "/items/edit"))

@@ -133,7 +133,7 @@ class AdminUexPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void toggleTerminalVisibilityAjax_withHeader_returns200() throws Exception {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/terminals/" + id), eq(TerminalDto.class)))
+    when(backendApiClient.get(eq("/api/v1/terminals/{id}"), eq(TerminalDto.class), eq(id)))
         .thenReturn(terminal(id));
     when(backendApiClient.put(eq("/api/v1/terminals/{id}"), any(), eq(Void.class), eq(id)))
         .thenReturn(null);

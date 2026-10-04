@@ -472,13 +472,14 @@ class OrgUnitBankPageControllerMvcTest {
     PageResponse<BankBookingDto> bookings =
         new PageResponse<>(List.of(booking), 0, 20, 1L, 1, List.of());
 
-    String detailUri = "/api/v1/org-units/bank/accounts/" + accountId;
+    String detailUri = "/api/v1/org-units/bank/accounts/{id}";
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
-    when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class)))
+    when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class), eq(accountId)))
         .thenReturn(detail);
-    when(backendApiClient.get(eq(detailUri + "/settings"), eq(OrgUnitBankAccountSettingsDto.class)))
+    when(backendApiClient.get(
+            eq(detailUri + "/settings"), eq(OrgUnitBankAccountSettingsDto.class), eq(accountId)))
         .thenReturn(settings);
-    when(backendApiClient.get(contains(detailUri + "/transactions"), anyTypeRef()))
+    when(backendApiClient.get(contains(detailUri + "/transactions"), anyTypeRef(), eq(accountId)))
         .thenReturn(bookings);
   }
 
@@ -544,11 +545,11 @@ class OrgUnitBankPageControllerMvcTest {
                 java.util.List.of()));
     OrgUnitBankAccountDetailDto detail =
         new OrgUnitBankAccountDetailDto(inner, true, false, false, true, false, null, false);
-    String detailUri = "/api/v1/org-units/bank/accounts/" + accountId;
+    String detailUri = "/api/v1/org-units/bank/accounts/{id}";
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
-    when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class)))
+    when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class), eq(accountId)))
         .thenReturn(detail);
-    when(backendApiClient.get(contains(detailUri + "/transactions"), anyTypeRef()))
+    when(backendApiClient.get(contains(detailUri + "/transactions"), anyTypeRef(), eq(accountId)))
         .thenReturn(new PageResponse<>(List.of(), 0, 20, 0L, 0, List.of()));
 
     mockMvc
@@ -609,11 +610,11 @@ class OrgUnitBankPageControllerMvcTest {
     OrgUnitBankAccountDetailDto detail =
         new OrgUnitBankAccountDetailDto(
             inner, true, false, false, true, false, new BigDecimal("1000000"), false);
-    String detailUri = "/api/v1/org-units/bank/accounts/" + accountId;
+    String detailUri = "/api/v1/org-units/bank/accounts/{id}";
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
-    when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class)))
+    when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class), eq(accountId)))
         .thenReturn(detail);
-    when(backendApiClient.get(contains(detailUri + "/transactions"), anyTypeRef()))
+    when(backendApiClient.get(contains(detailUri + "/transactions"), anyTypeRef(), eq(accountId)))
         .thenReturn(new PageResponse<>(List.of(), 0, 20, 0L, 0, List.of()));
 
     mockMvc

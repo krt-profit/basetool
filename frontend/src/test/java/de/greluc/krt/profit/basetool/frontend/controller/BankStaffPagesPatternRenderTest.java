@@ -60,7 +60,8 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 class BankStaffPagesPatternRenderTest {
 
-  private static final String ACCOUNTS_URI = "/api/v1/bank/accounts?page=0&size=25&sort=name,asc";
+  private static final String ACCOUNTS_URI =
+      "/api/v1/bank/accounts?page={page}&size={size}&sort=name,asc";
 
   private static final String CARTEL_URI = "/api/v1/bank/accounts?type=CARTEL&size=1";
 
@@ -139,7 +140,7 @@ class BankStaffPagesPatternRenderTest {
   @WithMockUser(roles = "BANK_MANAGEMENT")
   void manageAccountsTabRendersRowMenusAndOnePrimaryAction() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
-    when(backendApiClient.get(eq(ACCOUNTS_URI), anyTypeRef()))
+    when(backendApiClient.get(eq(ACCOUNTS_URI), anyTypeRef(), eq(0), eq(25)))
         .thenReturn(
             new PageResponse<>(
                 List.of(

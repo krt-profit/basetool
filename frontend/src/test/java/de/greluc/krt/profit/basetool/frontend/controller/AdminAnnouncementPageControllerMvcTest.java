@@ -19,11 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -33,9 +31,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.AnnouncementDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.Locale;
-import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,8 +72,8 @@ class AdminAnnouncementPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void updateAjax_withHeader_returns200AndEchoesVersion() throws Exception {
     when(backendApiClient.put(eq("/api/v1/announcement"), any(), eq(Void.class))).thenReturn(null);
-    when(backendApiClient.get(contains("/announcement/admin"), anyTypeRef()))
-        .thenReturn(Map.of("content", "x", "version", 7));
+    when(backendApiClient.get(eq("/api/v1/announcement/admin"), eq(AnnouncementDto.class)))
+        .thenReturn(new AnnouncementDto(null, "x", null, 7L));
 
     mockMvc
         .perform(
@@ -121,8 +119,8 @@ class AdminAnnouncementPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void thePageRendersTheFormPattern() throws Exception {
-    when(backendApiClient.get(contains("/announcement/admin"), anyTypeRef()))
-        .thenReturn(Map.of("content", "Hallo **Welt**", "version", 3));
+    when(backendApiClient.get(eq("/api/v1/announcement/admin"), eq(AnnouncementDto.class)))
+        .thenReturn(new AnnouncementDto(null, "Hallo **Welt**", null, 3L));
 
     String html =
         mockMvc

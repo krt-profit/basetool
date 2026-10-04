@@ -136,11 +136,11 @@ public class AdminSpecialCommandsPageController {
         CatalogPages.fetchAll(
             page ->
                 backendApiClient.get(
-                    "/api/v1/special-commands?size=1000&sort=name,asc&includeInactive="
-                        + includeInactive
-                        + "&page="
-                        + page,
-                    MAP_PAGE_TYPE));
+                    "/api/v1/special-commands?size=1000&sort=name,asc"
+                        + "&includeInactive={includeInactive}&page={page}",
+                    MAP_PAGE_TYPE,
+                    includeInactive,
+                    page));
     List<SpecialCommandDto> commands =
         catalog.items().stream()
             .map(

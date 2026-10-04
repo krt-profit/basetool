@@ -139,6 +139,24 @@ public class BackendApiClient {
   }
 
   /**
+   * GET against the authenticated backend for a simple (non-generic) return type, expanding {@code
+   * uriVariables} into {@code uriTemplate} so the WebClient encodes each value (REQ-SEC-051).
+   *
+   * @param uriTemplate the URI template containing {@code {name}} placeholders
+   * @param responseType the decoded response class
+   * @param uriVariables the values expanded into the template, in order
+   * @param <T> the response body type
+   * @return the decoded response body, or {@code null} when the backend returned none
+   */
+  public <T> T get(String uriTemplate, Class<T> responseType, Object... uriVariables) {
+    return exchange(
+        HttpMethod.GET,
+        uriTemplate,
+        () -> webClient.get().uri(uriTemplate, uriVariables),
+        spec -> spec.bodyToMono(responseType));
+  }
+
+  /**
    * Cached GET of a {@link CachedCatalog}, stored in its domain cache (resolved by {@link
    * CatalogCacheResolver}) until the domain's TTL expires or an eviction. A {@link
    * CachedCatalog.Fetch#PAGE_WALK} catalogue is cached complete, every page merged (REQ-ADMIN-003).

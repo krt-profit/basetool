@@ -92,7 +92,7 @@ class MaterialgesuchPageControllerMvcTest {
         .thenReturn(new MaterialExchangeCountsDto(1, 0));
     when(backendApiClient.get(contains("/material-requests?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(request), 0, 200, 1, 1, List.of()));
-    when(backendApiClient.get(contains("/material-requests/" + request.id()), anyClass()))
+    when(backendApiClient.get(eq("/api/v1/material-requests/{id}"), anyClass(), eq(request.id())))
         .thenReturn(request);
   }
 

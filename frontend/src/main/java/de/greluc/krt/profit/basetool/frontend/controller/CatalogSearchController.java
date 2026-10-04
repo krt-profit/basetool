@@ -77,13 +77,12 @@ public class CatalogSearchController {
       PageResponse<MaterialDto> page =
           backendApiClient.get(
               "/api/v1/materials/search?search={q}&jobOrderOnly={jobOrder}&rawOnly={raw}"
-                  + "&size="
-                  + PickerSearch.PAGE_SIZE
-                  + "&sort=name,asc",
+                  + "&size={size}&sort=name,asc",
               PAGE_OF_MATERIAL,
               q == null ? "" : q,
               jobOrder,
-              raw);
+              raw,
+              PickerSearch.PAGE_SIZE);
       return page != null && page.content() != null ? page.content() : List.of();
     } catch (Exception e) {
       log.error("Failed to search materials", e);
@@ -104,11 +103,10 @@ public class CatalogSearchController {
     try {
       PageResponse<LocationReferenceDto> page =
           backendApiClient.get(
-              "/api/v1/locations/search?search={q}&size="
-                  + PickerSearch.LOCATION_PAGE_SIZE
-                  + "&sort=name,asc",
+              "/api/v1/locations/search?search={q}&size={size}&sort=name,asc",
               PAGE_OF_LOCATION_REFERENCE,
-              q == null ? "" : q);
+              q == null ? "" : q,
+              PickerSearch.LOCATION_PAGE_SIZE);
       return page != null && page.content() != null ? page.content() : List.of();
     } catch (Exception e) {
       log.error("Failed to search locations", e);

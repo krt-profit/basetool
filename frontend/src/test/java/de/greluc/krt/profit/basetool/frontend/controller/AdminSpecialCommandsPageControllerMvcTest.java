@@ -101,7 +101,8 @@ class AdminSpecialCommandsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fullPage_rendersSwapWrapper() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/special-commands"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/special-commands"), anyTypeRef(), any(Object[].class)))
         .thenReturn(oneSpecialCommand());
 
     mockMvc
@@ -119,7 +120,8 @@ class AdminSpecialCommandsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_rendersTheListPattern() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/special-commands"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/special-commands"), anyTypeRef(), any(Object[].class)))
         .thenReturn(oneSpecialCommand());
 
     String html =
@@ -147,7 +149,8 @@ class AdminSpecialCommandsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_rendersTheEmptyState() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/special-commands"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/special-commands"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0L, 0, List.of()));
 
     mockMvc
@@ -160,7 +163,8 @@ class AdminSpecialCommandsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/special-commands"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/special-commands"), anyTypeRef(), any(Object[].class)))
         .thenReturn(oneSpecialCommand());
 
     mockMvc
@@ -175,7 +179,8 @@ class AdminSpecialCommandsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fragmentResults_rendersOnlyInnerFragment() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/special-commands"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/special-commands"), anyTypeRef(), any(Object[].class)))
         .thenReturn(oneSpecialCommand());
 
     mockMvc

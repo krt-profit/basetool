@@ -59,7 +59,7 @@ class AdminMaterialsPageControllerTest {
             matId, "Alpha", "RAW", "PIECE", "Desc", null, null, false, false, false, false, false,
             false, true, 2L);
 
-    when(backendApiClient.get("/api/v1/materials/" + matId, MaterialDto.class))
+    when(backendApiClient.get("/api/v1/materials/{id}", MaterialDto.class, matId))
         .thenReturn(currentMaterial)
         .thenReturn(updatedMaterial);
 
@@ -170,8 +170,9 @@ class AdminMaterialsPageControllerTest {
         new PageResponse<>(materials, 0, 1000, materials.size(), 1, List.of("name,asc"));
 
     when(backendApiClient.get(
-            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page=0"),
-            anyTypeRef()))
+            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page={page}"),
+            anyTypeRef(),
+            eq(0)))
         .thenReturn(materialsPage);
 
     controller.listMaterials(model);
@@ -234,10 +235,10 @@ class AdminMaterialsPageControllerTest {
             false,
             true,
             0L);
-    String base = "/api/v1/materials?size=1000&sort=name,asc&includeHidden=true";
-    when(backendApiClient.get(eq(base + "&page=0"), anyTypeRef()))
+    String template = "/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page={page}";
+    when(backendApiClient.get(eq(template), anyTypeRef(), eq(0)))
         .thenReturn(new PageResponse<>(List.of(first), 0, 1000, 2, 2, List.of("name,asc")));
-    when(backendApiClient.get(eq(base + "&page=1"), anyTypeRef()))
+    when(backendApiClient.get(eq(template), anyTypeRef(), eq(1)))
         .thenReturn(new PageResponse<>(List.of(second), 1, 1000, 2, 2, List.of("name,asc")));
 
     controller.listMaterials(model);

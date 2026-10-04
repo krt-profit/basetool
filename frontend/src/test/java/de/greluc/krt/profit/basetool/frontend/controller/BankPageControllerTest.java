@@ -297,9 +297,9 @@ class BankPageControllerTest {
                 java.util.List.of()));
 
     when(backendApiClient.get(
-            eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
+            eq("/api/v1/bank/accounts/{id}"), eq(BankAccountDetailDto.class), eq(accountId)))
         .thenReturn(detail);
-    when(backendApiClient.get(contains("/transactions"), anyTypeRef()))
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef(), any(Object[].class)))
         .thenReturn(
             new PageResponse<BankBookingDto>(List.of(), 0, 20, 0, 0, Collections.emptyList()));
     when(backendApiClient.get(eq("/api/v1/bank/holders"), anyTypeRef()))
@@ -362,7 +362,7 @@ class BankPageControllerTest {
                 null,
                 java.util.List.of()));
     when(backendApiClient.get(
-            eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
+            eq("/api/v1/bank/accounts/{id}"), eq(BankAccountDetailDto.class), eq(accountId)))
         .thenReturn(detail);
     when(backendApiClient.get(any(String.class), anyTypeRef())).thenReturn(null);
 
@@ -380,7 +380,8 @@ class BankPageControllerTest {
     UUID accountId = UUID.randomUUID();
     PageResponse<BankBookingDto> bookings =
         new PageResponse<>(List.of(), 0, 20, 0, 0, Collections.emptyList());
-    when(backendApiClient.get(contains("/transactions"), anyTypeRef())).thenReturn(bookings);
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(bookings);
 
     String view = controller.accountDetail(accountId, 2, null, null, null, null, "bookings", model);
 
@@ -392,7 +393,7 @@ class BankPageControllerTest {
             .toString()
             .startsWith("/bank/accounts/" + accountId + "?from="));
     verify(backendApiClient, never())
-        .get(eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class));
+        .get(eq("/api/v1/bank/accounts/{id}"), eq(BankAccountDetailDto.class), eq(accountId));
     verify(backendApiClient, never()).get(eq("/api/v1/bank/holders"), anyTypeRef());
   }
 
@@ -421,9 +422,9 @@ class BankPageControllerTest {
                 null,
                 java.util.List.of()));
     when(backendApiClient.get(
-            eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
+            eq("/api/v1/bank/accounts/{id}"), eq(BankAccountDetailDto.class), eq(accountId)))
         .thenReturn(detail);
-    when(backendApiClient.get(contains("/transactions"), anyTypeRef()))
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef(), any(Object[].class)))
         .thenReturn(
             new PageResponse<BankBookingDto>(List.of(), 0, 20, 0, 0, Collections.emptyList()));
     when(backendApiClient.get(eq("/api/v1/bank/holders"), anyTypeRef()))
@@ -454,9 +455,11 @@ class BankPageControllerTest {
             holderId, UUID.randomUUID(), "greluc", true, new BigDecimal("1000000"), false, 0L);
     PageResponse<BankHolderBookingDto> bookings =
         new PageResponse<>(List.of(), 0, 20, 0, 0, Collections.emptyList());
-    when(backendApiClient.get(eq("/api/v1/bank/holders/" + holderId), eq(BankHolderDto.class)))
+    when(backendApiClient.get(
+            eq("/api/v1/bank/holders/{id}"), eq(BankHolderDto.class), eq(holderId)))
         .thenReturn(holder);
-    when(backendApiClient.get(contains("/transactions"), anyTypeRef())).thenReturn(bookings);
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(bookings);
 
     String view = controller.holderDetail(holderId, null, null, model);
 
@@ -474,7 +477,8 @@ class BankPageControllerTest {
     UUID holderId = UUID.randomUUID();
     PageResponse<BankHolderBookingDto> bookings =
         new PageResponse<>(List.of(), 0, 20, 0, 0, Collections.emptyList());
-    when(backendApiClient.get(contains("/transactions"), anyTypeRef())).thenReturn(bookings);
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(bookings);
 
     String view = controller.holderDetail(holderId, 2, "holderBookings", model);
 
@@ -482,7 +486,7 @@ class BankPageControllerTest {
     assertEquals(bookings, model.getAttribute("bookings"));
     assertEquals("/bank/holders/" + holderId, model.getAttribute("paginationBaseUrl"));
     verify(backendApiClient, never())
-        .get(eq("/api/v1/bank/holders/" + holderId), eq(BankHolderDto.class));
+        .get(eq("/api/v1/bank/holders/{id}"), eq(BankHolderDto.class), eq(holderId));
   }
 
   private static BankAccountDto account(UUID id, String no, String status, String balance) {

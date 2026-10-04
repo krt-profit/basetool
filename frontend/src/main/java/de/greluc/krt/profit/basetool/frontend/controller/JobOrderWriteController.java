@@ -1069,7 +1069,7 @@ public class JobOrderWriteController {
               form.getRecipientSquadron(),
               items);
       backendApiClient.post("/api/v1/orders/{id}/handovers", dto, JobOrderHandoverDto.class, id);
-      JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
+      JobOrderDto order = backendApiClient.get("/api/v1/orders/{id}", JobOrderDto.class, id);
       return org.springframework.http.ResponseEntity.ok(order);
     } catch (BackendServiceException bse) {
       de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging.warn(
@@ -1120,7 +1120,7 @@ public class JobOrderWriteController {
               parseHandoverTime(form.getHandoverTime()), form.getRecipientHandle(), entries);
       backendApiClient.post(
           "/api/v1/orders/{id}/item-handovers", dto, JobOrderItemHandoverDto.class, id);
-      JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
+      JobOrderDto order = backendApiClient.get("/api/v1/orders/{id}", JobOrderDto.class, id);
       return org.springframework.http.ResponseEntity.ok(order);
     } catch (BackendServiceException bse) {
       de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging.warn(
@@ -1167,7 +1167,7 @@ public class JobOrderWriteController {
           de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemDto.class,
           id,
           itemId);
-      JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
+      JobOrderDto order = backendApiClient.get("/api/v1/orders/{id}", JobOrderDto.class, id);
       return org.springframework.http.ResponseEntity.ok(order);
     } catch (BackendServiceException bse) {
       de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging.warn(
@@ -1264,7 +1264,7 @@ public class JobOrderWriteController {
               Void.class,
               id,
               inventoryItemId);
-          JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
+          JobOrderDto order = backendApiClient.get("/api/v1/orders/{id}", JobOrderDto.class, id);
           return org.springframework.http.ResponseEntity.ok(order);
         });
   }

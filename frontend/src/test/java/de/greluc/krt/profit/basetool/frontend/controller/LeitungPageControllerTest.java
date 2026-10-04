@@ -228,7 +228,7 @@ class LeitungPageControllerTest {
                         false,
                         List.of(
                             new LeitungMemberDto(pilot, "Pilot", "MEMBER", null, 0L, false))))));
-    when(backend.get(eq("/api/v1/special-commands/" + managed + "/members"), anyTypeRef()))
+    when(backend.get(eq("/api/v1/special-commands/{id}/members"), anyTypeRef(), eq(managed)))
         .thenReturn(
             List.of(
                 Map.of(
@@ -248,7 +248,7 @@ class LeitungPageControllerTest {
     assertTrue(known.contains(managed));
     assertFalse(known.contains(leadOnly));
     verify(backend, never())
-        .get(eq("/api/v1/special-commands/" + leadOnly + "/members"), anyTypeRef());
+        .get(eq("/api/v1/special-commands/{id}/members"), anyTypeRef(), eq(leadOnly));
     Map<UUID, List<OrgUnitMembershipDto>> rosters =
         assertInstanceOf(Map.class, model.getAttribute("skRosters"));
     List<OrgUnitMembershipDto> rows = rosters.get(managed);

@@ -162,7 +162,7 @@ public class MemberManagementController {
           try {
             List<de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto> all =
                 backendApiClient.get(
-                    "/api/v1/users/" + u.id() + "/memberships", MEMBERSHIP_OPTION_LIST_TYPE);
+                    "/api/v1/users/{id}/memberships", MEMBERSHIP_OPTION_LIST_TYPE, u.id());
             if (all == null) {
               skMemberships.put(u.id(), java.util.Collections.emptyList());
               continue;
@@ -224,13 +224,13 @@ public class MemberManagementController {
       Model model,
       RedirectAttributes redirectAttributes) {
     try {
-      UserDto user = backendApiClient.get("/api/v1/users/" + id, UserDto.class);
+      UserDto user = backendApiClient.get("/api/v1/users/{id}", UserDto.class, id);
       model.addAttribute("user", user);
 
       String memberRsiHandle = null;
       try {
         Map<String, Object> handle =
-            backendApiClient.get("/api/v1/users/" + id + "/rsi-handle", STRING_OBJECT_MAP_TYPE);
+            backendApiClient.get("/api/v1/users/{id}/rsi-handle", STRING_OBJECT_MAP_TYPE, id);
         if (handle != null && handle.get("rsiHandle") != null) {
           memberRsiHandle = String.valueOf(handle.get("rsiHandle"));
         }
@@ -243,7 +243,7 @@ public class MemberManagementController {
         List<de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto>
             memberships =
                 backendApiClient.get(
-                    "/api/v1/users/" + id + "/memberships", MEMBERSHIP_OPTION_LIST_TYPE);
+                    "/api/v1/users/{id}/memberships", MEMBERSHIP_OPTION_LIST_TYPE, id);
         model.addAttribute(
             "memberMemberships",
             memberships != null
@@ -265,7 +265,7 @@ public class MemberManagementController {
       try {
         MembershipDeltaResponse detail =
             backendApiClient.get(
-                "/api/v1/users/" + id + "/memberships/detail", MembershipDeltaResponse.class);
+                "/api/v1/users/{id}/memberships/detail", MembershipDeltaResponse.class, id);
         if (detail != null && detail.memberships() != null) {
           staffelRows =
               detail.memberships().stream().filter(m -> m.kind() == OrgUnitKind.SQUADRON).toList();
@@ -457,7 +457,7 @@ public class MemberManagementController {
    */
   private Long currentUserVersion(@NotNull UUID id, Long priorVersion) {
     try {
-      UserDto user = backendApiClient.get("/api/v1/users/" + id, UserDto.class);
+      UserDto user = backendApiClient.get("/api/v1/users/{id}", UserDto.class, id);
       if (user != null && user.version() != null) {
         return user.version();
       }

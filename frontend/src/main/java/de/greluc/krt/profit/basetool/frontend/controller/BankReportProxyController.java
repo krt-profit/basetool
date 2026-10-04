@@ -69,11 +69,13 @@ public class BankReportProxyController {
       @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
       @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
     String uri =
-        UriComponentsBuilder.fromPath("/api/v1/bank/accounts/" + id + "/statement")
+        UriComponentsBuilder.fromPath("/api/v1/bank/accounts/{id}/statement")
             .queryParam("from", from)
             .queryParam("to", to)
+            .encode()
+            .build()
             .toUriString();
-    return fetchPdf(uri, userTimeZone, "kontoauszug-" + id + ".pdf");
+    return fetchPdf(uri, new Object[] {id}, userTimeZone, "kontoauszug-" + id + ".pdf");
   }
 
   /**
@@ -87,20 +89,27 @@ public class BankReportProxyController {
   public ResponseEntity<byte[]> downloadThreeMonthReport(
       @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
     return fetchPdf(
-        "/api/v1/bank/export/three-month-report", userTimeZone, "bank-3-monats-report.pdf");
+        "/api/v1/bank/export/three-month-report",
+        new Object[0],
+        userTimeZone,
+        "bank-3-monats-report.pdf");
   }
 
   /**
    * Fetches one backend PDF and re-wraps it with attachment headers; backend errors propagate with
    * their original status so bank.js can surface 403/400 distinctly.
    *
-   * @param uri the backend URI incl. query
+   * @param uri the backend URI template incl. query
+   * @param uriVariables the values expanded into the template, in order
    * @param userTimeZone the zone header to forward; may be {@code null}
    * @param filename the download filename
    * @return the proxied PDF response
    */
   private ResponseEntity<byte[]> fetchPdf(
-      @NotNull String uri, String userTimeZone, @NotNull String filename) {
+      @NotNull String uri,
+      @NotNull Object[] uriVariables,
+      String userTimeZone,
+      @NotNull String filename) {
     byte[] pdf =
         withBackendStatus(
             () ->
@@ -110,7 +119,7 @@ public class BankReportProxyController {
                     webClient ->
                         webClient
                             .get()
-                            .uri(uri)
+                            .uri(uri, uriVariables)
                             .headers(
                                 h -> {
                                   if (userTimeZone != null && !userTimeZone.isBlank()) {

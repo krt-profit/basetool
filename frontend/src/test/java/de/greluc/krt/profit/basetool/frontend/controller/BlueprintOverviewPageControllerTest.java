@@ -45,6 +45,10 @@ import org.springframework.ui.Model;
 @ExtendWith(MockitoExtension.class)
 class BlueprintOverviewPageControllerTest {
 
+  /** The URI template of one page of the availability list. */
+  private static final String OVERVIEW_URI =
+      "/api/v1/personal-blueprints/overview?page={page}&size={size}";
+
   @Mock private BackendApiClient backendApiClient;
   @InjectMocks private BlueprintOverviewPageController controller;
 
@@ -58,9 +62,7 @@ class BlueprintOverviewPageControllerTest {
             1,
             1,
             List.of());
-    when(backendApiClient.get(
-            contains("/api/v1/personal-blueprints/overview?page=0&size=50"), anyTypeRef()))
-        .thenReturn(page);
+    when(backendApiClient.get(eq(OVERVIEW_URI), anyTypeRef(), eq(0), eq(50))).thenReturn(page);
 
     Model model = new ExtendedModelMap();
     String view = controller.view(null, null, null, null, model);
@@ -74,30 +76,31 @@ class BlueprintOverviewPageControllerTest {
 
   @Test
   void view_nonWhitelistedSize_fallsBackToDefault() {
-    when(backendApiClient.get(contains("?page=2&size=50"), anyTypeRef()))
+    when(backendApiClient.get(eq(OVERVIEW_URI), anyTypeRef(), eq(2), eq(50)))
         .thenReturn(new PageResponse<BlueprintOverviewEntryDto>(List.of(), 2, 50, 0, 0, List.of()));
 
     controller.view(2, 1000, null, null, new ExtendedModelMap());
 
-    verify(backendApiClient).get(contains("?page=2&size=50"), anyTypeRef());
+    verify(backendApiClient).get(eq(OVERVIEW_URI), anyTypeRef(), eq(2), eq(50));
   }
 
   @Test
   void view_search_isRelayedAsUriVariable_andEchoedTrimmed() {
-    when(backendApiClient.get(contains("&search={search}"), anyTypeRef(), eq("Aurora")))
+    when(backendApiClient.get(
+            eq(OVERVIEW_URI + "&search={search}"), anyTypeRef(), eq(0), eq(10), eq("Aurora")))
         .thenReturn(new PageResponse<BlueprintOverviewEntryDto>(List.of(), 0, 10, 0, 0, List.of()));
 
     Model model = new ExtendedModelMap();
     controller.view(0, 10, "  Aurora  ", null, model);
 
     verify(backendApiClient)
-        .get(contains("?page=0&size=10&search={search}"), anyTypeRef(), eq("Aurora"));
+        .get(eq(OVERVIEW_URI + "&search={search}"), anyTypeRef(), eq(0), eq(10), eq("Aurora"));
     assertEquals("Aurora", model.getAttribute("search"));
   }
 
   @Test
   void view_fragmentResults_returnsResultsFragmentView() {
-    when(backendApiClient.get(contains("?page=0&size=50"), anyTypeRef()))
+    when(backendApiClient.get(eq(OVERVIEW_URI), anyTypeRef(), eq(0), eq(50)))
         .thenReturn(new PageResponse<BlueprintOverviewEntryDto>(List.of(), 0, 50, 0, 0, List.of()));
 
     Model model = new ExtendedModelMap();
@@ -109,7 +112,7 @@ class BlueprintOverviewPageControllerTest {
 
   @Test
   void view_onBackendError_setsErrorKey_andEmptyOverview() {
-    when(backendApiClient.get(any(String.class), anyTypeRef()))
+    when(backendApiClient.get(any(String.class), anyTypeRef(), any(Object[].class)))
         .thenThrow(new RuntimeException("boom"));
 
     Model model = new ExtendedModelMap();

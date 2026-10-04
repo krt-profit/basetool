@@ -359,7 +359,7 @@ public class SpecialCommandMembersPageController {
    */
   @Nullable
   private SpecialCommandDto fetchSpecialCommand(@NotNull UUID id) {
-    Map<String, Object> map = backendApiClient.get("/api/v1/special-commands/" + id, MAP_TYPE);
+    Map<String, Object> map = backendApiClient.get("/api/v1/special-commands/{id}", MAP_TYPE, id);
     if (map == null) {
       return null;
     }
@@ -385,7 +385,7 @@ public class SpecialCommandMembersPageController {
   private List<OrgUnitMembershipDto> fetchMembers(@NotNull UUID specialCommandId) {
     List<Map<String, Object>> raw =
         backendApiClient.get(
-            "/api/v1/special-commands/" + specialCommandId + "/members", MAP_LIST_TYPE);
+            "/api/v1/special-commands/{id}/members", MAP_LIST_TYPE, specialCommandId);
     if (raw == null) {
       return List.of();
     }

@@ -101,7 +101,7 @@ public class AdminMaterialAliasesPageController {
   public String edit(@PathVariable @NotNull UUID id, Model model) {
     try {
       MaterialExternalAliasDto alias =
-          backendApiClient.get(BACKEND_BASE + "/" + id, MaterialExternalAliasDto.class);
+          backendApiClient.get(BACKEND_BASE + "/{id}", MaterialExternalAliasDto.class, id);
       model.addAttribute("aliasToEdit", alias);
     } catch (Exception e) {
       log.error("Failed to load alias {} for edit", id, e);

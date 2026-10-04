@@ -107,6 +107,7 @@ class InventoryPageControllerMvcTest {
     PageResponse<AggregatedInventoryDto> page =
         new PageResponse<>(List.of(), 0, 10, 0, 1, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -694,6 +695,7 @@ class InventoryPageControllerMvcTest {
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 0, 10, 0, 1, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
     when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_LOOKUP), anyTypeRef()))
         .thenReturn(
             List.of(
@@ -745,6 +747,7 @@ class InventoryPageControllerMvcTest {
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(item), 1, 50, 120, 3, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(List.of(new MaterialReferenceDto(materialId, "Quantanium", "SCU")));
 
@@ -772,6 +775,7 @@ class InventoryPageControllerMvcTest {
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 1, 50, 120, 3, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     mockMvc
         .perform(
@@ -1795,6 +1799,7 @@ class InventoryPageControllerMvcTest {
     PageResponse<AggregatedInventoryDto> page =
         new PageResponse<>(List.of(row), 0, 10, 1, 1, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -1845,6 +1850,7 @@ class InventoryPageControllerMvcTest {
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(item), 0, 1000, 1, 1, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -1892,6 +1898,7 @@ class InventoryPageControllerMvcTest {
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(item), 1, 50, 130, 3, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
