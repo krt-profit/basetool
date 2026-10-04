@@ -19,10 +19,11 @@ dependencies {
   api("org.springframework:spring-test")
   api("ch.qos.logback:logback-classic")
   api(libs.archunit.core) { exclude(group = "org.slf4j") }
-  implementation(libs.testcontainers.core)
+  compileOnly(libs.testcontainers.core)
 
   testImplementation("jakarta.servlet:jakarta.servlet-api")
   testImplementation(libs.junit.jupiter)
+  testImplementation(libs.testcontainers.core)
   testImplementation("org.assertj:assertj-core")
   testImplementation("org.mockito:mockito-core")
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
