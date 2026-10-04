@@ -21,9 +21,11 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.enforceSectionVersion;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionObjective;
 import de.greluc.krt.profit.basetool.backend.model.MissionObjectiveKind;
@@ -31,7 +33,6 @@ import de.greluc.krt.profit.basetool.backend.model.MissionStep;
 import de.greluc.krt.profit.basetool.backend.repository.MissionObjectiveRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionStepRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.MissionSection;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.ArrayList;
@@ -69,7 +70,7 @@ public class MissionTimelineService {
   private final MissionObjectiveRepository missionObjectiveRepository;
 
   /** Records the state-mutating timeline activities into the audit log (REQ-AUDIT-001). */
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Appends an undone step to the end of the mission's Ablauf timeline and bumps {@code
@@ -101,7 +102,7 @@ public class MissionTimelineService {
     missionStepRepository.save(step);
 
     missionRepository.save(mission);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_STEP_ADDED,
         mission.getId(),
         mission.getName(),
@@ -128,7 +129,7 @@ public class MissionTimelineService {
     step.setOrderIndex(orderIndex);
     mission.addStep(step);
     missionStepRepository.save(step);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_STEP_ADDED,
         mission.getId(),
         mission.getName(),
@@ -159,7 +160,7 @@ public class MissionTimelineService {
     step.setMeta(StringNormalization.trimToNull(meta));
 
     missionRepository.save(mission);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_STEP_UPDATED,
         mission.getId(),
         mission.getName(),
@@ -189,7 +190,7 @@ public class MissionTimelineService {
     repackStepOrder(mission);
 
     missionRepository.save(mission);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_STEP_REMOVED,
         mission.getId(),
         mission.getName(),
@@ -229,7 +230,7 @@ public class MissionTimelineService {
     }
 
     missionRepository.save(mission);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_STEP_REORDERED,
         mission.getId(),
         mission.getName(),
@@ -258,7 +259,7 @@ public class MissionTimelineService {
     step.setDone(done);
 
     missionRepository.save(mission);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_STEP_DONE_CHANGED,
         mission.getId(),
         mission.getName(),
@@ -335,7 +336,7 @@ public class MissionTimelineService {
     missionObjectiveRepository.save(objective);
 
     missionRepository.save(mission);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_OBJECTIVE_ADDED,
         mission.getId(),
         mission.getName(),
@@ -362,7 +363,7 @@ public class MissionTimelineService {
     objective.setOrderIndex(orderIndex);
     mission.addObjective(objective);
     missionObjectiveRepository.save(objective);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_OBJECTIVE_ADDED,
         mission.getId(),
         mission.getName(),
@@ -397,7 +398,7 @@ public class MissionTimelineService {
     objective.setKind(kind);
 
     missionRepository.save(mission);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_OBJECTIVE_UPDATED,
         mission.getId(),
         mission.getName(),
@@ -431,7 +432,7 @@ public class MissionTimelineService {
     repackObjectiveOrder(mission);
 
     missionRepository.save(mission);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_OBJECTIVE_REMOVED,
         mission.getId(),
         mission.getName(),
@@ -475,7 +476,7 @@ public class MissionTimelineService {
     }
 
     missionRepository.save(mission);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MISSION_OBJECTIVE_REORDERED,
         mission.getId(),
         mission.getName(),

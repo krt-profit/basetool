@@ -19,11 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
@@ -38,7 +40,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
@@ -81,7 +82,7 @@ public class HangarService {
   private final ShipMapper shipMapper;
   private final EntityManager entityManager;
   private final OwnerScopeService ownerScopeService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Returns the paged ship list in the caller's squadron scope; an admin without an active squadron
@@ -162,7 +163,7 @@ public class HangarService {
               .orElseThrow(() -> new BadRequestException("Location not found")));
     }
     Ship saved = shipRepository.save(ship);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.HANGAR_SHIP_CREATED,
         saved.getId(),
         saved.getShipType().getName(),
@@ -325,7 +326,7 @@ public class HangarService {
 
     Ship saved = shipRepository.save(ship);
     if (!changed.isEmpty()) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.HANGAR_SHIP_UPDATED,
           saved.getId(),
           saved.getShipType().getName(),
@@ -358,7 +359,7 @@ public class HangarService {
 
     entityManager.flush();
     shipRepository.delete(ship);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.HANGAR_SHIP_DELETED,
         shipId,
         ship.getShipType().getName(),
@@ -387,7 +388,7 @@ public class HangarService {
     }
     entityManager.flush();
     shipRepository.deleteAll(ships);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.HANGAR_EMPTIED,
         null,
         null,
@@ -407,7 +408,7 @@ public class HangarService {
         shipRepository.resetAllFittedScoped(
             scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
     if (reset > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.HANGAR_FITTED_RESET,
           null,
           null,
@@ -438,7 +439,7 @@ public class HangarService {
     }
     int updated = shipRepository.setLocationForOwner(userId, location);
     if (updated > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.HANGAR_HOME_LOCATION_SET,
           location.getId(),
           location.getName(),
@@ -460,7 +461,7 @@ public class HangarService {
     for (MissionUnit unit : units) {
       unit.setShip(null);
       missionUnitRepository.save(unit);
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.MISSION_UNIT_UPDATED,
           unit.getMission().getId(),
           unit.getMission().getName(),

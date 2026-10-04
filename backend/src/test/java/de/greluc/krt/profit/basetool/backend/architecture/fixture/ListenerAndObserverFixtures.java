@@ -20,7 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.architecture.fixture;
 
 import de.greluc.krt.profit.basetool.backend.annotation.ObserverSpi;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.RequestScopeResolver;
@@ -44,21 +45,25 @@ public final class ListenerAndObserverFixtures {
   /** Listeners that record audit rows after commit or on another thread. */
   public static final class PlantedAuditingListener {
 
+    private final AuditRecorder auditRecorder;
+
     private final AuditService auditService;
 
     /**
      * Creates the fixture.
      *
-     * @param auditService the recorder the planted methods call
+     * @param auditRecorder the published recorder the planted methods call
+     * @param auditService the recorder's implementation the planted helper calls
      */
-    public PlantedAuditingListener(AuditService auditService) {
+    public PlantedAuditingListener(AuditRecorder auditRecorder, AuditService auditService) {
+      this.auditRecorder = auditRecorder;
       this.auditService = auditService;
     }
 
     /** Records an audit row directly after commit. */
     @TransactionalEventListener(classes = Object.class)
     public void recordsDirectly() {
-      auditService.record(AuditEventType.USER_DELETED, null, null, null, null);
+      auditRecorder.record(AuditEventType.USER_DELETED, null, null, null, null);
     }
 
     /** Records an audit row on another thread through a private helper. */
@@ -71,7 +76,7 @@ public final class ListenerAndObserverFixtures {
     @TransactionalEventListener(classes = Object.class)
     public void recordsInALambda() {
       Runnable work =
-          () -> auditService.record(AuditEventType.USER_DELETED, null, null, null, null);
+          () -> auditRecorder.record(AuditEventType.USER_DELETED, null, null, null, null);
       work.run();
     }
 

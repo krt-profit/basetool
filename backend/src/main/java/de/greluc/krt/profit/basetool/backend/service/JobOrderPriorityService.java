@@ -19,13 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.JobOrderAuditLabel;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -51,7 +52,7 @@ public class JobOrderPriorityService {
   private final JobOrderRepository jobOrderRepository;
 
   /** Records the priority-change audit event (REQ-AUDIT-001). */
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /** Projects the reordered order back to its stock/claim DTO. */
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
@@ -102,7 +103,7 @@ public class JobOrderPriorityService {
       o.setPriority(currentPrio++);
     }
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.JOB_ORDER_PRIORITY_CHANGED,
         targetOrder.getId(),
         orderLabel(targetOrder),

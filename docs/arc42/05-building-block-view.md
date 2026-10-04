@@ -80,6 +80,13 @@ is the source of truth for its target module and that module's rank: every class
 by the first matching rule, and a class no rule assigns fails the build
 ([`module-boundaries.md`](../specs/module-boundaries.md), REQ-MOD-001/002).
 
+The first module package is `audit.api`, the audit module's published interface (plan §5.3): the
+`AuditRecorder` every other module records through, and the vocabulary `AuditEventType`,
+`AuditDomain` and `AuditDetails`. Recording stays a direct call inside the business transaction
+(`MANDATORY`), never an event. The recorder's implementation `AuditService`, the `AuditEvent`
+entity, its repository, the viewer and the retention purge are the module's internals and still sit
+in the layer packages.
+
 ## 5.3 Level 2 — inside `frontend`
 
 | Package | What lives there |

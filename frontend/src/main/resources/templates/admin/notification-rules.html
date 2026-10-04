@@ -21,43 +21,45 @@
     <div id="rules-host" class="card card--flush">
         <th:block th:fragment="rules">
         <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{${error}}">Fehler beim Laden.</div>
-        <table id="rules-table" class="data-table data-table--stack" th:if="${!#lists.isEmpty(rules)}"
-               th:data-list-total="${#lists.size(rules)}">
-            <thead>
-            <tr>
-                <th th:text="#{admin.notificationRules.eventType}">Ereignis</th>
-                <th th:text="#{admin.notificationRules.notificationType}">Benachrichtigungstyp</th>
-                <th class="num" th:text="#{admin.notificationRules.selectors}">Empfänger-Selektoren</th>
-                <th class="cell-status" th:text="#{admin.notificationRules.enabled}">Aktiv</th>
-                <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.notificationRules.actions}">Aktion</span></th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr th:each="r : ${rules}" th:attr="data-rule-id=${r.id}" data-testid="rule-row">
-                <td>
-                    <span class="cell-title" th:text="${#messages.msgOrNull('admin.notificationRules.eventType.' + r.eventType) ?: r.eventType}">Auftrag angelegt</span>
-                    <span class="cell-sub" th:if="${r.description != null and !#strings.isEmpty(r.description)}" th:text="${r.description}">…</span>
-                </td>
-                <td th:attr="data-label=#{admin.notificationRules.notificationType}"
-                    th:text="${#messages.msgOrNull('admin.notificationRules.notificationType.' + r.notificationType) ?: r.notificationType}">Auftrag angelegt</td>
-                <td class="num" th:attr="data-label=#{admin.notificationRules.selectors}" th:text="${#lists.size(r.selectors)}">4</td>
-                <td class="cell-status">
-                    <span th:if="${r.enabled}" class="chip chip--success" th:text="#{admin.notificationRules.status.enabled}">Aktiv</span>
-                    <span th:unless="${r.enabled}" class="chip chip--muted" th:text="#{admin.notificationRules.status.disabled}">Inaktiv</span>
-                </td>
-                <td class="cell-actions">
-                    <button type="button" class="btn btn-ghost btn-icon" data-rule-edit
-                            th:title="#{admin.notificationRules.edit}" th:aria-label="#{admin.notificationRules.edit}">
-                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"></use></svg>
-                    </button>
-                    <button type="button" class="btn btn-quiet-danger btn-icon" data-rule-delete
-                            th:title="#{admin.notificationRules.delete}" th:aria-label="#{admin.notificationRules.delete}">
-                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"></use></svg>
-                    </button>
-                </td>
-            </tr>
-            </tbody>
-        </table>
+        <div class="table-responsive" th:if="${!#lists.isEmpty(rules)}">
+            <table id="rules-table" class="data-table data-table--stack"
+                   th:data-list-total="${#lists.size(rules)}">
+                <thead>
+                <tr>
+                    <th th:text="#{admin.notificationRules.eventType}">Ereignis</th>
+                    <th th:text="#{admin.notificationRules.notificationType}">Benachrichtigungstyp</th>
+                    <th class="num" th:text="#{admin.notificationRules.selectors}">Empfänger-Selektoren</th>
+                    <th class="cell-status" th:text="#{admin.notificationRules.enabled}">Aktiv</th>
+                    <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.notificationRules.actions}">Aktion</span></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="r : ${rules}" th:attr="data-rule-id=${r.id}" data-testid="rule-row">
+                    <td>
+                        <span class="cell-title" th:text="${#messages.msgOrNull('admin.notificationRules.eventType.' + r.eventType) ?: r.eventType}">Auftrag angelegt</span>
+                        <span class="cell-sub" th:if="${r.description != null and !#strings.isEmpty(r.description)}" th:text="${r.description}">…</span>
+                    </td>
+                    <td th:attr="data-label=#{admin.notificationRules.notificationType}"
+                        th:text="${#messages.msgOrNull('admin.notificationRules.notificationType.' + r.notificationType) ?: r.notificationType}">Auftrag angelegt</td>
+                    <td class="num" th:attr="data-label=#{admin.notificationRules.selectors}" th:text="${#lists.size(r.selectors)}">4</td>
+                    <td class="cell-status">
+                        <span th:if="${r.enabled}" class="chip chip--success" th:text="#{admin.notificationRules.status.enabled}">Aktiv</span>
+                        <span th:unless="${r.enabled}" class="chip chip--muted" th:text="#{admin.notificationRules.status.disabled}">Inaktiv</span>
+                    </td>
+                    <td class="cell-actions">
+                        <button type="button" class="btn btn-ghost btn-icon" data-rule-edit
+                                th:title="#{admin.notificationRules.edit}" th:aria-label="#{admin.notificationRules.edit}">
+                            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"></use></svg>
+                        </button>
+                        <button type="button" class="btn btn-quiet-danger btn-icon" data-rule-delete
+                                th:title="#{admin.notificationRules.delete}" th:aria-label="#{admin.notificationRules.delete}">
+                            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"></use></svg>
+                        </button>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
         <th:block th:if="${error == null and #lists.isEmpty(rules)}">
             <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.notificationRules.empty.title', textKey='admin.notificationRules.empty')}"></th:block>
         </th:block>

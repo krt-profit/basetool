@@ -19,13 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.event.JobOrderCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.event.JobOrderUpdatedByRequesterEvent;
 import de.greluc.krt.profit.basetool.backend.event.OrgUnitRef;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
@@ -46,7 +48,6 @@ import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
@@ -92,7 +93,7 @@ public class JobOrderService {
   private final AuthHelperService authHelperService;
   private final ApplicationEventPublisher eventPublisher;
   private final MaterialClaimService materialClaimService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final JobOrderItemService jobOrderItemService;
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
   private final JobOrderPriorityService jobOrderPriorityService;
@@ -134,7 +135,7 @@ public class JobOrderService {
     jobOrderRepository.flush();
     jobOrderPriorityService.normalizePriorities();
     publishJobOrderCreated(jobOrder);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.JOB_ORDER_CREATED,
         jobOrder.getId(),
         orderLabel(jobOrder),
@@ -185,7 +186,7 @@ public class JobOrderService {
     jobOrderRepository.flush();
     jobOrderPriorityService.normalizePriorities();
     publishJobOrderCreated(jobOrder);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.JOB_ORDER_ITEM_CREATED,
         jobOrder.getId(),
         orderLabel(jobOrder),
@@ -290,14 +291,14 @@ public class JobOrderService {
     }
 
     if (status == JobOrderStatus.COMPLETED && previousStatus != JobOrderStatus.COMPLETED) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.JOB_ORDER_COMPLETED,
           jobOrder.getId(),
           orderLabel(jobOrder),
           null,
           AuditDetails.of("from", previousStatus).with("autoCompleted", "false"));
     } else {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.JOB_ORDER_STATUS_CHANGED,
           jobOrder.getId(),
           orderLabel(jobOrder),
@@ -356,7 +357,7 @@ public class JobOrderService {
     jobOrder.setCountBlueprintsWithVariants(countWithVariants);
     jobOrder = jobOrderRepository.saveAndFlush(jobOrder);
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.JOB_ORDER_BLUEPRINT_COUNTING_CHANGED,
         jobOrder.getId(),
         orderLabel(jobOrder),
@@ -393,7 +394,7 @@ public class JobOrderService {
 
     MaterialReplaceOutcome outcome =
         replaceMaterialsWithinTransaction(id, jobOrder, updateDto.materials());
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.JOB_ORDER_UPDATED,
         outcome.order().getId(),
         orderLabel(outcome.order()),
@@ -551,7 +552,7 @@ public class JobOrderService {
 
     int orphanedClaimsWithdrawn =
         materialClaimService.withdrawOrphanedClaimsWithinTransaction(jobOrder);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.JOB_ORDER_ITEM_UPDATED,
         jobOrder.getId(),
         orderLabel(jobOrder),
@@ -715,7 +716,7 @@ public class JobOrderService {
 
     MaterialReplaceOutcome outcome =
         replaceMaterialsWithinTransaction(id, jobOrder, updateDto.materials());
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.JOB_ORDER_UPDATED,
         outcome.order().getId(),
         orderLabel(outcome.order()),
@@ -784,7 +785,7 @@ public class JobOrderService {
         Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
     int orphanedClaimsWithdrawn =
         materialClaimService.withdrawOrphanedClaimsWithinTransaction(refreshed);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.JOB_ORDER_ITEM_UPDATED,
         refreshed.getId(),
         orderLabel(refreshed),
@@ -836,7 +837,7 @@ public class JobOrderService {
     if (priority != null) {
       jobOrderPriorityService.normalizePriorities();
     }
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.JOB_ORDER_DELETED,
         deletedId,
         deletedLabel,
@@ -882,7 +883,7 @@ public class JobOrderService {
 
     jobOrder.getMaterials().removeIf(m -> m.getMaterial().getId().equals(materialId));
     jobOrderRepository.save(jobOrder);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.JOB_ORDER_MATERIAL_UNLINKED,
         jobOrderId,
         label,
@@ -915,7 +916,7 @@ public class JobOrderService {
 
     item.getJobOrderAllocations()
         .removeIf(a -> a.getJobOrder() != null && a.getJobOrder().getId().equals(jobOrderId));
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.JOB_ORDER_INVENTORY_UNLINKED,
         jobOrderId,
         orderLabel(jobOrder),
@@ -992,7 +993,7 @@ public class JobOrderService {
       jobOrderRepository.flush();
       jobOrderPriorityService.normalizePriorities();
       inventoryItemRepository.deleteJobOrderAllocationsByJobOrder(jobOrder.getId());
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.JOB_ORDER_COMPLETED,
           jobOrder.getId(),
           orderLabel(jobOrder),
@@ -1065,7 +1066,7 @@ public class JobOrderService {
     if (target.getKind() == OrgUnitKind.SQUADRON) {
       claimsWithdrawn = materialClaimService.withdrawAllForOrderWithinTransaction(jobOrder);
     }
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.JOB_ORDER_REASSIGNED,
         jobOrder.getId(),
         orderLabel(jobOrder),

@@ -102,31 +102,33 @@
 
     <div id="audit-results" class="card card--flush" data-testid="audit-panel">
         <th:block th:fragment="auditResults">
-        <table th:if="${events != null and !#lists.isEmpty(events.content())}" class="data-table data-table--stack">
-            <thead>
-            <tr>
-                <th th:text="#{admin.audit.col.event}">Ereignis</th>
-                <th th:text="#{admin.audit.col.actor}">Akteur</th>
-                <th th:text="#{admin.audit.col.subject}">Betroffen</th>
-                <th th:text="#{admin.audit.col.client}">Client</th>
-                <th th:text="#{admin.audit.col.details}">Details</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr th:each="e : ${events.content()}" data-testid="audit-row">
-                <td>
-                    <span class="cell-title" th:text="#{${e.eventLabelKey()}}">Ereignis</span>
-                    <span class="cell-sub utc-time" th:text="${e.occurredAt()}">2026-06-12T18:30:00Z</span>
-                </td>
-                <td th:attr="data-label=#{admin.audit.col.actor}" th:text="${@handles.display(e.actorHandle())}">greluc</td>
-                <td th:attr="data-label=#{admin.audit.col.subject}" th:text="${@handles.display(e.subject())}">&mdash;</td>
-                <td data-testid="audit-row-client" th:attr="data-label=#{admin.audit.col.client}"
-                    th:text="${e.clientId() != null ? (clientNames[e.clientId()] ?: (#messages.msgOrNull('admin.audit.client.' + e.clientId()) ?: e.clientId())) : '—'}">&mdash;</td>
-                <td class="audit-details" th:attr="data-label=#{admin.audit.col.details}"
-                    th:text="${e.details()}" th:title="${e.details()}">Details</td>
-            </tr>
-            </tbody>
-        </table>
+        <div class="table-responsive" th:if="${events != null and !#lists.isEmpty(events.content())}">
+            <table class="data-table data-table--stack">
+                <thead>
+                <tr>
+                    <th th:text="#{admin.audit.col.event}">Ereignis</th>
+                    <th th:text="#{admin.audit.col.actor}">Akteur</th>
+                    <th th:text="#{admin.audit.col.subject}">Betroffen</th>
+                    <th th:text="#{admin.audit.col.client}">Client</th>
+                    <th th:text="#{admin.audit.col.details}">Details</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="e : ${events.content()}" data-testid="audit-row">
+                    <td>
+                        <span class="cell-title" th:text="#{${e.eventLabelKey()}}">Ereignis</span>
+                        <span class="cell-sub utc-time" th:text="${e.occurredAt()}">2026-06-12T18:30:00Z</span>
+                    </td>
+                    <td th:attr="data-label=#{admin.audit.col.actor}" th:text="${@handles.display(e.actorHandle())}">greluc</td>
+                    <td th:attr="data-label=#{admin.audit.col.subject}" th:text="${@handles.display(e.subject())}">&mdash;</td>
+                    <td data-testid="audit-row-client" th:attr="data-label=#{admin.audit.col.client}"
+                        th:text="${e.clientId() != null ? (clientNames[e.clientId()] ?: (#messages.msgOrNull('admin.audit.client.' + e.clientId()) ?: e.clientId())) : '—'}">&mdash;</td>
+                    <td class="audit-details" th:attr="data-label=#{admin.audit.col.details}"
+                        th:text="${e.details()}" th:title="${e.details()}">Details</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
         <th:block th:if="${error == null and (events == null or #lists.isEmpty(events.content()))}">
             <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.audit.empty.title', textKey='admin.audit.empty',
                 emptyId='audit-empty')}"></th:block>

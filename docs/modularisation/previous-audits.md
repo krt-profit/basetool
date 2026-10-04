@@ -69,6 +69,9 @@ section. Every implementing pull request is on `main`.
 | **Total** | **124** | **27** | **2** | **1** | **2** |
 
 The remaining work carries priority P1 in 8 findings, P2 in 16 and P3 in 9; 123 findings are closed.
+The tables are the 2026-09-29 snapshot; since then #2387 closed BLD-PERF-04 and CI-SEC-12 and the
+leftovers of CI-01, SEC-16, TST-18, ING-SEC-04 and OPS-SEC-08 (PSB-11, PSB-12, PSB-14), and moved
+CI-SEC-16 (PSB-13) as far as a workflow change can.
 Ten DONE findings have a production half that only a host or Prometheus read could confirm —
 APPSEC-04, APPSEC-05, APPSEC-07, CI-SEC-01, ING-SEC-03, ING-SEC-04, OPS-PRIV-01, OPS-SEC-01,
 OPS-SEC-05 and OPS-SIMP-03; the knowledge base records the state of their rollout. "Operations" is
@@ -158,7 +161,7 @@ Ordered by area, then by the audit's priority.
 | ING-SEC-03 | Ingest | P2 → closed | Whether the gates apply in prod can only be settled with host access | DONE | CONFIRMED | Audience-gate gauge, alert and panel; the production value was not re-read. | #1990, #2270; `ingest/src/main/java/…/metrics/IngestGatePostureMetric.java:44` |
 | ING-SIMP-02 | Ingest | P2 → closed | Bucket factory duplicated; per-IP and per-subject limits share one budget | DONE | CONFIRMED | One factory, a separate per-IP capacity. | #1990; `ingest/src/main/java/…/ratelimit/RateLimitBuckets.java:61` |
 | ING-MOD-01 | Ingest | P3 → closed | Remove WebFlux from the internet-facing gateway | DONE | CONFIRMED | `RestClient` on the JDK client (ADR-0204). | #2008; `ingest/src/main/java/…/config/RestClientConfig.java:102-144` |
-| ING-SEC-04 | Ingest | P3 → P3 | Every ingest container holds the key that also identifies backend and Keycloak | DONE | ADJUSTED | Per-service leaves done (ADR-0211); the jar's hostname-check default is still off. | #2034, #2036; `ingest/src/main/resources/application.yml:50` |
+| ING-SEC-04 | Ingest | P3 → P3 | Every ingest container holds the key that also identifies backend and Keycloak | DONE | ADJUSTED | Per-service leaves done (ADR-0211); the jar's hostname-check default is still off. **Closed 2026-10-04 (#2387):** the ingest jar defaults to `true`, `dev`/`test` opt out. | #2034, #2036; `ingest/src/main/resources/application.yml:50` |
 | KC-CI-01 | Keycloak | P1 → closed | Login-gate module without SpotBugs/FindSecBugs and without coverage | DONE | CONFIRMED | SpotBugs, FindSecBugs and coverage floors wired. | #1990; `keycloak-spi/build.gradle.kts:4,7` |
 | KC-PERF-01 | Keycloak | P1 → closed | The first Discord login queries the same guild endpoint three times | DONE | CONFIRMED | One member lookup per first login. | #1990; `keycloak-spi/src/main/java/…/DiscordGuildRoleGateAuthenticator.java:117-125` |
 | THEME-SEC-01 | Keycloak | P1 → closed | Login form blocks password managers and always ticks "remember me" | DONE | CONFIRMED | Autocomplete hints; remember-me only when set (REQ-SEC-066). | #1990; `keycloak-theme/krt-theme/login/login.ftl:13-27` |
@@ -171,13 +174,13 @@ Ordered by area, then by the audit's priority.
 | BLD-PERF-10 | Build | P1 → closed | Mockito agent resolved at configuration time and written into the cache key as an absolute path | DONE | CONFIRMED | Configuration-cache-clean argument provider. | #2019; `build.gradle.kts:138-148` |
 | DOC-20 | Build | P1 → closed | Stale build comments and the `versions.properties` question | DONE | CONFIRMED | File removed; build scripts carry no comments (ADR-0214). | #2019, #2074 |
 | DOC-21 | Build | P1 → closed | The project CLAUDE.md names the owner's retired e-mail address | DONE | CONFIRMED | Replaced; only a historical CHANGELOG entry mentions the switch. | `674e55bd7` |
-| SEC-16 | Build | P1 → P3 | OWASP suppressions never expire | DONE | ADJUSTED | All nine expire on one date; the renewal procedure went with the removed header comment. | #2019, #2074; `config/owasp/dependency-check-suppressions.xml` |
+| SEC-16 | Build | P1 → P3 | OWASP suppressions never expire | DONE | ADJUSTED | All nine expire on one date; the renewal procedure went with the removed header comment. **Closed 2026-10-04 (#2387):** CONTRIBUTING → *OWASP suppressions expire*. | #2019, #2074; `config/owasp/dependency-check-suppressions.xml` |
 | SEC-17 | Build | P1 → closed | Test profile ships in the production jars | DONE | CONFIRMED | The jar gate is applied by plugin id, so any new subproject inherits it. | #2019; `build.gradle.kts:154-175` |
 | TS-SIMP-01 | Build | P1 → closed | test-support uses the JUnit pin meant only for keycloak-spi | DONE | CONFIRMED | Pin removed; the Boot BOM supplies JUnit. | #1990; `test-support/build.gradle.kts:22-24` |
-| TST-18 | Build | P1 → P3 | Redis tests run against Redis 7, production runs Redis 8 | DONE | ADJUSTED | Redis parity done; the same drift exists for PostgreSQL. | #2019; `test-support/src/main/java/…/containers/TestImages.java:39-40` |
+| TST-18 | Build | P1 → P3 | Redis tests run against Redis 7, production runs Redis 8 | DONE | ADJUSTED | Redis parity done; the same drift exists for PostgreSQL. **Closed 2026-10-04 (#2387):** `TestImages.POSTGRES` through the backend's `PinnedPostgresImageSubstitutor`. | #2019; `test-support/src/main/java/…/containers/TestImages.java:39-40` |
 | TST-19 | Build | P1 → closed | Testcontainers JDBC without `TC_DAEMON` | DONE | CONFIRMED | Set in the test profile. | #2019; `backend/src/test/resources/application-test.yml:7` |
 | BLD-PERF-03 | Build | P2 → P1/P2 | Spring test-context cache fragmented — 38 contexts at a cache size of 32 | OPEN | ADJUSTED | Untouched; profile unification now, module-scoped test slices with the modularisation. | no commit; `build.gradle.kts:186` |
-| BLD-PERF-04 | Build | P2 → P3 | Configuration cache off because refreshVersions runs in every build | PARTIAL | CONFIRMED | CI builds with the cache; developer builds still default to off. | #2019; `settings.gradle.kts:1-5` |
+| BLD-PERF-04 | Build | P2 → P3 | Configuration cache off because refreshVersions runs in every build | DONE (2026-10-04) | CONFIRMED | CI builds with the cache; developer builds still default to off. **Closed 2026-10-04 (#2387):** `org.gradle.configuration-cache=true` in `gradle.properties`. | #2019; `settings.gradle.kts:1-5` |
 | BLD-PERF-08 | Build | P2 → closed | `minifyStaticCss` overwrites the output of `processResources` | DONE | CONFIRMED | The minified copy has its own directory. | #2019; `frontend/build.gradle.kts:333-385` |
 | BLD-SIMP-06 | Build | P2 → P2 | About 250 duplicated lines across the module builds | DONE | ADJUSTED | Plugin-id conventions help a split; name-keyed floors and test heap would silently drop. | #2019; `build.gradle.kts:184,228-241` |
 | IMG-CI-13 | Build | P2 → closed | Nothing checks that the CDS archive is created and accepted | DONE | CONFIRMED | AOT-cache verification at build time plus a Loki rule. | #2029, #2050; `docker/app/Dockerfile:105-117` |
@@ -186,7 +189,7 @@ Ordered by area, then by the audit's priority.
 | IMG-SIMP-14 | Build | P3 → P2 | Three nearly identical app Dockerfiles | DONE | ADJUSTED | One Dockerfile, but it enumerates today's subprojects. | #2029; `docker/app/Dockerfile:12-27` |
 | SEC-15 | Build | P3 → closed | No Gradle dependency verification for artefacts that end up in signed images | DONE | CONFIRMED | Strict SHA-256 verification (ADR-0208); every new framework regenerates it. | #2025, #2040; `gradle/verification-metadata.xml` |
 | XMOD-SIMP-01 | Build | P3 → closed | LogSafe/PiiMasker three times, held together by a mirror test | DONE | CONFIRMED | One `logging-support` module (ADR-0205); other platform mirrors remain (PSA-03). | #2016 |
-| CI-01 | CI | P0 → P2 | CodeQL default setup crowds out the NVD and Playwright caches | DONE | ADJUSTED | Advanced CodeQL only, but the cache stands at 9.39 of 10 GiB, above the audit's guard. | #1982, #1986; `.github/workflows/cache-janitor.yml:64-70` |
+| CI-01 | CI | P0 → P2 | CodeQL default setup crowds out the NVD and Playwright caches | DONE | ADJUSTED | Advanced CodeQL only, but the cache stands at 9.39 of 10 GiB, above the audit's guard. **Closed 2026-10-04 (#2387):** newest `gradle-home-` entry per family plus its bundles; warning above 8 GiB. | #1982, #1986; `.github/workflows/cache-janitor.yml:64-70` |
 | CI-02 | CI | P0 → closed | Weekly OWASP run without a result since 2026-07-20 | DONE | CONFIRMED | Runs finish again since the NVD JSON 2.0 feeds; a failed run opens an issue. | #1993; `.github/workflows/dependency-check.yml:118-141` |
 | CI-03 | CI | P0 → P1 | Backend mutation tests have failed for eight weeks while the job shows green | PARTIAL | ADJUSTED | Gate added, but the only CI run since timed out and passed on a partial report. | #1993; `.github/workflows/pitest.yml:19,45-66` |
 | CI-09 | CI | P1 → closed | JDK and Gradle setup copied nine times, ineffective chmods | DONE | CONFIRMED | One setup composite. | `.github/actions/setup-jdk-gradle/action.yml` |
@@ -202,7 +205,7 @@ Ordered by area, then by the audit's priority.
 | CI-SEC-08 | CI | P1 → closed | Dependabot alerts see not a single Maven dependency | DONE | CONFIRMED | Dependency submission on `main`; 944 Maven entries in the graph. | `.github/workflows/dependency-submission.yml` |
 | CI-SEC-10 | CI | P1 → P1 | Only five required checks — gitleaks, wrapper validation and actionlint are not among them | DONE | ADJUSTED | Nine required checks now, but `Self-tests` and `Container checks` are not required. | `.github/workflows/repo-lint.yml:306,379` |
 | CI-SEC-11 | CI | P1 → closed | gitleaks reads its allow-list from the PR head | DONE | CONFIRMED | Configuration loaded from the base commit. | `.github/workflows/gitleaks.yml:57-75` |
-| CI-SEC-12 | CI | P1 → P2 | CI tools without checksums, pip packages unpinned | PARTIAL | ADJUSTED | Binaries hashed; PyYAML, Ansible and one `npx` fetch are not. | `.github/workflows/repo-lint.yml:108,277-278`; `.github/workflows/exchange-docs.yml:58` |
+| CI-SEC-12 | CI | P1 → P2 | CI tools without checksums, pip packages unpinned | DONE (2026-10-04) | ADJUSTED | Binaries hashed; PyYAML, Ansible and one `npx` fetch are not. **Closed 2026-10-04 (#2387):** `--require-hashes` files, markdownlint lockfile, exact collections. | `.github/workflows/repo-lint.yml:108,277-278`; `.github/workflows/exchange-docs.yml:58` |
 | CI-SEC-14 | CI | P1 → closed | Actions policy does not enforce SHA pins | DONE | CONFIRMED | SHA pinning required, selected owners only. | repository Actions policy |
 | CI-SEC-15 | CI | P1 → closed | No workflow security linter in CI | DONE | CONFIRMED | Hash-pinned zizmor in the required Linters job. | `.github/workflows/repo-lint.yml:61-75` |
 | CI-SEC-17 | CI | P1 → closed | e2e-smoke would upload a real staging session cookie as a public artefact | DONE | CONFIRMED | Session material deleted and excluded before upload. | `.github/workflows/e2e-smoke.yml:50-69` |
@@ -213,7 +216,7 @@ Ordered by area, then by the audit's priority.
 | CI-08 | CI | P2 → closed | The promote job exists twice, almost identical | DONE | CONFIRMED | One `retag-verified-digest` composite. | `.github/actions/retag-verified-digest/action.yml` |
 | CI-SEC-04 | CI | P2 → closed | Release and promote workflows give every job all permissions | DONE | CONFIRMED | Per-job permissions; the SPI is compiled without `id-token`. | `.github/workflows/release-images.yml:13` |
 | CI-SEC-13 | CI | P2 → closed | BuildKit builder floats on a tag and may come from a mirror | DONE | CONFIRMED | Pinned by digest through a carrier Dockerfile. | `.github/actions/setup-buildx/Dockerfile:1` |
-| CI-SEC-16 | CI | P2 → P2 | Long-lived PATs as repository-wide secrets | PARTIAL | ADJUSTED | App tokens replace the PATs; the App key is not confined to a `main`-only environment. | `.github/workflows/release-publish.yml:3-6` |
+| CI-SEC-16 | CI | P2 → P2 | Long-lived PATs as repository-wide secrets | PARTIAL | ADJUSTED | App tokens replace the PATs; the App key is not confined to a `main`-only environment. **2026-10-04 (#2387):** `release-prepare` and `refresh-versions` run in the `release` environment (owner creates it); `release-publish` cannot until its `pull_request` trigger changes (ADR-0201 amendment 3). | `.github/workflows/release-publish.yml:3-6` |
 | CI-07 | CI | P3 → P3 | release-images rebuilds everything on 19 of 30 main commits without an image change | DONE | ADJUSTED | Per-module reuse (ADR-0210); its input derivation must change before any Gradle extraction. | #2031, #2033, #2046; `.github/scripts/image_reuse_plan.py:44-112` |
 | OPS-MON-01 | Operations | P0 → P1 | Critical alert ContainerRestartLoop cannot fire | PARTIAL | ADJUSTED | The alert reads the podman series now, but nothing notices when those series vanish. | #1984; `monitoring/prometheus/alerts/infrastructure.yml:60-61`; `scripts/check-conformance.py:74-81` |
 | OPS-PERF-01 | Operations | P0 → closed | Podman kills every container after 10 s | DONE | CONFIRMED | `StopTimeout` and `TimeoutStopSec` for the nine units with a grace period. | `scripts/generate-quadlet.py:783-787` |
@@ -230,7 +233,7 @@ Ordered by area, then by the audit's priority.
 | OPS-SEC-07 | Operations | P1 → closed | Prometheus lifecycle API enabled, nobody uses it | DONE | CONFIRMED | Flag removed. | `quadlet/systemd/prometheus.container:22` |
 | OPS-MOD-01 | Operations | P2 → closed | Generator uses raw podman flags instead of Quadlet keys | DONE | CONFIRMED | Quadlet keys wherever podman offers one. | `scripts/generate-quadlet.py:750` |
 | OPS-SEC-06 | Operations | P2 → closed | Host Alloy and node_exporter are never updated | DONE | CONFIRMED | The conformance check compares host agent versions with the compose pins. | `scripts/check-conformance.py:1290-1330` |
-| OPS-SEC-08 | Operations | P2 → P3 | sudoers comment overstates the boundary between `deploy` and `iri` | DONE | REPRIORITISED | The statement is corrected in the docs; the optional sudo wrapper is low urgency. | #1992; `ansible/README.md:43` |
+| OPS-SEC-08 | Operations | P2 → P3 | sudoers comment overstates the boundary between `deploy` and `iri` | DONE | REPRIORITISED | The statement is corrected in the docs; the optional sudo wrapper is low urgency. **Closed 2026-10-04 (#2387):** sudoers allowlist of the 15 sub-commands the scripts run, kept in step by `check-deploy-podman-allowlist.py`; host rollout is the owner's. | #1992; `ansible/README.md:43` |
 | OPS-SIMP-01 | Operations | P2 → closed | The Docker half of the runtime seam is dead code after the cutover | DONE | CONFIRMED | No Docker branch left (ADR-0203). | #2001; `scripts/lib/container-runtime.sh` |
 | OPS-SIMP-02 | Operations | P2 → closed | Docker and NPM leftovers in compose, rules, `docker/` and alert texts | DONE | CONFIRMED | cAdvisor and NPM leftovers gone (ADR-0203). | `monitoring/prometheus/alerts/containers-runtime.yml` |
 | OPS-SIMP-03 | Operations | P2 → closed | Four operations units repeat 60 lines of hardening — and drift | DONE | CONFIRMED | One sandbox drop-in, drill paths narrowed; no host run evidenced. | #2001; `scripts/iri-deploy-account-sandbox.conf` |
@@ -557,12 +560,15 @@ Every finding that is not DONE or not CONFIRMED, grouped by the priority of the 
   question that needs a browser baseline first. Adopted in §8.2, with the baseline decided as D-16
   (Baseline 2025, ES2025).
 - **PSB-11 — Actions cache budget** (CI-01): keep the newest Gradle entry per key family and warn
-  above 8 GiB, keeping the janitor's fork guard.
-- **PSB-12 — Hash the remaining CI tool fetches** (CI-SEC-12).
+  above 8 GiB, keeping the janitor's fork guard. Done (#2387).
+- **PSB-12 — Hash the remaining CI tool fetches** (CI-SEC-12). Done (#2387).
 - **PSB-13 — Confine the release App key to `main`** (CI-SEC-16), after a dry run of the trigger
-  question.
+  question. Partly done (#2387): the trigger question is answered by GitHub's documentation — a
+  `pull_request` run is evaluated as `refs/pull/<n>/merge`, which a `main`-only rule refuses — so
+  only the `main`-ref jobs moved; `release-publish` needs a trigger decision (ADR-0201 amendment 3).
 - **PSB-14 — Optional sudo wrapper for `deploy`** (OPS-SEC-08, now P3); every new `rt_*` call would
-  have to be added to it.
+  have to be added to it. Done in code (#2387), as a sudoers `Cmnd_Alias` rather than a wrapper
+  script; repo-lint fails when a new call is missing from it. The host rollout is the owner's.
 - **PSB-15 — Name the frontend shared kernel the September work created.** In scripts: `krtFetch`
   (used by 68 scripts), `krtModal` (35), `krtEvents` (32), `krtLiveSync` (29), `krtI18nText` (27)
   and the escape helpers; in Java: `BackendErrorResponses`, `GlobalExceptionHandler`,
@@ -808,7 +814,7 @@ L-3, L-5 and L-6 is not recorded.
 | --- | --- | --- | --- | --- |
 | PERF-V91 | Drop the V91 two-column index "in a future cleanup pass" | DONE | DROPPED | Dropped by `backend/src/main/resources/db/migration/V103__drop_legacy_owning_squadron_columns.sql:39`; V209 restored the status index. |
 | PERF-CONC | `CREATE INDEX CONCURRENTLY` for large tables "if needed" | OPEN | REPRIORITISED | Conditional; no table size demands it yet. |
-| PERF-FORKS | `maxParallelForks` reverted; move `WebClientResilienceTest` to virtual time | OPEN | REPRIORITISED | Still a real 400 ms limiter (`frontend/src/test/java/…/WebClientResilienceTest.java:61`); a prerequisite only if Gradle modules multiply parallel test tasks (Phase 5). |
+| PERF-FORKS | `maxParallelForks` reverted; move `WebClientResilienceTest` to virtual time | DONE (2026-10-04, #2387) | REPRIORITISED | Still a real 400 ms limiter (`frontend/src/test/java/…/WebClientResilienceTest.java:61`); a prerequisite only if Gradle modules multiply parallel test tasks (Phase 5). |
 | PERF-M6 | Rejected: `loading=lazy` on images | — | REJECTION-HOLDS | The images are above the fold, mostly the header logo. |
 | PERF-M7 | Redis persistence off | SUPERSEDED | DROPPED | Reversed later: Redis persists again (`quadlet/systemd/redis.container:20`), as it also holds live-sync and ingest state. |
 | PERF-L7 | Presence heartbeat (60 s) and TTL (120 s) changed in lockstep (fixed; at risk) | DONE | ADJUSTED | Holds (`frontend/src/main/resources/static/js/mission-presence.js:4`, `frontend/src/main/java/…/service/LiveSyncPresenceService.java:58`), but nothing pins the pair, and the Javadoc names the wrong script; a parity test (PRV-14). |
@@ -863,13 +869,13 @@ the September audit (OPS-MON-01, OPS-REL-01).
 
 | ID | Item | Status | Verdict | Why and evidence |
 | --- | --- | --- | --- | --- |
-| D1981-ADR | 29 ADRs flipped from Proposed to Accepted, pending the owner's ratification | — | UNKNOWN | ADR-0020, -0032, -0047 and -0205, on which the plan leans, read "Accepted"; the owner settles the rest. |
-| D1981-TERMS | The terms still mention guests and list five areas | OPEN | CONFIRMED | `backend/src/main/resources/messages_de.properties:234,236,238`; a change forces re-consent (ADR-0127), so it is the owner's call. |
+| D1981-ADR | 29 ADRs flipped from Proposed to Accepted, pending the owner's ratification | DONE | CONFIRMED | Ratified by the owner on 2026-10-04 (D-27). |
+| D1981-TERMS | The terms still mention guests and list five areas | DONE | DROPPED | The owner keeps the text (D-25, 2026-10-04), because a change forces re-consent (ADR-0127). |
 | D1981-PRIVACY | `privacy.p_3_8_1` describes IP logging | — | UNKNOWN | Whether it was revisited is not recorded (`frontend/src/main/resources/messages_de.properties:1411`). |
 | D1981-INGEST007 | REQ-INGEST-007 promises a "remember me" opt-in the extractor lacks | — | UNKNOWN | The spec is unchanged (`docs/specs/desktop-ingest.md:515-522`); to be settled in the extractor repository. |
 | D1981-REQIDS | Duplicated requirement ids | DONE | DROPPED | 18 ids renumbered (`d9a7d53bb3`). |
 | D1981-RESTORE | The restore-drill alert used a 35-day window | DONE | DROPPED | Eight days (`monitoring/prometheus/alerts/ops-automation.yml:56`). |
-| D1981-KCHARDEN | Keycloak hardening steps 2 (SMTP, forgotten password), 11 (OTP for admins) and 12 (session windows) | OPEN | CONFIRMED | `docs/KEYCLOAK_HARDENING_RUNBOOK.md`; independent of the domain split — step 11 matters most, as admin accounts have no second factor. |
+| D1981-KCHARDEN | Keycloak hardening steps 2 (SMTP, forgotten password), 11 (OTP for admins) and 12 (session windows) | OPEN | CONFIRMED | Adopted on 2026-10-04 (D-26); each realm write needs the owner's yes. `docs/KEYCLOAK_HARDENING_RUNBOOK.md`; independent of the domain split — step 11 matters most, as admin accounts have no second factor. |
 | D1981-OAUTH | The confidential frontend OAuth2 client not yet migrated | DONE | DROPPED | Live in production since 2026-09-25. |
 | D1981-TS | TypeScript migration plan | — | REJECTION-HOLDS | Deliberately unscheduled (ADR-0125); per-domain script folders work with `checkJs`. |
 
