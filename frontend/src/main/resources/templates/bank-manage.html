@@ -198,58 +198,60 @@
     </div>
 
     <div class="card card--flush" th:if="${activeTab == 'halter'}" data-testid="bank-holders-panel">
-        <table class="data-table data-table--stack" th:if="${!#lists.isEmpty(holders)}">
-            <thead>
-            <tr>
-                <th th:text="#{bank.manage.holder.handle}">Handle</th>
-                <th th:text="#{bank.manage.holder.source}">Typ</th>
-                <th class="num" th:text="#{bank.manage.holder.total}">H&auml;lt gesamt</th>
-                <th class="cell-status" th:text="#{bank.manage.holder.status}">Status</th>
-                <th class="cell-actions"><span class="visually-hidden" th:text="#{general.actions}">Aktionen</span></th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr th:each="h : ${holders}" data-testid="bank-holder-registry-row"
-                th:with="canViewHolder=${management or (h.userId() != null and selfUserId != null and h.userId().toString().equals(selfUserId))}"
-                th:attr="data-holder-handle=${h.handle()}">
-                <td>
-                    <a th:if="${canViewHolder}" class="row-link" th:href="@{'/bank/holders/' + ${h.id()}}"
-                       data-testid="bank-holder-history-link">
-                        <span class="cell-title" th:text="${@handles.display(h.handle())}">greluc</span>
-                    </a>
-                    <span th:unless="${canViewHolder}" class="cell-title" th:text="${@handles.display(h.handle())}">greluc</span>
-                </td>
-                <td th:attr="data-label=#{bank.manage.holder.source}">
-                    <span class="chip chip--muted"
-                          th:text="${h.roleManaged()} ? #{bank.holder.source.auto} : #{bank.holder.source.manual}">Auto</span>
-                </td>
-                <td class="num" th:attr="data-label=#{bank.manage.holder.total}"
-                    th:text="${#numbers.formatInteger(@moneyFormat.round(h.totalHeld()), 1, 'POINT')}">1.000.000</td>
-                <td class="cell-status">
-                    <span class="status-pill"
-                          th:classappend="${h.active()} ? ' status-active' : ' status-completed'"
-                          th:text="${h.active()} ? #{bank.holder.status.active} : #{bank.holder.status.inactive}">Aktiv</span>
-                </td>
-                <td class="cell-actions">
-                    <div class="bank-manage-row-actions">
-                        <th:block th:if="${management}">
-                            <button type="button" class="btn btn-quiet-danger btn-xs" th:if="${h.active()}"
-                                    data-trigger="open-modal-display" data-modal-id="bank-holder-deactivate-modal"
-                                    th:attr="data-field-_id=${h.id()},data-field-version=${h.version()}"
-                                    data-testid="bank-holder-deactivate-open"
-                                    th:text="#{bank.manage.holder.deactivate}">Deaktivieren</button>
-                            <button type="button" class="btn btn-ghost btn-xs" th:unless="${h.active()}"
-                                    data-trigger="open-modal-display" data-modal-id="bank-holder-reactivate-modal"
-                                    th:attr="data-field-_id=${h.id()},data-field-version=${h.version()}"
-                                    data-testid="bank-holder-reactivate-open"
-                                    th:text="#{bank.manage.holder.reactivate}">Reaktivieren</button>
-                        </th:block>
-                        <svg th:if="${canViewHolder}" class="krt-icon row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
-                    </div>
-                </td>
-            </tr>
-            </tbody>
-        </table>
+        <div class="table-responsive" th:if="${!#lists.isEmpty(holders)}">
+            <table class="data-table data-table--stack">
+                <thead>
+                <tr>
+                    <th th:text="#{bank.manage.holder.handle}">Handle</th>
+                    <th th:text="#{bank.manage.holder.source}">Typ</th>
+                    <th class="num" th:text="#{bank.manage.holder.total}">H&auml;lt gesamt</th>
+                    <th class="cell-status" th:text="#{bank.manage.holder.status}">Status</th>
+                    <th class="cell-actions"><span class="visually-hidden" th:text="#{general.actions}">Aktionen</span></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="h : ${holders}" data-testid="bank-holder-registry-row"
+                    th:with="canViewHolder=${management or (h.userId() != null and selfUserId != null and h.userId().toString().equals(selfUserId))}"
+                    th:attr="data-holder-handle=${h.handle()}">
+                    <td>
+                        <a th:if="${canViewHolder}" class="row-link" th:href="@{'/bank/holders/' + ${h.id()}}"
+                           data-testid="bank-holder-history-link">
+                            <span class="cell-title" th:text="${@handles.display(h.handle())}">greluc</span>
+                        </a>
+                        <span th:unless="${canViewHolder}" class="cell-title" th:text="${@handles.display(h.handle())}">greluc</span>
+                    </td>
+                    <td th:attr="data-label=#{bank.manage.holder.source}">
+                        <span class="chip chip--muted"
+                              th:text="${h.roleManaged()} ? #{bank.holder.source.auto} : #{bank.holder.source.manual}">Auto</span>
+                    </td>
+                    <td class="num" th:attr="data-label=#{bank.manage.holder.total}"
+                        th:text="${#numbers.formatInteger(@moneyFormat.round(h.totalHeld()), 1, 'POINT')}">1.000.000</td>
+                    <td class="cell-status">
+                        <span class="status-pill"
+                              th:classappend="${h.active()} ? ' status-active' : ' status-completed'"
+                              th:text="${h.active()} ? #{bank.holder.status.active} : #{bank.holder.status.inactive}">Aktiv</span>
+                    </td>
+                    <td class="cell-actions">
+                        <div class="bank-manage-row-actions">
+                            <th:block th:if="${management}">
+                                <button type="button" class="btn btn-quiet-danger btn-xs" th:if="${h.active()}"
+                                        data-trigger="open-modal-display" data-modal-id="bank-holder-deactivate-modal"
+                                        th:attr="data-field-_id=${h.id()},data-field-version=${h.version()}"
+                                        data-testid="bank-holder-deactivate-open"
+                                        th:text="#{bank.manage.holder.deactivate}">Deaktivieren</button>
+                                <button type="button" class="btn btn-ghost btn-xs" th:unless="${h.active()}"
+                                        data-trigger="open-modal-display" data-modal-id="bank-holder-reactivate-modal"
+                                        th:attr="data-field-_id=${h.id()},data-field-version=${h.version()}"
+                                        data-testid="bank-holder-reactivate-open"
+                                        th:text="#{bank.manage.holder.reactivate}">Reaktivieren</button>
+                            </th:block>
+                            <svg th:if="${canViewHolder}" class="krt-icon row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
         <th:block th:if="${#lists.isEmpty(holders)}">
             <th:block th:replace="~{fragments/components :: emptyState(titleKey='bank.manage.holders.empty.title', textKey='bank.manage.holders.empty', emptyId='bank-holders-empty')}"></th:block>
         </th:block>

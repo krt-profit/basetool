@@ -75,51 +75,53 @@
         <h2 class="bank-holder-history__title" th:text="#{bank.holder.detail.history}">Halter-Buchungen</h2>
         <div id="bank-holder-bookings-results" class="card card--flush">
         <th:block th:fragment="holderBookings">
-        <table class="data-table data-table--stack" th:if="${bookings != null and !#lists.isEmpty(bookings.content())}">
-            <thead>
-            <tr>
-                <th th:text="#{bank.booking.date}">Datum</th>
-                <th class="cell-status" th:text="#{bank.booking.type}">Typ</th>
-                <th th:text="#{bank.holder.booking.reference}">Bezug</th>
-                <th class="num" th:text="#{bank.booking.amount}">Betrag</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr th:each="b : ${bookings.content()}" data-testid="bank-holder-booking-row"
-                th:attr="data-transaction-id=${b.transactionId()}">
-                <td>
-                    <span class="cell-title utc-time" th:text="${b.createdAt()}">2026-06-10T18:30:00Z</span>
-                    <span class="cell-sub bank-holder-note" th:if="${!#strings.isEmpty(b.note())}"
-                          th:text="${b.note()}" th:title="${b.note()}">Missionsertrag</span>
-                </td>
-                <td class="cell-status" th:switch="${b.type()}">
-                    <span th:case="'DEPOSIT'" class="chip chip--success" th:text="#{bank.type.DEPOSIT}">Einzahlung</span>
-                    <span th:case="'WITHDRAWAL'" class="chip chip--warning" th:text="#{bank.type.WITHDRAWAL}">Auszahlung</span>
-                    <span th:case="'TRANSFER'" class="chip" th:text="#{bank.type.TRANSFER}">Transfer</span>
-                    <span th:case="'HOLDER_TRANSFER'" class="chip" th:text="#{bank.type.HOLDER_TRANSFER}">Umbuchung</span>
-                    <span th:case="'REVERSAL'" class="chip chip--danger" th:text="#{bank.type.REVERSAL}">Storno</span>
-                    <span th:case="'WIPE_RESET'" class="chip chip--danger" th:text="#{bank.type.WIPE_RESET}">Wipe-Reset</span>
-                    <span th:case="*" class="chip" th:text="${b.type()}">?</span>
-                </td>
-                <td th:attr="data-label=#{bank.holder.booking.reference}">
-                    <span th:if="${b.type() == 'HOLDER_TRANSFER' and b.counterHolderHandle() != null}"
-                          th:text="(${b.amount().signum() < 0} ? '&#8594; ' : '&#8592; ') + ${@handles.display(b.counterHolderHandle())}">&#8594; carol</span>
-                    <span th:if="${b.type() != 'HOLDER_TRANSFER' and b.counterAccountNo() != null}"
-                          th:text="${b.counterAccountNo()} + ' &#8212; ' + ${b.counterAccountName()}">KB-0001 &#8212; Staffel IRIDIUM</span>
-                    <span th:if="${(b.type() == 'HOLDER_TRANSFER' and b.counterHolderHandle() == null) or (b.type() != 'HOLDER_TRANSFER' and b.counterAccountNo() == null)}"
-                          class="text-muted">&mdash;</span>
-                </td>
-                <td class="num">
-                    <span class="bank-amount"
-                          th:classappend="${b.amount().signum() > 0} ? ' bank-amount--pos' : (${b.amount().signum() < 0} ? ' bank-amount--neg' : ' bank-amount--zero')"
-                          th:text="${b.amount().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(b.amount()), 1, 'POINT')}">+250.000</span>
-                    <span class="bank-fee-note cell-sub" data-testid="bank-holder-booking-fee"
-                          th:if="${b.transferFee() != null and b.transferFee().signum() > 0 and b.amount().signum() < 0}"
-                          th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'POINT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'POINT')}">Geb&uuml;hr 25 &middot; kommt an 4.975.000</span>
-                </td>
-            </tr>
-            </tbody>
-        </table>
+        <div class="table-responsive" th:if="${bookings != null and !#lists.isEmpty(bookings.content())}">
+            <table class="data-table data-table--stack">
+                <thead>
+                <tr>
+                    <th th:text="#{bank.booking.date}">Datum</th>
+                    <th class="cell-status" th:text="#{bank.booking.type}">Typ</th>
+                    <th th:text="#{bank.holder.booking.reference}">Bezug</th>
+                    <th class="num" th:text="#{bank.booking.amount}">Betrag</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="b : ${bookings.content()}" data-testid="bank-holder-booking-row"
+                    th:attr="data-transaction-id=${b.transactionId()}">
+                    <td>
+                        <span class="cell-title utc-time" th:text="${b.createdAt()}">2026-06-10T18:30:00Z</span>
+                        <span class="cell-sub bank-holder-note" th:if="${!#strings.isEmpty(b.note())}"
+                              th:text="${b.note()}" th:title="${b.note()}">Missionsertrag</span>
+                    </td>
+                    <td class="cell-status" th:switch="${b.type()}">
+                        <span th:case="'DEPOSIT'" class="chip chip--success" th:text="#{bank.type.DEPOSIT}">Einzahlung</span>
+                        <span th:case="'WITHDRAWAL'" class="chip chip--warning" th:text="#{bank.type.WITHDRAWAL}">Auszahlung</span>
+                        <span th:case="'TRANSFER'" class="chip" th:text="#{bank.type.TRANSFER}">Transfer</span>
+                        <span th:case="'HOLDER_TRANSFER'" class="chip" th:text="#{bank.type.HOLDER_TRANSFER}">Umbuchung</span>
+                        <span th:case="'REVERSAL'" class="chip chip--danger" th:text="#{bank.type.REVERSAL}">Storno</span>
+                        <span th:case="'WIPE_RESET'" class="chip chip--danger" th:text="#{bank.type.WIPE_RESET}">Wipe-Reset</span>
+                        <span th:case="*" class="chip" th:text="${b.type()}">?</span>
+                    </td>
+                    <td th:attr="data-label=#{bank.holder.booking.reference}">
+                        <span th:if="${b.type() == 'HOLDER_TRANSFER' and b.counterHolderHandle() != null}"
+                              th:text="(${b.amount().signum() < 0} ? '&#8594; ' : '&#8592; ') + ${@handles.display(b.counterHolderHandle())}">&#8594; carol</span>
+                        <span th:if="${b.type() != 'HOLDER_TRANSFER' and b.counterAccountNo() != null}"
+                              th:text="${b.counterAccountNo()} + ' &#8212; ' + ${b.counterAccountName()}">KB-0001 &#8212; Staffel IRIDIUM</span>
+                        <span th:if="${(b.type() == 'HOLDER_TRANSFER' and b.counterHolderHandle() == null) or (b.type() != 'HOLDER_TRANSFER' and b.counterAccountNo() == null)}"
+                              class="text-muted">&mdash;</span>
+                    </td>
+                    <td class="num">
+                        <span class="bank-amount"
+                              th:classappend="${b.amount().signum() > 0} ? ' bank-amount--pos' : (${b.amount().signum() < 0} ? ' bank-amount--neg' : ' bank-amount--zero')"
+                              th:text="${b.amount().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(b.amount()), 1, 'POINT')}">+250.000</span>
+                        <span class="bank-fee-note cell-sub" data-testid="bank-holder-booking-fee"
+                              th:if="${b.transferFee() != null and b.transferFee().signum() > 0 and b.amount().signum() < 0}"
+                              th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'POINT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'POINT')}">Geb&uuml;hr 25 &middot; kommt an 4.975.000</span>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
         <th:block th:if="${bookings == null or #lists.isEmpty(bookings.content())}">
             <th:block th:replace="~{fragments/components :: emptyState(titleKey='bank.holder.detail.history.empty.title', textKey='bank.holder.detail.history.empty', emptyId='bank-holder-bookings-empty')}"></th:block>
         </th:block>

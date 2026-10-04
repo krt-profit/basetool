@@ -131,75 +131,77 @@
                 textKey='bank.detail.history.empty')}"></th:block>
         </div>
     </th:block>
-    <table class="data-table data-table--stack bank-bookings-table"
-           th:unless="${bookings == null or #lists.isEmpty(bookings.content())}">
-        <thead>
-        <tr>
-            <th th:text="#{bank.booking.date}">Datum</th>
-            <th th:text="#{bank.request.field.type}">Vorgang</th>
-            <th th:text="#{bank.booking.party}">Gegenpartei</th>
-            <th class="num" th:text="#{bank.booking.amount}">Betrag</th>
-            <th class="num" th:text="#{bank.booking.balanceAfter}">Saldo nach Buchung</th>
-            <th:block th:if="${staff}">
-                <th class="cell-actions"
-                    sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)"><span
-                        class="visually-hidden" th:text="#{bank.request.col.actions}">Aktionen</span></th>
-            </th:block>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:each="b : ${bookings.content()}" class="bank-booking-row"
-            th:with="after=${balancesAfter != null ? balancesAfter.get(b.postingId()) : null}"
-            th:attr="data-testid=${rowTestId},data-transaction-id=${b.transactionId()}">
-            <td class="bank-booking-date"><span class="utc-time" th:text="${b.createdAt()}">2026-10-02T18:30:00Z</span></td>
-            <td class="cell-status" th:switch="${b.type()}">
-                <span th:case="'DEPOSIT'" class="chip chip--success" th:text="#{bank.type.DEPOSIT}">Einzahlung</span>
-                <span th:case="'WITHDRAWAL'" class="chip chip--danger" th:text="#{bank.type.WITHDRAWAL}">Auszahlung</span>
-                <span th:case="'TRANSFER'" class="chip chip--info" th:text="#{bank.type.TRANSFER}">Transfer</span>
-                <span th:case="'REVERSAL'" class="chip chip--warning" th:text="#{bank.type.REVERSAL}">Storno</span>
-                <span th:case="*" class="chip chip--muted" th:text="#{'bank.type.' + ${b.type()}}">Wipe-Reset</span>
-            </td>
-            <td class="bank-booking-party" th:attr="data-testid=${testIdPrefix + '-counterparty'}">
-                <span class="cell-title" th:if="${b.type() == 'TRANSFER' and b.counterAccountNo() != null}"
-                      th:text="(${b.amount().signum() < 0} ? '&#8594; ' : '&#8592; ') + (${b.counterAccountName() != null} ? ${b.counterAccountName()} + ' (' + ${b.counterAccountNo()} + ')' : ${b.counterAccountNo()})">&#8594; KRT-Konto (KB-0002)</span>
-                <span class="cell-title" th:if="${!(b.type() == 'TRANSFER' and b.counterAccountNo() != null) and b.counterpartyHandle() != null}"
-                      th:text="${@handles.display(b.counterpartyHandle())} + (${b.counterpartyOrgUnitName() != null} ? ' (' + ${b.counterpartyOrgUnitName()} + ')' : '')">vexx (IRIDIUM)</span>
-                <span class="cell-title bank-party-none" th:if="${!(b.type() == 'TRANSFER' and b.counterAccountNo() != null) and b.counterpartyHandle() == null}">&ndash;</span>
-                <span class="cell-sub" th:if="${!#strings.isEmpty(b.justification())}"
-                      th:attr="data-testid=${testIdPrefix + '-justification'}" th:text="${b.justification()}">Erl&ouml;s Quantanium-Verkauf</span>
-                <span class="cell-sub" th:if="${!#strings.isEmpty(b.note())}"><span class="bank-sub-label"
-                        th:text="#{bank.booking.note}">Notiz</span> <span th:text="${b.note()}">Missionsertrag</span></span>
-                <span class="cell-sub" th:if="${!#strings.isEmpty(b.staffNote())}"
-                      th:attr="data-testid=${testIdPrefix + '-staff-note'}"><span class="bank-sub-label"
-                        th:text="#{bank.booking.staffNote}">Notiz Bankmitarbeiter</span> <span th:text="${b.staffNote()}">Nach R&uuml;cksprache</span></span>
-                <span class="cell-sub" th:if="${staff}" th:attr="data-testid=${testIdPrefix + '-holder'}"><span class="bank-sub-label"
-                        th:text="#{bank.booking.holder}">Halter</span> <span
-                        th:text="${b.type() == 'TRANSFER' and b.counterHolderHandle() != null} ? ${@handles.display(b.holderHandle())} + ' &#8594; ' + ${@handles.display(b.counterHolderHandle())} : ${@handles.display(b.holderHandle())}">greluc</span></span>
-            </td>
-            <td class="num bank-booking-amount">
-                <span class="bank-amount"
-                      th:classappend="${b.amount().signum() > 0} ? ' bank-amount--pos' : (${b.amount().signum() < 0} ? ' bank-amount--neg' : ' bank-amount--zero')"
-                      th:text="${b.amount().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(b.amount()), 1, 'POINT')}">+240.000</span>
-                <span class="cell-sub bank-fee-note" th:attr="data-testid=${testIdPrefix + '-fee'}"
-                      th:if="${b.transferFee() != null and b.transferFee().signum() > 0 and b.amount().signum() < 0}"
-                      th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'POINT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'POINT')}">Geb&uuml;hr 25 &middot; kommt an 4.975</span>
-            </td>
-            <td class="num bank-balance-after" th:attr="data-label=#{bank.booking.balanceAfter}"
-                th:text="${after != null} ? ${#numbers.formatInteger(@moneyFormat.round(after), 1, 'POINT')} : '&ndash;'">3.148.200</td>
-            <th:block th:if="${staff}">
-                <td class="cell-actions"
-                    sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)">
-                    <button type="button" class="btn btn-ghost btn-xs bank-reverse-btn"
-                            th:if="${(b.type() == 'DEPOSIT' or b.type() == 'WITHDRAWAL' or b.type() == 'TRANSFER') and b.reversedTransactionId() == null}"
-                            data-trigger="open-modal-display" data-modal-id="bank-reverse-modal"
-                            th:attr="data-field-_id=${b.transactionId()}"
-                            data-testid="bank-reverse-open"
-                            th:text="#{bank.action.reverse}">Stornieren</button>
+    <div class="table-responsive">
+        <table class="data-table data-table--stack bank-bookings-table"
+               th:unless="${bookings == null or #lists.isEmpty(bookings.content())}">
+            <thead>
+            <tr>
+                <th th:text="#{bank.booking.date}">Datum</th>
+                <th th:text="#{bank.request.field.type}">Vorgang</th>
+                <th th:text="#{bank.booking.party}">Gegenpartei</th>
+                <th class="num" th:text="#{bank.booking.amount}">Betrag</th>
+                <th class="num" th:text="#{bank.booking.balanceAfter}">Saldo nach Buchung</th>
+                <th:block th:if="${staff}">
+                    <th class="cell-actions"
+                        sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)"><span
+                            class="visually-hidden" th:text="#{bank.request.col.actions}">Aktionen</span></th>
+                </th:block>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="b : ${bookings.content()}" class="bank-booking-row"
+                th:with="after=${balancesAfter != null ? balancesAfter.get(b.postingId()) : null}"
+                th:attr="data-testid=${rowTestId},data-transaction-id=${b.transactionId()}">
+                <td class="bank-booking-date"><span class="utc-time" th:text="${b.createdAt()}">2026-10-02T18:30:00Z</span></td>
+                <td class="cell-status" th:switch="${b.type()}">
+                    <span th:case="'DEPOSIT'" class="chip chip--success" th:text="#{bank.type.DEPOSIT}">Einzahlung</span>
+                    <span th:case="'WITHDRAWAL'" class="chip chip--danger" th:text="#{bank.type.WITHDRAWAL}">Auszahlung</span>
+                    <span th:case="'TRANSFER'" class="chip chip--info" th:text="#{bank.type.TRANSFER}">Transfer</span>
+                    <span th:case="'REVERSAL'" class="chip chip--warning" th:text="#{bank.type.REVERSAL}">Storno</span>
+                    <span th:case="*" class="chip chip--muted" th:text="#{'bank.type.' + ${b.type()}}">Wipe-Reset</span>
                 </td>
-            </th:block>
-        </tr>
-        </tbody>
-    </table>
+                <td class="bank-booking-party" th:attr="data-testid=${testIdPrefix + '-counterparty'}">
+                    <span class="cell-title" th:if="${b.type() == 'TRANSFER' and b.counterAccountNo() != null}"
+                          th:text="(${b.amount().signum() < 0} ? '&#8594; ' : '&#8592; ') + (${b.counterAccountName() != null} ? ${b.counterAccountName()} + ' (' + ${b.counterAccountNo()} + ')' : ${b.counterAccountNo()})">&#8594; KRT-Konto (KB-0002)</span>
+                    <span class="cell-title" th:if="${!(b.type() == 'TRANSFER' and b.counterAccountNo() != null) and b.counterpartyHandle() != null}"
+                          th:text="${@handles.display(b.counterpartyHandle())} + (${b.counterpartyOrgUnitName() != null} ? ' (' + ${b.counterpartyOrgUnitName()} + ')' : '')">vexx (IRIDIUM)</span>
+                    <span class="cell-title bank-party-none" th:if="${!(b.type() == 'TRANSFER' and b.counterAccountNo() != null) and b.counterpartyHandle() == null}">&ndash;</span>
+                    <span class="cell-sub" th:if="${!#strings.isEmpty(b.justification())}"
+                          th:attr="data-testid=${testIdPrefix + '-justification'}" th:text="${b.justification()}">Erl&ouml;s Quantanium-Verkauf</span>
+                    <span class="cell-sub" th:if="${!#strings.isEmpty(b.note())}"><span class="bank-sub-label"
+                            th:text="#{bank.booking.note}">Notiz</span> <span th:text="${b.note()}">Missionsertrag</span></span>
+                    <span class="cell-sub" th:if="${!#strings.isEmpty(b.staffNote())}"
+                          th:attr="data-testid=${testIdPrefix + '-staff-note'}"><span class="bank-sub-label"
+                            th:text="#{bank.booking.staffNote}">Notiz Bankmitarbeiter</span> <span th:text="${b.staffNote()}">Nach R&uuml;cksprache</span></span>
+                    <span class="cell-sub" th:if="${staff}" th:attr="data-testid=${testIdPrefix + '-holder'}"><span class="bank-sub-label"
+                            th:text="#{bank.booking.holder}">Halter</span> <span
+                            th:text="${b.type() == 'TRANSFER' and b.counterHolderHandle() != null} ? ${@handles.display(b.holderHandle())} + ' &#8594; ' + ${@handles.display(b.counterHolderHandle())} : ${@handles.display(b.holderHandle())}">greluc</span></span>
+                </td>
+                <td class="num bank-booking-amount">
+                    <span class="bank-amount"
+                          th:classappend="${b.amount().signum() > 0} ? ' bank-amount--pos' : (${b.amount().signum() < 0} ? ' bank-amount--neg' : ' bank-amount--zero')"
+                          th:text="${b.amount().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(b.amount()), 1, 'POINT')}">+240.000</span>
+                    <span class="cell-sub bank-fee-note" th:attr="data-testid=${testIdPrefix + '-fee'}"
+                          th:if="${b.transferFee() != null and b.transferFee().signum() > 0 and b.amount().signum() < 0}"
+                          th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'POINT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'POINT')}">Geb&uuml;hr 25 &middot; kommt an 4.975</span>
+                </td>
+                <td class="num bank-balance-after" th:attr="data-label=#{bank.booking.balanceAfter}"
+                    th:text="${after != null} ? ${#numbers.formatInteger(@moneyFormat.round(after), 1, 'POINT')} : '&ndash;'">3.148.200</td>
+                <th:block th:if="${staff}">
+                    <td class="cell-actions"
+                        sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)">
+                        <button type="button" class="btn btn-ghost btn-xs bank-reverse-btn"
+                                th:if="${(b.type() == 'DEPOSIT' or b.type() == 'WITHDRAWAL' or b.type() == 'TRANSFER') and b.reversedTransactionId() == null}"
+                                data-trigger="open-modal-display" data-modal-id="bank-reverse-modal"
+                                th:attr="data-field-_id=${b.transactionId()}"
+                                data-testid="bank-reverse-open"
+                                th:text="#{bank.action.reverse}">Stornieren</button>
+                    </td>
+                </th:block>
+            </tr>
+            </tbody>
+        </table>
+    </div>
     <div class="pagination-controls bank-bookings-foot" th:if="${bookings != null and bookings.totalElements() > 0}">
         <nav th:replace="~{fragments/pagination :: pageSizePicker(${bookings}, ${paginationBaseUrl}, ${pageSizes})}"></nav>
         <nav th:replace="~{fragments/pagination :: pagination(${bookings}, ${paginationBaseUrl})}"></nav>

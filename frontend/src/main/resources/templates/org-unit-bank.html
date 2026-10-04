@@ -93,56 +93,58 @@
                         <h2 class="card-title" th:text="#{bank.orgUnit.pending.title}">Laufende Antr&auml;ge</h2>
                         <span class="chip chip--muted" th:text="${#lists.size(openRequests)}">3</span>
                     </div>
-                    <table class="data-table data-table--stack ou-open-table">
-                        <thead>
-                        <tr>
-                            <th th:text="#{bank.request.field.type}">Vorgang</th>
-                            <th th:text="#{bank.orgUnit.pending.col.request}">Antrag</th>
-                            <th th:text="#{bank.orgUnit.step.label}">Freigabeweg</th>
-                            <th class="num" th:text="#{bank.request.col.amount}">Betrag</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="o : ${openRequests}" th:with="r=${o.request()}"
-                            data-testid="org-unit-bank-open-row">
-                            <td class="ou-open-type" th:switch="${r.type()}">
-                                <span th:case="'DEPOSIT'" class="chip chip--success" th:text="#{bank.request.type.DEPOSIT}">Einzahlung</span>
-                                <span th:case="'WITHDRAWAL'" class="chip chip--danger" th:text="#{bank.request.type.WITHDRAWAL}">Auszahlung</span>
-                                <span th:case="*" class="chip chip--info" th:text="#{'bank.request.type.' + ${r.type()}}">Transfer</span>
-                            </td>
-                            <td class="ou-open-title">
-                                <span class="cell-title" th:switch="${r.type()}">
-                                    <th:block th:case="'DEPOSIT'"
-                                              th:text="(${r.counterpartyHandle() != null} ? ${@handles.display(r.counterpartyHandle())} : ${@handles.display(r.requesterHandle())}) + ' &#8594; ' + ${r.accountName()}">vexx &#8594; IRI R&uuml;cklage</th:block>
-                                    <th:block th:case="'TRANSFER'"
-                                              th:text="${r.accountName()} + (${r.targetAccountNo() != null} ? ' &#8594; ' + ${r.targetAccountNo()} : '')">IRI Betriebskonto &#8594; KB-0002</th:block>
-                                    <th:block th:case="*"
-                                              th:text="${r.accountName()} + (${r.counterpartyHandle() != null} ? ' &#8594; ' + ${@handles.display(r.counterpartyHandle())} : '')">IRI Betriebskonto &#8594; greluc</th:block>
-                                </span>
-                                <span class="cell-sub" th:if="${!#strings.isEmpty(r.justification())}"
-                                      th:text="${r.justification()}">Treibstoff + Munition Flotten&uuml;bung</span>
-                                <span class="cell-sub" th:if="${#strings.isEmpty(r.justification()) and !#strings.isEmpty(r.note())}"
-                                      th:text="${r.note()}">Quartalsabgabe Q3</span>
-                            </td>
-                            <td class="ou-open-steps">
-                                <ol class="ou-steps" th:attr="aria-label=#{bank.orgUnit.step.label}">
-                                    <li th:each="s : ${o.steps()}" class="ou-step"
-                                        th:classappend="${'ou-step--' + s.modifier()}"
-                                        th:attr="aria-current=${s.modifier() == 'current'} ? 'step' : null,data-testid='org-unit-bank-step-' + ${s.modifier()}">
-                                        <span class="ou-step-mark" aria-hidden="true"></span>
-                                        <span th:text="#{__${s.labelKey()}__}">Eingereicht</span>
-                                        <span class="visually-hidden" th:text="#{'bank.orgUnit.step.state.' + ${s.modifier()}}">erledigt</span>
-                                    </li>
-                                </ol>
-                            </td>
-                            <td class="num ou-open-amount">
-                                <span class="bank-amount"
-                                      th:classappend="${r.type() == 'DEPOSIT'} ? ' bank-amount--pos' : (${r.type() == 'WITHDRAWAL'} ? ' bank-amount--neg' : '')"
-                                      th:text="(${r.type() == 'DEPOSIT'} ? '+ ' : '&#8722; ') + ${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')}">&#8722; 180.000</span>
-                            </td>
-                        </tr>
-                        </tbody>
-                    </table>
+                    <div class="table-responsive">
+                        <table class="data-table data-table--stack ou-open-table">
+                            <thead>
+                            <tr>
+                                <th th:text="#{bank.request.field.type}">Vorgang</th>
+                                <th th:text="#{bank.orgUnit.pending.col.request}">Antrag</th>
+                                <th th:text="#{bank.orgUnit.step.label}">Freigabeweg</th>
+                                <th class="num" th:text="#{bank.request.col.amount}">Betrag</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="o : ${openRequests}" th:with="r=${o.request()}"
+                                data-testid="org-unit-bank-open-row">
+                                <td class="ou-open-type" th:switch="${r.type()}">
+                                    <span th:case="'DEPOSIT'" class="chip chip--success" th:text="#{bank.request.type.DEPOSIT}">Einzahlung</span>
+                                    <span th:case="'WITHDRAWAL'" class="chip chip--danger" th:text="#{bank.request.type.WITHDRAWAL}">Auszahlung</span>
+                                    <span th:case="*" class="chip chip--info" th:text="#{'bank.request.type.' + ${r.type()}}">Transfer</span>
+                                </td>
+                                <td class="ou-open-title">
+                                    <span class="cell-title" th:switch="${r.type()}">
+                                        <th:block th:case="'DEPOSIT'"
+                                                  th:text="(${r.counterpartyHandle() != null} ? ${@handles.display(r.counterpartyHandle())} : ${@handles.display(r.requesterHandle())}) + ' &#8594; ' + ${r.accountName()}">vexx &#8594; IRI R&uuml;cklage</th:block>
+                                        <th:block th:case="'TRANSFER'"
+                                                  th:text="${r.accountName()} + (${r.targetAccountNo() != null} ? ' &#8594; ' + ${r.targetAccountNo()} : '')">IRI Betriebskonto &#8594; KB-0002</th:block>
+                                        <th:block th:case="*"
+                                                  th:text="${r.accountName()} + (${r.counterpartyHandle() != null} ? ' &#8594; ' + ${@handles.display(r.counterpartyHandle())} : '')">IRI Betriebskonto &#8594; greluc</th:block>
+                                    </span>
+                                    <span class="cell-sub" th:if="${!#strings.isEmpty(r.justification())}"
+                                          th:text="${r.justification()}">Treibstoff + Munition Flotten&uuml;bung</span>
+                                    <span class="cell-sub" th:if="${#strings.isEmpty(r.justification()) and !#strings.isEmpty(r.note())}"
+                                          th:text="${r.note()}">Quartalsabgabe Q3</span>
+                                </td>
+                                <td class="ou-open-steps">
+                                    <ol class="ou-steps" th:attr="aria-label=#{bank.orgUnit.step.label}">
+                                        <li th:each="s : ${o.steps()}" class="ou-step"
+                                            th:classappend="${'ou-step--' + s.modifier()}"
+                                            th:attr="aria-current=${s.modifier() == 'current'} ? 'step' : null,data-testid='org-unit-bank-step-' + ${s.modifier()}">
+                                            <span class="ou-step-mark" aria-hidden="true"></span>
+                                            <span th:text="#{__${s.labelKey()}__}">Eingereicht</span>
+                                            <span class="visually-hidden" th:text="#{'bank.orgUnit.step.state.' + ${s.modifier()}}">erledigt</span>
+                                        </li>
+                                    </ol>
+                                </td>
+                                <td class="num ou-open-amount">
+                                    <span class="bank-amount"
+                                          th:classappend="${r.type() == 'DEPOSIT'} ? ' bank-amount--pos' : (${r.type() == 'WITHDRAWAL'} ? ' bank-amount--neg' : '')"
+                                          th:text="(${r.type() == 'DEPOSIT'} ? '+ ' : '&#8722; ') + ${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')}">&#8722; 180.000</span>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </section>
             </div>
 
