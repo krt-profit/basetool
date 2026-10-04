@@ -168,9 +168,7 @@
 
     .profit-route__line {
         display: block;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        overflow-wrap: anywhere;
         font-variant-numeric: tabular-nums;
     }
 
@@ -191,10 +189,8 @@
         color: var(--color-white);
     }
 
-    .profit-route__terminal[title] {
-        text-decoration: underline dotted;
-        text-underline-offset: 2px;
-        cursor: help;
+    .profit-route__place {
+        color: var(--color-gray-2-text);
     }
 
     .profit-table td.profit-max {
@@ -226,14 +222,6 @@
         .profit-inputs__note {
             align-items: flex-start;
             text-align: left;
-        }
-
-        .profit-route__line {
-            display: inline;
-        }
-
-        .profit-route__line + .profit-route__line::before {
-            content: '\00a0\00b7\00a0';
         }
     }
 }

@@ -119,7 +119,7 @@
     }
 
     /**
-     * One route line: the side label, the terminal with its location as tooltip, and the price.
+     * One route line: the side label, the terminal with its location in brackets, and the price.
      *
      * @param {string} cls the side class
      * @param {string} side the side label
@@ -129,12 +129,17 @@
      * @returns {string} the line's HTML
      */
     function routeLine(cls, side, terminal, place, price) {
+        const placeHtml = place
+            ? ' <span class="profit-route__place" data-testid="profit-route-place">(' +
+              escapeHtml(place) +
+              ')</span>'
+            : '';
         const terminalHtml = terminal
-            ? '<span class="profit-route__terminal" data-testid="profit-route-terminal"' +
-              (place ? ' title="' + escapeAttr(place) + '"' : '') +
-              '>' +
+            ? '<span class="profit-route__terminal" data-testid="profit-route-terminal">' +
               escapeHtml(terminal) +
-              '</span> · '
+              '</span>' +
+              placeHtml +
+              ' · '
             : '';
         return (
             '<span class="profit-route__line"><span class="' +
