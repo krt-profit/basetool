@@ -222,6 +222,7 @@ function countActiveAdminInventoryFilters() {
 function filterInventory() {
     persistAdminInventoryFilters();
     if (window.krtFilterPanel) window.krtFilterPanel.refresh('globalFilterPanel');
+    if (window.krtFilterChips) window.krtFilterChips.refresh();
     const itemsView = adminLager.lagerIsItemsView();
     const activeMats = adminLager.collectChecked('matCheck');
     const activeGameItems = adminLager.collectChecked('gameItemCheck');
@@ -425,6 +426,7 @@ document.addEventListener('DOMContentLoaded', function () {
         );
         window.krtFilterPanel.refresh('globalFilterPanel');
     }
+    if (window.krtFilterChips) window.krtFilterChips.refresh();
     if (filtersRestored) filterInventory();
 });
 
@@ -549,7 +551,7 @@ function openUmbuchenModal(
     const mergeRow = document.getElementById('umbuchenMergeRow');
     const mergeCheckbox = adminUmbuchenInput('umbuchenMergeStock');
     if (mergeCheckbox) mergeCheckbox.checked = false;
-    if (mergeRow) mergeRow.classList.toggle('krtm-hidden', !isScu);
+    if (mergeRow) mergeRow.hidden = !isScu;
     amountEl.value = amount ?? '';
     amountEl.max = amount ?? '';
     targetEl.value = '0';

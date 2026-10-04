@@ -80,6 +80,11 @@
   stapeln, und Formulare mit fixierter Aktionsleiste. Breakpoints nur noch 768/1024/1440 px
   (REQ-UI-027, REQ-UI-009, ADR-0242).
 
+- **Mein Lager und Globales Lager im neuen Muster.** Filter im Popover mit Chips, „Alle · Persönlich
+  · Gemeinsam" statt zweier Haken; Ausbuchen, Umbuchen und Einheit ändern für markierte Einträge
+  stehen in einer Auswahlleiste, die erst bei einer Auswahl erscheint. „Globales Lager leeren" liegt
+  im „⋯"-Menü (REQ-INV-034/036/037/046).
+
 - **Eigenes internes OpenAPI-Dokument für die Exchange-Relay-Schnittstelle.** Die 14 Operationen
   unter `/api/v1/exchange/**` stehen jetzt in `exchange-relay.openapi.json` mit eigener
   Aktualitätsprüfung statt in `openapi.json`; der Vergleich mit dem letzten Release prüft beide

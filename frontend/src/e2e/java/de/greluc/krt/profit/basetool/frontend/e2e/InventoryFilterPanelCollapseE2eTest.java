@@ -34,9 +34,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Verifies the collapsible Lager filter panels of "Mein Lager" and "Globales Lager" in a browser
- * (REQ-INV-037): the toggle works, the choice persists, and a collapsed panel shows the
- * active-filter count.
+ * Verifies the Lager filter popovers of "Mein Lager" and "Globales Lager" in a browser
+ * (REQ-INV-037, REQ-UI-027): the toggle opens and closes the popover, a reload starts closed, an
+ * active filter shows its count on the toggle and as a chip, and the visibility segment stays
+ * outside the count.
  */
 @Tag("e2e")
 class InventoryFilterPanelCollapseE2eTest {
@@ -77,11 +78,11 @@ class InventoryFilterPanelCollapseE2eTest {
   }
 
   /**
-   * On "Mein Lager", an unfiltered first visit starts collapsed, and both an explicit expand and an
-   * explicit collapse survive a reload.
+   * On "Mein Lager", the popover starts closed, opens from the toggle, closes on Escape, and a
+   * reload starts closed again.
    */
   @Test
-  void filterPanelCollapsesAndRemembersTheChoiceAcrossReloads() {
+  void filterPopoverOpensClosesAndStartsClosedAfterAReload() {
     String baseUrl = STACK.baseUrl();
     Path storageState = E2eSupport.authenticatedStorageState(browser, baseUrl, USERNAME, PASSWORD);
     try (BrowserContext context =
@@ -103,13 +104,13 @@ class InventoryFilterPanelCollapseE2eTest {
         assertThat(page.locator("[data-testid='lager-filter-toggle']"))
             .hasAttribute("aria-expanded", "true");
 
-        page.reload();
-        page.waitForLoadState();
-        assertThat(page.locator("#myFilterPanel"))
-            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
+        page.keyboard().press("Escape");
+        assertThat(page.locator("#myFilterPanel")).isHidden();
+        assertThat(page.locator("[data-testid='lager-filter-toggle']"))
+            .hasAttribute("aria-expanded", "false");
 
         page.locator("[data-testid='lager-filter-toggle']").click();
-        assertThat(page.locator("#myFilterPanel")).isHidden();
+        assertThat(page.locator("#myFilterPanel")).isVisible();
         page.reload();
         page.waitForLoadState();
         assertThat(page.locator("[data-testid='lager-filter-toggle']"))
@@ -123,10 +124,9 @@ class InventoryFilterPanelCollapseE2eTest {
   }
 
   /**
-   * Ticking a filter must light up the count chip on the toggle. This is the guarantee that keeps a
-   * collapsed panel honest — without it the page can reach a state where the table is narrowed and
-   * nothing on screen says so. The personal-entries checkbox is used because it needs no seeded
-   * stock: it renders on every Lager, empty or not.
+   * Picking a filter in the popover lights up the count on the toggle and adds a chip; the
+   * visibility segment of the toolbar narrows the tree without adding to that count. The stolen
+   * filter is used because it needs no seeded stock: it renders on every Lager, empty or not.
    */
   @Test
   void activeFilterCountAppearsOnTheToggle() {
@@ -146,13 +146,23 @@ class InventoryFilterPanelCollapseE2eTest {
 
         assertThat(page.locator(".filter-toggle [data-filter-count]")).isHidden();
 
+        page.waitForResponse(
+            r -> r.url().contains("/inventory/my?") && r.url().contains("personalOnly=true"),
+            () -> page.locator("[data-testid='segment-personalScope-personal']").click());
+        assertThat(page.locator(".filter-toggle [data-filter-count]")).isHidden();
+
         page.locator("[data-testid='lager-filter-toggle']").click();
         assertThat(page.locator("#myFilterPanel")).isVisible();
-        page.locator("#personalOnly").check();
+        page.locator("#stolenFilter").selectOption("non");
 
         assertThat(page.locator(".filter-toggle [data-filter-count]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
         assertThat(page.locator(".filter-toggle [data-filter-count-value]")).hasText("1");
+        assertThat(page.locator("[data-testid='filter-chip-stolen']")).isVisible();
+
+        page.locator("[data-testid='segment-personalScope-all']").click();
+        page.locator("[data-testid='filter-chips-reset']").click();
+        assertThat(page.locator(".filter-toggle [data-filter-count]")).isHidden();
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "inventory-filter-count-chip");
         throw failure;
@@ -161,11 +171,11 @@ class InventoryFilterPanelCollapseE2eTest {
   }
 
   /**
-   * On "Globales Lager", the same collapse lifecycle holds under its own storage key, and a
-   * collapsed panel shows the active-filter count chip.
+   * On "Globales Lager", the same popover lifecycle holds, and an active filter shows its count on
+   * the toggle.
    */
   @Test
-  void globalFilterPanelCollapsesRemembersTheChoiceAndCountsActiveFilters() {
+  void globalFilterPopoverOpensClosesAndCountsActiveFilters() {
     String baseUrl = STACK.baseUrl();
     Path storageState = E2eSupport.authenticatedStorageState(browser, baseUrl, USERNAME, PASSWORD);
     try (BrowserContext context =
@@ -203,6 +213,7 @@ class InventoryFilterPanelCollapseE2eTest {
         assertThat(page.locator(".filter-toggle [data-filter-count]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
         assertThat(page.locator(".filter-toggle [data-filter-count-value]")).hasText("1");
+        assertThat(page.locator("[data-testid='filter-chip-minQuality']")).isVisible();
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "inventory-global-filter-panel-collapse");
         throw failure;

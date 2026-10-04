@@ -26,17 +26,17 @@ Der Nutzer öffnet die Lager-Ansichten oder den Hangar und filtert, klappt, blä
 ## Hauptablauf
 
 1. **Gruppenansicht** (ADR-0003, REQ-INV-002): `/inventory/all` laden.
-2. **Filterpanel „Mein Lager"** (REQ-INV-037): erster Besuch ohne Filter, dann aufklappen und neu laden, zuklappen und neu laden; danach die Checkbox „persönliche Einträge" setzen.
-3. **Filterpanel „Globales Lager":** derselbe Ablauf mit eigenem Speicherschlüssel; der Zähler wird am Ende über das Mindestqualitäts-Select getrieben.
+2. **Filter-Popover „Mein Lager"** (REQ-INV-037, REQ-UI-027): Seite laden, „Filter" öffnen, mit Escape schließen, neu laden; dann im Popover „Gestohlen:" setzen und in der Werkzeugleiste „Persönlich" wählen.
+3. **Filter-Popover „Globales Lager":** derselbe Ablauf; der Zähler wird über das Mindestqualitäts-Select getrieben.
 4. **Ortsfilter** (REQ-INV-040): auf `/inventory/my` den Reload-Marker setzen und einen der zwei Orte anhaken.
 5. **Live-Sync des geteilten Lagers** (#1307): beide Kontexte klappen denselben Stack auf `/inventory/all` auf; B wartet, bis `window.krtLiveSync.subscribedTopics()` `inventory` enthält. A fügt über „+ Zuordnen" einen Auftrags-Chip hinzu (`POST /inventory/{id}/allocation`); B lädt nie neu.
-6. **Filter-Persistenz** (REQ-UI-017, ADR-0120): auf `/refinery-orders` den Status `COMPLETED` zur Vorauswahl hinzufügen und „nur meine" setzen; auf `/missions` `showPast` einschalten; auf `/materialboerse` die Sortierung ändern — jeweils neu laden.
+6. **Filter-Persistenz** (REQ-UI-017, ADR-0120): auf `/refinery-orders` das Segment „Abgeschlossen" wählen und den Schalter „Meine Aufträge" setzen; auf `/missions` `showPast` einschalten; auf `/materialboerse` die Sortierung ändern — jeweils neu laden.
 7. **Hangar** (REQ-HANGAR-002): `/hangar?size=10` laden, eine Seite weiter blättern, dann eine Suche ohne Treffer eingeben.
 
 ## Erwartetes Ergebnis
 
 - Der ungeknüpfte Bestand erscheint als Materialgruppe (`div.tree-row--group` mit seiner `data-material-id`).
-- Das Filterpanel startet beim ungefilterten Erstbesuch zugeklappt, und jede ausdrückliche Wahl überlebt den Reload; ein gesetzter Filter lässt den Zähler-Chip am Umschalter aufleuchten — auf beiden Lager-Seiten.
+- Das Popover startet bei jedem Laden geschlossen, öffnet über „Filter" und schließt mit Escape; ein gesetzter Filter lässt den Zähler am „Filter"-Knopf aufleuchten und erscheint als Chip — auf beiden Lager-Seiten. Das Segment „Alle · Persönlich · Gemeinsam" engt den Baum ein, ohne den Zähler zu erhöhen.
 - Der Ortsfilter tauscht die Gruppentabelle **in place**: der Stack am gewählten Ort bleibt, der andere verschwindet, dessen Option bleibt wählbar, der Filter-Chip zählt die neue Dimension, und der Marker überlebt.
 - B zeigt den neuen Chip **in place**, allein durch das Signal `inventory/[stock]`.
 - Alle drei Filterwahlen sind nach dem Reload wiederhergestellt und wirken (der `showPast`-Zustand treibt den Neuabruf der Ergebnisse).
@@ -45,7 +45,7 @@ Der Nutzer öffnet die Lager-Ansichten oder den Hangar und filtert, klappt, blä
 ## Sonderfälle & Lehren
 
 - **Implizite INNER JOINs verschluckten Bestand** (v0.4.0): Die Group-on-read-Abfragen projizierten die nullbaren Assoziationen `jobOrder`/`mission`/`owningOrgUnit` als ganze Entitäten, was jeden Stack ohne diese Verknüpfung still fallen ließ — `/inventory/all` zeigte „Keine Einträge gefunden", während `/inventory` den Bestand listete. Das Daten-Gegenstück ist `InventoryItemStackQueryDataTest`. Der Klassen-Qualifier `tree-row--group` ist tragend: dieselbe `data-material-id` steht auch auf den versteckten Stack-Zeilen.
-- **Das Einklappen existiert nur im Browser.** Der Server rendert das Panel immer offen, damit ein Client ohne JavaScript seine Filter behält; `inventory-my.js` und `inventory-admin.js` wenden die gespeicherte Wahl an. Ein toter `data-trigger` oder ein falscher Speicherschlüssel ließe das von `InventoryPageControllerMvcTest` geprüfte Markup unverändert. Ein eingeklappter Filter ohne Zähler wäre der verbotene Zustand: eine eingeengte Tabelle, deren Grund unsichtbar ist.
+- **Das Schließen existiert nur im Browser.** Der Server rendert die Filter im Formular, damit ein Client ohne JavaScript sie behält; `krt-filter-panel.js` schließt das Popover beim Laden. Seit der Website-Überarbeitung (Phase 3, 2026-10-03) merkt es sich keinen offenen oder geschlossenen Zustand mehr — der frühere Speicherschlüssel `krt.filterPanel.inventory-*` wird nicht mehr geschrieben. Ein geschlossener Filter ohne Zähler und ohne Chip wäre der verbotene Zustand: eine eingeengte Tabelle, deren Grund unsichtbar ist.
 - **Über den Socket fließen keine Bestandsdaten.** B holt nach dem Signal seine eigene, berechtigte Sicht neu; der gefilterte Fragment-Abruf erhält den aufgeklappten Baum.
 - **Die Filter-Persistenz schloss eine Audit-Lücke:** Die Refinery-Warteschlange speicherte nicht, obwohl die Auftrags-Warteschlange es tat; die Börsen-Sortierung ging selbst bei F5 verloren, weil ihre Fragment-Tausche `history:false` laufen. Suche und Datumsbereich der Einsatzliste bleiben bewusst ungespeichert.
 - **Der Hangar-Test prüft Struktur, nicht Inhalt,** damit andere Schiffe im geteilten Stack ihn nicht stören.
