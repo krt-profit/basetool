@@ -258,13 +258,13 @@ a delivery or an assignee change refreshes the KPIs in place.
 **Tabs.** The tabs are filtered by order kind, in this order:
 
 - **`MATERIAL`** — *Bedarf* · *Übergaben* · *Bearbeiter* · *Verknüpft*.
-- **`ITEM`** — *Items* · *Materialien* (the aggregated material demand) · *Herstellung* (the
+- **`ITEM`** — *Items* · *Materialien* (the aggregated material demand) · *Hersteller* (the
   blueprint coverage of `REQ-ORDERS-016` — who can craft the items) · *Übergaben* · *Bearbeiter* ·
   *Verknüpft*.
 
 A tab appears only when its pane applies, and an empty tab is not shown: *Materialien* is hidden
 while the aggregate is empty; *Übergaben* is hidden while the order has none and the caller may not
-record one (Logistician, Officer, Admin); *Herstellung* needs the caller to see the blueprint
+record one (Logistician, Officer, Admin); *Hersteller* needs the caller to see the blueprint
 coverage; *Verknüpft* needs orphaned linked inventory. The requester-redacted view (`REQ-ORDERS-023`)
 drops *Materialien*, *Übergaben* and *Bearbeiter* as before. A hidden tab reappears when a live swap
 brings its count above zero. Each tab holds at most one primary action: *Übergaben* „Übergabe
@@ -274,7 +274,7 @@ erfassen", which opens the dialog of the same name for a material or an item han
 Blaupausen").
 
 The tab keys are unchanged — `materials` (*Bedarf*), `items`, `aggregated` (*Materialien*),
-`blueprints` (*Herstellung*), `handovers` and `item-handovers` (*Übergaben*), `assignees`, `verkn` —
+`blueprints` (*Hersteller*), `handovers` and `item-handovers` (*Übergaben*), `assignees`, `verkn` —
 so stored and linked tabs keep resolving.
 
 **Tab behaviour.** Tabs use the WAI-ARIA tabs pattern (`role="tablist"/"tab"/"tabpanel"`,
@@ -290,7 +290,7 @@ permission gate of the previous panel layout is preserved; the redacted requeste
 (`REQ-ORDERS-023`) keeps hiding the same sections.
 
 The **production booking surface stays on the *Items* tab** for LOGISTICIAN+ editors — the
-*Herstellung* tab shows who can craft, it books nothing. Each item line carries a leading chevron
+*Hersteller* tab shows who can craft, it books nothing. Each item line carries a leading chevron
 that reveals the per-unit material demand (*Bedarf je Stück*) in a collapsible sub-row (hidden by
 default, mirroring the bank request table's Notiz/Begründung detail row, so a multi-material recipe
 no longer widens the row) and, as the last column, a *Herstellung erfassen* button that opens the
@@ -328,10 +328,14 @@ tiles; tabs renamed and reordered per kind (*Bestellte Items* → *Items*, *Aggr
 *Materialien*, *Blaupausen* → *Herstellung*, *Item-Übergaben* → *Übergaben*, *Materialien* of a
 material order → *Bedarf*), empty tabs hidden, the handover dialog titled „Übergabe erfassen".*
 
+*Amended 2026-10-04 (owner decision): the blueprint-coverage tab is called *Hersteller* instead of
+*Herstellung*, so it no longer shares its name with the production booking (*Herstellung erfassen*)
+on the *Items* tab.*
+
 **Acceptance**
 
 - [ ] A `MATERIAL` order shows the tabs *Bedarf* · *Übergaben* · *Bearbeiter* · *Verknüpft*; an
-  `ITEM` order shows *Items* · *Materialien* · *Herstellung* · *Übergaben* · *Bearbeiter* ·
+  `ITEM` order shows *Items* · *Materialien* · *Hersteller* · *Übergaben* · *Bearbeiter* ·
   *Verknüpft* — each only when it applies, in that order.
 - [ ] The „Geliefert / benötigt" tile shows delivered against required per unit for a material order
   (requirement = open amount + delivered) and delivered against ordered pieces for an item order,
@@ -349,7 +353,7 @@ material order → *Bedarf*), empty tabs hidden, the handover dialog titled „�
   *Offen*.
 - [ ] The *Items* tab shows the chevron/demand sub-row and the *Herstellung erfassen* button only
   for a LOGISTICIAN+ editor of an `ITEM` order; a read-only or requester viewer sees only the plain
-  status columns. The *Herstellung* tab books nothing.
+  status columns. The *Hersteller* tab books nothing.
 - [ ] `?tab=<key>` selects that tab on load and is honoured over `#tab=`, `localStorage`, and the
   default; back/forward re-applies the tab.
 - [ ] Arrow-key navigation moves selection along the tablist; `aria-selected` tracks the active tab.

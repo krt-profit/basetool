@@ -348,7 +348,7 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
   <Material>" plus „Raffinerie eingerechnet" / „nur dank Raffinerie" / the ITEM hint where they
   apply, its edge green, the accent colour, or grey by state — followed by the ingredients table
   „Material · Bedarf · Vorrat · Qualität": the per-craft need, the qualifying stock (marked short or
-  limiting), and the effective quality as a bar on 0–1000 with its value (the column head explains
+  limiting; a short cell adds „fehlt n“ beneath the stock), and the effective quality as a bar on 0–1000 with its value (the column head explains
   „SCU-gewichtete Qualität deines qualifizierenden Vorrats"). The toolbar's switch **„Raffinerie
   einrechnen"** is the refinery fold-in, and its segment **„Alle n · Craftbar n"** is the
   **"show only craftable" view filter** — client-side, default „Alle", hiding every master row that
@@ -366,6 +366,9 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
   the segment; the detail's counter and per-material breakdown became the key-figure block and the
   ingredients table.
 
+  *Amended 2026-10-04 (owner decision):* the short stock cell shows the missing amount again
+  („fehlt n“, in the material's unit) beneath the available amount.
+
 **Acceptance criteria:**
 
 - [ ] Given the caller owns a blueprint and enough qualifying RESOURCE stock, then the row and
@@ -377,11 +380,11 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
 - [ ] Given stock below an ingredient's `min_quality` or below the no-degradation floor, then that
   stock does not count toward availability or the effective quality.
 - [ ] Given a not-fully-craftable blueprint, then the detail's ingredients table marks the short
-  materials and the row shows a grey dot and a dash.
+  materials with the missing amount („fehlt n“) and the row shows a grey dot and a dash.
 - [ ] Given a RESOURCE ingredient that resolves to a `PIECE`-quantity material, then its required /
   available / missing amounts are computed in whole pieces and the required and available ones are
   displayed labelled "Stück" (the per-craft requirement rounded to a whole piece), not as fractional
-  SCU. The missing amount is no longer printed since 2026-10-03; the stock cell is marked short.
+  SCU; the missing amount („fehlt n“) is printed in the same unit.
 - [ ] Given the refinery switch is on, then the caller's `OPEN` + `IN_PROGRESS` refinery yield is
   added (quantity and quality), counts are recomputed, and a blueprint craftable only or more often
   via refinery is shown as craftable with a caveat („nur dank Raffinerie" when it needs the refinery

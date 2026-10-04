@@ -22,6 +22,9 @@ package de.greluc.krt.profit.basetool.backend.controller;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.ProfitCalculationDto;
 import de.greluc.krt.profit.basetool.backend.service.ProfitCalculationService;
@@ -33,6 +36,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 @ExtendWith(MockitoExtension.class)
 class ProfitCalculationControllerTest {
@@ -45,12 +50,7 @@ class ProfitCalculationControllerTest {
   void shouldGetProfitCalculation() {
     UUID shipId = UUID.randomUUID();
     List<String> systems = List.of("Stanton");
-    ProfitCalculationDto dto =
-        new ProfitCalculationDto(
-            UUID.randomUUID(), "Laranite",
-            BigDecimal.valueOf(20), BigDecimal.valueOf(30),
-            BigDecimal.valueOf(10), BigDecimal.valueOf(50),
-            BigDecimal.valueOf(160), BigDecimal.valueOf(80));
+    ProfitCalculationDto dto = laranite(UUID.randomUUID());
 
     when(profitCalculationService.calculateProfit(shipId, systems)).thenReturn(List.of(dto));
 
@@ -61,5 +61,43 @@ class ProfitCalculationControllerTest {
     assertEquals(1, result.size());
     assertEquals("Laranite", result.get(0).materialName());
     verify(profitCalculationService, times(1)).calculateProfit(shipId, systems);
+  }
+
+  @Test
+  void responseNamesTheBuyAndSellTerminalsOfEachRoute() throws Exception {
+    UUID shipId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    when(profitCalculationService.calculateProfit(shipId, List.of("Stanton", "Pyro")))
+        .thenReturn(List.of(laranite(materialId)));
+    MockMvc mockMvc = MockMvcBuilders.standaloneSetup(profitCalculationController).build();
+
+    mockMvc
+        .perform(
+            get("/api/v1/materials/profit-calculation")
+                .param("shipId", shipId.toString())
+                .param("starSystemNames", "Stanton", "Pyro"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].materialId").value(materialId.toString()))
+        .andExpect(jsonPath("$[0].buyTerminalName").value("TDD Lorville"))
+        .andExpect(jsonPath("$[0].buyTerminalLocation").value("Hurston · Lorville"))
+        .andExpect(jsonPath("$[0].sellTerminalName").value("Admin - ARC-L1"))
+        .andExpect(jsonPath("$[0].sellTerminalLocation").value("Stanton · ARC-L1"))
+        .andExpect(jsonPath("$[0].maxProfitFullLoad").value(80));
+  }
+
+  private static ProfitCalculationDto laranite(UUID materialId) {
+    return new ProfitCalculationDto(
+        materialId,
+        "Laranite",
+        BigDecimal.valueOf(20),
+        BigDecimal.valueOf(30),
+        BigDecimal.valueOf(10),
+        BigDecimal.valueOf(50),
+        BigDecimal.valueOf(160),
+        BigDecimal.valueOf(80),
+        "TDD Lorville",
+        "Hurston · Lorville",
+        "Admin - ARC-L1",
+        "Stanton · ARC-L1");
   }
 }

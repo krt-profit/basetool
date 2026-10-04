@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -406,6 +407,134 @@ class ProfitCalculationServiceTest {
     assertTrue(
         row.maxProfitFullLoad().compareTo(BigDecimal.ZERO) < 0,
         "a loss ship-load must surface as a negative full-load profit");
+  }
+
+  @Test
+  void route_namesTheBuyAndTheSellTerminalWithTheirLocation() {
+    UUID shipId = UUID.randomUUID();
+    when(shipTypeRepository.findById(shipId))
+        .thenReturn(Optional.of(newShip(shipId, "Cutlass", 46)));
+
+    Material material = newMaterial("Laranite");
+    Terminal buyAt = namedTerminal("TDD Lorville", "Stanton", "Hurston", "Lorville", null, null);
+    Terminal sellAt = namedTerminal("Admin - ARC-L1", "Stanton", null, null, "ARC-L1", null);
+    Terminal elsewhere =
+        namedTerminal("Admin - Everus", "Stanton", "Hurston", null, "Everus", null);
+
+    when(materialPriceRepository.findAllAutoLoadPrices())
+        .thenReturn(
+            List.of(
+                newPrice(material, elsewhere, 25, 28),
+                newPrice(material, buyAt, 20, 22),
+                newPrice(material, sellAt, 0, 31)));
+
+    ProfitCalculationDto row = profitCalculationService.calculateProfit(shipId, null).get(0);
+
+    assertEquals("TDD Lorville", row.buyTerminalName());
+    assertEquals("Hurston · Lorville", row.buyTerminalLocation());
+    assertEquals("Admin - ARC-L1", row.sellTerminalName());
+    assertEquals(
+        "Stanton · ARC-L1",
+        row.sellTerminalLocation(),
+        "a station with no planet falls back to the star system as the region");
+    assertEquals(0, BigDecimal.valueOf(20).compareTo(row.minBuyPrice()));
+    assertEquals(0, BigDecimal.valueOf(31).compareTo(row.maxSellPrice()));
+  }
+
+  @Test
+  void route_tiedPrices_pickTheTerminalFirstByName() {
+    UUID shipId = UUID.randomUUID();
+    when(shipTypeRepository.findById(shipId))
+        .thenReturn(Optional.of(newShip(shipId, "Cutlass", 46)));
+
+    Material material = newMaterial("Laranite");
+    Terminal zulu = namedTerminal("zulu", "Stanton", "microTech", null, null, null);
+    Terminal alpha = namedTerminal("Alpha", "Stanton", "microTech", null, null, null);
+    Terminal nameless = namedTerminal(null, "Stanton", "microTech", null, null, null);
+
+    when(materialPriceRepository.findAllAutoLoadPrices())
+        .thenReturn(
+            List.of(
+                newPrice(material, nameless, 10, 30),
+                newPrice(material, zulu, 10, 30),
+                newPrice(material, alpha, 10, 30)));
+
+    ProfitCalculationDto row = profitCalculationService.calculateProfit(shipId, null).get(0);
+
+    assertEquals("Alpha", row.buyTerminalName(), "ties break by name, case-insensitively");
+    assertEquals("Alpha", row.sellTerminalName(), "a nameless terminal never wins a tie");
+  }
+
+  @Test
+  void route_locationCollapsesARepeatedPlaceAndMayBeAbsent() {
+    UUID shipId = UUID.randomUUID();
+    when(shipTypeRepository.findById(shipId))
+        .thenReturn(Optional.of(newShip(shipId, "Cutlass", 46)));
+
+    Material material = newMaterial("Laranite");
+    Terminal samePlace = namedTerminal("Pyro Gateway", "Pyro", null, null, "pyro", null);
+    Terminal nowhere = namedTerminal("Lost", null, " ", null, null, null);
+
+    when(materialPriceRepository.findAllAutoLoadPrices())
+        .thenReturn(
+            List.of(newPrice(material, samePlace, 10, 0), newPrice(material, nowhere, 0, 30)));
+
+    ProfitCalculationDto row = profitCalculationService.calculateProfit(shipId, null).get(0);
+
+    assertEquals("Pyro", row.buyTerminalLocation());
+    assertEquals("Lost", row.sellTerminalName());
+    assertNull(row.sellTerminalLocation());
+  }
+
+  @Test
+  void route_outpostWithoutRegionIsTheWholeLocation() {
+    UUID shipId = UUID.randomUUID();
+    when(shipTypeRepository.findById(shipId))
+        .thenReturn(Optional.of(newShip(shipId, "Cutlass", 46)));
+
+    Material material = newMaterial("Laranite");
+    Terminal outpost = namedTerminal("Shubin SAL-2", null, null, null, null, "Shubin SAL-2");
+
+    when(materialPriceRepository.findAllAutoLoadPrices())
+        .thenReturn(List.of(newPrice(material, outpost, 10, 30)));
+
+    ProfitCalculationDto row = profitCalculationService.calculateProfit(shipId, null).get(0);
+
+    assertEquals("Shubin SAL-2", row.buyTerminalLocation());
+    assertEquals("Shubin SAL-2", row.sellTerminalLocation());
+  }
+
+  @Test
+  void hullC_routeNamesOnlyTerminalsWithLoadingDock() {
+    UUID shipId = UUID.randomUUID();
+    when(shipTypeRepository.findById(shipId))
+        .thenReturn(Optional.of(newShip(shipId, "Hull C", 4608)));
+
+    Material material = newMaterial("Quantanium");
+    Terminal dock = namedTerminal("Dock", "Stanton", "Hurston", "Lorville", null, null);
+    dock.setHasLoadingDock(true);
+    Terminal outpost = namedTerminal("Outpost", "Stanton", "Hurston", null, null, "HDMS");
+    outpost.setHasLoadingDock(false);
+
+    when(materialPriceRepository.findAllAutoLoadPrices())
+        .thenReturn(List.of(newPrice(material, dock, 10, 20), newPrice(material, outpost, 5, 25)));
+
+    ProfitCalculationDto row = profitCalculationService.calculateProfit(shipId, null).get(0);
+
+    assertEquals("Dock", row.buyTerminalName());
+    assertEquals("Dock", row.sellTerminalName());
+  }
+
+  private static Terminal namedTerminal(
+      String name, String starSystem, String planet, String city, String station, String outpost) {
+    Terminal t = new Terminal();
+    t.setName(name);
+    t.setStarSystemName(starSystem);
+    t.setPlanetName(planet);
+    t.setCityName(city);
+    t.setSpaceStationName(station);
+    t.setOutpostName(outpost);
+    return t;
   }
 
   private static ShipType newShip(UUID id, String name, Integer scu) {

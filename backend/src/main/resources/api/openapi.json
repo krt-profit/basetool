@@ -81252,6 +81252,12 @@
       "ProfitCalculationDto" : {
         "type" : "object",
         "properties" : {
+          "buyTerminalLocation" : {
+            "type" : "string"
+          },
+          "buyTerminalName" : {
+            "type" : "string"
+          },
           "fullLoadCost" : {
             "type" : "number"
           },
@@ -81276,6 +81282,12 @@
           },
           "profitPerScu" : {
             "type" : "number"
+          },
+          "sellTerminalLocation" : {
+            "type" : "string"
+          },
+          "sellTerminalName" : {
+            "type" : "string"
           }
         }
       },

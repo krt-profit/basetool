@@ -21,19 +21,7 @@
 (function () {
     'use strict';
 
-    /**
-     * One result row of the profit calculation.
-     *
-     * @typedef {object} ProfitRow
-     * @property {string} materialId the material
-     * @property {string} materialName the material's name
-     * @property {number | null} minBuyPrice the lowest purchase price per SCU
-     * @property {number | null} maxSellPrice the highest sale price per SCU
-     * @property {number | null} profitPerScu the profit per SCU
-     * @property {number | null} marginPercent the margin in percent
-     * @property {number | null} fullLoadCost the capital a full load ties up
-     * @property {number | null} maxProfitFullLoad the profit of a full load
-     */
+    /** @typedef {ApiDto<'ProfitCalculationDto'>} ProfitRow */
 
     const PROFIT_FILTER_KEY = 'profit_calculation_filters';
     const config = document.getElementById('profitConfig');
@@ -131,20 +119,30 @@
     }
 
     /**
-     * One route line: the side label and the price.
+     * One route line: the side label, the terminal with its location as tooltip, and the price.
      *
      * @param {string} cls the side class
      * @param {string} side the side label
-     * @param {number | null} price the price per SCU
+     * @param {string | null | undefined} terminal the terminal's name
+     * @param {string | null | undefined} place the terminal's location
+     * @param {number | null | undefined} price the price per SCU
      * @returns {string} the line's HTML
      */
-    function routeLine(cls, side, price) {
+    function routeLine(cls, side, terminal, place, price) {
+        const terminalHtml = terminal
+            ? '<span class="profit-route__terminal" data-testid="profit-route-terminal"' +
+              (place ? ' title="' + escapeAttr(place) + '"' : '') +
+              '>' +
+              escapeHtml(terminal) +
+              '</span> · '
+            : '';
         return (
             '<span class="profit-route__line"><span class="' +
             cls +
             '">' +
             escapeHtml(side) +
             '</span> ' +
+            terminalHtml +
             escapeHtml(num(PRICE, price)) +
             '</span>'
         );
@@ -175,14 +173,26 @@
                 '<tr class="profit-row' +
                 (rank === 1 ? ' profit-row--top' : '') +
                 '" data-testid="profit-row"><td><a class="row-link" data-testid="row-link" href="/materials/' +
-                escapeAttr(encodeURIComponent(item.materialId)) +
+                escapeAttr(encodeURIComponent(item.materialId || '')) +
                 '"><span class="profit-rank">' +
                 escapeHtml(rank) +
                 '</span><span class="cell-title">' +
                 escapeHtml(item.materialName) +
                 '</span></a></td><td class="profit-route">' +
-                routeLine('profit-route__buy', label('buy'), item.minBuyPrice) +
-                routeLine('profit-route__sell', label('sell'), item.maxSellPrice) +
+                routeLine(
+                    'profit-route__buy',
+                    label('buy'),
+                    item.buyTerminalName,
+                    item.buyTerminalLocation,
+                    item.minBuyPrice,
+                ) +
+                routeLine(
+                    'profit-route__sell',
+                    label('sell'),
+                    item.sellTerminalName,
+                    item.sellTerminalLocation,
+                    item.maxSellPrice,
+                ) +
                 '</td><td class="num">' +
                 escapeHtml(num(PER_SCU, item.profitPerScu)) +
                 '</td><td class="num">' +

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialPrice;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
+import de.greluc.krt.profit.basetool.backend.model.Terminal;
 import de.greluc.krt.profit.basetool.backend.model.dto.ProfitCalculationDto;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialPriceRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
@@ -31,25 +32,34 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Computes the best per-material buy/sell margin for a chosen ship and optional star-system filter,
- * from the lowest auto-load buy and highest auto-load sell price. "Hull C"-class ships only get
- * terminals with a loading dock.
+ * from the lowest auto-load buy and highest auto-load sell price, naming the terminal of each.
+ * "Hull C"-class ships only get terminals with a loading dock.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ProfitCalculationService {
+
+  /** Separator between the parts of a location label. */
+  private static final String LOCATION_SEPARATOR = " · ";
+
+  /** Breaks a price tie between terminals by terminal name, case-insensitively, nameless last. */
+  private static final Comparator<MaterialPrice> BY_TERMINAL_NAME =
+      Comparator.comparing(
+          (MaterialPrice p) -> p.getTerminal().getName(),
+          Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
 
   private final MaterialPriceRepository materialPriceRepository;
   private final ShipTypeRepository shipTypeRepository;
@@ -106,23 +116,23 @@ public class ProfitCalculationService {
       Material material = entry.getKey();
       List<MaterialPrice> materialPrices = entry.getValue();
 
-      BigDecimal minBuy =
+      MaterialPrice bestBuy =
           materialPrices.stream()
-              .map(MaterialPrice::getPriceBuy)
-              .filter(Objects::nonNull)
-              .filter(p -> p.compareTo(BigDecimal.ZERO) > 0)
-              .min(BigDecimal::compareTo)
+              .filter(p -> isPositive(p.getPriceBuy()))
+              .min(Comparator.comparing(MaterialPrice::getPriceBuy).thenComparing(BY_TERMINAL_NAME))
               .orElse(null);
 
-      BigDecimal maxSell =
+      MaterialPrice bestSell =
           materialPrices.stream()
-              .map(MaterialPrice::getPriceSell)
-              .filter(Objects::nonNull)
-              .filter(p -> p.compareTo(BigDecimal.ZERO) > 0)
-              .max(BigDecimal::compareTo)
+              .filter(p -> isPositive(p.getPriceSell()))
+              .min(
+                  Comparator.comparing(MaterialPrice::getPriceSell, Comparator.reverseOrder())
+                      .thenComparing(BY_TERMINAL_NAME))
               .orElse(null);
 
-      if (minBuy != null && maxSell != null) {
+      if (bestBuy != null && bestSell != null) {
+        BigDecimal minBuy = bestBuy.getPriceBuy();
+        BigDecimal maxSell = bestSell.getPriceSell();
         BigDecimal profitPerScu = maxSell.subtract(minBuy);
         BigDecimal marginPercent =
             minBuy.compareTo(BigDecimal.ZERO) > 0
@@ -142,12 +152,66 @@ public class ProfitCalculationService {
                 profitPerScu,
                 marginPercent,
                 fullLoadCost,
-                maxProfitFullLoad));
+                maxProfitFullLoad,
+                bestBuy.getTerminal().getName(),
+                location(bestBuy.getTerminal()),
+                bestSell.getTerminal().getName(),
+                location(bestSell.getTerminal())));
       }
     }
 
     results.sort(Comparator.comparing(ProfitCalculationDto::materialName));
     log.debug("Calculation finished, returned {} results", results.size());
     return results;
+  }
+
+  /**
+   * Whether a price is present and above zero; zero or absent means the side is not traded there.
+   *
+   * @param price the raw price
+   * @return {@code true} when the price is positive
+   */
+  private static boolean isPositive(@Nullable BigDecimal price) {
+    return price != null && price.compareTo(BigDecimal.ZERO) > 0;
+  }
+
+  /**
+   * The location label of a terminal: its planet, or its star system when it has none, then its
+   * city, station or outpost when that differs.
+   *
+   * @param terminal the terminal
+   * @return the label, or {@code null} when the terminal names no place
+   */
+  @Nullable
+  private static String location(@NotNull Terminal terminal) {
+    String region = firstPresent(terminal.getPlanetName(), terminal.getStarSystemName(), null);
+    String place =
+        firstPresent(
+            terminal.getCityName(), terminal.getSpaceStationName(), terminal.getOutpostName());
+    if (region == null) {
+      return place;
+    }
+    return place == null || place.equalsIgnoreCase(region)
+        ? region
+        : region + LOCATION_SEPARATOR + place;
+  }
+
+  /**
+   * The first non-blank of up to three values.
+   *
+   * @param first the preferred value
+   * @param second the first fallback
+   * @param third the second fallback
+   * @return the first non-blank value, or {@code null}
+   */
+  @Nullable
+  private static String firstPresent(
+      @Nullable String first, @Nullable String second, @Nullable String third) {
+    for (String value : new String[] {first, second, third}) {
+      if (value != null && !value.isBlank()) {
+        return value;
+      }
+    }
+    return null;
   }
 }

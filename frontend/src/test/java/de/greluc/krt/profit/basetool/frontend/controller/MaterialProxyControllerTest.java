@@ -169,6 +169,25 @@ class MaterialProxyControllerTest {
   }
 
   @Test
+  void getProfitCalculation_relaysTheRouteTerminalsUnchanged() {
+    UUID shipId = UUID.randomUUID();
+    Map<String, Object> row =
+        Map.of(
+            "materialName", "Laranite",
+            "buyTerminalName", "TDD Lorville",
+            "buyTerminalLocation", "Hurston · Lorville",
+            "sellTerminalName", "Admin - ARC-L1",
+            "sellTerminalLocation", "Stanton · ARC-L1");
+    when(backendApiClient.<List<Map<String, Object>>>get(
+            anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(List.of(row));
+
+    List<Map<String, Object>> result = controller.getProfitCalculation(shipId, null);
+
+    assertEquals(List.of(row), result);
+  }
+
+  @Test
   void getProfitCalculation_withNullBackendResponse_returnsEmptyList() {
     UUID shipId = UUID.randomUUID();
     when(backendApiClient.<List<Map<String, Object>>>get(
