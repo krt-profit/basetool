@@ -39,35 +39,13 @@
             }, 5000);
         });
     </script>
-    <script th:attr="nonce=${cspNonce}">
-        window.krtScuInput = window.krtScuInput || {
-            normalize: function (raw) {
-                if (raw === null || raw === undefined) {
-                    return '';
-                }
-                var s = String(raw).trim().replace(/,/g, '.');
-                if (!/[0-9]/.test(s)) {
-                    return '';
-                }
-                var dot = s.indexOf('.');
-                if (dot !== -1) {
-                    s = s.slice(0, dot + 1) + s.slice(dot + 1).replace(/\./g, '');
-                }
-                return s;
-            },
-            parse: function (raw) {
-                var n = parseFloat(this.normalize(raw));
-                return isFinite(n) ? n : NaN;
-            }
-        };
-    </script>
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
         window.krtScuI18n = {
             scu: /*[[#{material.scu.validation.positive}]]*/ 'Enter an SCU amount greater than 0.',
             piece: /*[[#{material.piece.validation.positive}]]*/ 'Enter a whole number greater than 0.'
         };
     </script>
-    <script th:src="@{/js/escape-html.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/krt-html.js}" defer th:attr="nonce=${cspNonce}"></script>
     <script th:src="@{/js/safe-url.js}" defer th:attr="nonce=${cspNonce}"></script>
     <script th:src="@{/js/event-delegation.js}" defer th:attr="nonce=${cspNonce}"></script>
     <script th:src="@{/js/common-handlers.js}" defer th:attr="nonce=${cspNonce}"></script>

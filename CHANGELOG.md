@@ -323,6 +323,11 @@
 
 ### Fixed
 
+- **Admin-Seiten Missionsdaten und Spezialkommandos: Meldungen ohne Anführungszeichen.** Toasts
+  und Dialogtitel zeigten ihren Text in `"…"`, weil das Inline-Skript die Übersetzung in ein
+  JavaScript-Stringliteral schrieb; die Werte kommen jetzt sauber aus dem Seiten-Bootstrap
+  (Templates, ADR-0069).
+
 - **Startseite und Buchungsanträge passen wieder auf Smartphone und Tablet.** Auf der Startseite
   brechen Status, „Angemeldet" und „Meine Einheit" am Smartphone in eine zweite Zeile um, statt die
   Seite zu verbreitern; die Antragsliste der Kartellbank stapelt am Tablet die Entscheidungsknöpfe,
@@ -406,6 +411,12 @@
   Cookie-Attribut tatsächlich, ein Test hält den gesendeten `Set-Cookie` fest.
 
 ### Security
+
+- **Frontend: Trusted Types im Report-Modus.** Jede Seite sendet zusätzlich den Header
+  `Content-Security-Policy-Report-Only: require-trusted-types-for 'script'; trusted-types krt-html
+  krt-fragment`; ein ungeschützter DOM-Schreibzugriff wird als `csp_violation` gemeldet, nichts wird
+  blockiert. Neue Variable `APP_SECURITY_TRUSTED_TYPES` (`report` als Vorgabe, `enforce` erzwingt);
+  das Umschalten der Produktion ist ein eigener, freizugebender Schritt (REQ-SEC-064, ADR-0239).
 
 - **Frontend: die Session liest nur noch die 21 Anwendungstypen, die wirklich dort landen.** Statt
   aller 325 Klassen unter `frontend.model` nennt die Session-Allow-List die aus dem Code abgeleiteten

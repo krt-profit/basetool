@@ -2277,6 +2277,11 @@ A fifth frontend session meter came with the session type allow-list (REQ-SEC-06
   can: `basetool_session_type_allow_list_mode{mode="enforce"} == 1` per frontend instance proves the
   setting reached the process, as the startup line `Session type allow-list mode: ENFORCE` does for
   one start only. No alert: a mode is a configuration, not a fault.
+- `basetool_trusted_types_mode{mode}` — gauge (`TrustedTypesModeMetric`), one series per mode
+  (`report` / `enforce`, a closed set), `1` on the mode the frontend process resolved from
+  `app.security.trusted-types` and `0` on the other (REQ-SEC-064, ADR-0239). It shows whether the
+  Trusted Types directives of the CSP are report-only or enforced on each instance; the violations
+  themselves are `csp_violation` reports below. No alert, for the same reason.
 
 Two frontend meters were added by the 2026-08 logging audit:
 
@@ -2330,7 +2335,14 @@ Two frontend meters were added by the 2026-08 logging audit:
   `ClientErrorReportController.originOnly` repeats the reduction server-side, so a path, query or
   user info never reaches the `DEBUG` line even from a crafted beacon. It rides the same panel 43
   and the same `ClientErrorSpike` rule; browser extensions that inject inline code are part of its
-  permanent background, which is exactly what the step-change shape tolerates.
+  permanent background, which is exactly what the step-change shape tolerates. Since 2026-10-04 it
+  also carries the **Trusted Types** violations of the report-only policy (ADR-0239): `message` is
+  `require-trusted-types-for` followed by the sink the browser names (`Element innerHTML`, never the
+  sample's markup), or `trusted-types` for a policy name the CSP does not list, and `source` is
+  `trusted-types-sink` / `trusted-types-policy`. The browser dispatches `securitypolicyviolation`
+  for a report-only policy too, which is why the beacon needs no `report-uri` for this phase.
+  `sum(increase(basetool_client_error_total{kind="csp_violation"}[7d]))` staying empty is the
+  precondition for switching production to `enforce` (`deployment.md`).
 
 The auth surfaces (#1041 item 18) add `basetool_login_total{outcome,reason}` (`SecurityConfig`'s
 OAuth2 success/failure handlers: `outcome` = `success` / `failure`; on failure `reason` =

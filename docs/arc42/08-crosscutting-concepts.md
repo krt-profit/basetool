@@ -176,8 +176,17 @@ Two binding rules shape every UI change:
   `fetch` or `XMLHttpRequest` outside the transport fails `:frontend:lintJs` — writes go through
   `krtFetch.write` / `submitForm` (REQ-FE-002), reads through `krtFetch.get` / `getJson`, which
   hand a lost session to the login and refuse a redirected answer (REQ-FE-031, since 2026-10-04) —
-  and so does an HTML sink that is neither escaped through `escapeHtml` / `escapeAttr` nor a server
-  fragment inserted through `krtFetch.setTrustedHtml` (REQ-FE-022, `eslint-plugin-no-unsanitized`).
+  and so does any HTML or script sink outside the two Trusted Types helpers (REQ-FE-022, since
+  2026-10-04).
+- **Every DOM sink takes a Trusted Types policy value** (ADR-0239, 2026-10-04). Markup built in
+  script goes through the tagged-template builder `krtHtml` (policy `krt-html`, escaping every
+  interpolation) and `krtHtml.set`; a server fragment through `krtFetch.setTrustedHtml` /
+  `replaceWithTrustedHtml` / `parseTrustedDocument` (policy `krt-fragment`); a clear is
+  `replaceChildren()`. No `default` policy exists. The CSP carries `require-trusted-types-for
+  'script'; trusted-types krt-html krt-fragment`, report-only by default and enforced by
+  `APP_SECURITY_TRUSTED_TYPES=enforce`; violations reach the client-error beacon as `csp_violation`
+  (REQ-SEC-064). The dialog page walk fails on any violation. Enforcing in production is the one
+  open step, an owner-approved configuration change.
 - **The browser baseline is "Baseline 2025"**: Chrome 122, Firefox 131, Safari / iOS 18.4; the type
   check and ESLint run at ES2025 (ADR-0239, REQ-FE-018).
 - **An ETag only where it pays** (FE-PERF-03, 2026-09-22; assets out 2026-09-23). The frontend's
@@ -196,11 +205,13 @@ Two binding rules shape every UI change:
   linked where its `<style>` block stood; the icon sprite stays inline by measurement (2.4 KB gzip).
   A page is 33–42 % smaller raw and about half the size gzipped (REQ-UI-023,
   `TemplateCommentHygieneTest`).
-- **Every script is deferred; an inline script runs nothing at parse time** (FE-PERF-05,
-  2026-09-23). Only `krt-client-error.js` stays synchronous and first. Page modules keep their order
-  behind the head scripts; inline page scripts run their code on `DOMContentLoaded`. A head-side
-  `krtEvents` watchdog throws into the client-error beacon when `event-delegation.js` never ran
-  (REQ-FE-023, `InlineScriptLoadOrderTest`, `ScriptLoadOrderE2eTest`).
+- **Every script is deferred; an inline script is data only** (FE-PERF-05, 2026-09-23; ADR-0069
+  finished 2026-10-04). Only `krt-client-error.js` stays synchronous and first. Page modules keep
+  their order behind the head scripts. An inline script is a `th:inline="javascript"` bootstrap of
+  literals that hands Thymeleaf values to its module; all page logic is in linted, type-checked
+  files. The one exception is the head-side `krtEvents` stub, whose watchdog throws into the
+  client-error beacon when `event-delegation.js` never ran (REQ-FE-023, `InlineScriptLoadOrderTest`,
+  `InlineScriptDataOnlyTest`, `ScriptLoadOrderE2eTest`).
 - **Only data forms arm the unsaved-changes guard** (2026-10-02). `unsaved-changes.js` warns before
   a link leaves a page with an edited form; a form marked `no-track` or with `method="get"` is a
   query and never arms it, and a submit triggered by the same edit clears it (REQ-FE-024,

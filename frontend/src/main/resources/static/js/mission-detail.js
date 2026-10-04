@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global MSG_ERROR_PAYOUT_UPDATE, MSG_ERROR_MANAGER_ADD, MSG_ERROR_MANAGER_REMOVE, MSG_ERROR_OWNER_CHANGE, MSG_CONFIRM_OWNER_CHANGE, MSG_ERROR_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_MANAGER_REMOVE, MSG_ERROR_USER_REQUIRED, MSG_ERROR_MISSION_ID_MISSING, missionId, openEditFinanceModal, showFrontendErrorToast */
+/* global MSG_ERROR_PAYOUT_UPDATE, MSG_ERROR_MANAGER_ADD, MSG_ERROR_MANAGER_REMOVE, MSG_ERROR_OWNER_CHANGE, MSG_CONFIRM_OWNER_CHANGE, MSG_ERROR_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_MANAGER_REMOVE, MSG_ERROR_USER_REQUIRED, MSG_ERROR_MISSION_ID_MISSING, missionId, showFrontendErrorToast */
 
 const MISSION_SECTIONS = {
     crew: { container: '#crew-board-results', fragmentValue: 'crew-board' },
@@ -2479,6 +2479,29 @@ document.addEventListener('DOMContentLoaded', () => {
     setupShipFilter('add-unit-shiptype', 'add-unit-ship');
     setupShipFilter('edit-unit-shiptype', 'edit-unit-ship');
 });
+
+/**
+ * Fills the finance-entry edit dialog with one entry's values and opens it.
+ *
+ * @param {string | null} id the entry id
+ * @param {string | null} note the entry note; the string 'null' counts as none
+ * @param {string | null} type 'EXPENSE' or anything else for income
+ * @param {string | null} amount the amount
+ * @param {string | null} version the entry's optimistic-lock version
+ */
+function openEditFinanceModal(id, note, type, amount, version) {
+    const form = document.getElementById('edit-finance-form');
+    form.action = window.safeSameOriginUrl(
+        `/missions/${window.missionId}/finance-entries/${id}/update`,
+        form.action,
+    );
+    form.setAttribute('data-entry-id', id);
+    document.getElementById('edit-finance-note').value = note && note !== 'null' ? note : '';
+    window.krtSegSet('edit-finance-type', type === 'EXPENSE' ? 'EXPENSE' : 'INCOME');
+    document.getElementById('edit-finance-amount').value = amount;
+    document.getElementById('edit-finance-version').value = version;
+    window.krtModalOpen(document.getElementById('edit-finance-entry-modal'));
+}
 
 function registerMissionDetailEventHandlers() {
     if (!window.krtEvents || typeof window.krtEvents.on !== 'function') {

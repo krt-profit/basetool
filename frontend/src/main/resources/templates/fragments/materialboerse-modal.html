@@ -78,7 +78,7 @@
         </th:block>
     </th:block>
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-        window.materialboerseI18n = Object.assign(window.materialboerseI18n || {}, {
+        window.materialboerseModalI18n = {
             releaseTitle: /*[[#{materialboerse.modal.release.title}]]*/ 'Material für die Börse freigeben',
             editTitle: /*[[#{materialboerse.modal.edit.title}]]*/ 'Angebot bearbeiten',
             itemTitle: /*[[#{materialboerse.modal.itemOffer.title}]]*/ 'Item für die Börse freigeben',
@@ -99,14 +99,14 @@
             pickerStolen: /*[[#{inventory.stolen.chip}]]*/ 'Gestohlen',
             unitScu: /*[[#{material.quantity.scu}]]*/ 'SCU',
             unitPiece: /*[[#{material.quantity.piece}]]*/ 'Stück',
-            conflict: window.materialboerseI18n && window.materialboerseI18n.conflict ? window.materialboerseI18n.conflict : {
+            conflict: {
                 title: /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
                 reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Neu laden.',
                 reloadLabel: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Neu laden',
                 dismissLabel: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
                 reloadQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Neu laden?'
             }
-        });
+        };
     </script>
     <script th:src="@{/js/materialboerse-release.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>

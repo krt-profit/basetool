@@ -799,7 +799,6 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("inputmode=\"decimal\"")))
         .andExpect(content().string(containsString("data-scu-allow-zero")))
         .andExpect(content().string(containsString("/js/scu-decimal-input.js")))
-        .andExpect(content().string(containsString("window.krtScuInput")))
         .andExpect(content().string(containsString("window.krtScuI18n")));
   }
 

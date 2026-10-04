@@ -214,7 +214,7 @@
         if (!list) {
             return;
         }
-        list.innerHTML = '';
+        list.replaceChildren();
         if (empty) {
             empty.classList.add('notification-badge-hidden');
         }

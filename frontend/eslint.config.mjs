@@ -43,6 +43,47 @@ const FETCH_PROPERTIES = GLOBAL_OBJECTS.map((object) => ({
   message: RAW_FETCH_MESSAGE,
 }));
 
+const TRUSTED_TYPES_MESSAGE =
+  "HTML and script sinks are Trusted Types sinks (ADR-0239): write markup with krtHtml.set(el, krtHtml`…`), a server fragment with krtFetch.setTrustedHtml / parseTrustedDocument, and clear with el.replaceChildren().";
+
+const HTML_SINK_FILES = [
+  "src/main/resources/static/js/krt-html.js",
+  "src/main/resources/static/js/krt-fetch.js",
+];
+
+const TRUSTED_TYPES_SINKS = [
+  {
+    selector:
+      "AssignmentExpression[left.type='MemberExpression'][left.property.name=/^(innerHTML|outerHTML|srcdoc)$/]",
+    message: TRUSTED_TYPES_MESSAGE,
+  },
+  {
+    selector:
+      "CallExpression[callee.property.name=/^(insertAdjacentHTML|createContextualFragment|setHTMLUnsafe|parseHTMLUnsafe|parseFromString)$/]",
+    message: TRUSTED_TYPES_MESSAGE,
+  },
+  {
+    selector: "CallExpression[callee.property.name='createPolicy']",
+    message:
+      "Only krt-html.js and krt-fetch.js create the two Trusted Types policies (ADR-0239).",
+  },
+];
+
+const ALWAYS_BANNED_SINKS = [
+  {
+    selector: "CallExpression[callee.object.name='document'][callee.property.name=/^(write|writeln)$/]",
+    message: TRUSTED_TYPES_MESSAGE,
+  },
+  {
+    selector: "CallExpression[callee.property.name='createElement'][arguments.0.value='script']",
+    message: "Scripts are loaded by the templates with the CSP nonce, never created (ADR-0239).",
+  },
+  {
+    selector: "CallExpression[callee.name='krtHtml'], CallExpression[callee.property.name='krtHtml']",
+    message: "krtHtml is a template tag: krtHtml`<li>${value}</li>` (ADR-0239).",
+  },
+];
+
 const MODERN_SYNTAX_RULES = {
   "prefer-template": "error",
   "prefer-arrow-callback": "error",
@@ -67,11 +108,14 @@ export default [
       sourceType: "script",
       globals: {
         ...globals.browser,
-        escapeHtml: "readonly",
-        escapeAttr: "readonly",
+        krtHtml: "readonly",
       },
     },
     rules: {
+      "no-eval": "error",
+      "no-implied-eval": "error",
+      "no-new-func": "error",
+      "no-restricted-syntax": ["error", ...TRUSTED_TYPES_SINKS, ...ALWAYS_BANNED_SINKS],
       "no-var": "error",
       "no-empty": ["error", { allowEmptyCatch: true }],
       "prefer-const": "error",
@@ -107,12 +151,18 @@ export default [
     rules: {
       "no-unsanitized/method": [
         "error",
-        { escape: { taggedTemplates: [], methods: ["escapeHtml", "escapeAttr"] } },
+        { escape: { taggedTemplates: ["krtHtml"], methods: [] } },
       ],
       "no-unsanitized/property": [
         "error",
-        { escape: { taggedTemplates: [], methods: ["escapeHtml", "escapeAttr"] } },
+        { escape: { taggedTemplates: ["krtHtml"], methods: [] } },
       ],
+    },
+  },
+  {
+    files: HTML_SINK_FILES,
+    rules: {
+      "no-restricted-syntax": ["error", ...ALWAYS_BANNED_SINKS],
     },
   },
   {

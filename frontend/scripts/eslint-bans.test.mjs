@@ -65,6 +65,38 @@ const BANNED = {
     'Promise.try': ['Promise.try(() => 1);', 'no-restricted-properties'],
     'RegExp.escape': ["RegExp.escape('a');", 'no-restricted-properties'],
     'a Float16Array': ['new Float16Array(1);', 'no-restricted-globals'],
+    'an innerHTML assignment, even of an empty string': [
+        "document.body.innerHTML = '';",
+        'no-restricted-syntax',
+    ],
+    'an innerHTML assignment of krtHtml': [
+        'document.body.innerHTML = krtHtml`<b></b>`;',
+        'no-restricted-syntax',
+    ],
+    'an outerHTML assignment': ["document.body.outerHTML = '<b></b>';", 'no-restricted-syntax'],
+    insertAdjacentHTML: [
+        "document.body.insertAdjacentHTML('beforeend', '<b></b>');",
+        'no-restricted-syntax',
+    ],
+    'a DOMParser parse': [
+        "new DOMParser().parseFromString('<b></b>', 'text/html');",
+        'no-restricted-syntax',
+    ],
+    'a contextual fragment': [
+        "document.createRange().createContextualFragment('<b></b>');",
+        'no-restricted-syntax',
+    ],
+    'document.write': ["document.write('<b></b>');", 'no-restricted-syntax'],
+    'a srcdoc assignment': ["document.body.srcdoc = '<b></b>';", 'no-restricted-syntax'],
+    'a created script element': ["document.createElement('script');", 'no-restricted-syntax'],
+    'a Trusted Types policy outside the two helpers': [
+        "window.trustedTypes.createPolicy('default', {});",
+        'no-restricted-syntax',
+    ],
+    'krtHtml called as a function': ["krtHtml(['<b></b>']);", 'no-restricted-syntax'],
+    eval: ["eval('1');", 'no-eval'],
+    'a string timer': ["setTimeout('alert(1)', 1);", 'no-implied-eval'],
+    'new Function': ["new Function('return 1');", 'no-new-func'],
 };
 
 for (const [name, [code, rule]] of Object.entries(BANNED)) {
@@ -72,6 +104,30 @@ for (const [name, [code, rule]] of Object.entries(BANNED)) {
         assert.ok((await rulesFor(code)).includes(rule), `${rule} not reported for ${code}`);
     });
 }
+
+await test('the builder and its sinks pass in a page script', async () => {
+    const code = [
+        "const el = document.getElementById('a');",
+        'krtHtml.set(el, krtHtml`<li title="${window.name}">${[krtHtml`<b></b>`]}</li>`);',
+        'el.replaceChildren();',
+        "window.krtFetch.setTrustedHtml(el, '<b></b>');",
+    ].join('\n');
+    assert.deepEqual(await rulesFor(code), []);
+});
+
+await test('only the two helpers write to an HTML sink or create a policy', async () => {
+    const sink = "document.body.innerHTML = '';\nwindow.trustedTypes.createPolicy('x', {});";
+    assert.deepEqual(await rulesFor(sink, 'krt-html.js'), []);
+    assert.deepEqual(await rulesFor(sink, 'krt-fetch.js'), []);
+    assert.ok(
+        (await rulesFor('document.body.innerHTML = window.name;', 'krt-html.js')).includes(
+            'no-unsanitized/property',
+        ),
+    );
+    assert.ok(
+        (await rulesFor("document.write('');", 'krt-html.js')).includes('no-restricted-syntax'),
+    );
+});
 
 await test('the transport may call fetch but still not XMLHttpRequest', async () => {
     assert.deepEqual(await rulesFor("fetch('/a');", 'krt-fetch.js'), []);

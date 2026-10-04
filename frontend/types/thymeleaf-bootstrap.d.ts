@@ -6,14 +6,22 @@
  * against the module's `global` header. A new bootstrap constant goes here and into that header.
  */
 
-/** Opens the mission finance edit modal; declared inline in mission-detail.html. */
-declare function openEditFinanceModal(
-    id: string,
-    note: string,
-    type: string,
-    amount: number,
-    version: number,
-): void;
+/** Injected by the page bootstrap (declared in members.html). */
+declare const MSG_DELETE_LABEL: string;
+/** Injected by the page bootstrap (declared in members.html). */
+declare const MSG_CANCEL_LABEL: string;
+/** Injected by the page bootstrap (declared in members.html). */
+declare const MSG_DELETE_SUCCESS: string;
+/** Injected by the page bootstrap (declared in members.html). */
+declare const MSG_SYNC_SUCCESS: string;
+/** Injected by the page bootstrap (declared in members.html). */
+declare const MSG_SYNC_ERROR: string;
+/** Injected by the page bootstrap (declared in members.html). */
+declare const MSG_CONSOLIDATE_SUCCESS: string;
+/** Injected by the page bootstrap (declared in members.html). */
+declare const MSG_CONSOLIDATE_ERROR: string;
+/** Injected by the page bootstrap (declared in members.html). */
+declare const MSG_CONSOLIDATE_NO_TARGET: string;
 
 /** Injected by the page bootstrap (declared in material-aliases.html). */
 declare const ALIAS_CONFLICT: KrtI18nDict;
