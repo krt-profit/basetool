@@ -28,27 +28,29 @@
         <th:block th:fragment="inventoryMaterialResults">
         <div th:if="${error}" class="alert alert-danger drill-alert" role="alert" th:text="#{__${error}__}">Fehler</div>
 
-        <table th:if="${!#lists.isEmpty(items)}" class="data-table data-table--stack">
-            <thead>
-                <tr>
-                    <th th:text="#{inventory.user}">Nutzer</th>
-                    <th th:text="#{inventory.location}">Standort</th>
-                    <th class="num" th:text="#{inventory.quality}">Qualit&auml;t</th>
-                    <th class="num" th:text="#{inventory.amount}">Menge</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr th:each="item : ${items}" data-testid="inventory-material-row">
-                    <td><span class="cell-title" th:text="${item.user.effectiveName}">Username</span></td>
-                    <td th:attr="data-label=#{inventory.location}" th:text="${item.location.name}">Ort</td>
-                    <td class="num" th:attr="data-label=#{inventory.quality}" th:text="${item.quality}">100</td>
-                    <td class="num" th:attr="data-label=#{inventory.amount}" th:switch="${item.material.quantityType}">
-                        <span th:case="'PIECE'" th:text="|${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'} #{material.quantity.piece}|">10 St&uuml;ck</span>
-                        <span th:case="*" th:text="|${item.amount != null ? #numbers.formatDecimal(item.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|">10.500 SCU</span>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+        <div class="table-responsive" th:if="${!#lists.isEmpty(items)}">
+            <table class="data-table data-table--stack">
+                <thead>
+                    <tr>
+                        <th th:text="#{inventory.user}">Nutzer</th>
+                        <th th:text="#{inventory.location}">Standort</th>
+                        <th class="num" th:text="#{inventory.quality}">Qualit&auml;t</th>
+                        <th class="num" th:text="#{inventory.amount}">Menge</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="item : ${items}" data-testid="inventory-material-row">
+                        <td><span class="cell-title" th:text="${item.user.effectiveName}">Username</span></td>
+                        <td th:attr="data-label=#{inventory.location}" th:text="${item.location.name}">Ort</td>
+                        <td class="num" th:attr="data-label=#{inventory.quality}" th:text="${item.quality}">100</td>
+                        <td class="num" th:attr="data-label=#{inventory.amount}" th:switch="${item.material.quantityType}">
+                            <span th:case="'PIECE'" th:text="|${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'} #{material.quantity.piece}|">10 St&uuml;ck</span>
+                            <span th:case="*" th:text="|${item.amount != null ? #numbers.formatDecimal(item.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|">10.500 SCU</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
 
         <th:block th:if="${#lists.isEmpty(items)}">
             <th:block th:replace="~{fragments/components :: emptyState(titleKey='inventory.material.drilldown.empty', textKey='inventory.drilldown.empty.text')}"></th:block>
