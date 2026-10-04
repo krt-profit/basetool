@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-02.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-04.
 > **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0031, ADR-0053, ADR-0069, ADR-0071, ADR-0085, ADR-0089, ADR-0094, ADR-0100, ADR-0106, ADR-0125, ADR-0126, ADR-0130, ADR-0143, ADR-0165, ADR-0206, ADR-0239
 
 # Frontend AJAX mutations — krtFetch, krtCsrf & fragment swaps
@@ -177,9 +177,65 @@ handover PDF preview) and, on `write`, `bodyOnDelete` (the Lager allocation remo
 reads a body); a 2xx result also reports `redirected`, so a caller that swaps an HTML body can refuse
 a followed redirect.
 
-**Enforced by:** `:frontend:lintJs` (`no-restricted-syntax`), per-area double-submit e2e (incl.
+> [!note] Amended 2026-10-04 — every raw `fetch` is rejected (REQ-FE-031)
+> The `no-restricted-syntax` selector above, which saw only an inline `method` other than `GET`, is
+> gone: `eslint.config.mjs` now rejects every `fetch(…)` and `window` / `globalThis` / `self`
+> `.fetch` outside the two exempt files (`no-restricted-globals`, `no-restricted-properties`), and
+> `XMLHttpRequest` everywhere. That also closes the gap of an init built in another function.
+
+**Enforced by:** `:frontend:lintJs` (`no-restricted-globals`, `no-restricted-properties`),
+`:frontend:testEslintBans`, per-area double-submit e2e (incl.
 `AdminMaterialCreateInPlaceE2eTest`) · **Code:** `krt-fetch.js` (`write`, `submitForm`, `send`,
 `resolveSubmitter`), `eslint.config.mjs` · **Issues:** #572, #916, #1133
+
+### REQ-FE-031 — Every read goes through `krtFetch.get` / `krtFetch.getJson`
+
+A background read — a picker's remote source, a lazily loaded fragment, a poll, a report download —
+behaves on session loss and at the consent gate exactly like a write. There is one read path in
+`krt-fetch.js`:
+
+- **`krtFetch.get(url, opts)`** sends a same-origin `GET` that always carries
+  `X-Requested-With: XMLHttpRequest`, so the entry point and the terms gate answer `401` +
+  `X-Reauthenticate` or `X-Terms-Acceptance-Required` instead of a redirect (REQ-SEC-012,
+  REQ-SEC-028). It offers every answer to both gates first and resolves **null** when one of them
+  navigated away or when the answer came through a redirect, which for a background read is a login
+  or consent page rather than the resource. Any other answer is resolved as the `Response`, ok or
+  not; a transport failure or an abort rejects, as `fetch` does. `opts`: `accept`, extra `headers`,
+  an `AbortSignal` (`signal`), and a supersede `key` — a later read with the same key aborts the
+  earlier one still in flight.
+- **`krtFetch.getJson(url, opts)`** reads through `get` with `Accept: application/json` and resolves
+  the parsed body of a 2xx JSON answer (null for a `204`). Anything else rejects with a
+  `KrtReadError` (`reason` `refused` / `status` / `not-json`, the `status`, and the parsed problem
+  of a non-2xx JSON answer): a redirected or non-JSON answer is never parsed as the payload.
+- `krtFetch.swap` reads through `get` as well.
+
+**Pickers and other reads that went empty on session loss now send the member to the login.** That
+is the intended contract: a remote picker used to answer a lost session with "no matches", which
+reads as "the member does not exist". A refused read otherwise takes the call site's existing
+failure path (its fallback value or its error toast).
+
+Only `krt-fetch.js` (the transport) and `krt-client-error.js` (the beacon, which must work when
+`krtFetch` did not load) call `fetch`; `XMLHttpRequest` is banned in every file. Inline template
+scripts are not linted (ADR-0069), so the same rule is pinned against the shipped scripts **and**
+templates by a Java test.
+
+**Acceptance**
+
+- [x] No script outside the two transport files and no template calls `fetch` or uses
+  `XMLHttpRequest`. *`:frontend:lintJs`, `BackgroundReadGateContractTest`.*
+- [x] `get` runs both gates, always sends the background marker and refuses a redirected answer;
+  `getJson` refuses a non-JSON or non-2xx answer; a supersede key aborts the earlier read.
+  *`:frontend:testKrtFetchReadJs`.*
+- [x] The bans fire on planted sources. *`:frontend:testEslintBans`,
+  `BackgroundReadGateContractTest#theRawRequestMatcher_seesEveryShapeItRejects`.*
+- [x] A remote picker typed into after the session is gone shows the Keycloak login.
+  *`PickerSessionLossE2eTest`.*
+
+**Enforced by:** `:frontend:lintJs` (`no-restricted-globals`, `no-restricted-properties`),
+`:frontend:testEslintBans`, `:frontend:testKrtFetchReadJs`, `BackgroundReadGateContractTest`,
+`PickerSessionLossE2eTest` · **Code:** `krt-fetch.js` (`get`, `getJson`, `swap`),
+`types/globals.d.ts` (`KrtReadOpts`, `KrtReadError`), `eslint.config.mjs` · **ADR:** ADR-0012,
+ADR-0239 · **Plan:** domain modularisation §8.2 ("One read path")
 
 ### REQ-FE-022 — Every HTML sink is escaped or a trusted server fragment
 
@@ -1775,22 +1831,35 @@ constant is added to **both** the declaration file and the module's `global` hea
 
 **The browser baseline is "Baseline 2025" (ES2025)** (owner decision D-16, ADR-0239). The scripts
 may rely on what Chrome 122, Firefox 131 and Safari / iOS 18.4 ship — the floor set by the iterator
-helpers — and nothing newer: `Promise.try`, `RegExp.escape` and `Float16Array` wait until the floor
-moves past them. The type check's `lib` / `target` and ESLint's `ecmaVersion` stay at **ES2023**
-until TypeScript 7 is proven to accept the `ES2025` lib, then rise to 2025 together; until then an
-ES2025 API is used only where the type check already knows it. Trusted Types follow the same
-decision: report-only through the `csp_violation` beacon first, then enforced.
+helpers — and nothing newer. The type check's `lib` / `target` (`tsconfig.json`) and ESLint's
+`ecmaVersion` (`eslint.config.mjs`, browser and Node scripts) are **ES2025**. TypeScript's `ES2025`
+lib also declares `Promise.try`, `RegExp.escape` and `Float16Array`, which the floor does not ship,
+so ESLint rejects those three (`no-restricted-properties`, `no-restricted-globals`) until the floor
+moves past them. Trusted Types follow the same decision: report-only through the `csp_violation`
+beacon first, then enforced.
+
+**Modern syntax is lint-enforced.** `prefer-template`, `prefer-arrow-callback`,
+`prefer-object-has-own`, `radix` and `logical-assignment-operators` are errors for the browser and
+the Node scripts. `?.` and `??` are not enforced: their semantics differ from `&&` / `||` for falsy
+values, so they are introduced by hand in files that opt into `// @ts-check`.
 
 > [!note] Amended 2026-10-02 — the browser baseline (D-16; ADR-0239)
 > The project had no documented baseline; the features already shipped implied Chrome 105,
-> Firefox 121 and Safari 16.4. **Decided, implementation pending:** `tsconfig.json` and
-> `eslint.config.mjs` still target ES2023, and no Trusted Types directive is sent yet.
+> Firefox 121 and Safari 16.4.
+
+> [!note] Amended 2026-10-04 — the language level is ES2025
+> TypeScript 7.0.2 accepts the `ES2025` lib: a planted checked file using `Set.prototype.union`
+> and an iterator helper passes `:frontend:typecheckJs` under ES2025 and fails it under ES2023
+> (TS2550, TS2339). `tsconfig.json` and `eslint.config.mjs` moved to 2025 together, and the five
+> modern-syntax rules above were enabled with their autofix applied. No Trusted Types directive is
+> sent yet.
 
 **JSDoc must be JSDoc.** In a checked file, `{@code …}` / `{@link …}` / `@param name {shape}` —
 Javadoc spellings this repo uses elsewhere — are parsed as type syntax and are hard errors.
 Convert them when opting a file in.
 
-> **Verification** — **Gate:** `./gradlew :frontend:typecheckJs` (strict, in `check`) ·
+> **Verification** — **Gate:** `./gradlew :frontend:typecheckJs` (strict, in `check`),
+> `:frontend:lintJs` and `:frontend:testEslintBans` (the language level and the baseline bans) ·
 > **Config:** `frontend/tsconfig.json` (`allowJs` + `noEmit` + `moduleDetection: legacy`),
 > `frontend/build.gradle.kts` (`generateApiTypes`, `typecheckJs`) · **Code:**
 > `frontend/types/globals.d.ts`, `frontend/types/thymeleaf-bootstrap.d.ts`,
@@ -1893,7 +1962,10 @@ registry: the admin area is web-only permanently, so a room there would have no 
 - [x] Both buckets bound what they are meant to, and one member's flood does not cost another theirs
   (`LiveSyncRelayServiceTest`).
 - [x] Each room's gate is its own read's gate; a throwing check refuses
-  (`LiveSyncSubscriptionAuthorizerTest`).
+  (`LiveSyncSubscriptionAuthorizerTest`). The owning module asks it through its
+  `livesync.api.LiveSyncTopicAuthorizer`; every kind but the member and self rooms has exactly one,
+  or the backend does not start (`LiveSyncSubscriptionAuthorizerTest`,
+  `LiveSyncTopicAuthorizersTest`).
 - [x] The backend registry is a subset of the frontend's, staff rooms excluded
   (`LiveSyncTopicRegistryParityTest`).
 - [x] **A Redis that is unreachable at startup does not stop the backend from starting**; the
@@ -1919,7 +1991,8 @@ registry: the admin area is web-only permanently, so a room there would have no 
 > anyway, in the keyspace-notification initializer, before any `SmartLifecycle` runs.
 >
 > **Code:** `backend/…/controller/LiveSyncController`, `backend/…/service/LiveSyncStreamService`,
-> `LiveSyncRelayService`, `LiveSyncSubscriptionAuthorizer`, `RedisLiveSyncFanout`,
+> `LiveSyncRelayService`, `LiveSyncSubscriptionAuthorizer`, `backend/…/livesync/api/LiveSyncTopicAuthorizer`
+> and its `*LiveSyncTopicAuthorizer` implementations, `RedisLiveSyncFanout`,
 > `LocalLiveSyncFanout`, `LiveSyncRedisConfig`, `NotificationRedisConfig`,
 > `backend/…/support/ResilientRedisMessageListenerContainer`, `backend/…/support/LiveSyncTopic`,
 > `LiveSyncTopicClass`, `LiveSyncAuthorization` · **ADR:** ADR-0143 (ADR-0094 unchanged) ·

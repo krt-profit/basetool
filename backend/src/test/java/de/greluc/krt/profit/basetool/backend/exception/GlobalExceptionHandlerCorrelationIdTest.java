@@ -34,8 +34,8 @@ import ch.qos.logback.core.AppenderBase;
 import de.greluc.krt.profit.basetool.backend.config.LoggingProperties;
 import de.greluc.krt.profit.basetool.backend.logging.CorrelationIdFilter;
 import de.greluc.krt.profit.basetool.backend.logging.RequestLoggingFilter;
+import de.greluc.krt.profit.basetool.backend.service.ActiveOrgUnitProvider;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
@@ -99,15 +99,16 @@ class GlobalExceptionHandlerCorrelationIdTest {
             new SimpleMeterRegistry());
 
     AuthHelperService authHelperService = mock(AuthHelperService.class);
-    OwnerScopeService ownerScopeService = mock(OwnerScopeService.class);
+    ActiveOrgUnitProvider activeOrgUnitProvider = mock(ActiveOrgUnitProvider.class);
     when(authHelperService.isAuthenticated()).thenReturn(false);
-    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
+    when(activeOrgUnitProvider.activeOrgUnitId()).thenReturn(Optional.empty());
 
     mockMvc =
         MockMvcBuilders.standaloneSetup(new ThrowingController())
             .setControllerAdvice(handler)
             .addFilters(
-                new CorrelationIdFilter(loggingProperties, authHelperService, ownerScopeService),
+                new CorrelationIdFilter(
+                    loggingProperties, authHelperService, activeOrgUnitProvider),
                 new RequestLoggingFilter(loggingProperties))
             .build();
 

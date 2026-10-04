@@ -55,11 +55,9 @@
      */
     function currentRow(skId, userId) {
         return document.querySelector(
-            '[data-sk-roster][data-sk-id="' +
-                CSS.escape(skId) +
-                '"] tr[data-user-id="' +
-                CSS.escape(userId) +
-                '"]',
+            `[data-sk-roster][data-sk-id="${CSS.escape(skId)}"] tr[data-user-id="${CSS.escape(
+                userId,
+            )}"]`,
         );
     }
 
@@ -75,13 +73,11 @@
             run();
             return;
         }
-        window
-            .showKrtConfirm(title, message, MEMBER_MSG.confirm, MEMBER_MSG.cancel)
-            .then(function (ok) {
-                if (ok) {
-                    run();
-                }
-            });
+        window.showKrtConfirm(title, message, MEMBER_MSG.confirm, MEMBER_MSG.cancel).then((ok) => {
+            if (ok) {
+                run();
+            }
+        });
     }
 
     /**
@@ -119,7 +115,7 @@
         }
         button.setAttribute('aria-busy', 'true');
         window.krtFetch
-            .serialize(SERIALIZE_KEY, function () {
+            .serialize(SERIALIZE_KEY, () => {
                 const row = currentRow(parts.skId, parts.userId) || parts.row;
                 let logistician = row.getAttribute('data-logistician') === 'true';
                 let missionManager = row.getAttribute('data-mission-manager') === 'true';
@@ -144,7 +140,7 @@
                     },
                 });
             })
-            .finally(function () {
+            .finally(() => {
                 button.removeAttribute('aria-busy');
             });
     }
@@ -164,8 +160,8 @@
         const lead = parts.row.getAttribute('data-lead') === 'true';
         const mode = parts.roster.getAttribute('data-lead-mode');
         const name = parts.row.getAttribute('data-user-name');
-        confirmThen(name, lead ? MEMBER_MSG.confirmDemote : MEMBER_MSG.confirmPromote, function () {
-            window.krtFetch.serialize(SERIALIZE_KEY, function () {
+        confirmThen(name, lead ? MEMBER_MSG.confirmDemote : MEMBER_MSG.confirmPromote, () => {
+            window.krtFetch.serialize(SERIALIZE_KEY, () => {
                 const row = currentRow(parts.skId, parts.userId) || parts.row;
                 const version = row.getAttribute('data-version') || '0';
                 const onSuccess = function () {
@@ -209,28 +205,24 @@
         if (!parts || !url || !window.krtFetch) {
             return;
         }
-        confirmThen(
-            parts.row.getAttribute('data-user-name'),
-            MEMBER_MSG.confirmRemove,
-            function () {
-                window.krtFetch.serialize(SERIALIZE_KEY, function () {
-                    return window.krtFetch.submitForm({
-                        url,
-                        method: 'POST',
-                        formData: new URLSearchParams(),
-                        successMessage: MEMBER_MSG.deleted,
-                        errorMessage: MEMBER_MSG.error,
-                        conflict: MEMBER_CONFLICT,
-                        onSuccess() {
-                            return refresh(parts.roster);
-                        },
-                    });
+        confirmThen(parts.row.getAttribute('data-user-name'), MEMBER_MSG.confirmRemove, () => {
+            window.krtFetch.serialize(SERIALIZE_KEY, () => {
+                return window.krtFetch.submitForm({
+                    url,
+                    method: 'POST',
+                    formData: new URLSearchParams(),
+                    successMessage: MEMBER_MSG.deleted,
+                    errorMessage: MEMBER_MSG.error,
+                    conflict: MEMBER_CONFLICT,
+                    onSuccess() {
+                        return refresh(parts.roster);
+                    },
                 });
-            },
-        );
+            });
+        });
     }
 
-    document.addEventListener('click', function (e) {
+    document.addEventListener('click', (e) => {
         const target = e.target instanceof Element ? e.target : null;
         if (!target || !target.closest('[data-sk-roster]')) {
             return;
@@ -265,7 +257,7 @@
             return undefined;
         }
         return window.krtFetch.swap({
-            url: '/organisation/special-commands/' + encodeURIComponent(scId) + '?fragment=members',
+            url: `/organisation/special-commands/${encodeURIComponent(scId)}?fragment=members`,
             container: '#members-results',
             fragmentValue: 'members',
             history: false,
@@ -283,7 +275,7 @@
         }
     }
 
-    document.addEventListener('krt:swapped', function (e) {
+    document.addEventListener('krt:swapped', (e) => {
         const container = e.detail ? e.detail.container : null;
         if (container && container.id === 'members-results') {
             updateCount();
@@ -294,22 +286,22 @@
     const openBtn = document.getElementById('add-member-btn');
     const closeBtn = document.querySelector('#add-member-modal .close-add-member-modal');
     if (modal && openBtn) {
-        openBtn.addEventListener('click', function () {
+        openBtn.addEventListener('click', () => {
             window.krtModal.open(modal);
         });
         if (closeBtn) {
-            closeBtn.addEventListener('click', function () {
+            closeBtn.addEventListener('click', () => {
                 window.krtModal.close(modal);
             });
         }
-        modal.addEventListener('click', function (e) {
+        modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 window.krtModal.close(modal);
             }
         });
         const addForm = modal.querySelector('form');
         if (addForm) {
-            addForm.addEventListener('submit', function (e) {
+            addForm.addEventListener('submit', (e) => {
                 e.preventDefault();
                 if (!window.krtFetch) {
                     addForm.submit();

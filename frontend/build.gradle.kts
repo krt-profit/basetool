@@ -713,8 +713,35 @@ val testPromotionCsvEscape =
     outputs.upToDateWhen { false }
   }
 
+val testKrtFetchReadJs =
+  tasks.register<NodeTask>("testKrtFetchReadJs") {
+    group = "verification"
+    description = "Regression tests for the one read path, krtFetch.get / getJson (REQ-FE-031)."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/krt-fetch-read.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/krt-fetch-read.test.mjs"))
+    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/krt-fetch.js"))
+    outputs.upToDateWhen { false }
+  }
+
+val testEslintBans =
+  tasks.register<NodeTask>("testEslintBans") {
+    group = "verification"
+    description = "Proves the ESLint transport and browser-baseline bans fire on planted sources."
+    dependsOn(tasks.named("npmInstall"))
+    script.set(layout.projectDirectory.file("scripts/eslint-bans.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/eslint-bans.test.mjs"))
+    inputs.file(layout.projectDirectory.file("eslint.config.mjs"))
+    inputs.file(layout.projectDirectory.file("package.json"))
+    outputs.upToDateWhen { false }
+  }
+
 tasks.named("check").configure {
   dependsOn(
+    testKrtFetchReadJs,
+    testEslintBans,
     testPromotionCsvEscape,
     lintCss,
     lintCssInline,

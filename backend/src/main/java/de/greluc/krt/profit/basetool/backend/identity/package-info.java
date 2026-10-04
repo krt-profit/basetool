@@ -18,7 +18,8 @@
  */
 
 /** The identity module: users, registration, approval, profile and terms consent. */
-@ApplicationModule(allowedDependencies = {"audit::api", "kernel", "notification::api"})
+@ApplicationModule(
+    allowedDependencies = {"audit::api", "kernel", "livesync::api", "notification::api"})
 package de.greluc.krt.profit.basetool.backend.identity;
 
 import org.springframework.modulith.ApplicationModule;

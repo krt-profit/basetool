@@ -157,6 +157,13 @@ its full `krtFetch`/fragment-swap contract and the live multi-user sync live in
 success, leaves a sibling/peer view stale, or hand-rolls a `fetch`/CSRF write outside `krtFetch` is
 incomplete — extend the standard to cover it, don't fall back to a reload.
 
+**Reads go through `krtFetch` too (REQ-FE-031).** `krtFetch.getJson(url)` for JSON,
+`krtFetch.get(url, {accept, headers, signal, key})` for a fragment, a blob or a status the caller
+reads itself. Both send the background marker, hand a lost session or the consent gate to the
+navigation, and refuse a redirected answer (`get` resolves null, `getJson` rejects). A raw `fetch`
+or `XMLHttpRequest` fails `:frontend:lintJs` outside `krt-fetch.js` and `krt-client-error.js`, and
+`BackgroundReadGateContractTest` fails one in an inline template script.
+
 **Live update and multi-user sync move with every feature — added, changed *or* removed.** Whenever
 you add, change or remove a frontend surface that participates in live update or live multi-user
 sync (a new editable section, a renamed/retired one, a new mutation on an existing section), you
@@ -213,6 +220,9 @@ is gone (ADR-0130). Two consequences you will actually trip over:
 implicit-any errors — and TS 5.9.3 reported the identical 514, so that is pre-existing annotation
 debt rather than anything TS 7 introduced.
 
+- **The language level is ES2025** (ADR-0239, REQ-FE-018): the floor is Chrome 122, Firefox 131,
+  Safari / iOS 18.4. `Promise.try`, `RegExp.escape` and `Float16Array` are in TypeScript's `ES2025`
+  lib but above the floor, so ESLint rejects them.
 - **Opt in per file** with a leading `// @ts-check`. A file that opts in **must** be error-free —
   there is no partial state. Prefer opting in any file you substantially touch.
 - **Declare shared contracts in the same change.** A new `window.krt*` API, a new custom DOM event

@@ -205,6 +205,8 @@ import de.greluc.krt.profit.basetool.backend.service.OperationService;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitBankAccessService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitBankApprovalLimitService;
+import de.greluc.krt.profit.basetool.backend.service.OrgUnitBankLiveSyncTopicAuthorizer;
+import de.greluc.krt.profit.basetool.backend.service.OrgUnitBankRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitBankResponsibilityService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitBankVisibilityService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitCascadeService;
@@ -519,6 +521,8 @@ class ArchitectureTest {
           OrgUnitBankViewUserDto.class,
           OrgUnitBankAccessService.class,
           OrgUnitBankApprovalLimitService.class,
+          OrgUnitBankLiveSyncTopicAuthorizer.class,
+          OrgUnitBankRecipientDirectory.class,
           OrgUnitBankResponsibilityService.class,
           OrgUnitBankVisibilityService.class);
 

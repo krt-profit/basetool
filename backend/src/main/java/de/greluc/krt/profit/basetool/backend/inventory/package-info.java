@@ -23,6 +23,7 @@
       "audit::api",
       "identity::api",
       "kernel",
+      "livesync::api",
       "notification::api",
       "orgunit::api",
       "scope::api"

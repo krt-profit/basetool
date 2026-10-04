@@ -40,7 +40,7 @@
      */
     function valueOf(form, tier) {
         const input = /** @type {HTMLInputElement | null} */ (
-            form.querySelector('[data-tier-input="' + tier + '"]')
+            form.querySelector(`[data-tier-input="${tier}"]`)
         );
         if (!input || input.value.trim() === '') return null;
         const n = Number(input.value);
@@ -97,7 +97,7 @@
         );
     }
 
-    document.addEventListener('input', function (event) {
+    document.addEventListener('input', (event) => {
         const target = event.target;
         if (!(target instanceof HTMLInputElement) || !target.hasAttribute('data-tier-input'))
             return;

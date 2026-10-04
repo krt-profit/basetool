@@ -83,6 +83,21 @@ public record LiveSyncTopic(
   }
 
   /**
+   * The resource id of a per-resource topic.
+   *
+   * @return the id
+   * @throws IllegalStateException if the topic carries no id (registry and parser disagree)
+   */
+  @NotNull
+  public UUID requiredResourceId() {
+    if (resourceId == null) {
+      throw new IllegalStateException(
+          "Per-resource topic class " + topicClass + " parsed without a resource id");
+    }
+    return resourceId;
+  }
+
+  /**
    * Parses a UUID strictly, rejecting any input whose canonical form differs from it apart from
    * case.
    *

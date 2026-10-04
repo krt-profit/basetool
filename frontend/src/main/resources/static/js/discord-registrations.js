@@ -19,7 +19,7 @@
 
 /* global DISCORD_MSG */
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     if (!window.krtFetch) {
         return;
     }
@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (empty) {
             empty.hidden = rows > 0;
         }
-        const count = document.querySelector('[data-reg-count="' + countKey + '"]');
+        const count = document.querySelector(`[data-reg-count="${countKey}"]`);
         if (count) {
             count.textContent = String(rows);
         }
@@ -87,7 +87,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const tabs = Array.prototype.slice.call(document.querySelectorAll('[data-reg-tab]'));
 
     function selectTab(tab, focus) {
-        tabs.forEach(function (other) {
+        tabs.forEach((other) => {
             const selected = other === tab;
             other.classList.toggle('active', selected);
             other.setAttribute('aria-selected', selected ? 'true' : 'false');
@@ -102,11 +102,11 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    tabs.forEach(function (tab, index) {
-        tab.addEventListener('click', function () {
+    tabs.forEach((tab, index) => {
+        tab.addEventListener('click', () => {
             selectTab(tab, false);
         });
-        tab.addEventListener('keydown', function (event) {
+        tab.addEventListener('keydown', (event) => {
             let next = null;
             if (event.key === 'ArrowRight') {
                 next = tabs[(index + 1) % tabs.length];
@@ -136,17 +136,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (Number.isNaN(date.getTime())) {
             return '';
         }
-        return (
-            pad(date.getUTCDate()) +
-            '.' +
-            pad(date.getUTCMonth() + 1) +
-            '.' +
-            date.getUTCFullYear() +
-            ' ' +
-            pad(date.getUTCHours()) +
-            ':' +
-            pad(date.getUTCMinutes())
-        );
+        return `${pad(date.getUTCDate())}.${pad(
+            date.getUTCMonth() + 1,
+        )}.${date.getUTCFullYear()} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
     }
 
     function actionButton(action, className, label) {
@@ -211,7 +203,7 @@ document.addEventListener('DOMContentLoaded', function () {
         cell.className = 'cell-actions';
         const actions = document.createElement('div');
         actions.className = 'cluster gap-2 reg-actions';
-        buttons.forEach(function (button) {
+        buttons.forEach((button) => {
             actions.appendChild(button);
         });
         cell.appendChild(actions);
@@ -260,7 +252,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const version = row.getAttribute('data-version');
         window.krtFetch.write({
             method: 'POST',
-            url: '/admin/discord-registrations/' + encodeURIComponent(id) + '/approve',
+            url: `/admin/discord-registrations/${encodeURIComponent(id)}/approve`,
             payload: { version: version == null ? null : Number(version) },
             toast: false,
             errorMessage: DISCORD_MSG.approveError,
@@ -327,7 +319,7 @@ document.addEventListener('DOMContentLoaded', function () {
         reopenTarget = null;
     }
 
-    body.addEventListener('click', function (event) {
+    body.addEventListener('click', (event) => {
         const btn = event.target.closest('button[data-action]');
         if (!btn) {
             return;
@@ -349,7 +341,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     if (rejectedBody) {
-        rejectedBody.addEventListener('click', function (event) {
+        rejectedBody.addEventListener('click', (event) => {
             const btn = event.target.closest('button[data-action="reopen"]');
             if (!btn) {
                 return;
@@ -367,7 +359,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     const confirmBtn = document.getElementById('reject-confirm');
     if (confirmBtn) {
-        confirmBtn.addEventListener('click', function () {
+        confirmBtn.addEventListener('click', () => {
             if (!rejectTarget) {
                 return;
             }
@@ -377,7 +369,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const reason = reasonInput ? reasonInput.value.trim() : '';
             window.krtFetch.write({
                 method: 'POST',
-                url: '/admin/discord-registrations/' + encodeURIComponent(id) + '/reject',
+                url: `/admin/discord-registrations/${encodeURIComponent(id)}/reject`,
                 payload: {
                     reason: reason === '' ? null : reason,
                     version: version == null ? null : Number(version),
@@ -402,7 +394,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     const linkConfirmBtn = document.getElementById('link-confirm');
     if (linkConfirmBtn) {
-        linkConfirmBtn.addEventListener('click', function () {
+        linkConfirmBtn.addEventListener('click', () => {
             if (!linkTarget) {
                 return;
             }
@@ -419,7 +411,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const version = row.getAttribute('data-version');
             window.krtFetch.write({
                 method: 'POST',
-                url: '/admin/discord-registrations/' + encodeURIComponent(id) + '/link',
+                url: `/admin/discord-registrations/${encodeURIComponent(id)}/link`,
                 payload: {
                     targetUserId,
                     version: version == null ? null : Number(version),
@@ -444,7 +436,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const mergeConfirmBtn = document.getElementById('merge-confirm');
     if (mergeConfirmBtn) {
-        mergeConfirmBtn.addEventListener('click', function () {
+        mergeConfirmBtn.addEventListener('click', () => {
             if (!mergeTarget) {
                 return;
             }
@@ -461,7 +453,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const version = row.getAttribute('data-version');
             window.krtFetch.write({
                 method: 'POST',
-                url: '/admin/discord-registrations/' + encodeURIComponent(id) + '/merge',
+                url: `/admin/discord-registrations/${encodeURIComponent(id)}/merge`,
                 payload: {
                     sourceUserId,
                     version: version == null ? null : Number(version),
@@ -487,7 +479,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     const reopenConfirmBtn = document.getElementById('reopen-confirm');
     if (reopenConfirmBtn) {
-        reopenConfirmBtn.addEventListener('click', function () {
+        reopenConfirmBtn.addEventListener('click', () => {
             if (!reopenTarget) {
                 return;
             }
@@ -497,7 +489,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const reason = reopenReasonInput ? reopenReasonInput.value.trim() : '';
             window.krtFetch.write({
                 method: 'POST',
-                url: '/admin/discord-registrations/' + encodeURIComponent(id) + '/reopen',
+                url: `/admin/discord-registrations/${encodeURIComponent(id)}/reopen`,
                 payload: {
                     reason: reason === '' ? null : reason,
                     version: version == null ? null : Number(version),
@@ -516,7 +508,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    window.addEventListener('click', function (event) {
+    window.addEventListener('click', (event) => {
         if (event.target === modal) {
             closeReject();
         } else if (event.target === linkModal) {
@@ -525,7 +517,7 @@ document.addEventListener('DOMContentLoaded', function () {
             closeReopen();
         }
     });
-    document.addEventListener('keydown', function (event) {
+    document.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape') {
             return;
         }

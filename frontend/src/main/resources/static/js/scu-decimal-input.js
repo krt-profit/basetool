@@ -77,11 +77,11 @@
         }
         scaled = scaled.replace(/^0+(?=\d)/, '');
         while (scaled.length < MAX_DECIMALS + 1) {
-            scaled = '0' + scaled;
+            scaled = `0${scaled}`;
         }
         const newInt = scaled.slice(0, scaled.length - MAX_DECIMALS);
         const newFrac = scaled.slice(scaled.length - MAX_DECIMALS).replace(/0+$/, '');
-        return newFrac ? newInt + '.' + newFrac : newInt;
+        return newFrac ? `${newInt}.${newFrac}` : newInt;
     }
 
     /**

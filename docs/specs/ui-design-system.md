@@ -11,6 +11,7 @@
 > [0177](../adr/0177-the-app-has-exactly-one-dialog-shape.md) (REQ-UI-013) ·
 > [0197](../adr/0197-shipped-dependencies-pass-a-gpl-compatible-licence-gate-and-are-listed-on-a-public-page.md) (REQ-UI-021) ·
 > [0212](../adr/0212-every-stylesheet-sits-in-a-cascade-layer.md) (REQ-UI-024) ·
+> [0239](../adr/0239-the-browser-baseline-is-baseline-2025-and-trusted-types-follow.md) (supported browsers) ·
 > [0240](../adr/0240-navigation-is-a-structured-drawer-a-quick-access-and-a-phone-tab-bar.md) (REQ-UI-026) ·
 > [0242](../adr/0242-page-patterns-a-to-c-and-the-design-system-update-2026-10.md) (REQ-UI-027, REQ-UI-009) ·
 > [0243](../adr/0243-colours-and-stacking-layers-are-written-through-tokens.md) (REQ-UI-001, REQ-UI-023) ·
@@ -31,6 +32,12 @@ disagree, the skill wins and this file is corrected in the same PR.
 
 > New UI/visual decisions are recorded in an ADR and reflected here and in the design
 > skill — see the governance rules in `CLAUDE.md`.
+
+**Supported browsers — "Baseline 2025".** The UI targets at least **Chrome 122, Firefox 131 and
+Safari / iOS 18.4** (owner decision D-16, [ADR-0239](../adr/0239-the-browser-baseline-is-baseline-2025-and-trusted-types-follow.md)).
+Set methods, iterator helpers, the `popover` attribute and same-document view transitions are
+available without a polyfill; `Promise.try`, `RegExp.escape` and `Float16Array` are not, and ESLint
+rejects them. The script-side rule — the type check and ESLint at ES2025 — is REQ-FE-018.
 
 ## Requirements
 

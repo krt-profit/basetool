@@ -22,7 +22,7 @@ const INVENTORY_INDEX_SECTIONS = {
     stock: { container: '#inventory-results', fragmentValue: 'results' },
 };
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     if (window.krtFetch) {
         window.krtFetch.bindSwap({ container: '#inventory-results', history: true });
     }

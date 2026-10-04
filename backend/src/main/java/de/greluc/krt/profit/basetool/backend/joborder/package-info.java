@@ -24,6 +24,7 @@
       "identity::api",
       "inventory::api",
       "kernel",
+      "livesync::api",
       "materialexchange::api",
       "notification::api",
       "orgunit::api",

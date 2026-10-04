@@ -638,6 +638,9 @@ and swallowed there, so the scheduler thread survives a bad run.
   marker.
 - [x] A domain whose purge throws is logged and the remaining domains — and the bank trail — are
   still purged.
+- [x] The bank trail joins the sweep as an `audit.api.RetentionParticipant` that the bank module
+  implements; every participant is purged after the activity domains, and a failing one is logged
+  without stopping the others.
 - [x] The cutoff is `now - max-age`; the job reports the deleted count as its `items` metric.
 - [x] The sweep is disabled under the `test` profile.
 - [x] A `max-age` under `P30D` (including `P0D` and negative values) or an `interval` under `PT1M`
@@ -645,8 +648,9 @@ and swallowed there, so the scheduler thread survives a bad run.
 
 **Enforced by:** `AuditRetentionServiceTest`, `AuditRetentionTaskTest`,
 `BackendPropertiesValidationTest` (the floors) · **Code:**
-`service/AuditRetentionService`, `task/AuditRetentionTask`, `support/AuditRetentionProperties`, `metrics/ScheduledJob#AUDIT_RETENTION`,
+`service/AuditRetentionService`, `audit/api/RetentionParticipant`, `task/AuditRetentionTask`, `support/AuditRetentionProperties`, `metrics/ScheduledJob#AUDIT_RETENTION`,
 `repository/AuditEventRepository#existsByDomainAndOccurredAtBefore`,
+`service/BankAuditService#holdsRowsBefore`,
 `repository/BankAuditEventRepository#existsByOccurredAtBefore`, `templates/admin/audit-log.html` ·
 **Decision:** [ADR-0179](../adr/0179-both-audit-trails-are-swept-on-a-retention-ceiling.md),
 amending [ADR-0038](../adr/0038-admin-retention-purge-of-audit-logs.md) ·

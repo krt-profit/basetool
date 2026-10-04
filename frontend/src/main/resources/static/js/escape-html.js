@@ -11,7 +11,7 @@
 
     function escapeHtml(value) {
         if (value === null || value === undefined) return '';
-        return String(value).replace(/[&<>"'/]/g, function (c) {
+        return String(value).replace(/[&<>"'/]/g, (c) => {
             return ENTITY[c];
         });
     }
