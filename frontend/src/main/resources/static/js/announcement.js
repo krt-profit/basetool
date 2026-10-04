@@ -25,6 +25,24 @@ document.addEventListener('DOMContentLoaded', function () {
     const closeDeleteBtns = document.querySelectorAll('.close-delete-modal');
     const updateForm = document.getElementById('announcement-update-form');
     const deleteForm = document.getElementById('announcement-delete-form');
+    const contentField = document.getElementById('info-edit-content');
+    const counter = document.getElementById('info-edit-counter');
+
+    /** Writes the textarea's current character count into the counter under it. */
+    function updateCounter() {
+        if (!contentField || !counter) {
+            return;
+        }
+        const template = counter.getAttribute('data-template') || '{0}';
+        const count = contentField.value.length.toLocaleString(
+            document.documentElement.lang || undefined,
+        );
+        counter.textContent = template.replace('{0}', count);
+    }
+
+    if (contentField) {
+        contentField.addEventListener('input', updateCounter);
+    }
 
     function closeDeleteModal() {
         if (deleteModal) window.krtModal.close(deleteModal);
@@ -97,6 +115,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         if (contentInput) contentInput.value = '';
                         if (versionInput) versionInput.value = '0';
                     }
+                    updateCounter();
                     closeDeleteModal();
                 },
             });

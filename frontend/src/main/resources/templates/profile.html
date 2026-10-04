@@ -2,7 +2,9 @@
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{profile.title} + ' - ' + ${appTitle}">User Profile - Profit Basetool</title>
-    <th:block th:fragment="extraLinks"></th:block>
+    <th:block th:fragment="extraLinks">
+<link rel="stylesheet" th:href="@{/css/pages/profile.css}">
+    </th:block>
 </head>
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
@@ -10,14 +12,14 @@
 <th:block th:replace="~{fragments/header :: header}" />
 <main>
     <div class="profile-page">
-        <h1 class="pf-title" th:text="#{profile.title}">Mein Profil</h1>
-        <p class="pf-sub" th:text="#{profile.subtitle}">Your master data and personal preferences.</p>
+        <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.personal', titleText=#{profile.title})}"></th:block>
 
         <div class="card card--accent">
             <div class="id-band">
                 <div class="id-tile" th:text="${initials}" aria-hidden="true">VA</div>
                 <div class="id-main">
-                    <p class="id-name" th:text="${#strings.isEmpty(displayName) ? username : displayName}">Valk</p>
+                    <p class="id-name" id="profile-id-name" th:data-fallback="${username}"
+                       th:text="${#strings.isEmpty(displayName) ? username : displayName}">Valk</p>
                     <p class="id-handle" th:text="'@' + ${username}">@valk</p>
                     <div class="id-chips">
                         <span th:if="${rank}" class="chip chip--primary" th:text="${rank}">Commander</span>
@@ -44,138 +46,168 @@
             </div>
         </div>
 
-        <div class="stack">
+        <div class="profile-layout">
+            <nav class="profile-nav" th:attr="aria-label=#{profile.nav.label}" data-testid="profile-section-nav">
+                <ul>
+                    <li><a href="#profile-section-identity" th:text="#{profile.section.identity}">Profil</a></li>
+                    <li><a href="#profile-section-rsi" th:text="#{profile.rsiHandle.label}">RSI-Handle</a></li>
+                    <li><a href="#profile-section-payout" th:text="#{profile.section.payout}">Auszahlung</a></li>
+                    <li><a href="#profile-section-blueprints" th:text="#{profile.section.blueprints}">Blaupausen</a></li>
+                    <li><a href="#profile-security-card" th:text="#{profile.security.title}">Zugang &amp; Sicherheit</a></li>
+                    <li><a href="#profile-export-card" th:text="#{profile.section.export}">Datenexport</a></li>
+                    <li><a href="#profile-deletion-card" th:text="#{profile.deletion.title}">Konto löschen</a></li>
+                </ul>
+            </nav>
 
-            <form id="profile-description-form" class="card" th:action="@{/profile/description}" method="post" th:object="${profileDescriptionForm}">
-                <input type="hidden" name="version" th:field="*{version}">
-                <div class="card-head">
-                    <h2 class="card-title" th:text="#{profile.custom_data}">Custom Data</h2>
-                </div>
-                <div class="form-group">
-                    <label for="displayName" class="form-label" th:text="#{profile.display_name}">Display Name</label>
-                    <input type="text" th:field="*{displayName}" class="w-full"
-                           th:classappend="${#fields.hasErrors('displayName')} ? 'input-error'" />
-                    <div th:if="${#fields.hasErrors('displayName')}" th:errors="*{displayName}" class="field-error"></div>
-                </div>
-                <div class="form-group mb-0">
-                    <label for="description" class="form-label" th:text="#{profile.description}">Description</label>
-                    <textarea th:field="*{description}" rows="5" class="w-full"
-                              th:classappend="${#fields.hasErrors('description')} ? 'input-error'"></textarea>
-                    <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
-                </div>
-                <div class="card-foot">
-                    <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{profile.save_custom_data}">Save</span></button>
-                </div>
-            </form>
+            <div class="profile-sections">
+                <div class="form-layout card profile-settings" id="profile-settings" data-testid="profile-settings">
 
-            <form id="profile-payout-form" class="card" th:action="@{/profile/payout-preference}" method="post" th:object="${profilePayoutPreferenceForm}">
-                <input type="hidden" name="version" th:field="*{version}">
-                <div class="card-head">
-                    <h2 class="card-title" th:text="#{profile.payout.preference}">Default Payout Preference</h2>
-                </div>
-                <div class="form-group mb-0">
-                    <label for="defaultPayoutPreference" class="form-label" th:text="#{profile.payout.preference}">Default Payout Preference</label>
-                    <select th:field="*{defaultPayoutPreference}" class="payout-select">
-                        <option th:value="PAYOUT" th:text="#{mission.payout.preference.payout}">Payout</option>
-                        <option th:value="DONATE" th:text="#{mission.payout.preference.donate}">Donate</option>
-                    </select>
-                    <p class="form-hint"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg> <span th:text="#{profile.payout.preference.hint}">Pre-selected at every mission sign-up. You can still change it per mission.</span></p>
-                </div>
-                <div class="card-foot">
-                    <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{profile.payout.save}">Save Payout Preference</span></button>
-                </div>
-            </form>
+                    <form id="profile-description-form" th:action="@{/profile/description}" method="post" th:object="${profileDescriptionForm}"
+                          th:data-section-name="#{profile.section.identity}">
+                        <input type="hidden" name="version" th:field="*{version}">
+                        <fieldset class="form-section" id="profile-section-identity">
+                            <legend class="form-section__head" th:text="'1 · ' + #{profile.section.identity}">1 · Profil</legend>
+                            <div class="form-group">
+                                <label for="displayName" class="form-label" th:text="#{profile.display_name}">Display Name</label>
+                                <input type="text" th:field="*{displayName}" maxlength="255"
+                                       th:classappend="${#fields.hasErrors('displayName')} ? 'input-error'" />
+                                <div th:if="${#fields.hasErrors('displayName')}" th:errors="*{displayName}" class="field-error"></div>
+                            </div>
+                            <div class="form-group">
+                                <label for="description" class="form-label" th:text="#{profile.description}">Description</label>
+                                <textarea th:field="*{description}" rows="5" maxlength="2000"
+                                          aria-describedby="profile-description-counter"
+                                          th:classappend="${#fields.hasErrors('description')} ? 'input-error'"></textarea>
+                                <p class="profile-counter" id="profile-description-counter" data-testid="profile-description-counter"
+                                   th:text="${(profileDescriptionForm.description() == null ? 0 : profileDescriptionForm.description().length()) + ' / 2000'}">0 / 2000</p>
+                                <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
+                            </div>
+                            <noscript>
+                                <button type="submit" class="btn btn-ghost btn-xs" th:text="#{profile.save_custom_data}">Save</button>
+                            </noscript>
+                        </fieldset>
+                    </form>
 
-            <form id="profile-blueprint-sharing-form" class="card" th:action="@{/profile/blueprint-sharing}" method="post" th:object="${profileBlueprintSharingForm}">
-                <input type="hidden" name="version" th:field="*{version}">
-                <div class="card-head">
-                    <h2 class="card-title" th:text="#{profile.blueprintSharing.label}">Blueprint Sharing</h2>
-                </div>
-                <div class="check-row">
-                    <input type="checkbox" th:field="*{shareBlueprintsGlobally}" />
-                    <div>
-                        <label for="shareBlueprintsGlobally" th:text="#{profile.blueprintSharing.toggle}">Make my blueprints available to everyone</label>
-                        <p class="form-hint" th:text="#{profile.blueprintSharing.hint}">When enabled, your owned blueprints are counted in the availability views for every org unit, not only your own.</p>
+                    <form id="profile-rsi-handle-form" th:action="@{/profile/rsi-handle}" method="post" th:object="${profileRsiHandleForm}"
+                          th:data-section-name="#{profile.rsiHandle.label}">
+                        <input type="hidden" name="version" th:field="*{version}">
+                        <fieldset class="form-section" id="profile-section-rsi">
+                            <legend class="form-section__head">
+                                <span th:text="'2 · ' + #{profile.rsiHandle.label}">2 · RSI-Handle</span>
+                                <span class="opt" th:text="'· ' + #{form.optional}">· optional</span>
+                            </legend>
+                            <div class="form-group">
+                                <label for="rsiHandle" class="form-label" th:text="#{profile.rsiHandle.field}">Dein RSI-Handle</label>
+                                <input type="text" th:field="*{rsiHandle}" maxlength="60"
+                                       pattern="[A-Za-z0-9_\-]{3,60}" autocomplete="off" spellcheck="false"
+                                       th:placeholder="#{profile.rsiHandle.placeholder}"
+                                       data-testid="profile-rsi-handle-input"
+                                       th:classappend="${#fields.hasErrors('rsiHandle')} ? 'input-error'" />
+                                <div th:if="${#fields.hasErrors('rsiHandle')}" th:errors="*{rsiHandle}" class="field-error"></div>
+                                <p class="form-hint"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg> <span th:text="#{profile.rsiHandle.hint}">Optional.</span></p>
+                            </div>
+                            <noscript>
+                                <button type="submit" class="btn btn-ghost btn-xs" th:text="#{profile.rsiHandle.save}">Save</button>
+                            </noscript>
+                        </fieldset>
+                    </form>
+
+                    <form id="profile-payout-form" th:action="@{/profile/payout-preference}" method="post" th:object="${profilePayoutPreferenceForm}"
+                          th:data-section-name="#{profile.section.payout}">
+                        <input type="hidden" name="version" th:field="*{version}">
+                        <fieldset class="form-section" id="profile-section-payout">
+                            <legend class="form-section__head" th:text="'3 · ' + #{profile.payout.preference}">3 · Standard-Auszahlungsart</legend>
+                            <div class="form-group">
+                                <th:block th:replace="~{fragments/components :: segmented(name='defaultPayoutPreference', labelKey='profile.payout.preference',
+                                    selected=*{defaultPayoutPreference}, variant='segmented--block segmented--lg',
+                                    options=${ {{value: 'PAYOUT', labelKey: 'mission.payout.preference.payout'},
+                                                {value: 'DONATE', labelKey: 'mission.payout.preference.donate'}} })}"></th:block>
+                                <p class="form-hint"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg> <span th:text="#{profile.payout.preference.hint}">Pre-selected at every mission sign-up. You can still change it per mission.</span></p>
+                            </div>
+                            <noscript>
+                                <button type="submit" class="btn btn-ghost btn-xs" th:text="#{profile.payout.save}">Save Payout Preference</button>
+                            </noscript>
+                        </fieldset>
+                    </form>
+
+                    <form id="profile-blueprint-sharing-form" th:action="@{/profile/blueprint-sharing}" method="post" th:object="${profileBlueprintSharingForm}"
+                          th:data-section-name="#{profile.section.blueprints}">
+                        <input type="hidden" name="version" th:field="*{version}">
+                        <fieldset class="form-section" id="profile-section-blueprints">
+                            <legend class="form-section__head" th:text="'4 · ' + #{profile.blueprintSharing.label}">4 · Blaupausen-Verfügbarkeit</legend>
+                            <div class="check-row">
+                                <input type="checkbox" id="shareBlueprintsGlobally" th:field="*{shareBlueprintsGlobally}" />
+                                <div>
+                                    <label for="shareBlueprintsGlobally" th:text="#{profile.blueprintSharing.toggle}">Make my blueprints available to everyone</label>
+                                    <p class="form-hint" th:text="#{profile.blueprintSharing.hint}">When enabled, your owned blueprints are counted in the availability views for every org unit, not only your own.</p>
+                                </div>
+                            </div>
+                            <noscript>
+                                <button type="submit" class="btn btn-ghost btn-xs" th:text="#{profile.blueprintSharing.save}">Save</button>
+                            </noscript>
+                        </fieldset>
+                    </form>
+
+                    <div class="form-actions--sticky profile-save-bar" id="profile-save-bar" data-testid="profile-save-bar" hidden>
+                        <span class="form-actions__summary" id="profile-save-summary" data-testid="profile-save-summary"
+                              th:data-prefix="#{profile.save.bar.summary}"></span>
+                        <button type="button" class="btn btn-ghost" id="profile-discard" data-testid="profile-discard"
+                                th:text="#{profile.save.bar.discard}">Verwerfen</button>
+                        <button type="button" class="btn btn--cta" id="profile-save" data-testid="profile-save"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{profile.save.bar.submit}">Änderungen speichern</span></button>
                     </div>
                 </div>
-                <div class="card-foot">
-                    <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{profile.blueprintSharing.save}">Save</span></button>
-                </div>
-            </form>
 
-            <form id="profile-rsi-handle-form" class="card" th:action="@{/profile/rsi-handle}" method="post" th:object="${profileRsiHandleForm}">
-                <input type="hidden" name="version" th:field="*{version}">
-                <div class="card-head">
-                    <h2 class="card-title" th:text="#{profile.rsiHandle.label}">RSI-Handle</h2>
+                <div class="card card--inset" id="profile-security-card">
+                    <div class="card-head">
+                        <h2 class="card-title" th:text="#{profile.security.title}">Access &amp; Security</h2>
+                    </div>
+                    <p class="acct-note">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg>
+                        <span th:text="#{profile.security.hint}">Password, email address and two-factor authentication are managed centrally in Keycloak.</span>
+                    </p>
+                    <div class="acct-actions">
+                        <a th:href="${keycloakAccountUrl}" class="btn btn-outline" target="_blank" rel="noopener"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-external-link"/></svg> <span th:text="#{profile.edit_link}">Edit in Keycloak</span></a>
+                    </div>
                 </div>
-                <div class="form-group mb-0">
-                    <label for="rsiHandle" class="form-label" th:text="#{profile.rsiHandle.field}">Dein RSI-Handle</label>
-                    <input type="text" th:field="*{rsiHandle}" class="w-full" maxlength="60"
-                           pattern="[A-Za-z0-9_\-]{3,60}" autocomplete="off" spellcheck="false"
-                           th:placeholder="#{profile.rsiHandle.placeholder}"
-                           data-testid="profile-rsi-handle-input"
-                           th:classappend="${#fields.hasErrors('rsiHandle')} ? 'input-error'" />
-                    <div th:if="${#fields.hasErrors('rsiHandle')}" th:errors="*{rsiHandle}" class="field-error"></div>
-                    <p class="form-hint"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg> <span th:text="#{profile.rsiHandle.hint}">Optional.</span></p>
-                </div>
-                <div class="card-foot">
-                    <button type="submit" class="btn btn--cta" data-testid="profile-rsi-handle-save"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{profile.rsiHandle.save}">Save</span></button>
-                </div>
-            </form>
 
-            <div class="card card--inset">
-                <div class="card-head">
-                    <h2 class="card-title" th:text="#{profile.security.title}">Access &amp; Security</h2>
+                <div class="card card--inset" id="profile-export-card">
+                    <div class="card-head">
+                        <h2 class="card-title" th:text="#{profile.export.title}">Meine Daten exportieren</h2>
+                    </div>
+                    <p class="acct-note">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg>
+                        <span th:text="#{profile.export.hint}">Du kannst jederzeit eine Kopie deiner Daten herunterladen.</span>
+                    </p>
+                    <p class="form-hint" th:text="#{profile.export.formats}">Das PDF ist die lesbare Zusammenfassung, die JSON-Datei die vollst&auml;ndige Auskunft.</p>
+                    <div class="acct-actions">
+                        <a th:href="@{/api/proxy/me/export/pdf}" class="btn btn-outline"
+                           data-testid="profile-export-pdf">
+                            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-pdf"/></svg>
+                            <span th:text="#{profile.export.pdf}">Als PDF</span>
+                        </a>
+                        <a th:href="@{/api/proxy/me/export/json}" class="btn btn-ghost"
+                           data-testid="profile-export-json">
+                            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-download"/></svg>
+                            <span th:text="#{profile.export.json}">Als JSON</span>
+                        </a>
+                    </div>
                 </div>
-                <p class="acct-note">
-                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg>
-                    <span th:text="#{profile.security.hint}">Password, email address and two-factor authentication are managed centrally in Keycloak.</span>
-                </p>
-                <div class="acct-actions">
-                    <a th:href="${keycloakAccountUrl}" class="btn btn-outline" target="_blank" rel="noopener"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-external-link"/></svg> <span th:text="#{profile.edit_link}">Edit in Keycloak</span></a>
-                    <a th:href="@{/}" class="btn btn-ghost"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"/></svg> <span th:text="#{profile.back}">Back</span></a>
+
+                <div id="profile-deletion-host">
+                    <div th:replace="~{fragments/profile-deletion-card :: card}"></div>
                 </div>
             </div>
-
-            <div class="card card--inset" id="profile-export-card">
-                <div class="card-head">
-                    <h2 class="card-title" th:text="#{profile.export.title}">Meine Daten exportieren</h2>
-                </div>
-                <p class="acct-note">
-                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg>
-                    <span th:text="#{profile.export.hint}">Du kannst jederzeit eine Kopie deiner Daten herunterladen.</span>
-                </p>
-                <p class="form-hint" th:text="#{profile.export.formats}">Das PDF ist die lesbare Zusammenfassung, die JSON-Datei die vollst&auml;ndige Auskunft.</p>
-                <div class="acct-actions">
-                    <a th:href="@{/api/proxy/me/export/pdf}" class="btn btn-outline"
-                       data-testid="profile-export-pdf">
-                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-pdf"/></svg>
-                        <span th:text="#{profile.export.pdf}">Als PDF</span>
-                    </a>
-                    <a th:href="@{/api/proxy/me/export/json}" class="btn btn-ghost"
-                       data-testid="profile-export-json">
-                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-download"/></svg>
-                        <span th:text="#{profile.export.json}">Als JSON</span>
-                    </a>
-                </div>
-            </div>
-
-            <div id="profile-deletion-host">
-                <div th:replace="~{fragments/profile-deletion-card :: card}"></div>
-            </div>
-
         </div>
     </div>
 
     <div th:replace="~{fragments/modal-wrapper :: modal(modalId='profile-deletion-modal', titleKey='profile.deletion.modal.title', variant=null, body=~{::.profile-deletion-form})}">
         <div class="profile-deletion-form">
             <div class="krt-modal-body">
-                <div class="hud-box krtm-border-color-var-color-warning-display-flex-1b12" role="alert">
-                    <svg class="krt-icon krtm-flex-0-0-auto-margin-top-0-1rem-f087" aria-hidden="true">
-                        <use href="#krt-icon-warning"/></svg>
-                    <p class="krtm-margin-0-2a0c" th:text="#{profile.deletion.modal.warning}">Your warehouse stock, hangar, personal inventory and blueprints are deleted; missions and refinery orders you created are reassigned to an administrator.</p>
+                <div class="alert alert-warning profile-deletion-warning" role="alert">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg>
+                    <p th:text="#{profile.deletion.modal.warning}">Your warehouse stock, hangar, personal inventory and blueprints are deleted; missions and refinery orders you created are reassigned to an administrator.</p>
                 </div>
-                <p class="bank-field-hint" th:text="#{profile.deletion.modal.hint}">An administrator decides the request. Nothing is deleted when you submit it.</p>
+                <p class="form-hint" th:text="#{profile.deletion.modal.hint}">An administrator decides the request. Nothing is deleted when you submit it.</p>
                 <div class="check-row">
                     <input type="checkbox" id="profile-deletion-erase-history"
                            data-testid="profile-deletion-erase-history">
@@ -184,13 +216,13 @@
                         <p class="form-hint" th:text="#{profile.deletion.modal.eraseHistory.hint}">An administrator weighs this separately against the interest in an auditable ledger and decides it.</p>
                     </div>
                 </div>
-                <span class="bank-field-error" data-error-for="_global"></span>
+                <span class="field-error" data-error-for="_global"></span>
             </div>
             <div class="krt-modal-foot">
                 <button type="button" class="btn btn-ghost"
                         data-trigger="close-modal-display" data-modal-id="profile-deletion-modal"
                         th:text="#{general.cancel}">Cancel</button>
-                <button type="button" class="btn btn--danger" id="profile-deletion-submit"
+                <button type="button" class="btn btn-danger" id="profile-deletion-submit"
                         data-testid="profile-deletion-submit"
                         th:text="#{profile.deletion.modal.submit}">Submit request</button>
             </div>

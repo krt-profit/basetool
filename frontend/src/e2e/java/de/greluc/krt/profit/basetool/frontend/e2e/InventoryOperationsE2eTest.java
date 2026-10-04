@@ -850,10 +850,8 @@ class InventoryOperationsE2eTest {
 
           page.locator("#personal").check();
 
-          assertThat(page.locator("#missionAllocGroup"))
-              .hasClass(Pattern.compile(".*krtm-hidden.*"));
-          assertThat(page.locator("#jobOrderAllocGroup"))
-              .hasClass(Pattern.compile(".*krtm-hidden.*"));
+          assertThat(page.locator("#missionAllocGroup")).isHidden();
+          assertThat(page.locator("#jobOrderAllocGroup")).isHidden();
           assertThat(page.locator("#missionAllocRows [data-alloc-row]")).hasCount(0);
         });
   }

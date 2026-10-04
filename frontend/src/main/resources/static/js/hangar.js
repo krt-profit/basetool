@@ -66,6 +66,71 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    const insuranceValue = document.getElementById('ship-insurance');
+    const insuranceMonths = document.getElementById('ship-insurance-months');
+    const insuranceMonthsRow = document.getElementById('ship-insurance-months-row');
+    const insuranceKinds = Array.from(form.querySelectorAll('input[name="insuranceKind"]'));
+    if (insuranceKinds.length) {
+        insuranceKinds[0].required = true;
+    }
+
+    /**
+     * Writes the stored insurance value (0, LTI or a month count) derived from the segmented
+     * control and the month field into the hidden form field, and shows the month field only
+     * for "Monate".
+     *
+     * @returns {string} the stored value, or an empty string while it is incomplete
+     */
+    function syncInsurance() {
+        const checked = insuranceKinds.find((radio) => radio.checked);
+        const kind = checked ? checked.value : '';
+        const months = parseInt(insuranceMonths ? insuranceMonths.value : '', 10);
+        let value = '';
+        if (kind === 'NONE') {
+            value = '0';
+        } else if (kind === 'LTI') {
+            value = 'LTI';
+        } else if (kind === 'MONTHS' && !Number.isNaN(months)) {
+            value = String(months);
+        }
+        if (insuranceMonthsRow) insuranceMonthsRow.hidden = kind !== 'MONTHS';
+        if (insuranceMonths) insuranceMonths.required = kind === 'MONTHS';
+        if (insuranceValue) insuranceValue.value = value;
+        return value;
+    }
+
+    /**
+     * Preselects the segmented control and the month field from a stored insurance value.
+     *
+     * @param {string | null} stored the stored value: 0, LTI, a month count, or empty for none
+     */
+    function setInsurance(stored) {
+        const value = stored == null ? '' : String(stored).trim();
+        let kind = 'MONTHS';
+        if (value === '') {
+            kind = '';
+        } else if (value === '0') {
+            kind = 'NONE';
+        } else if (value.toUpperCase() === 'LTI') {
+            kind = 'LTI';
+        }
+        insuranceKinds.forEach((radio) => {
+            radio.checked = radio.value === kind;
+        });
+        if (insuranceMonths) insuranceMonths.value = kind === 'MONTHS' ? value : '';
+        syncInsurance();
+    }
+
+    insuranceKinds.forEach((radio) => {
+        radio.addEventListener('change', () => {
+            syncInsurance();
+            if (radio.checked && radio.value === 'MONTHS' && insuranceMonths) {
+                insuranceMonths.focus();
+            }
+        });
+    });
+    if (insuranceMonths) insuranceMonths.addEventListener('input', syncInsurance);
+
     function openModal() {
         window.krtModal.open(modal);
     }
@@ -95,7 +160,7 @@ document.addEventListener('DOMContentLoaded', function () {
         form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
         document.getElementById('ship-name').value = '';
         document.getElementById('ship-type').value = '';
-        document.getElementById('ship-insurance').value = '';
+        setInsurance('');
         document.getElementById('ship-location').value = '';
         document.getElementById('ship-fitted').checked = false;
         document.getElementById('ship-version').value = '';
@@ -108,7 +173,7 @@ document.addEventListener('DOMContentLoaded', function () {
         form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
         document.getElementById('ship-name').value = btn.getAttribute('data-name');
         document.getElementById('ship-type').value = btn.getAttribute('data-type');
-        document.getElementById('ship-insurance').value = btn.getAttribute('data-ins');
+        setInsurance(btn.getAttribute('data-ins'));
         document.getElementById('ship-location').value = btn.getAttribute('data-loc') || '';
         document.getElementById('ship-fitted').checked = btn.getAttribute('data-fitted') === 'true';
         document.getElementById('ship-version').value = btn.getAttribute('data-version');
@@ -422,7 +487,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const payload = {
             name: document.getElementById('ship-name').value || null,
             shipTypeId: document.getElementById('ship-type').value || null,
-            insurance: document.getElementById('ship-insurance').value || null,
+            insurance: syncInsurance() || null,
             locationId: document.getElementById('ship-location').value || null,
             fitted: document.getElementById('ship-fitted').checked,
             version: isUpdate && versionRaw ? Number(versionRaw) : null,

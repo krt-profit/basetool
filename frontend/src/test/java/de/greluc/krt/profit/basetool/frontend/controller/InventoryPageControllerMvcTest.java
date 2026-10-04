@@ -480,13 +480,13 @@ class InventoryPageControllerMvcTest {
             content()
                 .string(
                     stringContainsInOrder(
+                        "class=\"form-group check-row\" id=\"merge-stock-row\" hidden",
+                        "id=\"mergeStock\"",
+                        "for=\"mergeStock\"",
+                        "class=\"form-hint\"",
                         "class=\"form-group check-row\"",
                         "id=\"personal\"",
                         "for=\"personal\"",
-                        "class=\"form-hint\"",
-                        "class=\"form-group check-row krtm-hidden\" id=\"merge-stock-row\"",
-                        "id=\"mergeStock\"",
-                        "for=\"mergeStock\"",
                         "class=\"form-hint\"")));
   }
 
@@ -530,8 +530,11 @@ class InventoryPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("inventory-input"))
         .andExpect(content().string(containsString("name=\"inventoryCatalogMode\"")))
-        .andExpect(content().string(containsString("data-testid=\"inventory-mode-material\"")))
-        .andExpect(content().string(containsString("data-testid=\"inventory-mode-item\"")))
+        .andExpect(
+            content()
+                .string(containsString("data-testid=\"segment-inventoryCatalogMode-material\"")))
+        .andExpect(
+            content().string(containsString("data-testid=\"segment-inventoryCatalogMode-item\"")))
         .andExpect(content().string(containsString("data-krt-combobox=\"remote-game-items\"")))
         .andExpect(
             content()
@@ -558,11 +561,11 @@ class InventoryPageControllerMvcTest {
             content()
                 .string(
                     stringContainsInOrder(
+                        "class=\"form-group check-row\" id=\"merge-stock-row\" hidden",
+                        "id=\"mergeStock\"",
+                        "class=\"form-hint\"",
                         "class=\"form-group check-row\"",
                         "id=\"personal\"",
-                        "class=\"form-hint\"",
-                        "class=\"form-group check-row krtm-hidden\" id=\"merge-stock-row\"",
-                        "id=\"mergeStock\"",
                         "class=\"form-hint\"")));
   }
 
@@ -576,10 +579,8 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/input"))
         .andExpect(status().isOk())
-        .andExpect(
-            PageStylesheets.content(
-                containsString(
-                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")))
+        .andExpect(PageStylesheets.content(containsString(".form-layout [hidden]")))
+        .andExpect(PageStylesheets.content(not(containsString(".form-group input {"))))
         .andExpect(
             PageStylesheets.content(not(containsString(".form-group.check-row.krtm-hidden"))));
   }

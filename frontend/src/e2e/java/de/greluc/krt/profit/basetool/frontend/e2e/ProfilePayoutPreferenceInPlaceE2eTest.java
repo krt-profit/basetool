@@ -29,8 +29,8 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.assertions.LocatorAssertions;
-import com.microsoft.playwright.options.SelectOption;
 import java.nio.file.Path;
+import java.util.Locale;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -105,15 +105,16 @@ class ProfilePayoutPreferenceInPlaceE2eTest {
             "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
                 + " 'none'; } }");
 
-        Locator select =
-            page.locator("#profile-payout-form select[name='defaultPayoutPreference']");
-        Locator submit = page.locator("#profile-payout-form button[type='submit']");
+        Locator checked =
+            page.locator("#profile-payout-form input[name='defaultPayoutPreference']:checked");
+        Locator submit = page.getByTestId("profile-save");
 
-        String initial = select.inputValue();
+        String initial = checked.count() == 0 ? "" : checked.inputValue();
         String firstTarget = "PAYOUT".equals(initial) ? "DONATE" : "PAYOUT";
-        String secondTarget = initial.isBlank() ? "PAYOUT" : initial;
+        String secondTarget = initial.isBlank() ? "DONATE" : initial;
 
-        select.selectOption(new SelectOption().setValue(firstTarget));
+        page.getByTestId("segment-defaultPayoutPreference-" + firstTarget.toLowerCase(Locale.ROOT))
+            .click();
         saveInPlace(page, submit);
         assertEquals(
             Boolean.TRUE,
@@ -122,7 +123,8 @@ class ProfilePayoutPreferenceInPlaceE2eTest {
         assertEquals(
             firstTarget, persistedPayoutPreference(), "the first in-place save must persist");
 
-        select.selectOption(new SelectOption().setValue(secondTarget));
+        page.getByTestId("segment-defaultPayoutPreference-" + secondTarget.toLowerCase(Locale.ROOT))
+            .click();
         saveInPlace(page, submit);
         assertEquals(
             Boolean.TRUE,
@@ -140,11 +142,11 @@ class ProfilePayoutPreferenceInPlaceE2eTest {
   }
 
   /**
-   * Submits the payout form in place and asserts a success toast, no error toast and no {@code
-   * OPTIMISTIC_LOCK} reload-confirm dialog ({@code .krt-confirm-overlay}).
+   * Saves the payout section through the save bar and asserts a success toast, no error toast and
+   * no {@code OPTIMISTIC_LOCK} reload-confirm dialog ({@code .krt-confirm-overlay}).
    *
    * @param page the authenticated profile page
-   * @param submit the payout form's submit button
+   * @param submit the save bar's save button
    */
   private static void saveInPlace(Page page, Locator submit) {
     page.evaluate(

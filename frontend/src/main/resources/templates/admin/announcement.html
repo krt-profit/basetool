@@ -11,25 +11,39 @@
 
 <th:block th:replace="~{fragments/header :: header}" />
 
-<main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{info.edit.title}">Informationen verwalten</h1>
-    </div>
+<main th:with="announcementContent=${adminAnnouncement != null and adminAnnouncement.content != null ? adminAnnouncement.content : ''}">
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.members', titleText=#{info.edit.title}, actions=~{::announcement-actions})}">
+        <th:block th:ref="announcement-actions">
+            <th:block th:replace="~{fragments/components :: overflowMenu(id='announcement-menu', items=~{::announcement-menu-items})}">
+                <th:block th:ref="announcement-menu-items">
+                    <button type="button" id="trigger-delete-confirm" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
+                            data-testid="announcement-delete-open"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{info.delete}">Löschen</span></button>
+                </th:block>
+            </th:block>
+        </th:block>
+    </th:block>
 
-    <div class="hud-box mt-2">
-        <form id="announcement-update-form" th:action="@{/admin/announcement/update}" method="post">
-             <input type="hidden" name="version" th:value="${adminAnnouncement != null ? adminAnnouncement.version : 0}">
-             <div class="form-group">
-                 <textarea name="content" id="info-edit-content" rows="10" 
-                           th:text="${adminAnnouncement != null ? adminAnnouncement.content : ''}"></textarea>
-             </div>
-             
-             <div class="flex-between">
-                 <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
-                 <button type="button" id="trigger-delete-confirm" class="btn btn-outline-danger"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{info.delete}">Löschen</span></button>
-             </div>
-        </form>
-    </div>
+    <form id="announcement-update-form" class="form-layout card" th:action="@{/admin/announcement/update}" method="post">
+        <input type="hidden" name="version" th:value="${adminAnnouncement != null ? adminAnnouncement.version : 0}">
+        <fieldset class="form-section">
+            <legend class="form-section__head" th:text="|1 · #{info.edit.section.text}|">1 · Text</legend>
+            <div class="form-group">
+                <label for="info-edit-content" class="form-label" th:text="#{info.edit.content}">Inhalt</label>
+                <textarea name="content" id="info-edit-content" class="announcement-text" rows="12" aria-describedby="info-edit-hint info-edit-counter"
+                          th:text="${announcementContent}"></textarea>
+                <div class="announcement-meta">
+                    <span id="info-edit-hint" class="form-hint" th:text="#{mission.description.markdown_hint}">Markdown wird unterstützt (z. B. **fett**, Listen, Links).</span>
+                    <span id="info-edit-counter" class="form-hint announcement-counter" data-testid="announcement-counter"
+                          th:data-template="#{info.edit.counter}"
+                          th:text="#{info.edit.counter(${#strings.length(announcementContent)})}">0 Zeichen</span>
+                </div>
+            </div>
+        </fieldset>
+
+        <div class="form-actions--sticky">
+            <button type="submit" class="btn btn--cta" data-testid="announcement-save"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{info.edit.save}">Information speichern</span></button>
+        </div>
+    </form>
 
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='delete-confirm-modal', titleKey='info.delete.confirm.title', variant='krt-modal--danger', closeTrigger='', closeClass='close-delete-modal', body=~{::delete-confirm-modal-body})}">
         <th:block th:ref="delete-confirm-modal-body">

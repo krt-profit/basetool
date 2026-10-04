@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.addEventListener('change', function (event) {
         if (event.target.matches('[data-alloc-target]')) {
             updateAllocOver();
-        } else if (event.target.matches('[data-trigger="inv-input-mode-toggle"]')) {
+        } else if (event.target.matches('input[name="inventoryCatalogMode"]')) {
             applyCatalogMode();
         }
     });
@@ -227,7 +227,7 @@ function setMergeOptInVisible(visible) {
     const mergeRow = document.getElementById('merge-stock-row');
     const mergeCheckbox = document.getElementById('mergeStock');
     if (!mergeRow) return;
-    mergeRow.classList.toggle('krtm-hidden', !visible);
+    mergeRow.hidden = !visible;
     if (!visible && mergeCheckbox) mergeCheckbox.checked = false;
 }
 
@@ -440,7 +440,7 @@ function markBlankAllocationAmounts() {
         }
     });
     const hint = document.getElementById('inputAllocAmountMissing');
-    if (hint) hint.classList.toggle('krtm-hidden', blank.length === 0);
+    if (hint) hint.hidden = blank.length === 0;
     return blank;
 }
 
@@ -474,7 +474,7 @@ function allocTargetedRows(dimension) {
 function updateAllocSingleHint(dimension) {
     const hint = document.getElementById(allocConfig(dimension).singleHint);
     if (!hint) return;
-    hint.classList.toggle('krtm-hidden', allocTargetedRows(dimension).length > 1);
+    hint.hidden = allocTargetedRows(dimension).length > 1;
 }
 
 function reindexAllocRows(dimension) {
@@ -666,7 +666,7 @@ function updateAllocOver() {
     const total = isNaN(amount) ? 0 : amount;
     const over =
         allocDimensionSum('jobOrder') > total + 1e-6 || allocDimensionSum('mission') > total + 1e-6;
-    overEl.classList.toggle('krtm-hidden', !over);
+    overEl.hidden = !over;
 }
 
 function syncPersonalAllocations() {
@@ -677,7 +677,7 @@ function syncPersonalAllocations() {
         const cfg = allocConfig(dimension);
         const hide = on || (dimension === 'mission' && itemMode);
         const group = document.getElementById(cfg.group);
-        if (group) group.classList.toggle('krtm-hidden', hide);
+        if (group) group.hidden = hide;
         if (hide) {
             const container = document.getElementById(cfg.rows);
             if (container) container.innerHTML = '';

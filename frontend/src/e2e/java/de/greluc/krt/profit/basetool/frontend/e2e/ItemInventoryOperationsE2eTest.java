@@ -160,7 +160,7 @@ class ItemInventoryOperationsE2eTest {
           E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/input?source=my");
           page.waitForLoadState();
 
-          page.getByTestId("inventory-mode-item").check();
+          page.getByTestId("segment-inventoryCatalogMode-item").click();
           E2eSupport.selectComboboxByValue(
               page.locator(".krt-combobox:has(#gameItemId) .krt-combobox__input"),
               einbuchenGameItemId);
@@ -273,9 +273,8 @@ class ItemInventoryOperationsE2eTest {
           E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/input?source=my");
           page.waitForLoadState();
 
-          page.getByTestId("inventory-mode-item").check();
-          assertThat(page.locator("#missionAllocGroup"))
-              .hasClass(Pattern.compile(".*krtm-hidden.*"));
+          page.getByTestId("segment-inventoryCatalogMode-item").click();
+          assertThat(page.locator("#missionAllocGroup")).isHidden();
 
           E2eSupport.selectComboboxByValue(
               page.locator(".krt-combobox:has(#gameItemId) .krt-combobox__input"), gateGameItemId);
@@ -302,7 +301,7 @@ class ItemInventoryOperationsE2eTest {
           E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/input?source=my");
           page.waitForLoadState();
 
-          page.getByTestId("inventory-mode-item").check();
+          page.getByTestId("segment-inventoryCatalogMode-item").click();
           E2eSupport.selectComboboxByValue(
               page.locator(".krt-combobox:has(#gameItemId) .krt-combobox__input"), needGameItemId);
           page.locator("[data-trigger='inv-input-add-order']").click();
