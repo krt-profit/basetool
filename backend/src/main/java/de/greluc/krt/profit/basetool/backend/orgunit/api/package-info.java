@@ -22,4 +22,7 @@
  * de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipChangeObserver} SPI (plan §5.2,
  * §5.3).
  */
+@NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
+
+import org.springframework.modulith.NamedInterface;

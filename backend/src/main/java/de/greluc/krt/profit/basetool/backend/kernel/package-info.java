@@ -18,4 +18,7 @@
  */
 
 /** The kernel: domain-free primitives every module may use (plan §5.1 rank 0). */
+@ApplicationModule(allowedDependencies = {})
 package de.greluc.krt.profit.basetool.backend.kernel;
+
+import org.springframework.modulith.ApplicationModule;

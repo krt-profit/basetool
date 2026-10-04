@@ -214,9 +214,10 @@ Two binding rules shape every UI change:
   `AccessibleTextTintTest` fails the build on a stylesheet or script that sets one of the canonical
   hues as a text colour (REQ-UI-006).
 - **The cascade layer decides, not the load order** (FE-MOD-02, 2026-09-23). Every stylesheet
-  declares `@layer base, components, page, migration, utilities;` and keeps its rules inside its
-  layer: page CSS beats the design system without specificity bumps, a migrated inline class beats
-  both, and the two state classes win outright (REQ-UI-024, ADR-0212, `CascadeLayerOrderTest`).
+  declares `@layer base, components, page, utilities;` and keeps its rules inside its layer: page
+  CSS beats the design system without specificity bumps, and the two state classes (`is-hidden`, the
+  dialog's `is-open`) win outright (REQ-UI-024, ADR-0212, `CascadeLayerOrderTest`). The `migration`
+  layer went with `inline-migration.css` on 2026-10-04 (REQ-UI-027 phase 4, `NoMigrationClassTest`).
 - **One navigation chrome, rendered once** (2026-10-03). Every app page includes
   `fragments/header.html` and `fragments/sidebar.html`; the drawer is also the phone menu sheet, and
   the `Ctrl`/`⌘` + `K` quick access indexes the links the server rendered into it, so `sec:authorize`
@@ -368,9 +369,12 @@ Backend module coupling is measured in tests too. An ArchUnit `modules()` rule o
 lets a module depend only on lower-ranked modules and its same-rank `allow` rows; today's violations
 are frozen in `backend/src/test/resources/architecture/module-baseline/` and may only shrink — a new
 edge fails, a fixed one must be removed from the committed file. Spring Modulith runs beside it in
-test scope only, with explicitly annotated module detection. **Only coupling is ever frozen;** a
+test scope only, with explicitly annotated module detection: every module package declares itself
+in its `package-info` (only the annotations are on the main compile classpath, `compileOnly`), its
+`api` package tree is its one named interface, and its allowed dependencies are derived from the
+domain map's ranks, so the two tools state one layering. **Only coupling is ever frozen;** a
 security or structural rule stays a hard rule
-([`module-boundaries.md`](../specs/module-boundaries.md), REQ-MOD-003…005).
+([`module-boundaries.md`](../specs/module-boundaries.md), REQ-MOD-003…006).
 
 **A quality gate never falls back to a default, and a guard never narrows in silence.** Each module
 declares its test heap, coverage floors and PIT targets in its own `build-settings.properties`, and

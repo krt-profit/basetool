@@ -167,7 +167,7 @@ function applyItemAmountMode() {
     const scuHint = document.getElementById('amount-scu-hint');
     if (amountInput) amountInput.setAttribute('step', '1');
     if (unitSpan) unitSpan.textContent = '(' + MSG_UNIT_PIECE + ')';
-    if (scuHint) scuHint.classList.add('krtm-hidden');
+    if (scuHint) scuHint.classList.add('is-hidden');
     updateMergeOptIn('PIECE');
 }
 
@@ -200,15 +200,15 @@ function updateAmountFieldForMaterial(selectElement) {
     if (qtType === 'PIECE') {
         amountInput.setAttribute('step', '1');
         unitSpan.textContent = '(' + MSG_UNIT_PIECE + ')';
-        if (scuHint) scuHint.classList.add('krtm-hidden');
+        if (scuHint) scuHint.classList.add('is-hidden');
     } else if (qtType === 'SCU') {
         amountInput.setAttribute('step', '0.001');
         unitSpan.textContent = '(' + MSG_UNIT_SCU + ')';
-        if (scuHint) scuHint.classList.remove('krtm-hidden');
+        if (scuHint) scuHint.classList.remove('is-hidden');
     } else {
         amountInput.setAttribute('step', '0.001');
         unitSpan.textContent = '';
-        if (scuHint) scuHint.classList.add('krtm-hidden');
+        if (scuHint) scuHint.classList.add('is-hidden');
     }
 
     updateMergeOptIn(qtType);
@@ -304,7 +304,7 @@ function captureOwnOwnerOptions() {
             return node.cloneNode(true);
         }),
         value: parts.select.value,
-        visible: !parts.wrapper.classList.contains('krtm-hidden'),
+        visible: !parts.wrapper.classList.contains('is-hidden'),
         required: parts.select.required,
     };
 }
@@ -320,7 +320,7 @@ function restoreOwnOwnerOptions() {
     );
     parts.select.value = ownOwnerOptions.value;
     parts.select.required = ownOwnerOptions.required;
-    parts.wrapper.classList.toggle('krtm-hidden', !ownOwnerOptions.visible);
+    parts.wrapper.classList.toggle('is-hidden', !ownOwnerOptions.visible);
 }
 
 function ownerOption(membership, selectedId) {
@@ -386,7 +386,7 @@ function renderOwnerOptions(memberships) {
     select.value = preset;
     const visible = list.length > 1;
     select.required = visible && !preset;
-    parts.wrapper.classList.toggle('krtm-hidden', !visible);
+    parts.wrapper.classList.toggle('is-hidden', !visible);
 }
 
 function reloadOwnerPickerForUser() {

@@ -4,7 +4,9 @@
 > merged as one chain of pull requests, #2350 … #2353): the decision records (ADR-0231 … ADR-0239
 > and the amendments of §14) and every guard of §6.1 that Phase 0 owns; the app's re-read of the
 > version policy shipped with app v0.5.0 (basetool-android#209, published 2026-10-03). Phase 1:
-> the error model (P1-12) is done (2026-10-04) — the first classes moved into module packages.
+> the error model (P1-12) is done (2026-10-04) — the first classes moved into module packages;
+> the module declarations (P1-13) are in place for every module package on `main` (2026-10-04)
+> and grow with each move.
 > Last reviewed: 2026-10-04.
 > **Owner area:** BE · FE · API · SEC · **Related ADRs:** ADR-0020, ADR-0028, ADR-0032, ADR-0047,
 > ADR-0060, ADR-0065, ADR-0069, ADR-0130, ADR-0135, ADR-0136, ADR-0205, ADR-0206, ADR-0212,
@@ -398,7 +400,7 @@ map now assigns to the kernel as part of the exception contract (138 → 136 edg
 
 | Layer | Tool | What it checks |
 | --- | --- | --- |
-| Module boundaries | Spring Modulith 2.1.1 `ApplicationModules.verify()` in test scope, `explicitly-annotated` detection, `@ApplicationModule(allowedDependencies = …)` per `package-info`, `@NamedInterface` for `api` | No cycles between modules, no access to another module's internals, only allowed dependencies |
+| Module boundaries | Spring Modulith 2.1.1 `ApplicationModules.verify()` in test scope, `explicitly-annotated` detection, `@ApplicationModule(allowedDependencies = …)` per `package-info` (the `<module>::api` of every declared module the domain map's ranks and `allow` rows permit), `@NamedInterface("api")` on the `api` package and on each package below it; only the annotations (`spring-modulith-api`) are on the main compile classpath, `compileOnly` | No cycles between modules, no access to another module's internals, only allowed dependencies |
 | Frozen baseline | ArchUnit `modules()` rule over the domain map, wrapped in `FreezingArchRule` | Today's 150 violating edges are recorded and may only shrink; security rules are never frozen |
 | Security and structure | The existing ArchUnit rules, re-keyed (§6) | Gates on every endpoint, no `SecurityContextHolder` outside the seam, no entities on the wire, the bank seam, the exchange's reduced authority, audit writes |
 | What neither sees | Targeted tests (§6, G-01…G-24) | SpEL bean references, spliced JPQL scope fragments, JPQL strings, Thymeleaf `T(…)`, native-SQL GDPR registries, database triggers, path-keyed security lists |
@@ -650,7 +652,9 @@ Cheap moves that break many cycles without changing behaviour:
   instead of the entity — **done 2026-10-04** (P1-7): no caller used the row; the two
   `UexRefinerySyncService` calls that handed it through `SyncChunkWriter.inNewTransaction(Supplier)`
   now use `runInNewTransaction(Runnable)`.
-  The re-homings P1-1 … P1-6 are **done 2026-10-04**; the module baseline shrank by 9 edges, from
+  The re-homings P1-1 … P1-6 are **done 2026-10-04**, and `kernel` (base package, allowed by bare
+  name) and `orgunit` (`orgunit.api` its named interface, `orgunit.web` internal) are declared
+  Spring Modulith modules under REQ-MOD-006; the module baseline shrank by 9 edges, from
   136 to 127 (37 module pairs):
   - P1-1: `BereichLeadershipRole` moved to `orgunit.api`, `GrandAdmiralRequest` and
     `AddBereichLeaderRequest` to `orgunit.web` (the latter had to move with the enum, or
@@ -698,9 +702,8 @@ Cheap moves that break many cycles without changing behaviour:
   outside the audit module inject `AuditRecorder`; the listener and controller audit rules key on
   `AuditRecorder` as well, without which the move would have disarmed them. The module baseline
   stayed at 138 edges: the moved types were already assigned to `audit` by name, and audit's own
-  edges sit in `AuditService` and `AuditRetentionService`. No `@ApplicationModule` yet (P1-13):
-  Spring Modulith is test-scope only, so a `package-info` annotation needs `spring-modulith-api` as
-  a `compileOnly` dependency first.
+  edges sit in `AuditService` and `AuditRetentionService`. The `@ApplicationModule` declarations
+  followed with P1-13 (below), once `spring-modulith-api` was a `compileOnly` dependency.
   The event records are **done 2026-10-04** (P1-11): the 19 types of the central `event` package
   moved, names unchanged, into the `api.events` package of the module of the service that publishes
   them — `identity` (`DiscordRegistrationPendingEvent`, `UserApprovalDecidedEvent`,
@@ -717,6 +720,27 @@ Cheap moves that break many cycles without changing behaviour:
   (`eventLayerShouldNotDependOnServiceLayer`, floor 19) is re-keyed from the package tree of
   `NotificationEvent` to every module's `api.events` tree — left on the anchor, it would have
   selected two classes and failed its floor — and `event` left the layer-package names.
+- The Spring Modulith module declarations (P1-13, §5.2, §5.7) are **done 2026-10-04 for every
+  module package on `main`**, and the step grows with each later move: a move that creates a module
+  package adds its declarations in the same pull request, and `ModularityTest` fails until it does.
+  `spring-modulith-api` is a `compileOnly` dependency of the backend's main source set — annotations
+  only, absent from the boot jar, the image and the SBOM, so D-02's "test scope only" holds for
+  everything that runs. Eleven modules are declared: `audit`, `bank`, `exchange`, `identity`,
+  `inventory`, `joborder`, `materialexchange`, `notification`, `privacy`, `refinery` and `scope`.
+  Each root `package-info` carries `@ApplicationModule` (closed), each `api` package
+  `@NamedInterface("api")`. `allowedDependencies` is exact for every module: the `<module>::api` of
+  each declared module that the domain map's ranks and `allow` rows permit, so `audit` and
+  `notification` (rank 1) allow nothing, and `ModularityTest` fails when a declaration differs from
+  what the domain map derives. `verify()` is green on six real cross-module edges today (bank,
+  exchange, identity, joborder, materialexchange and privacy → `notification::api`, the
+  `NotificationEvent` contract). The module baseline is unchanged at 138 edges: no class moved.
+  **Corrections to §5.2 and §5.7**, found with the planted fixture: `@NamedInterface` on a package
+  covers that package only — its `propagate` attribute applies to annotated types — so every package
+  below `api` (today the seven `api.events`) carries `@NamedInterface("api")` too, which Modulith
+  merges into the one `api` interface; an allowed dependency written as the bare module name admits
+  only the module's unnamed interface, so a module with an `api` interface is allowed as
+  `<module>::api`; and an allowed dependency that names an undeclared module makes Modulith throw,
+  so `kernel` and the other rank-0 modules enter the lists only once they are declared.
 
 **Pros** many cycles gone before any domain moves; each step is small. **Cons** broad, shallow
 churn. **Risks** SpEL bean names and FQCN references (guards G-01, G-04 catch them). **Effort** M.

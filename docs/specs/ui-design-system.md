@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-04.
 > **Owner area:** UI · **Related ADRs:**
 > [0053](../adr/0053-standardize-user-selection-on-searchable-combobox.md) (searchable user pickers, REQ-UI-012) ·
 > [0093](../adr/0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md) (no inline `style=""`, REQ-UI-013) ·
@@ -286,20 +286,20 @@ footer buttons of the `mission-detail.html` dialogs (handled by `krt-modal.js`);
 use it. The overlay's hidden default comes from
 the **global** `.krt-modal-overlay { display:none }` in `styles.css` (loaded on every page;
 `bank.css` duplicates it as defense-in-depth), so the fragment injects no inline style. A modal is
-made visible by adding the `krtm-modal-open` class (`display:flex`, in the `utilities` cascade layer,
-so it wins over every component, page and migrated rule — REQ-UI-024; until 2026-09-23 it won by
-being loaded last) — at runtime via `open-modal-display` (which toggles `classList`, not an
+made visible by adding the `is-open` class (`.krt-modal-overlay.is-open { display:flex }`, in the
+`utilities` cascade layer, so it wins over every component and page rule — REQ-UI-024; until
+2026-10-04 the pair was named `krtm-modal-open` / `krtm-hidden`) — at runtime via `open-modal-display` (which toggles `classList`, not an
 inline `style.display`) or a server-rendered `th:classappend`; the global default must never be
 `display:flex`, or a page whose scoped stylesheet fails to load would render every closed modal open
 on load (#1003 WebKit flake). A page script that **closes** a modal after an in-place AJAX write
 (e.g. the bank confirm/reject modal on success, `bank.js`) must close it the **same** class-based
-way — remove `krtm-modal-open` (and add `krtm-hidden`), never write an inline `modal.style.display =
+way — remove `is-open` (and add `is-hidden`), never write an inline `modal.style.display =
 'none'`. An inline `display` outranks the non-`!important` class rule, so an inline close leaves a
 stale inline style that the class-toggling `open-modal-display` cannot beat, and the modal can never
 be re-opened without a full page reload (a bank staffer confirming a second request straight after
 the first got a dead button). The inverse also holds: a modal a page script OPENS with an
 inline `style.display = 'flex'` must not be closed through the class-only `close-modal-display`
-alone, or the inline `display:flex` outranks `krtm-hidden` and the modal stays on screen (the
+alone, or the inline `display:flex` outranks `is-hidden` and the modal stays on screen (the
 `delete-operation-modal` Cancel button). As a defensive backstop **both** shared handlers clear any
 inline `display` on the modal — `open-modal-display` before showing it, `close-modal-display` before
 hiding it — so the class always wins regardless of how the other side toggled visibility.
@@ -362,10 +362,11 @@ singular.
 
 **No inline `style=""` attributes (CSP hardening).** Templates must not use inline `style=""`
 attributes: the CSP pins `style-src-attr 'none'`, so an inline style attribute is blocked by the
-browser (closing the CSS-injection residual). Static styling goes in a CSS class; a former inline
-value already has a `krtm-*` class in `inline-migration.css` (generated, one class per distinct
-value, loaded last). Data-driven values use a class toggle (`th:classappend`, e.g. the modal
-`krtm-modal-open`/`krtm-hidden` pair, `krtm-opacity-05/06`, `krtm-color-danger`) or, when the value
+browser (closing the CSS-injection residual). Static styling goes in a design-system class or a page-stylesheet rule;
+the generated one-class-per-value `krtm-*` classes of `inline-migration.css` that first replaced the
+inline values are retired (2026-10-04, REQ-UI-027 phase 4, guarded by `NoMigrationClassTest`).
+Data-driven values use a class toggle (`th:classappend`, e.g. the modal `is-open` / `is-hidden`
+pair) or, when the value
 is genuinely dynamic (progress-bar widths), a `data-krtm-width` attribute applied to `style.width`
 via the CSSOM in `inline-style-apply.js` — the CSSOM is not governed by `style-src-attr`. Setting a
 style through JavaScript (`element.style.x = …`) stays allowed; only literal `style=""` attributes in
@@ -377,8 +378,8 @@ blocked exactly the same way (this is what broke the `/materials/overview` virtu
 rows — a JS-built `style="height:…"` — after the CSP was pinned). A value a script computes goes
 through a CSS class (static) or the same `data-krtm-*` → CSSOM path (`element.style.x = …`, genuinely
 dynamic — e.g. the `/materials/overview` virtual-scroll spacer heights) instead. And when a script
-toggles the visibility of an element whose hidden state is a **class** (e.g. the skeleton hides it
-with `krtm-display-none-*`, or the scu-hint fragment with `krtm-hidden`), it must **toggle that
+toggles the visibility of an element whose hidden state is a **class** (e.g. the scu-hint fragment
+hides it with `is-hidden`), it must **toggle that
 class** — clearing `element.style.display` does not override a class rule, so `el.style.display = ''`
 leaves a class-hidden element hidden. Setting a non-empty display (`el.style.display = 'flex'`) still
 works (inline beats a non-`!important` class), and a pure JS filter loop that both hides and reveals
@@ -422,10 +423,10 @@ out-specify the page-level `.form-row > .form-group` floor, which is declared la
 - [ ] A swap container between `.krt-modal` and its `<form>` carries `.krt-modal-flow`, so the body
   still scrolls under the `90vh` cap.
 - [ ] `.krt-modal-overlay` is `display:none` by default in the global `styles.css` (not only in a
-  page-scoped stylesheet); a modal is shown by adding the `krtm-modal-open` class (`display:flex`),
+  page-scoped stylesheet); a modal is shown by adding the `is-open` class (`display:flex`),
   never an inline `style.display`.
-- [ ] A modal a script closes after an in-place AJAX write toggles its class (`krtm-modal-open` off,
-  `krtm-hidden` on), not an inline `style.display = 'none'`, so the next `open-modal-display` re-opens
+- [ ] A modal a script closes after an in-place AJAX write toggles its class (`is-open` off,
+  `is-hidden` on), not an inline `style.display = 'none'`, so the next `open-modal-display` re-opens
   it in the same session without a page reload.
 - [ ] A modal a script opens with an inline `style.display = 'flex'` still closes via
   `close-modal-display` (the shared handlers clear the inline `display` on both open and close, so the
@@ -610,8 +611,8 @@ Declared `--touch-target-dense` consumers today: `.btn.btn-xs`, `.btn-icon` (`st
 
 The same inversion applies to **which rows wrap on the phone class**: a row that directly contains a
 control or a link wraps, matched structurally with `:has()` rather than by class name. Enumeration
-was hopeless there for an additional reason — many rows carry a generated class from
-`inline-migration.css`, and those names are content-hashed.
+was hopeless there for an additional reason — many rows then carried a generated, content-hashed
+class from `inline-migration.css` (retired 2026-10-04).
 
 **Acceptance**
 
@@ -657,11 +658,29 @@ was hopeless there for an additional reason — many rows carry a generated clas
   lets the text inside it wrap instead of painting straight out of the narrowed track.
 - [ ] On ≤768px the footer is `static` and `--krt-footer-height` is `0px`; above it the footer is
   `fixed` and `main`'s `padding-bottom` covers its measured height.
+- [ ] **The page-pattern rules of REQ-UI-027 hold on every swept page** (2026-10-04): on the phone
+  class no visible `.card` is wider inside than its own box (`scrollWidth` ≤ `clientWidth`; a
+  `.table-responsive` scroller inside the card clips its own overflow and is allowed to scroll, the
+  card is not); at every class the page head's primary action — the visible `page-head-primary`, or
+  else the visible `.btn--cta` in `.page-head .page-actions` — lies inside the first viewport above
+  the phone tab bar; a `.page-actions` row shows at most one visible `.btn--cta`; no `.hud-box`
+  sits inside another (hidden ones included); and no visible element draws its own text in
+  `rgb(100, 100, 100)`, the retired `--color-gray-2` that failed contrast as text (DS-1). A finding
+  names the card's widest box outside a nested scroller, the primary's position against the
+  viewport, the crowded buttons, both boxes, or the gray element.
+- [ ] **A hidden overlay takes no room.** A hidden tooltip bubble still counts toward the page's
+  scrollable width, and on a phone it widens the layout viewport: the hidden `.scu-hint__bubble`
+  beside a toolbar's right edge widened `/personal-inventory/blueprints` to 487 px at 375 px and
+  scrolled it 104 px sideways at 810 px. The hidden bubble is scaled to nothing
+  (`transform: … scale(0)`, restored at once on hover or focus and only after the fade-out).
 
 **Enforced by:** [ADR-0172](../adr/0172-the-phone-class-gets-its-own-layout-contract.md) · `TouchClassLayoutE2eTest` (all five device classes — 375×812, 810×1080, 1024×768, 1280×800, 1600×900 — over the page routes of the shared `FrontendPageRoutes.PAGES` catalogue, plus a real detail view per
 list and every modal on the page — 96 `.krt-modal-overlay` roots, the one shape `MODAL_SHAPES` holds
 since ADR-0177: page-level overflow, cut-off elements, unscrollable tables, control floors, footer
-behaviour, chrome share — with a full-page screenshot per page and class) ·
+behaviour, chrome share, and the five page-pattern checks of REQ-UI-027 — cards scrolling sideways
+on the phone, the head's primary action outside the first viewport, more than one `.btn--cta` in
+`.page-actions`, nested `.hud-box`es, text in `rgb(100, 100, 100)` — with a full-page screenshot per
+page and class and a per-page `patterns:` line in the report) ·
 `PageRouteCatalogueTest` (the route list is no longer hand-maintained on trust: it asks the
 dispatcher for every mapping it knows and fails when a variable-free `GET` route is in neither
 `PAGES` nor `NOT_PAGES`, so a page added next month is swept on the day it is added — and it runs
@@ -1235,16 +1254,19 @@ Precedence between two stylesheets is decided by the **cascade layer** each rule
 in this order at the top of every file:
 
 ```css
-@layer base, components, page, migration, utilities;
+@layer base, components, page, utilities;
 ```
+
+*Amended 2026-10-04 (REQ-UI-027 phase 4): the `migration` layer is gone with `inline-migration.css`,
+and the two state classes, renamed `is-hidden` and `is-open`, moved into a `utilities` block at the
+end of `styles.css`. The statements below about migrated classes describe 2026-09-23 to 2026-10-04.*
 
 | Layer | Holds |
 | --- | --- |
 | `base` | `@font-face` and the `:root` design tokens (`styles.css`) |
 | `components` | the rest of `styles.css`: the design system's components and helpers |
 | `page` | every page / area stylesheet (`bank.css`, …, `css/pages/*.css`), and the few design-system declarations that must keep beating one (the block at the end of `styles.css`) |
-| `migration` | `inline-migration.css`: one class per former inline `style="…"` |
-| `utilities` | the two runtime state classes, `krtm-hidden` and `krtm-modal-open` |
+| `utilities` | the two runtime state classes, `.is-hidden` and `.krt-modal-overlay.is-open` (the last block of `styles.css`) |
 
 Between layers the order decides, before specificity. Inside a layer, specificity and source order
 decide as before. So:
@@ -1257,14 +1279,13 @@ decide as before. So:
   ADR-0214: this used to be a comment beside the rule). Inside that layer, specificity
   against the page stylesheets decides exactly as it did under load order. It does not go into
   `utilities`: that would also let it beat the page rules that deliberately out-specify it
-  (`.krt-personal-inventory .form-group select`) and every migrated inline class.
+  (`.krt-personal-inventory .form-group select`).
 - **A migrated inline style wins against page and component CSS**, as the inline `style=""` it
   replaced did (ADR-0093). Under load order it lost to any rule with higher specificity. That changed
   what a few elements look like, and the owner accepted each change (listed below).
-- **The state classes win outright.** `krtm-hidden` hides whatever display a component, page or
-  migrated rule sets. The co-located `.x.krtm-hidden` re-assertions are gone.
-- **`head.html`'s link order is no longer part of the contract.** `inline-migration.css` still loads
-  last, but only because it always did.
+- **The state classes win outright.** `is-hidden` hides whatever display a component or page rule
+  sets. No stylesheet re-asserts it next to another class.
+- **`head.html`'s link order is no longer part of the contract.**
 
 **The page-layer block at the end of `styles.css`.** Before the layers these won by specificity
 alone; in `components` they would lose to every page rule. `styles.css` loads first, so a page rule
@@ -1304,12 +1325,12 @@ knock-on of one; no declaration changed hands between the design system and a pa
 **Acceptance**
 
 - [x] Every stylesheet under `static/css` starts with the layer order and puts all its rules in one
-  of the five layers.
-- [x] No page stylesheet uses `!important` against a component rule; the two that remain beat a
-  migrated class (the Lager filter rows).
+  of the four layers.
+- [x] No page stylesheet uses `!important`.
 - [x] No change a user can see beyond the accepted corrections above.
 
-**Enforced by:** `CascadeLayerOrderTest` (the order line and the layer of every file) ·
+**Enforced by:** `CascadeLayerOrderTest` (the order line, the layer of every file, the state
+classes only in `utilities`) ·
 `SingleModalShapeTest` and `TouchClassLayoutE2eTest` read rules inside `@layer` blocks ·
 **Related:** ADR-0212, ADR-0093, ADR-0176, REQ-UI-023
 
@@ -1483,8 +1504,8 @@ krt-profit/design-system#6), and every work page follows one of three patterns.
    is two columns from tablet up, computed values as `.field-computed`, two to four exclusive options
    as `.segmented--lg` instead of radios, and the actions in `.form-actions--sticky` with a live
    `.form-actions__summary` (DS-9).
-9. **Layout** uses `.stack`, `.cluster`, `.split` and `.grid-auto` (DS-12). No new `krtm-*` class;
-   every touched template replaces its own.
+9. **Layout** uses `.stack`, `.cluster`, `.split` and `.grid-auto` (DS-12). No `krtm-*` class
+   (the last ones were replaced in phase 4).
 10. **Touch targets** stay at 44 px on phones and tablets (REQ-UI-009), including the overflow-menu
     entries, the filter chips and the toolbar search.
 
@@ -1519,7 +1540,16 @@ Pages that swap their filter form call `window.krtFilterChips.refresh()`.
 
 New `data-testid`s: `page-head`, `page-eyebrow`, `page-head-count`, `page-head-primary` (set by
 the page on its primary action), `overflow-menu-toggle`, `toolbar-search`, `segment-<name>-<value>`,
-`filter-chips`, `filter-chip-<name>`, `filter-chips-reset`, `empty-state`, `empty-state-action`.
+`filter-chips`, `filter-chip-<name>`, `filter-chips-reset`, `empty-state`, `empty-state-action`,
+`row-link` (on the `a.row-link` that makes a table row clickable). Every existing `data-testid`
+stays: a primary action or row link that carried a page-specific id before the patterns keeps it
+(`missions-create-link`, `orders-create-link`, `bank-movement-open`, `bank-holder-history-link`, …),
+because an element has one `data-testid` and the smoke tests address the old one. A hand-built
+pattern carries the same ids as its fragment — the bank's account filter is the page's
+`toolbar-search`.
+
+*Amended 2026-10-04 (phase 5): `row-link` added; the ids pinned per pattern by
+`PagePatternTestIdsRenderTest`.*
 
 **Rollout.** Phase 0 (this requirement's foundation) ships the design-system update, the fragments,
 the scripts and the breakpoint gate; the list pages, the home page and the forms, the areas of the
@@ -1579,8 +1609,9 @@ wide data view with the „UEX · vor n min" chip, dropdown filters that summari
 von 42"), „+ Filter" chips, the best sale/purchase rings, the spread and the legend; the material
 detail with category/flag chips, four figures and the terminal table sorted by sale price (segment
 „Verkauf · Einkauf"); the profit calculation with one input card, the Hull C chip and results ranked
-by max. profit with a two-line route „Kauf <Terminal> · <Preis>" / „Verkauf <Terminal> · <Preis>",
-the terminal's location (planet or star system, then city, station or outpost) as its tooltip.
+by max. profit with a two-line route „Kauf <Terminal> (<Ort>) · <Preis>" / „Verkauf <Terminal> (<Ort>)
+· <Preis>", the terminal's location (planet or star system, then city, station or outpost) in
+brackets after its name; the lines wrap rather than cut off.
 Auftragsdetail: page head with kind and status badges and the admin overflow „Auftrag löschen", the
 progress tile „Geliefert / benötigt" leading the KPI grid, tabs filtered per kind (Material: Bedarf
 · Übergaben · Bearbeiter · Verknüpft; Item: Items · Materialien · Hersteller · Übergaben ·
@@ -1610,14 +1641,36 @@ request's approval path, the staff request queue filters by the status segment �
 Bestätigt · Abgelehnt · Alle" with „n warten auf dich", and the KRT approval thresholds are drawn as
 a tier bar (REQ-BANK-023, REQ-BANK-047).
 
+*Amended 2026-10-04: the terminal's location stands in the route line in brackets (it was a tooltip,
+invisible on touch screens; owner decision of the same day).*
+
 *Amended 2026-10-04: the profit calculation's route names its terminals.
 `GET /api/v1/materials/profit-calculation` answers each row with `buyTerminalName`,
 `buyTerminalLocation`, `sellTerminalName` and `sellTerminalLocation` — the terminals of the chosen
 lowest purchase and highest sale price, the first by name on a price tie, a location `null` when the
 terminal names no place.*
 
-**Enforced by:** `PagePatternFragmentsRenderTest` (the fragments' markup and ARIA) · Stylelint
-`media-feature-name-value-allowed-list` (breakpoints) · `TouchClassLayoutE2eTest` (touch floors) ·
+**Clean-up (phase 4, 2026-10-04):** `inline-migration.css` and its `<link>` in `fragments/head.html`
+are deleted. The last six one-off classes went to the design system or a page rule (the admin bank
+page onto the page head with `.alert` notices, the bank account table's number as `.cell-sub`, the
+account card's type chip as a `bank.css` rule); the two state classes are `is-hidden` and the
+overlay's `is-open`, declared in `styles.css`'s `utilities` layer. Dead rules the redesign left
+behind are gone (the bank panel, collapse, facts and filter-bar rules, the 2200 px widening of the
+bank account detail — it now stops at `--content-max-data` like every page — `.hangar-filter*`,
+the unused `promotion-admin.css` toolbar rules, `.oss-unavailable`), and so are the
+`components :: filterToggle` fragment, the stored open/closed state of `krt-filter-panel.js`, the
+bank panel-collapse and old request status-filter scripts, and 205 message keys no template, script
+or class read any more (the `*.description` subtitles stay). No template or script may name a
+`krtm-*` class again (`NoMigrationClassTest`); `data-krtm-width` and `inline-style-apply.js` stay as
+the CSP-safe width mechanism.
+
+**Enforced by:** `PagePatternFragmentsRenderTest` (the fragments' markup and ARIA) ·
+`PagePatternTestIdsRenderTest` (the smoke-test ids on a representative page per pattern) ·
+`NoMigrationClassTest` (no `krtm-*` class, no `inline-migration.css`) · Stylelint
+`media-feature-name-value-allowed-list` (breakpoints) · `TouchClassLayoutE2eTest` (touch floors, and
+on every swept page: no `.card` scrolling sideways on the phone, the head's primary action in the
+first viewport, one `.btn--cta` per `.page-actions`, no nested `.hud-box`, no text in the retired
+gray — see REQ-UI-009) ·
 **Code:** `static/css/styles.css` (`components` layer), `fragments/page-head.html`,
 `fragments/components.html`, `static/js/krt-overflow-menu.js`, `static/js/krt-filter-chips.js`,
 `frontend/.stylelintrc.json`, `frontend/.stylelintrc.templates.json` · **Related:** REQ-UI-004,

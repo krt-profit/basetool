@@ -581,8 +581,7 @@ class InventoryPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(PageStylesheets.content(containsString(".form-layout [hidden]")))
         .andExpect(PageStylesheets.content(not(containsString(".form-group input {"))))
-        .andExpect(
-            PageStylesheets.content(not(containsString(".form-group.check-row.krtm-hidden"))));
+        .andExpect(PageStylesheets.content(not(containsString(".form-group.check-row.is-hidden"))));
   }
 
   @Test
@@ -1288,7 +1287,7 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/input").param("source", "admin"))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("form-group owner-picker krtm-hidden")))
+        .andExpect(content().string(containsString("form-group owner-picker is-hidden")))
         .andExpect(
             content()
                 .string(
