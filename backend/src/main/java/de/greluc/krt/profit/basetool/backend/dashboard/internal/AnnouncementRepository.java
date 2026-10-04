@@ -17,15 +17,17 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.mapper;
+package de.greluc.krt.profit.basetool.backend.dashboard.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.Announcement;
-import de.greluc.krt.profit.basetool.backend.model.dto.AnnouncementDto;
-import org.mapstruct.Mapper;
+import java.util.Optional;
+import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
-/** MapStruct mapper between Announcement entities and DTOs. */
-@Mapper(config = CentralMapperConfig.class)
-public interface AnnouncementMapper {
-  /** Maps an {@link Announcement} entity to its outbound DTO. */
-  AnnouncementDto toDto(Announcement announcement);
+/** Spring Data repository for Announcement. */
+@Repository
+public interface AnnouncementRepository extends JpaRepository<Announcement, UUID> {
+
+  /** Returns the first matching {@code OrderByUpdatedAtDesc} (limit 1). */
+  Optional<Announcement> findTopByOrderByUpdatedAtDesc();
 }

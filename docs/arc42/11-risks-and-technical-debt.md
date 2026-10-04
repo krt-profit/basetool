@@ -366,4 +366,5 @@ along the way are fixed (Phase −1, merged 2026-10-01), the guards of Phase 0 a
 Phase 1 has begun: `audit.api`, `kernel`, `orgunit.api`/`orgunit.web` and the publishers'
 `api.events` packages exist, the former `support` package is split into the kernel, the
 `platform` module and the modules' `api`/`internal` packages, and the frozen module baseline has
-shrunk from 138 to 110 class edges.
+shrunk from 138 to 110 class edges. Phase 2 has begun (2026-10-05): `dashboard` is the first
+domain moved whole into its module package.

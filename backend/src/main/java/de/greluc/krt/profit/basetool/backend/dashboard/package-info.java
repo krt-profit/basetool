@@ -17,10 +17,19 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+/** The dashboard module: the shared announcement banner of the home page (plan §5.1 rank 6). */
+@ApplicationModule(
+    allowedDependencies = {
+      "audit::api",
+      "catalogue::api",
+      "identity::api",
+      "kernel",
+      "livesync::api",
+      "notification::api",
+      "orgunit::api",
+      "platform::api",
+      "scope::api"
+    })
+package de.greluc.krt.profit.basetool.backend.dashboard;
 
-import java.time.Instant;
-import java.util.UUID;
-
-/** Data transfer record carrying Announcement payload. */
-public record AnnouncementDto(UUID id, String content, Instant updatedAt, Long version) {}
+import org.springframework.modulith.ApplicationModule;

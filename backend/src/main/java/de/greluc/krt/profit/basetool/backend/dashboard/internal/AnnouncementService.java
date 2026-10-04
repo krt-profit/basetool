@@ -17,11 +17,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.dashboard.internal;
 
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.model.Announcement;
-import de.greluc.krt.profit.basetool.backend.repository.AnnouncementRepository;
 import java.util.Comparator;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
