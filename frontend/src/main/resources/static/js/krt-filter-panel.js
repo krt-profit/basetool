@@ -21,9 +21,6 @@
 (function () {
     'use strict';
 
-    /** localStorage key prefix; the panel's own name is appended. */
-    const STORE_PREFIX = 'krt.filterPanel.';
-
     /**
      * Page-registered active-filter counters keyed by panel id, used instead of the generic scan of
      * the panel's own controls.
@@ -31,43 +28,6 @@
      * @type {Map<string, () => number>}
      */
     const counters = new Map();
-
-    /**
-     * Reads the stored collapse preference for a panel.
-     *
-     * @param {HTMLElement} panel the panel element
-     * @returns {boolean | null} the stored state, or {@code null} when nothing is stored
-     */
-    function readPref(panel) {
-        try {
-            const raw = localStorage.getItem(STORE_PREFIX + panelName(panel));
-            return raw === null ? null : raw === '1';
-        } catch (_e) {
-            return null;
-        }
-    }
-
-    /**
-     * Stores the collapse preference for a panel.
-     *
-     * @param {HTMLElement} panel the panel element
-     * @param {boolean} collapsed whether the panel is now collapsed
-     */
-    function writePref(panel, collapsed) {
-        try {
-            localStorage.setItem(STORE_PREFIX + panelName(panel), collapsed ? '1' : '0');
-        } catch (_e) {}
-    }
-
-    /**
-     * The storage name of a panel: its {@code data-filter-panel} value, falling back to its id.
-     *
-     * @param {HTMLElement} panel the panel element
-     * @returns {string} a stable per-page name
-     */
-    function panelName(panel) {
-        return panel.getAttribute('data-filter-panel') || panel.id || 'default';
-    }
 
     /**
      * Finds the toggle button whose `aria-controls` names the panel's id.
@@ -133,7 +93,7 @@
     }
 
     /**
-     * Collapses or expands a panel without touching the stored preference.
+     * Collapses or expands a panel and mirrors the state on its toggle's `aria-expanded`.
      *
      * @param {HTMLElement} panel the panel element
      * @param {boolean} collapsed whether to collapse it
@@ -145,8 +105,8 @@
     }
 
     /**
-     * Wires one panel: applies the stored state (collapsed when none is stored), renders the count,
-     * and installs the listeners.
+     * Wires one panel as a transient popover: collapses it, renders the count, and installs the
+     * toggle, outside-click and Escape listeners. No open/closed state is stored (REQ-FE-021).
      *
      * @param {HTMLElement} panel the panel element
      */
@@ -154,44 +114,35 @@
         const toggle = toggleFor(panel);
         if (!toggle) return;
         updateBadge(panel);
-        const transient = panel.hasAttribute('data-filter-transient');
-        const stored = transient ? null : readPref(panel);
-        setCollapsed(panel, typeof stored === 'boolean' ? stored : true);
+        setCollapsed(panel, true);
         toggle.addEventListener('click', function () {
             const collapsed = !panel.hidden;
             setCollapsed(panel, collapsed);
-            if (transient) {
-                if (!collapsed) {
-                    panel.classList.remove('filter-popover__panel--start');
-                    if (panel.getBoundingClientRect().left < 0) {
-                        panel.classList.add('filter-popover__panel--start');
-                    }
-                    const first = /** @type {HTMLElement | null} */ (
-                        panel.querySelector('input:not([type="hidden"]), select, textarea, button')
-                    );
-                    if (first) first.focus();
-                }
-                return;
+            if (collapsed) return;
+            panel.classList.remove('filter-popover__panel--start');
+            if (panel.getBoundingClientRect().left < 0) {
+                panel.classList.add('filter-popover__panel--start');
             }
-            writePref(panel, collapsed);
+            const first = /** @type {HTMLElement | null} */ (
+                panel.querySelector('input:not([type="hidden"]), select, textarea, button')
+            );
+            if (first) first.focus();
         });
-        if (transient) {
-            document.addEventListener('click', function (event) {
-                if (panel.hidden || !(event.target instanceof Node)) return;
-                if (panel.contains(event.target) || toggle.contains(event.target)) return;
-                if (!event.target.isConnected) return;
-                setCollapsed(panel, true);
-            });
-            document.addEventListener('keydown', function (event) {
-                if (event.key !== 'Escape' || panel.hidden) return;
-                if (!(event.target instanceof Node)) return;
-                if (!panel.contains(event.target) && !toggle.contains(event.target)) return;
-                event.preventDefault();
-                event.stopPropagation();
-                setCollapsed(panel, true);
-                toggle.focus();
-            });
-        }
+        document.addEventListener('click', function (event) {
+            if (panel.hidden || !(event.target instanceof Node)) return;
+            if (panel.contains(event.target) || toggle.contains(event.target)) return;
+            if (!event.target.isConnected) return;
+            setCollapsed(panel, true);
+        });
+        document.addEventListener('keydown', function (event) {
+            if (event.key !== 'Escape' || panel.hidden) return;
+            if (!(event.target instanceof Node)) return;
+            if (!panel.contains(event.target) && !toggle.contains(event.target)) return;
+            event.preventDefault();
+            event.stopPropagation();
+            setCollapsed(panel, true);
+            toggle.focus();
+        });
         panel.addEventListener('input', function () {
             updateBadge(panel);
         });

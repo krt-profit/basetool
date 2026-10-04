@@ -4,6 +4,11 @@
 
 ### Added
 
+- **Layout-Prüfung um die Seitenmuster erweitert (Phase 5).** Die Geräteklassen-Prüfung meldet jetzt
+  auch seitlich scrollende Karten am Smartphone, eine Hauptaktion außerhalb des ersten Bildschirms,
+  mehr als eine Hauptaktion im Seitenkopf, verschachtelte `.hud-box`en und Text im alten Grau.
+  Tabellenzeilen-Links tragen einheitlich die Test-ID `row-link` (REQ-UI-009, REQ-UI-027).
+
 - **Startseite: „Angemeldet" bei den nächsten Einsätzen.** In „Nächste 7 Tage" trägt jeder Einsatz,
   für den man selbst angemeldet ist, den Chip „Angemeldet". Die Missionsliste der API liefert dafür
   pro Zeile das Feld `signedUp` für den Aufrufer (REQ-MISSION-012).
@@ -47,16 +52,19 @@
   Admin-Listen haben einen Seitenkopf mit Zähler, eine Werkzeugleiste mit Suche, Segment-Schalter und
   Filter-Popover, entfernbare Filter-Chips und Tabellen, deren Zeile der Link ist und die auf dem
   Smartphone stapeln; Status sind übersetzt, leere Listen zeigen einen Leerzustand (REQ-UI-027).
+  
 - **Mein Inventar: Blueprints mit Dialog und Craft-Status.** „Blueprints hinzufügen" öffnet einen
   Dialog, „SC Extractor laden" und „Alle löschen …" liegen im ⋯-Menü; die Seite hat eine Suche,
   „Alle · Craftbar" und „Raffinerie einrechnen". Jede Zeile zeigt Status-Punkt und „3×", das Detail
   eine Kennzahl und die Zutaten mit Bedarf, Vorrat und Qualität (REQ-INV-008/048).
+  
 - **Blueprint-Verfügbarkeit: Besitzer als Chips, Suche nach Personen.** Die ersten vier Besitzer
   stehen direkt in der Zeile, „+ n weitere" klappt den Rest auf; die Suche findet auch Besitzer
   innerhalb der eigenen Einheiten (REQ-INV-012/013).
 
 - **Einsätze und Operationen: Zeitraum „Kommend · Vergangen · Alle".** Ersetzt die Checkbox
   „Vergangene anzeigen"; die gespeicherte Auswahl wird übernommen.
+  
 - **Beförderung und Einsatzdaten im neuen Muster.** „Themenbereiche verwalten" und „Einsatzdaten
   verwalten" sind Listen mit Detailbereich, deren Auswahl als Link erhalten bleibt; die
   Rangvoraussetzungen stehen als Matrix Rangsprung × Themenbereich. „Beförderungssystem" zeigt den
@@ -65,11 +73,13 @@
 - **Benachrichtigungen: „Ungelesen · Alle" und Links.** Die Seite zeigt zunächst nur Ungelesenes;
   Benachrichtigungen zu Aufträgen, Materialbörse, verbundenen Anwendungen und Admin-Vorgängen
   führen direkt zur Seite (REQ-NOTIF-022).
+  
 - **Kartellbank: Kontodetail mit Kennzahlen und Reitern.** Beide Kontodetailseiten zeigen Saldo,
   Ziel, ± 30 Tage und Buchungen als Kacheln, darunter die Reiter „Buchungen" und „Konto-Info" bzw.
   „Ziel & Sichtbarkeit"; die Historie hat „30 Tage · 90 Tage · Zeitraum …" und die Spalte „Saldo
   nach Buchung", einklappbare Bereiche entfallen. Auf der Org-Einheits-Bank heißt der Reiter jetzt
   „Anträge an unsere Konten", und „Laufende Anträge" zeigt den Freigabeweg.
+  
 - **Buchungsanträge: Status als Segment.** „Ausstehend · Bestätigt · Abgelehnt · Alle" ersetzt die
   Status-Checkboxen, „n warten auf dich" zählt die entscheidbaren Anträge; wartet ein Antrag auf
   eine Freigabe, steht „wartet auf …" in der Zeile. Die KRT-Freigaben sind eine Stufen-Leiste.
@@ -176,6 +186,15 @@
 - **Abhängigkeiten aktualisiert.** Flyway 13.9.0, Bucket4j 8.21.0, commons-lang3 3.21.0, Jackson 2.22.3
   und 3.2.3 sowie json-schema-validator 3.0.8. Lombok und google-java-format bleiben bewusst stehen.
 
+- **Monitoring-Images aktualisiert.** Alloy v1.20.1, Tempo 3.1.0 (neue Blöcke im Format vParquet5) und
+  redis_exporter v1.93.0, jeweils per Digest gepinnt. Konfiguration und Dashboards bleiben unverändert;
+  Compose und Quadlet-Units sind nachgezogen.
+
+- **Aufräumen nach der Website-Überarbeitung (Phase 4).** `inline-migration.css` ist entfernt, die
+  letzten `krtm-*`-Klassen sind Design-System-Bausteine oder Seitenregeln; Bank-Administration hat
+  Seitenkopf und Hinweis-Boxen. Tote CSS-Regeln, Skripte und 205 Sprachschlüssel sind weg; das
+  Bank-Kontodetail ist auf großen Bildschirmen so breit wie die übrigen Seiten (REQ-UI-027).
+  
 - **Kartellbank: „Bestätigen" nur, wo du bestätigen darfst.** Die Antragswarteschlange zeigt die
   Bestätigen-Aktion nur noch bei Anträgen, für die dir die passende Konto-Berechtigung zusteht; sonst
   steht dort „wartet auf berechtigte Bankmitarbeiter". Die Queue-API liefert dafür pro Antrag
@@ -183,20 +202,26 @@
 
 - **Blueprints: Fehlmenge wieder sichtbar.** Ist der Vorrat einer Zutat zu knapp, steht unter dem
   Vorrat wieder „fehlt n“ (REQ-INV-048).
+  
 - **Auftragsdetail: Reiter „Hersteller“.** Der Reiter, der zeigt, wer ein Item craften kann, hieß
   „Herstellung“ wie das Buchen der Herstellung im Reiter „Items“; er heißt jetzt „Hersteller“
   (REQ-ORDERS-026).
 
 - **Build: Configuration-Cache auch für lokale Builds.** `gradle.properties` schaltet ihn ein;
   `--no-configuration-cache` schaltet ihn für einen Lauf ab (BLD-PERF-04).
+  
 - **CI: Cache-Janitor behält je Gradle-Job nur den neuesten Cache** und warnt, wenn der Actions-Cache
   nach dem Aufräumen über 8 GiB liegt (CI-01).
+  
 - **Tests: PostgreSQL-Testcontainer per Digest.** Die Backend-Tests starten genau das Produktions-Image
   (`TestImages.POSTGRES`, gegen Compose und Quadlet-Unit geprüft; TST-18).
+  
 - **CI: Dependabot-Digest-Bumps von Redis und PostgreSQL ziehen `TestImages` mit.** Der Compose-Follow-up
   setzt die Digest-Konstanten auf den Compose-Pin, statt `TestImagesTest` rot zu lassen (REQ-OPS-035,
   ADR-0215).
+  
 - **Doku: Verlängerung der OWASP-Suppressions beschrieben** (CONTRIBUTING, SEC-16).
+  
 - **Modularisierung: die Entscheidungen sind festgehalten.** ADR-0231 bis ADR-0239 (Modulschnitt,
   Zusammenspiel der Module, Prüfwerkzeuge, harter API-Schnitt mit erzwungenem App-Update, Fehlermodell,
   Zugriffsregeln je Fachbereich, NullAway, `switch` ohne `default`, Browser-Baseline 2025), dazu
@@ -287,6 +312,10 @@
 
 ### Fixed
 
+- **Blueprints: Seite scrollt nicht mehr seitlich.** Die unsichtbare Hinweisblase neben
+  „Raffinerie einrechnen" verbreiterte die Seite am Smartphone auf 487 px und am Tablet um 104 px;
+  verborgene Hinweisblasen belegen jetzt keinen Platz mehr (CSS, REQ-UI-009).
+
 - **Systemeinstellungen: Auftragsbearbeitung pro Spezialkommando wieder schaltbar.** Der Abschnitt
   zeigte seit dem Wegfall des anonymen Auftragsformulars immer „Keine Spezialkommandos gefunden.";
   jetzt listet er alle aktiven SKs mit ihrem Schalter (Frontend-Controller, REQ-ADMIN-001).
@@ -362,18 +391,33 @@
 
 ### Security
 
+- **Monitoring: Grafana 13.2.2 → 13.2.3.** Sicherheitsrelease gegen CVE-2026-13719,
+  CVE-2026-13720 und CVE-2026-81841 (je mittlere Schwere: Alert-Regeln fremder Ordner lesbar,
+  Provisioning-Metadaten durch Editoren setzbar, pausierter öffentlicher Dashboard-Link blieb
+  gültig). Digest in Compose und Quadlet aktualisiert; wirkt nach dem nächsten Deploy.
+  
+- **Basis-Images auf den aktuellen Stand der Tags gehoben (nur Digests, keine neuen Versionen).**
+  
+  Temurin JRE/JDK 25.0.4.1+1 (sicherheitsbedingter Sonderrelease), `nginx-unprivileged:1.31.6-alpine`
+  mit neuen Alpine-Schichten und der BuildKit-Builder `buildx-stable-1`. Die Log-Signaturen von
+  `JvmNativeThreadExhaustion` und `JvmStartupCacheRejected` wurden auf dem neuen JRE erneut geprüft.
+  
 - **Ingest prüft den Hostnamen des Backends standardmäßig.** Der Jar-Default von
   `app.ingest.verify-backend-hostname` ist jetzt `true`; nur das `dev`-Profil schaltet ihn ab.
   Compose und Quadlet setzten bereits `true` (ING-SEC-04).
+  
 - **Host: `deploy` darf nur noch die podman-Unterbefehle der Deploy-Skripte als `iri` ausführen**
   statt `podman *`; repo-lint prüft die Liste gegen die Skripte. Wirkt erst nach einem Ansible-Lauf
   auf dem Host (OPS-SEC-08).
+  
 - **CI: Werkzeuge per Hash gepinnt.** PyYAML, ansible-core/ansible-lint aus `--require-hashes`-Dateien,
   markdownlint-cli2 aus einem Lockfile, Ansible-Collections exakt versioniert (CI-SEC-12).
+  
 - **CI: Release-App-Schlüssel in der Umgebung `release`.** `release-prepare`, `refresh-versions` und
   `release-publish` lesen ihn dort; `release-publish` läuft dafür auf dem Push nach `main` und erkennt
   den Release-Merge selbst. Der Owner legt die Umgebung einmalig an und löscht danach das
   Repository-Secret (CI-SEC-16, ADR-0201).
+  
 - **Backend: Prüfregeln für Mandantentrennung und Massenzuweisung.** Org-Einheiten-gebundene Aggregate
   tragen `@TenantScoped`; ein Test verlangt für jeden Controller, der solche Daten schreibt, den
   Scope-Gate, und für Request-Bodies `@Valid`, keine Antwort-DTOs und keine servergeführten Felder

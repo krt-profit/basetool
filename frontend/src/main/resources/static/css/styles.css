@@ -1,4 +1,4 @@
-@layer base, components, page, migration, utilities;
+@layer base, components, page, utilities;
 
 @layer base {
     @font-face {
@@ -5392,7 +5392,7 @@
         width: max-content;
         max-width: min(17rem, 78vw);
         padding: var(--space-2) 0.6rem;
-        transform: translateX(calc(-50% + var(--hint-shift, 0px)));
+        transform: translateX(calc(-50% + var(--hint-shift, 0px))) scale(0);
         background: rgb(0 0 0 / 95%);
         border: 1px solid var(--color-primary);
         box-shadow: 0 0 10px rgb(231 126 35 / 30%);
@@ -5410,7 +5410,8 @@
         pointer-events: none;
         transition:
             opacity 0.2s ease,
-            visibility 0.2s ease;
+            visibility 0.2s ease,
+            transform 0s linear 0.2s;
     }
 
     .scu-hint:hover .scu-hint__bubble,
@@ -5418,6 +5419,10 @@
     .scu-hint:focus-within .scu-hint__bubble {
         opacity: 1;
         visibility: visible;
+        transform: translateX(calc(-50% + var(--hint-shift, 0px)));
+        transition:
+            opacity 0.2s ease,
+            visibility 0.2s ease;
     }
 
     .scu-hint__bubble::after {
@@ -5540,14 +5545,6 @@
         gap: 0.5rem;
         align-items: center;
         margin-left: auto;
-    }
-
-    .filter-chevron {
-        transition: transform 0.15s ease;
-    }
-
-    [aria-expanded='true'] .filter-chevron {
-        transform: rotate(90deg);
     }
 
     .filter-count[hidden] {
@@ -6446,10 +6443,6 @@
         font-size: var(--fs-xs);
         text-transform: uppercase;
         letter-spacing: 0.06em;
-    }
-
-    .oss-unavailable {
-        color: var(--color-warning);
     }
 
     details.oss-group > summary {
@@ -7737,5 +7730,15 @@
 
     .terms-body {
         overflow-wrap: anywhere;
+    }
+}
+
+@layer utilities {
+    .is-hidden {
+        display: none;
+    }
+
+    .krt-modal-overlay.is-open {
+        display: flex;
     }
 }
