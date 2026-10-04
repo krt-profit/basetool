@@ -6,7 +6,7 @@
      th:with="activeOption=${activeSquadronId != null and #lists.contains(options.![orgUnitId()], activeSquadronId) ? activeSquadronId : null},
               preset=${selected != null ? selected : activeOption},
               pickerVisible=${options.size() > 1}"
-     th:classappend="${pickerVisible} ? '' : 'krtm-hidden'"
+     th:classappend="${pickerVisible} ? '' : 'is-hidden'"
      th:attr="data-owner-picker-active=${activeSquadronId}"
      class="form-group owner-picker">
     <label th:for="${name}" th:text="#{ownerPicker.label}">Zuordnen zu</label>

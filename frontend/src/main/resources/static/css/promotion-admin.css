@@ -1,4 +1,4 @@
-@layer base, components, page, migration, utilities;
+@layer base, components, page, utilities;
 
 @layer page {
     .form-input {
@@ -46,44 +46,9 @@
         }
     }
 
-    .pa-btn-tiny {
-        padding: 0.35rem 0.7rem;
-        font-size: 0.75rem;
-        min-height: 44px;
-    }
-
     .pa-dirty {
         border-color: var(--color-primary);
         background: rgb(231 126 35 / 5%);
-    }
-
-    .pa-toolbar {
-        display: flex;
-        gap: 0.75rem;
-        align-items: center;
-        flex-wrap: wrap;
-        margin-bottom: 1rem;
-    }
-
-    .pa-toolbar .pa-search {
-        flex: 1 1 240px;
-        min-width: 180px;
-        max-width: 320px;
-    }
-
-    .pa-toolbar .pa-spacer {
-        flex: 1;
-    }
-
-    .pa-rank-subtable {
-        position: relative;
-    }
-
-    .pa-rank-subtable td.pa-actions-cell {
-        position: sticky;
-        right: 0;
-        background-color: var(--color-bg-dark-gray);
-        box-shadow: -2px 0 4px rgb(0 0 0 / 40%);
     }
 
     .pa-sort-controls {

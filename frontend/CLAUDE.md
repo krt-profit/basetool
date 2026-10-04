@@ -67,19 +67,20 @@ A rendered page carries no developer text and no inline page CSS (`REQ-UI-023`,
 
 ### CSS: the layer decides, not the load order (binding)
 
-Every stylesheet starts with `@layer base, components, page, migration, utilities;` and puts every
-rule inside one of those layers (`REQ-UI-024`, ADR-0212, `CascadeLayerOrderTest`). Between layers the
-order decides, before specificity:
+Every stylesheet starts with `@layer base, components, page, utilities;` and puts every rule inside
+one of those layers (`REQ-UI-024`, ADR-0212, `CascadeLayerOrderTest`). Between layers the order
+decides, before specificity:
 
-- `styles.css` owns `base` (fonts, tokens) and `components`; every page or area stylesheet is
-  `page`; `inline-migration.css` is `migration`; `krtm-hidden` / `krtm-modal-open` are `utilities`.
+- `styles.css` owns `base` (fonts, tokens), `components` and `utilities`; every page or area
+  stylesheet is `page`. `utilities` holds only the two state classes, `.is-hidden` and
+  `.krt-modal-overlay.is-open`.
 - A page rule beats a design-system rule as an ordinary rule. Do not bump specificity
   (`main .x`, `div.x`, `.x.x`) and do not add `!important` for it.
 - A design-system declaration that has to beat page CSS goes into the `@layer page` block at the end
-  of `styles.css`. Never into `utilities`, which would also beat
-  the page rules that out-specify it and every migrated inline class.
-- A migrated `krtm-*` class beats page and component rules, like the inline style it replaced. To
-  restyle such an element, remove the migrated class from the markup; do not fight it.
+  of `styles.css`. Never into `utilities`, which would also beat the page rules that out-specify it.
+- `inline-migration.css` and its `krtm-*` classes are retired (REQ-UI-027 phase 4): a one-off style
+  is a design-system class or a page rule, never a new `krtm-*` class (`NoMigrationClassTest`).
+  `data-krtm-width` with `inline-style-apply.js` stays — it is the CSP-safe width mechanism.
 - A rule outside any layer beats every layer. That is why the test fails on one.
 
 ### Script load order (binding — it has regressed three times)
@@ -98,7 +99,7 @@ fails the build on it, `ScriptLoadOrderE2eTest` checks it in the browser.
 Every dialog is a `<dialog class="krt-modal-overlay">` > `.krt-modal` (REQ-UI-013, ADR-0177) and
 opens and closes **only** through `window.krtModal.open(el | id)` / `window.krtModal.close(el | id)`
 — or the shared `data-trigger="open-modal-display"` / `"close-modal-display"` triggers, which call
-it. Never write `overlay.style.display`, never toggle `krtm-modal-open` yourself: the contract
+it. Never write `overlay.style.display`, never toggle `is-open` yourself: the contract
 calls `showModal()`, moves focus in and back, handles Escape, and keeps the class state that live
 sync and the tests read. While a dialog is open the page behind it is inert, so anything you append
 for the user to see or click — a toast, a confirm, a download link — goes into

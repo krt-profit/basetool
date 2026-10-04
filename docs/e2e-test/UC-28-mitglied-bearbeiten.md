@@ -34,7 +34,7 @@ Der Admin öffnet die Editseite des Mitglieds und speichert einen geänderten Ra
 
 Der Save landet: kein Fehler-Toast, kein Optimistic-Lock-Reload-Dialog (`.krt-confirm-overlay`), der Marker `window.__krtNoReload` überlebt, und der per Backend gelesene Rang (`GET /api/v1/users/{id}`) entspricht dem gesetzten Wert.
 
-Nach dem Klick auf „Zweite Staffel hinzufügen" ist der zweite Staffel-Slot tatsächlich sichtbar (REQ-ORG-017). Das ist ein reiner Client-Toggle ohne Schreibzugriff. Regressionsschutz für die Falle Klasse vs. Inline-Stil (ADR-0093): Slot 2 startet über die Klasse `krtm-hidden` verborgen; ein früherer Versuch, das per Inline-`style.display` zu überschreiben, ließ den Button verschwinden, während der Slot versteckt blieb.
+Nach dem Klick auf „Zweite Staffel hinzufügen" ist der zweite Staffel-Slot tatsächlich sichtbar (REQ-ORG-017). Das ist ein reiner Client-Toggle ohne Schreibzugriff. Regressionsschutz für die Falle Klasse vs. Inline-Stil (ADR-0093): Slot 2 startet über die Klasse `is-hidden` (bis 2026-10-04 `krtm-hidden`) verborgen; ein früherer Versuch, das per Inline-`style.display` zu überschreiben, ließ den Button verschwinden, während der Slot versteckt blieb.
 
 ## Sonderfälle & Lehren
 
