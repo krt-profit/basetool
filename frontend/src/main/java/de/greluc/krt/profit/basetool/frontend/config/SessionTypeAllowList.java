@@ -43,9 +43,9 @@ import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
  *
  * <p>Allowed: direct members of {@code java.util} and {@code java.time}, the {@link
  * #ALLOWED_EXACT_NAMES}, {@code org.springframework.security.*}, the direct members of {@code
- * org.springframework.validation}, {@code de.greluc.krt.profit.basetool.frontend.model.*} and
- * {@link RedisSessionConfig#CONTAINER_WRITTEN_FINAL_SESSION_TYPES}. Names are matched before a
- * class is loaded.
+ * org.springframework.validation}, the application's {@link #SESSION_BOUND_TYPES} and {@link
+ * RedisSessionConfig#CONTAINER_WRITTEN_FINAL_SESSION_TYPES}. Names are matched before a class is
+ * loaded; no application class is admitted by a prefix.
  *
  * <p>{@code app.session.type-allow-list} selects {@link Mode#OFF} (everything allowed, nothing
  * counted), {@link Mode#REPORT} (opt-in: everything read, outsiders counted and logged) or {@link
@@ -79,12 +79,40 @@ public final class SessionTypeAllowList {
   static final Pattern VALIDATION_TYPES =
       Pattern.compile("org\\.springframework\\.validation\\.[\\w$]+");
 
-  /**
-   * Name prefixes allowed wholesale: Spring Security, and the application's own session-bound model
-   * (forms and DTOs in {@code frontend.model}).
-   */
+  /** Name prefixes allowed wholesale: Spring Security only. */
   static final @Unmodifiable List<String> ALLOWED_PREFIXES =
-      List.of("org.springframework.security.", "de.greluc.krt.profit.basetool.frontend.model.");
+      List.of("org.springframework.security.");
+
+  /**
+   * The application's session-bound types, matched exactly (REQ-SEC-067, REQ-FE-027, D-10): the
+   * forms and DTOs the frontend flashes or stores in the session, their nested types and enums.
+   * {@code SessionBoundTypeClosureTest} derives this set from the compiled code and fails when it
+   * differs from this list.
+   */
+  static final @Unmodifiable List<String> SESSION_BOUND_TYPES =
+      List.of(
+          "de.greluc.krt.profit.basetool.frontend.model.dto.BankWipeResetResultDto",
+          "de.greluc.krt.profit.basetool.frontend.model.dto.ImportIssueCode",
+          "de.greluc.krt.profit.basetool.frontend.model.dto.ImportIssueDto",
+          "de.greluc.krt.profit.basetool.frontend.model.dto.ImportIssueSeverity",
+          "de.greluc.krt.profit.basetool.frontend.model.dto.ImportSuggestionDto",
+          "de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryLocationType",
+          "de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderStatus",
+          "de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm",
+          "de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm$AllocationRow",
+          "de.greluc.krt.profit.basetool.frontend.model.form.JobOrderForm",
+          "de.greluc.krt.profit.basetool.frontend.model.form.JobOrderForm$JobOrderMaterialForm",
+          "de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemForm",
+          "de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemForm$JobOrderItemLineForm",
+          "de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemForm"
+              + "$JobOrderItemMaterialForm",
+          "de.greluc.krt.profit.basetool.frontend.model.form.MissionForm",
+          "de.greluc.krt.profit.basetool.frontend.model.form.PersonalInventoryForm",
+          "de.greluc.krt.profit.basetool.frontend.model.form.RefineryGoodForm",
+          "de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderForm",
+          "de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderStoreForm",
+          "de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderStoreItemForm",
+          "de.greluc.krt.profit.basetool.frontend.model.form.ShipForm");
 
   /**
    * Individually allowed class names, matched exactly so a class sharing a prefix is not allowed by
@@ -195,6 +223,9 @@ public final class SessionTypeAllowList {
       builder.allowIfSubType(prefix);
     }
     for (String exact : ALLOWED_EXACT_NAMES) {
+      builder.allowIfSubType(Pattern.compile(Pattern.quote(exact)));
+    }
+    for (String exact : SESSION_BOUND_TYPES) {
       builder.allowIfSubType(Pattern.compile(Pattern.quote(exact)));
     }
     for (String exact : RedisSessionConfig.CONTAINER_WRITTEN_FINAL_SESSION_TYPES) {

@@ -5,7 +5,8 @@
 - **Deciders:** @greluc
 - **Requirement:** [REQ-SEC-067](../specs/security-and-access.md)
 - **Amended:** 2026-09-23 (final types in containers), 2026-09-26 (the flash-map list), 2026-10-02
-  (an exact list of the application's own session types, decided; implementation pending)
+  (an exact list of the application's own session types, decided), 2026-10-04 (that list
+  implemented)
 - **Related:** [ADR-0154](0154-a-container-written-final-session-value-gets-a-forced-type-id.md)
   (the one container class that needed a forced type id, now an allow-list entry too),
   [ADR-0157](0157-a-dropped-session-value-is-repaired-on-the-request-that-found-it.md) (what happens
@@ -46,7 +47,8 @@ production's real sessions before it refuses anything.
    members only — `java.util.logging`, `java.util.concurrent` are out), `org.springframework.security.*`,
    `FlashMap` and `LinkedMultiValueMap` by exact name, the direct members of
    `org.springframework.validation` (`beanvalidation` is out), the application's own
-   `de.greluc.krt.profit.basetool.frontend.model.*`, and `CONTAINER_WRITTEN_FINAL_SESSION_TYPES`. The
+   `de.greluc.krt.profit.basetool.frontend.model.*` (narrowed to an exact list by Amendment 3), and
+   `CONTAINER_WRITTEN_FINAL_SESSION_TYPES`. The
    builder is handed to `SecurityJacksonModules`, which adds Spring Security's exact types on top.
 2. **Three modes**, `app.session.type-allow-list` / `APP_SESSION_TYPE_ALLOW_LIST`: `off` (the old
    validator byte for byte), `report` (opt-in — everything is read as before, a class outside the
@@ -77,8 +79,9 @@ production's real sessions before it refuses anything.
   value *is* the security context, which a class outside `org.springframework.security` cannot be.
   The parity test proves the security context, both tokens, the authorization request, the CSRF
   token, the saved request and the flash maps read identically.
-- **A new session attribute of a new type is a list change.** A form or DTO under `frontend.model`
-  needs none; anything else does, in the same PR, and `report` mode names it in production first.
+- **A new session attribute of a new type is a list change.** Since Amendment 3 that includes a
+  form or DTO of our own: it gets an entry in `SESSION_BOUND_TYPES` in the same PR, and the closure
+  test fails the build until it has one.
 - **A class the name matchers leave undecided is still loaded** before the class-level check refuses
   it — that is how Jackson's two-step validation works and how Spring Security's class matchers are
   consulted. Loading runs a static initializer, not a constructor or a setter; the gadget risk is the
@@ -130,6 +133,19 @@ when the list and the derivation differ, and a second test fails on any entry br
 of a model or session package. The change ships in its own release, before the frontend move, so a
 missed type shows on `basetool_session_type_refused_total` before any class moves. The list is never widened back to a prefix
 (plan §6, red lines). Decision points 2 to 5 and the other entries are unchanged.
+
+**Implemented 2026-10-04.** `SessionTypeAllowList.ALLOWED_PREFIXES` holds only
+`org.springframework.security.`; the application's types are `SessionTypeAllowList.SESSION_BOUND_TYPES`,
+21 exact names (10 flashed forms and DTOs with their nested types and enums), matched like the other
+exact names. The list lives in the security class itself rather than in a test resource, so the
+code that admits a type and the review of it are one diff; `SessionBoundTypeClosureTest` fails when
+it and the derived set differ in either direction, and replaces the golden file that G-16 committed
+for the derivation. A type off the list takes the unchanged `enforce` path — refused, counted on
+`basetool_session_type_refused_total{mode="enforce"}`, the attribute dropped and repaired. A session
+written by the release before can hold only types that release's code stores, which is the derived
+list, so the switch refuses nothing that already sits in Redis; were it to, the member would lose
+one attribute (at most one redirect's flash values), never the login, which is held in Spring
+Security and JDK types. Mode default unchanged: `enforce`.
 
 ## Alternatives rejected
 

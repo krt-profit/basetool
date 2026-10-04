@@ -400,6 +400,12 @@
 
 ### Security
 
+- **Frontend: die Session liest nur noch die 21 Anwendungstypen, die wirklich dort landen.** Statt
+  aller 325 Klassen unter `frontend.model` nennt die Session-Allow-List die aus dem Code abgeleiteten
+  Formulare und DTOs einzeln; ein neuer Session-Typ ohne Eintrag bricht den Build. Geht als eigenes
+  Release vor dem Paket-Umbau des Frontends live (D-10); niemand wird abgemeldet, Konfiguration
+  unverändert (REQ-SEC-067, REQ-FE-027).
+
 - **Monitoring: Grafana 13.2.2 → 13.2.3.** Sicherheitsrelease gegen CVE-2026-13719,
   CVE-2026-13720 und CVE-2026-81841 (je mittlere Schwere: Alert-Regeln fremder Ordner lesbar,
   Provisioning-Metadaten durch Editoren setzbar, pausierter öffentlicher Dashboard-Link blieb

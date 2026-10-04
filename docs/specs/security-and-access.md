@@ -3673,13 +3673,29 @@ Redis, which three services reach (APPSEC-05, improvement audit 2026-09-22).
 | `com.nimbusds.oauth2.sdk.util.OrderedJSONObject` — exact name | a token-response JSON object as the Nimbus OAuth 2.0 SDK parses it, inside the stored authorized client (added 2026-09-23: under `enforce` its refusal dropped `AUTHORIZED_CLIENTS` and looped every E2E login) |
 | `org.springframework.security.*` | security context, OAuth2 login and authorized-client state, CSRF token, saved request (the Security Jackson modules add their own exact types on top) |
 | `org.springframework.web.servlet.FlashMap`, `java.util.concurrent.CopyOnWriteArrayList`, `org.springframework.util.LinkedMultiValueMap` — exact names; direct members of `org.springframework.validation` | a redirect's flash attributes, in the `CopyOnWriteArrayList` Spring's `SessionFlashMapManager` stores them in (added 2026-09-26); `validation.beanvalidation` and the rest of `java.util.concurrent` are **not** covered |
-| `de.greluc.krt.profit.basetool.frontend.model.*` | the application's own forms and DTOs, flashed across a redirect |
+| `SessionTypeAllowList.SESSION_BOUND_TYPES` — exact names, 21 on 2026-10-04 | the application's own forms and DTOs flashed across a redirect, with their nested types and enums; derived from the code by `SessionBoundTypeClosureTest` (REQ-FE-027). Until 2026-10-04 the prefix `de.greluc.krt.profit.basetool.frontend.model.` admitted every class of that package (325); no application class is admitted by a prefix any more (D-10) |
 | `CONTAINER_WRITTEN_FINAL_SESSION_TYPES` | Tomcat's WebSocket binding listener (REQ-SEC-049) |
 
-A new session attribute of a type outside the list is a change to this table, in the same PR.
+A new session attribute of a type outside the list is a change to this table, in the same PR — and
+for an application type, an entry in `SESSION_BOUND_TYPES` in the same PR.
 `SessionBoundTypeClosureTest` derives every session-bound type from the compiled code and fails the
-build when one falls outside the list, and `SessionTypeAllowListBreadthTest` refuses an entry
-broader than a model or session package (REQ-FE-027).
+build when the derived application types and `SESSION_BOUND_TYPES` differ in either direction (a
+missing entry or a stale one), and `SessionTypeAllowListBreadthTest` refuses any prefix other than
+`org.springframework.security.` and any `SESSION_BOUND_TYPES` entry that is not one plain frontend
+class name (REQ-FE-027).
+
+**What a refused value costs a session written by an older release.** The narrowing ships in its
+own release, before any frontend class moves (D-10). A session written by the release before it can
+hold only types that release's code stores, and the list is derived from that same code, so no
+stored value is newly refused by the switch. Were one refused anyway, it would take the same path as
+every refusal under `enforce`: `FaultTolerantSessionSerializer` turns that one attribute into an
+`UnreadableSessionValue`, `SessionAttributeDiagnosticMapper` logs and drops it, the session repair
+removes it on the same request (REQ-SEC-050), and it is counted on
+`basetool_session_type_refused_total{mode="enforce"}` and
+`basetool_session_value_dropped_total{cause="InvalidTypeIdException"}`. The login is not touched:
+the security context and the authorized clients are Spring Security and JDK types, which the list
+still admits; the member loses at most the flash attributes of one redirect (a toast or a
+re-shown form).
 
 > [!warning] Corrected 2026-09-23 — the first list refused every signed-in member under `enforce`
 > The list as merged (PR #2018) had no `java.lang`, `java.math` or `java.net` entry and not the
@@ -3724,6 +3740,10 @@ touches no stored session and needs no migration.
   instantiated, dropped as an unreadable attribute and counted on both counters.
 - [ ] Under `report` that same value is read and reported; under `off` it is read and not reported.
 - [ ] A subpackage of an allowed JDK or Spring package is not allowed by the parent entry.
+- [x] A class of `frontend.model` that is not on `SESSION_BOUND_TYPES` (`InventoryBookOutForm`) is
+  refused under `enforce`, dropped and counted exactly like any other outsider, while a listed form
+  reads back (`SessionTypeAllowListTest#aModelPackageClassOffTheExactList_isRefusedDroppedAndCountedLikeAnyOutsider`,
+  2026-10-04).
 - [x] A missing or mistyped mode falls back to `enforce`, never to a failed startup or a weaker
   check; `application.yml`, the `@Value` default, `docker-compose.yml` and the Quadlet env template
   all default to it (`SessionTypeAllowListTest#theShippedDefaultIsEnforce`).
