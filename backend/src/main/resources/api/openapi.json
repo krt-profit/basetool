@@ -15642,6 +15642,13 @@
           "schema" : {
             "type" : "string"
           }
+        }, {
+          "in" : "query",
+          "name" : "fitted",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
         } ],
         "responses" : {
           "200" : {
@@ -51895,7 +51902,7 @@
     },
     "/api/v1/personal-blueprints/overview" : {
       "get" : {
-        "description" : "Paginated; the optional product-name search filters before pagination so it spans every entry, not just the requested page.",
+        "description" : "Paginated; the optional search matches the product name or the display name of an in-scope owner and filters before pagination, so it spans every entry, not just the requested page.",
         "operationId" : "listAvailableBlueprints",
         "parameters" : [ {
           "in" : "query",

@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
 > **Owner area:** INV/UI · **Related ADRs:** none
 
 # Blueprint availability overview — list & drill-down contract
@@ -6,8 +6,9 @@
 ## Context & goal
 
 The leadership oversight page "Blueprint-Verfügbarkeit" (#364) lists, per product, how
-many members of the caller's oversight org units own the crafting blueprint, with a lazy
-per-row drill-down that fetches the owning members' display names. Expanding a row is the
+many members of the caller's oversight org units own the crafting blueprint, with the owning
+members' display names read lazily per row (as chips once the row scrolls into view, the rest on
+expand). Expanding a row is the
 page's hot path: it is clicked repeatedly while browsing, so it must stay responsive
 regardless of how many blueprints the table lists and how many users exist in the system.
 This spec pins the performance contract of that drill-down after a regression where every
@@ -36,6 +37,11 @@ users outside the requested family.
   class toggled on the element itself by `blueprint-overview.js`; no CSS rule may
   derive the companion row's visibility from a `:has()`/sibling selector that the
   browser has to re-evaluate across the table on every toggle.
+- [ ] Each row shows its first four owners as chips in the column „Kann craften" and, when it has
+  more, a „+ n weitere" chip that expands the companion row with the remaining owners („Weniger
+  anzeigen" folds it again). The chips are read through the same per-row owners endpoint, only for
+  rows that scroll into view (all at once where `IntersectionObserver` is missing), at most four
+  requests at a time, and each row's answer is cached so expanding it costs no second request.
 - [ ] The drill-down expands the row's family key to its concrete product keys **once** via the
   cached `BlueprintVariantFamilyCatalog` (a base plus its cosmetic variants — usually a handful),
   rebuilt only on the periodic blueprint sync, so an expand click never rescans the blueprint master.
@@ -59,6 +65,10 @@ users outside the requested family.
 `BlueprintVariantFamilyCatalog`, `frontend/src/main/resources/static/js/blueprint-overview.js` ·
 **Issues:** #364
 
+*Amended 2026-10-03 (website overhaul phase 3):* the „Details" button per row is gone; the owners
+show as chips in the row („Kann craften") and only the overflow beyond four expands the companion
+row. The columns are Blueprint · Anzahl · Kann craften.
+
 ### REQ-INV-013 — True server-side pagination with selectable page size
 
 The availability list paginates server-side over **all** matching entries — the page never
@@ -75,9 +85,12 @@ chooses between 10, 50 and 100 entries per page.
   picker render from the shared design-system pagination component (`.pagination`,
   square `.page-btn` link group — no native `<select>`); choosing a size jumps back to
   page 0; the picker is hidden while the total fits the smallest size.
-- [ ] The product search executes server-side **before** pagination, so it spans every
+- [ ] The search executes server-side **before** pagination, so it spans every
   entry (not just the visible page), and the reported page count describes the
-  filtered set.
+  filtered set. It keeps a row whose product name **or** the display name of one of its
+  in-scope owners contains the term (case-insensitive), so a leader can find a person; the
+  names it reads are those of the owners the list already counts, never anyone outside the
+  caller's oversight scope, and without a search term no owner name is read.
 - [ ] Paging and re-sizing never drop an active search: every generated page-nav and
   size-picker link carries the `search` parameter along.
 
@@ -85,6 +98,9 @@ chooses between 10, 50 and 100 entries per page.
 `BlueprintOverviewPageControllerTest`, `BlueprintOverviewPageControllerMvcTest` ·
 **Code:** `PersonalBlueprintOverviewService`, `BlueprintOverviewPageController`,
 `fragments/pagination.html` · **Issues:** #364
+
+*Amended 2026-10-03 (website overhaul phase 3):* the search also matches the display names of the
+in-scope owners (placeholder „Blueprint oder Person suchen …"), read only when a term is given.
 
 ## Out of scope
 

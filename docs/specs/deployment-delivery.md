@@ -1661,7 +1661,9 @@ fail-closed, exactly as REQ-OPS-015 specifies.
   additionally keeps `contents: write` for the release itself. In `release-images.yml` both are
   declared **per job, on the signing jobs only** (`merge`, `build-config`, `build-keycloak-spi`);
   the jobs that run the project's build (`build`, `keycloak-spi-jar`) hold neither, so no build step
-  can mint a certificate under the release identity (audit item CI-SEC-04, 2026-09-22).
+  can mint a certificate under the release identity (audit item CI-SEC-04, 2026-09-22). In
+  `release-publish.yml` they sit on the `publish` job, which runs in the `main`-only `release`
+  environment; its `detect` job holds only `contents: read` and `pull-requests: read` (ADR-0201).
 - [ ] A published artifact verifies with `gh attestation verify` alone — no cosign, and no copy of
   the signer-identity regexp that `deploy.sh` and `promote.yml` must keep in sync.
 - [ ] `deploy.sh` is **unchanged**: the host-side gate remains the cosign verification of
@@ -2402,6 +2404,10 @@ the result onto the Dependabot branch.
   list, and its `Signed-off-by` matches the author.
 - **A digest that cannot be resolved is kept and warned about**, never dropped; the workflow never
   adds or removes a file.
+- **The test images follow the compose pins.** Each digest-pinned constant in the test-support
+  `TestImages` class (Redis, PostgreSQL) is moved to the digest `docker-compose.yml` pins for the same
+  `name:tag`, so `TestImagesTest` stays green on the bump; an image the compose file pins to two
+  digests is left alone with a warning.
 - **No `pull_request_target` or `workflow_run` trigger** is used for it.
 - **A Keycloak image bump to another minor is not completed automatically.** The follow-up does not
   touch the version catalog, so `keycloak-version` (REQ-OPS-040) stays red until a human moves the
@@ -2416,7 +2422,11 @@ the result onto the Dependabot branch.
 - [ ] A second run on the completed head commits nothing.
 - [ ] A Dependabot branch carrying a human commit or a merge commit is refused with an error naming
   the commit.
-- [x] `dependabot_compose_followup.py --selftest` passes in `repo-lint.yml` (`quadlet-drift`).
+- [x] `dependabot_compose_followup.py --selftest` passes in `repo-lint.yml` (`quadlet-drift`),
+  including the `sync-test-images` cases and the check that the real `TestImages` and
+  `docker-compose.yml` still hold the Redis and PostgreSQL pins it syncs.
+- [ ] A Redis or PostgreSQL digest bump's `basetool-release[bot]` commit also moves the matching
+  `TestImages` constant.
 
 **Enforced by:** `.github/workflows/dependabot-compose.yml` ·
 `.github/scripts/dependabot_compose_followup.py` · `.github/scripts/create_signed_commit.py` ·

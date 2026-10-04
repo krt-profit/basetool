@@ -380,7 +380,7 @@ EN + base bundles, `{interessent}`/`{material}` placeholders).
 **Enforced by:** `MaterialExchangeServiceTest`, `RuleEvaluationServiceTest`,
 `MessageBundleConsistencyTest` · **Code:**
 `MaterialExchangeService#registerInterestInNewTransaction`,
-`event/MaterialExchangeInterestRegisteredEvent`, `model/NotificationEventType`,
+`materialexchange/api/events/MaterialExchangeInterestRegisteredEvent`, `model/NotificationEventType`,
 `model/NotificationType`, `db/migration/V211__seed_material_exchange_interest_notification_rule.sql`
 
 ### REQ-MARKET-012 — Offer a craftable item (blueprint product) with a stated quantity
@@ -655,7 +655,7 @@ EN + base bundles, `{lieferant}`/`{material}` placeholders).
 
 **Enforced by:** `MaterialRequestServiceTest`, `MessageBundleConsistencyTest` · **Code:**
 `MaterialRequestService#signalFulfillmentInNewTransaction`,
-`event/MaterialRequestFulfillmentSignalledEvent`, `model/NotificationEventType`,
+`materialexchange/api/events/MaterialRequestFulfillmentSignalledEvent`, `model/NotificationEventType`,
 `model/NotificationType`,
 `db/migration/V225__seed_material_exchange_request_fulfillment_notification_rule.sql`
 

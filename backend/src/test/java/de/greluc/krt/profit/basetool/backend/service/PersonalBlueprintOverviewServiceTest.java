@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipReposit
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -205,6 +206,63 @@ class PersonalBlueprintOverviewServiceTest {
     assertEquals(2, page.getTotalElements());
     assertEquals(1, page.getContent().size());
     assertEquals("Caterpillar", page.getContent().get(0).productName());
+  }
+
+  @Test
+  void list_search_alsoMatchesAnInScopeOwnersDisplayName() {
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(true, null, Set.of()));
+    when(personalBlueprintRepository.findAllDistinctOwnerUserIds())
+        .thenReturn(Set.of(USER_1, USER_2));
+    when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(any()))
+        .thenReturn(
+            List.of(
+                op("Aurora MR", USER_1),
+                op("Cutlass Black", USER_2),
+                op("Scattergun", USER_1),
+                op("Scattergun", USER_2)));
+    when(userRepository.findAllById(any()))
+        .thenReturn(List.of(user(USER_1, "Greluc"), user(USER_2, "Nyx")));
+
+    Page<BlueprintOverviewEntryDto> page = service.listAvailableBlueprints(byName(), "NYX");
+
+    assertEquals(
+        List.of("Cutlass Black", "Scattergun"),
+        page.getContent().stream().map(BlueprintOverviewEntryDto::productName).toList());
+    assertEquals(2, page.getTotalElements());
+  }
+
+  @Test
+  void list_search_readsOnlyTheInScopeOwnersNames() {
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, ORG_A, Set.of()));
+    when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_A)))
+        .thenReturn(Set.of(USER_1));
+    when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(any()))
+        .thenReturn(List.of(op("Aurora MR", USER_1)));
+    ArgumentCaptor<Iterable<UUID>> nameLookup = ArgumentCaptor.captor();
+    when(userRepository.findAllById(nameLookup.capture()))
+        .thenReturn(List.of(user(USER_1, "Alpha")));
+
+    Page<BlueprintOverviewEntryDto> page = service.listAvailableBlueprints(byName(), "bravo");
+
+    assertTrue(page.getContent().isEmpty());
+    Set<UUID> looked = new HashSet<>();
+    nameLookup.getValue().forEach(looked::add);
+    assertEquals(Set.of(USER_1), looked);
+  }
+
+  @Test
+  void list_withoutSearch_readsNoOwnerNames() {
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(true, null, Set.of()));
+    when(personalBlueprintRepository.findAllDistinctOwnerUserIds()).thenReturn(Set.of(USER_1));
+    when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(any()))
+        .thenReturn(List.of(op("Aurora MR", USER_1)));
+
+    service.listAvailableBlueprints(byName(), "  ");
+
+    verify(userRepository, never()).findAllById(any());
   }
 
   @Test

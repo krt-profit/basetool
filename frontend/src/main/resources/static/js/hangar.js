@@ -24,12 +24,17 @@ document.addEventListener('DOMContentLoaded', function () {
     const closeBtn = document.querySelector('.close-ship-modal');
     const form = document.getElementById('ship-form');
     const modalTitle = document.getElementById('modal-title');
+    const filterForm = document.getElementById('hangar-filter-form');
+
+    function currentListUrl() {
+        const query = new URLSearchParams(window.location.search).toString();
+        return '/hangar' + (query ? '?' + query : '');
+    }
 
     function reswapHangar() {
         if (window.krtFetch) {
-            const query = new URLSearchParams(window.location.search).toString();
             window.krtFetch.swap({
-                url: '/hangar?' + query,
+                url: currentListUrl(),
                 container: '#hangar-results',
                 history: false,
             });
@@ -65,6 +70,60 @@ document.addEventListener('DOMContentLoaded', function () {
             },
         });
     }
+
+    /**
+     * Copies the swapped list's totals into everything outside the list that shows them: the tab
+     * count, the readiness counter, the home-location ship count and the enabled state of the two
+     * hangar-wide menu entries.
+     */
+    function syncHangarStats() {
+        const stats = document.getElementById('hangar-stats');
+        if (!stats) return;
+        const totalRaw = stats.getAttribute('data-total');
+        const fittedRaw = stats.getAttribute('data-fitted');
+        const total = totalRaw === null || totalRaw === '' ? null : Number(totalRaw);
+        const fitted = fittedRaw === null || fittedRaw === '' ? null : Number(fittedRaw);
+
+        const tabCount = document.getElementById('hangar-tab-count-mine');
+        if (tabCount && total !== null) {
+            tabCount.textContent = String(total);
+        }
+
+        const summary = document.getElementById('hangar-fit-summary');
+        if (summary) {
+            if (total === null || fitted === null || total === 0) {
+                summary.hidden = true;
+            } else {
+                summary.textContent = String(hangarI18n.fitSummaryTemplate || '')
+                    .replace('{0}', String(fitted))
+                    .replace('{1}', String(total));
+                summary.hidden = false;
+            }
+        }
+
+        const count = total === null ? 0 : total;
+        ['set-home-location-btn', 'delete-all-ships-btn'].forEach(function (id) {
+            const item = document.getElementById(id);
+            if (!item) return;
+            const empty = count === 0;
+            item.disabled = empty;
+            if (empty) {
+                item.title = item.getAttribute('data-empty-title') || '';
+            } else {
+                item.removeAttribute('title');
+            }
+            if (id === 'set-home-location-btn') {
+                item.setAttribute('data-ship-count', String(count));
+            }
+        });
+    }
+
+    document.addEventListener('krt:swapped', function (e) {
+        const container = e && e.detail ? e.detail.container : null;
+        if (container && container.id === 'hangar-results') {
+            syncHangarStats();
+        }
+    });
 
     const insuranceValue = document.getElementById('ship-insurance');
     const insuranceMonths = document.getElementById('ship-insurance-months');
@@ -164,7 +223,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('ship-location').value = '';
         document.getElementById('ship-fitted').checked = false;
         document.getElementById('ship-version').value = '';
-        modalDeleteBtn.style.display = 'none';
+        modalDeleteBtn.hidden = true;
         openModal();
     }
 
@@ -179,7 +238,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('ship-version').value = btn.getAttribute('data-version');
         const action = btn.getAttribute('data-action');
         modalDeleteBtn.setAttribute('data-action', action.replace('/update', '/delete'));
-        modalDeleteBtn.style.display = 'block';
+        modalDeleteBtn.hidden = false;
         openModal();
     }
 
@@ -239,19 +298,14 @@ document.addEventListener('DOMContentLoaded', function () {
     (function () {
         const importBtn = document.getElementById('fleetview-import-btn');
         const fileInput = document.getElementById('fleetview-file');
-        const statusEl = document.getElementById('fleetview-status');
         const resultModal = document.getElementById('import-result-modal');
         const closeResultBtn = document.getElementById('import-result-close');
         const closeResultX = document.getElementById('import-result-close-x');
 
-        function showStatus(msg, color) {
-            statusEl.textContent = msg;
-            statusEl.style.color = color || 'var(--color-primary)';
-            statusEl.style.display = 'block';
-        }
-
-        function hideStatus() {
-            statusEl.style.display = 'none';
+        function showError(msg) {
+            if (window.showFrontendErrorToast) {
+                window.showFrontendErrorToast(msg);
+            }
         }
 
         function fillParagraphs(list, names) {
@@ -271,21 +325,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const skipSection = document.getElementById('import-skip-section');
             const skipList = document.getElementById('import-skip-list');
-            if (data.skippedShips && data.skippedShips.length > 0) {
+            const hasSkipped = !!(data.skippedShips && data.skippedShips.length > 0);
+            if (hasSkipped) {
                 fillParagraphs(skipList, data.skippedShips);
-                skipSection.style.display = 'block';
-            } else {
-                skipSection.style.display = 'none';
             }
+            skipSection.hidden = !hasSkipped;
 
             const dupSection = document.getElementById('import-dup-section');
             const dupList = document.getElementById('import-dup-list');
-            if (data.duplicateShips && data.duplicateShips.length > 0) {
+            const hasDuplicates = !!(data.duplicateShips && data.duplicateShips.length > 0);
+            if (hasDuplicates) {
                 fillParagraphs(dupList, data.duplicateShips);
-                dupSection.style.display = 'block';
-            } else {
-                dupSection.style.display = 'none';
             }
+            dupSection.hidden = !hasDuplicates;
 
             window.krtModal.open(resultModal);
         }
@@ -306,46 +358,34 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        if (importBtn) {
-            importBtn.addEventListener('click', function () {
-                const file = fileInput.files[0];
-                if (!file) {
-                    showStatus(importBtn.getAttribute('data-error-nofile'), 'var(--color-danger)');
-                    return;
-                }
-                const maxBytes = Number(importBtn.getAttribute('data-max-bytes'));
-                if (maxBytes > 0 && file.size > maxBytes) {
-                    showStatus(
-                        importBtn.getAttribute('data-error-toolarge'),
-                        'var(--color-danger)',
-                    );
-                    return;
-                }
-                if (!window.krtFetch) {
-                    return;
-                }
-                const formData = new FormData();
-                formData.append('file', file);
+        function upload(file) {
+            const maxBytes = Number(importBtn.getAttribute('data-max-bytes'));
+            if (maxBytes > 0 && file.size > maxBytes) {
+                showError(importBtn.getAttribute('data-error-toolarge'));
+                return;
+            }
+            if (!window.krtFetch) {
+                return;
+            }
+            const formData = new FormData();
+            formData.append('file', file);
 
-                showStatus(importBtn.getAttribute('data-uploading'));
+            function showFailure(detail) {
+                showError(
+                    importBtn.getAttribute('data-error-failed') +
+                        (detail ? ' (' + detail + ')' : ''),
+                );
+            }
 
-                function showFailure(detail) {
-                    showStatus(
-                        importBtn.getAttribute('data-error-failed') +
-                            (detail ? ' (' + detail + ')' : ''),
-                        'var(--color-danger)',
-                    );
-                }
-
-                window.krtFetch.submitForm({
+            importBtn.setAttribute('aria-busy', 'true');
+            window.krtFetch
+                .submitForm({
                     url: '/hangar/import/ships',
                     method: 'POST',
                     formData,
                     submitter: importBtn,
                     toast: false,
                     onSuccess(data) {
-                        hideStatus();
-                        fileInput.value = '';
                         openResultModal(data);
                     },
                     onError(status, body) {
@@ -356,7 +396,22 @@ document.addEventListener('DOMContentLoaded', function () {
                         showFailure('');
                         return true;
                     },
+                })
+                .then(function () {
+                    importBtn.removeAttribute('aria-busy');
+                    fileInput.value = '';
                 });
+        }
+
+        if (importBtn && fileInput) {
+            importBtn.addEventListener('click', function () {
+                fileInput.click();
+            });
+            fileInput.addEventListener('change', function () {
+                const file = fileInput.files && fileInput.files[0];
+                if (file) {
+                    upload(file);
+                }
             });
         }
     })();
@@ -370,6 +425,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!deleteAllBtn || !deleteAllModal) return;
 
         deleteAllBtn.addEventListener('click', function () {
+            if (deleteAllBtn.disabled) return;
             window.krtModal.open(deleteAllModal);
         });
 
@@ -429,7 +485,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-            window.krtEvents.on('click', 'hangar-open-home', function () {
+            window.krtEvents.on('click', 'hangar-open-home', function (btn) {
+                if (btn && btn.disabled) return;
                 refreshHomeBody();
                 window.krtModal.open(homeModal);
             });
@@ -537,77 +594,77 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let hangarFilterTimer = null;
 
-    function applyHangarFilter(url) {
-        const resultsContainer = document.getElementById('hangar-results');
-        const form = document.getElementById('hangar-filter-form');
-        if (!resultsContainer || !window.krtFetch) {
-            if (url) {
-                window.location.assign(url);
-            } else if (form) {
-                form.submit();
-            }
-            return Promise.resolve(false);
-        }
-        let target = url;
-        if (!target) {
-            const params = new URLSearchParams();
-            if (form) {
-                const data = new FormData(form);
-                for (const [key, value] of data.entries()) {
-                    if (value !== '') {
-                        params.append(key, value);
-                    }
+    function filterUrl() {
+        const params = new URLSearchParams();
+        if (filterForm) {
+            const data = new FormData(filterForm);
+            for (const [key, value] of data.entries()) {
+                if (value !== '') {
+                    params.append(key, value);
                 }
             }
-            const query = params.toString();
-            target = '/hangar' + (query ? '?' + query : '');
         }
-        return window.krtFetch
-            .swap({ url: target, container: resultsContainer, history: true })
-            .then(function (ok) {
-                const input = document.getElementById('hangar-ship-filter');
-                if (input) {
-                    input.focus();
-                    const v = input.value;
-                    try {
-                        input.setSelectionRange(v.length, v.length);
-                    } catch (_ignored) {}
-                }
-                return ok;
-            });
+        const query = params.toString();
+        return '/hangar' + (query ? '?' + query : '');
     }
 
-    document.addEventListener('input', function (e) {
-        if (!e.target || e.target.id !== 'hangar-ship-filter') {
+    function applyHangarFilter(url) {
+        const target = url || filterUrl();
+        if (!hangarResults || !window.krtFetch) {
+            window.location.assign(target);
             return;
         }
-        clearTimeout(hangarFilterTimer);
-        hangarFilterTimer = setTimeout(function () {
+        window.krtFetch.swap({ url: target, container: hangarResults, history: true });
+    }
+
+    if (filterForm) {
+        filterForm.addEventListener('input', function (e) {
+            if (!e.target || e.target.id !== 'hangar-ship-filter') {
+                return;
+            }
+            clearTimeout(hangarFilterTimer);
+            hangarFilterTimer = setTimeout(function () {
+                applyHangarFilter();
+            }, 300);
+        });
+
+        filterForm.addEventListener('change', function (e) {
+            if (!e.target || e.target.name !== 'fitted') {
+                return;
+            }
+            clearTimeout(hangarFilterTimer);
             applyHangarFilter();
-        }, 300);
-    });
+        });
 
-    document.addEventListener('submit', function (e) {
-        if (!e.target || e.target.id !== 'hangar-filter-form') {
-            return;
-        }
-        e.preventDefault();
-        clearTimeout(hangarFilterTimer);
-        applyHangarFilter();
-    });
+        filterForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            clearTimeout(hangarFilterTimer);
+            applyHangarFilter();
+        });
+    }
 
-    document.addEventListener('click', function (e) {
-        const clear = e.target.closest ? e.target.closest('#hangar-filter-clear') : null;
-        if (!clear) {
-            return;
-        }
-        e.preventDefault();
-        const input = document.getElementById('hangar-ship-filter');
-        if (input) {
-            input.value = '';
-        }
-        applyHangarFilter(clear.getAttribute('href'));
-    });
+    if (hangarResults) {
+        hangarResults.addEventListener('click', function (e) {
+            const clear = e.target.closest
+                ? e.target.closest('[data-testid="empty-state-action"]')
+                : null;
+            if (!clear || !hangarResults.contains(clear)) {
+                return;
+            }
+            e.preventDefault();
+            const input = document.getElementById('hangar-ship-filter');
+            if (input) {
+                input.value = '';
+            }
+            if (filterForm) {
+                filterForm.querySelectorAll('input[name="fitted"]').forEach(function (radio) {
+                    radio.checked = radio.value === '';
+                });
+            }
+            clearTimeout(hangarFilterTimer);
+            applyHangarFilter(clear.getAttribute('href'));
+        });
+    }
 
     if (window.krtFetch && typeof window.krtFetch.bindSwap === 'function') {
         window.krtFetch.bindSwap({ container: '#hangar-results', history: true });

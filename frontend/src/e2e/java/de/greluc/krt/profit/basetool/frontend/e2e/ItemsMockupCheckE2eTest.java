@@ -98,7 +98,7 @@ class ItemsMockupCheckE2eTest {
                   + " document.querySelector('.tab-nav .tab.active span')?.textContent, tabCount:"
                   + " document.querySelector('.tab-nav .tab.active .tab-count')?.textContent,"
                   + " oldTabs: !!document.querySelector('.krt-pi-tabs'), emptyState:"
-                  + " !!document.querySelector('.krt-personal-inventory .empty-state'),"
+                  + " !!document.querySelector('#pi-results .empty-state'),"
                   + " tableVisible: !!document.querySelector('.krt-pi-table'), modalFrame:"
                   + " !!document.querySelector('#krt-pi-modal .krt-modal'), dangerFrame:"
                   + " !!document.querySelector('#krt-pi-delete-modal .krt-modal--danger'),"
