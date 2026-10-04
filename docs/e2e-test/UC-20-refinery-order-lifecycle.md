@@ -25,7 +25,7 @@ Der User öffnet die Detailseite `/refinery-orders/{id}` (Bearbeiten/Abbrechen) 
 
 1. **Bearbeiten** — Detailseite, in der Eingangsmaterial-Combobox die erste angebotene Option wählen, `#oreSales` = `12345` setzen, Footer ausblenden, über den Speichern-Button (`button[form='refineryOrderMainForm']`) absenden; gewartet wird auf die Antwort des Update-`POST`.
 2. **Abbrechen** — Detailseite, Abbrechen-Submit im `…/{id}/delete`-Formular; das KRT-Bestätigungsmodal öffnet (#575) und wird mit `.krt-confirm-overlay .krt-confirm-ok` bestätigt; gewartet wird auf die Antwort des Delete-`POST`.
-3. **Status-Filter** — `/refinery-orders` (Default `OPEN`+`IN_PROGRESS`) zeigt den abgebrochenen Auftrag nicht; `/refinery-orders?status=CANCELED` zeigt ihn.
+3. **Status-Filter** — `/refinery-orders` (Segment „Läuft", also `OPEN`+`IN_PROGRESS`) zeigt den abgebrochenen Auftrag nicht; `/refinery-orders?status=CANCELED` zeigt ihn.
 4. **API-Edges** — Anlegen an einer Nicht-Raffinerie-Location (400), Anlegen mit leerer Waren-Liste (400), Update mit veralteter `version` (409).
 5. **Live-Sync** (`RefineryOrderLiveSyncE2eTest`, #1238) — zwei Browser-Kontexte desselben Nutzers öffnen denselben Auftrag, setzen je den Reload-Marker und warten, bis `window.krtLiveSync.subscribedTopics()` nicht leer ist. Kontext A macht das Formular absendbar (erste Option der Eingangsmaterial-Combobox), ändert Ore-Sales und speichert; Kontext B schaut nur zu.
 
@@ -33,13 +33,13 @@ Der User öffnet die Detailseite `/refinery-orders/{id}` (Bearbeiten/Abbrechen) 
 
 - Der geänderte Ore-Sales-Wert ist persistiert (GET `/api/v1/refinery-orders/{id}`).
 - Der abgebrochene Auftrag steht auf `CANCELED`.
-- Der `CANCELED`-Auftrag fehlt im Default-Filter und erscheint nach Anhaken von `CANCELED`.
+- Der `CANCELED`-Auftrag fehlt im Segment „Läuft" und erscheint unter dem exakten Filter `?status=CANCELED`.
 - Nicht-Raffinerie-Location → **400**; leere Waren-Liste → **400**; veraltete `version` → **409**.
 - Live-Sync: A rendert den Abschnitt `order` in place neu, B zeigt den neuen Ore-Sales-Wert ohne Reload; **beide** Marker überleben — ein Reload auf einer Seite fiele durch, statt sich als Live-Update auszugeben.
 
 ## Sonderfälle & Lehren
 
-- **Filter über die URL, nicht über den Button.** Das Formular der Status-Checkboxen wird per GET genau auf diesen `?status=…`-Vertrag abgeschickt, und sein „Filtern"-Button ist per JS ausgeblendet (Progressive Enhancement) — im Harness nicht klickbar. Die URL ruft denselben Backend-Filter auf wie die UI.
+- **Filter über die URL.** Die Liste hat seit 2026-10-03 die Segmente „Läuft · Abholbereit · Abgeschlossen · Alle" (`?view=…`) statt Status-Checkboxen; einen einzelnen Status wie `CANCELED` gibt es nur noch als exakten Filter `?status=…`, den die Liste weiter honoriert (REQ-REFINERY-019). Die URL ruft denselben Backend-Filter auf wie die UI.
 - **Warum die erste Material-Option:** Die Optionen des Eingangsmaterial-Pickers kommen aus der 10 Minuten gecachten Material-Liste, die das frisch geseedete Material noch nicht enthalten muss; ohne Auswahl blockiert die Pflichtfeld-Validierung das Speichern.
 - **Liste zeigt nur die letzten 4 Zeichen der Id**, die volle Id steckt aber im Details-Link (`a[href$='/refinery-orders/{id}']`) — das ist der robuste Zeilen-Selektor für Filter- und Scope-Assertions.
 - **Geld-Felder: 0 = nicht gesetzt.** `expenses`/`otherExpenses`/`oreSales` werden vom Backend per `zeroToNull` auf `null` normalisiert; der Test prüft daher einen echten Wert (12345) statt 0.

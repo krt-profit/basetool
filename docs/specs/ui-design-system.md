@@ -130,8 +130,9 @@ values exactly:
 > **Deprecated aliases — do not use as names.** Three earlier code names survive only as CSS
 > aliases so old code resolves: `--color-dept-combat` → Raumüberlegenheit, `--color-dept-research`
 > → Forschung, `--color-dept-marine` → Marinekorps (`styles.css` `:root`). Always use the official
-> names above; the last remaining consumer is `operation-detail.html`'s inline
-> `--color-dept-marine`.
+> names above. No stylesheet consumes the aliases any more: the last one, `operation-detail.css`'s
+> `--color-dept-marine`, went with the operation redesign of 2026-10-03, so the three aliases can go
+> in the phase-4 cleanup.
 
 **Acceptance**
 
@@ -392,10 +393,11 @@ clips it the overflow reads as "the spacing is wrong" rather than as a broken la
 non-shrinkable (10.5rem + `--space-2` + 7rem = an **18rem** floor). The measured defect is the
 participant edit modal: two groups in the 600px `.krt-modal--wide` frame get ~275px each, so the
 time part overflows by ~13px and "Endzeit" sits 3px from the modal border — at every desktop width
-from 1280px up. The mission Verwaltung form is the other multi-column user of the widget and is
-**not** affected today: its row keeps two groups per line at ≥18rem each across 1280–1800px, both
-before and after this rule. The rule is stated for the widget rather than scoped to the modal, so
-it also covers a future narrower row there.
+from 1280px up. The mission edit-mode form (formerly the Verwaltung tab) is the other multi-column
+user of the widget; since 2026-10-03 it lays its date/time groups out in an auto-fill grid
+(`.mission-time-grid`, columns of at least 18.5rem) rather than a `.form-row`, so it wraps by
+construction. The rule is stated for the widget rather than scoped to the modal, so it also covers
+a future narrower row there.
 
 Such a control declares its true minimum (`min-width: min(18rem, 100%)`) so the row **wraps** onto
 full-width lines instead of overflowing — where there is room the groups stay side by side, otherwise
@@ -510,10 +512,12 @@ space for a footer that is not there.
 **Two amendments to the dense-action exception, owner-approved 2026-09-13** after the first
 measured sweep of the touch classes found both:
 
-- **`.btn-xs2` is NOT exempt.** It is a page-local 32px variant declared in the page stylesheets
-  of `mission-detail.html` and `operation-detail.html` (inline `<style>` blocks until FE-PERF-02,
-  now `css/pages/mission-detail.css` / `operation-detail.css`, linked in the same place), and two of its instances are *form*
-  actions — „Ziel hinzufügen", „Schritt hinzufügen" on the Einsatz create form. The rule above is
+- **`.btn-xs2` is NOT exempt.** It is a page-local 32px variant declared in the page stylesheet of
+  `mission-detail.html` (an inline `<style>` block until FE-PERF-02, now
+  `css/pages/mission-detail.css`; `operation-detail.html` stopped using it on 2026-10-03), and three
+  of its instances are *form* actions — „Ziel hinzufügen", „Schritt hinzufügen" and „Frequenz
+  hinzufügen" in the mission's edit mode (the create form's own add buttons are plain `.btn`). The
+  rule above is
   explicit that a form button keeps the floor, so the whole variant is raised to 44px on the touch
   classes and keeps its density on desktop. The override is written `.btn.btn-xs2` because the
   page's inline rule is read *after* `styles.css`: at equal specificity the page would win and the
@@ -842,7 +846,7 @@ The mechanics follow the established idiom (REQ-ORDERS-027, REQ-UI-016):
   `null` = "no filter", so options added later stay included; on restore, stale values are dropped
   and an entirely stale subset falls back to the page's rendered no-filter default (all checked on
   the matrix/profit pages, all unchecked on the Lager views — semantically identical). Status
-  queues whose server default is a **subset** (orders, refinery: OPEN+IN_PROGRESS) store the
+  queues whose server default is a **subset** (orders: OPEN+IN_PROGRESS) store the
   checked list verbatim and collapse only zero-checked to `null`, so an explicit "show everything"
   choice survives (REQ-ORDERS-027 precedent).
 - The selection is persisted immediately on every change (never debounced with the re-fetch).

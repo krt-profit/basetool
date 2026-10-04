@@ -23,7 +23,7 @@ Der Nutzer bearbeitet einen Einsatz, filtert die Einsatzliste oder verschiebt au
 
 ### Kerndaten in place speichern (`MissionCoreEditInPlaceE2eTest`, #589)
 
-1. Im Tab Verwaltung den Namen ändern und speichern, dann ohne Reload ein zweites Mal speichern.
+1. Im Bearbeiten-Modus (`?tab=verw`, früher der Tab Verwaltung) den Namen ändern und speichern, dann ohne Reload ein zweites Mal speichern.
 2. Einen Kalender-Link ohne `https` eintragen — der Browser akzeptiert ihn (`type=url`), das Backend-`@Pattern` nicht — und speichern; danach mit gültigem Link erneut speichern.
 
 ### Verantwortlichen einer Einheit entfernen (`MissionUnitResponsibleClearE2eTest`)
@@ -42,8 +42,8 @@ Der Nutzer bearbeitet einen Einsatz, filtert die Einsatzliste oder verschiebt au
 ### Live-Sync zwischen zwei Betrachtern (`MissionLiveSyncE2eTest`, `MissionOrganisationLiveSyncE2eTest`)
 
 7. Kontext A fügt einen Gast-Teilnehmer hinzu; Kontext B schaut nur zu und lädt nie neu.
-8. Kontext A legt im Tab Verwaltung ein Ziel an; Kontext B hat den Ziele-Editor im Hintergrund offen.
-9. Kontext A setzt im Tab Verwaltung den Party-Lead auf einen Gast; Kontext B steht auf dem Standard-Tab. Vor der Mutation wartet der Test, bis `window.krtLiveSync.subscribedTopics()` das Thema `mission:{id}` enthält.
+8. Kontext A legt im Bearbeiten-Modus ein Ziel an; Kontext B hat den Ziele-Editor im Hintergrund offen.
+9. Kontext A setzt im Bearbeiten-Modus den Party-Lead auf einen Gast; Kontext B steht auf dem Standard-Tab. Vor der Mutation wartet der Test, bis `window.krtLiveSync.subscribedTopics()` das Thema `mission:{id}` enthält.
 
 ### Touch-Drag auf dem Crew-Board (`MissionCrewBoardTouchDragE2eTest`, #1936, REQ-MISSION-005, [ADR-0191](../adr/0191-touch-drags-the-crew-board-through-pointer-events.md))
 
@@ -52,7 +52,7 @@ Der Nutzer bearbeitet einen Einsatz, filtert die Einsatzliste oder verschiebt au
 
 ### Besitzerwechsel mit Versionszähler (`MissionOwnerChangeE2eTest`, #1994, BE-SIMP-03)
 
-12. Im Tab Verwaltung den Besitzer über die Server-Such-Combobox auf `test-member` setzen und den Bestätigungsdialog annehmen (`PUT /missions/{id}/owner/ajax`); `#owner-row` trägt vorher `data-ownership-version="0"`.
+12. Im Bearbeiten-Modus den Besitzer über die Server-Such-Combobox auf `test-member` setzen und den Bestätigungsdialog annehmen (`PUT /missions/{id}/owner/ajax`); `#owner-row` trägt vorher `data-ownership-version="0"`.
 13. Den Zähler auf der Zeile auf `0` zurücksetzen — die Seite eines zweiten Verwalters, die vor dem Wechsel geöffnet wurde — und den Besitzer auf `test-officer` setzen.
 
 ## Erwartetes Ergebnis

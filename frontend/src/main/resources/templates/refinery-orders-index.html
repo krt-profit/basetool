@@ -1,110 +1,106 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
-    <title th:text="#{nav.refinery}">Raffinerie</title>
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{refineryorder.index.title} + ' - ' + ${appTitle}">Raffinerie - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/pages/refinery-orders-index.css}">
+    </th:block>
 </head>
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
 
 <th:block th:replace="~{fragments/header :: header}" />
 
-<main>
-    <div class="greeting hud-box flex-between">
-        <h1 th:text="#{nav.refinery}">Raffinerieaufträge</h1>
-        <a th:href="@{/refinery-orders/create(source='index')}" class="btn btn--cta" data-testid="refinery-create-link" th:text="#{refineryorder.create.btn}">Neuer Auftrag</a>
-    </div>
-
-    <div class="hud-box mt-2">
-        <div class="actions-bar">
-            <div th:replace="~{fragments/components :: filterToggle('refinery-filter-panel', 'refinery-filter-toggle')}"></div>
-        </div>
-
-        <div class="filter-panel" id="refinery-filter-panel" data-filter-panel="refinery-orders">
-        <form id="refinery-filter-form" class="no-track krtm-display-flex-gap-1rem-margin-bottom-1rem-ali-e265" method="get" th:action="@{/refinery-orders}">
-            <span th:text="#{orders.index.filter.status}" class="krtm-font-weight-700-font-size-0-8rem-color-var-c-eed8">Status:</span>
-            <label class="flex-gap-2xs">
-                <input type="checkbox" name="status" value="OPEN" th:checked="${selectedStatuses != null and selectedStatuses.contains('OPEN')}">
-                <span th:text="#{refineryorder.status.OPEN}">Offen</span>
-            </label>
-            <label class="flex-gap-2xs">
-                <input type="checkbox" name="status" value="IN_PROGRESS" th:checked="${selectedStatuses != null and selectedStatuses.contains('IN_PROGRESS')}">
-                <span th:text="#{refineryorder.status.IN_PROGRESS}">In Bearbeitung</span>
-            </label>
-            <label class="flex-gap-2xs">
-                <input type="checkbox" name="status" value="COMPLETED" th:checked="${selectedStatuses != null and selectedStatuses.contains('COMPLETED')}">
-                <span th:text="#{refineryorder.status.COMPLETED}">Abgeschlossen</span>
-            </label>
-            <label class="flex-gap-2xs">
-                <input type="checkbox" name="status" value="CANCELED" th:checked="${selectedStatuses != null and selectedStatuses.contains('CANCELED')}">
-                <span th:text="#{refineryorder.status.CANCELED}">Abgebrochen</span>
-            </label>
-            <label class="krtm-display-flex-align-items-center-gap-0-25rem-675b">
-                <input type="checkbox" name="onlyMine" value="true" th:checked="${onlyMine}">
-                <span th:text="#{refineryorder.index.filter.onlyMine}">Meine Aufträge</span>
-            </label>
-            <button type="submit" class="btn btn-ghost krtm-padding-0-25rem-0-75rem-font-size-0-8rem-e5f2" th:text="#{orders.index.filter.apply}">Filtern</button>
-        </form>
-        </div>
-
-        <div id="refinery-orders-results">
-        <th:block th:fragment="refineryOrdersResults">
-        <div class="table-responsive">
-        <table class="data-table">
-            <thead>
-            <tr>
-                <th th:text="#{refineryorder.index.id}">ID</th>
-                <th th:text="#{refineryorder.index.owner}">Besitzer</th>
-                <th class="nowrap krtm-width-1-bd93" th:text="#{refineryorder.index.endsAt}">Ende</th>
-                <th th:text="#{refineryorder.index.location}">Ort</th>
-                <th th:text="#{refineryorder.index.mission}">Einsatz</th>
-                <th th:text="#{refineryorder.index.materials}">Materialien</th>
-                <th th:if="${isAllSquadronsMode}" th:text="#{refineryorder.index.owning_squadron}">Staffel</th>
-                <th th:text="#{refineryorder.index.actions}">Aktionen</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr th:each="order : ${orders}" data-testid="refinery-order-row">
-                <td class="nowrap">
-                    <span class="refinery-order-id-display" th:data-utc="${order.endsAt != null ? order.endsAt.toEpochMilli() : 'null'}" th:text="${#strings.substring(order.id, #strings.length(order.id) - 4)}"></span>
-                </td>
-                <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}"></td>
-                <td class="nowrap">
-                    <span class="local-datetime-display" th:data-utc="${order.endsAt != null ? order.endsAt.toEpochMilli() : 'null'}" th:text="${order.endsAt != null ? #temporals.format(order.endsAt, 'dd.MM. HH:mm', 'UTC') + ' UTC' : '-'}"></span>
-                </td>
-                <td th:text="${order.location != null ? order.location.name : '-'}"></td>
-                <td th:text="${order.mission != null ? order.mission.name : '-'}"></td>
-                <td>
-                    <span th:with="uniqueMaterials=${new java.util.LinkedHashSet()}">
-                        <th:block th:each="mat : ${order.goods}">
-                            <th:block th:if="${mat.inputMaterial != null}">
-                                <span th:text="${uniqueMaterials.add(mat.inputMaterial.name) ? '' : ''}" th:remove="all"></span>
-                            </th:block>
-                        </th:block>
-                        <span th:each="matName, iterStat : ${uniqueMaterials}" th:text="${matName} + ${!iterStat.last ? ', ' : ''}"></span>
-                    </span>
-                </td>
-                <td th:if="${isAllSquadronsMode}">
-                    <span th:if="${order.owningSquadron != null}" class="squadron-badge"
-                          th:title="${order.owningSquadron.name()}"
-                          th:text="${order.owningSquadron.shorthand()}">IRI</span>
-                    <span th:if="${order.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
-                </td>
-                <td class="nowrap">
-                    <a th:href="@{/refinery-orders/{id}(id=${order.id})}" class="btn btn-ghost" th:text="#{refineryorder.action.details}">Details</a>
-                </td>
-            </tr>
-            <tr th:if="${orders.empty}">
-                <td th:attr="colspan=${isAllSquadronsMode ? 8 : 7}" class="text-center" th:text="#{refineryorder.index.empty}">Keine Aufträge vorhanden</td>
-            </tr>
-            </tbody>
-        </table>
-        </div>
-        <div class="pagination-controls" th:if="${ordersPage != null}">
-            <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${ordersPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
-            <nav th:replace="~{fragments/pagination :: pagination(pageResponse=${ordersPage}, baseUrl=${paginationBaseUrl})}"></nav>
-        </div>
+<main class="refinery-index">
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{refineryorder.index.title}, actions=~{::refinery-actions})}">
+        <th:block th:ref="refinery-actions">
+            <a th:href="@{/refinery-orders/create(source='index')}" class="btn btn--cta" data-testid="refinery-create-link"
+               ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{refineryorder.create.btn}">Neuer Auftrag</span></a>
         </th:block>
+    </th:block>
+
+    <form id="refinery-filter-form" method="get" th:action="@{/refinery-orders}" class="no-track">
+        <div class="toolbar">
+            <th:block th:replace="~{fragments/components :: segmented(name='view', labelKey='refineryorder.view.label', selected=${view}, variant='refinery-segments',
+                options=${ {{value: 'RUNNING', labelKey: 'refineryorder.view.running', count: refineryCounts?.running()},
+                            {value: 'READY', labelKey: 'refineryorder.view.ready', count: refineryCounts?.ready()},
+                            {value: 'COMPLETED', labelKey: 'refineryorder.view.completed', count: refineryCounts?.completed()},
+                            {value: 'ALL', labelKey: 'filter.all', count: refineryCounts?.all()}} })}"></th:block>
+            <th:block th:replace="~{fragments/components :: toolbarSearch('refinery-search', 'q', ${searchQuery}, 'refineryorder.search.placeholder')}"></th:block>
+            <label class="switch" for="refinery-only-mine">
+                <input type="checkbox" id="refinery-only-mine" name="onlyMine" value="true" th:checked="${onlyMine}">
+                <span class="switch__track" aria-hidden="true"></span>
+                <span th:text="#{refineryorder.index.filter.onlyMine}">Meine Auftr&auml;ge</span>
+            </label>
+            <span id="refinery-loading-indicator" hidden><span class="krt-loading-indicator"></span></span>
         </div>
+        <th:block th:replace="~{fragments/components :: filterChips('refinery-filter-form')}"></th:block>
+    </form>
+
+    <div id="refinery-orders-results" class="card card--flush">
+        <th:block th:fragment="refineryOrdersResults">
+        <span hidden data-refinery-counts
+              th:attr="data-running=${refineryCounts?.running()},data-ready=${refineryCounts?.ready()},data-completed=${refineryCounts?.completed()},data-all=${refineryCounts?.all()}"></span>
+
+        <div class="table-responsive" th:if="${!#lists.isEmpty(orderRows)}">
+            <table class="data-table data-table--stack refinery-table"
+                   th:attr="data-msg-ready=#{refinery.readyFor},data-msg-ready-unknown=#{refineryorder.list.ready},data-msg-ends-in=#{refineryorder.list.endsIn}">
+                <thead>
+                <tr>
+                    <th th:text="#{refineryorder.list.yield}">Ausbeute</th>
+                    <th th:text="#{refineryorder.list.refinery}">Raffinerie</th>
+                    <th th:text="#{refineryorder.list.done}">Fertig</th>
+                    <th th:text="#{refineryorder.index.owner}">Besitzer</th>
+                    <th class="cell-actions"><span class="visually-hidden" th:text="#{refineryorder.index.actions}">Aktionen</span></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="row : ${orderRows}" th:with="o=${row.order()},endsLabel=${row.endsAt() != null ? #temporals.format(@relativeDays.local(row.endsAt()), 'dd.MM. HH:mm') : null}" data-testid="refinery-order-row"
+                    th:classappend="${row.ready()} ? 'refinery-row--ready'"
+                    th:attr="data-state=${row.state().name()},data-ends-at=${row.endsAt() != null ? row.endsAt().toEpochMilli() : null},data-started-at=${o.startedAt != null ? o.startedAt.toEpochMilli() : null},data-ends-label=${endsLabel}">
+                    <td>
+                        <a class="row-link" data-testid="row-link" th:href="@{/refinery-orders/{id}(id=${o.id})}">
+                            <span class="cell-title" th:text="${row.outputLabel()}">Quantanium 18,4 SCU</span>
+                            <span class="cell-sub"><span th:text="'#' + ${row.shortId()}">#1042</span><th:block th:if="${row.inputCount() == 1}"> &middot; <span th:text="#{refineryorder.list.input.one(${row.inputName()}, ${row.inputUnits()})}">Quantanium-Erz 2.300 Units</span></th:block><th:block th:if="${row.inputCount() > 1}"> &middot; <span th:text="#{refineryorder.list.input.many(${row.inputCount()}, ${row.inputUnits()})}">2 Erze &middot; 1.650 Units</span></th:block></span>
+                        </a>
+                    </td>
+                    <td th:attr="data-label=#{refineryorder.list.refinery}">
+                        <span class="cell-title refinery-location" th:text="${o.location != null ? o.location.name : '—'}">ARC-L1</span>
+                        <span class="cell-sub" th:if="${o.refiningMethod != null}" th:text="${o.refiningMethod.name}">Dinyx Solventation</span>
+                    </td>
+                    <td class="refinery-done" th:attr="data-label=#{refineryorder.list.done}">
+                        <th:block th:switch="${row.state().name()}">
+                            <span th:case="'RUNNING'" class="refinery-done__text" data-refinery-done-text
+                                  th:text="#{refineryorder.list.endsIn(${row.remaining()}, ${#temporals.format(@relativeDays.local(row.endsAt()), 'dd.MM. HH:mm')})}">in 3 h 20 min &middot; 03.10. 18:00</span>
+                            <span th:case="'READY'" class="refinery-done__text refinery-done__text--ready" data-refinery-done-text
+                                  th:text="${row.readySince() != null} ? #{refinery.readyFor(${row.readySince()})} : #{refineryorder.list.ready}">abholbereit seit 1 h</span>
+                            <span th:case="'COMPLETED'" class="refinery-done__text refinery-done__text--muted"
+                                  th:text="#{refineryorder.status.COMPLETED}">Abgeschlossen</span>
+                            <span th:case="*" class="refinery-done__text refinery-done__text--danger"
+                                  th:text="#{refineryorder.status.CANCELED}">Abgebrochen</span>
+                        </th:block>
+                        <span th:if="${row.state().name() == 'RUNNING' or row.ready()}" class="meter refinery-meter" aria-hidden="true"
+                              ><i th:classappend="${row.ready()} ? 'meter__fill--success'" th:attr="data-krtm-width=${row.progressPercent()}"></i></span>
+                    </td>
+                    <td th:attr="data-label=#{refineryorder.index.owner}" th:text="${o.owner != null ? o.owner.effectiveName : '—'}">greluc</td>
+                    <td class="cell-actions">
+                        <a th:if="${row.storable()}" th:hidden="${!row.ready()}" class="btn btn-ghost btn-xs" data-refinery-store
+                           data-testid="refinery-row-store" th:href="@{/refinery-orders/{id}(id=${o.id},store='open')}"
+                           th:text="#{refineryorder.action.store}">Einlagern</a>
+                        <svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <th:block th:if="${#lists.isEmpty(orderRows)}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='refineryorder.list.empty.title', textKey='refineryorder.list.empty.text')}"></th:block>
+        </th:block>
+
+        <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${ordersPage}, baseUrl=${paginationBaseUrl})}"></th:block>
+        <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${ordersPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
+        </th:block>
     </div>
 </main>
 

@@ -200,14 +200,19 @@ class PromotionTopicCrudE2eTest {
   }
 
   /**
-   * Locates the topic card ({@code details.admin-topic-card}) whose header carries the given name,
-   * so the per-card edit/delete controls can be scoped to it.
+   * Selects the topic in the master list and locates its detail pane, so the pane's edit/delete
+   * controls can be scoped to it.
    *
    * @param page the page showing the topics fragment
-   * @param name the topic name whose card to locate
-   * @return a locator for the matching topic card
+   * @param name the topic name whose pane to locate
+   * @return a locator for the visible detail pane of the topic
    */
   private static Locator topicCard(Page page, String name) {
-    return page.locator("details.admin-topic-card", new Page.LocatorOptions().setHasText(name));
+    page.locator(".pa-topic-row", new Page.LocatorOptions().setHasText(name)).first().click();
+    Locator pane =
+        page.locator(
+            "section.pa-topic-pane:not([hidden])", new Page.LocatorOptions().setHasText(name));
+    assertThat(pane).isVisible();
+    return pane;
   }
 }

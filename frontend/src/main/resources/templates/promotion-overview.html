@@ -12,126 +12,97 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{promotion.overview.title}">Beförderungssystem</h1>
-        <p th:text="#{promotion.overview.subtitle}">Übersicht</p>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.promotion', titleText=#{promotion.overview.title})}"></th:block>
 
-    <div th:if="${isAllSquadronsMode}" class="hud-box mt-2">
-        <p th:text="#{promotion.select_squadron.hint}">Bitte wähle eine Staffel, um ihr Beförderungssystem zu sehen.</p>
-    </div>
+    <div th:if="${isAllSquadronsMode}" class="alert alert-info"
+         th:text="#{promotion.select_squadron.hint}">Bitte wähle eine Staffel, um ihr Beförderungssystem zu sehen.</div>
     <th:block th:unless="${isAllSquadronsMode}">
 
-    <div class="hud-box mt-2">
-        <h2 th:text="#{promotion.overview.topics.title}">Bewertungskategorien</h2>
-
-        <div th:if="${#maps.isEmpty(topicCategoryMap)}">
-            <p th:text="#{promotion.overview.no.topics}">Keine Themenbereiche konfiguriert.</p>
+    <section class="card po-steps-card" aria-labelledby="po-steps-title">
+        <div class="card-head">
+            <h2 class="card-title" id="po-steps-title" th:text="#{promotion.overview.ranks.title}">Rangvoraussetzungen</h2>
+            <span th:if="${currentUserRank != null}" class="chip chip--primary" data-testid="po-your-rank"
+                  th:text="#{promotion.overview.your.rank.chip(${currentUserRank})}">Dein Rang: 20</span>
         </div>
 
-        <div th:each="topic : ${topics}" class="promotion-topic">
-            <div class="promotion-topic-header" th:text="${topic.name}">Themenbereich</div>
-            <p th:if="${topic.description}" th:text="${topic.description}" class="krtm-color-var-color-gray-2-margin-bottom-0-75rem-a9f4"></p>
+        <th:block th:if="${#lists.isEmpty(rankSteps)}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='promotion.overview.no.requirements', textKey='promotion.overview.no.requirements.text')}"></th:block>
+        </th:block>
 
-            <div th:each="category : ${topicCategoryMap[topic.id.toString()]}" class="promotion-category">
-                <div class="promotion-category-name" th:text="${category.name}">Kategorie</div>
-                <p th:if="${category.description}" th:text="${category.description}" class="krtm-color-var-color-gray-2-margin-bottom-0-5rem-4fdd"></p>
+        <ol class="ablauf po-ablauf" th:unless="${#lists.isEmpty(rankSteps)}">
+            <li th:each="step : ${rankSteps}"
+                th:with="fr=${step[0].fromRank}, tr=${step[0].toRank},
+                         isNow=${currentUserRank != null and fr == currentUserRank},
+                         isDone=${currentUserRank != null and fr > currentUserRank}"
+                class="step po-step"
+                th:classappend="${isNow ? 'step--now' : (isDone ? 'step--done' : '')}"
+                th:attr="data-po-from-rank=${fr},data-po-to-rank=${tr},aria-current=${isNow ? 'step' : null}">
+                <span class="step-num" aria-hidden="true"></span>
+                <div class="step-body">
+                    <span class="step-title">
+                        <span th:text="#{promotion.overview.step.title(${fr}, ${tr})}">Rang 20 → 19</span>
+                        <span th:if="${isNow}" class="chip chip--primary po-here"
+                              th:text="#{promotion.overview.you.are.here}">Du bist hier</span>
+                    </span>
+                    <span class="step-meta"
+                          th:text="${isDone} ? #{promotion.overview.step.done} : #{promotion.overview.step.count(${#lists.size(step)})}">2 Voraussetzungen</span>
+                    <ul class="po-req-list">
+                        <li th:each="req : ${step}" class="po-req">
+                            <span class="po-req-name">
+                                <span th:text="${req.categoryName != null ? req.categoryName : (req.topicName != null ? req.topicName : #messages.msg('promotion.admin.ranks.matrix.global'))}">Kategorie</span>
+                                <span class="po-req-topic" th:if="${req.categoryName != null and req.topicName != null}" th:text="${req.topicName}">Themenbereich</span>
+                            </span>
+                            <span class="cluster gap-2 po-req-facts">
+                                <span class="chip chip--primary" th:switch="${req.minimumLevel}">
+                                    <span th:case="'LEVEL_A'" th:text="#{promotion.overview.level.a}">Stufe A</span>
+                                    <span th:case="'LEVEL_B'" th:text="#{promotion.overview.level.b}">Stufe B</span>
+                                    <span th:case="'LEVEL_C'" th:text="#{promotion.overview.level.c}">Stufe C</span>
+                                    <span th:case="*">&mdash;</span>
+                                </span>
+                                <span class="chip chip--muted" th:text="#{promotion.overview.required.count(${req.requiredCount})}">1×</span>
+                            </span>
+                            <span class="po-req-desc" th:if="${req.description != null}" th:text="${req.description}">Beschreibung</span>
+                        </li>
+                    </ul>
+                </div>
+            </li>
+        </ol>
+    </section>
 
-                <div class="level-grid">
-                    <div th:each="content : ${categoryContentMap[category.id.toString()]}" class="level-card">
-                        <div class="level-card-header">
-                            <span th:switch="${content.level}">
+    <section class="card po-topics-card" aria-labelledby="po-topics-title">
+        <div class="card-head">
+            <h2 class="card-title" id="po-topics-title" th:text="#{promotion.overview.topics.title}">Bewertungskategorien</h2>
+        </div>
+
+        <th:block th:if="${#lists.isEmpty(topics)}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='promotion.overview.no.topics', textKey='promotion.overview.no.topics.text')}"></th:block>
+        </th:block>
+
+        <div class="stack gap-6" th:unless="${#lists.isEmpty(topics)}">
+            <article th:each="topic : ${topics}" class="promotion-topic">
+                <h3 class="promotion-topic-header" th:text="${topic.name}">Themenbereich</h3>
+                <p th:if="${topic.description}" th:text="${topic.description}" class="po-muted"></p>
+
+                <div th:each="category : ${topicCategoryMap[topic.id.toString()]}" class="promotion-category">
+                    <h4 class="promotion-category-name" th:text="${category.name}">Kategorie</h4>
+                    <p th:if="${category.description}" th:text="${category.description}" class="po-muted"></p>
+
+                    <div class="level-grid">
+                        <div th:each="content : ${categoryContentMap[category.id.toString()]}" class="level-card">
+                            <div class="level-card-header" th:switch="${content.level}">
                                 <span th:case="'LEVEL_A'" th:text="#{promotion.overview.level.a}">Stufe A</span>
                                 <span th:case="'LEVEL_B'" th:text="#{promotion.overview.level.b}">Stufe B</span>
                                 <span th:case="'LEVEL_C'" th:text="#{promotion.overview.level.c}">Stufe C</span>
-                            </span>
+                            </div>
+                            <div class="level-card-body" th:text="${content.description}">Beschreibung</div>
                         </div>
-                        <div class="level-card-body" th:text="${content.description}">Beschreibung</div>
                     </div>
                 </div>
-            </div>
+            </article>
         </div>
-    </div>
-
-    <div class="hud-box mt-2">
-        <h2 th:text="#{promotion.overview.ranks.title}">Rangvoraussetzungen</h2>
-
-        <div th:if="${#lists.isEmpty(rankRequirements)}">
-            <p th:text="#{promotion.overview.no.requirements}">Keine Rangvoraussetzungen konfiguriert.</p>
-        </div>
-
-        <div th:unless="${#lists.isEmpty(rankRequirements)}">
-            <div class="ov-toolbar">
-                <span th:if="${currentUserRank != null}"
-                      class="krtm-color-var-color-gray-2-font-size-0-85rem-b3ad">
-                    <span th:text="#{promotion.overview.your.rank}">Dein Rang</span>:
-                    <strong th:text="${currentUserRank}" class="krtm-color-var-data-fg-3a2d">20</strong>
-                </span>
-                <div class="ov-spacer"></div>
-                <button type="button"
-                        class="btn btn-ghost btn-tiny"
-                        data-trigger="po-expand-all"
-                        th:text="#{promotion.overview.expand.all}">Alle ausklappen</button>
-                <button type="button"
-                        class="btn btn-ghost btn-tiny"
-                        data-trigger="po-collapse-all"
-                        th:text="#{promotion.overview.collapse.all}">Alle einklappen</button>
-            </div>
-
-            <details th:each="entry : ${groupedRankRequirements}"
-                     class="rank-group"
-                     th:classappend="${currentUserRank != null and entry.value[0].fromRank == currentUserRank ? ' is-current' : ''}"
-                     th:attr="data-po-from-rank=${entry.value[0].fromRank},data-po-to-rank=${entry.value[0].toRank},open=${currentUserRank != null and entry.value[0].fromRank == currentUserRank ? 'open' : null}">
-                <summary>
-                    <span>
-                        <span th:text="#{promotion.overview.rank.from}">Von Rang</span>
-                        <span th:text="${entry.value[0].fromRank}">20</span>
-                        &rarr;
-                        <span th:text="#{promotion.overview.rank.to}">Nach Rang</span>
-                        <span th:text="${entry.value[0].toRank}">19</span>
-                    </span>
-                    <span th:if="${currentUserRank != null and entry.value[0].fromRank == currentUserRank}"
-                          class="rank-here-badge"
-                          th:text="#{promotion.overview.you.are.here}">Du bist hier</span>
-                </summary>
-                <div class="rank-group-body">
-                    <div class="rank-table-wrapper krtm-overflow-x-auto-987e">
-                        <table class="rank-subtable">
-                            <thead>
-                                <tr>
-                                    <th th:text="#{promotion.overview.rank.topic}">Themenbereich</th>
-                                    <th th:text="#{promotion.overview.rank.category}">Kategorie</th>
-                                    <th th:text="#{promotion.overview.rank.min.level}">Mindeststufe</th>
-                                    <th th:text="#{promotion.overview.rank.count}">Anzahl</th>
-                                    <th th:text="#{promotion.overview.rank.description}">Beschreibung</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr th:each="req : ${entry.value}">
-                                    <td th:text="${req.topicName} ?: '-'">-</td>
-                                    <td th:text="${req.categoryName} ?: '-'">-</td>
-                                    <td>
-                                        <span class="badge-level" th:switch="${req.minimumLevel}">
-                                            <span th:case="'LEVEL_A'" th:text="#{promotion.overview.level.a}">A</span>
-                                            <span th:case="'LEVEL_B'" th:text="#{promotion.overview.level.b}">B</span>
-                                            <span th:case="'LEVEL_C'" th:text="#{promotion.overview.level.c}">C</span>
-                                            <span th:case="*">-</span>
-                                        </span>
-                                    </td>
-                                    <td th:text="${req.requiredCount}">1</td>
-                                    <td th:text="${req.description} ?: '-'">-</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </details>
-        </div>
-    </div>
+    </section>
     </th:block>
 </main>
 <th:block th:replace="~{fragments/toast :: toast}" />
-
-<script th:src="@{/js/promotion-overview.js}" defer th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}"></script>
 </body>
 </html>

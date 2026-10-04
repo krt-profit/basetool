@@ -94,6 +94,7 @@ class MaterialboardPickerServerSearchE2eTest {
         page.waitForLoadState();
         page.waitForFunction("() => typeof window.krtMaterialRelease === 'object'");
 
+        page.locator("[data-testid='mb-create-offer']").click();
         page.locator("[data-mb-open-release]").first().click();
         assertThat(page.locator("#mb-modal [data-mb-picker-input]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
