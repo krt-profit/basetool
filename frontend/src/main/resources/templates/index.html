@@ -45,6 +45,8 @@
                         <span class="home-mission__status">
                             <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(mission.status)}"
                                   th:text="#{${'mission.status.' + #strings.toLowerCase(mission.status)}}">GEPLANT</span>
+                            <span th:if="${mission.signedUp}" class="chip chip--success" data-testid="home-mission-signed-up"
+                                  th:text="#{home.upcoming.signed_up}">Angemeldet</span>
                             <span th:if="${mission.owningSquadron != null and myOrgUnitIds.contains(mission.owningSquadron.id)}"
                                   class="chip chip--primary" th:text="#{home.upcoming.my_unit}">Meine Einheit</span>
                         </span>

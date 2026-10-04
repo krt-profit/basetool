@@ -866,7 +866,7 @@ scope, and per view min quality, min amount, sort and „Ohne gestohlene"; key
 view), Raffinerie (the segment „Läuft · Abholbereit · Abgeschlossen · Alle" + only-mine, key
 `refinery_orders_filter`; a stored status list of the former checkboxes maps onto a segment),
 Profitberechnung (ship + systems), Missionen/Operationen (the period segment „Kommend · Vergangen ·
-Alle"; a stored `showPast` migrates), Aufträge scope „Meine · Alle" (`orders_scope_filter`,
+Alle"; a stored `showPast` migrates), Aufträge scope „Meine · Zu bearbeiten · Alle" (`orders_scope_filter`,
 REQ-ORDERS-040), Benachrichtigungen „Ungelesen · Alle" (`notifications_filter`, REQ-NOTIF-022),
 Meine Bewertungen
 (only-open), Persönliche Blueprints (refinery + craftable toggles), Beförderung verwalten
@@ -1548,8 +1548,10 @@ Systemeinstellungen, Information bearbeiten, the notification-rule editor, the q
 and the profile as one settings page (section navigation, one save bar that appears on a change and
 saves the changed sections one after another, REQ-FE-001). The hangar's insurance field is a
 segment „Keine · Monate · LTI" with a month field; the stored value stays `0` / `LTI` / `n`. The
-„Angemeldet" chip of the hand-off's home page is not built: no read says whether the member is signed
-up for a listed mission.
+hand-off's „Angemeldet" chip marks a home row the member is signed up for, read from the mission
+list's per-caller `signedUp` flag (REQ-MISSION-012).
+
+Amended 2026-10-04: the „Angemeldet" chip, left out of phase 2 for want of a read, is built.
 
 **On the areas (phase 3):** Hangar: one page with the tabs „Meine Schiffe" · „Org-Einheit" (the
 former Org-Einheitsübersicht, ship types as tree rows with a readiness bar); „Meine Schiffe" filters
@@ -1577,10 +1579,11 @@ wide data view with the „UEX · vor n min" chip, dropdown filters that summari
 von 42"), „+ Filter" chips, the best sale/purchase rings, the spread and the legend; the material
 detail with category/flag chips, four figures and the terminal table sorted by sale price (segment
 „Verkauf · Einkauf"); the profit calculation with one input card, the Hull C chip and results ranked
-by max. profit with a two-line route (prices only — the calculation names no terminals).
+by max. profit with a two-line route „Kauf <Terminal> · <Preis>" / „Verkauf <Terminal> · <Preis>",
+the terminal's location (planet or star system, then city, station or outpost) as its tooltip.
 Auftragsdetail: page head with kind and status badges and the admin overflow „Auftrag löschen", the
 progress tile „Geliefert / benötigt" leading the KPI grid, tabs filtered per kind (Material: Bedarf
-· Übergaben · Bearbeiter · Verknüpft; Item: Items · Materialien · Herstellung · Übergaben ·
+· Übergaben · Bearbeiter · Verknüpft; Item: Items · Materialien · Hersteller · Übergaben ·
 Bearbeiter · Verknüpft) with empty tabs hidden, and „Übergabe erfassen" as the one action of the
 handover tab (REQ-ORDERS-026). Einsatz and Operation detail: both heads are page heads with the back
 link, the title and a translated `.status-badge`. The Einsatz page keeps three tabs (Übersicht ·
@@ -1606,6 +1609,12 @@ org-unit bank names its tab „Anträge an unsere Konten", „Laufende Anträge"
 request's approval path, the staff request queue filters by the status segment „Ausstehend ·
 Bestätigt · Abgelehnt · Alle" with „n warten auf dich", and the KRT approval thresholds are drawn as
 a tier bar (REQ-BANK-023, REQ-BANK-047).
+
+*Amended 2026-10-04: the profit calculation's route names its terminals.
+`GET /api/v1/materials/profit-calculation` answers each row with `buyTerminalName`,
+`buyTerminalLocation`, `sellTerminalName` and `sellTerminalLocation` — the terminals of the chosen
+lowest purchase and highest sale price, the first by name on a price tie, a location `null` when the
+terminal names no place.*
 
 **Enforced by:** `PagePatternFragmentsRenderTest` (the fragments' markup and ARIA) · Stylelint
 `media-feature-name-value-allowed-list` (breakpoints) · `TouchClassLayoutE2eTest` (touch floors) ·

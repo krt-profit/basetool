@@ -192,6 +192,46 @@ class OrdersListPatternRenderTest {
         .doesNotContain(">Fortschritt<");
   }
 
+  /**
+   * The to-process segment reads the queue of the caller's own units, hides the squadron filter and
+   * keeps the scope in the pagination links (REQ-ORDERS-040).
+   */
+  @Test
+  @WithMockUser
+  void toProcessScopeReadsTheQueueOfTheCallersUnits() throws Exception {
+    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(onePage("OPEN").content(), 0, 100, 300L, 3, List.of()));
+
+    String html = render(true, "scope=TO_PROCESS&squadronId=" + UUID.randomUUID());
+
+    verify(backendApiClient).get(eq(QUEUE_URL + "&toProcess=true"), anyTypeRef());
+    assertThat(html)
+        .contains("data-testid=\"segment-scope-mine\"")
+        .contains("data-testid=\"segment-scope-to_process\"")
+        .contains("data-testid=\"segment-scope-all\"")
+        .containsPattern("name=\"scope\" value=\"TO_PROCESS\" checked=\"checked\"")
+        .contains(">Zu bearbeiten<")
+        .containsPattern("id=\"ordersSquadronField\"[^>]*hidden")
+        .contains("/orders?scope=TO_PROCESS&amp;status=OPEN&amp;status=IN_PROGRESS")
+        .doesNotContain("squadronId=")
+        .contains("data-testid=\"order-row\"");
+  }
+
+  /** The default scope reads the full queue without the processing flag. */
+  @Test
+  @WithMockUser
+  void allScopeSendsNoProcessingFlag() throws Exception {
+    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef()))
+        .thenReturn(onePage("OPEN"));
+
+    String html = render(true, "scope=ALL");
+
+    verify(backendApiClient).get(eq(QUEUE_URL), anyTypeRef());
+    assertThat(html)
+        .containsPattern("name=\"scope\" value=\"ALL\" checked=\"checked\"")
+        .doesNotContainPattern("id=\"ordersSquadronField\"[^>]*hidden");
+  }
+
   /** A requester without the queue sees their own orders and no scope segment. */
   @Test
   @WithMockUser
@@ -205,6 +245,19 @@ class OrdersListPatternRenderTest {
     assertThat(html)
         .contains("data-testid=\"order-row\"")
         .doesNotContain("data-testid=\"segment-scope-mine\"")
+        .doesNotContain("data-testid=\"segment-scope-to_process\"")
         .doesNotContain("id=\"squadronFilterContainer\"");
+  }
+
+  /** A requester cannot reach the to-process queue through the URL. */
+  @Test
+  @WithMockUser
+  void requesterAskingForToProcessStillReadsTheirOwnOrders() throws Exception {
+    when(backendApiClient.get(contains("/api/v1/orders/requested?"), anyTypeRef()))
+        .thenReturn(onePage("OPEN"));
+
+    render(false, "scope=TO_PROCESS");
+
+    verify(backendApiClient).get(eq(REQUESTED_URL), anyTypeRef());
   }
 }

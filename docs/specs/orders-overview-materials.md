@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-04.
 > **Owner area:** ORDERS/UI · **Related ADRs:** [ADR-0120](../adr/0120-per-browser-filter-selection-persistence.md)
 
 # Order-overview Materialien column
@@ -288,21 +288,40 @@ query) · **Code:** `templates/orders-index.html`, `static/js/orders-index.js`,
 `JobOrderController.getAllJobOrders`, `JobOrderQueryService.getAllJobOrders`,
 `JobOrderRepository.findScopedJobOrders`
 
-### REQ-ORDERS-040 — Overview scope segment „Meine · Alle"
+### REQ-ORDERS-040 — Overview scope segment „Meine · Zu bearbeiten · Alle"
 
-A member who may see both the full queue (`canViewJobOrders`) and their own requested orders
-(`canViewOwnJobOrders`) chooses between them with a segmented control on the overview (`scope`,
-REQ-UI-027): `ALL` reads `/api/v1/orders` with the status and squadron filters; `MINE` reads
-`/api/v1/orders/requested` (REQ-ORDERS-023), ignores and hides the squadron filter, sends no
-squadron parameters and hides the progress column, whose data is redacted there. A member with only
-one of the two rights sees no segment. The pagination URL carries `scope=MINE` only in that case.
-The choice persists per browser (`orders_scope_filter`, REQ-UI-017); an explicit `scope` query
-parameter wins. A third tab „Zu bearbeiten" (orders the member's unit processes) is not offered —
-no backend read answers it yet.
+> Amended 2026-10-04: the third tab „Zu bearbeiten" is built, backed by the new `toProcess`
+> parameter of `GET /api/v1/orders`. Until then the segment was „Meine · Alle" and this requirement
+> said the third tab was not offered for lack of a backend read.
 
-**Enforced by:** `OrdersListPatternRenderTest` · **Code:** `JobOrderPageController.viewOrders`,
-`orders-index.html`, `static/js/orders-index.js` · **Related:** REQ-ORDERS-023, REQ-ORDERS-027,
-REQ-UI-027
+A member who may see the full queue (`canViewJobOrders`) chooses its scope with a segmented control
+on the overview (`scope`, REQ-UI-027):
+
+- `ALL` reads `/api/v1/orders` with the status and squadron filters.
+- `TO_PROCESS` („Zu bearbeiten") reads `/api/v1/orders?toProcess=true` with the status filter: the
+  orders whose responsible (processing) unit is one of the caller's own units and is profit-eligible
+  (`is_profit_eligible`, „Auftragsbearbeitung pro Staffel / pro Spezialkommando" in the admin
+  settings). The caller's units are the pinned
+  org unit when one is active, otherwise the caller's direct memberships (no leadership cascade). The
+  parameter is AND-ed with the existing visibility scope (`JOB_ORDER_SCOPE_PREDICATE`), so it only
+  narrows what `ALL` shows and never widens it; a caller with no such unit gets an empty page. The
+  squadron filter is hidden and no squadron parameter is sent.
+- `MINE` reads `/api/v1/orders/requested` (REQ-ORDERS-023), ignores and hides the squadron filter,
+  sends no squadron parameters and hides the progress column, whose data is redacted there. It is
+  offered only to a member who also holds `canViewOwnJobOrders`.
+
+A member without `canViewJobOrders` reads their own requested orders and sees no segment; a
+`scope` parameter cannot move them onto another list. The pagination URL carries `scope=MINE` or
+`scope=TO_PROCESS` when chosen, nothing for `ALL`. The choice persists per browser
+(`orders_scope_filter`, REQ-UI-017) and is restored only when that scope is offered on the page; an
+explicit `scope` query parameter wins.
+
+**Enforced by:** `OrdersListPatternRenderTest`, `JobOrderControllerTest`
+(`getAllJobOrders_forwardsToProcessFlag`), `JobOrderServiceAssigneeAndListTest` (`toProcess_*`),
+`JobOrderScopeQueryIntegrationTest` (`processingFilter_*`), `JobOrderToProcessMvcTest` · **Code:**
+`JobOrderPageController.viewOrders`, `orders-index.html`, `static/js/orders-index.js`,
+`JobOrderController.getAllJobOrders`, `JobOrderQueryService.getAllJobOrders`,
+`JobOrderRepository.findScopedJobOrders` · **Related:** REQ-ORDERS-023, REQ-ORDERS-027, REQ-UI-027
 
 ## Out of scope
 

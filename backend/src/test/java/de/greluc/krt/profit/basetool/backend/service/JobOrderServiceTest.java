@@ -345,7 +345,8 @@ class JobOrderServiceTest {
 
     assertTrue(result.isEmpty());
     verify(jobOrderRepository, never())
-        .findScopedJobOrders(any(), anyBoolean(), any(), anyBoolean(), any(), any(), any());
+        .findScopedJobOrders(
+            any(), anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(), any(), any());
     verify(ownerScopeService, never()).currentScopePredicate();
   }
 

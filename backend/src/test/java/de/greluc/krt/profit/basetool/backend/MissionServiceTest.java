@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -644,5 +645,27 @@ class MissionServiceTest {
 
     assertEquals(Map.of(), missionService.registeredCounts(List.of()));
     verify(missionParticipantRepository, never()).countByMissions(List.of());
+  }
+
+  /**
+   * Verifies that the caller's sign-ups for a page are read in one query keyed on the caller's own
+   * member id, and that an empty page or a caller without a member id runs no query
+   * (REQ-MISSION-012).
+   */
+  @Test
+  void signedUpMissionIds_readsTheCallersOwnRowsOnceAndSkipsWithoutCallerOrPage() {
+    UUID caller = UUID.randomUUID();
+    UUID joined = UUID.randomUUID();
+    UUID other = UUID.randomUUID();
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(caller));
+    when(missionParticipantRepository.findMissionIdsSignedUpBy(caller, List.of(joined, other)))
+        .thenReturn(List.of(joined));
+
+    assertEquals(Set.of(joined), missionService.signedUpMissionIds(List.of(joined, other)));
+    assertEquals(Set.of(), missionService.signedUpMissionIds(List.of()));
+
+    when(authHelperService.currentUserId()).thenReturn(Optional.empty());
+    assertEquals(Set.of(), missionService.signedUpMissionIds(List.of(joined)));
+    verify(missionParticipantRepository, times(1)).findMissionIdsSignedUpBy(any(), any());
   }
 }

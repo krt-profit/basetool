@@ -111,6 +111,7 @@ class HomeControllerMvcTest {
             null,
             "GrimHEX",
             6L,
+            false,
             0L);
     when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(mission), 0, 50, 1, 1, List.of()));
@@ -140,6 +141,78 @@ class HomeControllerMvcTest {
     org.assertj.core.api.Assertions.assertThat(
             html.substring(html.indexOf("<main"), html.indexOf("</main>")).split("btn--cta", -1))
         .hasSize(1);
+  }
+
+  /**
+   * REQ-MISSION-012: a row the viewer is signed up for carries the „Angemeldet" chip, read from the
+   * per-caller {@code signedUp} flag of the search; a row they are not signed up for carries none.
+   */
+  @Test
+  void home_ShouldShowSignedUpChip_OnlyOnMissionsTheViewerIsSignedUpFor() throws Exception {
+    MissionListDto joined = upcoming("Erzkonvoi-Eskorte", true);
+    MissionListDto open = upcoming("Grenzpatrouille Sol", false);
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(joined, open), 0, 50, 2, 1, List.of()));
+
+    String html =
+        mockMvc
+            .perform(get("/").with(oidcLogin()).locale(java.util.Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    String[] rows = html.split("data-testid=\"home-mission\"", -1);
+    org.assertj.core.api.Assertions.assertThat(rows).hasSize(3);
+    org.assertj.core.api.Assertions.assertThat(rows[1])
+        .contains("Erzkonvoi-Eskorte")
+        .containsPattern("class=\"chip chip--success\"[^>]*data-testid=\"home-mission-signed-up\"")
+        .contains(">Angemeldet<");
+    org.assertj.core.api.Assertions.assertThat(rows[2])
+        .contains("Grenzpatrouille Sol")
+        .doesNotContain("home-mission-signed-up");
+  }
+
+  /** The „Angemeldet" chip is translated: an English viewer reads „Signed up". */
+  @Test
+  void home_ShouldTranslateSignedUpChip_ForAnEnglishViewer() throws Exception {
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
+        .thenReturn(
+            new PageResponse<>(List.of(upcoming("Salvage-Lauf", true)), 0, 50, 1, 1, List.of()));
+
+    mockMvc
+        .perform(get("/").with(oidcLogin()).param("lang", "en"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString(">Signed up<")));
+  }
+
+  /**
+   * Builds a planned upcoming mission row starting tomorrow.
+   *
+   * @param name the mission name
+   * @param signedUp whether the viewer is signed up for it
+   * @return the list row as the search returns it
+   */
+  private static MissionListDto upcoming(String name, boolean signedUp) {
+    java.time.Instant start = java.time.Instant.now().plus(1, java.time.temporal.ChronoUnit.DAYS);
+    return new MissionListDto(
+        UUID.randomUUID(),
+        name,
+        null,
+        null,
+        "PLANNED",
+        null,
+        start,
+        null,
+        null,
+        null,
+        false,
+        null,
+        null,
+        null,
+        1L,
+        signedUp,
+        0L);
   }
 
   /**
@@ -221,6 +294,7 @@ class HomeControllerMvcTest {
             new SquadronReferenceDto(UUID.randomUUID(), "Alpha Staffel", "ALF"),
             null,
             0L,
+            false,
             0L);
     when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(mission), 0, 50, 1, 1, List.of()));
@@ -254,6 +328,7 @@ class HomeControllerMvcTest {
             null,
             null,
             0L,
+            false,
             0L);
     when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(mission), 0, 50, 1, 1, List.of()));
@@ -313,6 +388,7 @@ class HomeControllerMvcTest {
             myStaffel,
             null,
             0L,
+            false,
             0L);
     when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(ownMission), 0, 50, 1, 1, List.of()));
@@ -371,6 +447,7 @@ class HomeControllerMvcTest {
             new SquadronReferenceDto(UUID.randomUUID(), "Falke Staffel", "FLK"),
             null,
             0L,
+            false,
             0L);
     when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(foreignMission), 0, 50, 1, 1, List.of()));
@@ -432,6 +509,7 @@ class HomeControllerMvcTest {
             new SquadronReferenceDto(specialCommandId, "Phantom SK", "PHA"),
             null,
             0L,
+            false,
             0L);
     when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(skMission), 0, 50, 1, 1, List.of()));

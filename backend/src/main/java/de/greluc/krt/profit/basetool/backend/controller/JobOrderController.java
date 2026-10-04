@@ -522,24 +522,33 @@ public class JobOrderController {
    * @param status optional status filter (logical OR across values)
    * @param squadronId optional repeatable filter on the responsible or requesting org unit; absent
    *     means the full scoped view
+   * @param toProcess when {@code true}, keep only the orders one of the caller's own units
+   *     processes, the "Zu bearbeiten" queue (REQ-ORDERS-040); narrows the scope, never widens it
+   * @param page zero-based page index
+   * @param size page size
+   * @param sort sort spec (whitelisted: {@code priority}, {@code createdAt})
    * @return paged job-order DTOs visible to the caller
    */
   @GetMapping
   @Operation(
       summary = "Get all job orders",
-      description = "Returns a paginated list of job orders.")
+      description =
+          "Returns a paginated list of job orders. toProcess=true keeps only the orders whose"
+              + " profit-eligible responsible unit is one of the caller's own units.")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public PageResponse<JobOrderDto> getAllJobOrders(
       @RequestParam(required = false) List<JobOrderStatus> status,
       @RequestParam(required = false) List<UUID> squadronId,
+      @RequestParam(required = false, defaultValue = "false") boolean toProcess,
       @RequestParam(required = false, defaultValue = "0") int page,
       @RequestParam(required = false, defaultValue = "20") int size,
       @RequestParam(required = false, defaultValue = "priority,asc") String sort) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("priority", "createdAt"), "priority");
-    Page<JobOrderDto> p = jobOrderQueryService.getAllJobOrders(status, squadronId, pageable);
+    Page<JobOrderDto> p =
+        jobOrderQueryService.getAllJobOrders(status, squadronId, toProcess, pageable);
     return PageResponse.of(p);
   }
 
