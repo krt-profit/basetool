@@ -21,10 +21,10 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static de.greluc.krt.profit.basetool.backend.util.BankAmounts.plain;
 
-import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestCancelledEvent;
-import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestConfirmedEvent;
-import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestCreatedEvent;
-import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestRejectedEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCancelledEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestConfirmedEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCreatedEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestRejectedEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
