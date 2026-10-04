@@ -74,19 +74,21 @@
     </section>
 
     <div id="profitResults" class="card card--flush" data-state="idle" aria-live="polite">
-        <table id="resultsTable" class="data-table data-table--stack profit-table">
-            <thead>
-                <tr>
-                    <th scope="col"><span class="profit-rank" aria-hidden="true">#</span><span th:text="#{profit.col.material}">Material</span></th>
-                    <th scope="col" th:text="#{profit.col.route}">Route</th>
-                    <th scope="col" class="num" th:text="#{profit.col.per_scu}">je SCU</th>
-                    <th scope="col" class="num" th:text="#{profit.col.margin}">Marge</th>
-                    <th scope="col" class="num" th:text="#{profit.col.capital}">Kapital</th>
-                    <th scope="col" class="num" th:text="#{profit.col.total_profit}">Max. Profit</th>
-                </tr>
-            </thead>
-            <tbody id="profitBody"></tbody>
-        </table>
+        <div class="table-responsive">
+            <table id="resultsTable" class="data-table data-table--stack profit-table">
+                <thead>
+                    <tr>
+                        <th scope="col"><span class="profit-rank" aria-hidden="true">#</span><span th:text="#{profit.col.material}">Material</span></th>
+                        <th scope="col" th:text="#{profit.col.route}">Route</th>
+                        <th scope="col" class="num" th:text="#{profit.col.per_scu}">je SCU</th>
+                        <th scope="col" class="num" th:text="#{profit.col.margin}">Marge</th>
+                        <th scope="col" class="num" th:text="#{profit.col.capital}">Kapital</th>
+                        <th scope="col" class="num" th:text="#{profit.col.total_profit}">Max. Profit</th>
+                    </tr>
+                </thead>
+                <tbody id="profitBody"></tbody>
+            </table>
+        </div>
         <div id="profitState" class="empty-state profit-state" data-testid="profit-state">
             <span class="empty-title" id="profitStateText" th:text="#{profit.info.select_ship}">Bitte wähle ein Schiff aus, um die Berechnung zu starten.</span>
         </div>

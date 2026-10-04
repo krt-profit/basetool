@@ -73,34 +73,36 @@
         </div>
 
         <div class="card card--flush" th:unless="${terminalRows == null || terminalRows.isEmpty()}">
-            <table class="data-table data-table--stack md-terminals" id="priceTable" data-sort="sell">
-                <thead>
-                    <tr>
-                        <th scope="col" th:text="#{materials.detail.th.terminal}">Terminal</th>
-                        <th scope="col" th:text="#{materials.detail.th.location}">Ort</th>
-                        <th scope="col" class="num" aria-sort="descending" data-sort-col="sell">
-                            <span th:text="#{materials.detail.sort.sell}">Verkauf</span><span class="md-sort-mark" aria-hidden="true">↓</span>
-                        </th>
-                        <th scope="col" class="num" aria-sort="none" data-sort-col="buy">
-                            <span th:text="#{materials.detail.sort.buy}">Einkauf</span><span class="md-sort-mark" aria-hidden="true">↑</span>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="row : ${terminalRows}" class="md-terminal-row" th:classappend="${row.planetCssClass()}"
-                        th:data-terminal="${row.terminalName()}"
-                        th:data-sell="${row.priceSell()}" th:data-buy="${row.priceBuy()}">
-                        <td>
-                            <span class="cell-title" th:text="${row.terminalName()}">Area18 TDD</span>
-                        </td>
-                        <td th:text="${row.location() != null ? row.location() : '–'}">ArcCorp · Area18</td>
-                        <td class="num md-price-sell" th:attr="data-label=#{materials.detail.sort.sell}"
-                            th:classappend="${row.priceSell() == null} ? 'md-price--none'" th:text="${row.sellText()}">89,6</td>
-                        <td class="num md-price-buy" th:attr="data-label=#{materials.detail.sort.buy}"
-                            th:classappend="${row.priceBuy() == null} ? 'md-price--none'" th:text="${row.buyText()}">–</td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="table-responsive">
+                <table class="data-table data-table--stack md-terminals" id="priceTable" data-sort="sell">
+                    <thead>
+                        <tr>
+                            <th scope="col" th:text="#{materials.detail.th.terminal}">Terminal</th>
+                            <th scope="col" th:text="#{materials.detail.th.location}">Ort</th>
+                            <th scope="col" class="num" aria-sort="descending" data-sort-col="sell">
+                                <span th:text="#{materials.detail.sort.sell}">Verkauf</span><span class="md-sort-mark" aria-hidden="true">↓</span>
+                            </th>
+                            <th scope="col" class="num" aria-sort="none" data-sort-col="buy">
+                                <span th:text="#{materials.detail.sort.buy}">Einkauf</span><span class="md-sort-mark" aria-hidden="true">↑</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="row : ${terminalRows}" class="md-terminal-row" th:classappend="${row.planetCssClass()}"
+                            th:data-terminal="${row.terminalName()}"
+                            th:data-sell="${row.priceSell()}" th:data-buy="${row.priceBuy()}">
+                            <td>
+                                <span class="cell-title" th:text="${row.terminalName()}">Area18 TDD</span>
+                            </td>
+                            <td th:text="${row.location() != null ? row.location() : '–'}">ArcCorp · Area18</td>
+                            <td class="num md-price-sell" th:attr="data-label=#{materials.detail.sort.sell}"
+                                th:classappend="${row.priceSell() == null} ? 'md-price--none'" th:text="${row.sellText()}">89,6</td>
+                            <td class="num md-price-buy" th:attr="data-label=#{materials.detail.sort.buy}"
+                                th:classappend="${row.priceBuy() == null} ? 'md-price--none'" th:text="${row.buyText()}">–</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
             <div id="noResultsRow" hidden>
                 <th:block th:replace="~{fragments/components :: emptyState(titleKey='materials.detail.noResults', textKey='materials.detail.noResults.text')}"></th:block>
             </div>
