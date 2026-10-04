@@ -97,9 +97,14 @@ disaster recovery: [`backup.md`](backup.md). The monitoring plane:
 | `deploy` | system account, `/sbin/nologin`, home `/var/lib/iri` | runs `deploy.sh`, `backup.sh`, `restore-drill.sh`, `container-cleanup.sh`; owns `/var/lib/iri`, `/etc/iri`, `/var/iri/code`, the unit directory |
 | `iri` | the rootless service user (lingering, subuid base 100000) | the container store and all 39 Quadlet units; the podman-exporter user unit |
 
-`deploy` reaches `iri`'s containers only through `/etc/sudoers.d/basetool-deploy`: `podman *` and
+`deploy` reaches `iri`'s containers only through `/etc/sudoers.d/basetool-deploy`: the podman
+sub-commands its scripts run (`basetool_host_deploy_podman_subcommands` in the role defaults —
+`cp`, `create`, `exec`, `image inspect`, `image prune`, `info`, `inspect`, `login`,
+`network prune`, `ps`, `pull`, `rm`, `run`, `system df`, `volume inspect`) and
 `systemctl --user *` as `iri`, plus `systemctl restart alloy.service` as root, nothing else
-(`ansible/roles/basetool_host/tasks/22-deploy-user.yml`). That is strictly narrower than the
+(`ansible/roles/basetool_host/tasks/22-deploy-user.yml`). A script that needs another sub-command
+adds it to that list in the same PR — repo-lint's `check-deploy-podman-allowlist.py` fails
+otherwise — and the role run that installs the script installs the rule. That is strictly narrower than the
 `docker` group of the retired host, which was root-equivalent.
 
 **Container uids are translated.** Container uid *N* is host uid `100000 + N − 1`: 10001 → 110000
@@ -523,7 +528,10 @@ skipped commit has no `:sha-<short>` tag. A release commit's run never skips. Th
 GitHub App** (ADR-0201), minted from the secret `RELEASE_APP_PRIVATE_KEY`: the tag ruleset "Version"
 lets only that App and @greluc create `v*` tags, and an App token's events trigger
 `release-images.yml` where `GITHUB_TOKEN`'s would not. There is no fallback — without the key the
-publish job stops with an error. The same key is also a Dependabot secret for
+publish job stops with an error. `release-prepare.yml` and `refresh-versions.yml` read the key in
+the GitHub environment **`release`**, which only `main` may deploy to (CI-SEC-16, ADR-0201
+amendment 3); `release-publish.yml` still reads the repository secret, because its
+`pull_request: closed` trigger runs on `refs/pull/<n>/merge`, which a `main`-only rule refuses. The same key is also a Dependabot secret for
 [Dependabot image bumps](#dependabot-image-bumps); a rotation updates both. The manual path is @greluc creating the tag at the release PR's
 merge commit and re-running the failed publish job, which then skips the tag and publishes the
 rest.

@@ -187,9 +187,9 @@ internet-unreachable — the gateway reaches it over the internal network only.
   Token grant: 5 s connect, read bounded
   by the smaller of 10 s and `app.ingest.service-account.timeout-millis`. TLS trust: outside
   `dev`/`test` the `backend-trust` bundle (`INTERNAL_TLS_TRUSTSTORE`) is the relay's only anchor,
-  **without** a hostname check by default and **with** one when
-  `app.ingest.verify-backend-hostname` / `INTERNAL_TLS_VERIFY_HOSTNAME` is true — the state
-  REQ-SEC-070's rollout reaches, once one internal CA signs every service and the pin alone no
+  **with** a hostname check unless `app.ingest.verify-backend-hostname` /
+  `INTERNAL_TLS_VERIFY_HOSTNAME` is false (the jar's default is `true` since 2026-10-04, ING-SEC-04;
+  the `dev` profile opts out) — the state REQ-SEC-070's rollout reaches, once one internal CA signs every service and the pin alone no
   longer tells them apart. *(Corrected 2026-09-23: the parenthesis here said the service-alias
   certificate has no matching SAN. It has one — `dns:backend` — and the edge and Prometheus verify
   it; the check was off because a shared certificate made it meaningless, not impossible.)* No

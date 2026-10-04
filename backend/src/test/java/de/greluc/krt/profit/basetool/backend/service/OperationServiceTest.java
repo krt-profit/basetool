@@ -92,7 +92,7 @@ class OperationServiceTest {
     verify(operationRepository, times(1)).save(operation);
     verify(auditService)
         .record(
-            eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.OPERATION_CREATED),
+            eq(de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType.OPERATION_CREATED),
             any(),
             eq("Test Op"),
             isNull(),

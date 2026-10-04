@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.service.exchange;
 
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.repository.ExchangeClientRevocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ExchangeInstallationRepository;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -41,7 +41,7 @@ public class ExchangeConnectionRetentionService {
 
   private final ExchangeInstallationRepository installationRepository;
   private final ExchangeClientRevocationRepository revocationRepository;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Deletes every installation disconnected before the cutoff, then every installation a
@@ -59,7 +59,7 @@ public class ExchangeConnectionRetentionService {
     int revocations = revocationRepository.deleteRevokedBefore(cutoff);
     Purged purged = new Purged(installations, revocations);
     if (purged.total() > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.EXCHANGE_CONNECTIONS_PURGED,
           null,
           null,

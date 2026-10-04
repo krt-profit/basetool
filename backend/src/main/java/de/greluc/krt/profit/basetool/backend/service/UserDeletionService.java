@@ -19,8 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
@@ -37,7 +39,6 @@ import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.Map;
@@ -114,7 +115,7 @@ public class UserDeletionService {
   private final MissionParticipantRepository missionParticipantRepository;
   private final MaterialClaimRepository materialClaimRepository;
   private final UserApprovalEventRepository userApprovalEventRepository;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * The five stores keyed by a plain {@code app_user.id} column. Their foreign keys cascade on
@@ -242,7 +243,7 @@ public class UserDeletionService {
     missionRepository.updateOwner(user, admin);
 
     if (inventoryDeleted > 0 || shipsDeleted > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.INVENTORY_PURGED_ON_USER_DELETION,
           null,
           null,
@@ -257,7 +258,7 @@ public class UserDeletionService {
         || notificationsDeleted > 0
         || ruleSelectorsDeleted > 0
         || evaluationsDeleted > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.PERSONAL_DATA_PURGED_ON_USER_DELETION,
           null,
           null,
@@ -271,7 +272,7 @@ public class UserDeletionService {
     }
     int refineryReassigned = refineryOrderRepository.updateOwner(user, admin);
     if (refineryReassigned > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.REFINERY_ORDERS_REASSIGNED,
           null,
           null,
@@ -297,7 +298,7 @@ public class UserDeletionService {
             .getObject()
             .snapshotResponsibleHoldersForUser(userId);
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.USER_DELETED,
         null,
         null,

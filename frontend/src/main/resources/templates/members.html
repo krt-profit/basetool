@@ -30,80 +30,82 @@
 
     <div id="members-results" class="card card--flush">
         <th:block th:fragment="membersTableFragment">
-        <table th:if="${users != null and !users.isEmpty()}" class="data-table data-table--stack">
-            <thead>
-                <tr>
-                    <th th:text="#{profile.username}">Username</th>
-                    <th th:text="#{members.field.squadron}">Staffel</th>
-                    <th th:text="#{members.list.specialcommands}">SK</th>
-                    <th class="num" th:text="#{profile.rank}">Rang</th>
-                    <th th:text="#{members.discord}">Discord</th>
-                    <th class="cell-status" th:text="#{members.status}">Status</th>
-                    <th class="cell-actions"><span class="visually-hidden" th:text="#{general.action}">Aktion</span></th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr th:each="user : ${users}" data-testid="member-row">
-                    <td>
-                        <a class="row-link" data-testid="row-link" th:href="@{/members/{id}/edit(id=${user.id}, source='members')}">
-                            <span class="cell-title" th:text="${user.effectiveName}">Username</span>
-                        </a>
-                    </td>
-                    <td th:attr="data-label=#{members.field.squadron}">
-                        <span th:if="${user.squadrons != null and !user.squadrons.isEmpty()}">
-                            <th:block th:each="sq, st : ${user.squadrons}">
-                                <span class="squadron-badge"
-                                      th:title="${sq.name()}"
-                                      th:text="${sq.shorthand()}">IRI</span><span th:if="${!st.last}">&#160;&middot;&#160;</span>
-                            </th:block>
-                        </span>
-                        <span th:if="${user.squadrons == null or user.squadrons.isEmpty()}"
-                              class="squadron-badge squadron-badge-muted">&mdash;</span>
-                    </td>
-                    <td th:attr="data-label=#{members.list.specialcommands}">
-                        <span th:if="${userSkMemberships != null and userSkMemberships.get(user.id) != null and !userSkMemberships.get(user.id).isEmpty()}">
-                            <th:block th:each="sk, st : ${userSkMemberships.get(user.id)}">
-                                <span class="squadron-badge squadron-badge-sk"
-                                      th:title="${sk.orgUnitName()}"
-                                      th:text="${sk.orgUnitShorthand() != null ? sk.orgUnitShorthand() : sk.orgUnitName()}">ALPHA</span><span th:if="${!st.last}">&#160;&middot;&#160;</span>
-                            </th:block>
-                        </span>
-                        <span th:if="${userSkMemberships == null or userSkMemberships.get(user.id) == null or userSkMemberships.get(user.id).isEmpty()}"
-                              class="squadron-badge squadron-badge-muted"
-                              th:utext="#{members.list.specialcommands.none}">&mdash;</span>
-                    </td>
-                    <td class="num" th:attr="data-label=#{profile.rank}" th:text="${user.rank}">Rang</td>
-                    <td th:attr="data-label=#{members.discord}">
-                        <span th:if="${user.discordLinked}" role="img"
-                              th:title="#{members.discord.linked}" th:aria-label="#{members.discord.linked}">
-                            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-discord"/></svg>
-                        </span>
-                        <span th:unless="${user.discordLinked}" class="text-muted"
-                              th:title="#{members.discord.not_linked}" th:aria-label="#{members.discord.not_linked}">&mdash;</span>
-                    </td>
-                    <td class="cell-status">
-                        <span th:if="${user.inKeycloak}" class="status-pill status-active" th:text="#{members.in_keycloak}">In Keycloak</span>
-                        <span th:unless="${user.inKeycloak}" class="status-pill status-rejected" th:text="#{members.not_in_keycloak}">Nicht in Keycloak</span>
-                    </td>
-                    <td class="cell-actions">
-                        <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
-                                type="button"
-                                class="btn btn-ghost btn-icon"
-                                th:data-user-id="${user.id}"
-                                th:data-user-version="${user.version}"
-                                data-trigger="members-consolidate"
-                                th:title="#{members.consolidate.hint}" th:aria-label="#{members.consolidate}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-users"/></svg></button>
-                        <button th:if="${!user.inKeycloak}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
-                                type="button"
-                                class="btn btn-quiet-danger btn-icon"
-                                th:data-user-id="${user.id}"
-                                data-trigger="members-delete-user"
-                                th:title="#{members.delete}" th:aria-label="#{members.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                        <svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+        <div class="table-responsive" th:if="${users != null and !users.isEmpty()}">
+            <table class="data-table data-table--stack">
+                <thead>
+                    <tr>
+                        <th th:text="#{profile.username}">Username</th>
+                        <th th:text="#{members.field.squadron}">Staffel</th>
+                        <th th:text="#{members.list.specialcommands}">SK</th>
+                        <th class="num" th:text="#{profile.rank}">Rang</th>
+                        <th th:text="#{members.discord}">Discord</th>
+                        <th class="cell-status" th:text="#{members.status}">Status</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{general.action}">Aktion</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="user : ${users}" data-testid="member-row">
+                        <td>
+                            <a class="row-link" data-testid="row-link" th:href="@{/members/{id}/edit(id=${user.id}, source='members')}">
+                                <span class="cell-title" th:text="${user.effectiveName}">Username</span>
+                            </a>
+                        </td>
+                        <td th:attr="data-label=#{members.field.squadron}">
+                            <span th:if="${user.squadrons != null and !user.squadrons.isEmpty()}">
+                                <th:block th:each="sq, st : ${user.squadrons}">
+                                    <span class="squadron-badge"
+                                          th:title="${sq.name()}"
+                                          th:text="${sq.shorthand()}">IRI</span><span th:if="${!st.last}">&#160;&middot;&#160;</span>
+                                </th:block>
+                            </span>
+                            <span th:if="${user.squadrons == null or user.squadrons.isEmpty()}"
+                                  class="squadron-badge squadron-badge-muted">&mdash;</span>
+                        </td>
+                        <td th:attr="data-label=#{members.list.specialcommands}">
+                            <span th:if="${userSkMemberships != null and userSkMemberships.get(user.id) != null and !userSkMemberships.get(user.id).isEmpty()}">
+                                <th:block th:each="sk, st : ${userSkMemberships.get(user.id)}">
+                                    <span class="squadron-badge squadron-badge-sk"
+                                          th:title="${sk.orgUnitName()}"
+                                          th:text="${sk.orgUnitShorthand() != null ? sk.orgUnitShorthand() : sk.orgUnitName()}">ALPHA</span><span th:if="${!st.last}">&#160;&middot;&#160;</span>
+                                </th:block>
+                            </span>
+                            <span th:if="${userSkMemberships == null or userSkMemberships.get(user.id) == null or userSkMemberships.get(user.id).isEmpty()}"
+                                  class="squadron-badge squadron-badge-muted"
+                                  th:utext="#{members.list.specialcommands.none}">&mdash;</span>
+                        </td>
+                        <td class="num" th:attr="data-label=#{profile.rank}" th:text="${user.rank}">Rang</td>
+                        <td th:attr="data-label=#{members.discord}">
+                            <span th:if="${user.discordLinked}" role="img"
+                                  th:title="#{members.discord.linked}" th:aria-label="#{members.discord.linked}">
+                                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-discord"/></svg>
+                            </span>
+                            <span th:unless="${user.discordLinked}" class="text-muted"
+                                  th:title="#{members.discord.not_linked}" th:aria-label="#{members.discord.not_linked}">&mdash;</span>
+                        </td>
+                        <td class="cell-status">
+                            <span th:if="${user.inKeycloak}" class="status-pill status-active" th:text="#{members.in_keycloak}">In Keycloak</span>
+                            <span th:unless="${user.inKeycloak}" class="status-pill status-rejected" th:text="#{members.not_in_keycloak}">Nicht in Keycloak</span>
+                        </td>
+                        <td class="cell-actions">
+                            <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                                    type="button"
+                                    class="btn btn-ghost btn-icon"
+                                    th:data-user-id="${user.id}"
+                                    th:data-user-version="${user.version}"
+                                    data-trigger="members-consolidate"
+                                    th:title="#{members.consolidate.hint}" th:aria-label="#{members.consolidate}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-users"/></svg></button>
+                            <button th:if="${!user.inKeycloak}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                                    type="button"
+                                    class="btn btn-quiet-danger btn-icon"
+                                    th:data-user-id="${user.id}"
+                                    data-trigger="members-delete-user"
+                                    th:title="#{members.delete}" th:aria-label="#{members.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                            <svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
 
         <th:block th:if="${error == null and (users == null or users.isEmpty())}">
             <th:block th:replace="~{fragments/components :: emptyState(titleKey='members.empty', textKey='members.empty.text')}"></th:block>

@@ -32,6 +32,7 @@ import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.backend.annotation.ObserverSpi;
 import de.greluc.krt.profit.basetool.backend.architecture.fixture.ListenerAndObserverFixtures;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.BankAuditService;
@@ -90,7 +91,10 @@ class ListenerAndObserverRulesTest {
 
   /** The audit recorders whose rows must be written inside the business transaction. */
   private static final Set<String> AUDIT_RECORDERS =
-      Set.of(AuditService.class.getName(), BankAuditService.class.getName());
+      Set.of(
+          AuditRecorder.class.getName(),
+          AuditService.class.getName(),
+          BankAuditService.class.getName());
 
   /** Types every member of which reads request-bound state. */
   private static final Set<String> REQUEST_BOUND_TYPES =

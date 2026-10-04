@@ -19,9 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.Operation;
@@ -36,7 +38,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepos
 import de.greluc.krt.profit.basetool.backend.repository.OperationPayoutStatusRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -103,7 +104,7 @@ public class OperationPayoutService {
   private final OwnerScopeService ownerScopeService;
   private final AuthHelperService authHelperService;
   private final SystemSettingService systemSettingService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Proxy-backed self-reference through which {@link #setPayoutStatus} runs each attempt of {@link
@@ -335,7 +336,7 @@ public class OperationPayoutService {
     }
 
     payoutStatusRepository.save(status);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.OPERATION_PAYOUT_TOGGLED,
         operationId,
         operation.getName(),
