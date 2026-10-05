@@ -323,6 +323,11 @@
 
 ### Fixed
 
+- **Lager: `canEdit` sagt die ganze Wahrheit.** Das Feld war für ein einfaches Mitglied auch auf den
+  Zeilen anderer Mitglieder seiner Einheit `true`, obwohl jede Zeilenaktion dort mit 403 abgelehnt
+  wird; die App bot deshalb Aktionen an, die scheiterten. Jetzt gilt: Besitzer oder Logistiker und
+  höher, im eigenen Bereich (API, REQ-SEC-047).
+
 - **Hinweis-Toasts schlucken keine Klicks mehr.** Ein eingeblendeter Erfolgs- oder Fehler-Toast
   (unten rechts) fing fünf Sekunden lang jeden Klick auf das ab, was er verdeckte – etwa den
   Löschen-Knopf einer gerade angelegten Materialkategorie. Toasts sind jetzt für die Maus
