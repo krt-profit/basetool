@@ -368,4 +368,6 @@ Phase 1 has begun: `audit.api`, `kernel`, `orgunit.api`/`orgunit.web` and the pu
 `platform` module and the modules' `api`/`internal` packages, and the frozen module baseline has
 shrunk from 138 to 110 class edges. Phase 2 moves whole domains into their packages: `orgchart`
 (2026-10-05) — controllers in `orgchart.web`, everything else in `orgchart.internal`, reachable
-from the org-unit module only through its `MembershipChangeObserver`.
+from the org-unit module only through its `MembershipChangeObserver`. `operation` followed with the
+first access policy out of the scope hub and the first mission command; the baseline is at 108
+class edges.

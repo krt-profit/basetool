@@ -323,6 +323,7 @@ class rename, a moved bean or a changed signature therefore has to fail the buil
 
 **Enforced by:** `SecurityExpressionBeanResolutionTest`, `SecurityExpressionRulesTest`,
 `SecurityExpressionAnalyzerTest` · **Code:** the explicit names on `OwnerScopeService`,
+`OperationAccessPolicy`,
 `MissionSecurityService`, `AuthHelperService`, `OrgRoleManagementSecurityService`,
 `BankSecurityService`, `SpecialCommandSecurityService`, `ExchangeGate`, `ConnectedAppsGate` ·
 **Related:** REQ-SEC-002, REQ-OBS-020, plan guard G-04

@@ -137,6 +137,17 @@ of the rank change. A moved domain's `web` depends on its `internal`, never the 
 its services return the REST DTOs ([`module-boundaries.md`](../specs/module-boundaries.md),
 REQ-MOD-006).
 
+`operation` followed: `OperationController` in `operation.web`; the operation, finance and payout
+services, the payout-status entity and repository, the finance and payout DTOs and
+`OperationAccessPolicy` in `operation.internal`. The policy (bean `operationAccessPolicy`) is the
+first access policy taken out of the scope hub (ADR-0236): the operation endpoints, the operation
+live-sync room and the payout ledger check ask it instead of `OwnerScopeService`. Deleting an
+operation detaches its missions through the mission module's first published command,
+`mission.api.MissionCommands#detachFromOperation` (`MANDATORY`), instead of writing `Mission`
+rows itself. The `Operation` entity, its repository and mapper and the DTOs the mission module
+embeds stay in the layer packages until `Mission` references its operation by id (plan §7.5), so
+the operation's JPQL scope fragment still sits in `ScopeSpecifications`.
+
 The platform modules reach the domains only through SPIs they own and the domains implement
 (plan §5.3); Spring injects the implementations, so the platform names no domain class:
 
