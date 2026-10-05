@@ -82,13 +82,6 @@ class TypedBackendClientTest {
    */
   private static final Set<String> NOT_YET_ON_A_TYPED_CLIENT =
       Set.of(
-          "AdminBankPageController",
-          "BankGrantsPageController",
-          "BankManagePageController",
-          "BankPageController",
-          "BankProxyController",
-          "BankReportProxyController",
-          "BankRequestQueuePageController",
           "InventoryDeleteAllProxyController",
           "InventoryMergeProbeProxyController",
           "InventoryOrgUnitChangeProxyController",
@@ -102,12 +95,6 @@ class TypedBackendClientTest {
           "JobOrderStockAttributionProxyController",
           "JobOrderWriteController",
           "MaterialCollectionPageController",
-          "MissionFinancePageController",
-          "MissionPageController",
-          "MissionWriteController",
-          "OperationPageController",
-          "OrgUnitBankPageController",
-          "OrgUnitBankProxyController",
           "RefineryImportProxyController",
           "RefineryOrderPageController",
           "RefineryOrderWriteController");

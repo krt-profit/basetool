@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.admin.api.SystemSettings;
 import java.math.BigDecimal;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -39,12 +40,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class BankTransferFeeServiceTest {
 
-  @Mock private SystemSettingService systemSettingService;
+  @Mock private SystemSettings systemSettings;
 
   @InjectMocks private BankTransferFeeService bankTransferFeeService;
 
   private void rate(String value) {
-    when(systemSettingService.getSettingValue("operation.transfer_fee_rate"))
+    when(systemSettings.getSettingValue("operation.transfer_fee_rate"))
         .thenReturn(Optional.of(value));
   }
 
@@ -90,7 +91,7 @@ class BankTransferFeeServiceTest {
 
   @Test
   void resolveRate_fallsBackOnMissingBlankInvalidOrOutOfRange() {
-    when(systemSettingService.getSettingValue("operation.transfer_fee_rate"))
+    when(systemSettings.getSettingValue("operation.transfer_fee_rate"))
         .thenReturn(Optional.empty())
         .thenReturn(Optional.of("  "))
         .thenReturn(Optional.of("abc"))

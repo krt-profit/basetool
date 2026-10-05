@@ -20,6 +20,7 @@
 /** The Materialbörse module: material offers, requests and the interest registered on them. */
 @ApplicationModule(
     allowedDependencies = {
+      "admin::api",
       "audit::api",
       "catalogue::api",
       "identity::api",

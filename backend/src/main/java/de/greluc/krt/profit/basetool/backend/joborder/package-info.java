@@ -20,6 +20,7 @@
 /** The job-order module (Aufträge): orders, their production allocations and deliveries. */
 @ApplicationModule(
     allowedDependencies = {
+      "admin::api",
       "audit::api",
       "catalogue::api",
       "identity::api",

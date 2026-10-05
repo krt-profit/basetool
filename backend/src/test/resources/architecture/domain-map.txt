@@ -145,8 +145,6 @@ class ReportGenerationException kernel generic report failure
 class GlobalExceptionHandler platform RFC 7807 handler
 class ErrorDisclosurePolicy kernel the disclosure policy every AppException carries (ADR-0235)
 class LiveSyncChangedRequest livesync app live-sync relay payload
-class PingResponse admin liveness probe payload of SystemController
-class SystemController admin liveness/version probe
 class Department orgunit Bereich brand colour
 class MembershipRole orgunit rank on an OrgUnitMembership
 class FinanceType mission mission finance entry type
@@ -198,6 +196,7 @@ package catalogue catalogue the catalogue module's package tree (plan 5.2)
 package mission mission the mission module's package tree (plan 5.2)
 package dashboard dashboard the dashboard module's package tree (plan 5.2)
 package orgchart orgchart the org chart module's package tree (plan 5.2)
+package admin admin the admin module's package tree (plan 5.2)
 package promotion promotion the promotion module's package tree (plan 5.2)
 
 name ^OrgUnitBank bank
@@ -225,7 +224,6 @@ name ^(AdminPersonalBlueprint|AdminDefaultBlueprint) blueprint
 name ^(AdminExchange) exchange
 name ^(AdminP4k) catalogue
 name ^(QualityTier|AdminQualityTier) catalogue
-name ^(SystemSetting|AppVersionPolicy|AndroidClient|AndroidVersionPolicy) admin
 name ^(LiveSync|LocalLiveSync|RedisLiveSync) livesync
 name ^(City|Location|StarSystem|SpaceStation|Outpost|Poi|Terminal|Planet|Moon|Orbit|Faction|Jurisdiction|Material|Manufacturer|ShipType|JobType|FrequencyType|GameItem|Uex|ScWiki|P4k|Sync|ExternalSync|MasterData|EvictAllMaterialCaches|QuantityType|LookupTable|PairKeyRef) catalogue
 
