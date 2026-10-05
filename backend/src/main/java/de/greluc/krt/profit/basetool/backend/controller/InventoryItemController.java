@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkOrgUnitChangeRequest;
@@ -49,7 +50,6 @@ import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryOrgUnitChangeService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryStolenMarkService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

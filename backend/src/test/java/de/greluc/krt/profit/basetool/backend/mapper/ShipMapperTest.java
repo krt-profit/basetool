@@ -50,7 +50,7 @@ class ShipMapperTest {
     ReflectionTestUtils.setField(
         userMapper,
         "staffelMembershipResolver",
-        new de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver(
+        new de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver(
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.repository.SquadronRepository.class),
             org.mockito.Mockito.mock(

@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.DataExportSections;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
@@ -37,7 +38,6 @@ import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventReposit
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.UserAccountMergeService;
 import de.greluc.krt.profit.basetool.backend.service.UserDeletionService;
-import de.greluc.krt.profit.basetool.backend.support.DataExportSections;
 import java.sql.SQLException;
 import java.util.Map;
 import java.util.Set;

@@ -128,6 +128,8 @@ public class SecurityConfig {
    * @param clientRegistrationRepository the OAuth2 client registry the entry point redirects
    *     through
    * @param keycloakIssuerUri the issuer URI fed into the CSP {@code form-action} allow-list
+   * @param trustedTypesMode the raw {@code app.security.trusted-types} value, parsed leniently by
+   *     {@link TrustedTypesMode#parse}
    * @param sessionRegistryProvider the Redis-backed session registry, absent in the {@code test}
    *     profile
    * @param oauth2LoginSuccessHandler the post-login handler chain
@@ -142,6 +144,7 @@ public class SecurityConfig {
       ClientRegistrationRepository clientRegistrationRepository,
       @Value("${spring.security.oauth2.client.provider.keycloak.issuer-uri:}")
           String keycloakIssuerUri,
+      @Value("${app.security.trusted-types:report}") String trustedTypesMode,
       org.springframework.beans.factory.ObjectProvider<
               org.springframework.security.core.session.SessionRegistry>
           sessionRegistryProvider,
@@ -175,7 +178,8 @@ public class SecurityConfig {
         .addFilterAfter(termsAcceptanceGateFilter, BackendRoleSyncFilter.class)
         .requestCache(cache -> cache.requestCache(navigationRequestCache))
         .csrf(org.springframework.security.config.Customizer.withDefaults())
-        .headers(SecurityHeaders.frontend(keycloakIssuerUri))
+        .headers(
+            SecurityHeaders.frontend(keycloakIssuerUri, TrustedTypesMode.parse(trustedTypesMode)))
         .authorizeHttpRequests(
             auth ->
                 auth.requestMatchers("/actuator/health", "/actuator/health/**")

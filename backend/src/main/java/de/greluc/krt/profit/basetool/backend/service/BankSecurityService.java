@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountGrant;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountGrantId;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountGrantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;

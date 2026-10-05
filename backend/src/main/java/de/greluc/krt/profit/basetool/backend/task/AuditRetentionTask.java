@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.task;
 
+import de.greluc.krt.profit.basetool.backend.audit.internal.AuditRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.AuditRetentionService;
-import de.greluc.krt.profit.basetool.backend.support.AuditRetentionProperties;
 import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;

@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.OrgRelativeRole;
 import de.greluc.krt.profit.basetool.backend.notification.api.AccountRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.notification.api.OrgUnitRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.notification.api.RoleRecipientDirectory;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

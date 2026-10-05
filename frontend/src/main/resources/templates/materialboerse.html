@@ -290,7 +290,7 @@
 <th:block th:replace="~{fragments/toast :: toast}"/>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    window.materialboerseI18n = Object.assign(window.materialboerseI18n || {}, {
+    window.materialboerseI18n = {
         released: /*[[#{materialboerse.toast.released}]]*/ 'Auf die Börse gestellt.',
         deactivated: /*[[#{materialboerse.toast.deactivated}]]*/ 'Von der Börse genommen.',
         remarkSaved: /*[[#{materialboerse.toast.remarkSaved}]]*/ 'Bemerkung gespeichert.',
@@ -320,8 +320,8 @@
             dismissLabel: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
             reloadQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Neu laden?'
         }
-    });
-    window.materialgesuchI18n = Object.assign(window.materialgesuchI18n || {}, {
+    };
+    window.materialgesuchI18n = {
         created: /*[[#{materialgesuch.toast.created}]]*/ 'Gesuch veröffentlicht.',
         updated: /*[[#{materialgesuch.toast.updated}]]*/ 'Gesuch aktualisiert.',
         deactivated: /*[[#{materialgesuch.toast.deactivated}]]*/ 'Gesuch zurückgezogen.',
@@ -336,8 +336,14 @@
         agoDayOne: /*[[#{materialgesuch.ago.dayOne}]]*/ 'vor 1 Tag',
         agoDays: /*[[#{materialgesuch.ago.days}]]*/ 'vor {0} Tagen',
         agoNow: /*[[#{materialgesuch.ago.now}]]*/ 'gerade eben',
-        conflict: window.materialboerseI18n.conflict
-    });
+        conflict: {
+            title: /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
+            reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Neu laden.',
+            reloadLabel: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Neu laden',
+            dismissLabel: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
+            reloadQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Neu laden?'
+        }
+    };
 </script>
 <script th:src="@{/js/materialboerse.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>

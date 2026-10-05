@@ -1591,40 +1591,19 @@
         'delete_confirm': /*[[#{mission.frequency.custom.delete.confirm}]]*/ 'This frequency will be deleted.'
     };
     const missionId = /*[[${mission?.id?.toString()}]]*/ null;
-    window.missionId = missionId;
+    window.missionId = /*[[${mission?.id?.toString()}]]*/ null;
     window.missionCanEdit = /*[[${!isNew and mission != null and mission.canEdit}]]*/ false;
     window.missionOperationId =
         /*[[${mission?.operation?.id?.toString()}]]*/ null;
 </script>
 <script th:src="@{/js/mission-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <script th:inline="javascript" th:if="${!isNew}" th:attr="nonce=${cspNonce}">
-    function openEditFinanceModal(id, note, type, amount, version) {
-        document.getElementById('edit-finance-form').action = window.safeSameOriginUrl('/missions/[[${mission?.id?.toString()}]]/finance-entries/' + id + '/update', document.getElementById('edit-finance-form').action);
-        document.getElementById('edit-finance-form').setAttribute('data-entry-id', id);
-        document.getElementById('edit-finance-note').value = note && note !== 'null' ? note : '';
-        window.krtSegSet('edit-finance-type', type === 'EXPENSE' ? 'EXPENSE' : 'INCOME');
-        document.getElementById('edit-finance-amount').value = amount;
-        document.getElementById('edit-finance-version').value = version;
-        window.krtModalOpen(document.getElementById('edit-finance-entry-modal'));
-    }
-    </script>
 <script th:src="@{/js/mission-presence.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:if="${!isNew and authUserId != null}" th:attr="nonce=${cspNonce}" th:inline="javascript">
     window.MISSION_PRESENCE_I18N = {
         'mission.presence.editing.solo': /*[[#{mission.presence.editing.solo}]]*/ 'currently editing:',
         'mission.presence.editing.multi': /*[[#{mission.presence.editing.multi}]]*/ 'currently editing:'
     };
-    document.addEventListener('DOMContentLoaded', function () {
-        if (typeof window.MissionPresence !== 'function' || !window.missionId) {
-            return;
-        }
-        const presence = new window.MissionPresence(
-            window.missionId,
-            /*[[${authUserId}]]*/ null
-        );
-        presence.start();
-        window.missionPresence = presence;
-    });
+    window.missionPresenceUserId = /*[[${authUserId}]]*/ null;
 </script>
 </body>
 </html>

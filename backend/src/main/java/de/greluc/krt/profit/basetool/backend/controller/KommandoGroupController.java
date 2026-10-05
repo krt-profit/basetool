@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateKommandoGroupRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.KommandoGroupDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateKommandoGroupRequest;
 import de.greluc.krt.profit.basetool.backend.service.KommandoGroupService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.List;

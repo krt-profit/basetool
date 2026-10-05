@@ -61,8 +61,9 @@ class MissionFinanceEntryControllerTest {
   @Mock private MissionFinanceEntryService service;
 
   @org.mockito.Spy
-  private de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor missionPeerRedactor =
-      new de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor();
+  private de.greluc.krt.profit.basetool.backend.mission.internal.MissionPeerRedactor
+      missionPeerRedactor =
+          new de.greluc.krt.profit.basetool.backend.mission.internal.MissionPeerRedactor();
 
   @InjectMocks private MissionFinanceEntryController controller;
 

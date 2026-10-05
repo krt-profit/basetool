@@ -21,12 +21,12 @@ package de.greluc.krt.profit.basetool.backend.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.support.AuditRetentionProperties;
-import de.greluc.krt.profit.basetool.backend.support.AuthoritiesCacheProperties;
-import de.greluc.krt.profit.basetool.backend.support.ExchangeConnectionRetentionProperties;
-import de.greluc.krt.profit.basetool.backend.support.NotificationRetentionProperties;
-import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
-import de.greluc.krt.profit.basetool.backend.support.RejectedRegistrationRetentionProperties;
+import de.greluc.krt.profit.basetool.backend.audit.internal.AuditRetentionProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeConnectionRetentionProperties;
+import de.greluc.krt.profit.basetool.backend.identity.internal.RejectedRegistrationRetentionProperties;
+import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationRetentionProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthoritiesCacheProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.RateLimitProperties;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;

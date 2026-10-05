@@ -24,11 +24,11 @@ import de.greluc.krt.profit.basetool.backend.model.dto.ConnectedAppMassChangeReq
 import de.greluc.krt.profit.basetool.backend.model.dto.ConnectedAppMassChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ExchangeUndoRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ExchangeUndoResultDto;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.service.exchange.ConnectedAppsService;
 import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeMassChangeService;
 import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeRevocationSecond;
 import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeUndoService;
-import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;

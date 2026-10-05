@@ -245,9 +245,9 @@ class ArchitectureRuleFailureTest {
   }
 
   @Test
-  void theSupportAllowListFails() {
+  void theLeafHelperAllowListFails() {
     assertReports(
-        ArchitectureTest.supportPackageMustStayADependencyLeafRule(
+        ArchitectureTest.leafHelpersMustStayDependencyLeavesRule(
             ArchitectureTest.packageTreeOf("fixture support", Helper.class),
             ArchitectureTest.packageTreeOf("fixture support", Helper.class)
                 .or(ArchitectureTest.MODEL_CODE)

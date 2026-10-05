@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.mapper.NotificationRuleMapper;
 import de.greluc.krt.profit.basetool.backend.model.NotificationRule;
 import de.greluc.krt.profit.basetool.backend.model.NotificationRuleSelector;
@@ -30,8 +32,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleSelectorW
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleWriteRequest;
 import de.greluc.krt.profit.basetool.backend.notification.api.RoleRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRuleRepository;
-import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;

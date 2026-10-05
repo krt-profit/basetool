@@ -668,7 +668,7 @@ function syncPersonalAllocations() {
         if (group) group.hidden = hide;
         if (hide) {
             const container = document.getElementById(cfg.rows);
-            if (container) container.innerHTML = '';
+            if (container) container.replaceChildren();
         }
     });
     updateAllocOver();

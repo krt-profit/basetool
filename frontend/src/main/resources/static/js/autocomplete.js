@@ -120,7 +120,7 @@ function krtAutocomplete(inp, dataSource, options = {}) {
         const x = document.getElementsByClassName('autocomplete-items');
         for (let i = 0; i < x.length; i++) {
             if (elmnt !== x[i] && elmnt !== inp && x[i].id === `${inp.id}-autocomplete-list`) {
-                x[i].innerHTML = '';
+                x[i].replaceChildren();
             }
         }
     }

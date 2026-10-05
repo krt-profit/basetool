@@ -26,6 +26,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ActingMemberHeader;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeClient;
@@ -40,8 +42,6 @@ import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.DefaultBlueprintKeyService;
 import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeBlueprintFeedService;
-import de.greluc.krt.profit.basetool.backend.support.ActingMemberHeader;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.time.Instant;

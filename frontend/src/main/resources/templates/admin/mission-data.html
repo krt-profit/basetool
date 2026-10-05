@@ -385,22 +385,22 @@
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     var MISSION_MSG = {
-        saved:   '[[#{notification.success.save}]]',
-        deleted: '[[#{notification.success.delete}]]',
-        error:   '[[#{notification.error.save}]]'
+        saved:   /*[[#{notification.success.save}]]*/ '',
+        deleted: /*[[#{notification.success.delete}]]*/ '',
+        error:   /*[[#{notification.error.save}]]*/ ''
     };
     var MISSION_CONFLICT = {
-        title:                '[[#{frontend.ajax.conflict.title}]]',
-        reloadDetailFallback: '[[#{frontend.ajax.conflict.detail}]]',
-        reloadLabel:          '[[#{frontend.ajax.conflict.reload}]]',
-        dismissLabel:         '[[#{frontend.ajax.conflict.dismiss}]]',
-        reloadQuestion:       '[[#{frontend.ajax.conflict.question}]]'
+        title:                /*[[#{frontend.ajax.conflict.title}]]*/ '',
+        reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ '',
+        reloadLabel:          /*[[#{frontend.ajax.conflict.reload}]]*/ '',
+        dismissLabel:         /*[[#{frontend.ajax.conflict.dismiss}]]*/ '',
+        reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ ''
     };
     var MISSION_TITLES = {
-        squadronCreate: '[[#{admin.squadron.create}]]',
-        jobTypeCreate:  '[[#{admin.job_type.create}]]',
-        freqTypeCreate: '[[#{admin.frequency_type.create}]]',
-        edit:           '[[#{admin.edit}]]'
+        squadronCreate: /*[[#{admin.squadron.create}]]*/ '',
+        jobTypeCreate:  /*[[#{admin.job_type.create}]]*/ '',
+        freqTypeCreate: /*[[#{admin.frequency_type.create}]]*/ '',
+        edit:           /*[[#{admin.edit}]]*/ ''
     };
 </script>
 <script th:src="@{/js/mission-data.js}" defer th:attr="nonce=${cspNonce}"></script>

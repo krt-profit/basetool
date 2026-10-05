@@ -587,7 +587,7 @@
         }
         if (modalRoleGroup && modalRole) {
             modalRoleGroup.hidden = action !== 'add-bereich';
-            modalRole.innerHTML = '';
+            modalRole.replaceChildren();
             if (action === 'add-bereich') {
                 if (trigger.getAttribute('data-can-lead') === 'true') {
                     addOption(modalRole, 'LEITER', i18n.rankLeiter);

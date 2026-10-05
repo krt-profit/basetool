@@ -63,7 +63,7 @@ class ScriptLoadOrderE2eTest {
       () => {
         const missing = [];
         const globals = ['krtFetch', 'krtCsrf', 'krtLiveSync', 'krtSearchableSelect',
-                         'krtComboboxRemoteSources', 'krtI18nText', 'escapeHtml'];
+                         'krtComboboxRemoteSources', 'krtI18nText', 'krtHtml'];
         for (const name of globals) {
           if (window[name] === undefined || window[name] === null) {
             missing.push(name);

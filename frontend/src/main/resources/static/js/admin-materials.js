@@ -80,8 +80,10 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.className = 'btn btn-quiet-danger btn-icon';
         btn.title = CAT_MSG.deleteTitle;
         btn.setAttribute('aria-label', CAT_MSG.deleteTitle);
-        btn.innerHTML =
-            '<svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>';
+        krtHtml.set(
+            btn,
+            krtHtml`<svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>`,
+        );
         form.appendChild(btn);
         actionTd.appendChild(form);
         tr.appendChild(nameTd);
@@ -333,7 +335,7 @@ function refreshMaterialsTable() {
             if (html === null) {
                 return false;
             }
-            const fresh = new DOMParser().parseFromString(html, 'text/html');
+            const fresh = window.krtFetch.parseTrustedDocument(html);
             if (!fresh.querySelector('#materials-results #materialsTable tbody')) {
                 return false;
             }

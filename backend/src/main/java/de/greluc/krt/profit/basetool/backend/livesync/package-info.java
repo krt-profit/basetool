@@ -20,7 +20,7 @@
 /**
  * The live-sync module: the topic rooms, their relay and fan-out, and who may join them (ADR-0143).
  */
-@ApplicationModule(allowedDependencies = {"kernel"})
+@ApplicationModule(allowedDependencies = {"kernel", "platform::api"})
 package de.greluc.krt.profit.basetool.backend.livesync;
 
 import org.springframework.modulith.ApplicationModule;
