@@ -34,7 +34,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.exception.GlobalExceptionHandler;
+import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.operation.client.OperationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.service.MarkdownRenderer;
@@ -210,13 +212,17 @@ class ListSearchRelayParamsTest {
   private MockMvc missionsMvc(BackendApiClient backend) {
     return standalone(
         new MissionPageController(
-            backend, mock(FrontendAuthHelperService.class), mock(ParallelPageLoader.class)));
+            new MissionBackendClient(backend),
+            mock(FrontendAuthHelperService.class),
+            mock(ParallelPageLoader.class)));
   }
 
   private MockMvc operationsMvc(BackendApiClient backend) {
     return standalone(
         new OperationPageController(
-            backend, mock(MarkdownRenderer.class), mock(ParallelPageLoader.class)));
+            new OperationBackendClient(backend),
+            mock(MarkdownRenderer.class),
+            mock(ParallelPageLoader.class)));
   }
 
   private static MockMvc standalone(Object controller) {

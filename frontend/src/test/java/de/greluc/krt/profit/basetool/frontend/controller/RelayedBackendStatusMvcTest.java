@@ -37,6 +37,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.frontend.audit.client.AuditBackendClient;
+import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.AppHttpProperties;
@@ -148,7 +149,8 @@ class RelayedBackendStatusMvcTest {
             delete("/api/proxy/audit/BANK").param("before", FROM)),
         relay(
             "BankReportProxyController#downloadStatement",
-            wc -> new BankReportProxyController(RealBackendApiClient.over(wc)),
+            wc ->
+                new BankReportProxyController(new BankBackendClient(RealBackendApiClient.over(wc))),
             get("/api/proxy/bank/accounts/" + id + "/statement")
                 .param("from", FROM)
                 .param("to", TO)),
@@ -191,7 +193,9 @@ class RelayedBackendStatusMvcTest {
                 .content("{}")),
         relay(
             "OrgUnitBankProxyController#downloadStatement",
-            wc -> new OrgUnitBankProxyController(RealBackendApiClient.mockExecutingOver(wc)),
+            wc ->
+                new OrgUnitBankProxyController(
+                    new BankBackendClient(RealBackendApiClient.mockExecutingOver(wc))),
             get("/api/proxy/org-units/bank/accounts/" + id + "/statement")
                 .param("from", FROM)
                 .param("to", TO)),

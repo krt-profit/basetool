@@ -35,7 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutSummaryDt
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.form.OperationForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.operation.client.OperationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.MarkdownRenderer;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
@@ -43,7 +43,6 @@ import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -52,7 +51,6 @@ import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -88,21 +86,11 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("isAuthenticated()")
 public class OperationPageController {
 
-  private final BackendApiClient backendApiClient;
+  /** The operation domain's typed backend client. */
+  private final OperationBackendClient operationClient;
+
   private final MarkdownRenderer markdown;
   private final ParallelPageLoader parallelPageLoader;
-
-  /** Response type for one paginated page of the operations search endpoint. */
-  private static final ParameterizedTypeReference<PageResponse<OperationDto>> OPERATION_PAGE_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  /** Response type for the caller's pickable org units feeding the owner-picker fragment. */
-  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
-      PICKABLE_ORG_UNIT_LIST_TYPE = new ParameterizedTypeReference<>() {};
-
-  /** Response type for one paginated page of an operation's embedded missions. */
-  private static final ParameterizedTypeReference<PageResponse<MissionListDto>> MISSION_PAGE_TYPE =
-      new ParameterizedTypeReference<>() {};
 
   /**
    * The list's period segments (REQ-UI-027): upcoming (planned and active), past (completed and
@@ -147,39 +135,16 @@ public class OperationPageController {
       @RequestParam(required = false) String fragment,
       Model model,
       @AuthenticationPrincipal OidcUser principal) {
-    StringBuilder uri = new StringBuilder("/api/v1/operations/search?");
-    List<Object> uriVariables = new ArrayList<>();
-    if (search != null && !search.isBlank()) {
-      uri.append("query={query}&");
-      uriVariables.add(search);
-    }
-    if (start != null) {
-      uri.append("start={start}&");
-      uriVariables.add(start);
-    }
-    if (end != null) {
-      uri.append("end={end}&");
-      uriVariables.add(end);
-    }
-    uri.append("page={page}&");
-    uriVariables.add(page);
-    uri.append("size={size}&");
-    uriVariables.add(size);
-    uri.append("sort=createdAt,desc&");
-
     String knownPeriod = RelayParams.oneOfOrNull(period, OPERATION_PERIODS);
     String effectivePeriod = knownPeriod != null ? knownPeriod : showPast ? "ALL" : "UPCOMING";
-    switch (effectivePeriod) {
-      case "ALL" -> uri.append("status=PLANNED&status=ACTIVE&status=COMPLETED&status=CANCELED&");
-      case "PAST" -> uri.append("status=COMPLETED&status=CANCELED&");
-      default -> uri.append("status=PLANNED&status=ACTIVE&");
-    }
     model.addAttribute("showPast", !"UPCOMING".equals(effectivePeriod));
     model.addAttribute("period", effectivePeriod);
 
     try {
       PageResponse<OperationDto> operationsPage =
-          backendApiClient.get(uri.toString(), OPERATION_PAGE_TYPE, uriVariables.toArray());
+          operationClient.searchOperations(
+              new OperationBackendClient.OperationSearch(
+                  search, start, end, page, size, effectivePeriod));
       model.addAttribute("operations", operationsPage.content());
       model.addAttribute("operationsPage", operationsPage);
       model.addAttribute("search", search);
@@ -204,8 +169,7 @@ public class OperationPageController {
    */
   private List<OrgUnitMembershipOptionDto> fetchCallerMembershipOptions() {
     try {
-      List<OrgUnitMembershipOptionDto> options =
-          backendApiClient.get("/api/v1/users/me/pickable-org-units", PICKABLE_ORG_UNIT_LIST_TYPE);
+      List<OrgUnitMembershipOptionDto> options = operationClient.pickableOrgUnits();
       return options != null ? options : List.of();
     } catch (Exception e) {
       log.warn("Failed to fetch pickable org units for operation-create owner-picker", e);
@@ -315,22 +279,13 @@ public class OperationPageController {
   private void loadFullModel(
       UUID id, Integer page, Integer size, Authentication authentication, Model model) {
     CompletableFuture<OperationDto> operationF =
-        parallelPageLoader.loadAsync(
-            () -> backendApiClient.get("/api/v1/operations/{id}", OperationDto.class, id));
+        parallelPageLoader.loadAsync(() -> operationClient.operation(id));
     CompletableFuture<PageResponse<MissionListDto>> missionsF =
         parallelPageLoader.loadAsync(() -> fetchMissionsPage(id, page, size));
     CompletableFuture<OperationFinanceSummaryDto> financeF =
-        parallelPageLoader.loadAsync(
-            () ->
-                backendApiClient.get(
-                    "/api/v1/operations/{id}/finance-summary",
-                    OperationFinanceSummaryDto.class,
-                    id));
+        parallelPageLoader.loadAsync(() -> operationClient.financeSummary(id));
     CompletableFuture<OperationPayoutSummaryDto> payoutsF =
-        parallelPageLoader.loadAsync(
-            () ->
-                backendApiClient.get(
-                    "/api/v1/operations/{id}/payouts", OperationPayoutSummaryDto.class, id));
+        parallelPageLoader.loadAsync(() -> operationClient.payouts(id));
     CompletableFuture.allOf(operationF, missionsF, financeF, payoutsF).join();
 
     model.addAttribute("operation", operationF.join());
@@ -372,11 +327,8 @@ public class OperationPageController {
    * @param model Thymeleaf model to populate
    */
   private void loadPayoutModel(UUID id, Authentication authentication, @NotNull Model model) {
-    model.addAttribute(
-        "operation", backendApiClient.get("/api/v1/operations/{id}", OperationDto.class, id));
-    OperationPayoutSummaryDto payoutSummary =
-        backendApiClient.get(
-            "/api/v1/operations/{id}/payouts", OperationPayoutSummaryDto.class, id);
+    model.addAttribute("operation", operationClient.operation(id));
+    OperationPayoutSummaryDto payoutSummary = operationClient.payouts(id);
     model.addAttribute("operationPayouts", payoutSummary.payouts());
     model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
     model.addAttribute("payoutProgress", OperationPayoutProgress.of(payoutSummary.payouts()));
@@ -393,10 +345,7 @@ public class OperationPageController {
    * @param model Thymeleaf model to populate
    */
   private void loadFinanceModel(UUID id, @NotNull Model model) {
-    model.addAttribute(
-        "operationFinance",
-        backendApiClient.get(
-            "/api/v1/operations/{id}/finance-summary", OperationFinanceSummaryDto.class, id));
+    model.addAttribute("operationFinance", operationClient.financeSummary(id));
   }
 
   /**
@@ -414,8 +363,7 @@ public class OperationPageController {
   @NotNull
   private String missionsFragment(UUID id, Integer page, Integer size, Model model) {
     try {
-      model.addAttribute(
-          "operation", backendApiClient.get("/api/v1/operations/{id}", OperationDto.class, id));
+      model.addAttribute("operation", operationClient.operation(id));
       PageResponse<MissionListDto> missionsPage = fetchMissionsPage(id, page, size);
       model.addAttribute("missions", missionsPage.content());
       model.addAttribute("missionsPage", missionsPage);
@@ -437,13 +385,7 @@ public class OperationPageController {
    * @return the requested missions page envelope
    */
   private PageResponse<MissionListDto> fetchMissionsPage(UUID id, Integer page, Integer size) {
-    return backendApiClient.get(
-        "/api/v1/missions/search?operationId={id}&page={page}&size={size}"
-            + "&sort=plannedStartTime,asc",
-        MISSION_PAGE_TYPE,
-        id,
-        page,
-        size);
+    return operationClient.missions(id, page, size);
   }
 
   /**
@@ -462,12 +404,7 @@ public class OperationPageController {
   public String operationMissionFinance(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID missionId, Model model) {
     try {
-      MissionFinanceSummaryDto detail =
-          backendApiClient.get(
-              "/api/v1/operations/{id}/finances/{missionId}",
-              MissionFinanceSummaryDto.class,
-              id,
-              missionId);
+      MissionFinanceSummaryDto detail = operationClient.missionFinance(id, missionId);
       model.addAttribute("financeDetail", detail);
     } catch (Exception e) {
       log.error("Error loading finance detail for operation {} mission {}", id, missionId, e);
@@ -515,7 +452,7 @@ public class OperationPageController {
   public String createOperation(
       @ModelAttribute OperationForm form, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.post("/api/v1/operations", form, Void.class);
+      operationClient.createOperation(form);
       redirectAttributes.addFlashAttribute("successMessage", "operation.create.success");
     } catch (Exception e) {
       log.error("Error creating operation", e);
@@ -541,7 +478,7 @@ public class OperationPageController {
       @ModelAttribute OperationForm form,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.put("/api/v1/operations/{id}", form, Void.class, id);
+      operationClient.updateOperation(id, form);
       redirectAttributes.addFlashAttribute("successMessage", "operation.update.success");
     } catch (BackendServiceException e) {
       if (e.getStatusCode() == 409) {
@@ -581,12 +518,7 @@ public class OperationPageController {
   public ResponseEntity<OperationPayoutStatusDto> updatePayoutStatus(
       @PathVariable @NotNull UUID id, @RequestBody OperationPayoutStatusUpdateDto request) {
     try {
-      OperationPayoutStatusDto updated =
-          backendApiClient.put(
-              "/api/v1/operations/{id}/payouts/paid-out",
-              request,
-              OperationPayoutStatusDto.class,
-              id);
+      OperationPayoutStatusDto updated = operationClient.updatePayoutStatus(id, request);
       return ResponseEntity.ok(updated);
     } catch (BackendServiceException e) {
       log.debug(
@@ -642,7 +574,7 @@ public class OperationPageController {
   public String deleteOperation(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/operations/{id}", Void.class, id);
+      operationClient.deleteOperation(id);
       redirectAttributes.addFlashAttribute("successMessage", "operation.delete.success");
     } catch (Exception e) {
       log.error("Error deleting operation", e);
@@ -665,7 +597,7 @@ public class OperationPageController {
         log,
         "create operation (ajax)",
         () -> {
-          backendApiClient.post("/api/v1/operations", form, Void.class);
+          operationClient.createOperation(form);
           return ResponseEntity.ok().build();
         });
   }
@@ -688,8 +620,7 @@ public class OperationPageController {
         log,
         "update operation (ajax) for " + id,
         () -> {
-          OperationDto updated =
-              backendApiClient.put("/api/v1/operations/{id}", form, OperationDto.class, id);
+          OperationDto updated = operationClient.updateOperationAndRead(id, form);
           java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
           result.put("version", updated.version());
           result.put("name", updated.name());
@@ -713,7 +644,7 @@ public class OperationPageController {
         log,
         "delete operation (ajax) for " + id,
         () -> {
-          backendApiClient.delete("/api/v1/operations/{id}", Void.class, id);
+          operationClient.deleteOperation(id);
           return ResponseEntity.ok().build();
         });
   }

@@ -21,15 +21,30 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountLifecycleRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingOutcomeDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankDepositRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankGrantDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankTransactionDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankTransferRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.RenameBankAccountRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.ReverseBankTransactionRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateBankGrantRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateBankHolderRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -41,100 +56,118 @@ class BankProxyControllerTest {
 
   private BackendApiClient backendApiClient;
 
-  /** The URI variables of a helper call to a path without any. */
-  private static final Object[] NO_VARIABLES = {};
-
   private BankProxyController controller;
 
   @BeforeEach
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
-    controller = new BankProxyController(backendApiClient);
+    controller = new BankProxyController(new BankBackendClient(backendApiClient));
   }
 
   @Test
   void bookDeposit_ShouldForwardBodyToBackend() {
-    Map<String, Object> body = Map.of("accountId", "a", "holderId", "h", "amount", 100);
-    when(backendApiClient.post("/api/v1/bank/deposits", body, Map.class, NO_VARIABLES))
-        .thenReturn(Map.of("id", "x"));
+    BankDepositRequest body =
+        new BankDepositRequest(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            BigDecimal.valueOf(100),
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+    BankTransactionDto booked = new BankTransactionDto(UUID.randomUUID(), "DEPOSIT", null, null);
+    when(backendApiClient.post("/api/v1/bank/deposits", body, BankTransactionDto.class))
+        .thenReturn(booked);
 
-    Map<String, Object> result = controller.bookDeposit(body);
+    Object result = controller.bookDeposit(body);
 
-    assertEquals("x", result.get("id"));
-    verify(backendApiClient).post("/api/v1/bank/deposits", body, Map.class, NO_VARIABLES);
+    assertSame(booked, result);
+    verify(backendApiClient).post("/api/v1/bank/deposits", body, BankTransactionDto.class);
   }
 
   @Test
   void bookTransfer_ShouldReturnEmptyMapForBodylessResponse() {
-    Map<String, Object> body = Map.of("sourceAccountId", "a");
-    when(backendApiClient.post("/api/v1/bank/transfers", body, Map.class, NO_VARIABLES))
+    BankTransferRequest body =
+        new BankTransferRequest(UUID.randomUUID(), null, null, null, null, null, null, null, null);
+    when(backendApiClient.post("/api/v1/bank/transfers", body, BankBookingOutcomeDto.class))
         .thenReturn(null);
 
-    Map<String, Object> result = controller.bookTransfer(body);
+    Object result = controller.bookTransfer(body);
 
     assertEquals(Map.of(), result);
   }
 
   @Test
-  void reverseTransaction_ShouldForwardEmptyMapWhenBodyMissing() {
+  void reverseTransaction_ShouldForwardAnEmptyNoteWhenBodyMissing() {
     UUID id = UUID.randomUUID();
+    ReverseBankTransactionRequest empty = new ReverseBankTransactionRequest(null);
     when(backendApiClient.post(
-            eq("/api/v1/bank/transactions/{id}/reversal"), eq(Map.of()), eq(Map.class), eq(id)))
-        .thenReturn(Map.of());
+            eq("/api/v1/bank/transactions/{id}/reversal"),
+            eq(empty),
+            eq(BankTransactionDto.class),
+            eq(id)))
+        .thenReturn(new BankTransactionDto(id, "REVERSAL", null, null));
 
     controller.reverseTransaction(id, null);
 
     verify(backendApiClient)
-        .post("/api/v1/bank/transactions/{id}/reversal", Map.of(), Map.class, id);
+        .post("/api/v1/bank/transactions/{id}/reversal", empty, BankTransactionDto.class, id);
   }
 
   @Test
   void renameAccount_ShouldPatchBackend() {
     UUID id = UUID.randomUUID();
-    Map<String, Object> body = Map.of("name", "Neu", "version", 1);
-    when(backendApiClient.patch("/api/v1/bank/accounts/{id}", body, Map.class, id))
-        .thenReturn(Map.of("name", "Neu"));
+    RenameBankAccountRequest body = new RenameBankAccountRequest("Neu", 1L);
+    BankAccountDto renamed = mock(BankAccountDto.class);
+    when(backendApiClient.patch("/api/v1/bank/accounts/{id}", body, BankAccountDto.class, id))
+        .thenReturn(renamed);
 
-    Map<String, Object> result = controller.renameAccount(id, body);
+    Object result = controller.renameAccount(id, body);
 
-    assertEquals("Neu", result.get("name"));
+    assertSame(renamed, result);
   }
 
   @Test
   void closeAndReopen_ShouldPostLifecycleEndpoints() {
     UUID id = UUID.randomUUID();
-    Map<String, Object> body = Map.of("version", 2);
+    BankAccountLifecycleRequest body = new BankAccountLifecycleRequest(2L);
 
     controller.closeAccount(id, body);
     controller.reopenAccount(id, body);
 
-    verify(backendApiClient).post("/api/v1/bank/accounts/{id}/close", body, Map.class, id);
-    verify(backendApiClient).post("/api/v1/bank/accounts/{id}/reopen", body, Map.class, id);
+    verify(backendApiClient)
+        .post("/api/v1/bank/accounts/{id}/close", body, BankAccountDto.class, id);
+    verify(backendApiClient)
+        .post("/api/v1/bank/accounts/{id}/reopen", body, BankAccountDto.class, id);
   }
 
   @Test
   void updateHolder_ShouldPatchBackend() {
     UUID id = UUID.randomUUID();
-    Map<String, Object> body = Map.of("active", false, "version", 0);
+    UpdateBankHolderRequest body = new UpdateBankHolderRequest(false, 0L);
 
     controller.updateHolder(id, body);
 
-    verify(backendApiClient).patch("/api/v1/bank/holders/{id}", body, Map.class, id);
+    verify(backendApiClient).patch("/api/v1/bank/holders/{id}", body, BankHolderDto.class, id);
   }
 
   @Test
   void searchAccounts_ShouldForwardActiveNameSortedSearch_andUnwrapContent() {
-    Map<String, Object> row = Map.of("id", "acc-1", "accountNo", "KB-0001", "name", "Phoenix");
+    BankAccountDto row = mock(BankAccountDto.class);
+    when(row.accountNo()).thenReturn("KB-0001");
     when(backendApiClient.get(
             org.mockito.ArgumentMatchers.anyString(),
             anyTypeRef(),
             org.mockito.ArgumentMatchers.<Object>any()))
         .thenReturn(new PageResponse<>(List.of(row), 0, 50, 1, 1, List.of()));
 
-    List<Map<String, Object>> result = controller.searchAccounts("pho");
+    List<BankAccountDto> result = controller.searchAccounts("pho");
 
     assertEquals(1, result.size());
-    assertEquals("KB-0001", result.get(0).get("accountNo"));
+    assertEquals("KB-0001", result.get(0).accountNo());
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
     ArgumentCaptor<Object> varCaptor = ArgumentCaptor.forClass(Object.class);
     verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), varCaptor.capture());
@@ -177,7 +210,7 @@ class BankProxyControllerTest {
             org.mockito.ArgumentMatchers.<Object>any()))
         .thenReturn(null);
 
-    List<Map<String, Object>> result = controller.searchAccounts(null);
+    List<BankAccountDto> result = controller.searchAccounts(null);
 
     assertEquals(List.of(), result);
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
@@ -191,14 +224,18 @@ class BankProxyControllerTest {
   void grantLifecycle_ShouldTargetCompositeKeyPaths() {
     UUID userId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
-    Map<String, Object> flags =
-        Map.of("canDeposit", true, "canWithdraw", false, "canTransfer", true, "version", 3);
+    UpdateBankGrantRequest flags = new UpdateBankGrantRequest(true, false, true, 3L);
 
     controller.updateGrant(userId, accountId, flags);
     controller.deleteGrant(userId, accountId);
 
     verify(backendApiClient)
-        .patch("/api/v1/bank/grants/{userId}/{accountId}", flags, Map.class, userId, accountId);
+        .patch(
+            "/api/v1/bank/grants/{userId}/{accountId}",
+            flags,
+            BankGrantDto.class,
+            userId,
+            accountId);
     verify(backendApiClient)
         .delete("/api/v1/bank/grants/{userId}/{accountId}", Void.class, userId, accountId);
   }

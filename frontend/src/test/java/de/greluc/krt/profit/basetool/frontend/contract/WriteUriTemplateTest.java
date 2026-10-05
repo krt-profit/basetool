@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
 class WriteUriTemplateTest {
 
   /** The write-verb call sites when the guard was introduced; fewer means the scan broke. */
-  private static final int MIN_WRITE_SITES = 283;
+  private static final int MIN_WRITE_SITES = 305;
 
   /** A source with one templated and one concatenating write per verb shape. */
   private static final String FIXTURE_SOURCE =

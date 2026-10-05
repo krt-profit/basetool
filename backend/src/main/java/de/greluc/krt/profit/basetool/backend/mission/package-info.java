@@ -20,6 +20,7 @@
 /** The mission module: Einsätze, their participants and finance entries (plan §5.1 rank 9). */
 @ApplicationModule(
     allowedDependencies = {
+      "admin::api",
       "audit::api",
       "catalogue::api",
       "identity::api",

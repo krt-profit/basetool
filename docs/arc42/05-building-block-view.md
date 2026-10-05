@@ -135,6 +135,8 @@ mappers no other module needs) and `<module>.web` (controllers and their REST DT
 | Module | `api` | `internal` | `web` |
 | --- | --- | --- | --- |
 | `dashboard` | — (publishes nothing) | `Announcement`, `AnnouncementRepository`, `AnnouncementService` | `AnnouncementController`, `AnnouncementDto`, `AnnouncementMapper` |
+| `admin` | `SystemSettings` (setting read, system flag write) | `SystemSetting`, its repository, `SystemSettingService`, `SystemSettingMapper`, the setting records, `AndroidClientProperties`, `AndroidVersionPolicyReport` | `SystemSettingController`, `AppVersionPolicyController`, `SystemController`, `AppVersionPolicyDto`, `PingResponse` |
+| `personalinventory` | `PersonalInventoryErasure` (the GDPR deletion's bulk delete) | `PersonalInventoryItem`, `PersonalInventoryLocationType`, the repository, `PersonalInventoryItemService`, the mapper and records, `UexLocationDto` | `PersonalInventoryController`, `AdminPersonalInventoryController`, `UexLocationController` |
 | `orgchart` | — (publishes nothing; orgunit reaches it through `orgunit.api.MembershipChangeObserver`) | `OrgChartPosition` and its repository and enums, `OrgChartService`, `OrgChartReadService`, `LeitungViewService`, `OrgChartPositionMapper`, the chart and Leitung DTOs | `OrgChartController`, `LeitungController` |
 
 `OrgChartService` mirrors the leadership ranks inside the transaction of the rank change. The org

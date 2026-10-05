@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto;
@@ -111,7 +112,9 @@ class ParticipationCalculationTest {
 
     MissionPageController controller =
         new MissionPageController(
-            backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL);
+            new MissionBackendClient(backendApiClient),
+            mock(FrontendAuthHelperService.class),
+            PARALLEL);
     Model model = new ConcurrentModel();
 
     controller.missionDetail(missionId, model, null, null);
@@ -197,7 +200,9 @@ class ParticipationCalculationTest {
 
     MissionPageController controller =
         new MissionPageController(
-            backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL);
+            new MissionBackendClient(backendApiClient),
+            mock(FrontendAuthHelperService.class),
+            PARALLEL);
     Model model = new ConcurrentModel();
 
     controller.missionDetail(missionId, model, null, null);

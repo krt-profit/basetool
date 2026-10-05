@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.admin.api.SystemSettings;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
@@ -80,7 +81,7 @@ class JobOrderServiceTest {
 
   @Mock private OwnerScopeService ownerScopeService;
 
-  @Mock private SystemSettingService systemSettingService;
+  @Mock private SystemSettings systemSettings;
 
   @Mock private AuthHelperService authHelperService;
 

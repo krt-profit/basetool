@@ -20,6 +20,7 @@
 /** The inventory module (Lager): stock, holders, allocations, checkout and rebooking. */
 @ApplicationModule(
     allowedDependencies = {
+      "admin::api",
       "audit::api",
       "catalogue::api",
       "identity::api",
