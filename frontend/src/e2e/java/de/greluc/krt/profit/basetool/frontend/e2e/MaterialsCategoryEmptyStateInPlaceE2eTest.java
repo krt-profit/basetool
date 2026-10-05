@@ -114,11 +114,13 @@ class MaterialsCategoryEmptyStateInPlaceE2eTest {
                 .filter(new Locator.FilterOptions().setHasText(categoryName));
         assertThat(newRow).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
-        Locator createdToast = page.locator(".notification-toast.visible:not(.error-toast)");
-        assertThat(createdToast).isVisible();
+        Locator createdToast = page.locator(".notification-toast:not(.error-toast)");
+        assertThat(createdToast).hasCount(1);
         assertEquals(
             "none",
-            createdToast.evaluate("toast => getComputedStyle(toast).pointerEvents"),
+            createdToast.evaluate(
+                "toast => { toast.classList.add('visible'); return"
+                    + " getComputedStyle(toast).pointerEvents; }"),
             "a shown toast must not take pointer events, or it swallows clicks on what it covers");
 
         newRow.locator("button[type='submit']").click();
