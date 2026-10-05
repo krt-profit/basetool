@@ -2391,8 +2391,9 @@ the breaker, the error mapping.
   owns the domain's backend paths, passes runtime values as URI-template variables and returns
   typed records; only the kernel packages (`service`, `config`, `websocket`) and these clients
   call `BackendApiClient`. A typed client takes no `java.net.URI` or `UriBuilderFactory` and
-  carries no cache annotation. The controllers not yet moved are listed in
-  `TypedBackendClientTest`, a list that only shrinks.
+  carries no cache annotation. Twenty-one clients cover every controller, and no class outside
+  the kernel and the client packages calls `BackendApiClient` (`TypedBackendClientTest`, no
+  allow-list).
 - **HTTP-interface clients** (Spring `@HttpExchange`, none yet) are created only by the kernel,
   over the `webClient` bean (`HttpServiceProxyFactory`/`WebClientAdapter` used nowhere else), and
   never take a `java.net.URI` or `UriBuilderFactory` parameter (it replaces the whole request URL),
@@ -2422,7 +2423,7 @@ the breaker, the error mapping.
 - [x] No class outside the kernel holds a `WebClient`, and no controller does.
 - [x] Each `Outcome` maps to the status, problem code, log level and metric label it had before
   the mapper was extracted (`BackendErrorMapperTest`, and the unchanged `BackendApiClient*Test`).
-- [ ] Every controller reaches the backend only through its domain's typed client; a planted
+- [x] Every controller reaches the backend only through its domain's typed client; a planted
   controller calling `BackendApiClient` and a planted client outside a `<domain>.client` package
   that takes a `URI` and caches are reported (`TypedBackendClientTest`). Each typed client's
   requests are pinned against a MockWebServer (`*BackendClientTest`).
