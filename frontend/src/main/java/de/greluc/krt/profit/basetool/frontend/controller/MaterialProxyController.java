@@ -19,13 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import java.util.ArrayList;
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialSellingTerminalDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.ProfitCalculationDto;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -42,27 +41,19 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class MaterialProxyController {
 
-  /**
-   * Response type for the raw-JSON list payloads this proxy forwards ({@code terminals} and {@code
-   * profit-calculation}). A shared static {@link ParameterizedTypeReference} is behaviourally
-   * identical to a fresh anonymous instance per call (Q10).
-   */
-  private static final ParameterizedTypeReference<List<Map<String, Object>>> MAP_LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Reads the selling terminals and the profit calculation. */
+  private final CatalogueBackendClient catalogueClient;
 
   /**
-   * Returns the terminals trading the given material; empty on backend failure.
+   * Returns the terminals trading the given material.
    *
    * @param id material id
-   * @return list of terminal records (raw JSON maps), never {@code null}
+   * @return the selling terminals, never {@code null}
    */
   @GetMapping("/{id}/terminals")
   @PreAuthorize("isAuthenticated()")
-  public List<Map<String, Object>> getMaterialTerminals(@PathVariable UUID id) {
-    List<Map<String, Object>> response =
-        backendApiClient.get("/api/v1/materials/{id}/terminals", MAP_LIST_TYPE, id);
+  public List<MaterialSellingTerminalDto> getMaterialTerminals(@PathVariable UUID id) {
+    List<MaterialSellingTerminalDto> response = catalogueClient.materialSellingTerminals(id);
     return response != null ? response : List.of();
   }
 
@@ -77,22 +68,10 @@ public class MaterialProxyController {
    */
   @GetMapping("/profit-calculation")
   @PreAuthorize("isAuthenticated()")
-  public List<Map<String, Object>> getProfitCalculation(
+  public List<ProfitCalculationDto> getProfitCalculation(
       @RequestParam UUID shipId, @RequestParam(required = false) List<String> starSystemNames) {
-
-    StringBuilder uriTemplate =
-        new StringBuilder("/api/v1/materials/profit-calculation?shipId={shipId}");
-    List<Object> uriVariables = new ArrayList<>();
-    uriVariables.add(shipId);
-    if (starSystemNames != null) {
-      for (String starSystemName : starSystemNames) {
-        uriTemplate.append("&starSystemNames={starSystemName}");
-        uriVariables.add(starSystemName);
-      }
-    }
-
-    List<Map<String, Object>> response =
-        backendApiClient.get(uriTemplate.toString(), MAP_LIST_TYPE, uriVariables.toArray());
+    List<ProfitCalculationDto> response =
+        catalogueClient.profitCalculation(shipId, starSystemNames);
     return response != null ? response : List.of();
   }
 }

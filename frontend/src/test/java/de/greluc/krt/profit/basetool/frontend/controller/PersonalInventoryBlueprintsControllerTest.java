@@ -29,6 +29,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintProductDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintBatchCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintBatchResultDto;
@@ -37,9 +38,9 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
@@ -56,7 +57,13 @@ class PersonalInventoryBlueprintsControllerTest {
 
   @Mock private BackendApiClient backendApiClient;
 
-  @InjectMocks private PersonalInventoryBlueprintsPageController controller;
+  private PersonalInventoryBlueprintsPageController controller;
+
+  @BeforeEach
+  void setUp() {
+    controller =
+        new PersonalInventoryBlueprintsPageController(new BlueprintBackendClient(backendApiClient));
+  }
 
   @Test
   void search_delegatesToBackend_andDefaultsLimitTo25() {

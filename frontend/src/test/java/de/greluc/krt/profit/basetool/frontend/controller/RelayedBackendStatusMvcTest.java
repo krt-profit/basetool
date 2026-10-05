@@ -37,9 +37,12 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.frontend.audit.client.AuditBackendClient;
+import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.AppHttpProperties;
 import de.greluc.krt.profit.basetool.frontend.exception.GlobalExceptionHandler;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
 import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.nio.charset.StandardCharsets;
@@ -117,13 +120,17 @@ class RelayedBackendStatusMvcTest {
     return Stream.of(
         relay(
             "AdminP4kImportPageController#enqueuePreview",
-            wc -> new AdminP4kImportPageController(RealBackendApiClient.over(wc)),
+            wc -> {
+              BackendApiClient client = RealBackendApiClient.over(wc);
+              return new AdminP4kImportPageController(
+                  new CatalogueBackendClient(client), new CatalogueCacheEviction(client));
+            },
             multipart("/admin/p4k-import/jobs").file(upload())),
         relay(
             "AdminPersonalBlueprintsPageController#previewImport",
             wc ->
                 new AdminPersonalBlueprintsPageController(
-                    RealBackendApiClient.mockExecutingOver(wc)),
+                    new BlueprintBackendClient(RealBackendApiClient.mockExecutingOver(wc))),
             multipart("/admin/personal-blueprints/" + id + "/import/preview").file(upload())),
         relay(
             "AuditReportProxyController#downloadAuditLog",
@@ -185,7 +192,7 @@ class RelayedBackendStatusMvcTest {
             "PersonalBlueprintImportProxyController#preview",
             wc ->
                 new PersonalBlueprintImportProxyController(
-                    RealBackendApiClient.over(wc),
+                    new BlueprintBackendClient(RealBackendApiClient.over(wc)),
                     mock(IngestHandoffService.class),
                     new StaticMessageSource()),
             multipart("/personal-inventory/blueprints/import/preview").file(upload())));
@@ -281,7 +288,7 @@ class RelayedBackendStatusMvcTest {
     mockMvc(
             wc ->
                 new PersonalBlueprintImportProxyController(
-                    RealBackendApiClient.over(wc),
+                    new BlueprintBackendClient(RealBackendApiClient.over(wc)),
                     mock(IngestHandoffService.class),
                     new StaticMessageSource()))
         .perform(
@@ -310,7 +317,7 @@ class RelayedBackendStatusMvcTest {
     mockMvc(
             wc ->
                 new PersonalBlueprintImportProxyController(
-                    RealBackendApiClient.over(wc),
+                    new BlueprintBackendClient(RealBackendApiClient.over(wc)),
                     mock(IngestHandoffService.class),
                     new StaticMessageSource()))
         .perform(

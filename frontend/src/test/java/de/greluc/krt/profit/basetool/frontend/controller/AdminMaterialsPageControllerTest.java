@@ -26,6 +26,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialCreateAjaxRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialUpdateAjaxRequest;
@@ -33,6 +34,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -47,7 +49,10 @@ class AdminMaterialsPageControllerTest {
   @Test
   void updateMaterialAjax_ShouldUpdateAndReturnMaterial() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    AdminMaterialsPageController controller = new AdminMaterialsPageController(backendApiClient);
+    AdminMaterialsPageController controller =
+        new AdminMaterialsPageController(
+            new CatalogueBackendClient(backendApiClient),
+            new CatalogueCacheEviction(backendApiClient));
 
     UUID matId = UUID.randomUUID();
     MaterialDto currentMaterial =
@@ -76,7 +81,10 @@ class AdminMaterialsPageControllerTest {
   @Test
   void listMaterials_ShouldSortListsAscendingByName() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    AdminMaterialsPageController controller = new AdminMaterialsPageController(backendApiClient);
+    AdminMaterialsPageController controller =
+        new AdminMaterialsPageController(
+            new CatalogueBackendClient(backendApiClient),
+            new CatalogueCacheEviction(backendApiClient));
     Model model = new ConcurrentModel();
 
     List<MaterialDto> materials = new ArrayList<>();
@@ -198,7 +206,10 @@ class AdminMaterialsPageControllerTest {
   @Test
   void listMaterials_concatenatesAllBackendPages() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    AdminMaterialsPageController controller = new AdminMaterialsPageController(backendApiClient);
+    AdminMaterialsPageController controller =
+        new AdminMaterialsPageController(
+            new CatalogueBackendClient(backendApiClient),
+            new CatalogueCacheEviction(backendApiClient));
     Model model = new ConcurrentModel();
 
     MaterialDto first =
@@ -253,7 +264,10 @@ class AdminMaterialsPageControllerTest {
   @Test
   void createMaterialAjax_success_returnsBackendDto() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    AdminMaterialsPageController controller = new AdminMaterialsPageController(backendApiClient);
+    AdminMaterialsPageController controller =
+        new AdminMaterialsPageController(
+            new CatalogueBackendClient(backendApiClient),
+            new CatalogueCacheEviction(backendApiClient));
 
     MaterialCreateAjaxRequest req =
         new MaterialCreateAjaxRequest(
@@ -290,7 +304,10 @@ class AdminMaterialsPageControllerTest {
   @Test
   void createMaterialAjax_backendValidationFailure_propagatesStatus() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    AdminMaterialsPageController controller = new AdminMaterialsPageController(backendApiClient);
+    AdminMaterialsPageController controller =
+        new AdminMaterialsPageController(
+            new CatalogueBackendClient(backendApiClient),
+            new CatalogueCacheEviction(backendApiClient));
 
     MaterialCreateAjaxRequest req =
         new MaterialCreateAjaxRequest(
