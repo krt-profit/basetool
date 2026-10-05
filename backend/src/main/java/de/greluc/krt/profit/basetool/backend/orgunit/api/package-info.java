@@ -18,9 +18,9 @@
  */
 
 /**
- * The org-unit module's published API: the leadership vocabulary and the {@link
- * de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipChangeObserver} SPI (plan §5.2,
- * §5.3).
+ * The org-unit module's published API: the leadership vocabulary, the Staffel membership resolver
+ * and the {@link de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipChangeObserver} SPI
+ * (plan §5.2, §5.3).
  */
 @NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.orgunit.api;

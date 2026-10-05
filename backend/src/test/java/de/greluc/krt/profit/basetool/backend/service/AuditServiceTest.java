@@ -31,15 +31,16 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.audit.api.ActorHandleResolver;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDomain;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientDirectory;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
 import de.greluc.krt.profit.basetool.backend.mapper.AuditEventMapper;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.AuditEvent;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientAttribution;
+import de.greluc.krt.profit.basetool.backend.platform.internal.ApiClientMetricsProperties;
 import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
-import de.greluc.krt.profit.basetool.backend.support.ApiClientMetricsProperties;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
-import de.greluc.krt.profit.basetool.backend.support.ClientAttribution;
-import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
-import de.greluc.krt.profit.basetool.backend.support.KnownExchangeClients;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
@@ -78,8 +79,9 @@ class AuditServiceTest {
   private ClientAttribution clientAttribution =
       new ClientAttribution(
           BoundProperties.defaults(ApiClientMetricsProperties.class),
-          BoundProperties.defaults(IngestGatewayProperties.class),
-          Mockito.mock(KnownExchangeClients.class));
+          new ExchangeClientDirectory(
+              BoundProperties.defaults(IngestGatewayProperties.class),
+              Mockito.mock(KnownExchangeClients.class)));
 
   @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 

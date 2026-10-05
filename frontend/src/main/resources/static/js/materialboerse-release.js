@@ -13,7 +13,7 @@
 (function () {
     'use strict';
 
-    const i18n = window.materialboerseI18n || {};
+    const i18n = { ...window.materialboerseModalI18n, ...window.materialboerseI18n };
     const modal = document.getElementById('mb-modal');
     if (!modal || !window.krtFetch) {
         return;
@@ -88,7 +88,7 @@
         if (quantityType === 'PIECE') {
             return `${n.toLocaleString('de-DE', { maximumFractionDigits: 0 })} ${window.krtI18nText(
                 i18n.unitPiece,
-                'materialboerseI18n.unitPiece',
+                'materialboerseModalI18n.unitPiece',
             )}`;
         }
         return `${n.toLocaleString('de-DE', { maximumFractionDigits: 3 })} ${i18n.unitScu || 'SCU'}`;
@@ -117,7 +117,7 @@
         state.available = isNaN(maxNum) ? null : maxNum;
         if (unit) {
             unit.textContent = isPiece
-                ? window.krtI18nText(i18n.unitPiece, 'materialboerseI18n.unitPiece')
+                ? window.krtI18nText(i18n.unitPiece, 'materialboerseModalI18n.unitPiece')
                 : i18n.unitScu || 'SCU';
         }
         if (input) {
@@ -136,7 +136,7 @@
             hint.textContent =
                 state.available != null
                     ? fmt(
-                          window.krtI18nText(i18n.amountMax, 'materialboerseI18n.amountMax'),
+                          window.krtI18nText(i18n.amountMax, 'materialboerseModalI18n.amountMax'),
                           formatAmount(state.available, state.quantityType),
                       )
                     : '';
@@ -178,7 +178,7 @@
         const counter = q('[data-mb-charcount]');
         if (ta && counter) {
             counter.textContent = fmt(
-                window.krtI18nText(i18n.charCounter, 'materialboerseI18n.charCounter'),
+                window.krtI18nText(i18n.charCounter, 'materialboerseModalI18n.charCounter'),
                 ta.value.length.toLocaleString('de-DE'),
             );
         }
@@ -398,39 +398,37 @@
             return;
         }
         if (!pickerItems.length) {
-            list.innerHTML = `<li class="krt-combobox__notice">${escapeHtml(i18n.pickerEmpty || '')}</li>`;
+            krtHtml.set(
+                list,
+                krtHtml`<li class="krt-combobox__notice">${i18n.pickerEmpty || ''}</li>`,
+            );
             list.hidden = !pickerListOpen;
             return;
         }
-        let html = '';
-        pickerItems.forEach((it) => {
+        const html = pickerItems.map((it) => {
             const isItem = it.kind === 'ITEM';
-            let meta = escapeHtml(
-                (isItem ? '' : `Q ${it.quality} · `) + formatAmount(it.amount, it.quantityType),
-            );
+            let meta =
+                (isItem ? '' : `Q ${it.quality} · `) + formatAmount(it.amount, it.quantityType);
             if (it.locationName) {
-                meta += ` · ${escapeHtml(it.locationName)}`;
+                meta += ` · ${it.locationName}`;
             }
             if (it.alreadyReleased) {
-                meta += ` · ${escapeHtml(i18n.pickerAlready || '')}`;
+                meta += ` · ${i18n.pickerAlready || ''}`;
             }
-            let stolenChip = '';
-            if (it.stolen) {
-                stolenChip = `<span class="chip chip--danger" data-testid="stolen-chip">${escapeHtml(
-                    i18n.pickerStolen || '',
-                )}</span> `;
-            }
-            html += `<li class="krt-combobox__option" role="option" data-item-id="${escapeAttr(
-                it.inventoryItemId,
-            )}" data-kind="${escapeAttr(it.kind)}" data-material="${escapeAttr(
-                it.materialName,
-            )}" data-quantity-type="${escapeAttr(it.quantityType)}" data-quality="${escapeAttr(
-                isItem ? '' : it.quality,
-            )}" data-amount="${escapeAttr(it.amount)}"><strong>${escapeHtml(
-                it.materialName,
-            )}</strong> ${stolenChip}<small>${meta}</small></li>`;
+            const stolenChip = it.stolen
+                ? krtHtml`<span class="chip chip--danger" data-testid="stolen-chip">${
+                      i18n.pickerStolen || ''
+                  }</span> `
+                : '';
+            return krtHtml`<li class="krt-combobox__option" role="option" data-item-id="${
+                it.inventoryItemId
+            }" data-kind="${it.kind}" data-material="${it.materialName}" data-quantity-type="${
+                it.quantityType
+            }" data-quality="${isItem ? '' : it.quality}" data-amount="${it.amount}"><strong>${
+                it.materialName
+            }</strong> ${stolenChip}<small>${meta}</small></li>`;
         });
-        list.innerHTML = html;
+        krtHtml.set(list, html);
         list.hidden = !pickerListOpen;
     }
 
@@ -509,23 +507,22 @@
             return;
         }
         if (!productItems.length) {
-            list.innerHTML = `<li class="krt-combobox__notice">${escapeHtml(
-                i18n.itemPickerEmpty || '',
-            )}</li>`;
+            krtHtml.set(
+                list,
+                krtHtml`<li class="krt-combobox__notice">${i18n.itemPickerEmpty || ''}</li>`,
+            );
             list.hidden = !itemPickerListOpen;
             return;
         }
-        let html = '';
-        productItems.forEach((it) => {
-            html += `<li class="krt-combobox__option" role="option" data-product-key="${escapeAttr(
-                it.productKey,
-            )}" data-name="${escapeAttr(it.name)}"><strong>${escapeHtml(it.name)}</strong>`;
-            if (it.manufacturerName) {
-                html += ` <small>${escapeHtml(it.manufacturerName)}</small>`;
-            }
-            html += '</li>';
-        });
-        list.innerHTML = html;
+        const html = productItems.map(
+            (it) =>
+                krtHtml`<li class="krt-combobox__option" role="option" data-product-key="${
+                    it.productKey
+                }" data-name="${it.name}"><strong>${it.name}</strong>${
+                    it.manufacturerName ? krtHtml` <small>${it.manufacturerName}</small>` : ''
+                }</li>`,
+        );
+        krtHtml.set(list, html);
         list.hidden = !itemPickerListOpen;
     }
 

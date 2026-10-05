@@ -92,12 +92,38 @@ decides, before specificity:
 
 Every external `<script>` is `defer` — head and page modules alike — except `krt-client-error.js`,
 which stays the head's first, synchronous script (`REQ-FE-023`). Deferred scripts run in document
-order after parsing, so a page module may use every head global at load. An **inline** script runs
-earlier, during parsing: at its top level it may only declare constants, functions and `window.*`
-dictionaries, look up elements above it and register listeners / `window.krtEvents.on(...)`;
-whatever it has to run goes into `document.addEventListener('DOMContentLoaded', …)`. A top-level
-`bindX()` or IIFE that touches `window.krtFetch` silently does nothing. `InlineScriptLoadOrderTest`
-fails the build on it, `ScriptLoadOrderE2eTest` checks it in the browser.
+order after parsing, so a page module may use every head global at load.
+
+**An inline script is a data bootstrap and nothing else** (ADR-0069). It is a
+`th:inline="javascript"` block of `const` / `let` / `var NAME = literal` and `window.NAME = literal`
+statements whose literals (strings, numbers, booleans, `null`, arrays and objects of those) come
+from `/*[[…]]*/` natural-template values. A function, a call, a listener, a merge of two
+dictionaries or a reference to another global goes into the page's module under `static/js`, where
+it is linted and type-checked; a module that needs a server value reads it from such a bootstrap or
+a `data-*` attribute. Never `'[[#{key}]]'` inside a string literal — the inliner adds its own
+quotes. `InlineScriptDataOnlyTest` parses every inline block and fails the build on anything else;
+the head's `krtEvents` stub is its one reviewed exception. `InlineScriptLoadOrderTest` and
+`ScriptLoadOrderE2eTest` keep the load order.
+
+### Trusted Types: every DOM sink takes a policy value (binding)
+
+The CSP sends `require-trusted-types-for 'script'` (ADR-0239, REQ-FE-022, REQ-SEC-064) —
+report-only by default, enforced with `APP_SECURITY_TRUSTED_TYPES=enforce`. Under enforcement a
+string written into an HTML sink throws, even `innerHTML = ''`. So:
+
+- **Markup built in script:** ``krtHtml.set(el, krtHtml`<li data-id="${id}">${name}</li>`)``. Every
+  interpolation is escaped unless it is itself `krtHtml` markup; pass arrays of `krtHtml` pieces
+  (`items.map((it) => krtHtml`…`)`) instead of concatenating strings, and never pre-escape a value.
+  `krtHtml.set` writes anything that is not `krtHtml` markup as text.
+- **A server fragment:** `krtFetch.setTrustedHtml`, `replaceWithTrustedHtml` or
+  `parseTrustedDocument` — only with the body of a same-origin fragment response, never with markup
+  built in script.
+- **Clearing:** `el.replaceChildren()`.
+- Never create a Trusted Types policy (there is no `default` one), never call `krtHtml` as a
+  function, never use `eval`, `new Function`, a string timer or a created `<script>`.
+
+`:frontend:lintJs` rejects every other sink write outside `krt-html.js` and `krt-fetch.js`, and the
+dialog page walk (`DialogA11yE2eTest`) fails on any violation the browser reports.
 
 ### Dialogs: one contract (binding)
 
@@ -249,6 +275,6 @@ debt rather than anything TS 7 introduced.
 
 - **Frontend DOM version sync** — when an entity is updated via AJAX (dropdown change, row reorder, etc.), the new `version` must propagate to **every** related DOM element in the same context (edit/action buttons, modals inside the same `<tr>` or container). A missed `data-version` attribute → 409 on the user's next click. A reload on success is **not** an escape hatch here: the Live update rule above forbids it, so a tangled update is re-rendered through a fragment swap instead.
 
-The backend half — the `support.OptimisticLock` helper family, `Mission`'s manual section
+The backend half — the `kernel.OptimisticLock` helper family, `Mission`'s manual section
 counters, the `…WithinTransaction` pattern, bulk-updates-inside-loops and the find-or-create
 retry — lives in [`backend/CLAUDE.md`](../backend/CLAUDE.md).

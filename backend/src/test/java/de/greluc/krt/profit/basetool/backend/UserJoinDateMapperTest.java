@@ -46,7 +46,7 @@ class UserJoinDateMapperTest {
     ReflectionTestUtils.setField(
         userMapper,
         "staffelMembershipResolver",
-        new de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver(
+        new de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver(
             Mockito.mock(SquadronRepository.class),
             Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository.class)));

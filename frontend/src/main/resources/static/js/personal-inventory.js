@@ -369,12 +369,13 @@
             endpoints.uexSearch || '/personal-inventory/uex-search'
         }?q=${encodeURIComponent(q)}&limit=${SEARCH_LIMIT}`;
         resultsEl.hidden = false;
-        resultsEl.innerHTML = `<div class="krt-pi-typeahead-loading">${escapeHtml(
-            window.krtI18nText(
+        krtHtml.set(
+            resultsEl,
+            krtHtml`<div class="krt-pi-typeahead-loading">${window.krtI18nText(
                 (window.krtPersonalInventoryI18n || {}).searching,
                 'krtPersonalInventoryI18n.searching',
-            ),
-        )}</div>`;
+            )}</div>`,
+        );
         window.krtFetch
             .getJson(url)
             .then(renderResults)
@@ -386,39 +387,37 @@
     function renderResults(items) {
         if (!resultsEl) return;
         if (!items || items.length === 0) {
-            resultsEl.innerHTML = `<div class="krt-pi-typeahead-empty">${escapeHtml(
-                window.krtI18nText(
+            krtHtml.set(
+                resultsEl,
+                krtHtml`<div class="krt-pi-typeahead-empty">${window.krtI18nText(
                     (window.krtPersonalInventoryI18n || {}).noResults,
                     'krtPersonalInventoryI18n.noResults',
-                ),
-            )}</div>`;
+                )}</div>`,
+            );
             return;
         }
-        let html = '';
-        items.forEach((it) => {
+        const html = items.map((it) => {
             const typeClass = it.type === 'CITY' ? 'krt-pi-loc-city' : 'krt-pi-loc-station';
-            html +=
-                `<button type="button" class="krt-pi-typeahead-item" ` +
-                `data-uex-id="${escapeAttr(it.uexId)}" ` +
-                `data-type="${escapeAttr(it.type)}" ` +
-                `data-name="${escapeAttr(it.name)}">` +
-                `<span class="krt-pi-location-marker ${escapeAttr(typeClass)}"></span>` +
-                `<span class="krt-pi-typeahead-name">${escapeHtml(it.name || '')}</span>` +
-                `<span class="krt-pi-typeahead-meta">${escapeHtml(it.parentName || '')}`;
-            if (it.starSystemName) {
-                html += ` / ${escapeHtml(it.starSystemName)}`;
-            }
-            html += '</span></button>';
+            const meta = it.starSystemName
+                ? `${it.parentName || ''} / ${it.starSystemName}`
+                : it.parentName || '';
+            return krtHtml`<button type="button" class="krt-pi-typeahead-item" data-uex-id="${
+                it.uexId
+            }" data-type="${it.type}" data-name="${
+                it.name
+            }"><span class="krt-pi-location-marker ${typeClass}"></span><span class="krt-pi-typeahead-name">${
+                it.name || ''
+            }</span><span class="krt-pi-typeahead-meta">${meta}</span></button>`;
         });
         if (items.length >= SEARCH_LIMIT) {
-            html += `<div class="krt-pi-typeahead-more">${escapeHtml(
-                window.krtI18nText(
+            html.push(
+                krtHtml`<div class="krt-pi-typeahead-more">${window.krtI18nText(
                     (window.krtPersonalInventoryI18n || {}).moreResults,
                     'krtPersonalInventoryI18n.moreResults',
-                ),
-            )}</div>`;
+                )}</div>`,
+            );
         }
-        resultsEl.innerHTML = html;
+        krtHtml.set(resultsEl, html);
         resultsEl.querySelectorAll('.krt-pi-typeahead-item').forEach((btn) => {
             btn.addEventListener('click', () => {
                 if (hiddenUexId) hiddenUexId.value = btn.getAttribute('data-uex-id') || '';

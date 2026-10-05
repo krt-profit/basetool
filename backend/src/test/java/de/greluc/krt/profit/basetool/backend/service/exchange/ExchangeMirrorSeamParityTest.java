@@ -29,8 +29,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeMirrorProperties;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeClientStatus;
-import de.greluc.krt.profit.basetool.backend.support.ExchangeMirrorProperties;
 import de.greluc.krt.profit.basetool.testsupport.exchange.ExchangeSeam;
 import java.lang.reflect.RecordComponent;
 import java.time.Clock;

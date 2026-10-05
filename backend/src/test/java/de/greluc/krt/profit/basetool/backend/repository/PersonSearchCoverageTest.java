@@ -22,9 +22,9 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.greluc.krt.profit.basetool.backend.privacy.internal.PersonSearchTargets;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.PersonSearchTargets.Target;
 import de.greluc.krt.profit.basetool.backend.service.PersonSearchService;
-import de.greluc.krt.profit.basetool.backend.support.PersonSearchTargets;
-import de.greluc.krt.profit.basetool.backend.support.PersonSearchTargets.Target;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.ArrayList;

@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
-import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
+import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import java.beans.PropertyEditorSupport;
 import lombok.RequiredArgsConstructor;
 

@@ -58,6 +58,8 @@ class ModularityTest {
       Set.of(
           "audit",
           "bank",
+          "catalogue",
+          "dashboard",
           "exchange",
           "identity",
           "inventory",
@@ -65,19 +67,27 @@ class ModularityTest {
           "kernel",
           "livesync",
           "materialexchange",
+          "mission",
           "notification",
           "orgunit",
+          "platform",
           "privacy",
           "refinery",
           "scope");
 
-  private static final int DECLARED_MODULE_FLOOR = 14;
+  private static final int DECLARED_MODULE_FLOOR = 18;
 
   /**
    * Modules without an {@code api} package: their types lie in the base package, which is their
    * unnamed interface, and a dependent allows them by bare module name.
    */
   private static final Set<String> BASE_PACKAGE_MODULES = Set.of("kernel");
+
+  /**
+   * Modules that publish nothing yet: no {@code api} package and no type in the base package, so no
+   * other module may depend on them and no declaration allows them.
+   */
+  private static final Set<String> INTERNAL_ONLY_MODULES = Set.of("dashboard", "mission");
 
   private static final String API = "api";
 
@@ -117,6 +127,10 @@ class ModularityTest {
           String id = module.getIdentifier().toString();
           if (BASE_PACKAGE_MODULES.contains(id)) {
             assertBasePackageIsTheOnlyInterface(module, classes);
+            return;
+          }
+          if (INTERNAL_ONLY_MODULES.contains(id)) {
+            assertModulePublishesNothing(module, classes);
             return;
           }
           String apiPackage = module.getBasePackage().getName() + "." + API;
@@ -165,6 +179,42 @@ class ModularityTest {
         .allMatch(name -> name.substring(0, name.lastIndexOf('.')).equals(basePackage));
   }
 
+  private static void assertModulePublishesNothing(
+      org.springframework.modulith.core.ApplicationModule module, JavaClasses classes) {
+    String id = module.getIdentifier().toString();
+    String basePackage = module.getBasePackage().getName();
+    Set<String> named =
+        module.getNamedInterfaces().stream()
+            .filter(NamedInterface::isNamed)
+            .map(NamedInterface::getName)
+            .collect(Collectors.toUnmodifiableSet());
+    List<String> moduleTree =
+        ModuleSubjects.topLevelClasses(classes)
+            .map(JavaClass::getName)
+            .filter(name -> name.startsWith(basePackage + "."))
+            .toList();
+
+    assertThat(named).as(id).isEmpty();
+    assertThat(moduleTree).as(id).isNotEmpty();
+    assertThat(moduleTree)
+        .as(id + " keeps every type below its base package and outside an api package")
+        .allMatch(
+            name ->
+                !name.substring(0, name.lastIndexOf('.')).equals(basePackage)
+                    && !name.startsWith(basePackage + "." + API + "."));
+  }
+
+  @Test
+  void reportsATypeInTheBasePackageOfAModuleThatMustPublishNothing() {
+    org.springframework.modulith.core.ApplicationModule kernel =
+        BACKEND.getModuleByName("kernel").orElseThrow();
+
+    assertThatThrownBy(
+            () -> assertModulePublishesNothing(kernel, ModuleSubjects.importBackendMainClasses()))
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("keeps every type below its base package");
+  }
+
   @Test
   void everyDeclarationAllowsExactlyTheApisOfTheDeclaredModulesTheDomainMapPermits()
       throws ClassNotFoundException {
@@ -176,6 +226,7 @@ class ModularityTest {
       Set<String> permitted =
           DECLARED_MODULES.stream()
               .filter(target -> !target.equals(module) && map.mayDependOn(module, target))
+              .filter(target -> !INTERNAL_ONLY_MODULES.contains(target))
               .map(target -> BASE_PACKAGE_MODULES.contains(target) ? target : target + "::" + API)
               .collect(Collectors.toCollection(TreeSet::new));
 

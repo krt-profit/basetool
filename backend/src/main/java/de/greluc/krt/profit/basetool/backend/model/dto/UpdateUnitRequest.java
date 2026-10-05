@@ -29,7 +29,7 @@ import java.util.UUID;
  *
  * <p>A present {@code version} that does not match the unit's current version yields 409, the only
  * guard against a stale form overwriting a concurrent edit; {@code null} skips the check via {@link
- * de.greluc.krt.profit.basetool.backend.support.OptimisticLock#checkOptionalClient}.
+ * de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock#checkOptionalClient}.
  */
 public record UpdateUnitRequest(
     @NotBlank @Size(max = 255) String name,

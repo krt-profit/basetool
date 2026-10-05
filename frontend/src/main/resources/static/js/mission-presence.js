@@ -203,4 +203,13 @@
     };
 
     window.MissionPresence = MissionPresence;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!window.missionId || window.missionPresenceUserId == null) {
+            return;
+        }
+        const presence = new MissionPresence(window.missionId, window.missionPresenceUserId);
+        presence.start();
+        window.missionPresence = presence;
+    });
 })();

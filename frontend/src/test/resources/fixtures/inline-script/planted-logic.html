@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="de">
+<head>
+    <title>planted</title>
+</head>
+<body>
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    const PLANTED_MSG = {
+        saved: /*[[#{notification.success.save}]]*/ 'Gespeichert.'
+    };
+</script>
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    document.addEventListener('DOMContentLoaded', function () {
+        window.krtFetch.bindSwap({ container: '#planted' });
+    });
+</script>
+<script th:attr="nonce=${cspNonce}">
+    window.PLANTED = 1;
+</script>
+<script type="application/json" id="planted-data">{"a": 1}</script>
+<script th:src="@{/js/planted.js}" defer th:attr="nonce=${cspNonce}"></script>
+</body>
+</html>

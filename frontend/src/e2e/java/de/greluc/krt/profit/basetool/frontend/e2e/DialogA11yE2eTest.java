@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -53,7 +54,9 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * Checks the dialog contract on every dialog the app renders (REQ-UI-013, ADR-0177): modal opening,
  * focus inside, inert background, and closing via Escape and ✕.
  *
- * <p>Every declared {@code modalId} must be exercised or listed in {@link #UNREACHED}.
+ * <p>Every declared {@code modalId} must be exercised or listed in {@link #UNREACHED}. The page
+ * walk also collects every Trusted Types violation the report-only policy raises (ADR-0239) and
+ * fails on any; a planted violation on the first page proves the collector hears them.
  */
 @Tag("e2e")
 class DialogA11yE2eTest {
@@ -81,6 +84,36 @@ class DialogA11yE2eTest {
    * wrapper's, which {@code SingleModalShapeTest} asserts statically.
    */
   private static final Map<String, String> UNREACHED = Map.of();
+
+  /** The binding the violation collector reports through. */
+  private static final String TRUSTED_TYPES_BINDING = "__krtTrustedTypesViolation";
+
+  /**
+   * Registered before every page script: forwards each Trusted Types violation, enforced or
+   * report-only, to {@link #TRUSTED_TYPES_BINDING}.
+   */
+  private static final String TRUSTED_TYPES_COLLECTOR =
+      """
+      document.addEventListener('securitypolicyviolation', (e) => {
+        if (e.effectiveDirective !== 'require-trusted-types-for'
+            && e.effectiveDirective !== 'trusted-types') {
+          return;
+        }
+        window.__krtTrustedTypesViolation(
+          e.effectiveDirective + ' ' + e.sample + ' at ' + e.sourceFile + ':' + e.lineNumber);
+      });
+      """;
+
+  /** Writes a string into an HTML sink, which every Trusted Types policy mode reports. */
+  private static final String TRUSTED_TYPES_CANARY =
+      """
+      () => {
+        try {
+          document.createElement('div').innerHTML = '<b>krt-trusted-types-canary</b>';
+        } catch (_enforced) {
+        }
+      }
+      """;
 
   /** Pages whose dialogs render only with a squadron pinned, walked again with IRIDIUM pinned. */
   private static final List<String> SQUADRON_PAGES =
@@ -227,12 +260,21 @@ class DialogA11yE2eTest {
     List<String> findings = new ArrayList<>();
     Set<String> exercised = new TreeSet<>();
     Set<String> visited = new TreeSet<>();
+    List<String> violations = new CopyOnWriteArrayList<>();
     try (BrowserContext context =
         browser.newContext(
             new Browser.NewContextOptions()
                 .setIgnoreHTTPSErrors(true)
                 .setStorageStatePath(storageState))) {
+      context.exposeBinding(
+          TRUSTED_TYPES_BINDING,
+          (source, args) -> {
+            violations.add(source.page().url() + " -> " + args[0]);
+            return null;
+          });
+      context.addInitScript(TRUSTED_TYPES_COLLECTOR);
       Page page = context.newPage();
+      assertTheCollectorHearsAViolation(page, baseUrl, violations);
       List<String> paths = new ArrayList<>(FrontendPageRoutes.PAGES);
       paths.addAll(SEEDED_DETAILS);
       for (int i = 0; i < paths.size(); i++) {
@@ -282,7 +324,13 @@ class DialogA11yE2eTest {
       }
     }
     System.out.printf(
-        "[E2E][dialogs] %d dialogs exercised on %d pages%n", exercised.size(), visited.size());
+        "[E2E][dialogs] %d dialogs exercised on %d pages, %d Trusted Types violations%n",
+        exercised.size(), visited.size(), violations.size());
+    assertThat(violations)
+        .as(
+            "no page writes a DOM sink without a Trusted Types policy value (ADR-0239): use"
+                + " krtHtml.set, krtFetch.setTrustedHtml or replaceChildren")
+        .isEmpty();
     assertThat(findings)
         .as("every dialog follows the one dialog contract (REQ-UI-013, ADR-0177)")
         .isEmpty();
@@ -291,6 +339,42 @@ class DialogA11yE2eTest {
             "every dialog a template declares is exercised here, or listed in UNREACHED with the"
                 + " reason a seeded stack cannot show it")
         .isEmpty();
+  }
+
+  /**
+   * Plants one Trusted Types violation on the home page and waits for the collector to report it,
+   * then forgets it, so the walk below cannot pass because the report-only policy or the collector
+   * went missing. A browser engine without Trusted Types reports nothing to collect; Chromium must
+   * have them.
+   *
+   * @param page the page
+   * @param baseUrl the frontend origin
+   * @param violations the collected violations
+   */
+  private static void assertTheCollectorHearsAViolation(
+      Page page, String baseUrl, List<String> violations) {
+    E2eSupport.navigate(page, baseUrl + "/");
+    boolean supported =
+        Boolean.TRUE.equals(page.evaluate("() => typeof window.trustedTypes !== 'undefined'"));
+    if (!supported) {
+      assertThat(browser.browserType().name())
+          .as("Chromium ships Trusted Types; the collector must be proven there")
+          .isNotEqualTo("chromium");
+      System.out.printf(
+          "[E2E][dialogs] %s has no Trusted Types; the collector stays silent%n",
+          browser.browserType().name());
+      return;
+    }
+    page.evaluate(TRUSTED_TYPES_CANARY);
+    for (int i = 0; i < 50 && violations.isEmpty(); i++) {
+      page.waitForTimeout(100);
+    }
+    assertThat(violations)
+        .as(
+            "the planted innerHTML write is reported; the Content-Security-Policy-Report-Only"
+                + " header or the violation collector is missing")
+        .anyMatch(v -> v.contains("require-trusted-types-for"));
+    violations.clear();
   }
 
   /**

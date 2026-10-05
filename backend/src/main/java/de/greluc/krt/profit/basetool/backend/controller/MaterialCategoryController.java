@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialCategoryMapper;
 import de.greluc.krt.profit.basetool.backend.model.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.service.MaterialCategoryService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;

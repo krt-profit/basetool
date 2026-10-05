@@ -200,7 +200,104 @@
         });
     }
 
+    /** Submits the edit form through `krtFetch`, showing field errors and syncing the version. */
+    function bindSubmit() {
+        const formElement = /** @type {HTMLFormElement | null} */ (
+            document.getElementById('member-edit-form')
+        );
+        if (
+            !formElement ||
+            formElement.getAttribute('data-member-edit') === null ||
+            !window.krtFetch ||
+            !window.krtCsrf
+        ) {
+            return;
+        }
+        const form = formElement;
+        const i18n = window.krtMemberEditI18n || {};
+
+        /** Empties every field-error slot of the form. */
+        function clearErrors() {
+            form.querySelectorAll('.field-error[data-error-for]').forEach((slot) => {
+                slot.textContent = '';
+            });
+        }
+
+        /**
+         * Writes the server's field errors into their slots and shows the tab of the first one.
+         *
+         * @param {Record<string, string> | null} errors field name to message
+         */
+        function renderErrors(errors) {
+            clearErrors();
+            if (!errors) {
+                return;
+            }
+            Object.keys(errors).forEach((field) => {
+                const slot = form.querySelector(`.field-error[data-error-for="${field}"]`);
+                if (slot) {
+                    slot.textContent = errors[field];
+                    const panel = /** @type {HTMLElement | null} */ (
+                        slot.closest('[role="tabpanel"]')
+                    );
+                    const tab =
+                        panel && panel.hidden
+                            ? document.getElementById(panel.getAttribute('aria-labelledby') || '')
+                            : null;
+                    if (tab) {
+                        tab.click();
+                    }
+                }
+            });
+        }
+
+        /**
+         * Copies the new optimistic-lock version into every version input of the form.
+         *
+         * @param {number | null | undefined} version the version the server answered with
+         */
+        function syncVersion(version) {
+            if (version == null) {
+                return;
+            }
+            form.querySelectorAll('input[name="version"]').forEach((input) => {
+                /** @type {HTMLInputElement} */ (input).value = String(version);
+            });
+        }
+
+        form.addEventListener('submit', (event) => {
+            event.preventDefault();
+            window.krtFetch.submitForm({
+                form,
+                submitter: /** @type {HTMLElement | null} */ (
+                    form.querySelector('button[type="submit"]')
+                ),
+                successMessage: i18n.saved,
+                errorMessage: i18n.error,
+                conflict: {
+                    title: i18n.conflictTitle,
+                    reloadLabel: i18n.conflictReload,
+                    dismissLabel: i18n.conflictDismiss,
+                    reloadQuestion: i18n.conflictQuestion,
+                    reloadDetailFallback: i18n.conflictDetail,
+                },
+                onError(status, body) {
+                    if (status === 422) {
+                        renderErrors(body || {});
+                        return true;
+                    }
+                    return false;
+                },
+                onSuccess(body) {
+                    clearErrors();
+                    syncVersion(body ? body.version : null);
+                },
+            });
+        });
+    }
+
     bindTabs();
     bindStaffelSlots();
     bindCharCounters();
+    document.addEventListener('DOMContentLoaded', bindSubmit);
 })();

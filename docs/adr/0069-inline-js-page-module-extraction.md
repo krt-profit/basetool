@@ -1,6 +1,7 @@
 # ADR-0069 — Extract inline template JavaScript into static page modules (bootstrap-dict + verbatim module)
 
-- **Status:** Accepted — amended 2026-10-02 (IIFE namespaces per domain; a correction, see below)
+- **Status:** Accepted — amended 2026-10-02 (IIFE namespaces per domain; a correction, see below);
+  finished 2026-10-04 (every inline script is a data bootstrap)
 - **Date:** 2026-07-03
 - **Deciders:** Repository owner (@greluc)
 - **Related:** issue #924 (L5 part 2, epic #905) · ADR-0068 (the controller split of the same issue) · ADR-0012/0013 (krtFetch foundation) · REQ-FE-001…011 ([`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md)) · #574 (mission i18n-dict precedent)
@@ -99,3 +100,41 @@ and a boundary text test forbids one domain's page from reading another domain's
 outside an allow-list. The bootstrap/module split of the decision above stays, and every new
 namespace is declared in `frontend/types/globals.d.ts` (REQ-FE-018). The remaining 70 inline
 script blocks move into modules on the same recipe.
+
+## Amendment — 2026-10-04: finished, and the bootstrap is data only
+
+**Correction of the count.** On 2026-10-04 the templates held 67 inline `<script>` blocks with 1,645
+non-blank lines, and 55 of them were already what this decision calls a bootstrap: Thymeleaf values
+declared as literals, nothing else. The "70 blocks, 1,860 lines" of the audit counted those as
+logic still to move. Eleven blocks carried code: the bank holder and manage pagers, the org-unit
+bank tabs, the member list (166 lines) and the member edit form, the mission finance dialog and the
+mission presence start, the head's SCU parser fallback, the two Materialbörse dictionaries that
+merged themselves with `Object.assign` and a conditional, and the Leitung conflict alias; five more
+were empty `DOMContentLoaded` listeners on the error pages.
+
+**Decision.** An inline script is a `th:inline="javascript"` block of `const` / `let` / `var NAME =
+literal` and `window.NAME = literal` statements, where a literal is a string, number, boolean,
+`null`, or an array or object of literals, filled from `/*[[…]]*/` natural-template values. A
+function, call, listener, merge or reference to another global belongs in the page's module, and a
+server value the module needs reaches it through such a bootstrap or a `data-*` attribute.
+`InlineScriptDataOnlyTest` parses every inline block against that grammar, with a planted template
+proving it fails and floors of 100 templates and 55 blocks; the one block that keeps code, the
+head's `krtEvents` stub and watchdog, is listed in its `EXCEPTIONS` with the reason (it detects a
+deferred script that never ran, so it must not be one). The test also rejects a Thymeleaf
+expression inside a JavaScript string literal: `'[[#{key}]]'` in an inlined block renders as
+`'"Gespeichert."'`, so the toasts and dialog titles of the mission-data and special-commands admin
+pages showed the text in quotes, and the mission finance dialog's form action carried a quoted
+mission id. Both pages now use the natural-template form.
+
+**How the eleven moved.** The pagers into `bank-holder-detail.js` and `bank-manage.js`, the tabs
+into a new `org-unit-bank.js`, the member list into `members.js` and the edit form into
+`member-edit.js` (with its labels as `window.krtMemberEditI18n`), the finance dialog into
+`mission-detail.js` and the presence start into `mission-presence.js` (with the viewer id as
+`window.missionPresenceUserId`). The SCU parser fallback was dropped: `scu-decimal-input.js`
+installs the same `window.krtScuInput` before any page module and nothing calls it at parse time.
+The dialogue dictionaries of `fragments/materialboerse-modal.html` and
+`fragments/materialgesuch-modal.html` are now `window.materialboerseModalI18n` /
+`window.materialgesuchModalI18n`, which their modules merge with the page's dictionary; the conflict
+labels are written out instead of aliased. Listener registration moved from parse time into the
+deferred module of the same page, which runs before `DOMContentLoaded`, so every listener still
+fires; the order among them changes only where they are independent.
