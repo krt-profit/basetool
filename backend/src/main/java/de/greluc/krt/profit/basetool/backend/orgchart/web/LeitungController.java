@@ -17,10 +17,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.orgchart.web;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.LeitungViewDto;
-import de.greluc.krt.profit.basetool.backend.service.LeitungViewService;
+import de.greluc.krt.profit.basetool.backend.orgchart.internal.LeitungViewDto;
+import de.greluc.krt.profit.basetool.backend.orgchart.internal.LeitungViewService;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;

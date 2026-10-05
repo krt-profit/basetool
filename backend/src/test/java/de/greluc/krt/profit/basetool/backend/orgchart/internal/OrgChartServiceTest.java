@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.orgchart.internal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -33,27 +33,16 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.mapper.OrgChartPositionMapperImpl;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.Department;
 import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
-import de.greluc.krt.profit.basetool.backend.model.OrgChartPosition;
-import de.greluc.krt.profit.basetool.backend.model.OrgChartPositionType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.BereichChartDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.CommandChartDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionCreateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionUpdateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.SquadronChartDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichLeadershipRole;
-import de.greluc.krt.profit.basetool.backend.repository.OrgChartPositionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.List;

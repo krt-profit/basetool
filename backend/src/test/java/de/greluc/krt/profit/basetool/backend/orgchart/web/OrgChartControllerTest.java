@@ -17,21 +17,21 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.orgchart.web;
 
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.model.OrgChartPositionType;
-import de.greluc.krt.profit.basetool.backend.model.dto.AreaLeadershipDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionCreateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionUpdateRequest;
-import de.greluc.krt.profit.basetool.backend.service.OrgChartReadService;
-import de.greluc.krt.profit.basetool.backend.service.OrgChartService;
+import de.greluc.krt.profit.basetool.backend.orgchart.internal.AreaLeadershipDto;
+import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartDto;
+import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartPositionCreateRequest;
+import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartPositionDto;
+import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartPositionType;
+import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartPositionUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartReadService;
+import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

@@ -135,6 +135,12 @@ mappers no other module needs) and `<module>.web` (controllers and their REST DT
 | Module | `api` | `internal` | `web` |
 | --- | --- | --- | --- |
 | `dashboard` | — (publishes nothing) | `Announcement`, `AnnouncementRepository`, `AnnouncementService` | `AnnouncementController`, `AnnouncementDto`, `AnnouncementMapper` |
+| `orgchart` | — (publishes nothing; orgunit reaches it through `orgunit.api.MembershipChangeObserver`) | `OrgChartPosition` and its repository and enums, `OrgChartService`, `OrgChartReadService`, `LeitungViewService`, `OrgChartPositionMapper`, the chart and Leitung DTOs | `OrgChartController`, `LeitungController` |
+
+`OrgChartService` mirrors the leadership ranks inside the transaction of the rank change. The org
+chart's DTOs stay in `internal`, because its services return them: a moved domain's `web` depends on
+its `internal`, never the reverse ([`module-boundaries.md`](../specs/module-boundaries.md),
+REQ-MOD-006).
 
 The platform modules reach the domains only through SPIs they own and the domains implement
 (plan §5.3); Spring injects the implementations, so the platform names no domain class:

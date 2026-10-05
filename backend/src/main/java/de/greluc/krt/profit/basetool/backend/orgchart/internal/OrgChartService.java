@@ -17,28 +17,20 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.orgchart.internal;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
-import de.greluc.krt.profit.basetool.backend.mapper.OrgChartPositionMapper;
 import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
-import de.greluc.krt.profit.basetool.backend.model.OrgChartPosition;
-import de.greluc.krt.profit.basetool.backend.model.OrgChartPositionType;
-import de.greluc.krt.profit.basetool.backend.model.OrgChartScope;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionCreateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipChangeObserver;
-import de.greluc.krt.profit.basetool.backend.repository.OrgChartPositionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.UUID;

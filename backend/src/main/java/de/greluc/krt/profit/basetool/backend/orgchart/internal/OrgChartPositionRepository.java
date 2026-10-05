@@ -17,10 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.repository;
+package de.greluc.krt.profit.basetool.backend.orgchart.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.OrgChartPosition;
-import de.greluc.krt.profit.basetool.backend.model.OrgChartPositionType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;

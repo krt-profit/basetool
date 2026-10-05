@@ -17,11 +17,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.mapper;
+package de.greluc.krt.profit.basetool.backend.orgchart.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.OrgChartPosition;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartNodeDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionDto;
+import de.greluc.krt.profit.basetool.backend.mapper.CentralMapperConfig;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

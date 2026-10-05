@@ -149,7 +149,6 @@ class PingResponse admin liveness probe payload of SystemController
 class SystemController admin liveness/version probe
 class Department orgunit Bereich brand colour
 class MembershipRole orgunit rank on an OrgUnitMembership
-class AreaLeadershipDto orgchart org chart tier
 class FinanceType mission mission finance entry type
 class RefineryMissionProfitAggregate refinery refinery profit per mission projection
 class FinanceEntryAggregate mission mission finance aggregate projection
@@ -197,6 +196,7 @@ package platform platform the platform's package tree (plan 5.1 rank 0)
 package catalogue catalogue the catalogue module's package tree (plan 5.2)
 package mission mission the mission module's package tree (plan 5.2)
 package dashboard dashboard the dashboard module's package tree (plan 5.2)
+package orgchart orgchart the org chart module's package tree (plan 5.2)
 
 name ^OrgUnitBank bank
 name ^(Bank|CreateBank|CancelBank|ConfirmBank|RegisterBank|RejectBank|RenameBank|ReverseBank|SetBank|UpdateBank|SetCartel|OrgUnitBalanceTarget) bank
@@ -216,8 +216,6 @@ name ^(Hangar|Ship(?!Type)|Fleet|Starjump|Shiplist|SquadronShip|SetHomeLocation)
 name ^(Notification|LocalNotification|RedisNotification|RuleEvaluation|RecipientResolution|SelectorKind|OrgRelativeRole|Mail|SmtpMail) notification
 name ^Audit audit
 name ^(Promotion|RankRequirement|MemberEvaluation) promotion
-name ^(OrgChart|BereichChart|CommandChart|OlChart|SpecialCommandChart|SquadronChart) orgchart
-name ^Leitung orgchart the Leitung view belongs to the org chart (plan 7.3)
 name ^(OrgRoleManagement|AddOlMember|SquadronRole|AssignSquadronRank) orgunit leadership writes merged into orgunit (plan 7.3)
 name ^(OrgUnit|Squadron|SpecialCommand|Bereich|Organisationsleitung|KommandoGroup|CreateKommandoGroup|UpdateKommandoGroup|OrgHierarchy|Membership) orgunit
 name ^(User|Role|Registration|PendingRegistration|ApproveRegistration|RejectRegistration|ReopenRegistration|LinkRegistration|MyRegistration|Discord|Keycloak|Terms|DeletionRequest|CreateDeletionRequest|DecideDeletionRequest|DataExport|AdminDataExport|AccountDeletion|AccountConsolidation|ConsolidateAccount|MergeAccount|Handle|PersonSearch|AdminPersonSearch|AdminTerms|AdminDeletion|RejectedRegistration|ApprovalDecision|ApprovalStatus|AdminController$) identity

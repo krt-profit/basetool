@@ -17,15 +17,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.orgchart.web;
 
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionCreateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionUpdateRequest;
-import de.greluc.krt.profit.basetool.backend.service.OrgChartReadService;
-import de.greluc.krt.profit.basetool.backend.service.OrgChartService;
+import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartDto;
+import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartPositionCreateRequest;
+import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartPositionDto;
+import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartPositionUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartReadService;
+import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
