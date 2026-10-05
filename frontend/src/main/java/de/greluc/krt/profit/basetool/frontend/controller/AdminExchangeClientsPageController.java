@@ -21,11 +21,10 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.GrafanaLinkProperties;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.exchange.client.ExchangeBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeBulkUndoRunDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeClientDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeClientUsageDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeSettingsDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.HashMap;
 import java.util.List;
@@ -35,7 +34,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -56,20 +54,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 @Slf4j
 public class AdminExchangeClientsPageController {
 
-  private static final ParameterizedTypeReference<List<ExchangeClientDto>> LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  private static final ParameterizedTypeReference<List<ExchangeClientUsageDto>> USAGE_TYPE =
-      new ParameterizedTypeReference<>() {};
-
   /** The {@code fragment} value that renders only the registry section, for the in-place swap. */
   static final String REGISTRY_FRAGMENT = "registry";
 
   /** The {@code fragment} value that renders only the bulk undo runs, for the in-place swap. */
   static final String UNDO_RUNS_FRAGMENT = "undoRuns";
-
-  private static final ParameterizedTypeReference<List<ExchangeBulkUndoRunDto>> RUNS_TYPE =
-      new ParameterizedTypeReference<>() {};
 
   /**
    * Every capability the registry can grant, in the backend's declaration order, labelled via
@@ -89,7 +78,7 @@ public class AdminExchangeClientsPageController {
           "exchange.drafts.refinery");
 
   /** Talks to the backend. */
-  private final BackendApiClient backendApiClient;
+  private final ExchangeBackendClient exchangeClient;
 
   /** Where the per-client error rate lives. */
   private final GrafanaLinkProperties grafanaLinks;
@@ -110,13 +99,9 @@ public class AdminExchangeClientsPageController {
   @GetMapping
   public String page(@Nullable @RequestParam(required = false) String fragment, Model model) {
     try {
-      List<ExchangeClientDto> clients =
-          backendApiClient.get(AdminExchangeClientsRelayController.CLIENTS, LIST_TYPE);
+      List<ExchangeClientDto> clients = exchangeClient.clients();
       model.addAttribute("clients", clients == null ? List.of() : clients);
-      model.addAttribute(
-          "settings",
-          backendApiClient.get(
-              AdminExchangeClientsRelayController.SETTINGS, ExchangeSettingsDto.class));
+      model.addAttribute("settings", exchangeClient.settings());
     } catch (Exception e) {
       log.debug("Failed to load the exchange registry", e);
       model.addAttribute("clients", List.of());
@@ -144,8 +129,7 @@ public class AdminExchangeClientsPageController {
    */
   private @NotNull List<ExchangeBulkUndoRunDto> undoRuns() {
     try {
-      List<ExchangeBulkUndoRunDto> runs =
-          backendApiClient.get(AdminExchangeClientsRelayController.UNDO_RUNS, RUNS_TYPE);
+      List<ExchangeBulkUndoRunDto> runs = exchangeClient.undoRuns();
       return runs == null ? List.of() : runs;
     } catch (Exception e) {
       log.debug("Failed to load the bulk undo runs", e);
@@ -161,8 +145,7 @@ public class AdminExchangeClientsPageController {
    */
   private @NotNull Map<UUID, ExchangeClientUsageDto> usage() {
     try {
-      List<ExchangeClientUsageDto> rows =
-          backendApiClient.get(AdminExchangeClientsRelayController.CLIENTS + "/usage", USAGE_TYPE);
+      List<ExchangeClientUsageDto> rows = exchangeClient.usage();
       Map<UUID, ExchangeClientUsageDto> byId = new HashMap<>();
       if (rows != null) {
         rows.forEach(row -> byId.put(row.id(), row));

@@ -251,28 +251,28 @@ public class JobOrderPageController {
     int yellowDays = 30;
     int redDays = 90;
     try {
-      String statusParam = String.join(",", status);
-      StringBuilder scopeParamBuilder = new StringBuilder();
+      StringBuilder uri =
+          new StringBuilder(ownScope ? "/api/v1/orders/requested" : "/api/v1/orders")
+              .append("?page={page}&size={size}&sort=priority,asc&status=");
+      List<Object> uriVariables = new ArrayList<>();
+      uriVariables.add(effectivePage);
+      uriVariables.add(effectiveSize);
+      for (int i = 0; i < status.size(); i++) {
+        if (i > 0) {
+          uri.append(",");
+        }
+        uri.append("{status}");
+        uriVariables.add(status.get(i));
+      }
       if (toProcessScope) {
-        scopeParamBuilder.append("&toProcess=true");
+        uri.append("&toProcess=true");
       } else if (!ownScope) {
         for (UUID sid : selectedSquadronIds) {
-          scopeParamBuilder.append("&squadronId=").append(sid);
+          uri.append("&squadronId={squadronId}");
+          uriVariables.add(sid);
         }
       }
-      String scopeParam = scopeParamBuilder.toString();
-      String listBase = ownScope ? "/api/v1/orders/requested" : "/api/v1/orders";
-      p =
-          backendApiClient.get(
-              listBase
-                  + "?page="
-                  + effectivePage
-                  + "&size="
-                  + effectiveSize
-                  + "&sort=priority,asc&status="
-                  + statusParam
-                  + scopeParam,
-              PAGE_OF_JOB_ORDER);
+      p = backendApiClient.get(uri.toString(), PAGE_OF_JOB_ORDER, uriVariables.toArray());
       if (p != null && p.content() != null) {
         orders = new ArrayList<>(p.content());
         if (log.isDebugEnabled()) {
@@ -399,7 +399,7 @@ public class JobOrderPageController {
     }
     model.addAttribute("requesterView", requesterView);
     try {
-      JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
+      JobOrderDto order = backendApiClient.get("/api/v1/orders/{id}", JobOrderDto.class, id);
       requesterView = order.redacted();
       model.addAttribute("requesterView", requesterView);
       model.addAttribute("order", order);
@@ -517,8 +517,9 @@ public class JobOrderPageController {
           model.addAttribute(
               "itemBlueprintOwners",
               backendApiClient.get(
-                  "/api/v1/orders/" + id + "/item-blueprint-owners",
-                  JobOrderItemBlueprintOwnersDto.class));
+                  "/api/v1/orders/{id}/item-blueprint-owners",
+                  JobOrderItemBlueprintOwnersDto.class,
+                  id));
         } catch (Exception e) {
           log.debug("Blueprint coverage unavailable for order {}: {}", id, e.getMessage());
         }
@@ -529,8 +530,7 @@ public class JobOrderPageController {
           && (fragment == null || "items".equalsIgnoreCase(fragment))) {
         try {
           List<JobOrderItemStockGroupDto> stock =
-              backendApiClient.get(
-                  "/api/v1/orders/" + id + "/item-stock", LIST_OF_ITEM_STOCK_GROUP);
+              backendApiClient.get("/api/v1/orders/{id}/item-stock", LIST_OF_ITEM_STOCK_GROUP, id);
           Map<UUID, JobOrderItemStockGroupDto> byGameItem = new LinkedHashMap<>();
           if (stock != null) {
             for (JobOrderItemStockGroupDto group : stock) {
@@ -550,7 +550,7 @@ public class JobOrderPageController {
           model.addAttribute(
               "orphanedInventory",
               backendApiClient.get(
-                  "/api/v1/orders/" + id + "/inventory/orphaned", LIST_OF_INVENTORY_ITEM));
+                  "/api/v1/orders/{id}/inventory/orphaned", LIST_OF_INVENTORY_ITEM, id));
         } catch (Exception e) {
           log.debug("Orphaned inventory unavailable for order {}: {}", id, e.getMessage());
         }
@@ -638,7 +638,7 @@ public class JobOrderPageController {
       @PathVariable UUID id, Model model, RedirectAttributes redirectAttributes) {
     JobOrderDto order;
     try {
-      order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
+      order = backendApiClient.get("/api/v1/orders/{id}", JobOrderDto.class, id);
     } catch (Exception e) {
       log.error("Failed to load item order for editing", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.joborder.load.details");
@@ -733,8 +733,9 @@ public class JobOrderPageController {
     try {
       List<BlueprintReferenceDto> result =
           backendApiClient.get(
-              "/api/v1/orders/item-catalog/" + gameItemId + "/blueprints",
-              LIST_OF_BLUEPRINT_REFERENCE);
+              "/api/v1/orders/item-catalog/{gameItemId}/blueprints",
+              LIST_OF_BLUEPRINT_REFERENCE,
+              gameItemId);
       return result != null ? result : List.of();
     } catch (Exception e) {
       log.error("Failed to fetch blueprints for item {}", gameItemId, e);
@@ -758,8 +759,10 @@ public class JobOrderPageController {
       @RequestParam(required = false, defaultValue = "1") int amount) {
     try {
       return backendApiClient.get(
-          "/api/v1/orders/item-catalog/blueprints/" + blueprintId + "/derivation?amount=" + amount,
-          ItemDerivationDto.class);
+          "/api/v1/orders/item-catalog/blueprints/{blueprintId}/derivation?amount={amount}",
+          ItemDerivationDto.class,
+          blueprintId,
+          amount);
     } catch (Exception e) {
       log.error("Failed to derive materials for blueprint {}", blueprintId, e);
       return null;
@@ -779,11 +782,10 @@ public class JobOrderPageController {
     try {
       PageResponse<GameItemReferenceDto> page =
           backendApiClient.get(
-              "/api/v1/orders/item-catalog?search={q}&size="
-                  + PickerSearch.PAGE_SIZE
-                  + "&sort=name,asc",
+              "/api/v1/orders/item-catalog?search={q}&size={size}&sort=name,asc",
               PAGE_OF_GAME_ITEM_REFERENCE,
-              q == null ? "" : q);
+              q == null ? "" : q,
+              PickerSearch.PAGE_SIZE);
       return page != null && page.content() != null ? page.content() : List.of();
     } catch (Exception e) {
       log.error("Failed to search orderable items", e);
@@ -822,7 +824,7 @@ public class JobOrderPageController {
       @PathVariable UUID id, @PathVariable UUID matId) {
     try {
       return backendApiClient.get(
-          "/api/v1/orders/" + id + "/materials/" + matId + "/inventory", LIST_OF_INVENTORY_ITEM);
+          "/api/v1/orders/{id}/materials/{matId}/inventory", LIST_OF_INVENTORY_ITEM, id, matId);
     } catch (Exception e) {
       log.error("Failed to fetch inventory items for job order {} and material {}", id, matId, e);
       throw new org.springframework.web.server.ResponseStatusException(

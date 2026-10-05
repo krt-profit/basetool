@@ -803,12 +803,28 @@ hub where it has one: `dashboard` (0 inbound edges), `admin` (4), `promotion` (1
 mission detach command), then `exchange` (11) and `bank` (18) as packages. Exchange and bank enter
 their "must stay green" period here (D-01).
 
+- `dashboard` — **done 2026-10-05** (P2-1). The announcement banner moved out of the layer
+  packages: `dashboard.web` holds `AnnouncementController`, `AnnouncementDto` and
+  `AnnouncementMapper`, `dashboard.internal` the `Announcement` entity, its repository and
+  `AnnouncementService`. The module publishes nothing (no other class uses it), so it is declared
+  like `mission`: closed, no named interface, in no other module's `allowedDependencies`. The
+  domain map's `name ^Announcement` rule became the `package dashboard` rule; the module baseline is
+  unchanged at 110 edges, because dashboard had no edge in it. Entity name, table, bean names, REST
+  paths, schema names, the authorization matrix and the OpenAPI document are unchanged; the one
+  visible difference is the persistent class name in the log context of an announcement 409,
+  which is now `dashboard.internal.Announcement`. The module has no access policy: its gates are
+  the role annotations `isAuthenticated()` and `hasRole('ADMIN')`, nothing of the scope hub.
+  **Correction to §5.2:** a mechanical move cannot satisfy `web`'s "no `@Transactional`, no
+  entity" — `AnnouncementController` keeps its class-level transaction and maps the entity in the
+  controller, as before. Those two rules are the target of the module's REST wave, which moves the
+  transaction boundary and the mapping into the module; a move keeps both where they are, because
+  either change alters the transaction boundary.
 - `orgchart` — **done 2026-10-05.** All 24 classes moved: the controllers `OrgChartController` and
   `LeitungController` into `orgchart.web`, the rest (entity `OrgChartPosition`, its repository, the
   enums, `OrgChartService`, `OrgChartReadService`, `LeitungViewService`, `OrgChartPositionMapper`
   and the 14 DTOs, `AreaLeadershipDto` with them as §7.3 P1-1 deferred) into `orgchart.internal`.
-  The module is declared (floor 18) and publishes nothing: no other module uses it, and orgunit
-  reaches it only through `MembershipChangeObserver`. The domain map trades its two `name` rules
+  The module is declared (floor 19, after `dashboard`) and publishes nothing: no other module uses
+  it, and orgunit reaches it only through `MembershipChangeObserver`. The domain map trades its two `name` rules
   and the `AreaLeadershipDto` class rule for one `package` rule. No access policy left the scope
   hub — the org chart has none: its reads are `isAuthenticated()`, its writes `hasRole('ADMIN')`,
   and neither touches `OwnerScopeService` or `AccessGateService`. The module baseline is unchanged
@@ -839,7 +855,7 @@ their "must stay green" period here (D-01).
      so every declared module above rank 9 allows `mission::api`.
   3. *Move*: `OperationController` into `operation.web`; the five services, the policy,
      `OperationPayoutStatus` with its repository and eight DTOs into `operation.internal`. The
-     module is declared (floor 19) and publishes nothing.
+     module is declared (floor 20) and publishes nothing.
   The module baseline shrank by the two `scope -> operation` edges, **110 → 108**.
   `OperationModuleContractTest` pins the endpoints per caller, the delete, the command's
   transaction rule and that the scoped list and the per-row gate admit the same operations.
@@ -892,7 +908,7 @@ domain stays a package.
 | F0 | Guards (Phase 0.4) |
 | F1 — **done 2026-10-04** | Kernel extraction: `BackendErrorMapper` (a sealed outcome type with a pattern switch), template overloads for write verbs, the eleven bypassing controllers moved onto the kernel, the `WebClient` confinement rule at zero |
 | F2 — **done 2026-10-04** | Exact session allow-list in its own release (D-10): `SessionTypeAllowList.SESSION_BOUND_TYPES`, 21 exact names; the `…frontend.model.` prefix is gone, `SessionBoundTypeClosureTest` holds the list equal to the derived set in both directions. Corrections: the list lives in the security class, not in the G-16 golden file (`session-bound-types.txt` is deleted, so `-PupdateSnapshots` can no longer widen the allow-list); the admitted application classes fall from 325 to 21, not "about 20" of "about eleven" forms — the 21 are 10 flashed forms and DTOs with their nested types and enums |
-| F3 | Typed client per domain, small domains first (audit, notification, settings, dashboard, exchange, orgchart), then the large four; untyped `Map` relays typed in the same step |
+| F3 — **in progress since 2026-10-05** | Typed client per domain, small domains first (audit, notification, settings, dashboard, exchange, orgchart), then the large four; untyped `Map` relays typed in the same step |
 | F4 | Package-by-domain move in one pull request; route/gate snapshot byte-identical |
 | F5 | Templates and assets per domain (§8.2), with the page chrome as one layout fragment |
 
@@ -911,6 +927,35 @@ Corrections: the eleven bypassing controllers had already returned to the kernel
 so F1 only verified it; the "zero" in this row was reached by moving the two named
 exceptions into the kernel, not by removing them; the 130 concatenating GET call sites are left for
 F3, where the typed clients replace them.
+
+*F3 as built, part 1 (2026-10-05).* The six small domains call typed clients:
+`audit.client.AuditBackendClient`, `notification.client.NotificationBackendClient`,
+`settings.client.SettingsBackendClient`, `dashboard.client.DashboardBackendClient`,
+`exchange.client.ExchangeBackendClient` and `orgchart.client.OrgChartBackendClient` — `@Service`
+classes over `BackendApiClient` in the `<domain>.client` packages of §5.9, so F4 moves only the
+controllers. A client owns its domain's paths and returns typed records; the announcement and the
+org-chart position relays, untyped `Map`s before, are `AnnouncementDto`/`AnnouncementRequest` and
+`OrgChartPosition{Create,Update}Request`/`OrgChartPositionDto`. Catalogue evictions go through the
+kernel's `CatalogueCacheEviction`. `TypedBackendClientTest` confines `BackendApiClient` to the
+kernel packages and the client packages (the controllers not yet moved are an exact list that
+only shrinks) and checks the client rules (no `URI`/`UriBuilderFactory` parameter, no cache
+annotation, `@Service`, `*BackendClient`) against planted fixtures. Every `get` and `execute(…)`
+passes its runtime values as template variables — `ReadUriTemplateTest` with a floor and a
+planted fixture, so with `WriteUriTemplateTest` no verb concatenates; `BackendApiClient` gained the
+`Class`-typed template `get`. Each client's requests are pinned against a MockWebServer through
+`BackendClientHarness`. Corrections: the "130 GET call sites" were 114 methods with a
+concatenated `get` (113 seen by the F1 scanner) and 8 with a concatenated `execute(…)` when the
+guard was introduced, all converted without a reviewed exception and without changing the bytes
+sent (a repeated placeholder takes the next value, pinned in `BackendApiClientHappyPathTest`); the F1 scanner under-reported, because a `String` parameter without an in-class caller
+folded to nothing inside a conditional, so `/api/v1/audit/" + (domain or "BANK")` read as the
+literal `BANK` branch only (`AdminAuditLogPageController#auditLog`), and a builder chain longer
+than ten links did not fold at all — both fixed, and a switch expression now folds too. A
+controller's typed client is the one of its own domain, page-composition reads of other backend
+roots included (the audit page reads the exchange registry, the settings page the squadron and
+Spezialkommando lists), so a page never needs a second domain's client; the duplicated reads are
+two lines each. Typed clients consolidate repeated call sites, so the write-site floor of
+`WriteUriTemplateTest` and the resolved-site floor of `BackendCallExistenceTest` fall with each
+domain (the four settings PUTs, written twice, are one `write` now).
 
 ### 7.9 REST API track
 
@@ -967,9 +1012,9 @@ JSpecify stays out for now (ADR-0192).
 | **Document the browser baseline — decided: "Baseline 2025", ES2025** (D-16). **Done 2026-10-04**: TypeScript 7.0.2 accepts the `ES2025` lib (proven by a planted checked file), `tsconfig.json` and `eslint.config.mjs` are at 2025, the floor is in `ui-design-system.md` and REQ-FE-018, and ESLint rejects the three ES2025 APIs above the floor, which the `ES2025` lib declares. The features already shipped imply Chrome 105, Firefox 121, Safari 16.4; the decided floor is at least Chrome 122, Firefox 131, Safari/iOS 18.4 (iterator helpers; `Promise.try`, `RegExp.escape` and `Float16Array` need newer releases), which brings Set methods, iterator helpers, popover and same-document view transitions. Raise the type check's `lib`/`target` and ESLint's `ecmaVersion` from 2023 to 2025 once TypeScript 7 is proven to accept the `ES2025` lib; write the floor into `ui-design-system.md` and REQ-FE-018 | Every other modern-feature decision needs this answer; today a newer API in an unchecked file passes every gate | Members who cannot update iOS to 18.4 or later lose functions; the rejected alternative was "Baseline widely available" (ES2024, Safari 17.4) | `typecheckJs`, `lintJs`, the E2E browser matrix |
 | **ESLint core autofix rules** — **done 2026-10-04**: all five are errors for the browser and Node scripts, autofix applied (1,345 arrow callbacks, 723 template literals, 9 logical assignments, 1 `Object.hasOwn`; 5 `parseInt` radixes and 3 `||=` by hand); `?.`/`??` stay a by-hand change in `@ts-check` files (`prefer-template` for 664 concatenations, `prefer-arrow-callback`, `prefer-object-has-own`, `radix`, `logical-assignment-operators`); `?.`/`??` by hand while a file opts into `@ts-check` (the semantics differ for falsy values) | Consistent modern code with no new dependency | About 1,800 sites; conflicts with in-flight branches | `lintJs`, `typecheckJs`, E2E |
 | **Type-check ratchet per domain folder**; the three largest scripts (mission detail, bank, order detail — 20 % of all JavaScript) split before they are checked | Null safety reaches the files that change most | Cast churn in DOM-heavy code | A folder is "migrated" only when fully checked |
-| **Finish ADR-0069**: the 70 inline script blocks (1,860 lines, never linted) move into modules; one page puts eleven `[[#{…}]]` markers into a script without `th:inline` (a likely i18n defect) | Lintable, checkable code | Timing of inline versus module code | `InlineScriptLoadOrderTest`, E2E |
+| **Finish ADR-0069**: the 70 inline script blocks (1,860 lines, never linted) move into modules; one page puts eleven `[[#{…}]]` markers into a script without `th:inline` (a likely i18n defect). **Done 2026-10-04** (ADR-0069 amendment): on that day 67 blocks with 1,645 lines remained, 55 of them already pure data bootstraps; the eleven blocks with code moved into their modules (one new, `org-unit-bank.js`), five empty error-page blocks were deleted. Every inline script is now a `th:inline="javascript"` bootstrap of literals, checked against a grammar by `InlineScriptDataOnlyTest` (planted fixture, floors of 100 templates / 55 blocks); the head's `krtEvents` stub is its one listed exception. *Correction:* the eleven-marker defect had already been fixed (B-04); what was still broken was the `'[[#{…}]]'` form inside inlined string literals on the mission-data and special-commands admin pages, which rendered the texts in quotes — fixed by the move | Lintable, checkable code | Timing of inline versus module code | `InlineScriptLoadOrderTest`, `InlineScriptDataOnlyTest`, E2E |
 | **One read path**: `krtFetch.get`/`getJson` with re-authentication, the terms gate, refusal of redirected or non-JSON answers and `AbortController`; then forbid `fetch(` outside the transport and ban `XMLHttpRequest`. **Done 2026-10-04** (REQ-FE-031): 61 raw reads in 33 scripts plus one inline read in `members.html` migrated, `swap` reads through `get` too; ESLint bans `fetch`/`XMLHttpRequest`, and `BackgroundReadGateContractTest` pins the same for templates, which ESLint never sees | 56 raw reads behave the same way on session loss | Pickers that silently emptied now send the user to the login — the intended contract | A new E2E for a picker after session loss |
-| **Trusted Types**, report-only first through the existing `csp_violation` beacon, then enforced: two named policies, a tagged-template HTML builder, no default policy | DOM-XSS becomes a browser-enforced property | Every future sink must use the helpers; under enforcement even `innerHTML = ''` throws | A violation collector in the dialog page-walk E2E |
+| **Trusted Types**, report-only first through the existing `csp_violation` beacon, then enforced: two named policies, a tagged-template HTML builder, no default policy. **Done 2026-10-04 except the production switch** (ADR-0239): `krt-html` behind the `krtHtml` builder, `krt-fragment` inside `krt-fetch.js`; 42 builder sites, 26 clears and one `DOMParser` read migrated, `escape-html.js` removed; ESLint bans every sink and policy outside the two helpers; the report-only header is the default of `APP_SECURITY_TRUSTED_TYPES` (`report` / `enforce`), with the gauge `basetool_trusted_types_mode`. **The only remaining step** is switching production to `enforce`, a production configuration change the owner approves after a quiet period (`deployment.md` → *Trusted Types: report, then enforce*) | DOM-XSS becomes a browser-enforced property | Every future sink must use the helpers; under enforcement even `innerHTML = ''` throws | A violation collector in the dialog page-walk E2E (proven by a planted violation), `:frontend:testEslintBans`, `:frontend:testTrustedTypesJs`, `TrustedTypesModeTest` |
 | **CSS** — **done 2026-10-04** (ADR-0243): lint the page stylesheets with the standard config (74 by then, not 54; 66 findings fixed without visual change); a custom-property existence test (it finds an undefined token that makes the material-demand search header transparent; B-03 was already fixed in Phase −1, and the test now also reads templates and scripts); `color-mix()` for alpha variants (120 hand-written token copies replaced, `ColourTokenCopyTest`); a z-index scale (18 `--z-*` tokens with the numbers they replaced, `ZIndexScaleTest`); container queries and nesting only where a design decision asks for them (none asked) | One lint standard; tokens as the single colour source | Visual changes | `CascadeLayerOrderTest`, screenshot review; a computed-style comparison of every touched declaration against `main` |
 | **One layout fragment** carrying head, sidebar, header and toast (83 pages copy the header in five variants) — native Thymeleaf, no Layout Dialect dependency | Chrome changes once | Touches 83–90 templates | Render tests, E2E |
 | **ES modules** only after the global-scope and inline-script work, and only behind a server-rendered import map (unversioned asset URLs are cached immutably for a year) | Explicit dependencies, lint-enforced boundaries | Import-map and nonce plumbing | Every specifier must be in the map |
@@ -1074,7 +1119,7 @@ They are fixed before the refactor starts (D-07), independently of this plan.
 | Hibernate `@Audited`, Jakarta Data repositories | Reject | Personal data outside the GDPR flow; stateless repositories do not fit the concurrency rules |
 | Generated client DTOs (openapi-generator) | Reject for production code | The generator emits mutable classes, not records, and hand mirrors are an output allow-list; generation stays in the test source set for the agreement test |
 | A JavaScript bundler | Reject | Supply-chain risk for every shipped asset; breaks "served equals checked" |
-| Trusted Types | Adopt, report-only first | No dependency; the existing CSP-violation beacon provides the report-only phase |
+| Trusted Types | Adopt, report-only first — **report-only since 2026-10-04**; enforcing in production waits for the owner | No dependency; the existing CSP-violation beacon provides the report-only phase |
 | `oasdiff` or another external API-diff tool | Reject | An unverified binary outside Gradle's dependency verification; the ingest's `SchemaCompatibility` helper generalises instead |
 
 ## 11 Previous audits re-evaluated

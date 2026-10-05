@@ -138,9 +138,9 @@ public class AdminDefaultBlueprintsPageController {
     try {
       String query = q == null ? "" : q;
       int effectiveLimit = limit == null ? 25 : Math.min(200, Math.max(1, limit));
-      String uri = "/api/v1/blueprints/products/search?q={q}&limit=" + effectiveLimit;
+      String uri = "/api/v1/blueprints/products/search?q={q}&limit={limit}";
       List<BlueprintProductDto> result =
-          backendApiClient.get(uri, BLUEPRINT_PRODUCT_LIST_TYPE, query);
+          backendApiClient.get(uri, BLUEPRINT_PRODUCT_LIST_TYPE, query, effectiveLimit);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
       log.debug(

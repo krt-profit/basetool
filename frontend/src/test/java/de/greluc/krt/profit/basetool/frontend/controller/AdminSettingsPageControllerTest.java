@@ -30,11 +30,13 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
+import de.greluc.krt.profit.basetool.frontend.settings.client.SettingsBackendClient;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ui.ConcurrentModel;
@@ -51,7 +53,16 @@ class AdminSettingsPageControllerTest {
 
   @Mock private BackendApiClient backendApiClient;
 
-  @InjectMocks private AdminSettingsPageController controller;
+  private AdminSettingsPageController controller;
+
+  @BeforeEach
+  void setUp() {
+    controller =
+        new AdminSettingsPageController(
+            new SettingsBackendClient(backendApiClient),
+            new CatalogueCacheEviction(backendApiClient),
+            null);
+  }
 
   @Test
   void updateSettings_neverTouchesTheDroppedIntakeSetting() {
@@ -68,9 +79,9 @@ class AdminSettingsPageControllerTest {
     SquadronDto first = new SquadronDto(UUID.randomUUID(), "Alpha", "AL", "", true, true, true, 0L);
     SquadronDto second = new SquadronDto(UUID.randomUUID(), "Zulu", "ZU", "", true, true, true, 0L);
     String squadronsBase = "/api/v1/squadrons?size=1000&sort=name,asc";
-    when(backendApiClient.get(eq(squadronsBase + "&page=0"), anyTypeRef()))
+    when(backendApiClient.get(eq(squadronsBase + "&page={page}"), anyTypeRef(), eq(0)))
         .thenReturn(new PageResponse<>(List.of(second), 0, 1000, 2, 2, List.of()));
-    when(backendApiClient.get(eq(squadronsBase + "&page=1"), anyTypeRef()))
+    when(backendApiClient.get(eq(squadronsBase + "&page={page}"), anyTypeRef(), eq(1)))
         .thenReturn(new PageResponse<>(List.of(first), 1, 1000, 2, 2, List.of()));
     ConcurrentModel model = new ConcurrentModel();
 

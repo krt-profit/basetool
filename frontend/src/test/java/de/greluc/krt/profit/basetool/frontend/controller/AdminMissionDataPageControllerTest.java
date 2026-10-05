@@ -61,13 +61,21 @@ class AdminMissionDataPageControllerTest {
         new PageResponse<>(squadrons, 0, 1000, squadrons.size(), 1, List.of("name,asc"));
 
     when(backendApiClient.get(
-            eq("/api/v1/job-types?size=1000&sort=name,asc&includeInactive=false&page=0"),
-            anyTypeRef()))
+            eq(
+                "/api/v1/job-types?size=1000&sort=name,asc"
+                    + "&includeInactive={includeInactive}&page={page}"),
+            anyTypeRef(),
+            eq(false),
+            eq(0)))
         .thenReturn(jobTypesPage);
 
     when(backendApiClient.get(
-            eq("/api/v1/squadrons?size=1000&sort=name,asc&includeInactive=false&page=0"),
-            anyTypeRef()))
+            eq(
+                "/api/v1/squadrons?size=1000&sort=name,asc"
+                    + "&includeInactive={includeInactive}&page={page}"),
+            anyTypeRef(),
+            eq(false),
+            eq(0)))
         .thenReturn(squadronsPage);
 
     controller.listData(false, false, false, null, model);
@@ -105,9 +113,10 @@ class AdminMissionDataPageControllerTest {
             List.of("name,asc"));
     PageResponse<Map<String, Object>> secondPage =
         new PageResponse<>(List.of(Map.of("name", "Miner")), 1, 1000, 3, 2, List.of("name,asc"));
-    String base = "/api/v1/job-types?size=1000&sort=name,asc&includeInactive=false";
-    when(backendApiClient.get(eq(base + "&page=0"), anyTypeRef())).thenReturn(firstPage);
-    when(backendApiClient.get(eq(base + "&page=1"), anyTypeRef())).thenReturn(secondPage);
+    String template =
+        "/api/v1/job-types?size=1000&sort=name,asc&includeInactive={includeInactive}&page={page}";
+    when(backendApiClient.get(eq(template), anyTypeRef(), eq(false), eq(0))).thenReturn(firstPage);
+    when(backendApiClient.get(eq(template), anyTypeRef(), eq(false), eq(1))).thenReturn(secondPage);
 
     controller.listData(false, false, false, null, model);
 
@@ -132,7 +141,10 @@ class AdminMissionDataPageControllerTest {
     PageResponse<Map<String, Object>> endlessPage =
         new PageResponse<>(
             List.of(Map.of("name", "Row")), 0, 1000, reportedPages, reportedPages, List.of());
-    when(backendApiClient.get(org.mockito.ArgumentMatchers.anyString(), anyTypeRef()))
+    when(backendApiClient.get(
+            org.mockito.ArgumentMatchers.anyString(),
+            anyTypeRef(),
+            org.mockito.ArgumentMatchers.any(Object[].class)))
         .thenReturn(endlessPage);
 
     controller.listData(false, false, false, null, model);

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
@@ -89,9 +90,30 @@ class RefineryOrdersListPatternRenderTest {
    */
   private @NotNull String render(
       @NotNull PageResponse<RefineryOrderListDto> page, @NotNull String query) throws Exception {
+    stubLists(page);
+    return perform(query);
+  }
+
+  /**
+   * Stubs every list call to return {@code page}, except a ready call, which gets the ready order.
+   *
+   * @param page the page every non-ready list call returns
+   */
+  private void stubLists(@NotNull PageResponse<RefineryOrderListDto> page) {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
-    when(backendApiClient.get(contains("ready=true"), anyTypeRef()))
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
+    when(backendApiClient.get(contains("ready=true"), anyTypeRef(), any(Object[].class)))
         .thenReturn(onlyOrder(order(READY_ID, 120, 60, "Quantanium-Erz", "Quantanium")));
+  }
+
+  /**
+   * Renders {@code /refinery-orders} in German as the viewer against the stubs already in place.
+   *
+   * @param query the query string, without {@code ?}
+   * @return the rendered HTML
+   * @throws Exception if the request fails
+   */
+  private @NotNull String perform(@NotNull String query) throws Exception {
     MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     return mockMvc
         .perform(
@@ -253,33 +275,29 @@ class RefineryOrdersListPatternRenderTest {
   void runningSegmentFetchesOnePageByEndAndCountsWithOneRowRequests() throws Exception {
     render(twoOpenOrders(), "");
 
+    String running =
+        "/api/v1/refinery-orders/all?page={page}&size={size}&sort=endsAt,asc"
+            + "&status=OPEN,IN_PROGRESS";
+    verify(backendApiClient).get(eq(running), anyTypeRef(), eq(0), eq(50));
+    verify(backendApiClient).get(eq(running), anyTypeRef(), eq(0), eq(1));
+    verify(backendApiClient).get(eq(running + "&ready=true"), anyTypeRef(), eq(0), eq(1));
     verify(backendApiClient)
         .get(
             eq(
-                "/api/v1/refinery-orders/all?page=0&size=50&sort=endsAt,asc"
-                    + "&status=OPEN,IN_PROGRESS"),
-            anyTypeRef());
-    verify(backendApiClient)
-        .get(
-            eq("/api/v1/refinery-orders/all?page=0&size=1&sort=endsAt,asc&status=OPEN,IN_PROGRESS"),
-            anyTypeRef());
-    verify(backendApiClient)
-        .get(
-            eq(
-                "/api/v1/refinery-orders/all?page=0&size=1&sort=endsAt,asc"
-                    + "&status=OPEN,IN_PROGRESS&ready=true"),
-            anyTypeRef());
-    verify(backendApiClient)
-        .get(
-            eq("/api/v1/refinery-orders/all?page=0&size=1&sort=startedAt,desc&status=COMPLETED"),
-            anyTypeRef());
+                "/api/v1/refinery-orders/all?page={page}&size={size}&sort=startedAt,desc"
+                    + "&status=COMPLETED"),
+            anyTypeRef(),
+            eq(0),
+            eq(1));
     verify(backendApiClient)
         .get(
             eq(
-                "/api/v1/refinery-orders/all?page=0&size=1&sort=startedAt,desc"
+                "/api/v1/refinery-orders/all?page={page}&size={size}&sort=startedAt,desc"
                     + "&status=OPEN,IN_PROGRESS,COMPLETED,CANCELED"),
-            anyTypeRef());
-    verify(backendApiClient, never()).get(contains("size=1000"), anyTypeRef());
+            anyTypeRef(),
+            eq(0),
+            eq(1));
+    verify(backendApiClient, never()).get(anyString(), anyTypeRef(), any(), eq(1000));
   }
 
   /** The ready segment asks the backend for the ready orders of the requested page and size. */
@@ -294,26 +312,31 @@ class RefineryOrdersListPatternRenderTest {
     verify(backendApiClient)
         .get(
             eq(
-                "/api/v1/refinery-orders/all?page=1&size=10&sort=endsAt,asc"
+                "/api/v1/refinery-orders/all?page={page}&size={size}&sort=endsAt,asc"
                     + "&status=OPEN,IN_PROGRESS&ready=true"),
-            anyTypeRef());
+            anyTypeRef(),
+            eq(1),
+            eq(10));
   }
 
   /** The search is passed to the backend as {@code q} and the rows are its answer. */
   @Test
   void searchIsPassedToTheBackend() throws Exception {
-    when(backendApiClient.get(contains("&q={q}"), anyTypeRef(), eq("taranite")))
+    stubLists(twoOpenOrders());
+    when(backendApiClient.get(contains("&q={q}"), anyTypeRef(), eq(0), eq(50), eq("taranite")))
         .thenReturn(onlyOrder(order(RUNNING_ID, 10, 200, "Taranite-Erz", "Taranite")));
 
-    String html = render(twoOpenOrders(), "view=COMPLETED&onlyMine=true&q=taranite");
+    String html = perform("view=COMPLETED&onlyMine=true&q=taranite");
 
     assertThat(html).contains("#1051").doesNotContain("#1042");
     verify(backendApiClient)
         .get(
             eq(
-                "/api/v1/refinery-orders/my-orders?page=0&size=50&sort=startedAt,desc"
+                "/api/v1/refinery-orders/my-orders?page={page}&size={size}&sort=startedAt,desc"
                     + "&status=COMPLETED&q={q}"),
             anyTypeRef(),
+            eq(0),
+            eq(50),
             eq("taranite"));
   }
 
@@ -323,7 +346,8 @@ class RefineryOrdersListPatternRenderTest {
     String html = render(new PageResponse<>(List.of(), 0, 50, 0L, 0, List.of()), "status=CANCELED");
 
     assertThat(html).containsPattern("name=\"view\" value=\"ALL\" checked=\"checked\"");
-    verify(backendApiClient, atLeastOnce()).get(contains("&status=CANCELED"), anyTypeRef());
+    verify(backendApiClient, atLeastOnce())
+        .get(contains("&status=CANCELED"), anyTypeRef(), any(Object[].class));
   }
 
   /** An empty segment shows the empty state, not a table. */

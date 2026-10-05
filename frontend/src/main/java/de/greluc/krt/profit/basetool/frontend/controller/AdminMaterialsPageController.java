@@ -96,8 +96,9 @@ public class AdminMaterialsPageController {
           CatalogPages.fetchAll(
               page ->
                   backendApiClient.get(
-                      "/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page=" + page,
-                      MATERIAL_PAGE_TYPE));
+                      "/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page={page}",
+                      MATERIAL_PAGE_TYPE,
+                      page));
       List<MaterialDto> materials = new ArrayList<>(materialsCatalog.items());
       model.addAttribute("catalogTruncated", materialsCatalog.truncated());
 
@@ -245,7 +246,7 @@ public class AdminMaterialsPageController {
       @PathVariable @NotNull UUID id, @Valid @RequestBody MaterialUpdateAjaxRequest request) {
     try {
       MaterialDto currentMaterial =
-          backendApiClient.get("/api/v1/materials/" + id, MaterialDto.class);
+          backendApiClient.get("/api/v1/materials/{id}", MaterialDto.class, id);
 
       MaterialCategoryDto category = currentMaterial.category();
       MaterialDto refinedMaterial = currentMaterial.refinedMaterial();
@@ -258,7 +259,9 @@ public class AdminMaterialsPageController {
         if (request.categoryId() != null) {
           category =
               backendApiClient.get(
-                  "/api/v1/material-categories/" + request.categoryId(), MaterialCategoryDto.class);
+                  "/api/v1/material-categories/{id}",
+                  MaterialCategoryDto.class,
+                  request.categoryId());
         } else {
           category = null;
         }
@@ -266,7 +269,7 @@ public class AdminMaterialsPageController {
         if (request.refinedMaterialId() != null) {
           refinedMaterial =
               backendApiClient.get(
-                  "/api/v1/materials/" + request.refinedMaterialId(), MaterialDto.class);
+                  "/api/v1/materials/{id}", MaterialDto.class, request.refinedMaterialId());
         } else {
           refinedMaterial = null;
         }
@@ -303,7 +306,7 @@ public class AdminMaterialsPageController {
       backendApiClient.put("/api/v1/materials/{id}", body, Void.class, id);
       backendApiClient.evict(CacheDomain.MATERIAL);
       MaterialDto updatedMaterial =
-          backendApiClient.get("/api/v1/materials/" + id, MaterialDto.class);
+          backendApiClient.get("/api/v1/materials/{id}", MaterialDto.class, id);
       return ResponseEntity.ok(updatedMaterial);
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "PUT /api/v1/materials", id, e);

@@ -543,7 +543,7 @@ public class MaterialboersePageController {
     }
     try {
       return backendApiClient.get(
-          "/api/v1/material-exchange/offers/" + offerId, MaterialExchangeOfferDto.class);
+          "/api/v1/material-exchange/offers/{id}", MaterialExchangeOfferDto.class, offerId);
     } catch (BackendServiceException e) {
       log.debug("Failed to load Materialbörse offer {}", offerId, e);
       return null;
@@ -633,7 +633,7 @@ public class MaterialboersePageController {
     }
     try {
       return backendApiClient.get(
-          "/api/v1/material-requests/" + requestId, MaterialRequestDto.class);
+          "/api/v1/material-requests/{id}", MaterialRequestDto.class, requestId);
     } catch (BackendServiceException e) {
       log.debug("Failed to load Materialbörse request {}", requestId, e);
       return null;

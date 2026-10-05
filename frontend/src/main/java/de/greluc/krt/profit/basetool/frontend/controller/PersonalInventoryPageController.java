@@ -370,8 +370,9 @@ public class PersonalInventoryPageController {
     try {
       String query = q == null ? "" : q;
       int effectiveLimit = limit == null ? 25 : Math.min(2000, Math.max(1, limit));
-      String uri = "/api/v1/uex/locations/search?q={q}&limit=" + effectiveLimit;
-      List<UexLocationDto> result = backendApiClient.get(uri, UEX_LOCATION_LIST_TYPE, query);
+      String uri = "/api/v1/uex/locations/search?q={q}&limit={limit}";
+      List<UexLocationDto> result =
+          backendApiClient.get(uri, UEX_LOCATION_LIST_TYPE, query, effectiveLimit);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
       log.debug(
@@ -400,11 +401,13 @@ public class PersonalInventoryPageController {
       String q, Integer page, Integer size, String sort) {
     try {
       StringBuilder uri = new StringBuilder("/api/v1/personal-inventory?");
-      if (page != null) {
-        uri.append("page=").append(page).append('&');
-      }
-      uri.append("size=").append(size == null ? 50 : size);
       List<Object> variables = new ArrayList<>();
+      if (page != null) {
+        uri.append("page={page}&");
+        variables.add(page);
+      }
+      uri.append("size={size}");
+      variables.add(size == null ? 50 : size);
       String safeSort = RelayParams.sortSpecOrNull(sort);
       if (safeSort != null) {
         uri.append("&sort={sort}");
@@ -413,9 +416,6 @@ public class PersonalInventoryPageController {
       if (q != null && !q.isBlank()) {
         uri.append("&q={q}");
         variables.add(q);
-      }
-      if (variables.isEmpty()) {
-        return backendApiClient.get(uri.toString(), PERSONAL_INVENTORY_ITEM_PAGE_TYPE);
       }
       return backendApiClient.get(
           uri.toString(), PERSONAL_INVENTORY_ITEM_PAGE_TYPE, variables.toArray());

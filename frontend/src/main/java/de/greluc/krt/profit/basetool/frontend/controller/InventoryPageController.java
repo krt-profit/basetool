@@ -240,11 +240,14 @@ public class InventoryPageController {
     List<AggregatedInventoryDto> aggregated = new ArrayList<>();
     try {
       StringBuilder uri = new StringBuilder("/api/v1/inventory/aggregated?");
+      List<Object> uriVariables = new ArrayList<>();
       if (page != null) {
-        uri.append("page=").append(page).append("&");
+        uri.append("page={page}&");
+        uriVariables.add(page);
       }
       if (size != null) {
-        uri.append("size=").append(size).append("&");
+        uri.append("size={size}&");
+        uriVariables.add(size);
       }
       if (itemsView) {
         uri.append("catalog=ITEM");
@@ -253,7 +256,7 @@ public class InventoryPageController {
       }
 
       PageResponse<AggregatedInventoryDto> p =
-          backendApiClient.get(uri.toString(), AGGREGATED_INVENTORY_PAGE);
+          backendApiClient.get(uri.toString(), AGGREGATED_INVENTORY_PAGE, uriVariables.toArray());
       if (p != null) {
         if (p.content() != null) {
           aggregated = new ArrayList<>(p.content());
@@ -317,8 +320,7 @@ public class InventoryPageController {
     List<InventoryItemDto> items = new ArrayList<>();
     try {
       PageResponse<InventoryItemDto> p =
-          fetchDrilldownPage(
-              "/api/v1/inventory/material/" + materialId, effectivePage, effectiveSize);
+          fetchDrilldownPage(false, materialId, effectivePage, effectiveSize);
       if (p != null) {
         if (p.content() != null) {
           items = new ArrayList<>(p.content());
@@ -403,8 +405,7 @@ public class InventoryPageController {
     List<InventoryItemDto> items = new ArrayList<>();
     try {
       PageResponse<InventoryItemDto> p =
-          fetchDrilldownPage(
-              "/api/v1/inventory/game-item/" + gameItemId, effectivePage, effectiveSize);
+          fetchDrilldownPage(true, gameItemId, effectivePage, effectiveSize);
       if (p != null) {
         if (p.content() != null) {
           items = new ArrayList<>(p.content());
@@ -439,24 +440,26 @@ public class InventoryPageController {
    * Fetches one page of a drilldown's rows, re-fetching the last page once when the requested page
    * lies past the end of a non-empty result (REQ-INV-033).
    *
-   * @param baseUri the drilldown backend URI without the {@code ?page/size} query
+   * @param gameItem {@code true} for the game-item drilldown, {@code false} for the material one
+   * @param id the drilled-into material or game item
    * @param requestedPage the caller's non-negative page index
    * @param size the whitelisted page size
    * @return the resolved page, or {@code null} when the backend yields no page
    */
   private PageResponse<InventoryItemDto> fetchDrilldownPage(
-      @NotNull String baseUri, int requestedPage, int size) {
+      boolean gameItem, @NotNull UUID id, int requestedPage, int size) {
+    String uri =
+        gameItem
+            ? "/api/v1/inventory/game-item/{id}?page={page}&size={size}"
+            : "/api/v1/inventory/material/{id}?page={page}&size={size}";
     PageResponse<InventoryItemDto> p =
-        backendApiClient.get(
-            baseUri + "?page=" + requestedPage + "&size=" + size, INVENTORY_ITEM_PAGE);
+        backendApiClient.get(uri, INVENTORY_ITEM_PAGE, id, requestedPage, size);
     if (p != null
         && p.totalElements() > 0
         && requestedPage > 0
         && requestedPage >= p.totalPages()) {
       int lastPage = p.totalPages() - 1;
-      p =
-          backendApiClient.get(
-              baseUri + "?page=" + lastPage + "&size=" + size, INVENTORY_ITEM_PAGE);
+      p = backendApiClient.get(uri, INVENTORY_ITEM_PAGE, id, lastPage, size);
     }
     return p;
   }
@@ -1592,8 +1595,9 @@ public class InventoryPageController {
     }
     try {
       return backendApiClient.get(
-          "/api/v1/users/" + form.getUserId(),
-          de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class);
+          "/api/v1/users/{id}",
+          de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class,
+          form.getUserId());
     } catch (Exception e) {
       log.warn(
           "Failed to resolve selected user {} for inventory-input picker seed",
@@ -1615,8 +1619,9 @@ public class InventoryPageController {
       try {
         List<OrgUnitMembershipOptionDto> options =
             backendApiClient.get(
-                "/api/v1/users/" + form.getUserId() + "/memberships?allKinds=true",
-                ORG_UNIT_MEMBERSHIP_OPTION_LIST);
+                "/api/v1/users/{id}/memberships?allKinds=true",
+                ORG_UNIT_MEMBERSHIP_OPTION_LIST,
+                form.getUserId());
         return options != null ? options : List.of();
       } catch (Exception e) {
         log.warn("Failed to fetch memberships for owner-picker", e);

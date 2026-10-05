@@ -104,7 +104,8 @@ public class BankGrantsPageController {
     if (!byEmployee && accountId != null) {
       try {
         BankAccountDetailDto detail =
-            backendApiClient.get("/api/v1/bank/accounts/" + accountId, BankAccountDetailDto.class);
+            backendApiClient.get(
+                "/api/v1/bank/accounts/{id}", BankAccountDetailDto.class, accountId);
         selectedAccount = detail == null ? null : detail.account();
       } catch (RuntimeException e) {
         log.debug("Could not resolve selected grant-filter account {} for seeding", accountId, e);

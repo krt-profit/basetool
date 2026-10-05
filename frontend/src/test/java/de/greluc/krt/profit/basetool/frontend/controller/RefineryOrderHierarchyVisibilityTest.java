@@ -85,7 +85,8 @@ class RefineryOrderHierarchyVisibilityTest {
             1L,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
+    when(backendApiClient.get(
+            eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(orderId)))
         .thenReturn(order);
     when(backendApiClient.get(
             eq("/api/v1/settings/refinery.rounding.mode"), eq(SystemSettingDto.class)))
@@ -149,7 +150,8 @@ class RefineryOrderHierarchyVisibilityTest {
             1L,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
+    when(backendApiClient.get(
+            eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(orderId)))
         .thenReturn(order);
     when(backendApiClient.get(
             eq("/api/v1/settings/refinery.rounding.mode"), eq(SystemSettingDto.class)))
@@ -223,7 +225,8 @@ class RefineryOrderHierarchyVisibilityTest {
             1L,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
+    when(backendApiClient.get(
+            eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(orderId)))
         .thenReturn(order);
     when(backendApiClient.get(
             eq("/api/v1/settings/refinery.rounding.mode"), eq(SystemSettingDto.class)))

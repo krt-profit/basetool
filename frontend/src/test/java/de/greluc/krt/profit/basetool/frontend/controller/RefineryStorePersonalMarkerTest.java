@@ -164,7 +164,8 @@ class RefineryStorePersonalMarkerTest {
             null,
             1L,
             null);
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
+    when(backendApiClient.get(
+            eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(orderId)))
         .thenReturn(order);
 
     String html =

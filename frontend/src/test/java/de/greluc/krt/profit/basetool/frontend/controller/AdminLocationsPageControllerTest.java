@@ -59,7 +59,7 @@ class AdminLocationsPageControllerTest {
   void toggleHomeLocation_readsCurrentAndPutsFlippedFlag_preservingOtherFields() {
     UUID id = UUID.randomUUID();
     LocationDto current = new LocationDto(id, "Lorville", "Hurston city", false, false, 2L);
-    when(backendApiClient.get("/api/v1/locations/" + id, LocationDto.class)).thenReturn(current);
+    when(backendApiClient.get("/api/v1/locations/{id}", LocationDto.class, id)).thenReturn(current);
 
     String view = controller.toggleHomeLocation(id, true, new RedirectAttributesModelMap());
 
@@ -81,10 +81,10 @@ class AdminLocationsPageControllerTest {
         new LocationDto(UUID.randomUUID(), "Port Olisar", "Crusader station", false, false, 0L);
     LocationDto area18 =
         new LocationDto(UUID.randomUUID(), "Area18", "ArcCorp city", false, true, 0L);
-    String base = "/api/v1/locations?size=1000&sort=name,asc&includeHidden=true";
-    when(backendApiClient.get(eq(base + "&page=0"), anyTypeRef()))
+    String template = "/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page={page}";
+    when(backendApiClient.get(eq(template), anyTypeRef(), eq(0)))
         .thenReturn(new PageResponse<>(List.of(portOlisar), 0, 1000, 2, 2, List.of("name,asc")));
-    when(backendApiClient.get(eq(base + "&page=1"), anyTypeRef()))
+    when(backendApiClient.get(eq(template), anyTypeRef(), eq(1)))
         .thenReturn(new PageResponse<>(List.of(area18), 1, 1000, 2, 2, List.of("name,asc")));
     ConcurrentModel model = new ConcurrentModel();
 
@@ -103,7 +103,7 @@ class AdminLocationsPageControllerTest {
   void toggleLocationVisibilityAjax_evictsLocationDomainAfterWrite() {
     UUID id = UUID.randomUUID();
     LocationDto current = new LocationDto(id, "Area18", "ArcCorp city", false, false, 4L);
-    when(backendApiClient.get("/api/v1/locations/" + id, LocationDto.class)).thenReturn(current);
+    when(backendApiClient.get("/api/v1/locations/{id}", LocationDto.class, id)).thenReturn(current);
 
     controller.toggleLocationVisibilityAjax(id);
 

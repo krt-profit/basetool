@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, labelPiece, labelScu, scuHintText, labelMenge, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_OWNER, MSG_LOCATION, MSG_STOLEN, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_BELOW_FLOOR, MSG_INVENTORY_PART_OF, MSG_PRODUCTION_COUNTED_HIGHER, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, PRODUCTION_I18N, ORDER_HANDOVER_I18N */
+/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, labelPiece, labelScu, scuHintText, labelMenge, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_OWNER, MSG_LOCATION, MSG_STOLEN, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_LOAD_ERROR, MSG_INVENTORY_BELOW_FLOOR, MSG_INVENTORY_PART_OF, MSG_PRODUCTION_COUNTED_HIGHER, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, PRODUCTION_I18N, ORDER_HANDOVER_I18N */
 
 let cachedInventoryItems = [];
 let isInventoryCached = false;
@@ -338,7 +338,9 @@ function addHandoverItemRow() {
     row.style.padding = '1rem';
     row.style.border = '1px solid var(--color-gray-3)';
 
-    let options = `<option value="" disabled selected>${escapeHtml(ORDER_HANDOVER_I18N.choose)}</option>`;
+    const options = [
+        krtHtml`<option value="" disabled selected>${ORDER_HANDOVER_I18N.choose}</option>`,
+    ];
     cachedInventoryItems.forEach((inv) => {
         const isPiece = inv.material && inv.material.quantityType === 'PIECE';
         const qtyLabel = isPiece ? labelPiece : labelScu;
@@ -353,28 +355,31 @@ function addHandoverItemRow() {
                 qtyLabel,
                 userName,
             ]) + (inv.stolen ? ` · ${MSG_STOLEN}` : '');
-        options += `<option value="${escapeAttr(inv.id)}">${escapeHtml(optionLabel)}</option>`;
+        options.push(krtHtml`<option value="${inv.id}">${optionLabel}</option>`);
     });
 
-    row.innerHTML = `
+    krtHtml.set(
+        row,
+        krtHtml`
             <div>
-                <label class="form-label-sm">${escapeHtml(ORDER_HANDOVER_I18N.entry)}</label>
-                <select name="items[${escapeAttr(index)}].inventoryItemId" required class="w-full">
+                <label class="form-label-sm">${ORDER_HANDOVER_I18N.entry}</label>
+                <select name="items[${index}].inventoryItemId" required class="w-full">
                     ${options}
                 </select>
             </div>
             <div>
-                <label class="form-label-sm">${escapeHtml(labelMenge)} <span data-role="amount-unit"></span> <span class="scu-hint is-hidden" data-role="scu-hint" tabindex="0" role="img" aria-label="${escapeAttr(scuHintText)}"><span aria-hidden="true">?</span><span class="scu-hint__bubble" aria-hidden="true">${escapeHtml(scuHintText)}</span></span></label>
-                <input type="text" inputmode="decimal" data-scu-decimal step="0.001" name="items[${escapeAttr(index)}].amount" min="0.001" required class="w-full">
+                <label class="form-label-sm">${labelMenge} <span data-role="amount-unit"></span> <span class="scu-hint is-hidden" data-role="scu-hint" tabindex="0" role="img" aria-label="${scuHintText}"><span aria-hidden="true">?</span><span class="scu-hint__bubble" aria-hidden="true">${scuHintText}</span></span></label>
+                <input type="text" inputmode="decimal" data-scu-decimal step="0.001" name="items[${index}].amount" min="0.001" required class="w-full">
             </div>
             <div data-role="handover-tier-holder" class="is-hidden">
-                <label class="form-label-sm">${escapeHtml(ORDER_HANDOVER_I18N.tier)}</label>
+                <label class="form-label-sm">${ORDER_HANDOVER_I18N.tier}</label>
                 <select data-role="handover-tier" class="w-full" data-testid="handover-tier"></select>
             </div>
             <div>
-                <button type="button" class="btn btn-quiet-danger btn-icon od-remove-btn" data-trigger="od-remove-handover-row" title="${escapeAttr(ORDER_HANDOVER_I18N.remove)}" aria-label="${escapeAttr(ORDER_HANDOVER_I18N.remove)}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                <button type="button" class="btn btn-quiet-danger btn-icon od-remove-btn" data-trigger="od-remove-handover-row" title="${ORDER_HANDOVER_I18N.remove}" aria-label="${ORDER_HANDOVER_I18N.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
             </div>
-        `;
+        `,
+    );
     const sel = row.querySelector('select');
     const amtInput = row.querySelector('input[data-scu-decimal]');
     if (sel && amtInput) {
@@ -622,7 +627,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     cachedInventoryItems = [];
                     handoverTierSuggestion = new Map();
                     const itemsContainer = document.getElementById('handover-items-container');
-                    if (itemsContainer) itemsContainer.innerHTML = '';
+                    if (itemsContainer) itemsContainer.replaceChildren();
                     showFrontendSuccessToast(MSG_HANDOVER_SUCCESS);
                     _refreshMaterialsSection(orderId);
                     _swapOrderSection(orderId, 'order-handovers-results', 'handovers');
@@ -1513,15 +1518,6 @@ async function toggleInventory(row) {
     const orderId = row.getAttribute('data-order-id');
     const materialId = row.getAttribute('data-material-id');
     const amountType = row.getAttribute('data-amount-type');
-    /** @type {string} */
-    let html;
-    let unlinkColHeader = '';
-    /** @type {string} */
-    let squadronCell;
-    /** @type {string} */
-    let unlinkCell;
-    /** @type {string} */
-    let stolenChip;
 
     const nextRow = row.nextElementSibling;
     if (nextRow && nextRow.classList.contains('inventory-details-row')) {
@@ -1531,11 +1527,14 @@ async function toggleInventory(row) {
 
     const detailsRow = document.createElement('tr');
     detailsRow.classList.add('inventory-details-row');
-    detailsRow.innerHTML = `
+    krtHtml.set(
+        detailsRow,
+        krtHtml`
             <td colspan="5" class="od-inv-cell">
-                <div class="od-inv-note">${escapeHtml(MSG_LOADING_INVENTORY)}</div>
+                <div class="od-inv-note">${MSG_LOADING_INVENTORY}</div>
             </td>
-        `;
+        `,
+    );
     row.parentNode.insertBefore(detailsRow, row.nextSibling);
 
     try {
@@ -1555,41 +1554,29 @@ async function toggleInventory(row) {
             : allItems;
 
         if (items.length === 0) {
-            detailsRow.innerHTML = `
+            krtHtml.set(
+                detailsRow,
+                krtHtml`
                     <td colspan="5" class="od-inv-cell">
-                        <div class="od-inv-note">${escapeHtml(MSG_EMPTY_INVENTORY)}</div>
+                        <div class="od-inv-note">${MSG_EMPTY_INVENTORY}</div>
                     </td>
-                `;
+                `,
+            );
             return;
         }
 
-        if (IS_LOGISTICIAN) unlinkColHeader = `<th class="od-inv-th"></th>`;
+        const unlinkColHeader = IS_LOGISTICIAN ? krtHtml`<th class="od-inv-th"></th>` : '';
         const subColspan = IS_LOGISTICIAN ? 7 : 6;
 
-        html = `
-                <td colspan="${escapeAttr(subColspan)}" class="p-0">
-                    <div class="od-inv-panel">
-                        <div class="table-responsive">
-                            <table class="data-table od-inv-table">
-                                <thead>
-                                    <tr>
-                                        <th class="od-inv-th">${escapeHtml(MSG_OWNER)}</th>
-                                        <th class="od-inv-th">${escapeHtml(MSG_SQUADRON)}</th>
-                                        <th class="od-inv-th">${escapeHtml(MSG_LOCATION)}</th>
-                                        <th class="od-inv-th">${escapeHtml(MSG_QUALITY)}</th>
-                                        <th class="od-inv-th">${escapeHtml(MSG_QUANTITY)}</th>
-                                        ${unlinkColHeader}
-                                    </tr>
-                                </thead>
-                                <tbody>
-            `;
-
-        for (const item of items) {
+        const rows = items.map((/** @type {any} */ item) => {
             const ownerName = item.user ? item.user.effectiveName : '-';
             const locationName = item.location ? item.location.name : '-';
-            stolenChip = '';
+            /** @type {KrtHtml[]} */
+            const chips = [];
             if (item.stolen) {
-                stolenChip = ` <span class="chip chip--danger chip-xs" data-testid="stolen-chip">${escapeHtml(MSG_STOLEN)}</span>`;
+                chips.push(
+                    krtHtml` <span class="chip chip--danger chip-xs" data-testid="stolen-chip">${MSG_STOLEN}</span>`,
+                );
             }
             const quality = item.quality !== null ? item.quality : '-';
             const unit = amountType ? amountType : '';
@@ -1603,7 +1590,9 @@ async function toggleInventory(row) {
                 ).replace('{1}', `${total} ${unit}`);
             }
             if (attribution && counted === undefined && attribution.unattributed.has(item.id)) {
-                stolenChip += ` <span class="chip chip-xs" data-testid="below-floor-chip">${escapeHtml(MSG_INVENTORY_BELOW_FLOOR)}</span>`;
+                chips.push(
+                    krtHtml` <span class="chip chip-xs" data-testid="below-floor-chip">${MSG_INVENTORY_BELOW_FLOOR}</span>`,
+                );
             }
             const itemSquadron = item.owningSquadron || null;
             const itemSquadronId = itemSquadron ? itemSquadron.id : null;
@@ -1617,50 +1606,68 @@ async function toggleInventory(row) {
             const squadronBadgeClass = isForeignSquadron
                 ? 'squadron-badge squadron-badge-foreign'
                 : 'squadron-badge';
-            squadronCell = `<span class="squadron-badge squadron-badge-muted">&mdash;</span>`;
-            if (itemSquadronShorthand) {
-                squadronCell = `<span class="${escapeAttr(squadronBadgeClass)}" title="${escapeAttr(itemSquadronName)}">${escapeHtml(itemSquadronShorthand)}</span>`;
-            }
-            unlinkCell = '';
-            if (IS_LOGISTICIAN) {
-                unlinkCell = `
+            const squadronCell = itemSquadronShorthand
+                ? krtHtml`<span class="${squadronBadgeClass}" title="${itemSquadronName}">${itemSquadronShorthand}</span>`
+                : krtHtml`<span class="squadron-badge squadron-badge-muted">&mdash;</span>`;
+            const unlinkCell = IS_LOGISTICIAN
+                ? krtHtml`
                                         <td data-trigger="stop-propagation">
                                             <button type="button" class="btn btn-quiet-danger od-inv-unlink-btn"
                                                     data-trigger="od-unlink-inventory"
-                                                    data-order-id="${escapeAttr(orderId)}"
-                                                    data-inventory-item-id="${escapeAttr(item.id)}"
-                                                    title="${escapeAttr(MSG_INVENTORY_UNLINK_TOOLTIP)}">&times;</button>
-                                        </td>`;
-            }
+                                                    data-order-id="${orderId}"
+                                                    data-inventory-item-id="${item.id}"
+                                                    title="${MSG_INVENTORY_UNLINK_TOOLTIP}">&times;</button>
+                                        </td>`
+                : '';
 
-            html += `
-                                    <tr class="${escapeAttr(rowClass)}">
-                                        <td>${escapeHtml(ownerName)}</td>
+            return krtHtml`
+                                    <tr class="${rowClass}">
+                                        <td>${ownerName}</td>
                                         <td>${squadronCell}</td>
-                                        <td>${escapeHtml(locationName)}${stolenChip}</td>
-                                        <td>${escapeHtml(quality)}</td>
-                                        <td>${escapeHtml(quantity)}</td>
+                                        <td>${locationName}${chips}</td>
+                                        <td>${quality}</td>
+                                        <td>${quantity}</td>
                                         ${unlinkCell}
                                     </tr>
                 `;
-        }
+        });
 
-        html += `
+        krtHtml.set(
+            detailsRow,
+            krtHtml`
+                <td colspan="${subColspan}" class="p-0">
+                    <div class="od-inv-panel">
+                        <div class="table-responsive">
+                            <table class="data-table od-inv-table">
+                                <thead>
+                                    <tr>
+                                        <th class="od-inv-th">${MSG_OWNER}</th>
+                                        <th class="od-inv-th">${MSG_SQUADRON}</th>
+                                        <th class="od-inv-th">${MSG_LOCATION}</th>
+                                        <th class="od-inv-th">${MSG_QUALITY}</th>
+                                        <th class="od-inv-th">${MSG_QUANTITY}</th>
+                                        ${unlinkColHeader}
+                                    </tr>
+                                </thead>
+                                <tbody>
+            ${rows}
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 </td>
-            `;
-
-        detailsRow.innerHTML = html;
+            `,
+        );
     } catch (error) {
         console.error('Error fetching inventory items:', error);
-        detailsRow.innerHTML = `
+        krtHtml.set(
+            detailsRow,
+            krtHtml`
                 <td colspan="5" class="od-inv-cell">
-                    <div class="text-danger">Fehler beim Laden der Lagereinträge.</div>
+                    <div class="text-danger">${window.krtI18nText(MSG_INVENTORY_LOAD_ERROR, 'MSG_INVENTORY_LOAD_ERROR')}</div>
                 </td>
-            `;
+            `,
+        );
     }
 }
 
@@ -1894,7 +1901,7 @@ function openProductionModal(button) {
 
     const container = document.getElementById('production-materials');
     if (container) {
-        container.innerHTML = '';
+        container.replaceChildren();
     }
 
     _prodResetBookIn();
@@ -1935,18 +1942,18 @@ function openProductionModal(button) {
         const card = document.createElement('div');
         card.className = 'card card--inset mb-1';
         card.setAttribute('data-prod-material', mat.materialId);
-        card.innerHTML =
-            `<div class="card-head"><h3 class="card-title">${escapeHtml(
-                mat.materialName,
-            )}</h3><span class="chip chip--muted" data-prod-chip></span></div>` +
-            `<label class="od-prod-skip" title="${escapeHtml(
-                PRODUCTION_I18N.skipHint,
-            )}"><input type="checkbox" data-prod-skip> ${escapeHtml(
-                PRODUCTION_I18N.skipLabel,
-            )}</label>` +
-            `<div data-prod-entries><p class="text-muted">${escapeHtml(
-                PRODUCTION_I18N.loadingStock,
-            )}</p></div>`;
+        krtHtml.set(
+            card,
+            krtHtml`<div class="card-head"><h3 class="card-title">${
+                mat.materialName
+            }</h3><span class="chip chip--muted" data-prod-chip></span></div><label class="od-prod-skip" title="${
+                PRODUCTION_I18N.skipHint
+            }"><input type="checkbox" data-prod-skip> ${
+                PRODUCTION_I18N.skipLabel
+            }</label><div data-prod-entries><p class="text-muted">${
+                PRODUCTION_I18N.loadingStock
+            }</p></div>`,
+        );
         const title = card.querySelector('.card-title');
         if (mat.floor > 0 && title) {
             const badge = document.createElement('span');
@@ -2018,38 +2025,40 @@ function _renderProdMaterialEntries(card, mat) {
         return;
     }
     if (mat.entries.length === 0) {
-        entriesEl.innerHTML = `<p class="text-muted">${escapeHtml(PRODUCTION_I18N.noStock)}</p>`;
+        krtHtml.set(entriesEl, krtHtml`<p class="text-muted">${PRODUCTION_I18N.noStock}</p>`);
         return;
     }
-    let html = '';
-    mat.entries.forEach((e, idx) => {
+    const html = mat.entries.map((e, idx) => {
         const cap = Math.min(e.slice, e.stock);
-        let stolenChip = '';
+        /** @type {KrtHtml[]} */
+        const chips = [];
         if (e.stolen) {
-            stolenChip = ` <span class="chip chip--danger chip-xs">${escapeHtml(MSG_STOLEN)}</span>`;
+            chips.push(krtHtml` <span class="chip chip--danger chip-xs">${MSG_STOLEN}</span>`);
         }
         const higher = mat.countedHigher ? mat.countedHigher.get(e.inventoryItemId) : null;
         if (higher && !e.belowFloor) {
-            stolenChip += ` <span class="chip chip--warning chip-xs" data-testid="prod-counted-higher">${escapeHtml(
-                MSG_PRODUCTION_COUNTED_HIGHER.replace('{0}', higher),
-            )}</span>`;
+            chips.push(
+                krtHtml` <span class="chip chip--warning chip-xs" data-testid="prod-counted-higher">${MSG_PRODUCTION_COUNTED_HIGHER.replace(
+                    '{0}',
+                    higher,
+                )}</span>`,
+            );
         }
         if (e.belowFloor) {
-            stolenChip += ` <span class="chip chip-xs" data-testid="prod-below-floor">${escapeHtml(
-                MSG_INVENTORY_BELOW_FLOOR,
-            )}</span>`;
+            chips.push(
+                krtHtml` <span class="chip chip-xs" data-testid="prod-below-floor">${MSG_INVENTORY_BELOW_FLOOR}</span>`,
+            );
         }
-        html += `<div class="od-prod-entry"><div class="od-prod-src">${escapeHtml(
-            e.ownerName,
-        )} · ${escapeHtml(String(e.location))}${stolenChip} <small>${escapeHtml(
-            MSG_QUALITY,
-        )} ${escapeHtml(String(e.quality))} · ${escapeHtml(PRODUCTION_I18N.available)} ${escapeHtml(
-            _prodFmtQty(cap, mat.quantityType),
-        )}</small></div><input type="number" min="0" step="${escapeAttr(
-            mat.quantityType === 'PIECE' ? '1' : 'any',
-        )}" value="0" data-prod-alloc data-prod-idx="${escapeAttr(idx)}"></div>`;
+        return krtHtml`<div class="od-prod-entry"><div class="od-prod-src">${e.ownerName} · ${String(
+            e.location,
+        )}${chips} <small>${MSG_QUALITY} ${String(e.quality)} · ${PRODUCTION_I18N.available} ${_prodFmtQty(
+            cap,
+            mat.quantityType,
+        )}</small></div><input type="number" min="0" step="${
+            mat.quantityType === 'PIECE' ? '1' : 'any'
+        }" value="0" data-prod-alloc data-prod-idx="${idx}"></div>`;
     });
-    entriesEl.innerHTML = html;
+    krtHtml.set(entriesEl, html);
     entriesEl.querySelectorAll('[data-prod-alloc]').forEach((inp) => {
         const entry = mat.entries[Number(inp.getAttribute('data-prod-idx'))];
         if (entry && entry.belowFloor) {
@@ -2195,7 +2204,7 @@ function _prodRefreshOrgUnitPicker() {
         return;
     }
     const ownerId = (ownerEl && ownerEl.value) || _prodActingUserId();
-    select.innerHTML = '';
+    select.replaceChildren();
     if (!ownerId) {
         wrapper.hidden = true;
         return;

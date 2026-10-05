@@ -59,7 +59,8 @@ public class DataExportProxyController {
   @GetMapping("/api/proxy/me/export/json")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<byte[]> json() {
-    return fetch("/api/v1/users/me/export", "datenauskunft.json", MediaType.APPLICATION_JSON);
+    return fetch(
+        "/api/v1/users/me/export", new Object[0], "datenauskunft.json", MediaType.APPLICATION_JSON);
   }
 
   /**
@@ -70,7 +71,11 @@ public class DataExportProxyController {
   @GetMapping("/api/proxy/me/export/pdf")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<byte[]> pdf() {
-    return fetch("/api/v1/users/me/export/pdf", "datenauskunft.pdf", MediaType.APPLICATION_PDF);
+    return fetch(
+        "/api/v1/users/me/export/pdf",
+        new Object[0],
+        "datenauskunft.pdf",
+        MediaType.APPLICATION_PDF);
   }
 
   /**
@@ -84,7 +89,8 @@ public class DataExportProxyController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<byte[]> adminPdf(@PathVariable UUID userId) {
     return fetch(
-        "/api/v1/admin/users/" + userId + "/export/pdf",
+        "/api/v1/admin/users/{userId}/export/pdf",
+        new Object[] {userId},
         "datenauskunft-" + userId + ".pdf",
         MediaType.APPLICATION_PDF);
   }
@@ -99,7 +105,8 @@ public class DataExportProxyController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<byte[]> adminJson(@PathVariable UUID userId) {
     return fetch(
-        "/api/v1/admin/users/" + userId + "/export",
+        "/api/v1/admin/users/{userId}/export",
+        new Object[] {userId},
         "datenauskunft-" + userId + ".json",
         MediaType.APPLICATION_JSON);
   }
@@ -108,13 +115,17 @@ public class DataExportProxyController {
    * Fetches one export document with an extended response timeout and no retries, and re-wraps it
    * with attachment headers. The filename never carries a handle.
    *
-   * @param uri the backend URI
+   * @param uri the backend URI template
+   * @param uriVariables the values expanded into the template, in order
    * @param filename the download filename
    * @param mediaType the response content type
    * @return the proxied attachment response
    */
   private ResponseEntity<byte[]> fetch(
-      @NotNull String uri, @NotNull String filename, @NotNull MediaType mediaType) {
+      @NotNull String uri,
+      @NotNull Object[] uriVariables,
+      @NotNull String filename,
+      @NotNull MediaType mediaType) {
     byte[] body =
         withBackendStatus(
             () ->
@@ -124,7 +135,7 @@ public class DataExportProxyController {
                     webClient ->
                         webClient
                             .get()
-                            .uri(uri)
+                            .uri(uri, uriVariables)
                             .httpRequest(
                                 request -> {
                                   HttpClientRequest nativeRequest = request.getNativeRequest();

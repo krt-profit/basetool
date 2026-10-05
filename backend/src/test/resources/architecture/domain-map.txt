@@ -195,6 +195,7 @@ package orgunit orgunit the org-unit module's package tree (plan 5.2)
 package platform platform the platform's package tree (plan 5.1 rank 0)
 package catalogue catalogue the catalogue module's package tree (plan 5.2)
 package mission mission the mission module's package tree (plan 5.2)
+package dashboard dashboard the dashboard module's package tree (plan 5.2)
 package orgchart orgchart the org chart module's package tree (plan 5.2)
 package operation operation the operation module's package tree (plan 5.2)
 
@@ -224,7 +225,6 @@ name ^(AdminPersonalBlueprint|AdminDefaultBlueprint) blueprint
 name ^(AdminExchange) exchange
 name ^(AdminP4k) catalogue
 name ^(QualityTier|AdminQualityTier) catalogue
-name ^Announcement dashboard
 name ^(SystemSetting|AppVersionPolicy|AndroidClient|AndroidVersionPolicy) admin
 name ^(LiveSync|LocalLiveSync|RedisLiveSync) livesync
 name ^(City|Location|StarSystem|SpaceStation|Outpost|Poi|Terminal|Planet|Moon|Orbit|Faction|Jurisdiction|Material|Manufacturer|ShipType|JobType|FrequencyType|GameItem|Uex|ScWiki|P4k|Sync|ExternalSync|MasterData|EvictAllMaterialCaches|QuantityType|LookupTable|PairKeyRef) catalogue

@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.when;
@@ -142,7 +142,8 @@ class PagePatternTestIdsRenderTest {
    */
   @Test
   void operationListPinsTheListPatternIds() throws Exception {
-    when(backendApiClient.get(startsWith("/api/v1/operations/search?"), anyTypeRef()))
+    when(backendApiClient.get(
+            startsWith("/api/v1/operations/search?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(
             new PageResponse<>(
                 List.of(
@@ -207,7 +208,8 @@ class PagePatternTestIdsRenderTest {
             Boolean.FALSE);
     when(backendApiClient.get(eq("/api/v1/users?sort=username,asc"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(member), 0, 20, 1L, 1, List.of("username,asc")));
-    when(backendApiClient.get(contains("/memberships"), anyTypeRef())).thenReturn(List.of());
+    when(backendApiClient.get(eq("/api/v1/users/{id}/memberships"), anyTypeRef(), eq(MEMBER_ID)))
+        .thenReturn(List.of());
 
     String html = render("/members", "ADMIN");
 

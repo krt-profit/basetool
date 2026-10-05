@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.contract;
 
 import com.sun.source.tree.AssignmentTree;
 import com.sun.source.tree.BinaryTree;
+import com.sun.source.tree.CaseTree;
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.CompoundAssignmentTree;
@@ -37,6 +38,7 @@ import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.NewClassTree;
 import com.sun.source.tree.ParenthesizedTree;
 import com.sun.source.tree.ReturnTree;
+import com.sun.source.tree.SwitchExpressionTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.tree.TypeCastTree;
 import com.sun.source.tree.VariableTree;
@@ -81,9 +83,9 @@ import org.jetbrains.annotations.Nullable;
  * verb and URI, or a request on one of the {@link #RAW_CLIENTS}. The URI expression is folded from
  * string literals, {@code +} concatenation, constants of any class, effectively-final locals,
  * {@code String} parameters (through the call sites of their method), helper methods returning a
- * {@code String}, {@code String.format}/{@code formatted}, conditionals and {@code
- * UriComponentsBuilder} chains. Every other operand is a runtime value and becomes a {@link
- * #DYNAMIC} part.
+ * {@code String}, {@code String.format}/{@code formatted}, conditionals, switch expressions and
+ * {@code UriComponentsBuilder} chains. Every other operand, including a conditional branch or a
+ * switch arm that does not fold, is a runtime value and becomes a {@link #DYNAMIC} part.
  */
 final class BackendCallScanner {
 
@@ -196,6 +198,12 @@ final class BackendCallScanner {
    *     concatenates a runtime value into its URI instead of passing it as a template variable
    *     (REQ-SEC-051)
    * @param writeSites the number of write-verb call sites seen
+   * @param concatenatedReads the {@code Class#method} of every {@code get} call site that
+   *     concatenates a runtime value into its URI (REQ-SEC-051)
+   * @param readSites the number of {@code get} call sites seen
+   * @param concatenatedExecutes the {@code Class#method} of every {@code execute(…)} call site
+   *     whose request concatenates a runtime value into its URI (REQ-SEC-051)
+   * @param executeSites the number of {@code execute(…)} call sites seen
    */
   record Result(
       List<Call> calls,
@@ -203,7 +211,11 @@ final class BackendCallScanner {
       List<Unresolved> unresolved,
       List<String> inconsistencies,
       Set<String> concatenatedWrites,
-      int writeSites) {}
+      int writeSites,
+      Set<String> concatenatedReads,
+      int readSites,
+      Set<String> concatenatedExecutes,
+      int executeSites) {}
 
   /** A class or interface declaration with its compilation unit and enclosing type. */
   private record TypeInfo(
@@ -357,18 +369,33 @@ final class BackendCallScanner {
     List<Unresolved> unresolved = new ArrayList<>();
     List<String> inconsistencies = new ArrayList<>();
     Set<String> concatenatedWrites = new java.util.TreeSet<>();
+    Set<String> concatenatedReads = new java.util.TreeSet<>();
+    Set<String> concatenatedExecutes = new java.util.TreeSet<>();
     int[] sites = {0};
     int[] writeSites = {0};
+    int[] readSites = {0};
+    int[] executeSites = {0};
     for (CompilationUnitTree unit : units) {
       new TreePathScanner<Void, Void>() {
         @Override
         public Void visitMethodInvocation(MethodInvocationTree node, Void unused) {
           Site site = siteOf(getCurrentPath(), unit, node);
           if (site != null) {
+            String owner = site.key().substring(0, site.key().indexOf(' '));
             if (site.isDirectWrite()) {
               writeSites[0]++;
               if (site.concatenatesRuntimeValue()) {
-                concatenatedWrites.add(site.key().substring(0, site.key().indexOf(' ')));
+                concatenatedWrites.add(owner);
+              }
+            } else if (site.isDirectRead()) {
+              readSites[0]++;
+              if (site.concatenatesRuntimeValue()) {
+                concatenatedReads.add(owner);
+              }
+            } else if (site.isExecute()) {
+              executeSites[0]++;
+              if (site.concatenatesRuntimeValue()) {
+                concatenatedExecutes.add(owner);
               }
             }
             List<Call> found = site.resolve(inconsistencies);
@@ -384,7 +411,16 @@ final class BackendCallScanner {
       }.scan(unit, null);
     }
     return new Result(
-        calls, sites[0], unresolved, inconsistencies, concatenatedWrites, writeSites[0]);
+        calls,
+        sites[0],
+        unresolved,
+        inconsistencies,
+        concatenatedWrites,
+        writeSites[0],
+        concatenatedReads,
+        readSites[0],
+        concatenatedExecutes,
+        executeSites[0]);
   }
 
   /** One call site with the expressions that carry its verb and URI. */
@@ -444,6 +480,25 @@ final class BackendCallScanner {
      */
     boolean isDirectWrite() {
       return execute == null && WRITE_VERBS.contains(verb) && rawClient == null;
+    }
+
+    /**
+     * Whether this is a {@code backendApiClient.get(…)} rather than an {@code execute(…)} or a
+     * raw-client request.
+     *
+     * @return {@code true} for a direct {@code get}
+     */
+    boolean isDirectRead() {
+      return execute == null && "GET".equals(verb) && rawClient == null;
+    }
+
+    /**
+     * Whether this is a {@code backendApiClient.execute(…)}.
+     *
+     * @return {@code true} for an {@code execute(…)} site
+     */
+    boolean isExecute() {
+      return execute != null;
     }
 
     /**
@@ -673,9 +728,21 @@ final class BackendCallScanner {
       case ParenthesizedTree parenthesized -> resolve(parenthesized.getExpression(), scope);
       case TypeCastTree cast -> resolve(cast.getExpression(), scope);
       case ConditionalExpressionTree conditional -> {
-        Set<String> both = new LinkedHashSet<>(resolve(conditional.getTrueExpression(), scope));
-        both.addAll(resolve(conditional.getFalseExpression(), scope));
+        Set<String> both =
+            new LinkedHashSet<>(orDynamic(resolve(conditional.getTrueExpression(), scope)));
+        both.addAll(orDynamic(resolve(conditional.getFalseExpression(), scope)));
         yield both;
+      }
+      case SwitchExpressionTree switchExpression -> {
+        Set<String> arms = new LinkedHashSet<>();
+        for (CaseTree arm : switchExpression.getCases()) {
+          if (arm.getBody() instanceof ExpressionTree body) {
+            arms.addAll(orDynamic(resolve(body, scope)));
+          } else {
+            arms.add(String.valueOf(DYNAMIC));
+          }
+        }
+        yield arms;
       }
       case BinaryTree binary when binary.getKind() == Tree.Kind.PLUS ->
           concat(
@@ -933,7 +1000,7 @@ final class BackendCallScanner {
       return base.isEmpty() ? Set.of() : extend(base, name, args, scope);
     }
     if (PATH_PRESERVING.contains(name)) {
-      return resolve(receiver, scope.deeper());
+      return resolve(receiver, scope);
     }
     if (args.isEmpty() && receiver instanceof MemberSelectTree constant) {
       Set<String> property = resolveEnumProperty(constant, name, scope);

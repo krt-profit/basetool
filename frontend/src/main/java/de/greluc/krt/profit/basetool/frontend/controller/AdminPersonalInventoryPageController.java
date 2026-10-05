@@ -51,6 +51,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Admin counterpart of {@link PersonalInventoryPageController}: manages a selected user's personal
@@ -271,7 +272,7 @@ public class AdminPersonalInventoryPageController {
   @Nullable
   private UserDto fetchUser(UUID userSub) {
     try {
-      return backendApiClient.get("/api/v1/users/" + userSub, UserDto.class);
+      return backendApiClient.get("/api/v1/users/{userSub}", UserDto.class, userSub);
     } catch (Exception e) {
       log.warn(
           "Failed to fetch selected member {} for admin personal inventory picker", userSub, e);
@@ -282,21 +283,23 @@ public class AdminPersonalInventoryPageController {
   private PageResponse<PersonalInventoryItemDto> fetchItems(
       UUID userSub, String q, Integer page, Integer size, String sort) {
     try {
-      StringBuilder uri =
-          new StringBuilder("/api/v1/admin/personal-inventory/").append(userSub).append('?');
+      UriComponentsBuilder builder =
+          UriComponentsBuilder.fromPath("/api/v1/admin/personal-inventory/{userSub}");
       if (page != null) {
-        uri.append("page=").append(page).append('&');
+        builder.queryParam("page", page);
       }
-      uri.append("size=").append(size == null ? 50 : size);
+      builder.queryParam("size", size == null ? 50 : size);
       String safeSort = RelayParams.sortSpecOrNull(sort);
       if (safeSort != null) {
-        uri.append("&sort=").append(safeSort);
+        builder.queryParam("sort", safeSort);
       }
       if (q != null && !q.isBlank()) {
-        uri.append("&q={q}");
-        return backendApiClient.get(uri.toString(), PERSONAL_INVENTORY_PAGE_TYPE, q);
+        builder.queryParam("q", "{q}");
+        String uri = builder.encode().build().toUriString();
+        return backendApiClient.get(uri, PERSONAL_INVENTORY_PAGE_TYPE, userSub, q);
       }
-      return backendApiClient.get(uri.toString(), PERSONAL_INVENTORY_PAGE_TYPE);
+      String uri = builder.encode().build().toUriString();
+      return backendApiClient.get(uri, PERSONAL_INVENTORY_PAGE_TYPE, userSub);
     } catch (Exception e) {
       log.error("Failed to fetch personal inventory items for {}", userSub, e);
       return new PageResponse<>(new ArrayList<>(), 0, size == null ? 50 : size, 0, 0, List.of());

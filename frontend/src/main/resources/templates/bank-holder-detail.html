@@ -134,18 +134,5 @@
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/bank-holder-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:attr="nonce=${cspNonce}">
-    function bindBankHolderBookingsPager() {
-        if (window.krtFetch) {
-            window.krtFetch.bindSwap({
-                container: '#bank-holder-bookings-results',
-                fragmentValue: 'holderBookings',
-                history: true
-            });
-        }
-    }
-    document.addEventListener('DOMContentLoaded', bindBankHolderBookingsPager);
-    document.addEventListener('krt:swapped', bindBankHolderBookingsPager);
-</script>
 </body>
 </html>

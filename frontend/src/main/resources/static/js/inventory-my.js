@@ -341,7 +341,7 @@ function refreshBulkRebookOrgUnitPicker() {
     );
     if (!wrapper || !select) return;
     const mode = bulkRebookMode();
-    select.innerHTML = '';
+    select.replaceChildren();
     wrapper.hidden = true;
     if (mode === 'PERSONALIZE') return;
     const userSelect = /** @type {HTMLInputElement | null} */ (
@@ -983,7 +983,7 @@ function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
         document.getElementById('umbuchenPersonalOrgUnitId')
     );
     if (!wrapper || !select) return;
-    select.innerHTML = '';
+    select.replaceChildren();
     wrapper.hidden = true;
     if (!ownerId) return;
     window.krtFetch
@@ -1256,7 +1256,7 @@ function fillOrgUnitChangePicker(currentOrgUnitId) {
         document.getElementById('orgUnitChangeTarget')
     );
     if (!select) return;
-    select.innerHTML = '';
+    select.replaceChildren();
     const none = document.createElement('option');
     none.value = '';
     none.textContent = orgUnitChangeI18n.none;
