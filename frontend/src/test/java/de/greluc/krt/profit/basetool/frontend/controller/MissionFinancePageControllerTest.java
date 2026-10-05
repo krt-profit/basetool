@@ -31,13 +31,15 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.FinanceType;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceEntryCreateDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceEntryDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceEntryUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.MissionFinanceEntryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import java.math.BigDecimal;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -73,7 +75,9 @@ class MissionFinancePageControllerTest {
     backendApiClient = mock(BackendApiClient.class);
     missionPageController = mock(MissionPageController.class);
     authHelper = mock(FrontendAuthHelperService.class);
-    controller = new MissionFinancePageController(backendApiClient, missionPageController);
+    controller =
+        new MissionFinancePageController(
+            new MissionBackendClient(backendApiClient), missionPageController);
     redirectAttributes = new RedirectAttributesModelMap();
     principal = mock(OidcUser.class);
   }
@@ -116,15 +120,17 @@ class MissionFinancePageControllerTest {
           controller.addFinanceEntry(MISSION_ID, form, br, model, redirectAttributes, principal);
 
       assertEquals("redirect:/missions/" + MISSION_ID, view);
-      ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.captor();
+      ArgumentCaptor<MissionFinanceEntryCreateDto> bodyCaptor = ArgumentCaptor.captor();
       verify(backendApiClient)
           .post(eq("/api/v1/finance-entries"), bodyCaptor.capture(), eq(Void.class));
-      Map<String, Object> body = bodyCaptor.getValue();
-      assertEquals(MISSION_ID, body.get("missionId"));
-      assertEquals(participantId, body.get("participantId"));
-      assertEquals("commodity sale", body.get("note"));
-      assertEquals(FinanceType.INCOME, body.get("type"));
-      assertEquals(new BigDecimal("250.00"), body.get("amount"));
+      assertEquals(
+          new MissionFinanceEntryCreateDto(
+              MISSION_ID,
+              participantId,
+              "commodity sale",
+              FinanceType.INCOME,
+              new BigDecimal("250.00")),
+          bodyCaptor.getValue());
       assertEquals(
           "notification.success.save", redirectAttributes.getFlashAttributes().get("successToast"));
     }
@@ -199,21 +205,18 @@ class MissionFinancePageControllerTest {
               MISSION_ID, ENTRY_ID, form, br, model, redirectAttributes, principal);
 
       assertEquals("redirect:/missions/" + MISSION_ID, view);
-      ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.captor();
+      ArgumentCaptor<MissionFinanceEntryUpdateDto> bodyCaptor = ArgumentCaptor.captor();
       verify(backendApiClient)
           .put(
               eq("/api/v1/finance-entries/{entryId}"),
               bodyCaptor.capture(),
               eq(Void.class),
               eq(ENTRY_ID));
-      Map<String, Object> body = bodyCaptor.getValue();
-      assertEquals("repairs", body.get("note"));
-      assertEquals(FinanceType.EXPENSE, body.get("type"));
-      assertEquals(new BigDecimal("99.99"), body.get("amount"));
       assertEquals(
-          3L, body.get("version"), "version must be propagated for the optimistic-lock check");
-      assertNull(
-          body.get("missionId"), "update body must NOT carry missionId — that's not editable");
+          new MissionFinanceEntryUpdateDto(
+              "repairs", FinanceType.EXPENSE, new BigDecimal("99.99"), 3L),
+          bodyCaptor.getValue(),
+          "the update body carries the version and no missionId");
       assertEquals(
           "notification.success.save", redirectAttributes.getFlashAttributes().get("successToast"));
     }
@@ -274,33 +277,48 @@ class MissionFinancePageControllerTest {
 
     @Test
     void addAjax_stampsMissionId_postsBody_andReturns200() {
-      Map<String, Object> body = new HashMap<>();
-      body.put("participantId", UUID.randomUUID().toString());
-      body.put("type", "INCOME");
-      body.put("amount", "250");
-      when(backendApiClient.post(eq("/api/v1/finance-entries"), any(), eq(Object.class)))
-          .thenReturn(Map.of("id", ENTRY_ID.toString()));
+      UUID participantId = UUID.randomUUID();
+      MissionFinanceEntryCreateDto body =
+          new MissionFinanceEntryCreateDto(
+              UUID.randomUUID(), participantId, null, FinanceType.INCOME, new BigDecimal("250"));
+      MissionFinanceEntryDto created =
+          new MissionFinanceEntryDto(ENTRY_ID, MISSION_ID, null, null, null, null, 0L);
+      when(backendApiClient.post(
+              eq("/api/v1/finance-entries"), any(), eq(MissionFinanceEntryDto.class)))
+          .thenReturn(created);
 
       ResponseEntity<Object> resp = controller.addFinanceEntryAjax(MISSION_ID, body, principal);
 
       assertEquals(200, resp.getStatusCode().value());
-      assertEquals(MISSION_ID, body.get("missionId"), "missionId is stamped from the path");
+      assertEquals(created, resp.getBody());
+      verify(backendApiClient)
+          .post(
+              "/api/v1/finance-entries",
+              new MissionFinanceEntryCreateDto(
+                  MISSION_ID, participantId, null, FinanceType.INCOME, new BigDecimal("250")),
+              MissionFinanceEntryDto.class);
     }
 
     @Test
     void updateAjax_putsBodyVerbatim_andReturns200() {
-      Map<String, Object> body = new HashMap<>();
-      body.put("amount", "99");
-      body.put("version", 3);
+      MissionFinanceEntryUpdateDto body =
+          new MissionFinanceEntryUpdateDto(null, null, new BigDecimal("99"), 3L);
       when(backendApiClient.put(
-              eq("/api/v1/finance-entries/{entryId}"), any(), eq(Object.class), eq(ENTRY_ID)))
-          .thenReturn(Map.of("id", ENTRY_ID.toString()));
+              eq("/api/v1/finance-entries/{entryId}"),
+              any(),
+              eq(MissionFinanceEntryDto.class),
+              eq(ENTRY_ID)))
+          .thenReturn(new MissionFinanceEntryDto(ENTRY_ID, MISSION_ID, null, null, null, null, 4L));
 
       ResponseEntity<Object> resp = controller.updateFinanceEntryAjax(MISSION_ID, ENTRY_ID, body);
 
       assertEquals(200, resp.getStatusCode().value());
       verify(backendApiClient)
-          .put(eq("/api/v1/finance-entries/{entryId}"), eq(body), eq(Object.class), eq(ENTRY_ID));
+          .put(
+              eq("/api/v1/finance-entries/{entryId}"),
+              eq(body),
+              eq(MissionFinanceEntryDto.class),
+              eq(ENTRY_ID));
     }
 
     @Test

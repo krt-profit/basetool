@@ -21,14 +21,13 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.withBackendStatus;
 
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -38,7 +37,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Frontend proxy for the bank PDF exports: account statement (REQ-BANK-014) and management
@@ -50,7 +48,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RequiredArgsConstructor
 public class BankReportProxyController {
 
-  private final BackendApiClient backendApiClient;
+  /** The bank domain's backend calls. */
+  private final BankBackendClient bankClient;
 
   /**
    * Proxies the account statement download for a caller-chosen period.
@@ -68,14 +67,8 @@ public class BankReportProxyController {
       @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
       @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
       @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
-    String uri =
-        UriComponentsBuilder.fromPath("/api/v1/bank/accounts/{id}/statement")
-            .queryParam("from", from)
-            .queryParam("to", to)
-            .encode()
-            .build()
-            .toUriString();
-    return fetchPdf(uri, new Object[] {id}, userTimeZone, "kontoauszug-" + id + ".pdf");
+    byte[] pdf = withBackendStatus(() -> bankClient.accountStatement(id, from, to, userTimeZone));
+    return pdfResponse(pdf, "kontoauszug-" + id + ".pdf");
   }
 
   /**
@@ -88,46 +81,19 @@ public class BankReportProxyController {
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<byte[]> downloadThreeMonthReport(
       @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
-    return fetchPdf(
-        "/api/v1/bank/export/three-month-report",
-        new Object[0],
-        userTimeZone,
-        "bank-3-monats-report.pdf");
+    byte[] pdf = withBackendStatus(() -> bankClient.threeMonthReport(userTimeZone));
+    return pdfResponse(pdf, "bank-3-monats-report.pdf");
   }
 
   /**
-   * Fetches one backend PDF and re-wraps it with attachment headers; backend errors propagate with
-   * their original status so bank.js can surface 403/400 distinctly.
+   * Wraps a fetched backend PDF with attachment headers; backend errors have already propagated
+   * with their original status so bank.js can surface 403/400 distinctly.
    *
-   * @param uri the backend URI template incl. query
-   * @param uriVariables the values expanded into the template, in order
-   * @param userTimeZone the zone header to forward; may be {@code null}
+   * @param pdf the PDF bytes, or {@code null} when the backend sent no body
    * @param filename the download filename
    * @return the proxied PDF response
    */
-  private ResponseEntity<byte[]> fetchPdf(
-      @NotNull String uri,
-      @NotNull Object[] uriVariables,
-      String userTimeZone,
-      @NotNull String filename) {
-    byte[] pdf =
-        withBackendStatus(
-            () ->
-                backendApiClient.execute(
-                    HttpMethod.GET,
-                    uri,
-                    webClient ->
-                        webClient
-                            .get()
-                            .uri(uri, uriVariables)
-                            .headers(
-                                h -> {
-                                  if (userTimeZone != null && !userTimeZone.isBlank()) {
-                                    h.set("X-User-Time-Zone", userTimeZone);
-                                  }
-                                }),
-                    spec -> spec.bodyToMono(byte[].class)));
-
+  private static ResponseEntity<byte[]> pdfResponse(byte[] pdf, @NotNull String filename) {
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_PDF);
     headers.setContentDispositionFormData("attachment", filename);
