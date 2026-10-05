@@ -106,7 +106,7 @@ class ParticipationCalculationTest {
             null);
 
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
 
     MissionPageController controller =
@@ -192,7 +192,7 @@ class ParticipationCalculationTest {
             null);
 
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
 
     MissionPageController controller =

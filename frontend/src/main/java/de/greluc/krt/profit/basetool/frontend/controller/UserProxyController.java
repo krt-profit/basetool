@@ -132,12 +132,12 @@ public class UserProxyController {
   public List<Map<String, Object>> userMemberships(
       @PathVariable UUID userId,
       @RequestParam(required = false, defaultValue = "false") boolean allKinds) {
-    String uri =
-        org.springframework.web.util.UriComponentsBuilder.fromPath(
-                "/api/v1/users/" + userId + "/memberships")
-            .queryParam("allKinds", allKinds)
-            .toUriString();
-    List<Map<String, Object>> memberships = backendApiClient.get(uri, MEMBERSHIP_OPTION_LIST);
+    List<Map<String, Object>> memberships =
+        backendApiClient.get(
+            "/api/v1/users/{userId}/memberships?allKinds={allKinds}",
+            MEMBERSHIP_OPTION_LIST,
+            userId,
+            allKinds);
     return memberships != null ? memberships : List.of();
   }
 
@@ -153,7 +153,7 @@ public class UserProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> getUser(@PathVariable UUID userId) {
     try {
-      return backendApiClient.get("/api/v1/users/" + userId, USER_MAP);
+      return backendApiClient.get("/api/v1/users/{userId}", USER_MAP, userId);
     } catch (Exception e) {
       return null;
     }

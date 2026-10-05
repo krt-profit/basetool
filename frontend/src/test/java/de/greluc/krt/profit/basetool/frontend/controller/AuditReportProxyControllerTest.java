@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
+import de.greluc.krt.profit.basetool.frontend.audit.client.AuditBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
@@ -44,7 +45,7 @@ class AuditReportProxyControllerTest {
 
   private final WebClient webClient = mock(WebClient.class);
   private final AuditReportProxyController controller =
-      new AuditReportProxyController(RealBackendApiClient.over(webClient));
+      new AuditReportProxyController(new AuditBackendClient(RealBackendApiClient.over(webClient)));
 
   @Test
   void pdfExport_rejectsUnknownDomain() {

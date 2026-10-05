@@ -100,7 +100,7 @@ class RefineryOrderStorageCalculationTest {
             0L,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), anyClass()))
+    when(backendApiClient.get(eq("/api/v1/refinery-orders/{id}"), anyClass(), eq(orderId)))
         .thenReturn(orderDto);
     when(oidcUser.getSubject()).thenReturn(UUID.randomUUID().toString());
 
@@ -157,7 +157,7 @@ class RefineryOrderStorageCalculationTest {
             0L,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), anyClass()))
+    when(backendApiClient.get(eq("/api/v1/refinery-orders/{id}"), anyClass(), eq(orderId)))
         .thenReturn(orderDto);
 
     SystemSettingDto settingDto = new SystemSettingDto("refinery.rounding.mode", "HALF_UP", 0L);
@@ -229,7 +229,7 @@ class RefineryOrderStorageCalculationTest {
             0L,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), anyClass()))
+    when(backendApiClient.get(eq("/api/v1/refinery-orders/{id}"), anyClass(), eq(orderId)))
         .thenReturn(orderDto);
 
     SystemSettingDto settingDto = new SystemSettingDto("refinery.rounding.mode", "HALF_UP", 0L);

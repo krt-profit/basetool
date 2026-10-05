@@ -104,12 +104,10 @@ public class BankManagePageController {
     int effectivePage = page == null || page < 0 ? 0 : page;
     PageResponse<BankAccountDto> accounts =
         backendApiClient.get(
-            "/api/v1/bank/accounts?page="
-                + effectivePage
-                + "&size="
-                + effectiveSize
-                + "&sort=name,asc",
-            BANK_ACCOUNT_PAGE_TYPE);
+            "/api/v1/bank/accounts?page={page}&size={size}&sort=name,asc",
+            BANK_ACCOUNT_PAGE_TYPE,
+            effectivePage,
+            effectiveSize);
     List<BankHolderDto> holders =
         backendApiClient.get("/api/v1/bank/holders", BANK_HOLDER_LIST_TYPE);
     model.addAttribute("accountsPage", accounts);

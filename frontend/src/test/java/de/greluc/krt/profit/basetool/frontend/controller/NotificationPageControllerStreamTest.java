@@ -32,6 +32,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendSideChannels;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -74,7 +75,7 @@ class NotificationPageControllerStreamTest {
         mock(OAuth2AuthorizedClientManager.class);
     NotificationPageController controller =
         new NotificationPageController(
-            backendApiClient,
+            new NotificationBackendClient(backendApiClient),
             messageSource,
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
@@ -101,7 +102,7 @@ class NotificationPageControllerStreamTest {
         mock(OAuth2AuthorizedClientManager.class);
     NotificationPageController controller =
         new NotificationPageController(
-            backendApiClient,
+            new NotificationBackendClient(backendApiClient),
             messageSource,
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
@@ -129,7 +130,7 @@ class NotificationPageControllerStreamTest {
         mock(OAuth2AuthorizedClientManager.class);
     NotificationPageController controller =
         new NotificationPageController(
-            backendApiClient,
+            new NotificationBackendClient(backendApiClient),
             messageSource,
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
@@ -159,7 +160,7 @@ class NotificationPageControllerStreamTest {
         mock(OAuth2AuthorizedClientManager.class);
     NotificationPageController controller =
         new NotificationPageController(
-            backendApiClient,
+            new NotificationBackendClient(backendApiClient),
             messageSource,
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
@@ -216,7 +217,7 @@ class NotificationPageControllerStreamTest {
     SimpleMeterRegistry registry = new SimpleMeterRegistry();
     NotificationPageController controller =
         new NotificationPageController(
-            backendApiClient,
+            new NotificationBackendClient(backendApiClient),
             messageSource,
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
@@ -261,7 +262,7 @@ class NotificationPageControllerStreamTest {
     SseEmitter mockEmitter = mock(SseEmitter.class);
     NotificationPageController controller =
         new NotificationPageController(
-            backendApiClient,
+            new NotificationBackendClient(backendApiClient),
             messageSource,
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,

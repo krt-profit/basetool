@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -99,6 +100,7 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
     PageResponse<PersonalBlueprintDto> page =
         new PageResponse<>(List.of(bp), 0, 200, 1, 1, List.of());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     mockMvc
         .perform(get("/personal-inventory/blueprints"))
@@ -132,6 +134,7 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
     PageResponse<PersonalBlueprintDto> page =
         new PageResponse<>(List.of(bp), 0, 200, 1, 1, List.of());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     mockMvc
         .perform(get("/personal-inventory/blueprints"))
@@ -177,7 +180,8 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
         new PageResponse<>(List.of(first), 0, 500, 2, 2, List.of());
     PageResponse<PersonalBlueprintDto> page1 =
         new PageResponse<>(List.of(second), 1, 500, 2, 2, List.of());
-    when(backendApiClient.get(startsWith("/api/v1/personal-blueprints?"), anyTypeRef()))
+    when(backendApiClient.get(
+            startsWith("/api/v1/personal-blueprints?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(page0, page1);
 
     mockMvc
@@ -209,6 +213,7 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
     PageResponse<PersonalBlueprintDto> page =
         new PageResponse<>(List.of(bp), 0, 200, 1, 1, List.of());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     mockMvc
         .perform(get("/personal-inventory/blueprints"))
@@ -239,6 +244,7 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
     PageResponse<PersonalBlueprintDto> page =
         new PageResponse<>(List.of(bp), 0, 200, 1, 1, List.of());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     mockMvc
         .perform(get("/personal-inventory/blueprints"))
@@ -287,7 +293,8 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
         new PageResponse<>(List.of(bp), 0, 500, 1, 1, List.of());
     PageResponse<PersonalBlueprintDto> items =
         new PageResponse<>(List.of(), 0, 1, 118, 118, List.of());
-    when(backendApiClient.get(startsWith("/api/v1/personal-blueprints?"), anyTypeRef()))
+    when(backendApiClient.get(
+            startsWith("/api/v1/personal-blueprints?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(owned);
     when(backendApiClient.get(startsWith("/api/v1/personal-inventory?"), anyTypeRef()))
         .thenReturn(items);
@@ -345,6 +352,7 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
     PageResponse<PersonalBlueprintDto> page =
         new PageResponse<>(List.of(bp), 0, 200, 1, 1, List.of());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     mockMvc
         .perform(get("/personal-inventory/blueprints"))
@@ -368,6 +376,7 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
     PageResponse<PersonalBlueprintDto> page =
         new PageResponse<>(List.of(), 0, 200, 0, 0, List.of());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     mockMvc
         .perform(get("/personal-inventory/blueprints").locale(Locale.GERMAN))
@@ -396,6 +405,7 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
     PageResponse<PersonalBlueprintDto> page =
         new PageResponse<>(List.of(bp), 0, 200, 1, 1, List.of());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     mockMvc
         .perform(get("/personal-inventory/blueprints").param("fragment", "list"))
@@ -411,7 +421,8 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
   @Test
   @WithMockUser
   void search_passesMultiWordQueryAsUriVariable() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(List.of());
 
     mockMvc
         .perform(get("/personal-inventory/blueprints/search").param("q", "Arclight Pistol"))
@@ -419,7 +430,7 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
     ArgumentCaptor<Object> qCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture());
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture(), eq(25));
     assertTrue(uriCaptor.getValue().contains("q={q}"), uriCaptor.getValue());
     assertEquals("Arclight Pistol", qCaptor.getValue());
   }
@@ -427,7 +438,8 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
   @Test
   @WithMockUser
   void search_passesUmlautQueryAsUriVariable_notFormEncoded() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(List.of());
 
     String term = "Röhre Größe";
     mockMvc
@@ -436,7 +448,7 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
     ArgumentCaptor<Object> qCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture());
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture(), eq(25));
     assertTrue(uriCaptor.getValue().contains("q={q}"), uriCaptor.getValue());
     assertEquals(term, qCaptor.getValue());
   }

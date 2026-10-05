@@ -87,8 +87,9 @@ public class AdminLocationsPageController {
           CatalogPages.fetchAll(
               page ->
                   backendApiClient.get(
-                      "/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page=" + page,
-                      LOCATION_PAGE));
+                      "/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page={page}",
+                      LOCATION_PAGE,
+                      page));
 
       List<LocationDto> locations = new ArrayList<>(locationsCatalog.items());
       locations.sort(
@@ -125,7 +126,7 @@ public class AdminLocationsPageController {
       RedirectAttributes redirectAttributes) {
     try {
       LocationDto currentLocation =
-          backendApiClient.get("/api/v1/locations/" + id, LocationDto.class);
+          backendApiClient.get("/api/v1/locations/{id}", LocationDto.class, id);
       LocationDto body =
           new LocationDto(
               id,
@@ -171,7 +172,7 @@ public class AdminLocationsPageController {
       RedirectAttributes redirectAttributes) {
     try {
       LocationDto currentLocation =
-          backendApiClient.get("/api/v1/locations/" + id, LocationDto.class);
+          backendApiClient.get("/api/v1/locations/{id}", LocationDto.class, id);
       LocationDto body =
           new LocationDto(
               id,
@@ -215,7 +216,8 @@ public class AdminLocationsPageController {
         log,
         "toggle location visibility (ajax)",
         () -> {
-          LocationDto current = backendApiClient.get("/api/v1/locations/" + id, LocationDto.class);
+          LocationDto current =
+              backendApiClient.get("/api/v1/locations/{id}", LocationDto.class, id);
           LocationDto body =
               new LocationDto(
                   id,
@@ -227,7 +229,7 @@ public class AdminLocationsPageController {
           backendApiClient.put("/api/v1/locations/{id}", body, Void.class, id);
           backendApiClient.evict(CacheDomain.LOCATION);
           return ResponseEntity.ok(
-              backendApiClient.get("/api/v1/locations/" + id, LocationDto.class));
+              backendApiClient.get("/api/v1/locations/{id}", LocationDto.class, id));
         });
   }
 
@@ -248,7 +250,8 @@ public class AdminLocationsPageController {
         log,
         "toggle home-location (ajax)",
         () -> {
-          LocationDto current = backendApiClient.get("/api/v1/locations/" + id, LocationDto.class);
+          LocationDto current =
+              backendApiClient.get("/api/v1/locations/{id}", LocationDto.class, id);
           LocationDto body =
               new LocationDto(
                   id,
@@ -260,7 +263,7 @@ public class AdminLocationsPageController {
           backendApiClient.put("/api/v1/locations/{id}", body, Void.class, id);
           backendApiClient.evict(CacheDomain.LOCATION);
           return ResponseEntity.ok(
-              backendApiClient.get("/api/v1/locations/" + id, LocationDto.class));
+              backendApiClient.get("/api/v1/locations/{id}", LocationDto.class, id));
         });
   }
 }

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -50,14 +51,16 @@ class AdminSpecialCommandsPageControllerTest {
   void listSpecialCommands_concatenatesAllPages_andSortsByName() {
     BackendApiClient client = mock(BackendApiClient.class);
     AdminSpecialCommandsPageController controller = new AdminSpecialCommandsPageController(client);
-    String base = "/api/v1/special-commands?size=1000&sort=name,asc&includeInactive=false";
+    String template =
+        "/api/v1/special-commands?size=1000&sort=name,asc"
+            + "&includeInactive={includeInactive}&page={page}";
     PageResponse<Map<String, Object>> firstPage =
         new PageResponse<>(
             List.of(Map.of("name", "Zulu"), Map.of("name", "Alpha")), 0, 1000, 3, 2, List.of());
     PageResponse<Map<String, Object>> secondPage =
         new PageResponse<>(List.of(Map.of("name", "Mike")), 1, 1000, 3, 2, List.of());
-    when(client.get(eq(base + "&page=0"), anyTypeRef())).thenReturn(firstPage);
-    when(client.get(eq(base + "&page=1"), anyTypeRef())).thenReturn(secondPage);
+    when(client.get(eq(template), anyTypeRef(), eq(false), eq(0))).thenReturn(firstPage);
+    when(client.get(eq(template), anyTypeRef(), eq(false), eq(1))).thenReturn(secondPage);
     Model model = new ConcurrentModel();
 
     String view = controller.listSpecialCommands(false, null, model);
@@ -81,7 +84,7 @@ class AdminSpecialCommandsPageControllerTest {
     PageResponse<Map<String, Object>> endlessPage =
         new PageResponse<>(
             List.of(Map.of("name", "SK")), 0, 1000, reportedPages, reportedPages, List.of());
-    when(client.get(anyString(), anyTypeRef())).thenReturn(endlessPage);
+    when(client.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(endlessPage);
     Model model = new ConcurrentModel();
 
     controller.listSpecialCommands(false, null, model);

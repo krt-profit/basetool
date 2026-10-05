@@ -55,21 +55,21 @@ class MaterialProxyControllerTest {
             Map.of("terminalName", "Lorville TDD", "priceBuy", 12.5),
             Map.of("terminalName", "Area18 TDD", "priceBuy", 13.0));
     when(backendApiClient.<List<Map<String, Object>>>get(
-            eq("/api/v1/materials/" + materialId + "/terminals"), anyTypeRef()))
+            eq("/api/v1/materials/{id}/terminals"), anyTypeRef(), eq(materialId)))
         .thenReturn(backendData);
 
     List<Map<String, Object>> result = controller.getMaterialTerminals(materialId);
 
     assertEquals(backendData, result);
     verify(backendApiClient)
-        .get(eq("/api/v1/materials/" + materialId + "/terminals"), anyTypeRef());
+        .get(eq("/api/v1/materials/{id}/terminals"), anyTypeRef(), eq(materialId));
   }
 
   @Test
   void getMaterialTerminals_withNullBackendResponse_returnsEmptyList() {
     UUID materialId = UUID.randomUUID();
     when(backendApiClient.<List<Map<String, Object>>>get(
-            eq("/api/v1/materials/" + materialId + "/terminals"), anyTypeRef()))
+            eq("/api/v1/materials/{id}/terminals"), anyTypeRef(), eq(materialId)))
         .thenReturn(null);
 
     List<Map<String, Object>> result = controller.getMaterialTerminals(materialId);
@@ -88,8 +88,8 @@ class MaterialProxyControllerTest {
     controller.getProfitCalculation(shipId, null);
 
     ArgumentCaptor<String> uriCap = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCap.capture(), anyTypeRef(), any(Object[].class));
-    assertEquals("/api/v1/materials/profit-calculation?shipId=" + shipId, uriCap.getValue());
+    verify(backendApiClient).get(uriCap.capture(), anyTypeRef(), eq(shipId));
+    assertEquals("/api/v1/materials/profit-calculation?shipId={shipId}", uriCap.getValue());
   }
 
   @Test
@@ -102,8 +102,8 @@ class MaterialProxyControllerTest {
     controller.getProfitCalculation(shipId, List.of());
 
     ArgumentCaptor<String> uriCap = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCap.capture(), anyTypeRef(), any(Object[].class));
-    assertEquals("/api/v1/materials/profit-calculation?shipId=" + shipId, uriCap.getValue());
+    verify(backendApiClient).get(uriCap.capture(), anyTypeRef(), eq(shipId));
+    assertEquals("/api/v1/materials/profit-calculation?shipId={shipId}", uriCap.getValue());
   }
 
   @Test
@@ -118,12 +118,11 @@ class MaterialProxyControllerTest {
     ArgumentCaptor<String> uriCap = ArgumentCaptor.captor();
     ArgumentCaptor<Object> varCap = ArgumentCaptor.captor();
     verify(backendApiClient)
-        .get(uriCap.capture(), anyTypeRef(), varCap.capture(), varCap.capture());
+        .get(uriCap.capture(), anyTypeRef(), eq(shipId), varCap.capture(), varCap.capture());
     String template = uriCap.getValue();
     assertEquals(
-        "/api/v1/materials/profit-calculation?shipId="
-            + shipId
-            + "&starSystemNames={f0}&starSystemNames={f1}",
+        "/api/v1/materials/profit-calculation?shipId={shipId}"
+            + "&starSystemNames={starSystemName}&starSystemNames={starSystemName}",
         template);
     assertEquals(List.of("Stanton", "Pyro"), varCap.getAllValues());
   }
@@ -139,9 +138,9 @@ class MaterialProxyControllerTest {
 
     ArgumentCaptor<String> uriCap = ArgumentCaptor.captor();
     ArgumentCaptor<Object> varCap = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCap.capture(), anyTypeRef(), varCap.capture());
+    verify(backendApiClient).get(uriCap.capture(), anyTypeRef(), eq(shipId), varCap.capture());
     assertEquals(
-        "/api/v1/materials/profit-calculation?shipId=" + shipId + "&starSystemNames={f0}",
+        "/api/v1/materials/profit-calculation?shipId={shipId}&starSystemNames={starSystemName}",
         uriCap.getValue());
     assertEquals("Stanton", varCap.getValue());
   }
@@ -158,10 +157,10 @@ class MaterialProxyControllerTest {
 
     ArgumentCaptor<String> uriCap = ArgumentCaptor.captor();
     ArgumentCaptor<Object> varCap = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCap.capture(), anyTypeRef(), varCap.capture());
+    verify(backendApiClient).get(uriCap.capture(), anyTypeRef(), eq(shipId), varCap.capture());
     String template = uriCap.getValue();
     assertEquals(
-        "/api/v1/materials/profit-calculation?shipId=" + shipId + "&starSystemNames={f0}",
+        "/api/v1/materials/profit-calculation?shipId={shipId}&starSystemNames={starSystemName}",
         template);
     assertFalse(template.contains("page=99"), template);
     assertEquals(1, template.split("shipId=", -1).length - 1, template);

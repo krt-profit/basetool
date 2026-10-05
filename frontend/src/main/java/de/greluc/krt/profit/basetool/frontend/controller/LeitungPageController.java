@@ -325,7 +325,7 @@ public class LeitungPageController {
   private Map<UUID, Map<String, Object>> skFlags(@NotNull UUID skId) {
     List<Map<String, Object>> raw;
     try {
-      raw = backendApiClient.get("/api/v1/special-commands/" + skId + "/members", MAP_LIST_TYPE);
+      raw = backendApiClient.get("/api/v1/special-commands/{id}/members", MAP_LIST_TYPE, skId);
     } catch (RuntimeException e) {
       log.debug("Spezialkommando roster flags unavailable", e);
       return null;

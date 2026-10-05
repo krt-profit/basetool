@@ -557,7 +557,7 @@ public class PromotionPageController {
     try {
       List<PromotionCategoryDto> result =
           backendApiClient.get(
-              "/api/v1/promotion/categories/by-topic/" + topicId + "/all", CATEGORY_LIST_TYPE);
+              "/api/v1/promotion/categories/by-topic/{topicId}/all", CATEGORY_LIST_TYPE, topicId);
       return result != null ? result : new ArrayList<>();
     } catch (Exception e) {
       log.error("Failed to fetch categories for topic {}", topicId, e);
@@ -580,8 +580,9 @@ public class PromotionPageController {
     try {
       List<PromotionLevelContentDto> result =
           backendApiClient.get(
-              "/api/v1/promotion/level-contents/by-category/" + categoryId,
-              LEVEL_CONTENT_LIST_TYPE);
+              "/api/v1/promotion/level-contents/by-category/{categoryId}",
+              LEVEL_CONTENT_LIST_TYPE,
+              categoryId);
       return result != null ? result : new ArrayList<>();
     } catch (Exception e) {
       log.error("Failed to fetch level contents for category {}", categoryId, e);
@@ -641,11 +642,10 @@ public class PromotionPageController {
       return CatalogPages.fetchAll(
           page ->
               backendApiClient.get(
-                  "/api/v1/promotion/evaluations/all?size="
-                      + MATRIX_FETCH_PAGE_SIZE
-                      + "&page="
-                      + page,
-                  MEMBER_EVALUATION_PAGE_TYPE));
+                  "/api/v1/promotion/evaluations/all?size={size}&page={page}",
+                  MEMBER_EVALUATION_PAGE_TYPE,
+                  MATRIX_FETCH_PAGE_SIZE,
+                  page));
     } catch (Exception e) {
       log.error("Failed to fetch all evaluations", e);
       return CompleteCatalog.empty();
@@ -664,11 +664,10 @@ public class PromotionPageController {
       return CatalogPages.fetchAll(
           page ->
               backendApiClient.get(
-                  "/api/v1/promotion/evaluations/members?size="
-                      + MATRIX_FETCH_PAGE_SIZE
-                      + "&page="
-                      + page,
-                  USER_PAGE_TYPE));
+                  "/api/v1/promotion/evaluations/members?size={size}&page={page}",
+                  USER_PAGE_TYPE,
+                  MATRIX_FETCH_PAGE_SIZE,
+                  page));
     } catch (Exception e) {
       log.error("Failed to fetch evaluatable members", e);
       return CompleteCatalog.empty();
@@ -690,7 +689,7 @@ public class PromotionPageController {
     try {
       List<PromotionEligibilityDto> result =
           backendApiClient.get(
-              "/api/v1/promotion/eligibility/user/" + userId, ELIGIBILITY_LIST_TYPE);
+              "/api/v1/promotion/eligibility/user/{userId}", ELIGIBILITY_LIST_TYPE, userId);
       return result != null ? result : new ArrayList<>();
     } catch (Exception e) {
       log.error("Failed to fetch promotion eligibility for member {}", userId, e);

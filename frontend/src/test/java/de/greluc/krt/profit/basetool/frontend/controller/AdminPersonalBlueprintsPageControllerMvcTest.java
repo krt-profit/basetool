@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -113,7 +114,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void view_withMember_rendersTheMembersDialogsTogetherWithTheImportScript() throws Exception {
     PageResponse<UserDto> empty = new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(empty);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(empty);
     String html =
         mockMvc
             .perform(
@@ -134,7 +135,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void view_rendersIdPlaceholderToken_inPerRowEndpoints() throws Exception {
     PageResponse<UserDto> empty = new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(empty);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(empty);
 
     mockMvc
         .perform(
@@ -164,7 +165,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
             null);
     PageResponse<PersonalBlueprintDto> page =
         new PageResponse<>(List.of(bp), 0, 200, 1L, 1, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     mockMvc
         .perform(
@@ -185,7 +186,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
     String userSub = UUID.randomUUID().toString();
     PageResponse<PersonalBlueprintDto> page =
         new PageResponse<>(List.of(), 0, 200, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     mockMvc
         .perform(
@@ -197,7 +198,13 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
     ArgumentCaptor<Object> qCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture());
+    verify(backendApiClient)
+        .get(
+            uriCaptor.capture(),
+            anyTypeRef(),
+            eq(UUID.fromString(userSub)),
+            eq(200),
+            qCaptor.capture());
     assertTrue(uriCaptor.getValue().contains("q={q}"), uriCaptor.getValue());
     assertEquals("Arclight Pistol", qCaptor.getValue());
   }
@@ -208,7 +215,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
     String userSub = UUID.randomUUID().toString();
     PageResponse<PersonalBlueprintDto> page =
         new PageResponse<>(List.of(), 0, 200, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     String term = "Größe Röhre";
     mockMvc
@@ -221,7 +228,13 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
     ArgumentCaptor<Object> qCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture());
+    verify(backendApiClient)
+        .get(
+            uriCaptor.capture(),
+            anyTypeRef(),
+            eq(UUID.fromString(userSub)),
+            eq(200),
+            qCaptor.capture());
     assertTrue(uriCaptor.getValue().contains("q={q}"), uriCaptor.getValue());
     assertEquals(term, qCaptor.getValue());
   }
@@ -261,8 +274,9 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
             null);
     PageResponse<PersonalBlueprintDto> emptyBlueprints =
         new PageResponse<>(List.of(), 0, 200, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), anyClass())).thenReturn(user);
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(emptyBlueprints);
+    when(backendApiClient.get(anyString(), anyClass(), any(Object[].class))).thenReturn(user);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(emptyBlueprints);
 
     mockMvc
         .perform(
@@ -278,7 +292,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void view_rendersGlobalPurgeDangerZone() throws Exception {
     PageResponse<UserDto> users = new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(users);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(users);
 
     mockMvc
         .perform(get("/admin/personal-blueprints"))
@@ -311,7 +325,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
             null,
             null,
             null);
-    when(backendApiClient.get(anyString(), anyTypeRef()))
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(bp), 0, 200, 1L, 1, List.of()));
 
     String html =

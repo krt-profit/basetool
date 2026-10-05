@@ -89,7 +89,8 @@ class AdminDefaultBlueprintsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void search_passesMultiWordQueryAsUriVariable() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(List.of());
 
     mockMvc
         .perform(get("/admin/default-blueprints/search").param("q", "Arclight Pistol"))
@@ -97,15 +98,16 @@ class AdminDefaultBlueprintsPageControllerMvcTest {
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
     ArgumentCaptor<Object> qCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture());
-    assertTrue(uriCaptor.getValue().contains("q={q}"), uriCaptor.getValue());
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture(), eq(25));
+    assertTrue(uriCaptor.getValue().contains("q={q}&limit={limit}"), uriCaptor.getValue());
     assertEquals("Arclight Pistol", qCaptor.getValue());
   }
 
   @Test
   @WithMockUser(roles = "ADMIN")
   void search_passesUmlautQueryAsUriVariable_notFormEncoded() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(List.of());
 
     String term = "Müller Röhre";
     mockMvc
@@ -114,8 +116,8 @@ class AdminDefaultBlueprintsPageControllerMvcTest {
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
     ArgumentCaptor<Object> qCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture());
-    assertTrue(uriCaptor.getValue().contains("q={q}"), uriCaptor.getValue());
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture(), eq(25));
+    assertTrue(uriCaptor.getValue().contains("q={q}&limit={limit}"), uriCaptor.getValue());
     assertEquals(term, qCaptor.getValue());
   }
 

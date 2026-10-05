@@ -67,9 +67,7 @@ public class JobOrderHandoverReportProxyController {
       @PathVariable @NotNull UUID handoverId,
       @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
     return fetchPdf(
-        "/api/v1/orders/" + jobOrderId + "/handovers/" + handoverId + "/report",
-        userTimeZone,
-        "uebergabeprotokoll-" + jobOrderId + ".pdf");
+        false, jobOrderId, handoverId, userTimeZone, "uebergabeprotokoll-" + jobOrderId + ".pdf");
   }
 
   /**
@@ -87,9 +85,7 @@ public class JobOrderHandoverReportProxyController {
       @PathVariable @NotNull UUID handoverId,
       @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
     return fetchPdf(
-        "/api/v1/orders/" + jobOrderId + "/item-handovers/" + handoverId + "/report",
-        userTimeZone,
-        "uebergabeprotokoll-" + jobOrderId + ".pdf");
+        true, jobOrderId, handoverId, userTimeZone, "uebergabeprotokoll-" + jobOrderId + ".pdf");
   }
 
   /**
@@ -103,7 +99,7 @@ public class JobOrderHandoverReportProxyController {
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<byte[]> previewHandoverReport(
       @PathVariable @NotNull UUID jobOrderId, @RequestBody @NotNull Map<String, Object> body) {
-    String uri = "/api/v1/orders/" + jobOrderId + "/handovers/report/preview";
+    String uri = "/api/v1/orders/{id}/handovers/report/preview";
     byte[] pdf =
         withBackendStatus(
             () ->
@@ -113,7 +109,7 @@ public class JobOrderHandoverReportProxyController {
                     webClient ->
                         webClient
                             .post()
-                            .uri(uri)
+                            .uri(uri, jobOrderId)
                             .contentType(MediaType.APPLICATION_JSON)
                             .bodyValue(body),
                     spec -> spec.bodyToMono(byte[].class)));
@@ -125,13 +121,23 @@ public class JobOrderHandoverReportProxyController {
    * Fetches one backend report PDF, forwarding the caller's time zone, and wraps it as an
    * attachment.
    *
-   * @param uri the backend path
+   * @param itemHandover {@code true} for an item-handover report, {@code false} for a material one
+   * @param jobOrderId the job order
+   * @param handoverId the handover or item-handover
    * @param userTimeZone the caller's IANA time zone; may be {@code null}
    * @param filename the download filename
    * @return the PDF with attachment headers
    */
   private @NotNull ResponseEntity<byte[]> fetchPdf(
-      @NotNull String uri, String userTimeZone, @NotNull String filename) {
+      boolean itemHandover,
+      @NotNull UUID jobOrderId,
+      @NotNull UUID handoverId,
+      String userTimeZone,
+      @NotNull String filename) {
+    String uri =
+        itemHandover
+            ? "/api/v1/orders/{id}/item-handovers/{handoverId}/report"
+            : "/api/v1/orders/{id}/handovers/{handoverId}/report";
     byte[] pdf =
         withBackendStatus(
             () ->
@@ -141,7 +147,7 @@ public class JobOrderHandoverReportProxyController {
                     webClient ->
                         webClient
                             .get()
-                            .uri(uri)
+                            .uri(uri, jobOrderId, handoverId)
                             .headers(
                                 h -> {
                                   if (userTimeZone != null && !userTimeZone.isBlank()) {

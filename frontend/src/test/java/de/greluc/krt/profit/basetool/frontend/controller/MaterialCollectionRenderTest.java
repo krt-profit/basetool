@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -73,7 +74,8 @@ class MaterialCollectionRenderTest {
    */
   private @NotNull String render(@NotNull List<MaterialCollectionEntryDto> entries)
       throws Exception {
-    when(backendApiClient.get(contains("/material-collection"), anyTypeRef())).thenReturn(entries);
+    when(backendApiClient.get(contains("/material-collection"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(entries);
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenReturn(List.of(new LocationReferenceDto(LOCATION_ID, "Lorville")));
     MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();

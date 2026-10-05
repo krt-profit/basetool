@@ -258,9 +258,11 @@ a matching log line. The per-domain typed clients the frontend gets are built ov
 Resilience4j chain, the SSE relay's `sseWebClient` and the live-sync probe's
 `liveSyncAuthWebClient` deliberately do not. Only `WebClientConfig` builds a client, and only the
 kernel holds one — `BackendApiClient`, and `BackendSideChannels` for the SSE relay and the probe
-(`WebClientConfinementTest`); every other class calls one of the two. `BackendErrorMapper` maps
-every failed `BackendApiClient` call in one exhaustive switch, and a runtime value enters a backend
-URI only as a template variable (REQ-SEC-051, `WriteUriTemplateTest` for the write verbs). The first filter of all four refuses any request whose scheme, host
+(`WebClientConfinementTest`); a controller calls its domain's typed client in
+`frontend.<domain>.client`, a thin service over `BackendApiClient` (plan F3,
+`TypedBackendClientTest`). `BackendErrorMapper` maps every failed `BackendApiClient` call in one
+exhaustive switch, and a runtime value enters a backend URI only as a template variable, for every
+verb (REQ-SEC-051, `WriteUriTemplateTest` and `ReadUriTemplateTest`). The first filter of all four refuses any request whose scheme, host
 and port differ from `app.backend-url`, before the OAuth2 filter can attach the member's bearer —
 an absolute URL handed to a client would otherwise carry the token to that host. Future
 HTTP-interface clients are created over the same `webClient` bean and take no `URI`,

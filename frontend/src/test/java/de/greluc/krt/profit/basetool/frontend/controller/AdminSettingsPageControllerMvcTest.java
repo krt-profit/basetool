@@ -173,7 +173,9 @@ class AdminSettingsPageControllerMvcTest {
     SpecialCommandDto alpha =
         new SpecialCommandDto(alphaId, "Alpha-Kommando", "AK", "", true, false, 1L);
     when(backendApiClient.get(
-            eq("/api/v1/special-commands?size=1000&sort=name,asc&page=0"), anyTypeRef()))
+            eq("/api/v1/special-commands?size=1000&sort=name,asc&page={page}"),
+            anyTypeRef(),
+            eq(0)))
         .thenReturn(new PageResponse<>(List.of(zulu, alpha), 0, 1000, 2, 1, List.of()));
 
     String html =
@@ -256,7 +258,8 @@ class AdminSettingsPageControllerMvcTest {
     when(backendApiClient.get(
             eq("/api/v1/settings/refinery.rounding.mode"), eq(SystemSettingDto.class)))
         .thenReturn(new SystemSettingDto("refinery.rounding.mode", "DOWN", 4L));
-    when(backendApiClient.get(eq("/api/v1/squadrons?size=1000&sort=name,asc&page=0"), anyTypeRef()))
+    when(backendApiClient.get(
+            eq("/api/v1/squadrons?size=1000&sort=name,asc&page={page}"), anyTypeRef(), eq(0)))
         .thenReturn(new PageResponse<>(squadrons, 0, 1000, squadrons.size(), 1, List.of()));
     return mockMvc
         .perform(get("/admin/settings").locale(Locale.GERMAN))

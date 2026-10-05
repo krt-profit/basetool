@@ -100,9 +100,10 @@ public class ShipDataPageController {
           CatalogPages.fetchAll(
               page ->
                   backendApiClient.get(
-                      "/api/v1/manufacturers?size=1000&sort=name,asc&includeHidden=true&page="
-                          + page,
-                      MANUFACTURER_PAGE_TYPE));
+                      "/api/v1/manufacturers?size=1000&sort=name,asc&includeHidden=true"
+                          + "&page={page}",
+                      MANUFACTURER_PAGE_TYPE,
+                      page));
       List<ManufacturerDto> manufacturers = new ArrayList<>(manufacturersCatalog.items());
       manufacturers.sort(
           Comparator.comparing(ManufacturerDto::name, String.CASE_INSENSITIVE_ORDER));
@@ -112,8 +113,9 @@ public class ShipDataPageController {
           CatalogPages.fetchAll(
               page ->
                   backendApiClient.get(
-                      "/api/v1/ship-types?size=1000&sort=name,asc&includeHidden=true&page=" + page,
-                      SHIP_TYPE_PAGE_TYPE));
+                      "/api/v1/ship-types?size=1000&sort=name,asc&includeHidden=true&page={page}",
+                      SHIP_TYPE_PAGE_TYPE,
+                      page));
       List<ShipTypeDto> shipTypes = new ArrayList<>(shipTypesCatalog.items());
       shipTypes.sort(Comparator.comparing(ShipTypeDto::name, String.CASE_INSENSITIVE_ORDER));
       model.addAttribute("shipTypes", shipTypes);

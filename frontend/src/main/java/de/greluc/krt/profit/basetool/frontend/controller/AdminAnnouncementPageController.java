@@ -22,16 +22,16 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.dashboard.client.DashboardBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AnnouncementDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AnnouncementRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -56,25 +56,21 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminAnnouncementPageController {
 
-  /** Response type for the raw admin-view announcement record ({@code Map<String, Object>}). */
-  private static final ParameterizedTypeReference<Map<String, Object>> STRING_OBJECT_MAP_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Reads and writes the announcement. */
+  private final DashboardBackendClient dashboardClient;
 
   /**
    * Loads the current admin-view announcement record. A backend failure is logged but the page
    * still renders so the admin can post a new announcement from the empty form.
    *
-   * @param model Thymeleaf model populated with {@code adminAnnouncement} (raw JSON map)
+   * @param model Thymeleaf model populated with {@code adminAnnouncement}
    * @return the {@code admin/announcement} view name
    */
   @NotNull
   @GetMapping
   public String showAnnouncementPage(Model model) {
     try {
-      Map<String, Object> adminAnnouncement =
-          backendApiClient.get("/api/v1/announcement/admin", STRING_OBJECT_MAP_TYPE);
+      AnnouncementDto adminAnnouncement = dashboardClient.adminAnnouncement();
       model.addAttribute("adminAnnouncement", adminAnnouncement);
     } catch (BackendServiceException e) {
       log.debug("Could not fetch admin announcement", e);
@@ -102,11 +98,7 @@ public class AdminAnnouncementPageController {
       @RequestParam(required = false) Long version,
       RedirectAttributes redirectAttributes) {
     try {
-      Map<String, Object> body = new HashMap<>();
-      body.put("content", content);
-      body.put("version", version);
-
-      backendApiClient.put("/api/v1/announcement", body, Void.class);
+      dashboardClient.saveAnnouncement(new AnnouncementRequest(content, version));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Update announcement failed", e);
@@ -147,15 +139,11 @@ public class AdminAnnouncementPageController {
         log,
         "update announcement (ajax)",
         () -> {
-          Map<String, Object> body = new HashMap<>();
-          body.put("content", content);
-          body.put("version", version);
-          backendApiClient.put("/api/v1/announcement", body, Void.class);
+          dashboardClient.saveAnnouncement(new AnnouncementRequest(content, version));
 
-          Map<String, Object> updated =
-              backendApiClient.get("/api/v1/announcement/admin", STRING_OBJECT_MAP_TYPE);
+          AnnouncementDto updated = dashboardClient.adminAnnouncement();
           Map<String, Object> result = new LinkedHashMap<>();
-          result.put("version", updated != null ? updated.get("version") : null);
+          result.put("version", updated != null ? updated.version() : null);
           return ResponseEntity.ok(result);
         });
   }
@@ -170,7 +158,7 @@ public class AdminAnnouncementPageController {
   @PostMapping("/delete")
   public String deleteAnnouncement(RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/announcement", Void.class);
+      dashboardClient.deleteAnnouncement();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (Exception e) {
       log.error("Delete announcement failed", e);
@@ -192,7 +180,7 @@ public class AdminAnnouncementPageController {
         log,
         "delete announcement (ajax)",
         () -> {
-          backendApiClient.delete("/api/v1/announcement", Void.class);
+          dashboardClient.deleteAnnouncement();
           return ResponseEntity.ok().build();
         });
   }

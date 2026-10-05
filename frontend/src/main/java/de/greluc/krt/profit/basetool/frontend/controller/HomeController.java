@@ -20,24 +20,23 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.dashboard.client.DashboardBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AnnouncementDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import jakarta.servlet.http.HttpSession;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -55,22 +54,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Slf4j
 public class HomeController {
 
-  /** Response type for the paged {@code /missions/search} upcoming-mission listing. */
-  private static final ParameterizedTypeReference<PageResponse<MissionListDto>> MISSION_PAGE_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  /** Response type for the {@code /users/me/org-unit-ids} direct-membership id list. */
-  private static final ParameterizedTypeReference<List<UUID>> UUID_LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  /** Response type for the {@code /announcement} public-announcement map. */
-  private static final ParameterizedTypeReference<Map<String, Object>> ANNOUNCEMENT_MAP_TYPE =
-      new ParameterizedTypeReference<>() {};
-
   @Value("${app.ui.notification-duration:5000}")
   private long notificationDuration;
 
-  private final BackendApiClient backendApiClient;
+  /** Reads the dashboard's backend data. */
+  private final DashboardBackendClient dashboardClient;
 
   /**
    * Renders {@code /}. For an anonymous visitor it returns the landing page without any backend
@@ -93,14 +81,7 @@ public class HomeController {
     try {
       Instant now = Instant.now();
       Instant horizon = now.plus(7, ChronoUnit.DAYS);
-      String searchUri =
-          "/api/v1/missions/search?start="
-              + now
-              + "&end="
-              + horizon
-              + "&sort=plannedStartTime,asc&status=PLANNED&status=ACTIVE&size=50";
-      PageResponse<MissionListDto> upcomingPage =
-          backendApiClient.get(searchUri, MISSION_PAGE_TYPE);
+      PageResponse<MissionListDto> upcomingPage = dashboardClient.upcomingMissions(now, horizon);
       List<MissionListDto> upcomingMissions =
           (upcomingPage != null && upcomingPage.content() != null)
               ? upcomingPage.content()
@@ -129,8 +110,7 @@ public class HomeController {
 
     try {
       de.greluc.krt.profit.basetool.frontend.model.dto.UserDto currentUser =
-          backendApiClient.get(
-              "/api/v1/users/me", de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class);
+          dashboardClient.currentUser();
       model.addAttribute("currentUser", currentUser);
 
       Set<UUID> myOrgUnitIds = new HashSet<>();
@@ -145,8 +125,7 @@ public class HomeController {
         myOrgUnitIds.add(currentUser.squadron().id());
       }
       try {
-        List<UUID> directOrgUnitIds =
-            backendApiClient.get("/api/v1/users/me/org-unit-ids", UUID_LIST_TYPE);
+        List<UUID> directOrgUnitIds = dashboardClient.myOrgUnitIds();
         if (directOrgUnitIds != null) {
           for (UUID id : directOrgUnitIds) {
             if (id != null) {
@@ -159,15 +138,13 @@ public class HomeController {
       }
       model.addAttribute("myOrgUnitIds", myOrgUnitIds);
 
-      Map<String, Object> announcement =
-          backendApiClient.get("/api/v1/announcement", ANNOUNCEMENT_MAP_TYPE);
+      AnnouncementDto announcement = dashboardClient.announcement();
       model.addAttribute("announcement", announcement);
 
       boolean unread = false;
-      if (announcement != null && announcement.containsKey("id")) {
-        String announcementId = (String) announcement.get("id");
+      if (announcement != null && announcement.id() != null) {
         if (currentUser.lastReadAnnouncementId() == null
-            || !currentUser.lastReadAnnouncementId().toString().equals(announcementId)) {
+            || !currentUser.lastReadAnnouncementId().equals(announcement.id())) {
           unread = true;
         }
       }
@@ -193,7 +170,7 @@ public class HomeController {
   public String markAnnouncementAsRead(
       @org.springframework.web.bind.annotation.RequestParam UUID id) {
     try {
-      backendApiClient.put("/api/v1/users/me/read-announcement/{id}", null, Void.class, id);
+      dashboardClient.markAnnouncementRead(id);
     } catch (Exception e) {
       log.error("Failed to mark announcement as read", e);
     }
@@ -215,7 +192,7 @@ public class HomeController {
   public org.springframework.http.ResponseEntity<Void> markAnnouncementAsReadAjax(
       @org.springframework.web.bind.annotation.RequestParam UUID id) {
     try {
-      backendApiClient.put("/api/v1/users/me/read-announcement/{id}", null, Void.class, id);
+      dashboardClient.markAnnouncementRead(id);
       return org.springframework.http.ResponseEntity.ok().build();
     } catch (Exception e) {
       log.error("Failed to mark announcement as read", e);

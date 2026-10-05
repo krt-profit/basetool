@@ -108,7 +108,8 @@ class MaterialboersePageControllerMvcTest {
         .thenReturn(new PageResponse<>(List.of(offer), 0, 200, 1, 1, List.of()));
     when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
         .thenReturn(new MaterialExchangeCountsDto(1, 0));
-    when(backendApiClient.get(contains("/material-exchange/offers/"), anyClass()))
+    when(backendApiClient.get(
+            contains("/material-exchange/offers/"), anyClass(), any(Object[].class)))
         .thenReturn(offer);
   }
 
@@ -212,7 +213,9 @@ class MaterialboersePageControllerMvcTest {
         .thenReturn(new PageResponse<>(List.of(item), 0, 200, 1, 1, List.of()));
     when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
         .thenReturn(new MaterialExchangeCountsDto(1, 0));
-    when(backendApiClient.get(contains("/material-exchange/offers/"), anyClass())).thenReturn(item);
+    when(backendApiClient.get(
+            contains("/material-exchange/offers/"), anyClass(), any(Object[].class)))
+        .thenReturn(item);
 
     mockMvc
         .perform(get("/materialboerse").param("lang", "en"))
@@ -256,7 +259,8 @@ class MaterialboersePageControllerMvcTest {
         .thenReturn(new PageResponse<>(List.of(stockBacked), 0, 200, 1, 1, List.of()));
     when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
         .thenReturn(new MaterialExchangeCountsDto(1, 1));
-    when(backendApiClient.get(contains("/material-exchange/offers/"), anyClass()))
+    when(backendApiClient.get(
+            contains("/material-exchange/offers/"), anyClass(), any(Object[].class)))
         .thenReturn(stockBacked);
 
     mockMvc
@@ -313,7 +317,8 @@ class MaterialboersePageControllerMvcTest {
         .thenReturn(new PageResponse<>(List.of(stolen), 0, 200, 1, 1, List.of()));
     when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
         .thenReturn(new MaterialExchangeCountsDto(1, 0));
-    when(backendApiClient.get(contains("/material-exchange/offers/"), anyClass()))
+    when(backendApiClient.get(
+            contains("/material-exchange/offers/"), anyClass(), any(Object[].class)))
         .thenReturn(stolen);
 
     String body =

@@ -332,13 +332,16 @@ public class MaterialsPageController {
     try {
       List<Object> uriVariables = new ArrayList<>();
       String template =
-          filteredMatrixTemplate(materials, systems, loadingDock, autoLoad, uriVariables);
-      Object[] variables = uriVariables.toArray();
+          filteredMatrixTemplate(materials, systems, loadingDock, autoLoad, uriVariables)
+              + "&page={page}";
       CatalogPages.CompleteCatalog<MaterialMatrixItemDto> walked =
           CatalogPages.fetchAll(
-              page ->
-                  backendApiClient.get(
-                      template + "&page=" + page, MATERIAL_MATRIX_PAGE_TYPE, variables));
+              page -> {
+                List<Object> pageVariables = new ArrayList<>(uriVariables);
+                pageVariables.add(page);
+                return backendApiClient.get(
+                    template, MATERIAL_MATRIX_PAGE_TYPE, pageVariables.toArray());
+              });
       if (walked.truncated()) {
         log.warn(
             "Filtered materials matrix hit the page-walk safety cap of {} pages — the grid slice is"
@@ -352,7 +355,7 @@ public class MaterialsPageController {
   }
 
   /**
-   * Builds the backend matrix URI template for a filtered fetch, with one {@code {fN}} placeholder
+   * Builds the backend matrix URI template for a filtered fetch, with one positional placeholder
    * per material or star-system value, appending the values to {@code uriVariables} in order.
    *
    * @param materials material names to keep, or empty/absent for all
@@ -372,13 +375,13 @@ public class MaterialsPageController {
     StringBuilder uri = new StringBuilder(CachedCatalog.MATERIALS_MATRIX.getUri());
     if (!isEmptySelection(materials)) {
       for (String material : materials) {
-        uri.append("&materialNames={f").append(uriVariables.size()).append('}');
+        uri.append("&materialNames={materialName}");
         uriVariables.add(material);
       }
     }
     if (!isEmptySelection(systems)) {
       for (String system : systems) {
-        uri.append("&starSystems={f").append(uriVariables.size()).append('}');
+        uri.append("&starSystems={starSystem}");
         uriVariables.add(system);
       }
     }
@@ -526,18 +529,18 @@ public class MaterialsPageController {
   public String getMaterialDetail(@PathVariable @NotNull UUID id, Model model) {
     model.addAttribute("uexAge", uexAge());
     try {
-      MaterialDto material = backendApiClient.get("/api/v1/materials/" + id, MaterialDto.class);
+      MaterialDto material = backendApiClient.get("/api/v1/materials/{id}", MaterialDto.class, id);
       model.addAttribute("material", material);
 
       CatalogPages.CompleteCatalog<MaterialPriceDto> prices =
           CatalogPages.fetchAll(
               page ->
                   backendApiClient.get(
-                      "/api/v1/materials/"
-                          + id
-                          + "/prices?size=10000&sort=terminal.name,asc&page="
-                          + page,
-                      MATERIAL_PRICE_PAGE_TYPE));
+                      "/api/v1/materials/{id}/prices?size=10000&sort=terminal.name,asc"
+                          + "&page={page}",
+                      MATERIAL_PRICE_PAGE_TYPE,
+                      id,
+                      page));
       if (prices.truncated()) {
         log.warn(
             "Material {} price list hit the page-walk safety cap of {} pages — the detail table is"

@@ -205,7 +205,7 @@ class AdminUexPageControllerTest {
     AdminUexPageController controller = new AdminUexPageController(client);
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
     UUID id = UUID.randomUUID();
-    when(client.get("/api/v1/terminals/" + id, TerminalDto.class))
+    when(client.get("/api/v1/terminals/{id}", TerminalDto.class, id))
         .thenReturn(terminalIn("Lorville TDD", "Stanton", "Lorville", null));
 
     String view = controller.toggleTerminalVisibility(id, true, attrs);
@@ -220,7 +220,7 @@ class AdminUexPageControllerTest {
     BackendApiClient client = mock(BackendApiClient.class);
     AdminUexPageController controller = new AdminUexPageController(client);
     UUID id = UUID.randomUUID();
-    when(client.get("/api/v1/terminals/" + id, TerminalDto.class))
+    when(client.get("/api/v1/terminals/{id}", TerminalDto.class, id))
         .thenReturn(terminalIn("Area 18 TDD", "Stanton", "Area 18", null));
 
     ResponseEntity<Object> response = controller.toggleTerminalVisibilityAjax(id);
@@ -285,9 +285,9 @@ class AdminUexPageControllerTest {
     stubEmptyPage(client, "/api/v1/outposts?size=10000&sort=name,asc");
     stubEmptyPage(client, "/api/v1/pois?size=10000&sort=name,asc");
     String terminalsBase = "/api/v1/terminals?size=10000&sort=name,asc";
-    when(client.get(eq(terminalsBase + "&page=0"), anyTypeRef()))
+    when(client.get(eq(terminalsBase + "&page={page}"), anyTypeRef(), eq(0)))
         .thenReturn(new PageResponse<>(List.of(first), 0, 10000, 5, 2, List.of()));
-    when(client.get(eq(terminalsBase + "&page=1"), anyTypeRef()))
+    when(client.get(eq(terminalsBase + "&page={page}"), anyTypeRef(), eq(1)))
         .thenReturn(new PageResponse<>(List.of(second), 1, 10000, 5, 2, List.of()));
 
     ConcurrentModel model = new ConcurrentModel();
@@ -453,13 +453,13 @@ class AdminUexPageControllerTest {
 
   private static void stubEmptyPage(BackendApiClient client, String uri) {
     PageResponse<Map<String, Object>> empty = new PageResponse<>(List.of(), 0, 10, 0, 0, List.of());
-    when(client.get(eq(uri + "&page=0"), anyTypeRef())).thenReturn(empty);
+    when(client.get(eq(uri + "&page={page}"), anyTypeRef(), eq(0))).thenReturn(empty);
   }
 
   @SafeVarargs
   private static void stubPage(BackendApiClient client, String uri, Map<String, Object>... rows) {
     PageResponse<Map<String, Object>> page =
         new PageResponse<>(List.of(rows), 0, 10, rows.length, 1, List.of());
-    when(client.get(eq(uri + "&page=0"), anyTypeRef())).thenReturn(page);
+    when(client.get(eq(uri + "&page={page}"), anyTypeRef(), eq(0))).thenReturn(page);
   }
 }

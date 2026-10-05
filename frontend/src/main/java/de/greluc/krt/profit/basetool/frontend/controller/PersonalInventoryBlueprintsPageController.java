@@ -197,8 +197,9 @@ public class PersonalInventoryBlueprintsPageController {
     try {
       String query = q == null ? "" : q;
       int effectiveLimit = limit == null ? 25 : Math.min(200, Math.max(1, limit));
-      String uri = "/api/v1/blueprints/products/search?q={q}&limit=" + effectiveLimit;
-      List<BlueprintProductDto> result = backendApiClient.get(uri, BLUEPRINT_PRODUCT_LIST, query);
+      String uri = "/api/v1/blueprints/products/search?q={q}&limit={limit}";
+      List<BlueprintProductDto> result =
+          backendApiClient.get(uri, BLUEPRINT_PRODUCT_LIST, query, effectiveLimit);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
       log.debug(
@@ -224,7 +225,7 @@ public class PersonalInventoryBlueprintsPageController {
     try {
       PersonalBlueprintRecipeDto result =
           backendApiClient.get(
-              "/api/v1/personal-blueprints/" + id + "/recipe", PersonalBlueprintRecipeDto.class);
+              "/api/v1/personal-blueprints/{id}/recipe", PersonalBlueprintRecipeDto.class, id);
       return result == null ? emptyRecipe() : result;
     } catch (Exception e) {
       log.warn("Failed to fetch blueprint recipe {}: {}", id, e.getMessage());
@@ -247,8 +248,9 @@ public class PersonalInventoryBlueprintsPageController {
     try {
       List<BlueprintCraftabilityDto> result =
           backendApiClient.get(
-              "/api/v1/personal-blueprints/craftability?includeRefinery=" + includeRefinery,
-              BLUEPRINT_CRAFTABILITY_LIST);
+              "/api/v1/personal-blueprints/craftability?includeRefinery={includeRefinery}",
+              BLUEPRINT_CRAFTABILITY_LIST,
+              includeRefinery);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
       log.warn("Failed to fetch blueprint craftability: {}", e.getMessage());
@@ -496,17 +498,12 @@ public class PersonalInventoryBlueprintsPageController {
    * @return the requested page of owned blueprints
    */
   private PageResponse<PersonalBlueprintDto> fetchOwnedPage(String q, int page) {
-    StringBuilder uri =
-        new StringBuilder("/api/v1/personal-blueprints?size=")
-            .append(FETCH_PAGE_SIZE)
-            .append("&page=")
-            .append(page)
-            .append("&sort=productName,asc");
+    String uri = "/api/v1/personal-blueprints?size={size}&page={page}&sort=productName,asc";
     if (q != null && !q.isBlank()) {
-      uri.append("&q={q}");
-      return backendApiClient.get(uri.toString(), PERSONAL_BLUEPRINT_PAGE, q);
+      return backendApiClient.get(
+          uri + "&q={q}", PERSONAL_BLUEPRINT_PAGE, FETCH_PAGE_SIZE, page, q);
     }
-    return backendApiClient.get(uri.toString(), PERSONAL_BLUEPRINT_PAGE);
+    return backendApiClient.get(uri, PERSONAL_BLUEPRINT_PAGE, FETCH_PAGE_SIZE, page);
   }
 
   /**

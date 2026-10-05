@@ -90,22 +90,22 @@ public class AdminBlueprintsPageController {
     int safePage = Math.max(page, 0);
     String trimmed = (search == null || search.isBlank()) ? null : search.trim();
 
-    StringBuilder uri =
-        new StringBuilder("/api/v1/blueprints?size=")
-            .append(PAGE_SIZE)
-            .append("&page=")
-            .append(safePage)
-            .append("&sort=outputName,asc");
     boolean hasSearch = trimmed != null;
-    if (hasSearch) {
-      uri.append("&search={search}");
-    }
 
     try {
       PageResponse<BlueprintDto> response =
           hasSearch
-              ? backendApiClient.get(uri.toString(), BLUEPRINT_PAGE_TYPE, trimmed)
-              : backendApiClient.get(uri.toString(), BLUEPRINT_PAGE_TYPE);
+              ? backendApiClient.get(
+                  "/api/v1/blueprints?size={size}&page={page}&sort=outputName,asc&search={search}",
+                  BLUEPRINT_PAGE_TYPE,
+                  PAGE_SIZE,
+                  safePage,
+                  trimmed)
+              : backendApiClient.get(
+                  "/api/v1/blueprints?size={size}&page={page}&sort=outputName,asc",
+                  BLUEPRINT_PAGE_TYPE,
+                  PAGE_SIZE,
+                  safePage);
       if (response != null) {
         model.addAttribute(
             "blueprints", response.content() == null ? List.of() : response.content());

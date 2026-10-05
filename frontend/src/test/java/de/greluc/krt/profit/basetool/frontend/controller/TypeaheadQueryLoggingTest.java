@@ -103,7 +103,7 @@ class TypeaheadQueryLoggingTest {
   @Test
   void uexTypeahead_logsSanitisedQueryAtDebugNotWarn() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.get(anyString(), anyTypeRef(), eq(FORGED_QUERY)))
+    when(client.get(anyString(), anyTypeRef(), eq(FORGED_QUERY), eq(25)))
         .thenThrow(new RuntimeException("backend down"));
     ListAppender<ILoggingEvent> appender = capture(PersonalInventoryPageController.class);
 
@@ -115,7 +115,7 @@ class TypeaheadQueryLoggingTest {
   @Test
   void personalBlueprintTypeahead_logsSanitisedQueryAtDebugNotWarn() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.get(anyString(), anyTypeRef(), eq(FORGED_QUERY)))
+    when(client.get(anyString(), anyTypeRef(), eq(FORGED_QUERY), eq(25)))
         .thenThrow(new RuntimeException("backend down"));
     ListAppender<ILoggingEvent> appender = capture(PersonalInventoryBlueprintsPageController.class);
 
@@ -128,7 +128,7 @@ class TypeaheadQueryLoggingTest {
   @Test
   void defaultBlueprintTypeahead_logsSanitisedQueryAtDebugNotWarn() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.get(anyString(), anyTypeRef(), eq(FORGED_QUERY)))
+    when(client.get(anyString(), anyTypeRef(), eq(FORGED_QUERY), eq(25)))
         .thenThrow(new RuntimeException("backend down"));
     ListAppender<ILoggingEvent> appender = capture(AdminDefaultBlueprintsPageController.class);
 
@@ -141,7 +141,7 @@ class TypeaheadQueryLoggingTest {
   @Test
   void adminBlueprintSearch_logsSanitisedQueryAtDebugOnBackendServiceException() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.get(anyString(), anyTypeRef(), eq(FORGED_QUERY)))
+    when(client.get(anyString(), anyTypeRef(), eq(25), eq(0), eq(FORGED_QUERY)))
         .thenThrow(new BackendServiceException("relay failed", null, 503));
     ListAppender<ILoggingEvent> appender = capture(AdminBlueprintsPageController.class);
 
@@ -158,7 +158,7 @@ class TypeaheadQueryLoggingTest {
   @Test
   void adminBlueprintSearch_keepsErrorLevelForTheUnexpectedCatchAll() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.get(anyString(), anyTypeRef(), eq(FORGED_QUERY)))
+    when(client.get(anyString(), anyTypeRef(), eq(25), eq(0), eq(FORGED_QUERY)))
         .thenThrow(new IllegalStateException("boom"));
     ListAppender<ILoggingEvent> appender = capture(AdminBlueprintsPageController.class);
 

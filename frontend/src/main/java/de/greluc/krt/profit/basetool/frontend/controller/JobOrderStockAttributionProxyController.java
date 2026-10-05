@@ -69,8 +69,10 @@ public class JobOrderStockAttributionProxyController {
     try {
       return ResponseEntity.ok(
           backendApiClient.get(
-              "/api/v1/orders/" + id + "/materials/" + matId + "/attribution",
-              LIST_OF_STOCK_ATTRIBUTION));
+              "/api/v1/orders/{id}/materials/{matId}/attribution",
+              LIST_OF_STOCK_ATTRIBUTION,
+              id,
+              matId));
     } catch (Exception e) {
       log.warn("Failed to load stock attribution for job order {} and material {}", id, matId, e);
       return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();

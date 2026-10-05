@@ -840,7 +840,7 @@ domain stays a package.
 | F0 | Guards (Phase 0.4) |
 | F1 — **done 2026-10-04** | Kernel extraction: `BackendErrorMapper` (a sealed outcome type with a pattern switch), template overloads for write verbs, the eleven bypassing controllers moved onto the kernel, the `WebClient` confinement rule at zero |
 | F2 — **done 2026-10-04** | Exact session allow-list in its own release (D-10): `SessionTypeAllowList.SESSION_BOUND_TYPES`, 21 exact names; the `…frontend.model.` prefix is gone, `SessionBoundTypeClosureTest` holds the list equal to the derived set in both directions. Corrections: the list lives in the security class, not in the G-16 golden file (`session-bound-types.txt` is deleted, so `-PupdateSnapshots` can no longer widen the allow-list); the admitted application classes fall from 325 to 21, not "about 20" of "about eleven" forms — the 21 are 10 flashed forms and DTOs with their nested types and enums |
-| F3 | Typed client per domain, small domains first (audit, notification, settings, dashboard, exchange, orgchart), then the large four; untyped `Map` relays typed in the same step |
+| F3 — **in progress since 2026-10-05** | Typed client per domain, small domains first (audit, notification, settings, dashboard, exchange, orgchart), then the large four; untyped `Map` relays typed in the same step |
 | F4 | Package-by-domain move in one pull request; route/gate snapshot byte-identical |
 | F5 | Templates and assets per domain (§8.2), with the page chrome as one layout fragment |
 
@@ -859,6 +859,35 @@ Corrections: the eleven bypassing controllers had already returned to the kernel
 so F1 only verified it; the "zero" in this row was reached by moving the two named
 exceptions into the kernel, not by removing them; the 130 concatenating GET call sites are left for
 F3, where the typed clients replace them.
+
+*F3 as built, part 1 (2026-10-05).* The six small domains call typed clients:
+`audit.client.AuditBackendClient`, `notification.client.NotificationBackendClient`,
+`settings.client.SettingsBackendClient`, `dashboard.client.DashboardBackendClient`,
+`exchange.client.ExchangeBackendClient` and `orgchart.client.OrgChartBackendClient` — `@Service`
+classes over `BackendApiClient` in the `<domain>.client` packages of §5.9, so F4 moves only the
+controllers. A client owns its domain's paths and returns typed records; the announcement and the
+org-chart position relays, untyped `Map`s before, are `AnnouncementDto`/`AnnouncementRequest` and
+`OrgChartPosition{Create,Update}Request`/`OrgChartPositionDto`. Catalogue evictions go through the
+kernel's `CatalogueCacheEviction`. `TypedBackendClientTest` confines `BackendApiClient` to the
+kernel packages and the client packages (the controllers not yet moved are an exact list that
+only shrinks) and checks the client rules (no `URI`/`UriBuilderFactory` parameter, no cache
+annotation, `@Service`, `*BackendClient`) against planted fixtures. Every `get` and `execute(…)`
+passes its runtime values as template variables — `ReadUriTemplateTest` with a floor and a
+planted fixture, so with `WriteUriTemplateTest` no verb concatenates; `BackendApiClient` gained the
+`Class`-typed template `get`. Each client's requests are pinned against a MockWebServer through
+`BackendClientHarness`. Corrections: the "130 GET call sites" were 114 methods with a
+concatenated `get` (113 seen by the F1 scanner) and 8 with a concatenated `execute(…)` when the
+guard was introduced, all converted without a reviewed exception and without changing the bytes
+sent (a repeated placeholder takes the next value, pinned in `BackendApiClientHappyPathTest`); the F1 scanner under-reported, because a `String` parameter without an in-class caller
+folded to nothing inside a conditional, so `/api/v1/audit/" + (domain or "BANK")` read as the
+literal `BANK` branch only (`AdminAuditLogPageController#auditLog`), and a builder chain longer
+than ten links did not fold at all — both fixed, and a switch expression now folds too. A
+controller's typed client is the one of its own domain, page-composition reads of other backend
+roots included (the audit page reads the exchange registry, the settings page the squadron and
+Spezialkommando lists), so a page never needs a second domain's client; the duplicated reads are
+two lines each. Typed clients consolidate repeated call sites, so the write-site floor of
+`WriteUriTemplateTest` and the resolved-site floor of `BackendCallExistenceTest` fall with each
+domain (the four settings PUTs, written twice, are one `write` now).
 
 ### 7.9 REST API track
 

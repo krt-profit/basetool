@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -127,14 +128,18 @@ class PromotionManagePageControllerMvcTest {
     when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(topic));
     when(backendApiClient.get(
-            contains("/api/v1/promotion/categories/by-topic/" + topicId + "/all"), anyTypeRef()))
+            contains("/api/v1/promotion/categories/by-topic/{topicId}/all"),
+            anyTypeRef(),
+            eq(topicId.toString())))
         .thenReturn(List.of(cat1, cat2));
-    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/all"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(eval), 0, 10000, 1, 1, List.of()));
-    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/members"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/members"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(member), 0, 1000, 1, 1, List.of()));
     when(backendApiClient.get(
-            contains("/api/v1/promotion/eligibility/user/" + memberId), anyTypeRef()))
+            eq("/api/v1/promotion/eligibility/user/{userId}"), anyTypeRef(), eq(memberId)))
         .thenReturn(List.of(elig));
 
     mockMvc
@@ -166,18 +171,28 @@ class PromotionManagePageControllerMvcTest {
     when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(topic));
     when(backendApiClient.get(
-            contains("/api/v1/promotion/categories/by-topic/" + topicId + "/all"), anyTypeRef()))
+            contains("/api/v1/promotion/categories/by-topic/{topicId}/all"),
+            anyTypeRef(),
+            eq(topicId.toString())))
         .thenReturn(List.of(cat));
-    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/all"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 1, List.of()));
     when(backendApiClient.get(
-            contains("/api/v1/promotion/evaluations/members?size=1000&page=0"), anyTypeRef()))
+            eq("/api/v1/promotion/evaluations/members?size={size}&page={page}"),
+            anyTypeRef(),
+            eq(1000),
+            eq(0)))
         .thenReturn(
             new PageResponse<>(List.of(member(memberA, "alice")), 0, 1000, 2, 2, List.of()));
     when(backendApiClient.get(
-            contains("/api/v1/promotion/evaluations/members?size=1000&page=1"), anyTypeRef()))
+            eq("/api/v1/promotion/evaluations/members?size={size}&page={page}"),
+            anyTypeRef(),
+            eq(1000),
+            eq(1)))
         .thenReturn(new PageResponse<>(List.of(member(memberB, "bob")), 1, 1000, 2, 2, List.of()));
-    when(backendApiClient.get(contains("/api/v1/promotion/eligibility/user/"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/eligibility/user/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of());
 
     mockMvc
@@ -186,9 +201,9 @@ class PromotionManagePageControllerMvcTest {
         .andExpect(content().string(not(containsString("alert-warning"))));
 
     verify(backendApiClient)
-        .get(contains("/api/v1/promotion/eligibility/user/" + memberA), anyTypeRef());
+        .get(eq("/api/v1/promotion/eligibility/user/{userId}"), anyTypeRef(), eq(memberA));
     verify(backendApiClient)
-        .get(contains("/api/v1/promotion/eligibility/user/" + memberB), anyTypeRef());
+        .get(eq("/api/v1/promotion/eligibility/user/{userId}"), anyTypeRef(), eq(memberB));
   }
 
   @Test
@@ -218,14 +233,19 @@ class PromotionManagePageControllerMvcTest {
     when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(topic));
     when(backendApiClient.get(
-            contains("/api/v1/promotion/categories/by-topic/" + topicId + "/all"), anyTypeRef()))
+            contains("/api/v1/promotion/categories/by-topic/{topicId}/all"),
+            anyTypeRef(),
+            eq(topicId.toString())))
         .thenReturn(List.of(cat));
-    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/all"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(eval), 0, 1000, 200_000, 200, List.of()));
-    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/members"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/members"), anyTypeRef(), any(Object[].class)))
         .thenReturn(
             new PageResponse<>(List.of(member(memberId, "alice")), 0, 1000, 1, 1, List.of()));
-    when(backendApiClient.get(contains("/api/v1/promotion/eligibility/user/"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/eligibility/user/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of());
 
     mockMvc
