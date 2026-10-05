@@ -19,11 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.admin.api.SystemSettings;
 import de.greluc.krt.profit.basetool.backend.model.DefaultBlueprint;
-import de.greluc.krt.profit.basetool.backend.model.SystemSetting;
 import de.greluc.krt.profit.basetool.backend.repository.DefaultBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SystemSettingRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -58,7 +57,7 @@ public class DefaultBlueprintBootstrap implements CommandLineRunner {
   /** {@code SystemSetting} key whose presence/{@code "true"} value marks the one-time seed done. */
   static final String SEEDED_FLAG_KEY = "defaultBlueprints.seeded";
 
-  private final SystemSettingRepository systemSettingRepository;
+  private final SystemSettings systemSettings;
   private final DefaultBlueprintRepository defaultBlueprintRepository;
   private final BlueprintProductService blueprintProductService;
   private final GameItemRepository gameItemRepository;
@@ -140,24 +139,14 @@ public class DefaultBlueprintBootstrap implements CommandLineRunner {
    * @return {@code true} if the seed flag is present and {@code "true"}
    */
   private boolean alreadySeeded() {
-    return systemSettingRepository
-        .findById(SEEDED_FLAG_KEY)
-        .map(s -> "true".equalsIgnoreCase(s.getValue()))
+    return systemSettings
+        .getSettingValue(SEEDED_FLAG_KEY)
+        .map("true"::equalsIgnoreCase)
         .orElse(false);
   }
 
   /** Persists the seed flag so the one-time seed never runs again. */
   private void markSeeded() {
-    SystemSetting flag =
-        systemSettingRepository
-            .findById(SEEDED_FLAG_KEY)
-            .orElseGet(
-                () -> {
-                  SystemSetting s = new SystemSetting();
-                  s.setId(SEEDED_FLAG_KEY);
-                  return s;
-                });
-    flag.setValue("true");
-    systemSettingRepository.save(flag);
+    systemSettings.putSettingValue(SEEDED_FLAG_KEY, "true");
   }
 }

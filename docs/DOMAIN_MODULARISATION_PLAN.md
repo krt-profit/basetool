@@ -833,6 +833,24 @@ their "must stay green" period here (D-01).
   `web` package cannot hold the REST DTOs yet — the services return them, so `internal -> web`
   would close a layer cycle inside the module (ADR-0047); they stay in `internal` until the module
   API returns its own records.
+- `admin` — **done 2026-10-05** (P2-2). The admin building blocks of §5.1 — the runtime system
+  settings, the Android version policy and the liveness probe — moved out of the layer packages:
+  `admin.web` holds `SystemSettingController`, `AppVersionPolicyController`, `SystemController`,
+  `AppVersionPolicyDto` and `PingResponse`; `admin.internal` the `SystemSetting` entity, its
+  repository, `SystemSettingService`, `SystemSettingMapper`, the setting records the service returns,
+  `AndroidClientProperties` and `AndroidVersionPolicyReport`. The `/admin` endpoints of other
+  domains are not part of it; they move with their domains. The module's four inbound edges (bank
+  transfer fee, operation payout, the default-blueprint bootstrap's entity and repository) now go
+  through one API type, `admin.api.SystemSettings` (`getSettingValue`, and `putSettingValue` for
+  the bootstrap's seed flag, the same find-or-create-and-save inside the caller's transaction),
+  implemented by `SystemSettingService`; every declared module of a higher rank allows
+  `admin::api`. The module baseline is unchanged at 110 edges (none of the four was a violation);
+  the authorization matrix and the OpenAPI document are unchanged. No access policy: every gate is
+  a role annotation. The setting records stay in `internal` beside the service that returns them, as
+  for `orgchart`. **Finding:**
+  the selection floor of `ArchitectureTest`'s `squadron_id` join-column rule counts the legacy
+  `model` package tree as well as every entity by role, so each move of `model.dto` records lowers
+  it (by 4 here) without the rule checking any entity less.
 
 ### 7.5 Phase 3 — the business core
 

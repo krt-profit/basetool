@@ -17,20 +17,17 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.admin.internal;
 
+import de.greluc.krt.profit.basetool.backend.admin.api.SystemSettings;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.mapper.SystemSettingMapper;
-import de.greluc.krt.profit.basetool.backend.model.SystemSetting;
-import de.greluc.krt.profit.basetool.backend.model.dto.SystemSettingDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.SystemSettingUpdateDto;
-import de.greluc.krt.profit.basetool.backend.repository.SystemSettingRepository;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,7 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)
-public class SystemSettingService {
+public class SystemSettingService implements SystemSettings {
 
   private final SystemSettingRepository systemSettingRepository;
   private final SystemSettingMapper systemSettingMapper;
@@ -77,8 +74,32 @@ public class SystemSettingService {
    * @param key setting key
    * @return the string value, or empty when the key is absent
    */
-  public Optional<String> getSettingValue(String key) {
+  @Override
+  public @NotNull Optional<String> getSettingValue(@NotNull String key) {
     return systemSettingRepository.findById(key).map(SystemSetting::getValue);
+  }
+
+  /**
+   * Stores a value under a key, creating the row when the key is absent; joins the caller's
+   * transaction and skips the optimistic-lock check, for system-owned keys.
+   *
+   * @param key setting key
+   * @param value the new value
+   */
+  @Override
+  @Transactional
+  public void putSettingValue(@NotNull String key, @NotNull String value) {
+    SystemSetting setting =
+        systemSettingRepository
+            .findById(key)
+            .orElseGet(
+                () -> {
+                  SystemSetting created = new SystemSetting();
+                  created.setId(key);
+                  return created;
+                });
+    setting.setValue(value);
+    systemSettingRepository.save(setting);
   }
 
   /**

@@ -56,6 +56,7 @@ class ModularityTest {
   /** The backend packages annotated with {@code @ApplicationModule}, by module name. */
   private static final Set<String> DECLARED_MODULES =
       Set.of(
+          "admin",
           "audit",
           "bank",
           "catalogue",
@@ -76,7 +77,7 @@ class ModularityTest {
           "refinery",
           "scope");
 
-  private static final int DECLARED_MODULE_FLOOR = 19;
+  private static final int DECLARED_MODULE_FLOOR = 20;
 
   /**
    * Modules without an {@code api} package: their types lie in the base package, which is their

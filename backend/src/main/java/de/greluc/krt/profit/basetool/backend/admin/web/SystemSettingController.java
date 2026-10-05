@@ -17,12 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.admin.web;
 
+import de.greluc.krt.profit.basetool.backend.admin.internal.SystemSettingDto;
+import de.greluc.krt.profit.basetool.backend.admin.internal.SystemSettingService;
+import de.greluc.krt.profit.basetool.backend.admin.internal.SystemSettingUpdateDto;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.model.dto.SystemSettingDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.SystemSettingUpdateDto;
-import de.greluc.krt.profit.basetool.backend.service.SystemSettingService;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
