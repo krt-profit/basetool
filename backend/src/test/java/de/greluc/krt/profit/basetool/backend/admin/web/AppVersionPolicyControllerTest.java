@@ -17,12 +17,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.admin.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.config.AndroidClientProperties;
-import de.greluc.krt.profit.basetool.backend.model.dto.AppVersionPolicyDto;
+import de.greluc.krt.profit.basetool.backend.admin.internal.AndroidClientProperties;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;

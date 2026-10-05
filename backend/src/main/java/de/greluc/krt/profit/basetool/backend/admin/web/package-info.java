@@ -18,26 +18,7 @@
  */
 
 /**
- * The bank module: the Kartellbank's accounts, bookings and booking requests, org-unit-blind by
- * design (ADR-0020).
+ * The admin module's REST surface: the settings, app version-policy and system ping controllers and
+ * their DTOs (plan §5.2).
  */
-@ApplicationModule(
-    allowedDependencies = {
-      "admin::api",
-      "audit::api",
-      "catalogue::api",
-      "identity::api",
-      "inventory::api",
-      "joborder::api",
-      "kernel",
-      "livesync::api",
-      "materialexchange::api",
-      "notification::api",
-      "orgunit::api",
-      "platform::api",
-      "refinery::api",
-      "scope::api"
-    })
-package de.greluc.krt.profit.basetool.backend.bank;
-
-import org.springframework.modulith.ApplicationModule;
+package de.greluc.krt.profit.basetool.backend.admin.web;

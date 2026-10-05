@@ -17,12 +17,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.mapper;
+package de.greluc.krt.profit.basetool.backend.admin.internal;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import de.greluc.krt.profit.basetool.backend.model.SystemSetting;
-import de.greluc.krt.profit.basetool.backend.model.dto.SystemSettingDto;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
 

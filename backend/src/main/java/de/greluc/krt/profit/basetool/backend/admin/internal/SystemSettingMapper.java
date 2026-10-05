@@ -17,12 +17,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.repository;
+package de.greluc.krt.profit.basetool.backend.admin.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.SystemSetting;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
+import de.greluc.krt.profit.basetool.backend.mapper.CentralMapperConfig;
+import org.mapstruct.Mapper;
 
-/** Spring Data repository for System Setting. */
-@Repository
-public interface SystemSettingRepository extends JpaRepository<SystemSetting, String> {}
+/** MapStruct mapper between System Setting entities and DTOs. */
+@Mapper(config = CentralMapperConfig.class)
+public interface SystemSettingMapper {
+  /** Maps a {@link SystemSetting} entity to its outbound DTO. */
+  SystemSettingDto toDto(SystemSetting setting);
+}

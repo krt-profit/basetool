@@ -17,27 +17,16 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/**
- * The bank module: the Kartellbank's accounts, bookings and booking requests, org-unit-blind by
- * design (ADR-0020).
- */
-@ApplicationModule(
-    allowedDependencies = {
-      "admin::api",
-      "audit::api",
-      "catalogue::api",
-      "identity::api",
-      "inventory::api",
-      "joborder::api",
-      "kernel",
-      "livesync::api",
-      "materialexchange::api",
-      "notification::api",
-      "orgunit::api",
-      "platform::api",
-      "refinery::api",
-      "scope::api"
-    })
-package de.greluc.krt.profit.basetool.backend.bank;
+package de.greluc.krt.profit.basetool.backend.admin.web;
 
-import org.springframework.modulith.ApplicationModule;
+/**
+ * Which Android builds the server still serves (REQ-API-010). An app below {@link
+ * #minimumVersionCode} shows the non-dismissible update screen; {@link #latestVersionCode}
+ * separately signals that a newer build exists.
+ *
+ * @param minimumVersionCode oldest {@code versionCode} still served; {@code 0} means no floor
+ * @param latestVersionCode newest published {@code versionCode}, or {@code 0} when unknown
+ * @param releasesUrl the GitHub release page to get the new build from
+ */
+public record AppVersionPolicyDto(
+    int minimumVersionCode, int latestVersionCode, String releasesUrl) {}

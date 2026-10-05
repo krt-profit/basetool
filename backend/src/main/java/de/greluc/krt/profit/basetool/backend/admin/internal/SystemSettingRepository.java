@@ -17,16 +17,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.admin.internal;
 
-/**
- * Which Android builds the server still serves (REQ-API-010). An app below {@link
- * #minimumVersionCode} shows the non-dismissible update screen; {@link #latestVersionCode}
- * separately signals that a newer build exists.
- *
- * @param minimumVersionCode oldest {@code versionCode} still served; {@code 0} means no floor
- * @param latestVersionCode newest published {@code versionCode}, or {@code 0} when unknown
- * @param releasesUrl the GitHub release page to get the new build from
- */
-public record AppVersionPolicyDto(
-    int minimumVersionCode, int latestVersionCode, String releasesUrl) {}
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+/** Spring Data repository for System Setting. */
+@Repository
+public interface SystemSettingRepository extends JpaRepository<SystemSetting, String> {}

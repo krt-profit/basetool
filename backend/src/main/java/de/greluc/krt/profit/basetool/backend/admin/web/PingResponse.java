@@ -17,11 +17,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.admin.web;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import java.time.Instant;
 
-/** Data transfer record carrying System Setting payload. */
-public record SystemSettingDto(
-    @NotBlank String id, @NotBlank String value, @NotNull Long version) {}
+/** Outbound response payload for the Ping operation. */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public record PingResponse(String status, String version, String message, Instant timestamp) {}

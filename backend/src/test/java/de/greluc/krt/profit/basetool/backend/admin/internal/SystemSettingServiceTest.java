@@ -17,18 +17,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.admin.internal;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.mapper.SystemSettingMapper;
-import de.greluc.krt.profit.basetool.backend.model.SystemSetting;
-import de.greluc.krt.profit.basetool.backend.model.dto.SystemSettingDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.SystemSettingUpdateDto;
-import de.greluc.krt.profit.basetool.backend.repository.SystemSettingRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -121,5 +116,38 @@ class SystemSettingServiceTest {
         ObjectOptimisticLockingFailureException.class,
         () -> systemSettingService.updateSetting("test_key", updateDto));
     verify(systemSettingRepository, never()).save(any());
+  }
+
+  @Test
+  void getSettingValue_returnsTheRawValueOrEmpty() {
+    when(systemSettingRepository.findById("test_key")).thenReturn(Optional.of(setting));
+    when(systemSettingRepository.findById("unknown_key")).thenReturn(Optional.empty());
+
+    assertEquals(Optional.of("test_value"), systemSettingService.getSettingValue("test_key"));
+    assertEquals(Optional.empty(), systemSettingService.getSettingValue("unknown_key"));
+  }
+
+  @Test
+  void putSettingValue_overwritesAnExistingRowWithoutAVersionCheck() {
+    when(systemSettingRepository.findById("test_key")).thenReturn(Optional.of(setting));
+
+    systemSettingService.putSettingValue("test_key", "true");
+
+    assertEquals("true", setting.getValue());
+    assertEquals(1L, setting.getVersion());
+    verify(systemSettingRepository).save(setting);
+  }
+
+  @Test
+  void putSettingValue_createsTheRowWhenTheKeyIsAbsent() {
+    when(systemSettingRepository.findById("new_key")).thenReturn(Optional.empty());
+
+    systemSettingService.putSettingValue("new_key", "true");
+
+    verify(systemSettingRepository)
+        .save(
+            argThat(
+                (SystemSetting saved) ->
+                    "new_key".equals(saved.getId()) && "true".equals(saved.getValue())));
   }
 }

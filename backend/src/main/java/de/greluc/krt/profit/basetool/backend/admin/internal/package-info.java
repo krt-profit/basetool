@@ -17,15 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.mapper;
-
-import de.greluc.krt.profit.basetool.backend.model.SystemSetting;
-import de.greluc.krt.profit.basetool.backend.model.dto.SystemSettingDto;
-import org.mapstruct.Mapper;
-
-/** MapStruct mapper between System Setting entities and DTOs. */
-@Mapper(config = CentralMapperConfig.class)
-public interface SystemSettingMapper {
-  /** Maps a {@link SystemSetting} entity to its outbound DTO. */
-  SystemSettingDto toDto(SystemSetting setting);
-}
+/**
+ * The admin module's internals: the system-setting entity, repository, service and mapper, and the
+ * Android version-policy settings and metric (plan §5.2).
+ */
+package de.greluc.krt.profit.basetool.backend.admin.internal;
