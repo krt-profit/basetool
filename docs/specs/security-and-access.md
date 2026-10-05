@@ -3356,8 +3356,8 @@ offer editing to a plain member whose own Staffel owns the order, which the endp
 > row's owner or `isLogisticianOrAbove()`. The web read the flag only where both already held, so it
 > renders unchanged.
 
-**The mapper reaches the gate through a leaf interface** (`StockViewerAccess` in `support`,
-implemented in `service`), for the ADR-0047 reason `MissionViewerAccess` already exists: a
+**The mapper reaches the gate through a leaf interface** (`StockViewerAccess` in `inventory.api`,
+implemented in `service`; in `support` until P1-9 split that package on 2026-10-04), for the ADR-0047 reason `MissionViewerAccess` already exists: a
 `mapper → service` edge would close a package cycle, and mappers may touch neither
 `SecurityContextHolder` (ArchUnit `mapperLayerShouldNotReachIntoSecurityContext`) nor the service
 layer directly.
