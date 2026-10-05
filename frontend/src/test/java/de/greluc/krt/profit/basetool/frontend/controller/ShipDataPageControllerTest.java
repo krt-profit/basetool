@@ -26,6 +26,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ManufacturerDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
@@ -51,7 +52,8 @@ class ShipDataPageControllerTest {
         .thenReturn(emptyManufacturerPage)
         .thenReturn(emptyShipTypePage);
 
-    ShipDataPageController controller = new ShipDataPageController(backendApiClient);
+    ShipDataPageController controller =
+        new ShipDataPageController(new CatalogueBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
 
     String view = controller.listData(model);
@@ -62,7 +64,8 @@ class ShipDataPageControllerTest {
   @Test
   void listData_concatenatesAllShipTypePages() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    ShipDataPageController controller = new ShipDataPageController(backendApiClient);
+    ShipDataPageController controller =
+        new ShipDataPageController(new CatalogueBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
 
     ManufacturerDto rsi = new ManufacturerDto(null, "RSI", "RSI", null, null, null, false);
@@ -101,7 +104,8 @@ class ShipDataPageControllerTest {
   @Test
   void testResetAllFitted_Success() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    ShipDataPageController controller = new ShipDataPageController(backendApiClient);
+    ShipDataPageController controller =
+        new ShipDataPageController(new CatalogueBackendClient(backendApiClient));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
     String view = controller.resetAllFitted(redirectAttributes);

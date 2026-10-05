@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportPreviewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintBatchCreateRequest;
@@ -76,7 +77,8 @@ class AdminPersonalBlueprintsControllerTest {
     server.start();
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
     backendApiClient = RealBackendApiClient.mockExecutingOver(webClient);
-    controller = new AdminPersonalBlueprintsPageController(backendApiClient);
+    controller =
+        new AdminPersonalBlueprintsPageController(new BlueprintBackendClient(backendApiClient));
   }
 
   @AfterEach

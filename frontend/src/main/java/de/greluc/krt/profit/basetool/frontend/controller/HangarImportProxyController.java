@@ -21,7 +21,8 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.withBackendStatus;
 
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.hangar.client.HangarBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.FleetviewImportResponseDto;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.LinkedHashMap;
@@ -32,18 +33,15 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.io.AbstractResource;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -68,7 +66,8 @@ public class HangarImportProxyController {
   /** Filename sent to the backend when the browser supplied none. */
   private static final String FALLBACK_FILENAME = "shiplist.json";
 
-  private final BackendApiClient backendApiClient;
+  /** Streams the accepted uploads to the backend. */
+  private final HangarBackendClient hangarClient;
 
   /** Resolves the localized {@code 413} message for an oversized upload. */
   private final MessageSource messageSource;
@@ -78,42 +77,41 @@ public class HangarImportProxyController {
    *
    * @param file the uploaded JSON file (Fleetview, HangarXPLOR Shiplist, Fleetyards or StarJump
    *     FleetViewer)
-   * @return the backend response (a {@code FleetviewImportResponseDto}) as a raw JSON map, or a
-   *     {@code 413} JSON body when the upload exceeds {@link #MAX_IMPORT_BYTES}
+   * @return the backend's {@link FleetviewImportResponseDto}, or a {@code 413} JSON body when the
+   *     upload exceeds {@link #MAX_IMPORT_BYTES}
    */
   @PostMapping(value = "/ships", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @PreAuthorize("isAuthenticated()")
-  public ResponseEntity<Map<?, ?>> importShips(@RequestParam("file") @NotNull MultipartFile file) {
-    return forwardImport(file, "/api/v1/hangar/import/ships");
+  public ResponseEntity<Object> importShips(@RequestParam("file") @NotNull MultipartFile file) {
+    return forwardImport(file, false);
   }
 
   /**
    * Deprecated alias of {@link #importShips(MultipartFile)} for the Fleetview-only path.
    *
    * @param file the uploaded JSON file
-   * @return the backend response (a {@code FleetviewImportResponseDto}) as a raw JSON map, or a
-   *     {@code 413} JSON body when the upload exceeds {@link #MAX_IMPORT_BYTES}
+   * @return the backend's {@link FleetviewImportResponseDto}, or a {@code 413} JSON body when the
+   *     upload exceeds {@link #MAX_IMPORT_BYTES}
    * @deprecated use {@code POST /hangar/import/ships}.
    */
   @PostMapping(value = "/fleetview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @PreAuthorize("isAuthenticated()")
   @Deprecated(since = "2026-05-14", forRemoval = true)
-  public ResponseEntity<Map<?, ?>> importFleetview(
-      @RequestParam("file") @NotNull MultipartFile file) {
-    return forwardImport(file, "/api/v1/hangar/import/fleetview");
+  public ResponseEntity<Object> importFleetview(@RequestParam("file") @NotNull MultipartFile file) {
+    return forwardImport(file, true);
   }
 
   /**
    * Forwards a multipart upload to the backend: refuses one above {@link #MAX_IMPORT_BYTES} unread,
-   * streams an accepted one through {@link BackendApiClient#execute}, which maps a backend failure
-   * like any other backend call.
+   * streams an accepted one through {@link HangarBackendClient}, which maps a backend failure like
+   * any other backend call.
    *
    * @param file uploaded multipart file
-   * @param backendPath relative path on the backend (without host) to forward to
-   * @return the backend response unchanged, or the {@code 413} refusal
+   * @param fleetviewOnly whether to use the backend's deprecated Fleetview-only path
+   * @return the backend's import result, or the {@code 413} refusal
    */
-  private @NotNull ResponseEntity<Map<?, ?>> forwardImport(
-      @NotNull MultipartFile file, @NotNull String backendPath) {
+  private @NotNull ResponseEntity<Object> forwardImport(
+      @NotNull MultipartFile file, boolean fleetviewOnly) {
     if (file.getSize() > MAX_IMPORT_BYTES) {
       log.warn(
           "Hangar import proxy: upload of {} bytes refused, the cap is {} bytes",
@@ -131,24 +129,13 @@ public class HangarImportProxyController {
     String originalFilename =
         file.getOriginalFilename() != null ? file.getOriginalFilename() : FALLBACK_FILENAME;
 
-    MultipartBodyBuilder builder = new MultipartBodyBuilder();
-    builder
-        .part("file", new StreamedUpload(file, originalFilename))
-        .contentType(MediaType.APPLICATION_OCTET_STREAM);
-
-    Map<?, ?> result =
+    StreamedUpload upload = new StreamedUpload(file, originalFilename);
+    FleetviewImportResponseDto result =
         withBackendStatus(
             () ->
-                backendApiClient.execute(
-                    HttpMethod.POST,
-                    backendPath,
-                    webClient ->
-                        webClient
-                            .post()
-                            .uri(backendPath)
-                            .contentType(MediaType.MULTIPART_FORM_DATA)
-                            .body(BodyInserters.fromMultipartData(builder.build())),
-                    spec -> spec.bodyToMono(Map.class)));
+                fleetviewOnly
+                    ? hangarClient.importFleetview(upload)
+                    : hangarClient.importShips(upload));
 
     return ResponseEntity.ok(result);
   }
@@ -160,7 +147,7 @@ public class HangarImportProxyController {
    *
    * @return a {@code 413 Content Too Large} response with a JSON body
    */
-  private @NotNull ResponseEntity<Map<?, ?>> tooLarge() {
+  private @NotNull ResponseEntity<Object> tooLarge() {
     String message =
         messageSource.getMessage(
             "hangar.import.error.tooLarge",

@@ -34,12 +34,12 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.LeitungUnitDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LeitungViewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitKind;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SpecialCommandChartDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronChartDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
@@ -168,15 +168,16 @@ class LeitungPagePatternRenderTest {
     when(backendApiClient.get(eq("/api/v1/special-commands/{id}/members"), anyTypeRef(), eq(SK)))
         .thenReturn(
             List.of(
-                Map.of(
-                    "userId",
-                    PILOT.toString(),
-                    "isLogistician",
+                new OrgUnitMembershipDto(
+                    PILOT,
+                    "Pilot",
+                    SK,
+                    OrgUnitKind.SPECIAL_COMMAND,
                     true,
-                    "isMissionManager",
                     false,
-                    "version",
-                    3)));
+                    false,
+                    null,
+                    3L)));
   }
 
   /**
