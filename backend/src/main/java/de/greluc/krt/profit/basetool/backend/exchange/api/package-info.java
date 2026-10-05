@@ -18,8 +18,8 @@
  */
 
 /**
- * The exchange module's published API: its problem codes and exception and, in {@code events}, the
- * events it fans out (plan §5.2).
+ * The exchange module's published API: its problem codes and exception, the acting-member contract,
+ * the ingest gateway settings and, in {@code events}, the events it fans out (plan §5.2).
  */
 @NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.exchange.api;

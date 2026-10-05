@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
@@ -36,7 +37,6 @@ import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
-import de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
@@ -123,7 +123,8 @@ public class AccessGateService {
 
   /**
    * Checks whether the caller holds the contextual authority {@code (roleName, orgUnitId)} ({@link
-   * de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority}); admins always pass.
+   * de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority}); admins always
+   * pass.
    *
    * @param orgUnitId the org unit the caller wants to act on; never {@code null}
    * @param roleName the role to check (e.g. {@code "LOGISTICIAN"}); never {@code null}

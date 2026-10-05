@@ -81,12 +81,12 @@
         if (!modal) {
             return;
         }
-        modal.querySelectorAll('.bank-field-error').forEach(function (slot) {
+        modal.querySelectorAll('.bank-field-error').forEach((slot) => {
             slot.textContent = '';
         });
     }
 
-    host.addEventListener('click', function (event) {
+    host.addEventListener('click', (event) => {
         const target = event.target;
         if (!(target instanceof Element)) {
             return;
@@ -134,7 +134,7 @@
 
     const declineSubmit = document.getElementById('decline-submit');
     if (declineSubmit) {
-        declineSubmit.addEventListener('click', function () {
+        declineSubmit.addEventListener('click', () => {
             if (!current) {
                 return;
             }
@@ -153,7 +153,7 @@
             }
             window.krtFetch.write({
                 method: 'POST',
-                url: '/admin/deletion-requests/' + current.id + '/decline',
+                url: `/admin/deletion-requests/${current.id}/decline`,
                 payload: { note: text, version: current.version },
                 successMessage: i18n.declined,
                 errorMessage: i18n.error,
@@ -167,7 +167,7 @@
 
     const executeSubmit = document.getElementById('execute-submit');
     if (executeSubmit) {
-        executeSubmit.addEventListener('click', function () {
+        executeSubmit.addEventListener('click', () => {
             if (!current) {
                 return;
             }
@@ -175,7 +175,7 @@
             const erase = document.querySelector('#execute-erase-history');
             window.krtFetch.write({
                 method: 'POST',
-                url: '/admin/deletion-requests/' + current.id + '/execute',
+                url: `/admin/deletion-requests/${current.id}/execute`,
                 payload: {
                     grantHistoryErasure: erase ? erase.checked : false,
                     version: current.version,

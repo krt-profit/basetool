@@ -56,18 +56,57 @@ interface KrtModalApi {
     layerRoot(): HTMLElement;
 }
 
-/**
- * Escapes `&`, `<`, `>`, `"`, `'` and `/` so a value can be interpolated into
- * `innerHTML` or a template literal. Returns the empty string for null and
- * undefined. Installed by `escape-html.js`.
- */
-declare function escapeHtml(value: unknown): string;
+/** A browser `TrustedHTML` value; the DOM lib of the type check does not declare Trusted Types. */
+interface TrustedHTML {
+    /** The markup the policy approved. */
+    toString(): string;
+}
+
+/** A named Trusted Types policy, created through `window.trustedTypes.createPolicy`. */
+interface TrustedTypePolicy {
+    /** The policy's name, as listed in the CSP `trusted-types` directive. */
+    readonly name: string;
+    /** Runs the policy's `createHTML` rule and wraps its result. */
+    createHTML(input: string): TrustedHTML;
+}
+
+/** The browser's Trusted Types factory, `window.trustedTypes`. */
+interface TrustedTypePolicyFactory {
+    /** Creates a named policy; a name the CSP does not list is a violation. */
+    createPolicy(
+        name: string,
+        rules: { createHTML?: (input: string) => string },
+    ): TrustedTypePolicy;
+    /** Whether a value is a `TrustedHTML`. */
+    isHTML(value: unknown): boolean;
+}
+
+/** Markup built by `krtHtml`: a `TrustedHTML` where the browser has Trusted Types. */
+interface KrtHtml {
+    /** Brands the type so a plain string is never accepted where markup is expected. */
+    readonly __krtHtml: never;
+}
 
 /**
- * Alias of {@linkcode escapeHtml} used at attribute-value interpolation sites,
- * where the distinct name documents the intent. Installed by `escape-html.js`.
+ * The tagged-template HTML builder of the `krt-html` Trusted Types policy, installed by
+ * `krt-html.js` (ADR-0239). Every interpolated value is escaped unless it is itself `krtHtml`
+ * markup; an array is rendered element by element.
  */
-declare function escapeAttr(value: unknown): string;
+interface KrtHtmlApi {
+    /** Builds markup from a template literal; only valid as a tag. */
+    (strings: TemplateStringsArray, ...values: unknown[]): KrtHtml;
+    /** Joins values into one piece of markup, each escaped unless it is `krtHtml` markup. */
+    join(values: Iterable<unknown>, separator?: unknown): KrtHtml;
+    /** Replaces an element's content with `krtHtml` markup or an array of pieces; else text. */
+    set(el: Element | null | undefined, value: unknown): void;
+    /** Whether a value was built by `krtHtml`. */
+    isHtml(value: unknown): value is KrtHtml;
+    /** The Trusted Types policy name, `krt-html`. */
+    readonly policyName: string;
+}
+
+/** The tagged-template HTML builder; see {@linkcode KrtHtmlApi}. Installed by `krt-html.js`. */
+declare const krtHtml: KrtHtmlApi;
 
 /** Shows a transient error toast. Installed by the layout's toast module. */
 declare function showFrontendErrorToast(message: string): void;
@@ -187,6 +226,32 @@ interface KrtSubmitFormOpts extends KrtSendOpts {
     sectionKey?: string;
 }
 
+/** Options for {@linkcode KrtFetchApi.get} and {@linkcode KrtFetchApi.getJson}. */
+interface KrtReadOpts {
+    /** Accept header value; `getJson` always sends `application/json`. */
+    accept?: string;
+    /** Extra request headers; `X-Requested-With` is always set and cannot be overridden. */
+    headers?: Record<string, string>;
+    /** Aborts the read when it fires; the promise then rejects with an `AbortError`. */
+    signal?: AbortSignal;
+    /** Supersede key: a later read with the same key aborts the earlier one still in flight. */
+    key?: string;
+}
+
+/**
+ * Rejection of {@linkcode KrtFetchApi.getJson} for an answer that is not the JSON it asked for. A
+ * transport failure or an abort rejects with the browser's own error instead.
+ */
+interface KrtReadError extends Error {
+    name: 'KrtReadError';
+    /** The HTTP status; 0 when a gate took over or the answer came through a redirect. */
+    status: number;
+    /** Why the answer was refused. */
+    reason: 'refused' | 'status' | 'not-json';
+    /** The parsed `problem+json` / JSON body of a non-2xx answer, else null. */
+    problem: any;
+}
+
 /** Options for the fragment-swap helpers. */
 interface KrtSwapOpts {
     /** The container to replace in place, or a selector for it. */
@@ -262,6 +327,18 @@ interface KrtSectionWriter {
  * sync, re-auth, RFC 7807 problem handling and toasts for every write (REQ-FE-001…010).
  */
 interface KrtFetchApi {
+    /**
+     * The one read path (REQ-FE-031): a same-origin GET marked as background traffic, run past the
+     * re-authentication and terms gates. Resolves the response, ok or not, or null when a gate
+     * navigated away or the answer came through a redirect; rejects like `fetch` on a transport
+     * failure or an abort.
+     */
+    get(url: string, opts?: KrtReadOpts): Promise<Response | null>;
+    /**
+     * Reads JSON through {@linkcode KrtFetchApi.get}: resolves the parsed body of a 2xx JSON answer
+     * (null for a 204), rejects with a {@linkcode KrtReadError} for any other answer.
+     */
+    getJson(url: string, opts?: KrtReadOpts): Promise<any>;
     /** Sends a JSON write and handles the response, returning the parsed outcome. */
     write(opts: KrtWriteOpts): Promise<KrtWriteResult>;
     /** Submits a form as multipart/form-encoded data through the same pipeline. */
@@ -284,6 +361,11 @@ interface KrtFetchApi {
      * same trust contract. No-op when `el` is absent or detached; null/undefined `html` removes it.
      */
     replaceWithTrustedHtml(el: Element | null | undefined, html: string | null | undefined): void;
+    /**
+     * Parses a same-origin page or fragment response into a detached document, under the same
+     * trust contract as `setTrustedHtml`, through the `krt-fragment` Trusted Types policy.
+     */
+    parseTrustedDocument(html: string): Document;
     /** Writes `newVersion` to the container and to every `[data-version]` descendant. */
     syncVersion(container: KrtElementRef, newVersion: number | string | null): void;
     /** Handles an RFC 7807 `problem+json` response, showing the appropriate toast. */
@@ -653,8 +735,9 @@ interface Window {
     krtFilterPanel: KrtFilterPanelApi;
     krtOverflowMenu: KrtOverflowMenuApi;
     krtFilterChips: KrtFilterChipsApi;
-    escapeHtml: typeof escapeHtml;
-    escapeAttr: typeof escapeAttr;
+    krtHtml: KrtHtmlApi;
+    /** The browser's Trusted Types factory; absent where the browser has none. */
+    trustedTypes?: TrustedTypePolicyFactory;
 
     showFrontendErrorToast?: (message: string) => void;
     showFrontendSuccessToast?: (message: string) => void;
@@ -688,6 +771,16 @@ interface Window {
 
     krtComboboxI18n?: KrtComboboxI18n;
     krtProfileI18n?: KrtI18nDict;
+    /** Labels of the Materialbörse page, from `materialboerse.html`. */
+    materialboerseI18n?: Record<string, any>;
+    /** Labels of the release dialog, from `fragments/materialboerse-modal.html`. */
+    materialboerseModalI18n?: Record<string, any>;
+    /** Labels of the request side of the Materialbörse page, from `materialboerse.html`. */
+    materialgesuchI18n?: Record<string, any>;
+    /** Labels of the request dialog, from `fragments/materialgesuch-modal.html`. */
+    materialgesuchModalI18n?: Record<string, any>;
+    /** Toast and conflict labels of the member edit form, from `member-edit.html`. */
+    krtMemberEditI18n?: KrtI18nDict;
     krtDeletionRequestsI18n?: KrtI18nDict;
     krtP4kImportI18n?: KrtI18nDict;
     krtBlueprintsImportI18n?: KrtI18nDict;
@@ -767,6 +860,8 @@ interface Window {
     krtRefreshMissionSection?: KrtSectionWriter['refresh'];
     krtNotifyMissionChanged?: KrtSectionWriter['notify'];
     MissionPresence?: unknown;
+    /** The viewer's user id on a saved mission, which starts the presence channel; else absent. */
+    missionPresenceUserId?: string | null;
 
     krtRefreshOrderSection?: (...args: any[]) => void;
     krtNotifyOrderChanged?: (...args: any[]) => void;

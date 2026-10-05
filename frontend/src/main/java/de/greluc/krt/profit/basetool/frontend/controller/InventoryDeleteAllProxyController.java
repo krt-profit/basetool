@@ -21,30 +21,26 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.withBackendStatus;
 
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.reactive.function.client.WebClient;
 
 /**
  * Admin-only proxy forwarding {@code DELETE /inventory/all} to {@code DELETE /api/v1/inventory/all}
- * through {@link BackendApiClient#execute}.
+ * through {@link InventoryBackendClient#deleteAll}.
  */
 @RestController
 @RequestMapping("/inventory")
 @RequiredArgsConstructor
 public class InventoryDeleteAllProxyController {
 
-  /** Backend path that clears the global inventory. */
-  private static final String INVENTORY_URI = "/api/v1/inventory/all";
-
-  private final BackendApiClient backendApiClient;
+  /** The inventory domain's typed backend client. */
+  private final InventoryBackendClient inventoryClient;
 
   /**
    * Proxies the "clear global inventory" request to the backend. Admin-only.
@@ -54,13 +50,7 @@ public class InventoryDeleteAllProxyController {
   @DeleteMapping("/all")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Void> deleteAllGlobalInventory() {
-    withBackendStatus(
-        () ->
-            backendApiClient.execute(
-                HttpMethod.DELETE,
-                INVENTORY_URI,
-                webClient -> webClient.delete().uri(INVENTORY_URI),
-                WebClient.ResponseSpec::toBodilessEntity));
+    withBackendStatus(inventoryClient::deleteAll);
     return ResponseEntity.noContent().build();
   }
 }

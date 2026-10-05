@@ -105,8 +105,7 @@ class HangarPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(
             PageStylesheets.content(
-                containsString(
-                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")))
+                containsString(".form-group input:where(:not([type='checkbox'], [type='radio']))")))
         .andExpect(
             PageStylesheets.content(
                 org.hamcrest.Matchers.not(containsString(".form-group input[type="))));

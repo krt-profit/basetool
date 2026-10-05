@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialMatrixItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialPriceOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
@@ -43,7 +44,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -112,7 +112,7 @@ class MaterialsPageControllerMvcTest {
         .andExpect(
             PageStylesheets.content(
                 containsString(
-                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+                    ".form-group input:where(:not([type='checkbox'], [type='radio']))")));
   }
 
   /**
@@ -337,8 +337,22 @@ class MaterialsPageControllerMvcTest {
         .thenReturn(
             new PageResponse<>(
                 List.of(
-                    Map.<String, Object>of(
-                        "uexSyncedAt", Instant.now().minus(Duration.ofMinutes(14)).toString())),
+                    new TerminalDto(
+                        UUID.fromString("0d6b3e1a-7c42-4f58-9a1e-3b5c7d9e2f40"),
+                        "Area18 TDD",
+                        null,
+                        "Stanton",
+                        "ArcCorp",
+                        "Area18",
+                        null,
+                        true,
+                        false,
+                        false,
+                        false,
+                        true,
+                        false,
+                        Instant.now().minus(Duration.ofMinutes(14)),
+                        false)),
                 0,
                 10000,
                 1,
@@ -389,14 +403,14 @@ class MaterialsPageControllerMvcTest {
    * @param prices the price list the backend returns
    */
   private void stubDetail(MaterialDto material, List<MaterialPriceDto> prices) {
-    when(backendApiClient.get(eq("/api/v1/materials/" + material.id()), eq(MaterialDto.class)))
+    when(backendApiClient.get(
+            eq("/api/v1/materials/{id}"), eq(MaterialDto.class), eq(material.id())))
         .thenReturn(material);
     when(backendApiClient.get(
-            eq(
-                "/api/v1/materials/"
-                    + material.id()
-                    + "/prices?size=10000&sort=terminal.name,asc&page=0"),
-            anyTypeRef()))
+            eq("/api/v1/materials/{id}/prices?size=10000&sort=terminal.name,asc&page={page}"),
+            anyTypeRef(),
+            eq(material.id()),
+            eq(0)))
         .thenReturn(new PageResponse<>(prices, 0, 10000, prices.size(), 1, List.of()));
   }
 

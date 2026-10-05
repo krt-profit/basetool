@@ -201,7 +201,11 @@ class ConnectedAppsPageControllerMvcTest {
         .andExpect(status().isNoContent());
 
     verify(backendApiClient)
-        .post("/api/v1/connected-apps/installations/" + INSTALLATION + "/seen", null, Void.class);
+        .post(
+            "/api/v1/connected-apps/installations/{installationId}/seen",
+            null,
+            Void.class,
+            INSTALLATION);
   }
 
   @Test
@@ -297,16 +301,17 @@ class ConnectedAppsPageControllerMvcTest {
                 .with(csrf()))
         .andExpect(status().isNoContent());
 
-    verify(backendApiClient).delete("/api/v1/connected-apps/versekit", Void.class);
+    verify(backendApiClient).delete("/api/v1/connected-apps/{clientId}", Void.class, "versekit");
   }
 
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void anUndoIsRelayedAndItsResultComesBack() throws Exception {
     when(backendApiClient.post(
-            eq("/api/v1/connected-apps/versekit/undo"),
+            eq("/api/v1/connected-apps/{clientId}/undo"),
             any(ExchangeUndoRequestDto.class),
-            eq(ExchangeUndoResultDto.class)))
+            eq(ExchangeUndoResultDto.class),
+            eq("versekit")))
         .thenReturn(
             new ExchangeUndoResultDto(
                 2,
@@ -326,9 +331,10 @@ class ConnectedAppsPageControllerMvcTest {
 
     verify(backendApiClient)
         .post(
-            eq("/api/v1/connected-apps/versekit/undo"),
+            eq("/api/v1/connected-apps/{clientId}/undo"),
             eq(new ExchangeUndoRequestDto(Instant.parse("2026-09-27T10:00:00Z"))),
-            eq(ExchangeUndoResultDto.class));
+            eq(ExchangeUndoResultDto.class),
+            eq("versekit"));
   }
 
   @Test
@@ -354,14 +360,15 @@ class ConnectedAppsPageControllerMvcTest {
                 .with(csrf()))
         .andExpect(status().isBadRequest());
 
-    verify(backendApiClient, never()).delete("/api/v1/connected-apps/Not_A_Client", Void.class);
+    verify(backendApiClient, never())
+        .delete("/api/v1/connected-apps/{clientId}", Void.class, "Not_A_Client");
   }
 
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void anInstallationDisconnectIsRelayedAndABackend404ComesBack() throws Exception {
     when(backendApiClient.delete(
-            "/api/v1/connected-apps/installations/" + INSTALLATION, Void.class))
+            "/api/v1/connected-apps/installations/{installationId}", Void.class, INSTALLATION))
         .thenThrow(new BackendServiceException("not mine", null, 404));
 
     mockMvc

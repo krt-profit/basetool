@@ -43,23 +43,21 @@ class NotificationStreamReconnectContractTest {
   /** The notification bell + unread-badge module. */
   private static final String NOTIFICATIONS_MODULE = "/static/js/notifications.js";
 
-  /** The gate-aware reader, from its declaration to the re-auth hand-off. */
-  private static final Pattern READER_UP_TO_REAUTH =
+  /** The gate-aware reader, from its declaration to its non-OK bail-out. */
+  private static final Pattern READER_UP_TO_NOT_OK =
       Pattern.compile(
-          "function readJson\\(res, fallback\\) \\{(.*?)krtReauth\\.check\\(res\\)",
-          Pattern.DOTALL);
+          "function readJson\\(res, fallback\\) \\{(.*?)if \\(!res\\.ok\\)", Pattern.DOTALL);
 
   /** The stream's {@code error} listener, up to the reconnect it schedules. */
   private static final Pattern ERROR_LISTENER =
       Pattern.compile(
-          "source\\.addEventListener\\('error', function \\(\\)"
-              + " \\{(.*?)scheduleSseReconnect\\(\\);",
+          "source\\.addEventListener\\('error', \\(\\) =>" + " \\{(.*?)scheduleSseReconnect\\(\\);",
           Pattern.DOTALL);
 
   /** The body of the reconnect timer's callback. */
   private static final Pattern RECONNECT_CALLBACK =
       Pattern.compile(
-          "sseReconnectTimer = window\\.setTimeout\\(function \\(\\) \\{(.*?)\\}, delay\\);",
+          "sseReconnectTimer = window\\.setTimeout\\(\\(\\) => \\{(.*?)\\}, delay\\);",
           Pattern.DOTALL);
 
   /** The body of {@code stopSse}. */
@@ -67,19 +65,22 @@ class NotificationStreamReconnectContractTest {
       Pattern.compile("function stopSse\\(\\) \\{(.*?)\\n    \\}", Pattern.DOTALL);
 
   /**
-   * A 401 on any badge read stops the stream, and does so before the re-auth helper runs: that
-   * helper returns without navigating inside its ten-second loop guard, and a stop made only on its
-   * success would then never happen.
+   * A refused badge read stops the stream whichever way the re-auth helper decided: a null answer
+   * means {@code krtFetch.get} handed it to a gate, and a 401 that still arrives means the helper
+   * returned without navigating inside its ten-second loop guard.
    *
    * @throws IOException if the module cannot be read from the classpath
    */
   @Test
-  void aRefusedReadStopsTheStreamBeforeTheReauthHelperDecides() throws IOException {
-    String reader = group(READER_UP_TO_REAUTH, readModule(), "readJson up to krtReauth.check");
+  void aRefusedReadStopsTheStreamWhateverTheReauthHelperDecides() throws IOException {
+    String reader = group(READER_UP_TO_NOT_OK, readModule(), "readJson up to its !res.ok bail-out");
 
     assertThat(reader)
-        .as("readJson must test for the 401 and stop the stream ahead of krtReauth.check")
-        .containsPattern("res\\.status === 401\\)\\s*\\{\\s*(//[^\\n]*\\n\\s*)*stopSse\\(\\);");
+        .as("a gated read (null) must stop the stream")
+        .containsPattern("if \\(!res\\)\\s*\\{\\s*stopSse\\(\\);");
+    assertThat(reader)
+        .as("a 401 the helper did not act on must stop the stream as well")
+        .containsPattern("res\\.status === 401\\)\\s*\\{\\s*stopSse\\(\\);");
   }
 
   /**
@@ -101,7 +102,7 @@ class NotificationStreamReconnectContractTest {
     assertThat(module)
         .as("the open listener must mark the stream opened and reset the refusal count")
         .containsPattern(
-            "addEventListener\\('open', function \\(\\) \\{\\s*opened = true;\\s*sseRefusals = 0;");
+            "addEventListener\\('open', \\(\\) => \\{\\s*opened = true;\\s*sseRefusals = 0;");
     assertThat(module)
         .as("the reconnect delay must grow with consecutive refusals")
         .containsPattern("Math\\.pow\\(2, Math\\.min\\(sseRefusals, SSE_MAX_BACKOFF_STEPS\\)\\)");

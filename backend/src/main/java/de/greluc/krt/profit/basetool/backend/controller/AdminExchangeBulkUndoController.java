@@ -19,13 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.dto.ExchangeBulkUndoInstallationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ExchangeBulkUndoPreviewDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ExchangeBulkUndoRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.ExchangeBulkUndoRunDetailDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ExchangeBulkUndoRunDto;
 import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeBulkUndoService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;

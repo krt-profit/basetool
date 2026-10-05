@@ -19,13 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.audit.client.AuditBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.AuditEventDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.AuditRowView;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAuditEventDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeClientDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.AuditDomains;
 import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
@@ -40,7 +40,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -87,10 +86,6 @@ public class AdminAuditLogPageController {
 
   /** The catch-all client values that close the filter list. */
   private static final List<String> TRAILING_CLIENT_IDS = List.of("other", "none");
-
-  /** Response type of the exchange registry list. */
-  private static final ParameterizedTypeReference<List<ExchangeClientDto>> EXCHANGE_CLIENT_LIST =
-      new ParameterizedTypeReference<>() {};
 
   /** The event types offered in the per-tab filter dropdown, by domain (in a sensible order). */
   private static final Map<String, List<String>> EVENT_TYPES_BY_DOMAIN =
@@ -381,21 +376,8 @@ public class AdminAuditLogPageController {
                   "CONNECTED_APPS_AUDIT_EXPORTED",
                   "CONNECTED_APPS_AUDIT_PURGED")));
 
-  /**
-   * Response type for one page of the bank audit trail ({@code /api/v1/bank/admin/audit}), read for
-   * the BANK tab.
-   */
-  private static final ParameterizedTypeReference<PageResponse<BankAuditEventDto>> BANK_AUDIT_PAGE =
-      new ParameterizedTypeReference<>() {};
-
-  /**
-   * Response type for one page of a generic-area audit trail ({@code /api/v1/audit/{domain}}), read
-   * for every non-BANK tab.
-   */
-  private static final ParameterizedTypeReference<PageResponse<AuditEventDto>> GENERIC_AUDIT_PAGE =
-      new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Reads the audit trails and the exchange registry. */
+  private final AuditBackendClient auditClient;
 
   /**
    * Renders the paged, filterable audit-log view for one tab. Filters are bound to typed values or
@@ -440,24 +422,22 @@ public class AdminAuditLogPageController {
     clientIds.addAll(TRAILING_CLIENT_IDS);
     final String activeClientId = RelayParams.oneOfOrNull(clientId, clientIds);
 
-    String backendPath = isBank ? "/api/v1/bank/admin/audit" : "/api/v1/audit/" + activeDomain;
-    UriComponentsBuilder uri =
-        UriComponentsBuilder.fromPath(backendPath)
-            .queryParam("page", Math.max(page, 0))
-            .queryParam("size", AUDIT_PAGE_SIZE);
-    appendIfPresent(uri, "from", from);
-    appendIfPresent(uri, "to", to);
-    appendIfPresent(uri, "actorUserId", actorUserId);
-    appendIfPresent(uri, "eventType", activeEventType);
-    appendIfPresent(uri, "clientId", activeClientId);
+    AuditBackendClient.Filter filter =
+        new AuditBackendClient.Filter(
+            Math.max(page, 0),
+            AUDIT_PAGE_SIZE,
+            from,
+            to,
+            actorUserId,
+            activeEventType,
+            activeClientId);
 
     PageResponse<AuditRowView> events = null;
     try {
       events =
           isBank
-              ? adaptBank(backendApiClient.get(uri.toUriString(), BANK_AUDIT_PAGE), eventKeyPrefix)
-              : adaptGeneric(
-                  backendApiClient.get(uri.toUriString(), GENERIC_AUDIT_PAGE), eventKeyPrefix);
+              ? adaptBank(auditClient.bankEvents(filter), eventKeyPrefix)
+              : adaptGeneric(auditClient.areaEvents(activeDomain, filter), eventKeyPrefix);
     } catch (BackendServiceException e) {
       log.debug("Failed to load audit log for domain {}", activeDomain, e);
       model.addAttribute("error", "admin.audit.error.load");
@@ -548,7 +528,7 @@ public class AdminAuditLogPageController {
   }
 
   /**
-   * Appends a query parameter to the backend URI when the value is present and non-blank.
+   * Appends a query parameter to the pagination URL when the value is present and non-blank.
    *
    * @param uri the builder
    * @param name the parameter name
@@ -600,8 +580,7 @@ public class AdminAuditLogPageController {
   private Map<String, String> exchangeClientNames() {
     Map<String, String> names = new TreeMap<>();
     try {
-      List<ExchangeClientDto> clients =
-          backendApiClient.get("/api/v1/admin/exchange-clients", EXCHANGE_CLIENT_LIST);
+      List<ExchangeClientDto> clients = auditClient.exchangeClients();
       if (clients != null) {
         clients.forEach(c -> names.put(c.clientId(), c.displayName()));
       }

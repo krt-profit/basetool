@@ -285,7 +285,8 @@ class AdminQualityTiersPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void updateRelaysTheVersionAndEvictsTheCatalogue() throws Exception {
-    when(backendApiClient.put(eq(BACKEND_BASE + "/" + GOOD_ID), any(), eq(QualityTierDto.class)))
+    when(backendApiClient.put(
+            eq("/api/v1/admin/quality-tiers/{id}"), any(), eq(QualityTierDto.class), eq(GOOD_ID)))
         .thenReturn(new QualityTierDto(GOOD_ID, "GOOD", 650, "Gut", "Good", 10, false, 4L));
 
     mockMvc
@@ -302,7 +303,11 @@ class AdminQualityTiersPageControllerMvcTest {
 
     ArgumentCaptor<QualityTierWriteDto> body = ArgumentCaptor.forClass(QualityTierWriteDto.class);
     verify(backendApiClient)
-        .put(eq(BACKEND_BASE + "/" + GOOD_ID), body.capture(), eq(QualityTierDto.class));
+        .put(
+            eq("/api/v1/admin/quality-tiers/{id}"),
+            body.capture(),
+            eq(QualityTierDto.class),
+            eq(GOOD_ID));
     assertThat(body.getValue().version()).isEqualTo(3L);
     assertThat(body.getValue().active()).isFalse();
     verify(backendApiClient).evict(CacheDomain.QUALITY_TIER);
@@ -311,7 +316,8 @@ class AdminQualityTiersPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void deleteRelaysToTheBackendAndEvictsTheCatalogue() throws Exception {
-    when(backendApiClient.delete(BACKEND_BASE + "/" + GOOD_ID, Void.class)).thenReturn(null);
+    when(backendApiClient.delete("/api/v1/admin/quality-tiers/{id}", Void.class, GOOD_ID))
+        .thenReturn(null);
 
     mockMvc
         .perform(
@@ -320,14 +326,14 @@ class AdminQualityTiersPageControllerMvcTest {
                 .with(csrf()))
         .andExpect(status().isOk());
 
-    verify(backendApiClient).delete(BACKEND_BASE + "/" + GOOD_ID, Void.class);
+    verify(backendApiClient).delete("/api/v1/admin/quality-tiers/{id}", Void.class, GOOD_ID);
     verify(backendApiClient).evict(CacheDomain.QUALITY_TIER);
   }
 
   @Test
   @WithMockUser(roles = "ADMIN")
   void aTierInUseIsRelayedAs409WithoutEviction() throws Exception {
-    when(backendApiClient.delete(BACKEND_BASE + "/" + GOOD_ID, Void.class))
+    when(backendApiClient.delete("/api/v1/admin/quality-tiers/{id}", Void.class, GOOD_ID))
         .thenThrow(
             new BackendServiceException(
                 "in use", null, 409, "ENTITY_IN_USE", null, List.of(), "in use"));
@@ -346,7 +352,8 @@ class AdminQualityTiersPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void aStaleVersionIsRelayedAs409() throws Exception {
-    when(backendApiClient.put(eq(BACKEND_BASE + "/" + GOOD_ID), any(), eq(QualityTierDto.class)))
+    when(backendApiClient.put(
+            eq("/api/v1/admin/quality-tiers/{id}"), any(), eq(QualityTierDto.class), eq(GOOD_ID)))
         .thenThrow(
             new BackendServiceException(
                 "stale", null, 409, "OPTIMISTIC_LOCK", null, List.of(), "stale"));

@@ -19,10 +19,10 @@
 
 /* global krtAutocomplete */
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     const dataEl = document.getElementById('materialNames-data');
     const materialNames = dataEl
-        ? Array.from(dataEl.options).map(function (opt) {
+        ? Array.from(dataEl.options).map((opt) => {
               return opt.value;
           })
         : [];
@@ -102,7 +102,7 @@ function toggleKindGroup(toggle) {
  */
 function filterCards(scope, filter) {
     let visibleCount = 0;
-    scope.querySelectorAll('.material-card').forEach(function (card) {
+    scope.querySelectorAll('.material-card').forEach((card) => {
         const title = card.querySelector('.material-title');
         const text = title ? title.textContent || '' : '';
         const visible = text.toUpperCase().indexOf(filter) > -1;
@@ -125,7 +125,7 @@ function filterMaterials() {
 
 function filterGroupedView(filter) {
     let totalVisibleCount = 0;
-    document.querySelectorAll('#materialsGrouped .kind-group').forEach(function (group) {
+    document.querySelectorAll('#materialsGrouped .kind-group').forEach((group) => {
         const visibleInGroup = filterCards(group, filter);
         group.hidden = visibleInGroup === 0;
         totalVisibleCount += visibleInGroup;
@@ -145,7 +145,7 @@ function filterFlatView(filter) {
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('input', 'materials-filter', filterMaterials);
     window.krtEvents.on('change', 'materials-filter', filterMaterials);
-    window.krtEvents.on('click', 'materials-toggle-kind', function (el) {
+    window.krtEvents.on('click', 'materials-toggle-kind', (el) => {
         toggleKindGroup(el);
     });
     window.krtEvents.on('change', 'materials-toggle-grouping', onToggleGrouping);

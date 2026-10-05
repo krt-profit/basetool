@@ -33,11 +33,18 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.leadership.client.LeadershipBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.LeitungUnitContext;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddBereichLeaderRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AssignSquadronRankRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BereichChartDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BereichMemberResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.CreateKommandoGroupRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.KommandoGroupDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LeitungMemberDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LeitungUnitDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LeitungViewDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitKind;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipDto;
@@ -69,7 +76,8 @@ class LeitungPageControllerTest {
   @Test
   void leitung_loadsView_doesNotPreloadUserRoster() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    LeitungPageController controller = new LeitungPageController(backend);
+    LeitungPageController controller =
+        new LeitungPageController(new LeadershipBackendClient(backend));
     LeitungViewDto view = emptyView();
     when(backend.get("/api/v1/leitung/view", LeitungViewDto.class)).thenReturn(view);
     Model model = new ConcurrentModel();
@@ -85,7 +93,8 @@ class LeitungPageControllerTest {
   @Test
   void leitung_fragment_returnsFragmentSelector() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    LeitungPageController controller = new LeitungPageController(backend);
+    LeitungPageController controller =
+        new LeitungPageController(new LeadershipBackendClient(backend));
     when(backend.get("/api/v1/leitung/view", LeitungViewDto.class)).thenReturn(emptyView());
     Model model = new ConcurrentModel();
 
@@ -118,7 +127,8 @@ class LeitungPageControllerTest {
   @Test
   void leitung_requestedUnitListed_isSelected_otherwiseFirstUnit() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    LeitungPageController controller = new LeitungPageController(backend);
+    LeitungPageController controller =
+        new LeitungPageController(new LeadershipBackendClient(backend));
     UUID squadron = UUID.randomUUID();
     UUID sk = UUID.randomUUID();
     when(backend.get("/api/v1/leitung/view", LeitungViewDto.class))
@@ -144,7 +154,8 @@ class LeitungPageControllerTest {
   @Test
   void leitung_orgChart_placesUnitsUnderTheirBereich() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    LeitungPageController controller = new LeitungPageController(backend);
+    LeitungPageController controller =
+        new LeitungPageController(new LeadershipBackendClient(backend));
     UUID bereich = UUID.randomUUID();
     UUID squadron = UUID.randomUUID();
     UUID sk = UUID.randomUUID();
@@ -184,7 +195,8 @@ class LeitungPageControllerTest {
   @Test
   void leitung_orgChartFails_rendersWithoutContext() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    LeitungPageController controller = new LeitungPageController(backend);
+    LeitungPageController controller =
+        new LeitungPageController(new LeadershipBackendClient(backend));
     when(backend.get("/api/v1/leitung/view", LeitungViewDto.class)).thenReturn(emptyView());
     when(backend.get("/api/v1/org-chart", OrgChartDto.class))
         .thenThrow(new BackendServiceException("down", null, 503));
@@ -200,7 +212,8 @@ class LeitungPageControllerTest {
   @Test
   void leitung_skRoster_readsFlagsOnlyWithTheRosterCap() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    LeitungPageController controller = new LeitungPageController(backend);
+    LeitungPageController controller =
+        new LeitungPageController(new LeadershipBackendClient(backend));
     UUID managed = UUID.randomUUID();
     UUID leadOnly = UUID.randomUUID();
     UUID pilot = UUID.randomUUID();
@@ -228,18 +241,19 @@ class LeitungPageControllerTest {
                         false,
                         List.of(
                             new LeitungMemberDto(pilot, "Pilot", "MEMBER", null, 0L, false))))));
-    when(backend.get(eq("/api/v1/special-commands/" + managed + "/members"), anyTypeRef()))
+    when(backend.get(eq("/api/v1/special-commands/{id}/members"), anyTypeRef(), eq(managed)))
         .thenReturn(
             List.of(
-                Map.of(
-                    "userId",
-                    pilot.toString(),
-                    "isLogistician",
+                new OrgUnitMembershipDto(
+                    pilot,
+                    "Pilot",
+                    managed,
+                    OrgUnitKind.SPECIAL_COMMAND,
                     true,
-                    "isMissionManager",
                     false,
-                    "version",
-                    5)));
+                    false,
+                    null,
+                    5L)));
     Model model = new ConcurrentModel();
 
     controller.leitung(null, null, null, model);
@@ -248,7 +262,7 @@ class LeitungPageControllerTest {
     assertTrue(known.contains(managed));
     assertFalse(known.contains(leadOnly));
     verify(backend, never())
-        .get(eq("/api/v1/special-commands/" + leadOnly + "/members"), anyTypeRef());
+        .get(eq("/api/v1/special-commands/{id}/members"), anyTypeRef(), eq(leadOnly));
     Map<UUID, List<OrgUnitMembershipDto>> rosters =
         assertInstanceOf(Map.class, model.getAttribute("skRosters"));
     List<OrgUnitMembershipDto> rows = rosters.get(managed);
@@ -264,7 +278,8 @@ class LeitungPageControllerTest {
   @Test
   void leitung_backendFailure_setsErrorAttribute() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    LeitungPageController controller = new LeitungPageController(backend);
+    LeitungPageController controller =
+        new LeitungPageController(new LeadershipBackendClient(backend));
     when(backend.get("/api/v1/leitung/view", LeitungViewDto.class))
         .thenThrow(new BackendServiceException("boom", null, 503));
     Model model = new ConcurrentModel();
@@ -278,15 +293,21 @@ class LeitungPageControllerTest {
   @Test
   void assignSquadronRank_success_returns200() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    LeitungPageController controller = new LeitungPageController(backend);
+    LeitungPageController controller =
+        new LeitungPageController(new LeadershipBackendClient(backend));
     UUID squadronId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     when(backend.put(
-            eq("/api/v1/squadrons/" + squadronId + "/ranks/" + userId), any(), eq(Object.class)))
-        .thenReturn(new Object());
+            eq("/api/v1/squadrons/{squadronId}/ranks/{userId}"),
+            any(),
+            eq(OrgUnitMembershipDto.class),
+            eq(squadronId),
+            eq(userId)))
+        .thenReturn(membership(userId, squadronId));
 
     ResponseEntity<Object> response =
-        controller.assignSquadronRank(squadronId, userId, Map.of("role", "KOMMANDOLEITER"));
+        controller.assignSquadronRank(
+            squadronId, userId, new AssignSquadronRankRequest("KOMMANDOLEITER", null, 0L));
 
     assertEquals(200, response.getStatusCode().value());
   }
@@ -294,17 +315,23 @@ class LeitungPageControllerTest {
   @Test
   void assignSquadronRank_optimisticLock_relays409() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    LeitungPageController controller = new LeitungPageController(backend);
+    LeitungPageController controller =
+        new LeitungPageController(new LeadershipBackendClient(backend));
     UUID squadronId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     when(backend.put(
-            eq("/api/v1/squadrons/" + squadronId + "/ranks/" + userId), any(), eq(Object.class)))
+            eq("/api/v1/squadrons/{squadronId}/ranks/{userId}"),
+            any(),
+            eq(OrgUnitMembershipDto.class),
+            eq(squadronId),
+            eq(userId)))
         .thenThrow(
             new BackendServiceException(
                 "conflict", null, 409, "OPTIMISTIC_LOCK", null, List.of(), "Stale."));
 
     ResponseEntity<Object> response =
-        controller.assignSquadronRank(squadronId, userId, Map.of("role", "ENSIGN"));
+        controller.assignSquadronRank(
+            squadronId, userId, new AssignSquadronRankRequest("ENSIGN", null, 0L));
 
     assertEquals(409, response.getStatusCode().value());
     Map<String, Object> body = assertInstanceOf(Map.class, response.getBody());
@@ -314,7 +341,8 @@ class LeitungPageControllerTest {
   @Test
   void removeSquadronRank_relaysVersionToBackend() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    LeitungPageController controller = new LeitungPageController(backend);
+    LeitungPageController controller =
+        new LeitungPageController(new LeadershipBackendClient(backend));
     UUID squadronId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
 
@@ -323,20 +351,34 @@ class LeitungPageControllerTest {
     assertEquals(200, response.getStatusCode().value());
     verify(backend)
         .delete(
-            "/api/v1/squadrons/" + squadronId + "/ranks/" + userId + "?version=4", Object.class);
+            "/api/v1/squadrons/{squadronId}/ranks/{userId}?version={version}",
+            OrgUnitMembershipDto.class,
+            squadronId,
+            userId,
+            4L);
   }
 
   @Test
   void createKommandoGroup_success_returns200() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    LeitungPageController controller = new LeitungPageController(backend);
+    LeitungPageController controller =
+        new LeitungPageController(new LeadershipBackendClient(backend));
     UUID squadronId = UUID.randomUUID();
     when(backend.post(
-            eq("/api/v1/squadrons/" + squadronId + "/kommando-groups"), any(), eq(Object.class)))
-        .thenReturn(new Object());
+            eq("/api/v1/squadrons/{squadronId}/kommando-groups"),
+            any(),
+            eq(KommandoGroupDto.class),
+            eq(squadronId)))
+        .thenReturn(
+            new KommandoGroupDto(
+                UUID.fromString("5e6f7a8b-9c0d-4e1f-a2b3-c4d5e6f7a8b9"),
+                squadronId,
+                "Alpha",
+                0,
+                0L));
 
     ResponseEntity<Object> response =
-        controller.createKommandoGroup(squadronId, Map.of("name", "Alpha"));
+        controller.createKommandoGroup(squadronId, new CreateKommandoGroupRequest("Alpha"));
 
     assertEquals(200, response.getStatusCode().value());
   }
@@ -344,19 +386,21 @@ class LeitungPageControllerTest {
   @Test
   void addBereichLeader_backendForbidden_relays403() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    LeitungPageController controller = new LeitungPageController(backend);
+    LeitungPageController controller =
+        new LeitungPageController(new LeadershipBackendClient(backend));
     UUID bereichId = UUID.randomUUID();
     when(backend.post(
-            eq("/api/v1/org-hierarchy/bereiche/" + bereichId + "/members"),
+            eq("/api/v1/org-hierarchy/bereiche/{bereichId}/members"),
             any(),
-            eq(Object.class)))
+            eq(BereichMemberResponse.class),
+            eq(bereichId)))
         .thenThrow(
             new BackendServiceException(
                 "denied", null, 403, "ACCESS_DENIED", null, List.of(), "No."));
 
     ResponseEntity<Object> response =
         controller.addBereichLeader(
-            bereichId, Map.of("userId", UUID.randomUUID().toString(), "role", "KOORDINATOR"));
+            bereichId, new AddBereichLeaderRequest(UUID.randomUUID(), "KOORDINATOR"));
 
     assertEquals(403, response.getStatusCode().value());
     assertTrue(((Map<String, Object>) response.getBody()).containsKey("code"));
@@ -365,17 +409,20 @@ class LeitungPageControllerTest {
   @Test
   void toggleSkLead_relaysToBackend() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    LeitungPageController controller = new LeitungPageController(backend);
+    LeitungPageController controller =
+        new LeitungPageController(new LeadershipBackendClient(backend));
     UUID skId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     when(backend.patch(
-            eq("/api/v1/special-commands/" + skId + "/members/" + userId + "/lead"),
+            eq("/api/v1/special-commands/{skId}/members/{userId}/lead"),
             any(),
-            eq(Object.class)))
-        .thenReturn(new Object());
+            eq(OrgUnitMembershipDto.class),
+            eq(skId),
+            eq(userId)))
+        .thenReturn(membership(userId, skId));
 
     ResponseEntity<Object> response =
-        controller.toggleSkLead(skId, userId, Map.of("isLead", true, "version", 0));
+        controller.toggleSkLead(skId, userId, new MembershipLeadToggleRequest(true, 0L));
 
     assertEquals(200, response.getStatusCode().value());
   }
@@ -383,7 +430,8 @@ class LeitungPageControllerTest {
   @Test
   void removeOlMember_success_returns200() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    LeitungPageController controller = new LeitungPageController(backend);
+    LeitungPageController controller =
+        new LeitungPageController(new LeadershipBackendClient(backend));
     UUID olId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
 
@@ -392,7 +440,14 @@ class LeitungPageControllerTest {
     assertEquals(200, response.getStatusCode().value());
     verify(backend)
         .delete(
-            "/api/v1/org-hierarchy/organisationsleitung/" + olId + "/members/" + userId,
-            Object.class);
+            "/api/v1/org-hierarchy/organisationsleitung/{olId}/members/{userId}",
+            Void.class,
+            olId,
+            userId);
+  }
+
+  private static OrgUnitMembershipDto membership(UUID userId, UUID orgUnitId) {
+    return new OrgUnitMembershipDto(
+        userId, "Pilot", orgUnitId, OrgUnitKind.SQUADRON, false, false, false, null, 1L);
   }
 }

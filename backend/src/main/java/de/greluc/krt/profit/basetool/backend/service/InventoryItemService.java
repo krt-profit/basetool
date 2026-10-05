@@ -27,7 +27,12 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -64,11 +69,6 @@ import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
-import de.greluc.krt.profit.basetool.backend.support.InventoryProperties;
-import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -638,8 +638,11 @@ public class InventoryItemService {
    *
    * @param id the inventory entry id
    * @param dto dimension, target, amount and echoed entry version
+   * @param currentUserId the authenticated caller
+   * @param isLogistician whether the caller is a logistician or above
    * @return the updated entry with its new version
    * @throws NotFoundException when the entry, job order or mission is unknown
+   * @throws AccessDeniedException when the caller neither owns the entry nor is a logistician
    * @throws BadRequestException when the entry is personal, the material is not required, the
    *     amount is invalid, or the target is already allocated
    * @throws OverAllocationException when the dimension total would exceed the entry's amount
@@ -647,8 +650,9 @@ public class InventoryItemService {
    *     is stale
    */
   @Transactional
-  public InventoryItemDto addAllocation(UUID id, InventoryAllocationWriteDto dto) {
-    InventoryItem item = loadForAllocationWrite(id, dto);
+  public InventoryItemDto addAllocation(
+      UUID id, InventoryAllocationWriteDto dto, UUID currentUserId, boolean isLogistician) {
+    InventoryItem item = loadForAllocationWrite(id, dto, currentUserId, isLogistician);
     assertNotPersonal(item);
     double amount = requireWriteAmount(dto, item);
     switch (dto.field()) {
@@ -707,16 +711,20 @@ public class InventoryItemService {
    *
    * @param id the inventory entry id
    * @param dto dimension, target, new amount and echoed entry version
+   * @param currentUserId the authenticated caller
+   * @param isLogistician whether the caller is a logistician or above
    * @return the updated entry
    * @throws NotFoundException when the entry or the target slice is unknown
+   * @throws AccessDeniedException when the caller neither owns the entry nor is a logistician
    * @throws BadRequestException when the entry is personal or the amount is invalid
    * @throws OverAllocationException when the dimension total would exceed the entry's amount
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the echoed version
    *     is stale
    */
   @Transactional
-  public InventoryItemDto changeAllocation(UUID id, InventoryAllocationWriteDto dto) {
-    InventoryItem item = loadForAllocationWrite(id, dto);
+  public InventoryItemDto changeAllocation(
+      UUID id, InventoryAllocationWriteDto dto, UUID currentUserId, boolean isLogistician) {
+    InventoryItem item = loadForAllocationWrite(id, dto, currentUserId, isLogistician);
     assertNotPersonal(item);
     double amount = requireWriteAmount(dto, item);
     switch (dto.field()) {
@@ -760,14 +768,18 @@ public class InventoryItemService {
    *
    * @param id the inventory entry id
    * @param dto dimension, target and echoed entry version; amount is ignored
+   * @param currentUserId the authenticated caller
+   * @param isLogistician whether the caller is a logistician or above
    * @return the updated entry
    * @throws NotFoundException when the entry or the target slice is unknown
+   * @throws AccessDeniedException when the caller neither owns the entry nor is a logistician
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the echoed version
    *     is stale
    */
   @Transactional
-  public InventoryItemDto removeAllocation(UUID id, InventoryAllocationWriteDto dto) {
-    InventoryItem item = loadForAllocationWrite(id, dto);
+  public InventoryItemDto removeAllocation(
+      UUID id, InventoryAllocationWriteDto dto, UUID currentUserId, boolean isLogistician) {
+    InventoryItem item = loadForAllocationWrite(id, dto, currentUserId, isLogistician);
     switch (dto.field()) {
       case JOB_ORDER -> {
         InventoryJobOrderAllocation slice = findJobOrderSlice(item, dto.targetId());
@@ -807,20 +819,30 @@ public class InventoryItemService {
   }
 
   /**
-   * Loads an entry under a forced version increment and checks the echoed version, making the
-   * entry's {@code @Version} the concurrency token for its allocation slices.
+   * Loads an entry under a forced version increment, refuses a caller who neither owns it nor is a
+   * logistician, and checks the echoed version, making the entry's {@code @Version} the concurrency
+   * token for its allocation slices.
    *
    * @param id the inventory entry id
    * @param dto the write payload carrying the echoed version
+   * @param currentUserId the authenticated caller
+   * @param isLogistician whether the caller is a logistician or above
    * @return the managed entry
    * @throws NotFoundException when the entry is unknown
+   * @throws AccessDeniedException when the caller neither owns the entry nor is a logistician
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the echoed version
    *     is stale
    */
-  private InventoryItem loadForAllocationWrite(UUID id, InventoryAllocationWriteDto dto) {
+  private InventoryItem loadForAllocationWrite(
+      UUID id, InventoryAllocationWriteDto dto, UUID currentUserId, boolean isLogistician) {
     InventoryItem item =
         Entities.require(
             inventoryItemRepository.findByIdForAllocationWrite(id), "Inventory item not found");
+    boolean isOwner = item.getUser() != null && item.getUser().getId().equals(currentUserId);
+    if (!isOwner && !isLogistician) {
+      throw new AccessDeniedException(
+          "You are not allowed to change the allocations of this inventory item");
+    }
     OptimisticLock.checkOptionalClient(item.getVersion(), dto.version(), InventoryItem.class, id);
     return item;
   }

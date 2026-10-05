@@ -19,10 +19,10 @@
 
 /* global krtAutocomplete, LOCATION_MSG, LOCATION_CONFLICT */
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     const dataList = document.getElementById('locationNames-data');
     const locationNames = dataList
-        ? Array.from(dataList.options).map(function (o) {
+        ? Array.from(dataList.options).map((o) => {
               return o.value;
           })
         : [];
@@ -49,7 +49,7 @@ function filterTable(tableId, query) {
 
 window.filterTable = filterTable;
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     function patchButton(btn, flagValue) {
         if (!btn) {
             return;
@@ -81,7 +81,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    document.addEventListener('submit', function (event) {
+    document.addEventListener('submit', (event) => {
         const form = event.target.closest('form[data-location-toggle]');
         if (!form) {
             return;
@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     patchRow(row, updated);
                 },
             })
-            .finally(function () {
+            .finally(() => {
                 if (button) {
                     button.disabled = false;
                 }

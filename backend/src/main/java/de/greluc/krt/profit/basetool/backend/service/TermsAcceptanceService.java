@@ -21,11 +21,11 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import de.greluc.krt.profit.basetool.backend.identity.api.TermsConsentCheck;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.TermsAcceptance;
 import de.greluc.krt.profit.basetool.backend.model.dto.TermsAcceptanceStatusDto;
 import de.greluc.krt.profit.basetool.backend.repository.TermsAcceptanceRepository;
-import de.greluc.krt.profit.basetool.backend.support.TermsConsentCheck;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;

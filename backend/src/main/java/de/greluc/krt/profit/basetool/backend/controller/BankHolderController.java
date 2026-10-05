@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankHolderBookingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankHolderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankTransactionDto;
@@ -28,7 +29,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.request.RegisterBankHolde
 import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateBankHolderRequest;
 import de.greluc.krt.profit.basetool.backend.service.BankHolderService;
 import de.greluc.krt.profit.basetool.backend.service.BankLedgerService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;

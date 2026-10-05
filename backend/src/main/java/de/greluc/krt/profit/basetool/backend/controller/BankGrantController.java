@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankGrantDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankGrantRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateBankGrantRequest;
 import de.greluc.krt.profit.basetool.backend.service.BankGrantService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.List;

@@ -20,8 +20,8 @@
 (function () {
     'use strict';
 
-    const i18n = window.materialboerseI18n || {};
-    const gi18n = window.materialgesuchI18n || {};
+    const i18n = { ...window.materialboerseModalI18n, ...window.materialboerseI18n };
+    const gi18n = { ...window.materialgesuchModalI18n, ...window.materialgesuchI18n };
     if (!window.krtFetch || !document.getElementById('mb-board')) {
         return;
     }
@@ -86,7 +86,7 @@
             return;
         }
         const wanted = tab === 'mein' ? 'mine' : 'all';
-        form.querySelectorAll('input[name="scope"]').forEach(function (radio) {
+        form.querySelectorAll('input[name="scope"]').forEach((radio) => {
             radio.checked = radio.value === wanted;
         });
     }
@@ -225,7 +225,7 @@
             }
             box.disabled = requests;
         }
-        document.querySelectorAll('[data-mb-offers-only]').forEach(function (el) {
+        document.querySelectorAll('[data-mb-offers-only]').forEach((el) => {
             /** @type {HTMLElement} */ (el).hidden = requests;
         });
         return changed;
@@ -276,7 +276,7 @@
         const p = params();
         p.set('fragment', 'list');
         return window.krtFetch.swap({
-            url: '/materialboerse?' + p.toString(),
+            url: `/materialboerse?${p.toString()}`,
             container: activeMode() === 'requests' ? '#mg-listwrap' : '#mb-listwrap',
             fragmentValue: 'list',
             history: false,
@@ -287,7 +287,7 @@
         const p = params();
         p.set('fragment', 'board');
         return window.krtFetch.swap({
-            url: '/materialboerse?' + p.toString(),
+            url: `/materialboerse?${p.toString()}`,
             container: '#mb-board',
             fragmentValue: 'board',
             history: false,
@@ -296,7 +296,7 @@
 
     function swapDetail(id) {
         return window.krtFetch.swap({
-            url: '/materialboerse?fragment=detail&selected=' + encodeURIComponent(id),
+            url: `/materialboerse?fragment=detail&selected=${encodeURIComponent(id)}`,
             container: '#mb-detail',
             fragmentValue: 'detail',
             history: false,
@@ -305,7 +305,7 @@
 
     function swapRequestDetail(id) {
         return window.krtFetch.swap({
-            url: '/materialboerse?view=requests&fragment=detail&selected=' + encodeURIComponent(id),
+            url: `/materialboerse?view=requests&fragment=detail&selected=${encodeURIComponent(id)}`,
             container: '#mg-detail',
             fragmentValue: 'detail',
             history: false,
@@ -321,13 +321,13 @@
             window.history.replaceState(
                 window.history.state,
                 '',
-                window.location.pathname + '?' + p.toString(),
+                `${window.location.pathname}?${p.toString()}`,
             );
         } catch (_e) {}
     }
 
     function applyAgo(root) {
-        (root || document).querySelectorAll('[data-mb-ago]').forEach(function (el) {
+        (root || document).querySelectorAll('[data-mb-ago]').forEach((el) => {
             const ts = el.getAttribute('data-ts');
             if (!ts) {
                 return;
@@ -359,7 +359,7 @@
      * @param {string} mode `offers` or `requests`
      */
     function setActiveMode(mode) {
-        document.querySelectorAll('.tab[data-mb-mode]').forEach(function (btn) {
+        document.querySelectorAll('.tab[data-mb-mode]').forEach((btn) => {
             const on = btn.getAttribute('data-mb-mode') === mode;
             btn.classList.toggle('active', on);
             btn.setAttribute('aria-selected', on ? 'true' : 'false');
@@ -367,7 +367,7 @@
         if (window.krtOverflowMenu) {
             window.krtOverflowMenu.closeAll();
         }
-        document.querySelectorAll('[data-mb-cta-group]').forEach(function (group) {
+        document.querySelectorAll('[data-mb-cta-group]').forEach((group) => {
             /** @type {HTMLElement} */ (group).hidden =
                 group.getAttribute('data-mb-cta-group') !== mode;
         });
@@ -403,7 +403,7 @@
     }
 
     function markActiveRow(id) {
-        document.querySelectorAll('.mb-mrow[data-offer-id]').forEach(function (row) {
+        document.querySelectorAll('.mb-mrow[data-offer-id]').forEach((row) => {
             const on = row.getAttribute('data-offer-id') === id;
             row.classList.toggle('is-active', on);
             row.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -411,7 +411,7 @@
     }
 
     function markActiveRequestRow(id) {
-        document.querySelectorAll('.mb-mrow[data-request-id]').forEach(function (row) {
+        document.querySelectorAll('.mb-mrow[data-request-id]').forEach((row) => {
             const on = row.getAttribute('data-request-id') === id;
             row.classList.toggle('is-active', on);
             row.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -430,14 +430,14 @@
         if (searchTimer) {
             clearTimeout(searchTimer);
         }
-        searchTimer = setTimeout(function () {
+        searchTimer = setTimeout(() => {
             clearSelection();
             swapList();
         }, 250);
     }
 
     function anyModalOpen() {
-        return ['mb-modal', 'mg-modal'].some(function (id) {
+        return ['mb-modal', 'mg-modal'].some((id) => {
             const modal = document.getElementById(id);
             return (
                 modal &&
@@ -494,7 +494,7 @@
         const interested = button.getAttribute('data-interested') === 'true';
         window.krtFetch.write({
             method: interested ? 'DELETE' : 'POST',
-            url: '/materialboerse/offers/' + id + '/interest/ajax',
+            url: `/materialboerse/offers/${id}/interest/ajax`,
             successMessage: interested ? i18n.interestRemoved : i18n.interestAdded,
             errorMessage: i18n.error,
             serialize: SERIALIZE_KEY,
@@ -513,13 +513,13 @@
                 i18n.confirmYes,
                 i18n.confirmNo,
             )
-            .then(function (ok) {
+            .then((ok) => {
                 if (!ok) {
                     return;
                 }
                 window.krtFetch.write({
                     method: 'POST',
-                    url: '/materialboerse/offers/' + id + '/deactivate/ajax',
+                    url: `/materialboerse/offers/${id}/deactivate/ajax`,
                     successMessage: i18n.deactivated,
                     errorMessage: i18n.error,
                     serialize: SERIALIZE_KEY,
@@ -544,7 +544,7 @@
         const interested = button.getAttribute('data-interested') === 'true';
         window.krtFetch.write({
             method: interested ? 'DELETE' : 'POST',
-            url: '/materialboerse/requests/' + id + '/interest/ajax',
+            url: `/materialboerse/requests/${id}/interest/ajax`,
             successMessage: interested ? gi18n.interestRemoved : gi18n.interestAdded,
             errorMessage: gi18n.error,
             serialize: REQUEST_SERIALIZE_KEY,
@@ -563,13 +563,13 @@
                 gi18n.confirmYes,
                 gi18n.confirmNo,
             )
-            .then(function (ok) {
+            .then((ok) => {
                 if (!ok) {
                     return;
                 }
                 window.krtFetch.write({
                     method: 'POST',
-                    url: '/materialboerse/requests/' + id + '/deactivate/ajax',
+                    url: `/materialboerse/requests/${id}/deactivate/ajax`,
                     successMessage: gi18n.deactivated,
                     errorMessage: gi18n.error,
                     serialize: REQUEST_SERIALIZE_KEY,
@@ -658,7 +658,7 @@
         }
     }
 
-    document.addEventListener('click', function (e) {
+    document.addEventListener('click', (e) => {
         let el;
         if ((el = e.target.closest('[data-mb-mode]'))) {
             switchMode(el.getAttribute('data-mb-mode') === 'requests' ? 'requests' : 'offers');
@@ -716,14 +716,14 @@
         }
     });
 
-    document.addEventListener('input', function (e) {
+    document.addEventListener('input', (e) => {
         if (e.target.matches('#mb-search, [data-mb-minquality], [data-mb-minamount]')) {
             persistFilters();
             debouncedList();
         }
     });
 
-    document.addEventListener('change', function (e) {
+    document.addEventListener('change', (e) => {
         if (e.target.matches('[data-mb-sort], [data-mb-exclude-stolen]')) {
             persistFilters();
             swapList();
@@ -737,7 +737,7 @@
     });
 
     if (form) {
-        form.addEventListener('submit', function (e) {
+        form.addEventListener('submit', (e) => {
             e.preventDefault();
             if (searchTimer) {
                 clearTimeout(searchTimer);
@@ -754,7 +754,7 @@
         if (peerTimer) {
             clearTimeout(peerTimer);
         }
-        peerTimer = setTimeout(function () {
+        peerTimer = setTimeout(() => {
             if (anyModalOpen()) {
                 return;
             }
@@ -768,7 +768,7 @@
         window.krtLiveSync.subscribe(MATERIALBOARD_TOPIC, { onChanged: onPeerChanged });
     }
 
-    document.addEventListener('krt:swapped', function () {
+    document.addEventListener('krt:swapped', () => {
         applyAgo(document);
         selectedId = readSelectedId();
         selectedRequestId = readSelectedRequestId();

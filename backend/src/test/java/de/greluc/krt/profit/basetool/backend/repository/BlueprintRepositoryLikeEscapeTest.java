@@ -21,10 +21,10 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintProductRow;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
-import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;

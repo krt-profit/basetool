@@ -42,7 +42,7 @@ function buildScuHint() {
 function copyTemplateOptions(templateId, target) {
     const tpl = document.getElementById(templateId);
     if (!tpl || !target) return;
-    Array.from(tpl.children).forEach(function (opt) {
+    Array.from(tpl.children).forEach((opt) => {
         target.appendChild(opt.cloneNode(true));
     });
 }
@@ -57,7 +57,7 @@ function copyTemplateOptions(templateId, target) {
 function fillQualityTierOptions(select, selectedCode) {
     const tpl = document.getElementById('item-quality-options-template');
     if (!tpl) return;
-    Array.from(tpl.querySelectorAll('option')).forEach(function (opt) {
+    Array.from(tpl.querySelectorAll('option')).forEach((opt) => {
         const code = opt.value;
         const selected = code === selectedCode;
         if (opt.getAttribute('data-inactive') === 'true' && !selected) return;
@@ -184,7 +184,7 @@ function renderSummary(el, count, strong, unitName) {
         parts.push(document.createTextNode((el.dataset.for || '{0}').replace('{0}', unitName)));
     }
     el.replaceChildren();
-    parts.forEach(function (part, i) {
+    parts.forEach((part, i) => {
         if (i > 0) el.appendChild(document.createTextNode(' · '));
         el.appendChild(part);
     });
@@ -197,7 +197,7 @@ function updateMaterialSummary() {
     if (!el || !container) return;
     let count = 0;
     let scu = 0;
-    container.querySelectorAll('.material-row').forEach(function (row) {
+    container.querySelectorAll('.material-row').forEach((row) => {
         const sel = row.querySelector('[data-role="material-select"]');
         if (!sel || !(/** @type {HTMLInputElement} */ (sel).value)) return;
         count++;
@@ -206,7 +206,7 @@ function updateMaterialSummary() {
         const value = amount ? parseAmount(/** @type {HTMLInputElement} */ (amount).value) : NaN;
         if (!isNaN(value)) scu += value;
     });
-    const scuText = scu > 0 ? formatSummaryNumber(scu) + ' ' + (el.dataset.unit || '') : '';
+    const scuText = scu > 0 ? `${formatSummaryNumber(scu)} ${el.dataset.unit || ''}` : '';
     renderSummary(el, count, scuText.trim(), selectedUnitName('requestingOrgUnitId'));
 }
 
@@ -216,7 +216,7 @@ function updateItemSummary() {
     const container = document.getElementById('item-lines');
     if (!el || !container) return;
     let count = 0;
-    container.querySelectorAll('.item-line').forEach(function (row) {
+    container.querySelectorAll('.item-line').forEach((row) => {
         const sel = row.querySelector('[data-role="item-select"]');
         if (sel && /** @type {HTMLInputElement} */ (sel).value) count++;
     });
@@ -230,7 +230,7 @@ function syncMaterialRemoveButtons() {
     const container = document.getElementById('materials-container');
     if (!container) return;
     const buttons = container.querySelectorAll('[data-trigger="orders-remove-material"]');
-    buttons.forEach(function (btn) {
+    buttons.forEach((btn) => {
         /** @type {HTMLButtonElement} */ (btn).disabled = buttons.length <= 1;
     });
 }
@@ -243,10 +243,10 @@ function renumberMaterialRows() {
     const container = document.getElementById('materials-container');
     if (!container) return;
     const rows = container.querySelectorAll('.material-row');
-    rows.forEach(function (row, i) {
-        row.querySelectorAll('[name^="materials["]').forEach(function (field) {
+    rows.forEach((row, i) => {
+        row.querySelectorAll('[name^="materials["]').forEach((field) => {
             const name = field.getAttribute('name') || '';
-            field.setAttribute('name', name.replace(/^materials\[\d+\]/, 'materials[' + i + ']'));
+            field.setAttribute('name', name.replace(/^materials\[\d+\]/, `materials[${i}]`));
         });
     });
     materialIndex = rows.length;
@@ -276,19 +276,15 @@ function updateCounter(area) {
     const counter = document.getElementById(area.dataset.counter || '');
     if (!counter) return;
     const max = area.maxLength > 0 ? area.maxLength : 1000;
-    counter.textContent = area.value.length + ' / ' + max;
+    counter.textContent = `${area.value.length} / ${max}`;
 }
 
 async function findJobOrderMaterialByName(normalizedName) {
     try {
-        const res = await fetch(
-            '/catalog/material-search?jobOrder=true&q=' + encodeURIComponent(normalizedName),
-            { headers: { Accept: 'application/json' } },
-        );
-        if (!res.ok) {
-            return null;
-        }
-        const list = (await res.json()) || [];
+        const list =
+            (await window.krtFetch.getJson(
+                `/catalog/material-search?jobOrder=true&q=${encodeURIComponent(normalizedName)}`,
+            )) || [];
         return list.find((m) => (m.name || '').trim().toLowerCase() === normalizedName) || null;
     } catch (_e) {
         return null;
@@ -366,7 +362,7 @@ async function importFromScmdb() {
         }
         let successMsg = MSG_SCMDB_SUCCESS;
         if (unknownMaterials.length > 0) {
-            successMsg += ' (' + MSG_SCMDB_SOME_UNKNOWN + ': ' + unknownMaterials.join(', ') + ')';
+            successMsg += ` (${MSG_SCMDB_SOME_UNKNOWN}: ${unknownMaterials.join(', ')})`;
         }
 
         if (window.showFrontendSuccessToast) {
@@ -375,7 +371,7 @@ async function importFromScmdb() {
     } else {
         let errorMsg = MSG_SCMDB_NO_MATCH;
         if (unknownMaterials.length > 0) {
-            errorMsg = MSG_SCMDB_NOT_FOUND + ': ' + unknownMaterials.join(', ');
+            errorMsg = `${MSG_SCMDB_NOT_FOUND}: ${unknownMaterials.join(', ')}`;
         }
 
         if (window.showFrontendErrorToast) {
@@ -391,20 +387,23 @@ function addMaterialRow() {
     row.className = 'material-row material-grid';
     const removeLabel = container.dataset.removeLabel || '';
 
-    row.innerHTML = `
+    krtHtml.set(
+        row,
+        krtHtml`
         <div class="form-group">
-            <label class="visually-hidden">${escapeHtml(MSG_MATERIAL_LABEL)}</label>
-            <select name="materials[${escapeAttr(materialIndex)}].materialId" data-role="material-select" data-krt-combobox="remote-materials-joborder" required></select>
+            <label class="visually-hidden">${MSG_MATERIAL_LABEL}</label>
+            <select name="materials[${materialIndex}].materialId" data-role="material-select" data-krt-combobox="remote-materials-joborder" required></select>
         </div>
         <div class="form-group material-row__amount">
-            <input type="text" inputmode="decimal" data-scu-decimal name="materials[${escapeAttr(materialIndex)}].amount" value="" data-role="material-amount" step="0.001" min="0" required aria-label="${escapeAttr(MSG_AMOUNT_LABEL)}">
+            <input type="text" inputmode="decimal" data-scu-decimal name="materials[${materialIndex}].amount" value="" data-role="material-amount" step="0.001" min="0" required aria-label="${MSG_AMOUNT_LABEL}">
             <span class="material-row__unit" data-role="amount-unit"></span>
         </div>
         <div class="form-group">
-            <select name="materials[${escapeAttr(materialIndex)}].minQuality" aria-label="${escapeAttr(MSG_MINQUALITY_LABEL)}"></select>
+            <select name="materials[${materialIndex}].minQuality" aria-label="${MSG_MINQUALITY_LABEL}"></select>
         </div>
-        <button type="button" class="btn btn-ghost btn-icon material-row__remove" data-trigger="orders-remove-material" data-testid="order-material-remove" aria-label="${escapeAttr(removeLabel)}" title="${escapeAttr(removeLabel)}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-    `;
+        <button type="button" class="btn btn-ghost btn-icon material-row__remove" data-trigger="orders-remove-material" data-testid="order-material-remove" aria-label="${removeLabel}" title="${removeLabel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+    `,
+    );
     const amountCell = row.querySelector('.material-row__amount');
     if (amountCell) {
         amountCell.appendChild(buildScuHint());
@@ -426,18 +425,14 @@ function addMaterialRow() {
 let itemLineIndex = 0;
 
 function fetchItemOptions(query) {
-    return fetch('/orders/item-search?q=' + encodeURIComponent(query || ''), {
-        headers: { Accept: 'application/json' },
-    })
-        .then(function (r) {
-            return r.ok ? r.json() : [];
-        })
-        .then(function (list) {
-            return (list || []).map(function (gi) {
+    return window.krtFetch
+        .getJson(`/orders/item-search?q=${encodeURIComponent(query || '')}`)
+        .then((list) => {
+            return (list || []).map((gi) => {
                 return { value: gi.id, label: gi.name };
             });
         })
-        .catch(function () {
+        .catch(() => {
             return [];
         });
 }
@@ -463,7 +458,7 @@ function toggleOrderMode() {
 }
 
 function addItemLine(prefill) {
-    prefill = prefill || {};
+    prefill ||= {};
     const idx = itemLineIndex++;
     const container = document.getElementById('item-lines');
     if (!container) return null;
@@ -472,33 +467,35 @@ function addItemLine(prefill) {
     row.dataset.lineIndex = idx;
     const manufactured = Number(prefill.manufactured) || 0;
     const minAmount = manufactured > 0 ? manufactured : 1;
-    let idInput = '';
+    let idInput = krtHtml``;
     if (prefill.id) {
-        idInput = `<input type="hidden" name="items[${escapeAttr(idx)}].id" value="${escapeAttr(prefill.id)}">`;
+        idInput = krtHtml`<input type="hidden" name="items[${idx}].id" value="${prefill.id}">`;
     }
-    let removeButton = '';
-    let producedNote = '';
+    let removeButton = krtHtml``;
+    let producedNote = krtHtml``;
     if (manufactured > 0) {
-        producedNote = `<p class="oc-note-block text-muted mb-0" data-role="produced-note">${escapeHtml(ITEM_I18N.producedLocked.replace('{0}', String(manufactured)))}</p>`;
+        producedNote = krtHtml`<p class="oc-note-block text-muted mb-0" data-role="produced-note">${ITEM_I18N.producedLocked.replace('{0}', String(manufactured))}</p>`;
     } else {
-        removeButton = `<button type="button" class="btn btn-quiet-danger mb-0 nowrap" data-trigger="orders-remove-item">${escapeHtml(ITEM_I18N.remove)}</button>`;
+        removeButton = krtHtml`<button type="button" class="btn btn-quiet-danger mb-0 nowrap" data-trigger="orders-remove-item">${ITEM_I18N.remove}</button>`;
     }
-    row.innerHTML = `
+    krtHtml.set(
+        row,
+        krtHtml`
         ${idInput}
-        <input type="hidden" name="items[${escapeAttr(idx)}].clientLineId" value="${escapeAttr(idx)}">
-        <input type="hidden" name="items[${escapeAttr(idx)}].parentClientLineId" value="${escapeAttr(prefill.parentId != null ? prefill.parentId : '')}">
+        <input type="hidden" name="items[${idx}].clientLineId" value="${idx}">
+        <input type="hidden" name="items[${idx}].parentClientLineId" value="${prefill.parentId != null ? prefill.parentId : ''}">
         <div class="oc-line-fields">
             <div class="form-group flex-2 mb-0">
-                <label>${escapeHtml(ITEM_I18N.item)}</label>
-                <select name="items[${escapeAttr(idx)}].gameItemId" data-role="item-select" data-testid="order-item-combobox" required></select>
+                <label>${ITEM_I18N.item}</label>
+                <select name="items[${idx}].gameItemId" data-role="item-select" data-testid="order-item-combobox" required></select>
             </div>
             <div class="form-group flex-1 mb-0" data-role="blueprint-wrap" hidden>
-                <label>${escapeHtml(ITEM_I18N.blueprint)}</label>
-                <select name="items[${escapeAttr(idx)}].blueprintId" data-role="blueprint-select"></select>
+                <label>${ITEM_I18N.blueprint}</label>
+                <select name="items[${idx}].blueprintId" data-role="blueprint-select"></select>
             </div>
             <div class="form-group flex-1 mb-0">
-                <label>${escapeHtml(ITEM_I18N.amount)}</label>
-                <input type="number" step="1" name="items[${escapeAttr(idx)}].amount" data-role="amount" min="${escapeAttr(minAmount)}" value="${escapeAttr(prefill.amount || 1)}" required>
+                <label>${ITEM_I18N.amount}</label>
+                <input type="number" step="1" name="items[${idx}].amount" data-role="amount" min="${minAmount}" value="${prefill.amount || 1}" required>
             </div>
             ${removeButton}
         </div>
@@ -506,7 +503,8 @@ function addItemLine(prefill) {
         <div data-role="derived" class="oc-derived-block"></div>
         <div data-role="unresolved" class="alert alert-danger oc-note-block" hidden></div>
         <div data-role="subassemblies" class="oc-note-block"></div>
-    `;
+    `,
+    );
     copyTemplateOptions('item-options-template', row.querySelector('[data-role="item-select"]'));
     container.appendChild(row);
     const itemSelect = row.querySelector('select[data-role="item-select"]');
@@ -536,11 +534,11 @@ function addItemLine(prefill) {
 }
 
 function clearDerived(row) {
-    row.querySelector('[data-role="derived"]').innerHTML = '';
+    row.querySelector('[data-role="derived"]').replaceChildren();
     const u = row.querySelector('[data-role="unresolved"]');
     u.hidden = true;
-    u.innerHTML = '';
-    row.querySelector('[data-role="subassemblies"]').innerHTML = '';
+    u.replaceChildren();
+    row.querySelector('[data-role="subassemblies"]').replaceChildren();
 }
 
 function loadBlueprints(row, preselectBpId, qualities) {
@@ -550,15 +548,14 @@ function loadBlueprints(row, preselectBpId, qualities) {
     clearDerived(row);
     if (!gameItemId) {
         wrap.hidden = true;
-        bpSelect.innerHTML = '';
+        bpSelect.replaceChildren();
         return;
     }
-    fetch('/orders/item-blueprints/' + encodeURIComponent(gameItemId), {
-        headers: { Accept: 'application/json' },
-    })
-        .then((r) => (r.ok ? r.json() : []))
+    window.krtFetch
+        .getJson(`/orders/item-blueprints/${encodeURIComponent(gameItemId)}`)
+        .catch(() => [])
         .then((list) => {
-            list = list || [];
+            list ||= [];
             bpSelect.replaceChildren(
                 ...list.map((b) => {
                     const opt = document.createElement('option');
@@ -593,17 +590,14 @@ function loadDerivation(row, qualities) {
     const derived = row.querySelector('[data-role="derived"]');
     const unresolved = row.querySelector('[data-role="unresolved"]');
     const subs = row.querySelector('[data-role="subassemblies"]');
-    fetch('/orders/item-derivation/' + encodeURIComponent(blueprintId) + '?amount=' + amount, {
-        headers: { Accept: 'application/json' },
-    })
-        .then((r) => (r.ok ? r.json() : null))
+    window.krtFetch
+        .getJson(`/orders/item-derivation/${encodeURIComponent(blueprintId)}?amount=${amount}`)
         .then((d) => {
             if (!d) {
                 clearDerived(row);
                 return;
             }
-            let html = `<strong class="oc-label-strong">${escapeHtml(ITEM_I18N.materialsTitle)}</strong>`;
-            (d.materials || []).forEach((m, mi) => {
+            const lines = (d.materials || []).map((m, mi) => {
                 const mat = m.material || {};
                 const unit = mat.quantityType === 'PIECE' ? MSG_UNIT_PIECE : MSG_UNIT_SCU;
                 const qty =
@@ -612,18 +606,21 @@ function loadDerivation(row, qualities) {
                         : Number((m.requiredQuantity || 0).toFixed(3));
                 const storedQ =
                     qualities && mat.id && qualities[mat.id] ? qualities[mat.id] : m.defaultQuality;
-                html += `
+                return krtHtml`
                     <div class="oc-material-line">
-                        <input type="hidden" name="items[${escapeAttr(idx)}].materials[${escapeAttr(mi)}].materialId" value="${escapeAttr(mat.id)}">
-                        <span class="flex-2">${escapeHtml(mat.name || '')}</span>
-                        <span class="flex-1">${escapeHtml(qty)} ${escapeHtml(unit)}</span>
-                        <select name="items[${escapeAttr(idx)}].materials[${escapeAttr(mi)}].quality" class="flex-1" data-quality-code="${escapeAttr(storedQ || '')}"></select>
+                        <input type="hidden" name="items[${idx}].materials[${mi}].materialId" value="${mat.id}">
+                        <span class="flex-2">${mat.name || ''}</span>
+                        <span class="flex-1">${qty} ${unit}</span>
+                        <select name="items[${idx}].materials[${mi}].quality" class="flex-1" data-quality-code="${storedQ || ''}"></select>
                     </div>`;
             });
-            derived.innerHTML = '';
+            derived.replaceChildren();
             if ((d.materials || []).length) {
-                derived.innerHTML = html;
-                derived.querySelectorAll('select[data-quality-code]').forEach(function (sel) {
+                krtHtml.set(
+                    derived,
+                    krtHtml`<strong class="oc-label-strong">${ITEM_I18N.materialsTitle}</strong>${lines}`,
+                );
+                derived.querySelectorAll('select[data-quality-code]').forEach((sel) => {
                     fillQualityTierOptions(
                         /** @type {HTMLSelectElement} */ (sel),
                         sel.getAttribute('data-quality-code'),
@@ -632,24 +629,28 @@ function loadDerivation(row, qualities) {
             }
             if ((d.unresolvedIngredients || []).length) {
                 unresolved.hidden = false;
-                unresolved.innerHTML = `<p>${escapeHtml(ITEM_I18N.unresolved)} ${escapeHtml(d.unresolvedIngredients.map(String).join(', '))}</p>`;
+                krtHtml.set(
+                    unresolved,
+                    krtHtml`<p>${ITEM_I18N.unresolved} ${d.unresolvedIngredients.map(String).join(', ')}</p>`,
+                );
             } else {
                 unresolved.hidden = true;
-                unresolved.innerHTML = '';
+                unresolved.replaceChildren();
             }
-            let s = '';
             if ((d.subAssemblies || []).length) {
-                s = `<strong class="oc-label-strong">${escapeHtml(ITEM_I18N.subTitle)}</strong>`;
-                d.subAssemblies.forEach((sa) => {
+                const subLines = d.subAssemblies.map((sa) => {
                     const gi = sa.gameItem || {};
-                    s += `<div class="oc-material-line">
-                        <span class="flex-2">${escapeHtml(gi.name || '')} &times; ${escapeHtml(sa.quantity)}</span>
-                        <button type="button" class="btn btn-ghost mb-0" data-trigger="orders-adopt-sub" data-game-item-id="${escapeAttr(gi.id)}" data-game-item-name="${escapeAttr(gi.name || '')}" data-amount="${escapeAttr(sa.quantity)}" data-parent="${escapeAttr(idx)}">${escapeHtml(ITEM_I18N.subAdopt)}</button>
+                    return krtHtml`<div class="oc-material-line">
+                        <span class="flex-2">${gi.name || ''} &times; ${sa.quantity}</span>
+                        <button type="button" class="btn btn-ghost mb-0" data-trigger="orders-adopt-sub" data-game-item-id="${gi.id}" data-game-item-name="${gi.name || ''}" data-amount="${sa.quantity}" data-parent="${idx}">${ITEM_I18N.subAdopt}</button>
                     </div>`;
                 });
-                subs.innerHTML = s;
+                krtHtml.set(
+                    subs,
+                    krtHtml`<strong class="oc-label-strong">${ITEM_I18N.subTitle}</strong>${subLines}`,
+                );
             } else {
-                subs.innerHTML = '';
+                subs.replaceChildren();
             }
         })
         .catch(() => clearDerived(row));
@@ -718,9 +719,9 @@ const itemModeEl = document.getElementById('mode-item');
 if (itemModeEl) {
     itemModeEl.addEventListener('change', updateItemSummary);
 }
-document.querySelectorAll('textarea[data-counter]').forEach(function (area) {
+document.querySelectorAll('textarea[data-counter]').forEach((area) => {
     const textarea = /** @type {HTMLTextAreaElement} */ (area);
-    textarea.addEventListener('input', function () {
+    textarea.addEventListener('input', () => {
         updateCounter(textarea);
     });
     updateCounter(textarea);

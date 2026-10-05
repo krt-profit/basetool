@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportApplyRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportPreviewDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportResultDto;
@@ -32,7 +33,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintUpdateRe
 import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintUploadPreviewService;
 import de.greluc.krt.profit.basetool.backend.service.PersonalBlueprintService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

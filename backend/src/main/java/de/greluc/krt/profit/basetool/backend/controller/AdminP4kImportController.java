@@ -20,13 +20,13 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.P4kImportJobMapper;
 import de.greluc.krt.profit.basetool.backend.model.P4kImportJob;
 import de.greluc.krt.profit.basetool.backend.model.P4kImportJobKind;
 import de.greluc.krt.profit.basetool.backend.model.dto.P4kImportJobDto;
 import de.greluc.krt.profit.basetool.backend.service.P4kImportJobRunner;
 import de.greluc.krt.profit.basetool.backend.service.P4kImportJobService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

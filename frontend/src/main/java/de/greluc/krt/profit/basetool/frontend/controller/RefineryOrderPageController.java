@@ -37,9 +37,8 @@ import de.greluc.krt.profit.basetool.frontend.model.form.RefineryGoodForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderStoreForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderStoreItemForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.refinery.client.RefineryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
@@ -63,7 +62,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -129,45 +127,9 @@ public class RefineryOrderPageController {
   /** The detail page's {@code ?fragment=} selector for the Einlagern dialog's form body. */
   private static final String FRAGMENT_STORE = "store";
 
-  /** Captured generic type for decoding a paged {@code /refinery-orders} list response. */
-  private static final ParameterizedTypeReference<PageResponse<RefineryOrderListDto>>
-      REFINERY_ORDER_LIST_PAGE =
-          new ParameterizedTypeReference<PageResponse<RefineryOrderListDto>>() {};
+  /** The refinery domain's typed backend client. */
+  private final RefineryBackendClient refineryClient;
 
-  /** Captured generic type for the per-material UEX yield map ({@code materialId -> percent}). */
-  private static final ParameterizedTypeReference<Map<String, Integer>> STRING_INTEGER_MAP =
-      new ParameterizedTypeReference<Map<String, Integer>>() {};
-
-  /** Captured generic type for decoding the cached paged materials catalog. */
-  private static final ParameterizedTypeReference<PageResponse<MaterialDto>> MATERIAL_PAGE =
-      new ParameterizedTypeReference<PageResponse<MaterialDto>>() {};
-
-  /** Captured generic type for decoding the cached paged refining-methods catalog. */
-  private static final ParameterizedTypeReference<PageResponse<RefiningMethodDto>>
-      REFINING_METHOD_PAGE = new ParameterizedTypeReference<PageResponse<RefiningMethodDto>>() {};
-
-  /** Captured generic type for decoding the cached paged locations catalog. */
-  private static final ParameterizedTypeReference<PageResponse<LocationDto>> LOCATION_PAGE =
-      new ParameterizedTypeReference<PageResponse<LocationDto>>() {};
-
-  /** Captured generic type for the cached refinery-locations list. */
-  private static final ParameterizedTypeReference<List<LocationDto>> LOCATION_LIST =
-      new ParameterizedTypeReference<List<LocationDto>>() {};
-
-  /** Captured generic type for decoding the paged missions catalog. */
-  private static final ParameterizedTypeReference<PageResponse<MissionListDto>> MISSION_LIST_PAGE =
-      new ParameterizedTypeReference<PageResponse<MissionListDto>>() {};
-
-  /** Captured generic type for the OrgUnit-membership option rows backing the owner pickers. */
-  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
-      ORG_UNIT_MEMBERSHIP_OPTION_LIST =
-          new ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>() {};
-
-  /** Captured generic type for the active job-order reference projections (store dropdown). */
-  private static final ParameterizedTypeReference<List<JobOrderReferenceDto>>
-      JOB_ORDER_REFERENCE_LIST = new ParameterizedTypeReference<List<JobOrderReferenceDto>>() {};
-
-  private final BackendApiClient backendApiClient;
   private final RoleHierarchy roleHierarchy;
   private final IngestHandoffService ingestHandoffService;
   private final ParallelPageLoader parallelPageLoader;
@@ -217,8 +179,6 @@ public class RefineryOrderPageController {
     final boolean mine = Boolean.TRUE.equals(onlyMine);
     final int effectivePage = page == null || page < 0 ? 0 : page;
     final int effectiveSize = size != null && PAGE_SIZES.contains(size) ? size : DEFAULT_PAGE_SIZE;
-    final String endpoint =
-        mine ? "/api/v1/refinery-orders/my-orders" : "/api/v1/refinery-orders/all";
     final ListQuery listQuery =
         exactStatuses != null
             ? new ListQuery(exactStatuses, false, query, SORT_BY_START)
@@ -226,16 +186,15 @@ public class RefineryOrderPageController {
 
     CompletableFuture<PageResponse<RefineryOrderListDto>> listFuture =
         parallelPageLoader.loadAsync(
-            () -> fetchOrderPage(endpoint, listQuery, effectivePage, effectiveSize));
+            () -> fetchOrderPage(mine, listQuery, effectivePage, effectiveSize));
     CompletableFuture<Long> runningFuture =
-        parallelPageLoader.loadAsync(() -> countOrders(endpoint, segmentQuery(VIEW_RUNNING, null)));
+        parallelPageLoader.loadAsync(() -> countOrders(mine, segmentQuery(VIEW_RUNNING, null)));
     CompletableFuture<Long> readyFuture =
-        parallelPageLoader.loadAsync(() -> countOrders(endpoint, segmentQuery(VIEW_READY, null)));
+        parallelPageLoader.loadAsync(() -> countOrders(mine, segmentQuery(VIEW_READY, null)));
     CompletableFuture<Long> completedFuture =
-        parallelPageLoader.loadAsync(
-            () -> countOrders(endpoint, segmentQuery(VIEW_COMPLETED, null)));
+        parallelPageLoader.loadAsync(() -> countOrders(mine, segmentQuery(VIEW_COMPLETED, null)));
     CompletableFuture<Long> allFuture =
-        parallelPageLoader.loadAsync(() -> countOrders(endpoint, segmentQuery(VIEW_ALL, null)));
+        parallelPageLoader.loadAsync(() -> countOrders(mine, segmentQuery(VIEW_ALL, null)));
     CompletableFuture.allOf(listFuture, runningFuture, readyFuture, completedFuture, allFuture)
         .join();
     model.addAttribute(
@@ -372,35 +331,9 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * The backend URL of one list request; the search, when present, is the {@code {q}} template
-   * variable so the client encodes it.
-   *
-   * @param endpoint the list endpoint, own or scoped
-   * @param listQuery the filter
-   * @param page the zero-based page index
-   * @param size the page size
-   * @return the URL template
-   */
-  @NotNull
-  static String orderPageUri(
-      @NotNull String endpoint, @NotNull ListQuery listQuery, int page, int size) {
-    return endpoint
-        + "?page="
-        + page
-        + "&size="
-        + size
-        + "&sort="
-        + listQuery.sort()
-        + "&status="
-        + String.join(",", listQuery.statuses())
-        + (listQuery.ready() ? "&ready=true" : "")
-        + (listQuery.query() != null ? "&q={q}" : "");
-  }
-
-  /**
    * Loads one page of refinery orders; a failure is logged and yields {@code null}.
    *
-   * @param endpoint the list endpoint, own or scoped
+   * @param mine whether the own-orders endpoint is listed instead of the scoped one
    * @param listQuery the filter
    * @param page the zero-based page index
    * @param size the page size
@@ -408,12 +341,16 @@ public class RefineryOrderPageController {
    */
   @Nullable
   private PageResponse<RefineryOrderListDto> fetchOrderPage(
-      @NotNull String endpoint, @NotNull ListQuery listQuery, int page, int size) {
-    String uri = orderPageUri(endpoint, listQuery, page, size);
+      boolean mine, @NotNull ListQuery listQuery, int page, int size) {
     try {
-      return listQuery.query() == null
-          ? backendApiClient.get(uri, REFINERY_ORDER_LIST_PAGE)
-          : backendApiClient.get(uri, REFINERY_ORDER_LIST_PAGE, listQuery.query());
+      return refineryClient.orderPage(
+          mine,
+          listQuery.statuses(),
+          listQuery.ready(),
+          listQuery.query(),
+          listQuery.sort(),
+          page,
+          size);
     } catch (Exception e) {
       log.error("Failed to fetch refinery orders", e);
       return null;
@@ -423,13 +360,13 @@ public class RefineryOrderPageController {
   /**
    * Counts the orders of a filter with a one-row request.
    *
-   * @param endpoint the list endpoint, own or scoped
+   * @param mine whether the own-orders endpoint is counted instead of the scoped one
    * @param listQuery the filter
    * @return the total, or {@code null} on a backend failure
    */
   @Nullable
-  private Long countOrders(@NotNull String endpoint, @NotNull ListQuery listQuery) {
-    PageResponse<RefineryOrderListDto> page = fetchOrderPage(endpoint, listQuery, 0, 1);
+  private Long countOrders(boolean mine, @NotNull ListQuery listQuery) {
+    PageResponse<RefineryOrderListDto> page = fetchOrderPage(mine, listQuery, 0, 1);
     return page == null ? null : page.totalElements();
   }
 
@@ -629,9 +566,7 @@ public class RefineryOrderPageController {
       return "refinery-orders-create :: refineryImportFormBody";
     }
     try {
-      RefineryImportDraftDto draft =
-          backendApiClient.post(
-              "/api/v1/refinery-orders/import-extract", extract, RefineryImportDraftDto.class);
+      RefineryImportDraftDto draft = refineryClient.importExtract(extract);
       if (draft == null || draft.order() == null) {
         model.addAttribute("importErrorKey", "refineryImport.error.failed");
       } else {
@@ -726,8 +661,7 @@ public class RefineryOrderPageController {
 
     if (!model.containsAttribute("refineryOrderForm") || !model.containsAttribute("storeForm")) {
       try {
-        RefineryOrderDto orderDto =
-            backendApiClient.get("/api/v1/refinery-orders/" + id, RefineryOrderDto.class);
+        RefineryOrderDto orderDto = java.util.Objects.requireNonNull(refineryClient.order(id));
         UUID currentUserId = getCurrentUserId(principal);
 
         boolean isOwner =
@@ -955,9 +889,7 @@ public class RefineryOrderPageController {
       return Map.of();
     }
     try {
-      Map<String, Integer> yields =
-          backendApiClient.get(
-              "/api/v1/refinery-orders/locations/" + locationId + "/yields", STRING_INTEGER_MAP);
+      Map<String, Integer> yields = refineryClient.yields(locationId);
       return yields != null ? yields : Map.of();
     } catch (Exception e) {
       log.warn("Failed to fetch refinery yields for location {}: {}", locationId, e.getMessage());
@@ -968,8 +900,7 @@ public class RefineryOrderPageController {
   @NotNull
   private List<MaterialDto> fetchMaterials() {
     try {
-      PageResponse<MaterialDto> p =
-          backendApiClient.getCached(CachedCatalog.MATERIALS, MATERIAL_PAGE);
+      PageResponse<MaterialDto> p = refineryClient.materials();
       if (p != null && p.content() != null) {
         return new ArrayList<>(p.content());
       }
@@ -982,8 +913,7 @@ public class RefineryOrderPageController {
   @NotNull
   private List<RefiningMethodDto> fetchMethods() {
     try {
-      PageResponse<RefiningMethodDto> p =
-          backendApiClient.getCached(CachedCatalog.REFINING_METHODS, REFINING_METHOD_PAGE);
+      PageResponse<RefiningMethodDto> p = refineryClient.refiningMethods();
       if (p != null && p.content() != null) {
         return new ArrayList<>(p.content());
       }
@@ -996,8 +926,7 @@ public class RefineryOrderPageController {
   @NotNull
   private List<LocationDto> fetchAllLocations() {
     try {
-      PageResponse<LocationDto> p =
-          backendApiClient.getCached(CachedCatalog.LOCATIONS, LOCATION_PAGE);
+      PageResponse<LocationDto> p = refineryClient.allLocations();
       if (p != null && p.content() != null) {
         return new ArrayList<>(p.content());
       }
@@ -1021,8 +950,7 @@ public class RefineryOrderPageController {
   private List<LocationDto> fetchLocations(LocationDto preserveLocation) {
     List<LocationDto> locs = new ArrayList<>();
     try {
-      List<LocationDto> fetched =
-          backendApiClient.getCached(CachedCatalog.LOCATIONS_REFINERIES, LOCATION_LIST);
+      List<LocationDto> fetched = refineryClient.refineryLocations();
       if (fetched != null) {
         locs = new ArrayList<>(fetched);
       }
@@ -1065,9 +993,7 @@ public class RefineryOrderPageController {
   @NotNull
   private List<MissionListDto> fetchMissions(UUID preserveMissionId) {
     try {
-      PageResponse<MissionListDto> p =
-          backendApiClient.get(
-              "/api/v1/missions?size=1000&sort=plannedStartTime,desc", MISSION_LIST_PAGE);
+      PageResponse<MissionListDto> p = refineryClient.missions();
       if (p == null) {
         return new ArrayList<>();
       }
@@ -1138,9 +1064,7 @@ public class RefineryOrderPageController {
    */
   private List<OrgUnitMembershipOptionDto> fetchMyPickableOrgUnits() {
     try {
-      List<OrgUnitMembershipOptionDto> options =
-          backendApiClient.get(
-              "/api/v1/users/me/pickable-org-units", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
+      List<OrgUnitMembershipOptionDto> options = refineryClient.pickableOrgUnits();
       return options != null ? options : List.of();
     } catch (Exception e) {
       log.warn("Failed to fetch pickable org units for refinery-order owner-picker", e);
@@ -1159,9 +1083,7 @@ public class RefineryOrderPageController {
       return List.of();
     }
     try {
-      List<OrgUnitMembershipOptionDto> options =
-          backendApiClient.get(
-              "/api/v1/users/" + userId + "/memberships", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
+      List<OrgUnitMembershipOptionDto> options = refineryClient.memberships(userId);
       return options != null ? options : List.of();
     } catch (Exception e) {
       log.warn("Failed to fetch memberships for refinery org-unit picker", e);
@@ -1184,7 +1106,7 @@ public class RefineryOrderPageController {
         continue;
       }
       try {
-        UserDto user = backendApiClient.get("/api/v1/users/" + id, UserDto.class);
+        UserDto user = refineryClient.user(id);
         if (user != null) {
           names.put(id, user.effectiveName() != null ? user.effectiveName() : user.username());
         }
@@ -1205,8 +1127,7 @@ public class RefineryOrderPageController {
   @NotNull
   private List<JobOrderReferenceDto> fetchActiveJobOrders() {
     try {
-      List<JobOrderReferenceDto> content =
-          backendApiClient.get("/api/v1/orders/lookup", JOB_ORDER_REFERENCE_LIST);
+      List<JobOrderReferenceDto> content = refineryClient.activeJobOrders();
       if (content != null) {
         return new ArrayList<>(content);
       }
@@ -1218,8 +1139,7 @@ public class RefineryOrderPageController {
 
   private String fetchRoundingMode() {
     try {
-      SystemSettingDto setting =
-          backendApiClient.get("/api/v1/settings/refinery.rounding.mode", SystemSettingDto.class);
+      SystemSettingDto setting = java.util.Objects.requireNonNull(refineryClient.roundingMode());
       return setting.value();
     } catch (Exception e) {
       log.warn("Failed to fetch refinery rounding mode, using default UP");
@@ -1237,7 +1157,7 @@ public class RefineryOrderPageController {
       return CurrentUser.userId(principal);
     } catch (Exception e) {
       try {
-        UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
+        UserDto me = refineryClient.currentUser();
         return me != null ? me.id() : null;
       } catch (Exception ex) {
         log.warn("Failed to get current user ID from backend: {}", ex.getMessage());
@@ -1270,9 +1190,7 @@ public class RefineryOrderPageController {
                         || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
     if (!result) {
       try {
-        de.greluc.krt.profit.basetool.frontend.model.dto.UserDto me =
-            backendApiClient.get(
-                "/api/v1/users/me", de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class);
+        de.greluc.krt.profit.basetool.frontend.model.dto.UserDto me = refineryClient.currentUser();
         if (me != null && Boolean.TRUE.equals(me.isLogistician())) {
           log.info("Granting logistician by backend flag");
           result = true;

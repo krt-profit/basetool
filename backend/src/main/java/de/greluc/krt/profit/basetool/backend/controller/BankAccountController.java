@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountDetailDto;
@@ -36,7 +37,6 @@ import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.BankAccountService;
 import de.greluc.krt.profit.basetool.backend.service.BankSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.BankStatementReportService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.web.PdfResponses;
 import de.greluc.krt.profit.basetool.backend.web.UserZone;

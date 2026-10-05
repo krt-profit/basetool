@@ -33,6 +33,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDetailDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingDto;
@@ -123,7 +124,7 @@ class BankPageControllerTest {
   @Test
   void dashboard_ShouldScaleSparklineIntoPolylinePoints() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankPageController controller = new BankPageController(backendApiClient);
+    BankPageController controller = new BankPageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     BankDashboardDto dashboard =
         new BankDashboardDto(
@@ -151,7 +152,7 @@ class BankPageControllerTest {
   @Test
   void dashboard_ShouldRenderFlatSeriesAsMidLine() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankPageController controller = new BankPageController(backendApiClient);
+    BankPageController controller = new BankPageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     BigDecimal level = new BigDecimal("500");
     BankDashboardDto dashboard =
@@ -171,7 +172,7 @@ class BankPageControllerTest {
   @Test
   void dashboard_ShouldHandleEmptySparklineAndNullDashboard() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankPageController controller = new BankPageController(backendApiClient);
+    BankPageController controller = new BankPageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     when(backendApiClient.get(eq("/api/v1/bank/dashboard"), eq(BankDashboardDto.class)))
         .thenReturn(new BankDashboardDto(false, List.of(dashboardAccount(List.of())), null));
@@ -188,7 +189,7 @@ class BankPageControllerTest {
   @Test
   void dashboard_ShouldSortCardsAlphabeticallyByName() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankPageController controller = new BankPageController(backendApiClient);
+    BankPageController controller = new BankPageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     BankDashboardDto dashboard =
         new BankDashboardDto(
@@ -214,7 +215,7 @@ class BankPageControllerTest {
   @Test
   void dashboard_byBereich_groupsAccountsWithColouredHeadersInOrder() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankPageController controller = new BankPageController(backendApiClient);
+    BankPageController controller = new BankPageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID profit = UUID.randomUUID();
     BankDashboardDto dashboard =
@@ -256,7 +257,7 @@ class BankPageControllerTest {
   @Test
   void dashboard_tableFragment_resolvesGridFragmentAndCarriesNoGroupsInAlphaMode() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankPageController controller = new BankPageController(backendApiClient);
+    BankPageController controller = new BankPageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     when(backendApiClient.get(eq("/api/v1/bank/dashboard"), eq(BankDashboardDto.class)))
         .thenReturn(new BankDashboardDto(true, List.of(), null));
@@ -272,7 +273,7 @@ class BankPageControllerTest {
   @Test
   void accountDetail_ShouldNotPreloadTransferTargetRoster_AndFiltersActiveHolders() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankPageController controller = new BankPageController(backendApiClient);
+    BankPageController controller = new BankPageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID accountId = UUID.randomUUID();
     UUID holderA = UUID.randomUUID();
@@ -297,9 +298,9 @@ class BankPageControllerTest {
                 java.util.List.of()));
 
     when(backendApiClient.get(
-            eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
+            eq("/api/v1/bank/accounts/{id}"), eq(BankAccountDetailDto.class), eq(accountId)))
         .thenReturn(detail);
-    when(backendApiClient.get(contains("/transactions"), anyTypeRef()))
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef(), any(Object[].class)))
         .thenReturn(
             new PageResponse<BankBookingDto>(List.of(), 0, 20, 0, 0, Collections.emptyList()));
     when(backendApiClient.get(eq("/api/v1/bank/holders"), anyTypeRef()))
@@ -342,7 +343,7 @@ class BankPageControllerTest {
   @Test
   void accountDetail_ShouldHandleEmptyListsOnZeroBalance() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankPageController controller = new BankPageController(backendApiClient);
+    BankPageController controller = new BankPageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID accountId = UUID.randomUUID();
     BankAccountDetailDto detail =
@@ -362,7 +363,7 @@ class BankPageControllerTest {
                 null,
                 java.util.List.of()));
     when(backendApiClient.get(
-            eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
+            eq("/api/v1/bank/accounts/{id}"), eq(BankAccountDetailDto.class), eq(accountId)))
         .thenReturn(detail);
     when(backendApiClient.get(any(String.class), anyTypeRef())).thenReturn(null);
 
@@ -375,12 +376,13 @@ class BankPageControllerTest {
   @Test
   void accountDetail_fragmentBookings_rendersOnlyBookingsFragment_andSkipsOtherFetches() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankPageController controller = new BankPageController(backendApiClient);
+    BankPageController controller = new BankPageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID accountId = UUID.randomUUID();
     PageResponse<BankBookingDto> bookings =
         new PageResponse<>(List.of(), 0, 20, 0, 0, Collections.emptyList());
-    when(backendApiClient.get(contains("/transactions"), anyTypeRef())).thenReturn(bookings);
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(bookings);
 
     String view = controller.accountDetail(accountId, 2, null, null, null, null, "bookings", model);
 
@@ -392,14 +394,14 @@ class BankPageControllerTest {
             .toString()
             .startsWith("/bank/accounts/" + accountId + "?from="));
     verify(backendApiClient, never())
-        .get(eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class));
+        .get(eq("/api/v1/bank/accounts/{id}"), eq(BankAccountDetailDto.class), eq(accountId));
     verify(backendApiClient, never()).get(eq("/api/v1/bank/holders"), anyTypeRef());
   }
 
   @Test
   void accountDetail_fragmentAccountBody_rendersBodyFragment_withFullModel() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankPageController controller = new BankPageController(backendApiClient);
+    BankPageController controller = new BankPageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID accountId = UUID.randomUUID();
     UUID holderA = UUID.randomUUID();
@@ -421,9 +423,9 @@ class BankPageControllerTest {
                 null,
                 java.util.List.of()));
     when(backendApiClient.get(
-            eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
+            eq("/api/v1/bank/accounts/{id}"), eq(BankAccountDetailDto.class), eq(accountId)))
         .thenReturn(detail);
-    when(backendApiClient.get(contains("/transactions"), anyTypeRef()))
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef(), any(Object[].class)))
         .thenReturn(
             new PageResponse<BankBookingDto>(List.of(), 0, 20, 0, 0, Collections.emptyList()));
     when(backendApiClient.get(eq("/api/v1/bank/holders"), anyTypeRef()))
@@ -446,7 +448,7 @@ class BankPageControllerTest {
   @Test
   void holderDetail_ShouldLoadHolderAndFirstHistoryPage() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankPageController controller = new BankPageController(backendApiClient);
+    BankPageController controller = new BankPageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID holderId = UUID.randomUUID();
     BankHolderDto holder =
@@ -454,9 +456,11 @@ class BankPageControllerTest {
             holderId, UUID.randomUUID(), "greluc", true, new BigDecimal("1000000"), false, 0L);
     PageResponse<BankHolderBookingDto> bookings =
         new PageResponse<>(List.of(), 0, 20, 0, 0, Collections.emptyList());
-    when(backendApiClient.get(eq("/api/v1/bank/holders/" + holderId), eq(BankHolderDto.class)))
+    when(backendApiClient.get(
+            eq("/api/v1/bank/holders/{id}"), eq(BankHolderDto.class), eq(holderId)))
         .thenReturn(holder);
-    when(backendApiClient.get(contains("/transactions"), anyTypeRef())).thenReturn(bookings);
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(bookings);
 
     String view = controller.holderDetail(holderId, null, null, model);
 
@@ -469,12 +473,13 @@ class BankPageControllerTest {
   @Test
   void holderDetail_fragmentHolderBookings_rendersOnlyFragment_andSkipsHeaderFetch() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankPageController controller = new BankPageController(backendApiClient);
+    BankPageController controller = new BankPageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID holderId = UUID.randomUUID();
     PageResponse<BankHolderBookingDto> bookings =
         new PageResponse<>(List.of(), 0, 20, 0, 0, Collections.emptyList());
-    when(backendApiClient.get(contains("/transactions"), anyTypeRef())).thenReturn(bookings);
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(bookings);
 
     String view = controller.holderDetail(holderId, 2, "holderBookings", model);
 
@@ -482,7 +487,7 @@ class BankPageControllerTest {
     assertEquals(bookings, model.getAttribute("bookings"));
     assertEquals("/bank/holders/" + holderId, model.getAttribute("paginationBaseUrl"));
     verify(backendApiClient, never())
-        .get(eq("/api/v1/bank/holders/" + holderId), eq(BankHolderDto.class));
+        .get(eq("/api/v1/bank/holders/{id}"), eq(BankHolderDto.class), eq(holderId));
   }
 
   private static BankAccountDto account(UUID id, String no, String status, String balance) {

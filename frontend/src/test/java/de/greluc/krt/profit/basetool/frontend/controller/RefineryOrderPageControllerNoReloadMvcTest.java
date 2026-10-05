@@ -91,7 +91,7 @@ class RefineryOrderPageControllerNoReloadMvcTest {
         .andExpect(jsonPath("$.targetUrl").value("/refinery-orders"));
 
     verify(backendApiClient)
-        .put(eq("/api/v1/refinery-orders/" + id), any(), eq(RefineryOrderDto.class));
+        .put(eq("/api/v1/refinery-orders/{id}"), any(), eq(RefineryOrderDto.class), eq(id));
   }
 
   @Test
@@ -107,7 +107,7 @@ class RefineryOrderPageControllerNoReloadMvcTest {
         .andExpect(status().isBadRequest());
 
     verify(backendApiClient, never())
-        .put(eq("/api/v1/refinery-orders/" + id), any(), eq(RefineryOrderDto.class));
+        .put(eq("/api/v1/refinery-orders/{id}"), any(), eq(RefineryOrderDto.class), eq(id));
   }
 
   @Test
@@ -167,7 +167,7 @@ class RefineryOrderPageControllerNoReloadMvcTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.targetUrl").value("/refinery-orders"));
 
-    verify(backendApiClient).delete(eq("/api/v1/refinery-orders/" + id), eq(Void.class));
+    verify(backendApiClient).delete(eq("/api/v1/refinery-orders/{id}"), eq(Void.class), eq(id));
   }
 
   @Test
@@ -175,7 +175,7 @@ class RefineryOrderPageControllerNoReloadMvcTest {
   void updateOrderAjax_backendConflict_propagatesProblemJsonWithCode() throws Exception {
     UUID id = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/refinery-orders/" + id), any(), eq(RefineryOrderDto.class)))
+            eq("/api/v1/refinery-orders/{id}"), any(), eq(RefineryOrderDto.class), eq(id)))
         .thenThrow(
             new BackendServiceException(
                 "conflict", null, 409, "OPTIMISTIC_LOCK", null, Collections.emptyList(), null));
@@ -198,7 +198,7 @@ class RefineryOrderPageControllerNoReloadMvcTest {
   void storeOrderAjax_backendConflict_propagatesProblemJsonWithCode() throws Exception {
     UUID id = UUID.randomUUID();
     when(backendApiClient.post(
-            eq("/api/v1/refinery-orders/" + id + "/store"), any(), eq(Void.class)))
+            eq("/api/v1/refinery-orders/{id}/store"), any(), eq(Void.class), eq(id)))
         .thenThrow(
             new BackendServiceException(
                 "conflict", null, 409, "OPTIMISTIC_LOCK", null, Collections.emptyList(), null));

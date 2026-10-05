@@ -23,11 +23,11 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockEntryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockGroupDto;
@@ -49,7 +49,8 @@ class ItemCollectionPageControllerTest {
   @Test
   void viewItemCollection_shouldPopulateModelAndReturnTemplate() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    ItemCollectionPageController controller = new ItemCollectionPageController(backendApiClient);
+    ItemCollectionPageController controller =
+        new ItemCollectionPageController(new JobOrderBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID jobOrderId = UUID.randomUUID();
 
@@ -68,7 +69,8 @@ class ItemCollectionPageControllerTest {
     List<LocationReferenceDto> locations =
         List.of(new LocationReferenceDto(UUID.randomUUID(), "Port Olisar"));
 
-    when(backendApiClient.get(contains("/item-stock"), anyTypeRef())).thenReturn(groups);
+    when(backendApiClient.get(eq("/api/v1/orders/{id}/item-stock"), anyTypeRef(), eq(jobOrderId)))
+        .thenReturn(groups);
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenReturn(locations);
 
@@ -89,11 +91,13 @@ class ItemCollectionPageControllerTest {
   @Test
   void viewItemCollection_shouldReturnFragment_whenFragmentIsResults() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    ItemCollectionPageController controller = new ItemCollectionPageController(backendApiClient);
+    ItemCollectionPageController controller =
+        new ItemCollectionPageController(new JobOrderBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID jobOrderId = UUID.randomUUID();
 
-    when(backendApiClient.get(contains("/item-stock"), anyTypeRef())).thenReturn(List.of());
+    when(backendApiClient.get(eq("/api/v1/orders/{id}/item-stock"), anyTypeRef(), eq(jobOrderId)))
+        .thenReturn(List.of());
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenReturn(List.of());
 
@@ -106,11 +110,12 @@ class ItemCollectionPageControllerTest {
   @Test
   void viewItemCollection_shouldHandleBackendErrorForItemStock() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    ItemCollectionPageController controller = new ItemCollectionPageController(backendApiClient);
+    ItemCollectionPageController controller =
+        new ItemCollectionPageController(new JobOrderBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID jobOrderId = UUID.randomUUID();
 
-    when(backendApiClient.get(contains("/item-stock"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}/item-stock"), anyTypeRef(), eq(jobOrderId)))
         .thenThrow(new BackendServiceException("Backend error", null, 500));
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenReturn(List.of());
@@ -126,11 +131,13 @@ class ItemCollectionPageControllerTest {
   @Test
   void viewItemCollection_shouldHandleBackendErrorForLocations() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    ItemCollectionPageController controller = new ItemCollectionPageController(backendApiClient);
+    ItemCollectionPageController controller =
+        new ItemCollectionPageController(new JobOrderBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID jobOrderId = UUID.randomUUID();
 
-    when(backendApiClient.get(contains("/item-stock"), anyTypeRef())).thenReturn(List.of());
+    when(backendApiClient.get(eq("/api/v1/orders/{id}/item-stock"), anyTypeRef(), eq(jobOrderId)))
+        .thenReturn(List.of());
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenThrow(new BackendServiceException("Backend error", null, 500));
 

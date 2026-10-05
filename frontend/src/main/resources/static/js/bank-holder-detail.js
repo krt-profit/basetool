@@ -46,14 +46,27 @@
         } else if (reserved > 0) {
             reservedPercent = 100;
         }
-        reservedSeg.style.width = reservedPercent + '%';
-        ownSeg.style.width = 100 - reservedPercent + '%';
+        reservedSeg.style.width = `${reservedPercent}%`;
+        ownSeg.style.width = `${100 - reservedPercent}%`;
     }
 
-    document.addEventListener('input', function (event) {
+    document.addEventListener('input', (event) => {
         const target = event.target;
         if (target instanceof HTMLInputElement && target.hasAttribute('data-balance-input')) {
             renderBar(target);
         }
     });
+
+    /** Binds the bookings pager of the holder detail to an in-place fragment swap. */
+    function bindBankHolderBookingsPager() {
+        if (window.krtFetch) {
+            window.krtFetch.bindSwap({
+                container: '#bank-holder-bookings-results',
+                fragmentValue: 'holderBookings',
+                history: true,
+            });
+        }
+    }
+    document.addEventListener('DOMContentLoaded', bindBankHolderBookingsPager);
+    document.addEventListener('krt:swapped', bindBankHolderBookingsPager);
 })();

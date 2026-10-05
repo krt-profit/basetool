@@ -4,7 +4,7 @@
     .error-container {
         text-align: center;
         border: 2px solid var(--color-danger);
-        box-shadow: 0 0 15px rgba(163, 0, 10, 0.3);
+        box-shadow: 0 0 15px color-mix(in srgb, var(--color-danger) 30%, transparent);
         background: var(--color-bg-dark-gray);
         padding: 2.5rem 2rem;
         max-width: 600px;
@@ -42,7 +42,7 @@
         display: inline-block;
         padding: 0.8rem 1.5rem;
         background-color: var(--color-danger);
-        color: #ffffff;
+        color: var(--color-white);
         font-family: var(--font-headline);
         text-decoration: none;
         font-weight: bold;
@@ -50,8 +50,8 @@
         text-transform: uppercase;
     }
     .btn-return:hover {
-        background-color: #d41a25;
-        box-shadow: 0 0 10px #d41a25;
+        background-color: var(--color-danger-hover);
+        box-shadow: 0 0 10px var(--color-danger-hover);
     }
     .btn-signin {
         background-color: var(--color-primary);

@@ -116,7 +116,7 @@
                 return;
             }
             const code = value;
-            const known = Array.from(select.options).some(function (option) {
+            const known = Array.from(select.options).some((option) => {
                 return option.value === code;
             });
             if (!known) {
@@ -138,10 +138,10 @@
         function unknownLabel(code) {
             const text = i18n.unknownValue;
             return text.includes('{0}')
-                ? text.replace('{0}', function () {
+                ? text.replace('{0}', () => {
                       return code;
                   })
-                : text + ' ' + code;
+                : `${text} ${code}`;
         }
 
         /**
@@ -149,7 +149,7 @@
          * @param {HTMLSelectElement} select
          */
         function dropUnknownOptions(select) {
-            select.querySelectorAll('[data-unknown-option]').forEach(function (option) {
+            select.querySelectorAll('[data-unknown-option]').forEach((option) => {
                 option.remove();
             });
         }
@@ -161,7 +161,7 @@
          */
         function rowSelect(row, name) {
             return /** @type {HTMLSelectElement | null} */ (
-                row.querySelector('[data-selector-' + name + ']')
+                row.querySelector(`[data-selector-${name}]`)
             );
         }
 
@@ -183,7 +183,7 @@
          */
         function setFieldVisible(row, field, visible) {
             const group = /** @type {HTMLElement | null} */ (
-                row.querySelector('[data-field="' + field + '"]')
+                row.querySelector(`[data-field="${field}"]`)
             );
             if (group) {
                 group.hidden = !visible;
@@ -231,16 +231,12 @@
                 return;
             }
             const select = rowSelect(row, 'userId');
-            fetch('/users/' + encodeURIComponent(userId), {
-                headers: { Accept: 'application/json' },
-            })
-                .then(function (response) {
-                    return response.ok ? response.json() : null;
-                })
-                .catch(function () {
+            window.krtFetch
+                .getJson(`/users/${encodeURIComponent(userId)}`)
+                .catch(() => {
                     return null;
                 })
-                .then(function (user) {
+                .then((user) => {
                     if (select) {
                         const option = document.createElement('option');
                         option.value = userId;
@@ -267,7 +263,7 @@
 
         function collectSelectors() {
             const rows = el.container.querySelectorAll('[data-selector-row]');
-            return Array.from(rows).map(function (row) {
+            return Array.from(rows).map((row) => {
                 const kind = readValue(row, 'kind');
                 /** @type {Record<string, string | null>} */
                 const selector = { kind };
@@ -308,7 +304,7 @@
             el.description.value = '';
             el.enabled.checked = true;
             el.excludeActor.checked = true;
-            el.container.innerHTML = '';
+            el.container.replaceChildren();
             addSelectorRow(null);
         }
 
@@ -323,12 +319,12 @@
             el.description.value = rule.description || '';
             el.enabled.checked = !!rule.enabled;
             el.excludeActor.checked = !!rule.excludeActor;
-            el.container.innerHTML = '';
+            el.container.replaceChildren();
             const selectors = Array.isArray(rule.selectors) ? rule.selectors : [];
             if (selectors.length === 0) {
                 addSelectorRow(null);
             } else {
-                selectors.forEach(function (selector) {
+                selectors.forEach((selector) => {
                     addSelectorRow(selector);
                 });
             }
@@ -337,18 +333,14 @@
 
         /** @param {string} id */
         function editRule(id) {
-            fetch('/admin/notification-rules/' + encodeURIComponent(id), {
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-            })
-                .then(function (res) {
-                    return res.ok ? res.json() : null;
-                })
-                .then(function (rule) {
+            window.krtFetch
+                .getJson(`/admin/notification-rules/${encodeURIComponent(id)}`)
+                .then((rule) => {
                     if (rule) {
                         prefillForm(rule);
                     }
                 })
-                .catch(function () {
+                .catch(() => {
                     if (typeof window.showFrontendErrorToast === 'function') {
                         window.showFrontendErrorToast(i18n.error);
                     }
@@ -375,7 +367,7 @@
             const submitter = el.form.querySelector('button[type="submit"]');
             window.krtFetch.write({
                 method: id ? 'PUT' : 'POST',
-                url: '/admin/notification-rules' + (id ? '/' + encodeURIComponent(id) : ''),
+                url: `/admin/notification-rules${id ? `/${encodeURIComponent(id)}` : ''}`,
                 payload: buildPayload(),
                 successMessage: i18n.saved,
                 errorMessage: i18n.error,
@@ -395,10 +387,10 @@
             if (!window.krtFetch) {
                 return;
             }
-            confirmThen(function () {
+            confirmThen(() => {
                 window.krtFetch.write({
                     method: 'DELETE',
-                    url: '/admin/notification-rules/' + encodeURIComponent(id),
+                    url: `/admin/notification-rules/${encodeURIComponent(id)}`,
                     successMessage: i18n.deleted,
                     errorMessage: i18n.error,
                     submitter,
@@ -422,7 +414,7 @@
                         i18n.confirmOk,
                         i18n.confirmCancel,
                     )
-                    .then(function (ok) {
+                    .then((ok) => {
                         if (ok) {
                             action();
                         }
@@ -435,7 +427,7 @@
         el.form.addEventListener('submit', onSubmit);
         const addSelector = document.getElementById('add-selector');
         if (addSelector) {
-            addSelector.addEventListener('click', function () {
+            addSelector.addEventListener('click', () => {
                 addSelectorRow(null);
             });
         }
@@ -444,7 +436,7 @@
             cancel.addEventListener('click', resetForm);
         }
 
-        el.container.addEventListener('change', function (event) {
+        el.container.addEventListener('change', (event) => {
             const target = event.target;
             const kindSelect =
                 target instanceof Element ? target.closest('[data-selector-kind]') : null;
@@ -453,7 +445,7 @@
                 toggleRow(row);
             }
         });
-        el.container.addEventListener('click', function (event) {
+        el.container.addEventListener('click', (event) => {
             const target = event.target;
             const removeBtn =
                 target instanceof Element ? target.closest('[data-selector-remove]') : null;
@@ -463,7 +455,7 @@
             }
         });
 
-        document.addEventListener('click', function (event) {
+        document.addEventListener('click', (event) => {
             const target = event.target;
             if (!(target instanceof Element)) {
                 return;

@@ -22,13 +22,13 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ApproveRegistrationRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LinkRegistrationRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MergeAccountRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PendingRegistrationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RejectRegistrationRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ReopenRegistrationRequest;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.List;
@@ -37,7 +37,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -64,20 +63,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminDiscordRegistrationsPageController {
 
-  private static final String BACKEND_BASE = "/api/v1/admin/registrations";
-
-  /** Query suffix selecting the rejected rows off the shared queue endpoint (REQ-SEC-034). */
-  private static final String REJECTED_QUERY = "?status=REJECTED";
-
-  /**
-   * Response type for the pending-registration queue read. A shared static {@link
-   * ParameterizedTypeReference} is behaviourally identical to a fresh anonymous instance per call
-   * (Q10).
-   */
-  private static final ParameterizedTypeReference<List<PendingRegistrationDto>>
-      PENDING_REGISTRATION_LIST_TYPE = new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Reads and decides the registration queue on the backend. */
+  private final IdentityBackendClient identityClient;
 
   /**
    * Renders the pending-registration queue.
@@ -89,8 +76,7 @@ public class AdminDiscordRegistrationsPageController {
   @GetMapping
   public String list(Model model) {
     try {
-      List<PendingRegistrationDto> registrations =
-          backendApiClient.get(BACKEND_BASE, PENDING_REGISTRATION_LIST_TYPE);
+      List<PendingRegistrationDto> registrations = identityClient.pendingRegistrations();
       model.addAttribute("registrations", registrations == null ? List.of() : registrations);
     } catch (BackendServiceException e) {
       log.debug("Failed to load the Discord registration queue", e);
@@ -113,8 +99,7 @@ public class AdminDiscordRegistrationsPageController {
    */
   private List<PendingRegistrationDto> loadRejected() {
     try {
-      List<PendingRegistrationDto> rejected =
-          backendApiClient.get(BACKEND_BASE + REJECTED_QUERY, PENDING_REGISTRATION_LIST_TYPE);
+      List<PendingRegistrationDto> rejected = identityClient.rejectedRegistrations();
       return rejected == null ? List.of() : rejected;
     } catch (BackendServiceException e) {
       log.debug("Failed to load the rejected registrations", e);
@@ -142,9 +127,7 @@ public class AdminDiscordRegistrationsPageController {
         log,
         "approve registration " + id,
         () -> {
-          return ResponseEntity.ok(
-              backendApiClient.post(
-                  BACKEND_BASE + "/" + id + "/approve", body, PendingRegistrationDto.class));
+          return ResponseEntity.ok(identityClient.approveRegistration(id, body));
         });
   }
 
@@ -164,9 +147,7 @@ public class AdminDiscordRegistrationsPageController {
         log,
         "reject registration " + id,
         () -> {
-          return ResponseEntity.ok(
-              backendApiClient.post(
-                  BACKEND_BASE + "/" + id + "/reject", body, PendingRegistrationDto.class));
+          return ResponseEntity.ok(identityClient.rejectRegistration(id, body));
         });
   }
 
@@ -186,9 +167,7 @@ public class AdminDiscordRegistrationsPageController {
         log,
         "reopen registration " + id,
         () -> {
-          return ResponseEntity.ok(
-              backendApiClient.post(
-                  BACKEND_BASE + "/" + id + "/reopen", body, PendingRegistrationDto.class));
+          return ResponseEntity.ok(identityClient.reopenRegistration(id, body));
         });
   }
 
@@ -209,9 +188,7 @@ public class AdminDiscordRegistrationsPageController {
         log,
         "merge into registration " + id,
         () -> {
-          return ResponseEntity.ok(
-              backendApiClient.post(
-                  BACKEND_BASE + "/" + id + "/merge", body, PendingRegistrationDto.class));
+          return ResponseEntity.ok(identityClient.mergeRegistration(id, body));
         });
   }
 
@@ -232,9 +209,7 @@ public class AdminDiscordRegistrationsPageController {
         log,
         "link registration " + id,
         () -> {
-          return ResponseEntity.ok(
-              backendApiClient.post(
-                  BACKEND_BASE + "/" + id + "/link", body, PendingRegistrationDto.class));
+          return ResponseEntity.ok(identityClient.linkRegistration(id, body));
         });
   }
 }

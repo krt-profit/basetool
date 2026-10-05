@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -150,11 +151,12 @@ class OrgUnitBankLimitsDisplayMvcTest {
     PageResponse<BankBookingDto> bookings =
         new PageResponse<>(List.of(booking), 0, 20, 1L, 1, List.of());
 
-    String detailUri = "/api/v1/org-units/bank/accounts/" + accountId;
+    String detailUri = "/api/v1/org-units/bank/accounts/{id}";
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
-    when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class)))
+    when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class), eq(accountId)))
         .thenReturn(detail);
-    when(backendApiClient.get(eq(detailUri + "/transactions?page=0"), anyTypeRef()))
+    when(backendApiClient.get(
+            startsWith(detailUri + "/transactions?page=0"), anyTypeRef(), eq(accountId)))
         .thenReturn(bookings);
     if (canManage) {
       OrgUnitBankAccountSettingsDto settings =
@@ -181,7 +183,7 @@ class OrgUnitBankLimitsDisplayMvcTest {
               new BankApprovalLimitsDto(
                   false, false, false, false, List.of(), Map.of(), null, null, List.of()));
       when(backendApiClient.get(
-              eq(detailUri + "/settings"), eq(OrgUnitBankAccountSettingsDto.class)))
+              eq(detailUri + "/settings"), eq(OrgUnitBankAccountSettingsDto.class), eq(accountId)))
           .thenReturn(settings);
     }
   }

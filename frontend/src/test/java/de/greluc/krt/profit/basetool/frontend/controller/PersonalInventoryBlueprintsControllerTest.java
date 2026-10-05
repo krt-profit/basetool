@@ -24,12 +24,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintProductDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintBatchCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintBatchResultDto;
@@ -38,9 +38,9 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
@@ -53,16 +53,23 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 @ExtendWith(MockitoExtension.class)
 class PersonalInventoryBlueprintsControllerTest {
 
+  private static final String SEARCH_URI = "/api/v1/blueprints/products/search?q={q}&limit={limit}";
+
   @Mock private BackendApiClient backendApiClient;
 
-  @InjectMocks private PersonalInventoryBlueprintsPageController controller;
+  private PersonalInventoryBlueprintsPageController controller;
+
+  @BeforeEach
+  void setUp() {
+    controller =
+        new PersonalInventoryBlueprintsPageController(new BlueprintBackendClient(backendApiClient));
+  }
 
   @Test
   void search_delegatesToBackend_andDefaultsLimitTo25() {
     BlueprintProductDto dto =
         new BlueprintProductDto("arclight pistol", "Arclight Pistol", 2, "Behring", "key", false);
-    when(backendApiClient.get(
-            contains("/api/v1/blueprints/products/search?q={q}&limit=25"), anyTypeRef(), eq("arc")))
+    when(backendApiClient.get(eq(SEARCH_URI), anyTypeRef(), eq("arc"), eq(25)))
         .thenReturn(List.of(dto));
 
     List<BlueprintProductDto> result = controller.search("arc", null);
@@ -73,14 +80,16 @@ class PersonalInventoryBlueprintsControllerTest {
 
   @Test
   void search_clampsLimitTo200() {
-    when(backendApiClient.get(contains("limit=200"), anyTypeRef(), any())).thenReturn(List.of());
+    when(backendApiClient.get(eq(SEARCH_URI), anyTypeRef(), eq("x"), eq(200)))
+        .thenReturn(List.of());
 
     assertTrue(controller.search("x", 9999).isEmpty());
   }
 
   @Test
   void search_returnsEmptyList_whenBackendThrows() {
-    when(backendApiClient.get(any(), anyTypeRef(), any())).thenThrow(new RuntimeException("boom"));
+    when(backendApiClient.get(eq(SEARCH_URI), anyTypeRef(), eq("anything"), eq(25)))
+        .thenThrow(new RuntimeException("boom"));
 
     List<BlueprintProductDto> result = controller.search("anything", 25);
 
@@ -129,7 +138,7 @@ class PersonalInventoryBlueprintsControllerTest {
     String view = controller.updateNote(id, "a note", "2026-03-01T00:00:00Z", 3L, flash);
 
     assertEquals("redirect:/personal-inventory/blueprints", view);
-    verify(backendApiClient).put(contains(id.toString()), any(), any());
+    verify(backendApiClient).put(eq("/api/v1/personal-blueprints/{id}"), any(), any(), eq(id));
     assertEquals(
         "personalInventory.blueprints.toast.noteUpdated",
         flash.getFlashAttributes().get("successToast"));
@@ -138,7 +147,7 @@ class PersonalInventoryBlueprintsControllerTest {
   @Test
   void updateNote_mapsConflictToOptimisticLockToast() {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.put(any(), any(), any()))
+    when(backendApiClient.put(any(), any(), any(), any(Object[].class)))
         .thenThrow(new BackendServiceException("conflict", null, 409));
     RedirectAttributesModelMap flash = new RedirectAttributesModelMap();
 
@@ -155,8 +164,9 @@ class PersonalInventoryBlueprintsControllerTest {
     PersonalBlueprintRecipeDto dto =
         new PersonalBlueprintRecipeDto("Arclight Pistol", 2, List.of(), List.of());
     when(backendApiClient.get(
-            contains("/api/v1/personal-blueprints/" + id + "/recipe"),
-            eq(PersonalBlueprintRecipeDto.class)))
+            eq("/api/v1/personal-blueprints/{id}/recipe"),
+            eq(PersonalBlueprintRecipeDto.class),
+            eq(id)))
         .thenReturn(dto);
 
     PersonalBlueprintRecipeDto result = controller.recipe(id);
@@ -168,7 +178,7 @@ class PersonalInventoryBlueprintsControllerTest {
   @Test
   void recipe_returnsEmptyRecipe_whenBackendThrows() {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.get(any(String.class), eq(PersonalBlueprintRecipeDto.class)))
+    when(backendApiClient.get(any(String.class), eq(PersonalBlueprintRecipeDto.class), eq(id)))
         .thenThrow(new RuntimeException("boom"));
 
     PersonalBlueprintRecipeDto result = controller.recipe(id);
@@ -186,7 +196,7 @@ class PersonalInventoryBlueprintsControllerTest {
     String view = controller.delete(id, flash);
 
     assertEquals("redirect:/personal-inventory/blueprints", view);
-    verify(backendApiClient).delete(contains(id.toString()), eq(Void.class));
+    verify(backendApiClient).delete(eq("/api/v1/personal-blueprints/{id}"), eq(Void.class), eq(id));
     assertEquals(
         "personalInventory.blueprints.toast.removed",
         flash.getFlashAttributes().get("successToast"));

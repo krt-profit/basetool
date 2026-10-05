@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDetailDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBalanceSeriesDto;
@@ -29,7 +30,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankTransferFeeRateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
@@ -41,7 +41,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -61,32 +60,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Slf4j
 public class BankPageController {
 
-  /** Response type for the bank-wide holder registry ({@code /api/v1/bank/holders}). */
-  private static final ParameterizedTypeReference<List<BankHolderDto>> BANK_HOLDER_LIST =
-      new ParameterizedTypeReference<>() {};
-
-  /**
-   * Response type for the all-kinds active org-unit option list ({@code
-   * /api/v1/org-units/active-all-kinds}) feeding the external-counterparty picklist (REQ-BANK-044).
-   */
-  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
-      ORG_UNIT_OPTION_LIST = new ParameterizedTypeReference<>() {};
-
-  /**
-   * Response type for one page of an account's booking history ({@code
-   * /api/v1/bank/accounts/{id}/transactions}).
-   */
-  private static final ParameterizedTypeReference<PageResponse<BankBookingDto>> BANK_BOOKING_PAGE =
-      new ParameterizedTypeReference<>() {};
-
-  /**
-   * Response type for one page of a holder's custody history ({@code
-   * /api/v1/bank/holders/{id}/transactions}).
-   */
-  private static final ParameterizedTypeReference<PageResponse<BankHolderBookingDto>>
-      BANK_HOLDER_BOOKING_PAGE = new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** The bank domain's backend calls. */
+  private final BankBackendClient bankClient;
 
   /**
    * Renders the bank dashboard (REQ-BANK-016) as card grid or table, alphabetical or grouped by
@@ -108,8 +83,7 @@ public class BankPageController {
       Model model) {
     String effectiveLayout = "table".equals(layout) ? "table" : "card";
     String effectiveGroup = "bereich".equals(group) ? "bereich" : "alpha";
-    BankDashboardDto dashboard =
-        backendApiClient.get("/api/v1/bank/dashboard", BankDashboardDto.class);
+    BankDashboardDto dashboard = bankClient.dashboard();
     List<BankDashboardViewAssembler.BankDashboardCardView> cards =
         dashboard == null
             ? List.of()
@@ -147,15 +121,14 @@ public class BankPageController {
    */
   private void addMovementModalData(@NotNull Model model, boolean canBook) {
     model.addAttribute("canBook", canBook);
-    List<BankHolderDto> holders = backendApiClient.get("/api/v1/bank/holders", BANK_HOLDER_LIST);
+    List<BankHolderDto> holders = bankClient.holders();
     model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);
     model.addAttribute(
         "activeHolders",
         holders == null
             ? List.<BankHolderDto>of()
             : holders.stream().filter(BankHolderDto::active).toList());
-    List<OrgUnitMembershipOptionDto> allOrgUnits =
-        backendApiClient.get("/api/v1/org-units/active-all-kinds", ORG_UNIT_OPTION_LIST);
+    List<OrgUnitMembershipOptionDto> allOrgUnits = bankClient.activeOrgUnitsAllKinds();
     model.addAttribute(
         "allOrgUnits", allOrgUnits == null ? List.<OrgUnitMembershipOptionDto>of() : allOrgUnits);
     model.addAttribute("transferFeeRate", fetchTransferFeeRate());
@@ -196,11 +169,10 @@ public class BankPageController {
     if ("balanceChart".equals(fragment)) {
       return balanceChartFragment(id, chartRange, model);
     }
-    BankAccountDetailDto detail =
-        backendApiClient.get("/api/v1/bank/accounts/" + id, BankAccountDetailDto.class);
+    BankAccountDetailDto detail = bankClient.account(id);
     addBookingsModel(id, page, size, from, to, model);
     addChartModel(id, chartRange, detail, model);
-    List<BankHolderDto> holders = backendApiClient.get("/api/v1/bank/holders", BANK_HOLDER_LIST);
+    List<BankHolderDto> holders = bankClient.holders();
 
     model.addAttribute("detail", detail);
     model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);
@@ -209,8 +181,7 @@ public class BankPageController {
         holders == null
             ? List.<BankHolderDto>of()
             : holders.stream().filter(BankHolderDto::active).toList());
-    List<OrgUnitMembershipOptionDto> allOrgUnits =
-        backendApiClient.get("/api/v1/org-units/active-all-kinds", ORG_UNIT_OPTION_LIST);
+    List<OrgUnitMembershipOptionDto> allOrgUnits = bankClient.activeOrgUnitsAllKinds();
     model.addAttribute(
         "allOrgUnits", allOrgUnits == null ? List.<OrgUnitMembershipOptionDto>of() : allOrgUnits);
     model.addAttribute("transferFeeRate", fetchTransferFeeRate());
@@ -252,7 +223,7 @@ public class BankPageController {
   private String balanceChartFragment(UUID id, String chartRange, Model model) {
     BankAccountDetailDto detail = null;
     try {
-      detail = backendApiClient.get("/api/v1/bank/accounts/" + id, BankAccountDetailDto.class);
+      detail = bankClient.account(id);
     } catch (RuntimeException e) {
       log.warn("Error loading account {} for balance-chart fragment", id, e);
     }
@@ -369,14 +340,8 @@ public class BankPageController {
    */
   private PageResponse<BankBookingDto> fetchBookings(
       UUID id, int page, Integer size, Instant from, Instant to) {
-    return backendApiClient.get(
-        UriComponentsBuilder.fromPath("/api/v1/bank/accounts/" + id + "/transactions")
-            .queryParam("page", page)
-            .queryParam("size", size == null ? BankAccountDetailSupport.DEFAULT_PAGE_SIZE : size)
-            .queryParam("from", from)
-            .queryParam("to", to)
-            .toUriString(),
-        BANK_BOOKING_PAGE);
+    return bankClient.accountBookings(
+        id, page, size == null ? BankAccountDetailSupport.DEFAULT_PAGE_SIZE : size, from, to);
   }
 
   /**
@@ -388,12 +353,7 @@ public class BankPageController {
    * @return the balance series envelope
    */
   private BankBalanceSeriesDto fetchBalanceSeries(UUID id, Instant from, Instant to) {
-    return backendApiClient.get(
-        UriComponentsBuilder.fromPath("/api/v1/bank/accounts/" + id + "/balance-series")
-            .queryParam("from", from)
-            .queryParam("to", to)
-            .toUriString(),
-        BankBalanceSeriesDto.class);
+    return bankClient.balanceSeries(id, from, to);
   }
 
   /**
@@ -418,7 +378,7 @@ public class BankPageController {
       return holderBookingsFragment(id, page, model);
     }
     int effectivePage = page == null || page < 0 ? 0 : page;
-    BankHolderDto holder = backendApiClient.get("/api/v1/bank/holders/" + id, BankHolderDto.class);
+    BankHolderDto holder = bankClient.holder(id);
     PageResponse<BankHolderBookingDto> bookings = fetchHolderBookings(id, effectivePage);
     model.addAttribute("holder", holder);
     model.addAttribute("bookings", bookings);
@@ -461,12 +421,7 @@ public class BankPageController {
    * @return the history page envelope
    */
   private PageResponse<BankHolderBookingDto> fetchHolderBookings(UUID id, int page) {
-    return backendApiClient.get(
-        UriComponentsBuilder.fromPath("/api/v1/bank/holders/" + id + "/transactions")
-            .queryParam("page", page)
-            .queryParam("size", 20)
-            .toUriString(),
-        BANK_HOLDER_BOOKING_PAGE);
+    return bankClient.holderBookings(id, page);
   }
 
   /**
@@ -476,8 +431,7 @@ public class BankPageController {
    * @return the fee rate as a fraction, never {@code null}
    */
   private BigDecimal fetchTransferFeeRate() {
-    BankTransferFeeRateDto rate =
-        backendApiClient.get("/api/v1/bank/transfer-fee-rate", BankTransferFeeRateDto.class);
+    BankTransferFeeRateDto rate = bankClient.transferFeeRate();
     return rate == null || rate.rate() == null ? BigDecimal.ZERO : rate.rate();
   }
 }

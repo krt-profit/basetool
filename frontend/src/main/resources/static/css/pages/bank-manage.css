@@ -9,7 +9,7 @@
     }
 
     .bank-manage-row-actions .overflow-menu:has(.overflow-menu__panel:not([hidden])) {
-        z-index: 60;
+        z-index: var(--z-popover-raised);
     }
 
     .bank-tiers {
@@ -55,12 +55,12 @@
     }
 
     .bank-tiers__seg--management {
-        background: rgb(231 126 35 / 12%);
+        background: color-mix(in srgb, var(--color-primary) 12%, transparent);
         box-shadow: inset 0 0 0 1px var(--color-accent-light);
     }
 
     .bank-tiers__seg--ol {
-        background: rgb(231 126 35 / 20%);
+        background: color-mix(in srgb, var(--color-primary) 20%, transparent);
         box-shadow: inset 0 0 0 1px var(--color-primary);
     }
 

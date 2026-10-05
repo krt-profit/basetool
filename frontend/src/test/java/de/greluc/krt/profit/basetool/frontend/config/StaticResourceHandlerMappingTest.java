@@ -164,7 +164,7 @@ class StaticResourceHandlerMappingTest {
   @ValueSource(
       strings = {
         "/css/styles.css",
-        "/js/escape-html.js",
+        "/js/krt-html.js",
         "/fonts/Lato-Regular.woff2",
         "/images/made-by-the-community.png",
         "/images/pattern.svg",
@@ -203,7 +203,7 @@ class StaticResourceHandlerMappingTest {
   @ValueSource(
       strings = {
         "/css/styles.css",
-        "/js/escape-html.js",
+        "/js/krt-html.js",
         "/fonts/Lato-Regular.woff2",
         "/images/made-by-the-community.png",
         "/images/pattern.svg",

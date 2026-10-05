@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
-import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
+import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.util.StringUtils;
 import tools.jackson.core.JsonParser;

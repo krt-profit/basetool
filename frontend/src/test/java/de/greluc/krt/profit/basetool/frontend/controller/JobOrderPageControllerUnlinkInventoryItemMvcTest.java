@@ -73,8 +73,10 @@ class JobOrderPageControllerUnlinkInventoryItemMvcTest {
     UUID inventoryItemId = UUID.randomUUID();
 
     when(backendApiClient.delete(
-            eq("/api/v1/orders/" + orderId + "/inventory/" + inventoryItemId + "/unlink"),
-            eq(Void.class)))
+            eq("/api/v1/orders/{id}/inventory/{inventoryItemId}/unlink"),
+            eq(Void.class),
+            eq(orderId),
+            eq(inventoryItemId)))
         .thenReturn(null);
 
     mockMvc
@@ -86,8 +88,10 @@ class JobOrderPageControllerUnlinkInventoryItemMvcTest {
 
     verify(backendApiClient)
         .delete(
-            eq("/api/v1/orders/" + orderId + "/inventory/" + inventoryItemId + "/unlink"),
-            eq(Void.class));
+            eq("/api/v1/orders/{id}/inventory/{inventoryItemId}/unlink"),
+            eq(Void.class),
+            eq(orderId),
+            eq(inventoryItemId));
   }
 
   @Test
@@ -111,8 +115,10 @@ class JobOrderPageControllerUnlinkInventoryItemMvcTest {
     doThrow(new BackendServiceException("Internal Server Error", null, 500))
         .when(backendApiClient)
         .delete(
-            eq("/api/v1/orders/" + orderId + "/inventory/" + inventoryItemId + "/unlink"),
-            eq(Void.class));
+            eq("/api/v1/orders/{id}/inventory/{inventoryItemId}/unlink"),
+            eq(Void.class),
+            eq(orderId),
+            eq(inventoryItemId));
 
     mockMvc
         .perform(

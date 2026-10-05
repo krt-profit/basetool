@@ -102,6 +102,8 @@ app:
     authenticated-timeout: ${APP_SESSION_AUTHENTICATED_TIMEOUT:720h}
     type-allow-list: ${APP_SESSION_TYPE_ALLOW_LIST:enforce}
     configure-keyspace-notifications: true
+  security:
+    trusted-types: ${APP_SECURITY_TRUSTED_TYPES:report}
   ui:
     notification-duration: 5000
   logging:
@@ -133,6 +135,11 @@ management:
   metrics:
     tags:
       application: basetool-frontend
+    web:
+      server:
+        max-uri-tags: 1000
+      client:
+        max-uri-tags: 1000
     distribution:
       percentiles-histogram:
         "[http.server.requests]": true

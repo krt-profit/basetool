@@ -31,8 +31,8 @@
  * @param {{ on: string, off: string, saved: string, error: string }} labels localized strings
  */
 function wireToggle(selector, idAttribute, urlFor, bodyFor, labels) {
-    document.querySelectorAll(selector).forEach(function (checkbox) {
-        checkbox.addEventListener('change', function () {
+    document.querySelectorAll(selector).forEach((checkbox) => {
+        checkbox.addEventListener('change', () => {
             if (!window.krtFetch) {
                 return;
             }
@@ -75,14 +75,14 @@ function wireToggle(selector, idAttribute, urlFor, bodyFor, labels) {
     });
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     wireToggle(
         '.squadron-promotion-toggle',
         'data-squadron-id',
-        function (id) {
-            return '/api/proxy/squadrons/' + encodeURIComponent(id) + '/promotion-enabled';
+        (id) => {
+            return `/api/proxy/squadrons/${encodeURIComponent(id)}/promotion-enabled`;
         },
-        function (checked) {
+        (checked) => {
             return { enabled: checked };
         },
         { on: MSG_ENABLED, off: MSG_DISABLED, saved: MSG_SAVED, error: MSG_ERROR },
@@ -96,10 +96,10 @@ document.addEventListener('DOMContentLoaded', function () {
     wireToggle(
         '.squadron-profit-toggle',
         'data-squadron-id',
-        function (id) {
-            return '/api/proxy/squadrons/' + encodeURIComponent(id) + '/profit-eligible';
+        (id) => {
+            return `/api/proxy/squadrons/${encodeURIComponent(id)}/profit-eligible`;
         },
-        function (checked) {
+        (checked) => {
             return { eligible: checked };
         },
         profitLabels,
@@ -107,22 +107,22 @@ document.addEventListener('DOMContentLoaded', function () {
     wireToggle(
         '.sk-profit-toggle',
         'data-sk-id',
-        function (id) {
-            return '/api/proxy/special-commands/' + encodeURIComponent(id) + '/profit-eligible';
+        (id) => {
+            return `/api/proxy/special-commands/${encodeURIComponent(id)}/profit-eligible`;
         },
-        function (checked) {
+        (checked) => {
             return { eligible: checked };
         },
         profitLabels,
     );
 });
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     const settingsForm = document.getElementById('admin-settings-form');
     if (!settingsForm) {
         return;
     }
-    settingsForm.addEventListener('submit', function (event) {
+    settingsForm.addEventListener('submit', (event) => {
         event.preventDefault();
         if (!window.krtFetch) {
             settingsForm.submit();
@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 },
             })
-            .finally(function () {
+            .finally(() => {
                 if (submitBtn) {
                     submitBtn.disabled = false;
                 }

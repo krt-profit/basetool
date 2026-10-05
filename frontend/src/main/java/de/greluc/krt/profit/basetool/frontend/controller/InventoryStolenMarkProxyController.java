@@ -21,11 +21,11 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BulkStolenMarkRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BulkStolenMarkResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemStolenMarkDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -54,7 +54,8 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class InventoryStolenMarkProxyController {
 
-  private final BackendApiClient backendApiClient;
+  /** The inventory domain's typed backend client. */
+  private final InventoryBackendClient inventoryClient;
 
   /**
    * Forwards the marker change of one row, or of a part of it, to {@code POST
@@ -72,8 +73,7 @@ public class InventoryStolenMarkProxyController {
       return validationError();
     }
     try {
-      InventoryItemDto result =
-          backendApiClient.post("/api/v1/inventory/" + id + "/stolen", dto, InventoryItemDto.class);
+      InventoryItemDto result = inventoryClient.markStolen(id, dto);
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       log.debug(
@@ -103,9 +103,7 @@ public class InventoryStolenMarkProxyController {
       return validationError();
     }
     try {
-      BulkStolenMarkResultDto result =
-          backendApiClient.post(
-              "/api/v1/inventory/bulk-stolen", request, BulkStolenMarkResultDto.class);
+      BulkStolenMarkResultDto result = inventoryClient.bulkMarkStolen(request);
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       log.debug("Failed to bulk-change the stolen marker: {}", e.getMessage());

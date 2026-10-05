@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.support.StockViewerAccess;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

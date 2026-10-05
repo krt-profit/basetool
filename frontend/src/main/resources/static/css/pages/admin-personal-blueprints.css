@@ -9,7 +9,8 @@
         margin: var(--space-4) 0 0;
     }
     .krt-pi-note {
-        word-break: break-word;
+        word-break: normal;
+        overflow-wrap: anywhere;
         max-width: 40rem;
     }
 }

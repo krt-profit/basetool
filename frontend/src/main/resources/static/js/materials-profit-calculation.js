@@ -33,7 +33,7 @@
      * @returns {string} the label, or an empty string
      */
     function label(name) {
-        return (config && config.getAttribute('data-label-' + name)) || '';
+        return (config && config.getAttribute(`data-label-${name}`)) || '';
     }
 
     const WHOLE = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
@@ -93,7 +93,7 @@
         const header = document.getElementById('systemHeader');
         const textEl = header ? header.querySelector('.selected-text') : null;
         const checks = systemChecks();
-        const picked = checks.filter(function (c) {
+        const picked = checks.filter((c) => {
             return c.checked;
         });
         const allBox = /** @type {HTMLInputElement | null} */ (document.getElementById('sysAll'));
@@ -103,7 +103,7 @@
             picked.length === checks.length || picked.length === 0
                 ? label('all')
                 : picked
-                      .map(function (c) {
+                      .map((c) => {
                           return c.value;
                       })
                       .join(', ');
@@ -126,31 +126,18 @@
      * @param {string | null | undefined} terminal the terminal's name
      * @param {string | null | undefined} place the terminal's location
      * @param {number | null | undefined} price the price per SCU
-     * @returns {string} the line's HTML
+     * @returns {KrtHtml} the line's HTML
      */
     function routeLine(cls, side, terminal, place, price) {
         const placeHtml = place
-            ? ' <span class="profit-route__place" data-testid="profit-route-place">(' +
-              escapeHtml(place) +
-              ')</span>'
+            ? krtHtml` <span class="profit-route__place" data-testid="profit-route-place">(${place})</span>`
             : '';
         const terminalHtml = terminal
-            ? '<span class="profit-route__terminal" data-testid="profit-route-terminal">' +
-              escapeHtml(terminal) +
-              '</span>' +
-              placeHtml +
-              ' · '
+            ? krtHtml`<span class="profit-route__terminal" data-testid="profit-route-terminal">${terminal}</span>${placeHtml} · `
             : '';
-        return (
-            '<span class="profit-route__line"><span class="' +
-            cls +
-            '">' +
-            escapeHtml(side) +
-            '</span> ' +
-            terminalHtml +
-            escapeHtml(num(PRICE, price)) +
-            '</span>'
-        );
+        return krtHtml`<span class="profit-route__line"><span class="${cls}">${side}</span> ${
+            terminalHtml
+        }${num(PRICE, price)}</span>`;
     }
 
     /**
@@ -161,7 +148,7 @@
     function renderRows(data) {
         const body = document.getElementById('profitBody');
         if (!body) return;
-        const rows = data.slice().sort(function (a, b) {
+        const rows = data.slice().sort((a, b) => {
             const pa = Number(a.maxProfitFullLoad);
             const pb = Number(b.maxProfitFullLoad);
             const diff = (isFinite(pb) ? pb : -Infinity) - (isFinite(pa) ? pa : -Infinity);
@@ -171,44 +158,35 @@
                       sensitivity: 'base',
                   });
         });
-        let html = '';
-        rows.forEach(function (item, index) {
+        const html = rows.map((item, index) => {
             const rank = index + 1;
-            html +=
-                '<tr class="profit-row' +
-                (rank === 1 ? ' profit-row--top' : '') +
-                '" data-testid="profit-row"><td><a class="row-link" data-testid="row-link" href="/materials/' +
-                escapeAttr(encodeURIComponent(item.materialId || '')) +
-                '"><span class="profit-rank">' +
-                escapeHtml(rank) +
-                '</span><span class="cell-title">' +
-                escapeHtml(item.materialName) +
-                '</span></a></td><td class="profit-route">' +
-                routeLine(
-                    'profit-route__buy',
-                    label('buy'),
-                    item.buyTerminalName,
-                    item.buyTerminalLocation,
-                    item.minBuyPrice,
-                ) +
-                routeLine(
-                    'profit-route__sell',
-                    label('sell'),
-                    item.sellTerminalName,
-                    item.sellTerminalLocation,
-                    item.maxSellPrice,
-                ) +
-                '</td><td class="num">' +
-                escapeHtml(num(PER_SCU, item.profitPerScu)) +
-                '</td><td class="num">' +
-                escapeHtml(num(PERCENT, item.marginPercent)) +
-                ' %</td><td class="num">' +
-                escapeHtml(num(WHOLE, item.fullLoadCost)) +
-                '</td><td class="num profit-max">' +
-                escapeHtml(num(WHOLE, item.maxProfitFullLoad)) +
-                '</td></tr>';
+            return krtHtml`<tr class="profit-row${
+                rank === 1 ? ' profit-row--top' : ''
+            }" data-testid="profit-row"><td><a class="row-link" data-testid="row-link" href="/materials/${encodeURIComponent(
+                item.materialId || '',
+            )}"><span class="profit-rank">${rank}</span><span class="cell-title">${
+                item.materialName
+            }</span></a></td><td class="profit-route">${routeLine(
+                'profit-route__buy',
+                label('buy'),
+                item.buyTerminalName,
+                item.buyTerminalLocation,
+                item.minBuyPrice,
+            )}${routeLine(
+                'profit-route__sell',
+                label('sell'),
+                item.sellTerminalName,
+                item.sellTerminalLocation,
+                item.maxSellPrice,
+            )}</td><td class="num">${num(PER_SCU, item.profitPerScu)}</td><td class="num">${num(
+                PERCENT,
+                item.marginPercent,
+            )}\u00a0%</td><td class="num">${num(
+                WHOLE,
+                item.fullLoadCost,
+            )}</td><td class="num profit-max">${num(WHOLE, item.maxProfitFullLoad)}</td></tr>`;
         });
-        window.krtFetch.setTrustedHtml(body, html);
+        krtHtml.set(body, html);
     }
 
     let requestToken = 0;
@@ -220,26 +198,23 @@
         const shipId = select ? select.value : '';
         const token = ++requestToken;
         if (!shipId) {
-            if (body) body.innerHTML = '';
+            if (body) body.replaceChildren();
             setState('idle', label('select-ship'));
             return;
         }
         setState('loading', label('loading'));
         const params = new URLSearchParams();
         params.append('shipId', shipId);
-        systemChecks().forEach(function (c) {
+        systemChecks().forEach((c) => {
             if (c.checked) params.append('starSystemNames', c.value);
         });
         try {
-            const response = await fetch(
-                '/api/proxy/materials/profit-calculation?' + params.toString(),
-                { headers: { 'X-Requested-With': 'XMLHttpRequest' } },
+            const data = await window.krtFetch.getJson(
+                `/api/proxy/materials/profit-calculation?${params.toString()}`,
             );
-            if (!response.ok) throw new Error('HTTP ' + response.status);
-            const data = await response.json();
             if (token !== requestToken) return;
             if (!Array.isArray(data) || data.length === 0) {
-                if (body) body.innerHTML = '';
+                if (body) body.replaceChildren();
                 setState('empty', label('no-data'));
                 return;
             }
@@ -247,7 +222,7 @@
             setState('ready');
         } catch (_error) {
             if (token !== requestToken) return;
-            if (body) body.innerHTML = '';
+            if (body) body.replaceChildren();
             setState('error', label('fetch-error'));
         }
     }
@@ -272,10 +247,10 @@
         const select = shipSelect();
         const checks = systemChecks();
         const picked = checks
-            .filter(function (c) {
+            .filter((c) => {
                 return c.checked;
             })
-            .map(function (c) {
+            .map((c) => {
                 return c.value;
             });
         try {
@@ -304,10 +279,10 @@
         }
         if (Array.isArray(saved.systems) && saved.systems.length > 0) {
             const checks = systemChecks();
-            const any = checks.some(function (c) {
+            const any = checks.some((c) => {
                 return saved.systems.indexOf(c.value) >= 0;
             });
-            checks.forEach(function (c) {
+            checks.forEach((c) => {
                 c.checked = !any || saved.systems.indexOf(c.value) >= 0;
             });
         }
@@ -321,7 +296,7 @@
         updateProfitCalculation();
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', () => {
         restoreProfitFilters();
         updateSystemSummary();
         updateHullChip();
@@ -330,9 +305,9 @@
 
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         window.krtEvents.on('change', 'profit-update', onInputChanged);
-        window.krtEvents.on('change', 'profit-toggle-all', function (el) {
+        window.krtEvents.on('change', 'profit-toggle-all', (el) => {
             const all = /** @type {HTMLInputElement} */ (el);
-            systemChecks().forEach(function (c) {
+            systemChecks().forEach((c) => {
                 c.checked = all.checked;
             });
             onInputChanged();

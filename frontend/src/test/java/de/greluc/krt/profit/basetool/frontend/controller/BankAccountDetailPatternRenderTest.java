@@ -194,7 +194,8 @@ class BankAccountDetailPatternRenderTest {
 
   /** Stubs the balance series, whose last point anchors the running balance at 3.148.200. */
   private void stubSeries() {
-    when(backendApiClient.get(contains("/balance-series"), eq(BankBalanceSeriesDto.class)))
+    when(backendApiClient.get(
+            contains("/balance-series"), eq(BankBalanceSeriesDto.class), eq(ACCOUNT_ID)))
         .thenReturn(
             new BankBalanceSeriesDto(
                 List.of(
@@ -211,9 +212,10 @@ class BankAccountDetailPatternRenderTest {
   void staffDetailRendersTheAccountDetailPattern() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(
-            eq("/api/v1/bank/accounts/" + ACCOUNT_ID), eq(BankAccountDetailDto.class)))
+            eq("/api/v1/bank/accounts/{id}"), eq(BankAccountDetailDto.class), eq(ACCOUNT_ID)))
         .thenReturn(detail(new BankCapabilitiesDto(true, true, true, true)));
-    when(backendApiClient.get(contains("/transactions"), anyTypeRef())).thenReturn(bookings());
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef(), eq(ACCOUNT_ID)))
+        .thenReturn(bookings());
     stubSeries();
 
     String html = render("/bank/accounts/" + ACCOUNT_ID);
@@ -256,7 +258,7 @@ class BankAccountDetailPatternRenderTest {
   @Test
   @WithMockUser(roles = "BANK_EMPLOYEE")
   void bookingsFragmentRendersTheEmptyState() throws Exception {
-    when(backendApiClient.get(contains("/transactions"), anyTypeRef()))
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef(), eq(ACCOUNT_ID)))
         .thenReturn(new PageResponse<BankBookingDto>(List.of(), 0, 50, 0L, 0, List.of()));
 
     String html = render("/bank/accounts/" + ACCOUNT_ID + "?fragment=bookings");
@@ -271,9 +273,9 @@ class BankAccountDetailPatternRenderTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void orgUnitDetailRendersTheSharedPatternWithTheRequestAction() throws Exception {
-    String detailUri = "/api/v1/org-units/bank/accounts/" + ACCOUNT_ID;
+    String detailUri = "/api/v1/org-units/bank/accounts/{id}";
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
-    when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class)))
+    when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class), eq(ACCOUNT_ID)))
         .thenReturn(
             new OrgUnitBankAccountDetailDto(
                 detail(new BankCapabilitiesDto(false, false, false, false)),
@@ -284,7 +286,7 @@ class BankAccountDetailPatternRenderTest {
                 false,
                 new BigDecimal("100000"),
                 false));
-    when(backendApiClient.get(contains(detailUri + "/transactions"), anyTypeRef()))
+    when(backendApiClient.get(contains(detailUri + "/transactions"), anyTypeRef(), eq(ACCOUNT_ID)))
         .thenReturn(bookings());
     when(backendApiClient.get(eq("/api/v1/org-units/bank/transfer-targets"), anyTypeRef()))
         .thenReturn(

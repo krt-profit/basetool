@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingRequestDto;
@@ -26,7 +27,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankTransferFeeRateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -41,13 +41,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Renders the bank-staff confirmation queue (REQ-BANK-023): the booking requests the caller may
@@ -76,32 +74,8 @@ public class BankRequestQueuePageController {
   /** Page size of the listed requests. */
   private static final int QUEUE_SIZE = 200;
 
-  /** Response type for one page of booking requests ({@code /api/v1/bank/requests}). */
-  private static final ParameterizedTypeReference<PageResponse<BankBookingRequestDto>>
-      BOOKING_REQUEST_PAGE = new ParameterizedTypeReference<>() {};
-
-  /**
-   * Response type for the bank-wide holder registry ({@code /api/v1/bank/holders}) feeding the
-   * confirm modal's holder select.
-   */
-  private static final ParameterizedTypeReference<List<BankHolderDto>> BANK_HOLDER_LIST =
-      new ParameterizedTypeReference<>() {};
-
-  /**
-   * Response type for the account list ({@code /api/v1/bank/accounts}) feeding the direct-booking
-   * modal's source and destination selectors (REQ-BANK-023).
-   */
-  private static final ParameterizedTypeReference<PageResponse<BankAccountDto>> BANK_ACCOUNT_PAGE =
-      new ParameterizedTypeReference<>() {};
-
-  /**
-   * Response type for the all-kinds active org-unit option list ({@code
-   * /api/v1/org-units/active-all-kinds}) feeding the external-counterparty picklist (REQ-BANK-044).
-   */
-  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
-      ORG_UNIT_OPTION_LIST = new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** The bank domain's backend calls. */
+  private final BankBackendClient bankClient;
 
   /**
    * Renders the queue, or its {@code requestQueue} fragment after a decision or segment change.
@@ -146,7 +120,7 @@ public class BankRequestQueuePageController {
             : pending.content().stream()
                 .filter(BankRequestQueuePageController::awaitsTheCaller)
                 .count();
-    List<BankHolderDto> holders = backendApiClient.get("/api/v1/bank/holders", BANK_HOLDER_LIST);
+    List<BankHolderDto> holders = bankClient.holders();
     model.addAttribute("requests", requests);
     model.addAttribute("selectedStatus", segment);
     model.addAttribute("statusCounts", counts);
@@ -161,11 +135,9 @@ public class BankRequestQueuePageController {
     if ("requestQueue".equals(fragment)) {
       return "bank-requests :: requestQueue";
     }
-    PageResponse<BankAccountDto> activeProbe =
-        backendApiClient.get("/api/v1/bank/accounts?status=ACTIVE&size=1", BANK_ACCOUNT_PAGE);
+    PageResponse<BankAccountDto> activeProbe = bankClient.activeAccountProbe();
     model.addAttribute("canBook", activeProbe != null && activeProbe.totalElements() > 0);
-    List<OrgUnitMembershipOptionDto> allOrgUnits =
-        backendApiClient.get("/api/v1/org-units/active-all-kinds", ORG_UNIT_OPTION_LIST);
+    List<OrgUnitMembershipOptionDto> allOrgUnits = bankClient.activeOrgUnitsAllKinds();
     model.addAttribute(
         "allOrgUnits", allOrgUnits == null ? List.<OrgUnitMembershipOptionDto>of() : allOrgUnits);
     model.addAttribute("transferFeeRate", fetchTransferFeeRate());
@@ -223,10 +195,7 @@ public class BankRequestQueuePageController {
   @Nullable
   private PageResponse<BankBookingRequestDto> fetchRequests(
       @NotNull List<String> statuses, int size) {
-    UriComponentsBuilder uri =
-        UriComponentsBuilder.fromPath("/api/v1/bank/requests").queryParam("size", size);
-    statuses.forEach(s -> uri.queryParam("status", s));
-    return backendApiClient.get(uri.toUriString(), BOOKING_REQUEST_PAGE);
+    return bankClient.bookingRequests(statuses, size);
   }
 
   /**
@@ -236,8 +205,7 @@ public class BankRequestQueuePageController {
    * @return the fee rate as a fraction, never {@code null}
    */
   private BigDecimal fetchTransferFeeRate() {
-    BankTransferFeeRateDto rate =
-        backendApiClient.get("/api/v1/bank/transfer-fee-rate", BankTransferFeeRateDto.class);
+    BankTransferFeeRateDto rate = bankClient.transferFeeRate();
     return rate == null || rate.rate() == null ? BigDecimal.ZERO : rate.rate();
   }
 

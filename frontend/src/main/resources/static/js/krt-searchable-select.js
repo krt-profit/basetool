@@ -30,7 +30,7 @@
         /** @type {HTMLElement | null} */
         let label = null;
         if (select.id) {
-            label = document.querySelector('label[for="' + select.id + '"]');
+            label = document.querySelector(`label[for="${select.id}"]`);
         }
         if (!label) {
             const group = select.closest('.form-group');
@@ -39,7 +39,7 @@
             }
         }
         if (label && !label.id) {
-            label.id = uid + '-label';
+            label.id = `${uid}-label`;
         }
         return label && label.id ? label : null;
     }
@@ -79,7 +79,7 @@
      *     option model
      */
     function makeItem(value, label, extra, data) {
-        const terms = extra && extra.trim() ? label + ' ' + extra.trim() : label;
+        const terms = extra && extra.trim() ? `${label} ${extra.trim()}` : label;
         return { value, label, search: terms.toLowerCase(), data };
     }
 
@@ -92,7 +92,7 @@
      */
     function optionData(option) {
         let map;
-        Object.keys(option.dataset).forEach(function (key) {
+        Object.keys(option.dataset).forEach((key) => {
             if (COMBOBOX_DATA_KEYS.indexOf(key) !== -1) {
                 return;
             }
@@ -148,7 +148,7 @@
         let placeholder = opts.placeholder || data.comboboxPlaceholder || '';
         let optional = false;
         let clearLabel = '';
-        Array.prototype.forEach.call(select.options, function (option) {
+        Array.prototype.forEach.call(select.options, (option) => {
             if (option.value === '') {
                 const emptyText = option.textContent.trim();
                 if (!placeholder) {
@@ -170,8 +170,8 @@
             );
         });
 
-        const uid = 'krt-cb-' + ++comboboxSeq;
-        const listboxId = uid + '-list';
+        const uid = `krt-cb-${++comboboxSeq}`;
+        const listboxId = `${uid}-list`;
 
         const wrapper = document.createElement('div');
         wrapper.className = 'krt-combobox';
@@ -185,7 +185,7 @@
             hidden.id = select.id;
         }
         const reservedKeys = [];
-        Object.keys(data).forEach(function (key) {
+        Object.keys(data).forEach((key) => {
             if (COMBOBOX_DATA_KEYS.indexOf(key) === -1) {
                 hidden.dataset[key] = data[key];
                 reservedKeys.push(key);
@@ -194,7 +194,7 @@
 
         const input = document.createElement('input');
         input.type = 'text';
-        input.id = uid + '-input';
+        input.id = `${uid}-input`;
         input.className = 'krt-combobox__input';
         input.setAttribute('role', 'combobox');
         input.setAttribute('aria-autocomplete', 'list');
@@ -235,7 +235,7 @@
         let mirroredKeys = [];
 
         function mirrorItemData(item) {
-            mirroredKeys.forEach(function (key) {
+            mirroredKeys.forEach((key) => {
                 delete hidden.dataset[key];
             });
             mirroredKeys = [];
@@ -243,7 +243,7 @@
             if (!map) {
                 return;
             }
-            Object.keys(map).forEach(function (key) {
+            Object.keys(map).forEach((key) => {
                 if (
                     COMBOBOX_DATA_KEYS.indexOf(key) !== -1 ||
                     reservedKeys.indexOf(key) !== -1 ||
@@ -260,7 +260,7 @@
         let committedValue = '';
         /** @type {any} */
         let committedItem = null;
-        const preselected = items.find(function (it) {
+        const preselected = items.find((it) => {
             return it.value === select.value;
         });
         if (preselected) {
@@ -295,17 +295,17 @@
             const flipUp = below < Math.min(cap, listbox.scrollHeight) && above > below;
             listbox.classList.toggle('krt-combobox__listbox--above', flipUp);
             listbox.style.position = 'fixed';
-            listbox.style.left = rect.left + 'px';
+            listbox.style.left = `${rect.left}px`;
             listbox.style.right = 'auto';
-            listbox.style.width = rect.width + 'px';
+            listbox.style.width = `${rect.width}px`;
             const avail = Math.max(0, Math.min(cap, (flipUp ? above : below) - gap));
-            listbox.style.maxHeight = avail + 'px';
+            listbox.style.maxHeight = `${avail}px`;
             if (flipUp) {
                 listbox.style.top = 'auto';
-                listbox.style.bottom = window.innerHeight - rect.top + 'px';
+                listbox.style.bottom = `${window.innerHeight - rect.top}px`;
             } else {
                 listbox.style.bottom = 'auto';
-                listbox.style.top = rect.bottom + 'px';
+                listbox.style.top = `${rect.bottom}px`;
             }
         }
 
@@ -380,7 +380,7 @@
             const matches = remoteSource
                 ? items.slice()
                 : q
-                  ? items.filter(function (it) {
+                  ? items.filter((it) => {
                         return (it.search || it.label.toLowerCase()).indexOf(q) !== -1;
                     })
                   : items.slice();
@@ -389,9 +389,9 @@
             const rows = clearLabel && !q ? [makeItem('', clearLabel)] : [];
             Array.prototype.push.apply(rows, matches.slice(0, maxResults));
 
-            rows.forEach(function (it, idx) {
+            rows.forEach((it, idx) => {
                 const li = document.createElement('li');
-                li.id = listboxId + '-opt-' + idx;
+                li.id = `${listboxId}-opt-${idx}`;
                 li.className = 'krt-combobox__option';
                 if (it.value === '') {
                     li.classList.add('krt-combobox__option--clear');
@@ -400,13 +400,13 @@
                 li.setAttribute('aria-selected', it.value === hidden.value ? 'true' : 'false');
                 li.dataset.value = it.value;
                 appendHighlighted(li, it.label, q);
-                li.addEventListener('mousedown', function (event) {
+                li.addEventListener('mousedown', (event) => {
                     event.preventDefault();
                 });
-                li.addEventListener('click', function () {
+                li.addEventListener('click', () => {
                     commit(it);
                 });
-                li.addEventListener('mousemove', function () {
+                li.addEventListener('mousemove', () => {
                     if (activeIndex !== idx) {
                         setActive(idx);
                     }
@@ -423,7 +423,7 @@
         }
 
         function highlightCommitted() {
-            const selIdx = rendered.findIndex(function (r) {
+            const selIdx = rendered.findIndex((r) => {
                 return r.item.value === hidden.value;
             });
             if (selIdx >= 0) {
@@ -450,7 +450,7 @@
         function loadRemote(query) {
             const token = ++remoteSeq;
             Promise.resolve(remoteSource(query))
-                .then(function (list) {
+                .then((list) => {
                     if (token !== remoteSeq || !isOpen()) {
                         return;
                     }
@@ -459,7 +459,7 @@
                     positionListbox();
                     highlightCommitted();
                 })
-                .catch(function () {
+                .catch(() => {
                     if (token !== remoteSeq || !isOpen()) {
                         return;
                     }
@@ -476,7 +476,7 @@
             positionListbox();
             attachReposition();
             window.clearTimeout(remoteTimer ?? undefined);
-            remoteTimer = window.setTimeout(function () {
+            remoteTimer = window.setTimeout(() => {
                 loadRemote(query);
             }, delay || 0);
         }
@@ -561,11 +561,11 @@
             input.setCustomValidity(input.value.trim() ? texts.invalid : '');
         }
 
-        input.addEventListener('focus', function () {
+        input.addEventListener('focus', () => {
             input.select();
         });
 
-        input.addEventListener('click', function () {
+        input.addEventListener('click', () => {
             if (isOpen()) {
                 close();
             } else if (remoteSource) {
@@ -575,7 +575,7 @@
             }
         });
 
-        input.addEventListener('input', function () {
+        input.addEventListener('input', () => {
             if (remoteSource) {
                 openRemote(input.value, 250);
             } else {
@@ -584,7 +584,7 @@
             reconcile();
         });
 
-        input.addEventListener('keydown', function (event) {
+        input.addEventListener('keydown', (event) => {
             switch (event.key) {
                 case 'ArrowDown':
                     event.preventDefault();
@@ -651,8 +651,8 @@
             }
         });
 
-        input.addEventListener('blur', function () {
-            window.setTimeout(function () {
+        input.addEventListener('blur', () => {
+            window.setTimeout(() => {
                 if (document.activeElement === input) {
                     return;
                 }
@@ -721,20 +721,20 @@
         }
         Array.prototype.forEach.call(
             root.querySelectorAll('select[data-krt-combobox]'),
-            function (select) {
+            (select) => {
                 krtSearchableSelect(select, autoConfig(select));
             },
         );
     }
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('DOMContentLoaded', () => {
             enhanceWithin(document);
         });
     } else {
         enhanceWithin(document);
     }
-    document.addEventListener('krt:swapped', function (event) {
+    document.addEventListener('krt:swapped', (event) => {
         const detail = /** @type {CustomEvent} */ (event).detail;
         enhanceWithin((detail && detail.container) || document);
     });

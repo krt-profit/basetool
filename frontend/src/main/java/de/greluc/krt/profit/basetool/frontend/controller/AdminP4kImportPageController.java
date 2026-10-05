@@ -21,21 +21,19 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.withBackendStatus;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.P4kImportJobDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -46,7 +44,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -55,7 +52,7 @@ import org.springframework.web.server.ResponseStatusException;
  * applies it.
  *
  * <p>Every action proxies to {@code /api/v1/admin/import/p4k/jobs} through {@link
- * BackendApiClient#execute}, so a backend refusal is mapped like any other backend call.
+ * CatalogueBackendClient}, so a backend refusal is mapped like any other backend call.
  */
 @Controller
 @UsesLayoutModel
@@ -64,10 +61,11 @@ import org.springframework.web.server.ResponseStatusException;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminP4kImportPageController {
 
-  /** Backend base path for the async import jobs. */
-  private static final String JOBS_URI = "/api/v1/admin/import/p4k/jobs";
+  /** Relays the import jobs. */
+  private final CatalogueBackendClient catalogueClient;
 
-  private final BackendApiClient backendApiClient;
+  /** Evicts the catalogues an applied import changes. */
+  private final CatalogueCacheEviction cacheEviction;
 
   /**
    * Renders the P4K import page and exposes the proxy base URL to its script.
@@ -97,31 +95,8 @@ public class AdminP4kImportPageController {
     byte[] bytes = readBytes(file);
     String filename =
         file.getOriginalFilename() != null ? file.getOriginalFilename() : "p4k-catalog.json";
-    MultipartBodyBuilder builder = new MultipartBodyBuilder();
-    builder
-        .part(
-            "file",
-            new ByteArrayResource(bytes) {
-              @Override
-              public String getFilename() {
-                return filename;
-              }
-            })
-        .contentType(MediaType.APPLICATION_OCTET_STREAM);
-
     P4kImportJobDto job =
-        withBackendStatus(
-            () ->
-                backendApiClient.execute(
-                    HttpMethod.POST,
-                    JOBS_URI,
-                    webClient ->
-                        webClient
-                            .post()
-                            .uri(JOBS_URI)
-                            .contentType(MediaType.MULTIPART_FORM_DATA)
-                            .body(BodyInserters.fromMultipartData(builder.build())),
-                    spec -> spec.bodyToMono(P4kImportJobDto.class)));
+        withBackendStatus(() -> catalogueClient.enqueueP4kImport(bytes, filename));
     return ResponseEntity.status(HttpStatus.ACCEPTED).body(job);
   }
 
@@ -134,13 +109,7 @@ public class AdminP4kImportPageController {
   @ResponseBody
   @NotNull
   public List<P4kImportJobDto> listJobs() {
-    return withBackendStatus(
-        () ->
-            backendApiClient.execute(
-                HttpMethod.GET,
-                JOBS_URI,
-                webClient -> webClient.get().uri(JOBS_URI),
-                spec -> spec.bodyToFlux(P4kImportJobDto.class).collectList()));
+    return withBackendStatus(catalogueClient::p4kImportJobs);
   }
 
   /**
@@ -153,16 +122,7 @@ public class AdminP4kImportPageController {
   @ResponseBody
   @NotNull
   public P4kImportJobDto getJob(@PathVariable("id") @NotNull UUID id) {
-    return withBackendStatus(
-        () ->
-            backendApiClient.execute(
-                HttpMethod.GET,
-                JOBS_URI + "/{id}",
-                webClient ->
-                    webClient
-                        .get()
-                        .uri(uriBuilder -> uriBuilder.path(JOBS_URI + "/{id}").build(id)),
-                spec -> spec.bodyToMono(P4kImportJobDto.class)));
+    return withBackendStatus(() -> catalogueClient.p4kImportJob(id));
   }
 
   /**
@@ -178,23 +138,8 @@ public class AdminP4kImportPageController {
   public ResponseEntity<P4kImportJobDto> applyJob(
       @PathVariable("id") @NotNull UUID id,
       @RequestParam(value = "seedNew", defaultValue = "false") boolean seedNew) {
-    P4kImportJobDto job =
-        withBackendStatus(
-            () ->
-                backendApiClient.execute(
-                    HttpMethod.POST,
-                    JOBS_URI + "/{id}/apply",
-                    webClient ->
-                        webClient
-                            .post()
-                            .uri(
-                                uriBuilder ->
-                                    uriBuilder
-                                        .path(JOBS_URI + "/{id}/apply")
-                                        .queryParam("seedNew", seedNew)
-                                        .build(id)),
-                    spec -> spec.bodyToMono(P4kImportJobDto.class)));
-    backendApiClient.evict(
+    P4kImportJobDto job = withBackendStatus(() -> catalogueClient.applyP4kImportJob(id, seedNew));
+    cacheEviction.evict(
         CacheDomain.MATERIAL,
         CacheDomain.MANUFACTURER,
         CacheDomain.SHIP_TYPE,

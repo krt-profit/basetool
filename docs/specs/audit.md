@@ -512,7 +512,7 @@ unreviewed, externally-chosen string into the one table whose value rests on car
 same instinct as the "no user free text, no PII in the details payload" rule above — and would grow
 an unbounded metric label on the other consumer (REQ-OBS-006).
 
-**One mapping, two consumers.** The bounded vocabulary is `support.ClientAttribution`, shared with
+**One mapping, two consumers.** The bounded vocabulary is `platform.api.ClientAttribution`, shared with
 the `client_id` label of `basetool_api_client_requests_total` (REQ-OBS-018). They must agree: an
 operator who sees a burst on that counter and then filters the audit log for the same client is
 joining two answers that only mean the same thing if one rule produced both. Two copies of the
@@ -568,7 +568,7 @@ than a feature, so the viewer offers the identical list everywhere.
 **Enforced by:** `AuditServiceTest`, `BankAuditServiceTest`, `ClientAttributionTest`,
 `AuditQueryIntegrationTest`, `BankAuditQueryIntegrationTest`, `AdminAuditLogPageControllerTest`,
 `AdminAuditLogModalRenderMvcTest`, `ApiClientMetricsFilterTest`, `AuditLogE2eTest` · **Code:**
-`support/ClientAttribution`, `service/AuditService#record`, `service/BankAuditService#record`,
+`platform/api/ClientAttribution`, `service/AuditService#record`, `service/BankAuditService#record`,
 `model/AuditEvent#clientId`, `model/BankAuditEvent#clientId`, `controller/AuditAdminController`,
 `controller/BankAdminController`, `controller/AdminAuditLogPageController`,
 `db/migration/V237`, `db/migration/V238` · **Decision:**
@@ -648,7 +648,7 @@ and swallowed there, so the scheduler thread survives a bad run.
 
 **Enforced by:** `AuditRetentionServiceTest`, `AuditRetentionTaskTest`,
 `BackendPropertiesValidationTest` (the floors) · **Code:**
-`service/AuditRetentionService`, `audit/api/RetentionParticipant`, `task/AuditRetentionTask`, `support/AuditRetentionProperties`, `metrics/ScheduledJob#AUDIT_RETENTION`,
+`service/AuditRetentionService`, `audit/api/RetentionParticipant`, `task/AuditRetentionTask`, `audit/internal/AuditRetentionProperties`, `metrics/ScheduledJob#AUDIT_RETENTION`,
 `repository/AuditEventRepository#existsByDomainAndOccurredAtBefore`,
 `service/BankAuditService#holdsRowsBefore`,
 `repository/BankAuditEventRepository#existsByOccurredAtBefore`, `templates/admin/audit-log.html` ·

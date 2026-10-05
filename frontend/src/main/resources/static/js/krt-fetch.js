@@ -2,6 +2,24 @@
 (function () {
     'use strict';
 
+    const fragmentPolicy =
+        window.trustedTypes && typeof window.trustedTypes.createPolicy === 'function'
+            ? window.trustedTypes.createPolicy('krt-fragment', { createHTML: (markup) => markup })
+            : null;
+
+    /**
+     * Wraps the text of a same-origin server response for an HTML sink through the `krt-fragment`
+     * Trusted Types policy (ADR-0239); the plain text where the browser has no Trusted Types.
+     *
+     * @param {string} markup the response text
+     * @returns {string} the value the sink accepts, typed as the string the DOM lib expects
+     */
+    function trustedFragment(markup) {
+        return fragmentPolicy
+            ? /** @type {string} */ (/** @type {unknown} */ (fragmentPolicy.createHTML(markup)))
+            : markup;
+    }
+
     /**
      * Returns the caller-supplied localized string, or the page-wide default from
      * `window.krtFetchI18n`; a missing default renders as its key name via `krtI18nText`.
@@ -27,13 +45,13 @@
     }
 
     function metaContent(name) {
-        const el = document.querySelector('meta[name="' + name + '"]');
+        const el = document.querySelector(`meta[name="${name}"]`);
         const content = el ? el.getAttribute('content') : null;
         return content && content !== 'undefined' ? content : null;
     }
 
     function setMetaContent(name, value) {
-        let el = document.querySelector('meta[name="' + name + '"]');
+        let el = document.querySelector(`meta[name="${name}"]`);
         if (!el) {
             el = document.createElement('meta');
             el.setAttribute('name', name);
@@ -85,10 +103,10 @@
         refreshInFlight = fetch('/csrf', {
             headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         })
-            .then(function (res) {
+            .then((res) => {
                 return res.ok ? res.json() : null;
             })
-            .then(function (data) {
+            .then((data) => {
                 if (data && data.token && data.headerName) {
                     setMetaContent('_csrf', data.token);
                     setMetaContent('_csrf_header', data.headerName);
@@ -96,10 +114,10 @@
                 }
                 return null;
             })
-            .catch(function () {
+            .catch(() => {
                 return null;
             })
-            .finally(function () {
+            .finally(() => {
                 refreshInFlight = null;
             });
         return refreshInFlight;
@@ -220,7 +238,7 @@
             return;
         }
         container.setAttribute('data-version', String(newVersion));
-        container.querySelectorAll('[data-version]').forEach(function (el) {
+        container.querySelectorAll('[data-version]').forEach((el) => {
             el.setAttribute('data-version', String(newVersion));
         });
     }
@@ -252,18 +270,160 @@
         }
     }
 
+    /** @type {Map<string, AbortController>} */
+    const readAborters = new Map();
+
+    /**
+     * Combines the caller's signal with a supersede controller for `key`, aborting the read still
+     * in flight under the same key.
+     *
+     * @param {KrtReadOpts} options the read options
+     * @returns {{ signal: AbortSignal | undefined, controller: AbortController | null }} the signal
+     *     to pass to fetch and the supersede controller to release afterwards
+     */
+    function readSignal(options) {
+        /** @type {AbortSignal[]} */
+        const signals = [];
+        if (options.signal) {
+            signals.push(options.signal);
+        }
+        /** @type {AbortController | null} */
+        let controller = null;
+        if (options.key) {
+            const previous = readAborters.get(options.key);
+            if (previous) {
+                previous.abort();
+            }
+            controller = new AbortController();
+            readAborters.set(options.key, controller);
+            signals.push(controller.signal);
+        }
+        if (signals.length === 0) {
+            return { signal: undefined, controller };
+        }
+        return { signal: signals.length === 1 ? signals[0] : AbortSignal.any(signals), controller };
+    }
+
+    /**
+     * Sends a same-origin GET marked as background traffic and runs the answer past the
+     * re-authentication and terms gates (REQ-FE-031).
+     *
+     * @param {string} url the same-origin URL to read
+     * @param {KrtReadOpts} [opts] accept, extra headers, signal and supersede key
+     * @returns {Promise<Response | null>} the response, ok or not; null when a gate navigated away
+     *     or the answer came through a redirect, which for a background read is a login or consent
+     *     page rather than the resource
+     */
+    async function get(url, opts) {
+        const options = opts || {};
+        /** @type {Record<string, string>} */
+        const headers = Object.assign({}, options.headers);
+        if (options.accept) {
+            headers.Accept = options.accept;
+        }
+        headers['X-Requested-With'] = 'XMLHttpRequest';
+        const { signal, controller } = readSignal(options);
+        let response;
+        try {
+            response = await fetch(url, {
+                method: 'GET',
+                headers,
+                credentials: 'same-origin',
+                signal,
+            });
+        } finally {
+            if (controller && options.key && readAborters.get(options.key) === controller) {
+                readAborters.delete(options.key);
+            }
+        }
+        if (maybeReauthenticate(response) || maybeTermsGate(response)) {
+            return null;
+        }
+        if (response.redirected) {
+            devWarn('krtFetch.get refused a redirected answer', { url, status: response.status });
+            return null;
+        }
+        return response;
+    }
+
+    /**
+     * Whether the response declares a JSON body (`application/json` or `application/problem+json`).
+     *
+     * @param {Response} response the response to inspect
+     * @returns {boolean} true for a JSON content type
+     */
+    function isJsonResponse(response) {
+        const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
+        return (
+            contentType.includes('application/json') ||
+            contentType.includes('application/problem+json')
+        );
+    }
+
+    /**
+     * Builds the rejection of {@link getJson}.
+     *
+     * @param {string} url the URL that was read
+     * @param {number} status the HTTP status, 0 when there was no usable answer
+     * @param {'refused' | 'status' | 'not-json'} reason why the answer was refused
+     * @param {any} problem the parsed error body, or null
+     * @returns {KrtReadError} the error to reject with
+     */
+    function readError(url, status, reason, problem) {
+        const error = /** @type {KrtReadError} */ (
+            new Error(`krtFetch.getJson ${reason} (${status}) for ${url}`)
+        );
+        error.name = 'KrtReadError';
+        error.status = status;
+        error.reason = reason;
+        error.problem = problem;
+        return error;
+    }
+
+    /**
+     * Reads JSON through {@link get}.
+     *
+     * @param {string} url the same-origin URL to read
+     * @param {KrtReadOpts} [opts] extra headers, signal and supersede key; Accept is always JSON
+     * @returns {Promise<any>} the parsed body of a 2xx JSON answer, or null for a 204; rejects with
+     *     a KrtReadError for a gated, redirected, non-2xx or non-JSON answer, and with the browser's
+     *     own error on a transport failure or an abort
+     */
+    async function getJson(url, opts) {
+        const response = await get(url, Object.assign({}, opts, { accept: 'application/json' }));
+        if (!response) {
+            throw readError(url, 0, 'refused', null);
+        }
+        if (!response.ok) {
+            let problem = null;
+            if (isJsonResponse(response)) {
+                try {
+                    problem = await response.json();
+                } catch (_unparsable) {}
+            }
+            throw readError(url, response.status, 'status', problem);
+        }
+        if (response.status === 204) {
+            return null;
+        }
+        if (!isJsonResponse(response)) {
+            throw readError(url, response.status, 'not-json', null);
+        }
+        return response.json();
+    }
+
     /** @type {Element | null} */
     let pendingSubmitter = null;
     document.addEventListener(
         'submit',
-        function (e) {
+        (e) => {
             const form = /** @type {HTMLFormElement | null} */ (e.target);
             pendingSubmitter =
                 /** @type {SubmitEvent} */ (e).submitter ||
                 (form && form.querySelector
                     ? form.querySelector('button[type="submit"], input[type="submit"]')
                     : null);
-            Promise.resolve().then(function () {
+            Promise.resolve().then(() => {
                 pendingSubmitter = null;
             });
         },
@@ -295,7 +455,7 @@
         const result = prev.then(task, task);
         const tail = result.then(noop, noop);
         serialChains.set(key, tail);
-        tail.then(function () {
+        tail.then(() => {
             if (serialChains.get(key) === tail) {
                 serialChains.delete(key);
             }
@@ -312,7 +472,7 @@
      */
     async function handleProblem(response, problem, opts) {
         const options = opts || {};
-        const prefix = options.conflictSectionLabel ? options.conflictSectionLabel + ': ' : '';
+        const prefix = options.conflictSectionLabel ? `${options.conflictSectionLabel}: ` : '';
         const genericError = text(
             options.errorMessage,
             defaults().saveFailed,
@@ -502,7 +662,7 @@
                 syncVersion(opts.containerSelector, body.version);
             }
             if (opts.toast !== false) {
-                const label = opts.sectionLabel ? opts.sectionLabel + ': ' : '';
+                const label = opts.sectionLabel ? `${opts.sectionLabel}: ` : '';
                 successToast(
                     label + text(opts.successMessage, defaults().saved, 'krtFetchI18n.saved'),
                 );
@@ -625,7 +785,18 @@
             return;
         }
         // eslint-disable-next-line no-unsanitized/property
-        el.innerHTML = html == null ? '' : String(html);
+        el.innerHTML = trustedFragment(html == null ? '' : String(html));
+    }
+
+    /**
+     * Parses a same-origin page or fragment response into a detached document, under the trust
+     * contract of {@link setTrustedHtml}.
+     *
+     * @param {string} html the response markup
+     * @returns {Document} the parsed, inert document
+     */
+    function parseTrustedDocument(html) {
+        return new DOMParser().parseFromString(trustedFragment(String(html)), 'text/html');
     }
 
     /**
@@ -651,7 +822,7 @@
     function withFragmentParam(url, paramName, paramValue) {
         const resolved = new URL(url, window.location.origin);
         resolved.searchParams.set(paramName, paramValue);
-        return resolved.pathname + '?' + resolved.searchParams.toString();
+        return `${resolved.pathname}?${resolved.searchParams.toString()}`;
     }
 
     /**
@@ -662,7 +833,7 @@
         const resolved = new URL(url, window.location.origin);
         resolved.searchParams.delete(paramName);
         const query = resolved.searchParams.toString();
-        return resolved.pathname + (query ? '?' + query : '');
+        return resolved.pathname + (query ? `?${query}` : '');
     }
 
     /**
@@ -723,18 +894,12 @@
         if (indicator) {
             indicator.style.display = 'block';
         }
-        return fetch(url, {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            signal: aborter ? aborter.signal : undefined,
-        })
-            .then(function (res) {
-                if (maybeReauthenticate(res)) {
+        return get(url, { signal: aborter ? aborter.signal : undefined })
+            .then((res) => {
+                if (!res) {
                     return null;
                 }
-                if (maybeTermsGate(res)) {
-                    return null;
-                }
-                if (res.redirected || !res.ok) {
+                if (!res.ok) {
                     devWarn('krtFetch.swap bailed: response is not a fragment', {
                         url,
                         status: res.status,
@@ -744,7 +909,7 @@
                 }
                 return res.text();
             })
-            .then(function (html) {
+            .then((html) => {
                 if (!isCurrent()) {
                     return false;
                 }
@@ -776,7 +941,7 @@
                 }
                 return true;
             })
-            .catch(function (error) {
+            .catch((error) => {
                 hideIndicatorIfCurrent();
                 releaseAborter();
                 const superseded = (error && error.name === 'AbortError') || !isCurrent();
@@ -792,7 +957,7 @@
             return;
         }
         container._krtSwapBound = true;
-        container.addEventListener('click', function (event) {
+        container.addEventListener('click', (event) => {
             const anchor = event.target.closest('a.page-btn[href], a[data-swap][href]');
             if (!anchor || !container.contains(anchor)) {
                 return;
@@ -859,16 +1024,13 @@
                  */
                 function t(key) {
                     if (!key) return undefined;
-                    return window.krtI18nText(
-                        dict[key],
-                        (config.dictName || 'dict') + '[' + key + ']',
-                    );
+                    return window.krtI18nText(dict[key], `${config.dictName || 'dict'}[${key}]`);
                 }
                 const key = opts.sectionKey || '';
                 const k = config.keys;
                 return write(
                     Object.assign({}, opts, {
-                        serialize: opts.serialize || (key ? 'section:' + key : undefined),
+                        serialize: opts.serialize || (key ? `section:${key}` : undefined),
                         sectionLabel: k.saveSectionPrefix
                             ? t(k.saveSectionPrefix + key)
                             : undefined,
@@ -893,7 +1055,7 @@
                     config.broadcast(list);
                 }
                 return Promise.all(
-                    list.map(function (sectionKey) {
+                    list.map((sectionKey) => {
                         const cfg = config.sections[sectionKey];
                         const url = cfg ? config.pageUrl() : null;
                         if (!cfg || !url || !document.querySelector(cfg.container)) {
@@ -920,12 +1082,15 @@
     }
 
     window.krtFetch = {
+        get,
+        getJson,
         write,
         submitForm,
         swap,
         bindSwap,
         setTrustedHtml,
         replaceWithTrustedHtml,
+        parseTrustedDocument,
         syncVersion,
         handleProblem,
         ownerOrgUnitRequiredMessage,

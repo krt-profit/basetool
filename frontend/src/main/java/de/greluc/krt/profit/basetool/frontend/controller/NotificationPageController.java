@@ -31,8 +31,9 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationPageSliceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationViewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.BackendSideChannels;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
@@ -55,7 +56,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -74,7 +74,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.Disposable;
@@ -93,7 +92,6 @@ import reactor.core.Disposable;
 @Slf4j
 public class NotificationPageController {
 
-  private static final String BACKEND_BASE = "/api/v1/notifications";
   private static final int PAGE_LIMIT = 50;
   private static final int DROPDOWN_LIMIT = 10;
 
@@ -114,21 +112,15 @@ public class NotificationPageController {
 
   private static final DateTimeFormatter DISPLAY_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'UTC'").withZone(ZoneOffset.UTC);
-  private static final ParameterizedTypeReference<List<NotificationDto>> LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
-  private static final ParameterizedTypeReference<PageResponse<NotificationDto>> PAGE_TYPE =
-      new ParameterizedTypeReference<>() {};
-  private static final ParameterizedTypeReference<ServerSentEvent<String>> SSE_TYPE =
-      new ParameterizedTypeReference<>() {};
   private static final long STREAM_TIMEOUT_MS = Duration.ofMinutes(30).toMillis();
   private static final String REGISTRATION_ID = "keycloak";
 
   /** Upper bound on cause-chain traversal in {@link #isTermsGateSignal(Throwable)} (loop guard). */
   private static final int MAX_CAUSE_DEPTH = 25;
 
-  private final BackendApiClient backendApiClient;
+  private final NotificationBackendClient notificationClient;
   private final MessageSource messageSource;
-  private final WebClient sseWebClient;
+  private final BackendSideChannels backendSideChannels;
   private final OAuth2AuthorizedClientManager authorizedClientManager;
   private final MeterRegistry meterRegistry;
 
@@ -260,12 +252,8 @@ public class NotificationPageController {
     }
     relayConnections.incrementAndGet();
     Disposable subscription =
-        sseWebClient
-            .get()
-            .uri(BACKEND_BASE + "/stream")
-            .headers(headers -> headers.setBearerAuth(bearerToken))
-            .retrieve()
-            .bodyToFlux(SSE_TYPE)
+        backendSideChannels
+            .notificationStream(bearerToken)
             .doFinally(signal -> relayConnections.decrementAndGet())
             .subscribe(
                 event -> forward(emitter, event),
@@ -307,7 +295,7 @@ public class NotificationPageController {
   @PostMapping(value = "/{id}/read", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> markRead(@PathVariable @NotNull UUID id) {
     try {
-      backendApiClient.post(BACKEND_BASE + "/" + id + "/read", null, NotificationDto.class);
+      notificationClient.markRead(id);
       return ResponseEntity.ok(new NotificationCountResponse(currentUnreadCount()));
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
@@ -328,8 +316,7 @@ public class NotificationPageController {
   @PostMapping(value = "/read-all", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> markAllRead() {
     try {
-      NotificationBulkResultDto result =
-          backendApiClient.post(BACKEND_BASE + "/read-all", null, NotificationBulkResultDto.class);
+      NotificationBulkResultDto result = notificationClient.markAllRead();
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
@@ -351,7 +338,7 @@ public class NotificationPageController {
   @DeleteMapping(value = "/{id}", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> delete(@PathVariable @NotNull UUID id) {
     try {
-      backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
+      notificationClient.delete(id);
       return ResponseEntity.ok(new NotificationCountResponse(currentUnreadCount()));
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
@@ -372,8 +359,7 @@ public class NotificationPageController {
   @DeleteMapping(value = "/read", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> clearRead() {
     try {
-      NotificationBulkResultDto result =
-          backendApiClient.delete(BACKEND_BASE + "/read", NotificationBulkResultDto.class);
+      NotificationBulkResultDto result = notificationClient.clearRead();
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
@@ -386,9 +372,7 @@ public class NotificationPageController {
   }
 
   private List<NotificationViewDto> loadView(int limit) {
-    List<NotificationDto> dtos =
-        backendApiClient.get(
-            BACKEND_BASE + "/recent?limit={limit}", LIST_TYPE, Integer.valueOf(limit));
+    List<NotificationDto> dtos = notificationClient.recent(limit);
     if (dtos == null) {
       return List.of();
     }
@@ -403,11 +387,7 @@ public class NotificationPageController {
    * @return the backend page response, or {@code null} when the backend returned none
    */
   private PageResponse<NotificationDto> loadPage(int page) {
-    return backendApiClient.get(
-        BACKEND_BASE + "?page={page}&size={size}&sort=createdAt,desc",
-        PAGE_TYPE,
-        Integer.valueOf(page),
-        Integer.valueOf(PAGE_LIMIT));
+    return notificationClient.page(page, PAGE_LIMIT);
   }
 
   /**
@@ -486,8 +466,7 @@ public class NotificationPageController {
 
   private long currentUnreadCount() {
     try {
-      NotificationCountResponse response =
-          backendApiClient.get(BACKEND_BASE + "/unread-count", NotificationCountResponse.class);
+      NotificationCountResponse response = notificationClient.unreadCount();
       return response != null && response.count() != null ? response.count() : 0L;
     } catch (ReauthenticationRequiredException e) {
       throw e;

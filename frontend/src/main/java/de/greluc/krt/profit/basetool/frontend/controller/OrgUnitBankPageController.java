@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountRefDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBalanceSeriesDto;
@@ -28,7 +29,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankAccountDetail
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankAccountSettingsDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankBalanceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
@@ -47,7 +47,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -84,27 +83,10 @@ public class OrgUnitBankPageController {
           + Roles.KRT_MEMBER
           + "')";
 
-  private final BackendApiClient backendApiClient;
+  /** The bank domain's backend calls. */
+  private final BankBackendClient bankClient;
+
   private final ParallelPageLoader parallelPageLoader;
-
-  /** Response type for the caller's viewable balance cards ({@code /bank/balances}). */
-  private static final ParameterizedTypeReference<List<OrgUnitBankBalanceDto>> BALANCE_LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  /**
-   * Response type for the booking-request lists ({@code /bank/requests} and its {@code /foreign}
-   * variant), both of which return a bare list of requests.
-   */
-  private static final ParameterizedTypeReference<List<BankBookingRequestDto>>
-      BOOKING_REQUEST_LIST_TYPE = new ParameterizedTypeReference<>() {};
-
-  /** Response type for the active transfer/deposit target accounts ({@code /transfer-targets}). */
-  private static final ParameterizedTypeReference<List<BankAccountRefDto>> ACCOUNT_REF_LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  /** Response type for one paginated page of an account's booking history. */
-  private static final ParameterizedTypeReference<PageResponse<BankBookingDto>>
-      BANK_BOOKING_PAGE_TYPE = new ParameterizedTypeReference<>() {};
 
   /**
    * Renders the org-unit bank overview as a card grid or, with {@code layout=table}, a dense table
@@ -228,8 +210,7 @@ public class OrgUnitBankPageController {
    */
   private List<OrgUnitBankBalanceDto> fetchBalances() {
     try {
-      List<OrgUnitBankBalanceDto> balances =
-          backendApiClient.get("/api/v1/org-units/bank/balances", BALANCE_LIST_TYPE);
+      List<OrgUnitBankBalanceDto> balances = bankClient.orgUnitBalances();
       if (balances != null) {
         return balances;
       }
@@ -248,8 +229,7 @@ public class OrgUnitBankPageController {
    */
   private List<BankBookingRequestDto> fetchOwnRequests() {
     try {
-      List<BankBookingRequestDto> requests =
-          backendApiClient.get("/api/v1/org-units/bank/requests", BOOKING_REQUEST_LIST_TYPE);
+      List<BankBookingRequestDto> requests = bankClient.ownOrgUnitRequests();
       if (requests != null) {
         return requests;
       }
@@ -268,9 +248,7 @@ public class OrgUnitBankPageController {
    */
   private List<BankBookingRequestDto> fetchForeignRequests() {
     try {
-      List<BankBookingRequestDto> requests =
-          backendApiClient.get(
-              "/api/v1/org-units/bank/requests/foreign", BOOKING_REQUEST_LIST_TYPE);
+      List<BankBookingRequestDto> requests = bankClient.foreignOrgUnitRequests();
       if (requests != null) {
         return requests;
       }
@@ -289,8 +267,7 @@ public class OrgUnitBankPageController {
    */
   private List<BankAccountRefDto> fetchTransferTargets() {
     try {
-      List<BankAccountRefDto> targets =
-          backendApiClient.get("/api/v1/org-units/bank/transfer-targets", ACCOUNT_REF_LIST_TYPE);
+      List<BankAccountRefDto> targets = bankClient.orgUnitTransferTargets();
       if (targets != null) {
         return targets;
       }
@@ -342,9 +319,7 @@ public class OrgUnitBankPageController {
     if ("orgUnitBalanceChart".equals(fragment)) {
       OrgUnitBankAccountDetailDto chartDetail = null;
       try {
-        chartDetail =
-            backendApiClient.get(
-                "/api/v1/org-units/bank/accounts/" + id, OrgUnitBankAccountDetailDto.class);
+        chartDetail = bankClient.orgUnitAccount(id);
       } catch (RuntimeException e) {
         log.warn("Error loading org-unit account {} for balance-chart fragment", id, e);
       }
@@ -352,9 +327,7 @@ public class OrgUnitBankPageController {
       return "org-unit-bank-account-detail :: orgUnitBalanceChart";
     }
 
-    OrgUnitBankAccountDetailDto detail =
-        backendApiClient.get(
-            "/api/v1/org-units/bank/accounts/" + id, OrgUnitBankAccountDetailDto.class);
+    OrgUnitBankAccountDetailDto detail = bankClient.orgUnitAccount(id);
     model.addAttribute("detail", detail);
 
     boolean canManage =
@@ -364,10 +337,7 @@ public class OrgUnitBankPageController {
                 || detail.canConfigureApprovalLimits());
     OrgUnitBankAccountSettingsDto settings = null;
     if (canManage) {
-      settings =
-          backendApiClient.get(
-              "/api/v1/org-units/bank/accounts/" + id + "/settings",
-              OrgUnitBankAccountSettingsDto.class);
+      settings = bankClient.orgUnitAccountSettings(id);
     }
     model.addAttribute("settings", settings);
 
@@ -444,15 +414,8 @@ public class OrgUnitBankPageController {
     PageResponse<BankBookingDto> bookings = null;
     try {
       bookings =
-          backendApiClient.get(
-              UriComponentsBuilder.fromPath(
-                      "/api/v1/org-units/bank/accounts/" + id + "/transactions")
-                  .queryParam("page", effectivePage)
-                  .queryParam("size", effectiveSize)
-                  .queryParam("from", period.fromInstant())
-                  .queryParam("to", period.toInstant())
-                  .toUriString(),
-              BANK_BOOKING_PAGE_TYPE);
+          bankClient.orgUnitAccountBookings(
+              id, effectivePage, effectiveSize, period.fromInstant(), period.toInstant());
     } catch (RuntimeException e) {
       log.warn("Error loading org-unit bookings for account {}", id, e);
     }
@@ -487,14 +450,7 @@ public class OrgUnitBankPageController {
       return Map.of();
     }
     try {
-      BankBalanceSeriesDto series =
-          backendApiClient.get(
-              UriComponentsBuilder.fromPath(
-                      "/api/v1/org-units/bank/accounts/" + id + "/balance-series")
-                  .queryParam("from", anchor)
-                  .queryParam("to", anchor)
-                  .toUriString(),
-              BankBalanceSeriesDto.class);
+      BankBalanceSeriesDto series = bankClient.orgUnitBalanceSeries(id, anchor, anchor);
       return BankRunningBalance.balancesAfter(
           bookings.content(), BankRunningBalance.lastBalance(series));
     } catch (RuntimeException e) {
@@ -524,14 +480,7 @@ public class OrgUnitBankPageController {
     Instant chartFrom = BankAccountDetailSupport.chartFromInstant(range, createdAt, now);
     BankBalanceSeriesDto series = null;
     try {
-      series =
-          backendApiClient.get(
-              UriComponentsBuilder.fromPath(
-                      "/api/v1/org-units/bank/accounts/" + id + "/balance-series")
-                  .queryParam("from", chartFrom)
-                  .queryParam("to", now)
-                  .toUriString(),
-              BankBalanceSeriesDto.class);
+      series = bankClient.orgUnitBalanceSeries(id, chartFrom, now);
     } catch (RuntimeException e) {
       log.warn("Error loading org-unit balance series for account {}", id, e);
     }

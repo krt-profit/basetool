@@ -19,7 +19,7 @@
 
 /* global ALIAS_MSG, ALIAS_CONFLICT */
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     const table = document.getElementById('aliasesTable');
     const tbody = table ? table.querySelector('tbody') : null;
 
@@ -122,7 +122,7 @@ document.addEventListener('DOMContentLoaded', function () {
         actionTd.className = 'cell-actions';
         const form = document.createElement('form');
         form.method = 'post';
-        form.action = '/admin/material-aliases/' + encodeURIComponent(alias.id) + '/delete';
+        form.action = `/admin/material-aliases/${encodeURIComponent(alias.id)}/delete`;
         form.className = 'm-0';
         form.setAttribute('data-alias-delete', '');
         const btn = document.createElement('button');
@@ -130,8 +130,10 @@ document.addEventListener('DOMContentLoaded', function () {
         btn.className = 'btn btn-quiet-danger btn-icon';
         btn.title = ALIAS_MSG.deleteTitle;
         btn.setAttribute('aria-label', ALIAS_MSG.deleteTitle);
-        btn.innerHTML =
-            '<svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>';
+        krtHtml.set(
+            btn,
+            krtHtml`<svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>`,
+        );
         form.appendChild(btn);
         actionTd.appendChild(form);
         tr.appendChild(actionTd);
@@ -139,12 +141,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function patchAliasRow(alias) {
-        const row = tbody ? tbody.querySelector('tr[data-alias-id="' + alias.id + '"]') : null;
+        const row = tbody ? tbody.querySelector(`tr[data-alias-id="${alias.id}"]`) : null;
         if (!row) {
             return;
         }
-        ['externalName', 'materialName', 'externalKey', 'externalCode'].forEach(function (key) {
-            const cell = row.querySelector('[data-alias-field="' + key + '"]');
+        ['externalName', 'materialName', 'externalKey', 'externalCode'].forEach((key) => {
+            const cell = row.querySelector(`[data-alias-field="${key}"]`);
             if (cell) {
                 cell.textContent = alias[key] != null ? alias[key] : '';
             }
@@ -156,7 +158,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    document.addEventListener('submit', function (event) {
+    document.addEventListener('submit', (event) => {
         const createForm = event.target.closest('form[data-alias-create]');
         const updateForm = event.target.closest('form[data-alias-update]');
         const deleteForm = event.target.closest('form[data-alias-delete]');
@@ -215,7 +217,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 };
             }
         }
-        window.krtFetch.write(opts).finally(function () {
+        window.krtFetch.write(opts).finally(() => {
             if (submitBtn) {
                 submitBtn.disabled = false;
             }

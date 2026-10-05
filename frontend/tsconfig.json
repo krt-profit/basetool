@@ -21,9 +21,9 @@
     "allowJs": true,
     "checkJs": false,
     "noEmit": true,
-    "target": "ES2023",
+    "target": "ES2025",
     "lib": [
-      "ES2023",
+      "ES2025",
       "DOM",
       "DOM.Iterable"
     ],

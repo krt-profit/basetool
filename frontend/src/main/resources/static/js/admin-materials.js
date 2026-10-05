@@ -27,13 +27,13 @@ function readMaterialNames() {
     );
     materialNames.length = 0;
     if (dataList) {
-        Array.from(dataList.options).forEach(function (o) {
+        Array.from(dataList.options).forEach((o) => {
             materialNames.push(o.value);
         });
     }
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     readMaterialNames();
     const inpMaterials = document.getElementById('filterMaterials');
     if (inpMaterials) krtAutocomplete(inpMaterials, materialNames);
@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function addCategoryOption(cat) {
         document
             .querySelectorAll('select[data-update-type="CATEGORY"], #cm-category')
-            .forEach(function (sel) {
+            .forEach((sel) => {
                 const opt = document.createElement('option');
                 opt.value = cat.id;
                 opt.textContent = cat.name;
@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function removeCategoryOption(id) {
         document
             .querySelectorAll('select[data-update-type="CATEGORY"] option, #cm-category option')
-            .forEach(function (opt) {
+            .forEach((opt) => {
                 if (opt.value === id) {
                     opt.remove();
                 }
@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', function () {
         actionTd.className = 'cell-actions';
         const form = document.createElement('form');
         form.method = 'post';
-        form.action = '/admin/materials/categories/' + encodeURIComponent(cat.id) + '/delete';
+        form.action = `/admin/materials/categories/${encodeURIComponent(cat.id)}/delete`;
         form.className = 'm-0';
         form.setAttribute('data-krt-confirm', '');
         form.setAttribute('data-krt-confirm-message', CAT_MSG.deleteConfirm);
@@ -80,8 +80,10 @@ document.addEventListener('DOMContentLoaded', function () {
         btn.className = 'btn btn-quiet-danger btn-icon';
         btn.title = CAT_MSG.deleteTitle;
         btn.setAttribute('aria-label', CAT_MSG.deleteTitle);
-        btn.innerHTML =
-            '<svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>';
+        krtHtml.set(
+            btn,
+            krtHtml`<svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>`,
+        );
         form.appendChild(btn);
         actionTd.appendChild(form);
         tr.appendChild(nameTd);
@@ -104,7 +106,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    document.addEventListener('submit', function (event) {
+    document.addEventListener('submit', (event) => {
         const form = event.target.closest('form[data-category-create]');
         if (!form) {
             return;
@@ -146,7 +148,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    document.addEventListener('submit', function (event) {
+    document.addEventListener('submit', (event) => {
         const form = event.target.closest('form[data-krt-confirm]');
         if (!form || form.dataset.krtConfirmed === 'true') {
             return;
@@ -157,7 +159,7 @@ document.addEventListener('DOMContentLoaded', function () {
             typeof window.showKrtConfirm === 'function'
                 ? window.showKrtConfirm(null, message)
                 : Promise.resolve(true);
-        proceed.then(function (ok) {
+        proceed.then((ok) => {
             if (!ok) {
                 return;
             }
@@ -241,7 +243,7 @@ function updateMaterial(selectElement) {
             method: 'PUT',
             url: `/admin/materials/${encodeURIComponent(matId)}/ajax`,
             payload: buildRequestBody,
-            serialize: 'admin-material:' + matId,
+            serialize: `admin-material:${matId}`,
             containerSelector: tr,
             successMessage: MSG_UPDATE_SUCCESS,
             errorMessage: MSG_UPDATE_ERROR,
@@ -253,7 +255,7 @@ function updateMaterial(selectElement) {
 }
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('change', 'admin-materials-update', function (el) {
+    window.krtEvents.on('change', 'admin-materials-update', (el) => {
         updateMaterial(el);
     });
 }
@@ -324,20 +326,16 @@ function replaceFromDocument(fresh, selector) {
 }
 
 function refreshMaterialsTable() {
-    return fetch(window.location.pathname + window.location.search, {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-    })
-        .then(function (res) {
-            if (window.krtFetch && window.krtFetch.maybeReauthenticate(res)) {
-                return null;
-            }
-            return res.redirected || !res.ok ? null : res.text();
+    return window.krtFetch
+        .get(window.location.pathname + window.location.search)
+        .then((res) => {
+            return !res || !res.ok ? null : res.text();
         })
-        .then(function (html) {
+        .then((html) => {
             if (html === null) {
                 return false;
             }
-            const fresh = new DOMParser().parseFromString(html, 'text/html');
+            const fresh = window.krtFetch.parseTrustedDocument(html);
             if (!fresh.querySelector('#materials-results #materialsTable tbody')) {
                 return false;
             }
@@ -357,7 +355,7 @@ function refreshMaterialsTable() {
             );
             return true;
         })
-        .catch(function (error) {
+        .catch((error) => {
             console.warn('admin-materials: table refresh failed', error);
             return false;
         });
@@ -366,12 +364,12 @@ function refreshMaterialsTable() {
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'materials-open-create-modal', openCreateMaterialModal);
     window.krtEvents.on('click', 'materials-close-create-modal', closeCreateMaterialModal);
-    window.krtEvents.on('click', 'materials-submit-create', function (btn) {
+    window.krtEvents.on('click', 'materials-submit-create', (btn) => {
         submitCreateMaterial(btn);
     });
 }
 
-document.addEventListener('keydown', function (e) {
+document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         const overlay = document.getElementById('modal-create-material');
         if (overlay && overlay.classList.contains('is-open')) {
@@ -381,7 +379,7 @@ document.addEventListener('keydown', function (e) {
 });
 const overlay = document.getElementById('modal-create-material');
 if (overlay) {
-    overlay.addEventListener('click', function (e) {
+    overlay.addEventListener('click', (e) => {
         if (e.target === overlay) closeCreateMaterialModal();
     });
 }

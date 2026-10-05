@@ -89,8 +89,9 @@ class AdminLocationsPageControllerMvcTest {
         new PageResponse<>(List.of(location), 0, 1000, 1, 1, Collections.emptyList());
 
     when(backendApiClient.get(
-            eq("/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page=0"),
-            anyTypeRef()))
+            eq("/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page={page}"),
+            anyTypeRef(),
+            eq(0)))
         .thenReturn(page);
 
     mockMvc
@@ -108,8 +109,9 @@ class AdminLocationsPageControllerMvcTest {
   void listData_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
     PageResponse<LocationDto> page = new PageResponse<>(List.of(), 0, 1000, 0, 1, List.of());
     when(backendApiClient.get(
-            eq("/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page=0"),
-            anyTypeRef()))
+            eq("/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page={page}"),
+            anyTypeRef(),
+            eq(0)))
         .thenReturn(page);
 
     mockMvc
@@ -118,7 +120,7 @@ class AdminLocationsPageControllerMvcTest {
         .andExpect(
             PageStylesheets.content(
                 containsString(
-                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+                    ".form-group input:where(:not([type='checkbox'], [type='radio']))")));
   }
 
   /**
@@ -130,8 +132,9 @@ class AdminLocationsPageControllerMvcTest {
    */
   private @NotNull String renderList(@NotNull List<LocationDto> locations) throws Exception {
     when(backendApiClient.get(
-            eq("/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page=0"),
-            anyTypeRef()))
+            eq("/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page={page}"),
+            anyTypeRef(),
+            eq(0)))
         .thenReturn(
             new PageResponse<>(locations, 0, 1000, locations.size(), 1, Collections.emptyList()));
     return mockMvc
@@ -192,9 +195,9 @@ class AdminLocationsPageControllerMvcTest {
     UUID id = UUID.randomUUID();
     LocationDto before = new LocationDto(id, "ARC-L1", "desc", false, false, 0L);
     LocationDto after = new LocationDto(id, "ARC-L1", "desc", true, false, 1L);
-    when(backendApiClient.get(eq("/api/v1/locations/" + id), eq(LocationDto.class)))
+    when(backendApiClient.get(eq("/api/v1/locations/{id}"), eq(LocationDto.class), eq(id)))
         .thenReturn(before, after);
-    when(backendApiClient.put(eq("/api/v1/locations/" + id), any(), eq(Void.class)))
+    when(backendApiClient.put(eq("/api/v1/locations/{id}"), any(), eq(Void.class), eq(id)))
         .thenReturn(null);
 
     mockMvc
@@ -210,9 +213,9 @@ class AdminLocationsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void toggleLocationVisibilityAjax_backendConflict_relays409() throws Exception {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/locations/" + id), eq(LocationDto.class)))
+    when(backendApiClient.get(eq("/api/v1/locations/{id}"), eq(LocationDto.class), eq(id)))
         .thenReturn(new LocationDto(id, "ARC-L1", "desc", false, false, 0L));
-    when(backendApiClient.put(eq("/api/v1/locations/" + id), any(), eq(Void.class)))
+    when(backendApiClient.put(eq("/api/v1/locations/{id}"), any(), eq(Void.class), eq(id)))
         .thenThrow(
             new BackendServiceException(
                 "conflict", null, 409, "OPTIMISTIC_LOCK", null, java.util.List.of(), "conflict"));
@@ -229,9 +232,9 @@ class AdminLocationsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void toggleLocationVisibility_withoutHeader_redirects() throws Exception {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/locations/" + id), eq(LocationDto.class)))
+    when(backendApiClient.get(eq("/api/v1/locations/{id}"), eq(LocationDto.class), eq(id)))
         .thenReturn(new LocationDto(id, "ARC-L1", "desc", false, false, 0L));
-    when(backendApiClient.put(eq("/api/v1/locations/" + id), any(), eq(Void.class)))
+    when(backendApiClient.put(eq("/api/v1/locations/{id}"), any(), eq(Void.class), eq(id)))
         .thenReturn(null);
 
     mockMvc

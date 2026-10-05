@@ -22,7 +22,7 @@ const INVENTORY_GAME_ITEM_SECTIONS = {
     stock: { container: '#inventory-game-item-results', fragmentValue: 'results' },
 };
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     if (window.krtFetch) {
         window.krtFetch.bindSwap({ container: '#inventory-game-item-results', history: true });
     }

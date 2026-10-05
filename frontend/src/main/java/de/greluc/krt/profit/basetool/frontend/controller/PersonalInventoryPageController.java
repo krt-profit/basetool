@@ -29,7 +29,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemDto
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UexLocationDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.PersonalInventoryForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.personalinventory.client.PersonalInventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
 import jakarta.validation.Valid;
@@ -43,7 +43,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -63,7 +62,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 /**
  * Page controller backing the personal inventory user area. Renders the list view, the create/edit
  * modal (KRT-styled, no native confirm()) and proxies form submissions to the backend via {@link
- * BackendApiClient}.
+ * PersonalInventoryBackendClient}.
  */
 @Controller
 @UsesLayoutModel
@@ -80,19 +79,8 @@ public class PersonalInventoryPageController {
    */
   private static final int MAX_LOGGED_QUERY = 80;
 
-  /** Response type for the {@code /api/v1/uex/locations/search} typeahead read. */
-  private static final ParameterizedTypeReference<List<UexLocationDto>> UEX_LOCATION_LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  /** Response type for the paged {@code /api/v1/personal-inventory} listing read. */
-  private static final ParameterizedTypeReference<PageResponse<PersonalInventoryItemDto>>
-      PERSONAL_INVENTORY_ITEM_PAGE_TYPE = new ParameterizedTypeReference<>() {};
-
-  /** Response type for the paged {@code /api/v1/personal-blueprints} read, used for its total. */
-  private static final ParameterizedTypeReference<PageResponse<PersonalBlueprintDto>>
-      PERSONAL_BLUEPRINT_PAGE_TYPE = new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Sends the page's item, blueprint-count and location requests. */
+  private final PersonalInventoryBackendClient personalInventoryClient;
 
   /**
    * Renders the personal-inventory list with the create/edit modal.
@@ -134,8 +122,7 @@ public class PersonalInventoryPageController {
   @Nullable
   private Long countBlueprints() {
     try {
-      PageResponse<PersonalBlueprintDto> owned =
-          backendApiClient.get("/api/v1/personal-blueprints?size=1", PERSONAL_BLUEPRINT_PAGE_TYPE);
+      PageResponse<PersonalBlueprintDto> owned = personalInventoryClient.blueprintCountPage();
       return owned == null ? null : owned.totalElements();
     } catch (Exception e) {
       log.debug("Failed to count owned blueprints: {}", e.getMessage());
@@ -175,7 +162,7 @@ public class PersonalInventoryPageController {
               form.getLocationUexId(),
               form.getLocationType(),
               form.getQuantity());
-      backendApiClient.post("/api/v1/personal-inventory", request, PersonalInventoryItemDto.class);
+      personalInventoryClient.create(request);
       redirectAttributes.addFlashAttribute("successToast", "personalInventory.toast.created");
     } catch (Exception e) {
       log.error("Failed to create personal inventory item", e);
@@ -220,8 +207,7 @@ public class PersonalInventoryPageController {
               form.getLocationType(),
               form.getQuantity(),
               form.getVersion());
-      backendApiClient.put(
-          "/api/v1/personal-inventory/" + id, request, PersonalInventoryItemDto.class);
+      personalInventoryClient.update(id, request);
       redirectAttributes.addFlashAttribute("successToast", "personalInventory.toast.updated");
     } catch (Exception e) {
       log.error("Failed to update personal inventory item {}", id, e);
@@ -242,7 +228,7 @@ public class PersonalInventoryPageController {
   @PostMapping("/{id}/delete")
   public String delete(@PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/personal-inventory/" + id, Void.class);
+      personalInventoryClient.delete(id);
       redirectAttributes.addFlashAttribute("successToast", "personalInventory.toast.deleted");
     } catch (Exception e) {
       log.error("Failed to delete personal inventory item {}", id, e);
@@ -270,8 +256,7 @@ public class PersonalInventoryPageController {
         log,
         "create personal inventory item (ajax)",
         () -> {
-          backendApiClient.post(
-              "/api/v1/personal-inventory", request, PersonalInventoryItemDto.class);
+          personalInventoryClient.create(request);
           return ResponseEntity.noContent().build();
         });
   }
@@ -302,8 +287,7 @@ public class PersonalInventoryPageController {
         log,
         "update personal inventory item " + id + " (ajax)",
         () -> {
-          backendApiClient.put(
-              "/api/v1/personal-inventory/" + id, request, PersonalInventoryItemDto.class);
+          personalInventoryClient.update(id, request);
           return ResponseEntity.noContent().build();
         });
   }
@@ -322,7 +306,7 @@ public class PersonalInventoryPageController {
         log,
         "delete personal inventory item " + id + " (ajax)",
         () -> {
-          backendApiClient.delete("/api/v1/personal-inventory/" + id, Void.class);
+          personalInventoryClient.delete(id);
           return ResponseEntity.noContent().build();
         });
   }
@@ -370,8 +354,7 @@ public class PersonalInventoryPageController {
     try {
       String query = q == null ? "" : q;
       int effectiveLimit = limit == null ? 25 : Math.min(2000, Math.max(1, limit));
-      String uri = "/api/v1/uex/locations/search?q={q}&limit=" + effectiveLimit;
-      List<UexLocationDto> result = backendApiClient.get(uri, UEX_LOCATION_LIST_TYPE, query);
+      List<UexLocationDto> result = personalInventoryClient.searchLocations(query, effectiveLimit);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
       log.debug(
@@ -399,26 +382,9 @@ public class PersonalInventoryPageController {
   private PageResponse<PersonalInventoryItemDto> fetchItems(
       String q, Integer page, Integer size, String sort) {
     try {
-      StringBuilder uri = new StringBuilder("/api/v1/personal-inventory?");
-      if (page != null) {
-        uri.append("page=").append(page).append('&');
-      }
-      uri.append("size=").append(size == null ? 50 : size);
-      List<Object> variables = new ArrayList<>();
-      String safeSort = RelayParams.sortSpecOrNull(sort);
-      if (safeSort != null) {
-        uri.append("&sort={sort}");
-        variables.add(safeSort);
-      }
-      if (q != null && !q.isBlank()) {
-        uri.append("&q={q}");
-        variables.add(q);
-      }
-      if (variables.isEmpty()) {
-        return backendApiClient.get(uri.toString(), PERSONAL_INVENTORY_ITEM_PAGE_TYPE);
-      }
-      return backendApiClient.get(
-          uri.toString(), PERSONAL_INVENTORY_ITEM_PAGE_TYPE, variables.toArray());
+      return personalInventoryClient.itemPage(
+          new PersonalInventoryBackendClient.ItemQuery(
+              page, size == null ? 50 : size, RelayParams.sortSpecOrNull(sort), q));
     } catch (Exception e) {
       log.error("Failed to fetch personal inventory items", e);
       return new PageResponse<>(new ArrayList<>(), 0, size == null ? 50 : size, 0, 0, List.of());

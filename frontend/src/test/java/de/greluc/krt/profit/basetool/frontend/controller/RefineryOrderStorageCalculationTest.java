@@ -27,13 +27,13 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.frontend.model.dto.*;
 import de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderStoreForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderStoreItemForm;
+import de.greluc.krt.profit.basetool.frontend.refinery.client.RefineryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
@@ -48,7 +48,7 @@ class RefineryOrderStorageCalculationTest {
 
   @Mock private RoleHierarchy roleHierarchy;
 
-  @InjectMocks private RefineryOrderPageController controller;
+  private RefineryOrderPageController controller;
 
   @Mock private OidcUser oidcUser;
 
@@ -56,6 +56,9 @@ class RefineryOrderStorageCalculationTest {
 
   @BeforeEach
   void setUp() {
+    controller =
+        new RefineryOrderPageController(
+            new RefineryBackendClient(backendApiClient), roleHierarchy, null, null);
     model = new ExtendedModelMap();
   }
 
@@ -100,7 +103,7 @@ class RefineryOrderStorageCalculationTest {
             0L,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), anyClass()))
+    when(backendApiClient.get(eq("/api/v1/refinery-orders/{id}"), anyClass(), eq(orderId)))
         .thenReturn(orderDto);
     when(oidcUser.getSubject()).thenReturn(UUID.randomUUID().toString());
 
@@ -157,7 +160,7 @@ class RefineryOrderStorageCalculationTest {
             0L,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), anyClass()))
+    when(backendApiClient.get(eq("/api/v1/refinery-orders/{id}"), anyClass(), eq(orderId)))
         .thenReturn(orderDto);
 
     SystemSettingDto settingDto = new SystemSettingDto("refinery.rounding.mode", "HALF_UP", 0L);
@@ -229,7 +232,7 @@ class RefineryOrderStorageCalculationTest {
             0L,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), anyClass()))
+    when(backendApiClient.get(eq("/api/v1/refinery-orders/{id}"), anyClass(), eq(orderId)))
         .thenReturn(orderDto);
 
     SystemSettingDto settingDto = new SystemSettingDto("refinery.rounding.mode", "HALF_UP", 0L);

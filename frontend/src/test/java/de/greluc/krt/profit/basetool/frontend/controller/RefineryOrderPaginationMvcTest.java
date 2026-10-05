@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -116,7 +117,8 @@ class RefineryOrderPaginationMvcTest {
 
   @Test
   void viewOrders_multiPageResult_rendersPaginationAndSizePicker() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/refinery-orders/"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/refinery-orders/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(page(1, 50, 300));
 
     mockMvc
@@ -137,7 +139,8 @@ class RefineryOrderPaginationMvcTest {
 
   @Test
   void viewOrders_onlyMine_keepsToggleInPaginationLinks() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/refinery-orders/"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/refinery-orders/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(page(1, 50, 300));
 
     mockMvc
@@ -154,9 +157,11 @@ class RefineryOrderPaginationMvcTest {
 
   @Test
   void viewOrders_search_pagesOnTheBackendAndKeepsTheSearchInPaginationLinks() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/refinery-orders/"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/refinery-orders/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(page(0, 1, 300));
-    when(backendApiClient.get(contains("/api/v1/refinery-orders/"), anyTypeRef(), eq("Gold Erz")))
+    when(backendApiClient.get(
+            contains("/api/v1/refinery-orders/"), anyTypeRef(), eq(1), eq(50), eq("Gold Erz")))
         .thenReturn(page(1, 50, 300));
 
     mockMvc
@@ -173,16 +178,20 @@ class RefineryOrderPaginationMvcTest {
     verify(backendApiClient)
         .get(
             eq(
-                "/api/v1/refinery-orders/all?page=1&size=50&sort=endsAt,asc"
+                "/api/v1/refinery-orders/all?page={page}&size={size}&sort=endsAt,asc"
                     + "&status=OPEN,IN_PROGRESS&q={q}"),
             anyTypeRef(),
+            eq(1),
+            eq(50),
             eq("Gold Erz"));
-    verify(backendApiClient, never()).get(contains("size=1000"), anyTypeRef());
+    verify(backendApiClient, never())
+        .get(contains("/api/v1/refinery-orders/"), anyTypeRef(), any(), eq(1000), any());
   }
 
   @Test
   void viewOrders_unknownPageSize_fallsBackToTheDefaultBackendPage() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/refinery-orders/"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/refinery-orders/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(page(0, 50, 5));
 
     mockMvc
@@ -193,15 +202,19 @@ class RefineryOrderPaginationMvcTest {
     verify(backendApiClient)
         .get(
             eq(
-                "/api/v1/refinery-orders/all?page=0&size=50&sort=startedAt,desc"
+                "/api/v1/refinery-orders/all?page={page}&size={size}&sort=startedAt,desc"
                     + "&status=OPEN,IN_PROGRESS,COMPLETED,CANCELED"),
-            anyTypeRef());
-    verify(backendApiClient, never()).get(contains("size=1000"), anyTypeRef());
+            anyTypeRef(),
+            eq(0),
+            eq(50));
+    verify(backendApiClient, never())
+        .get(contains("/api/v1/refinery-orders/"), anyTypeRef(), any(), eq(1000));
   }
 
   @Test
   void viewOrders_fragmentResults_rendersOnlyTableFragment() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/refinery-orders/"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/refinery-orders/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(pageWithRow(300));
 
     mockMvc
@@ -220,7 +233,8 @@ class RefineryOrderPaginationMvcTest {
 
   @Test
   void viewOrders_singleShortPage_rendersNeitherPageNavNorSizePicker() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/refinery-orders/"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/refinery-orders/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(page(0, 50, 5));
 
     mockMvc

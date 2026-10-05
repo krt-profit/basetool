@@ -243,7 +243,7 @@ the modules its row allows; a dependency upward is inverted through an SPI or an
 
 | Rank | Modules | Role |
 | --- | --- | --- |
-| 0 | `kernel`, `platform` | `kernel`: `AbstractEntity`, `PageResponse`, `Entities`, `OptimisticLock`, `StringNormalization`, `LikePatterns`, validation constraints, the error-model base (§5.5), handle anonymisation, `UserRef`/`OrgUnitRef` value types (`OrgUnitRef` only once `OrgUnitKind` is a kernel type, §7.3), SCU rounding. `platform`: web, logging, metrics infrastructure and the access core (`AuthHelperService`, `AuthenticatedSubject`, `Roles`, `Permissions`). Closed to domain meaning, like `logging-support` (ADR-0205). |
+| 0 | `kernel`, `platform` | `kernel`: `AbstractEntity`, `PageResponse`, `Entities`, `OptimisticLock`, `StringNormalization`, `LikePatterns`, validation constraints, the error-model base (§5.5), handle anonymisation, `UserRef`/`OrgUnitRef` value types (`OrgUnitRef` only once `OrgUnitKind` is a kernel type, §7.3), SCU rounding. `platform`: web, logging, metrics infrastructure and the access core (`AuthHelperService`, `AuthenticatedSubject`, `ClientAttribution`); `Roles`, `Permissions`, `RequestMemo` and `ProblemResponseFactory` are kernel types (corrected 2026-10-04, P1-9). Closed to domain meaning, like `logging-support` (ADR-0205). |
 | 1 | `audit`, `notification`, `livesync` | Platform services every domain may call; they depend upward only through SPIs. |
 | 2 | `catalogue` | Materials, items, locations, ship types, refining methods, job and frequency types, and the UEX, SC Wiki and P4K imports — including the recipe graph (`model.scwiki.Blueprint`). |
 | 3 | `identity` | Users, registration, profile, terms consent, and the GDPR orchestration, which calls the other modules through identity-owned SPIs. |
@@ -710,6 +710,37 @@ Cheap moves that break many cycles without changing behaviour:
 - `support` split into the kernel (`RequestMemo`, `StringNormalization`, `OptimisticLock`,
   `LikePatterns`, `ProblemResponseFactory`, `Roles`, `Permissions`) and per-domain internal packages;
   the ArchUnit leaf rule's message stops sending shared logic there.
+  **Done 2026-10-04** (P1-9). All 61 classes left `support`; the package is gone (two test-only
+  fixtures, `BoundProperties` and `QualityTierFixtures`, keep the test package `support`). The
+  kernel took the seven named classes plus `Quality` (already kernel in the domain map) and
+  `AppProblemProperties`, which `ProblemResponseFactory` reads — without it the factory would
+  have added a `kernel -> platform` edge. A new `platform` module package took the access core
+  and the request settings (`platform.api`: `AuthenticatedSubject`, `SubjectAuthentication`,
+  `OrgUnitContextualAuthority`, `ClientAttribution`, `RefusedSubjectWindow`,
+  `ResilientRedisMessageListenerContainer`, `AuthoritiesCacheProperties`,
+  `PartialRoleScopeProperties`, `RateLimitProperties`; `platform.internal`:
+  `ApiClientMetricsProperties`, `RequestBodyLimitProperties`). Every other class went to
+  `<module>.internal`, or to `<module>.api` when another module uses it (inventory, livesync,
+  identity, joborder, orgunit, exchange, catalogue). Two more module packages followed:
+  `catalogue` (`api.QuantityTypeRounding`, internal UEX helpers) and `mission` (section versions,
+  peer redaction, viewer-access SPI — all internal). Seventeen modules are declared now.
+  `ClientAttribution`'s two `platform -> exchange` edges were inverted through a platform SPI,
+  `platform.api.ClientDirectory`, implemented by `exchange.internal.ExchangeClientDirectory`,
+  because a declared `platform` module may not reach the exchange: the module baseline shrank
+  from **112 to 110 edges** and from 30 to 29 module pairs. No other class changed its module,
+  so no other line moved. The ArchUnit leaf rule is re-keyed by class literal
+  (`ArchitectureTest.LEAF_HELPER_CLASSES`, floor 63 = the 61 moved classes and the two SPI
+  types) with the same allow-list (the helpers, the entity model, the repositories); arrays of a
+  helper count as the helper, which the package-keyed rule had matched implicitly.
+  **Corrections:** (1) §5.1 places `Roles`, `Permissions` and the request memo in `platform`,
+  this step in the kernel; the code follows this step — they are constants and a
+  request-attribute memo with no domain meaning, and every module may depend on either rank-0
+  module, so the choice moved no edge. (2) `mission` has no module API yet, so it is the first
+  module that publishes nothing: `ModularityTest` requires every type below its base package and
+  outside an `api` package and keeps it out of every `allowedDependencies`, instead of demanding
+  an empty `api` package. (3) `catalogue`, `mission` and `platform` had no package before; each
+  enters the allowed dependencies of every module above it (`platform::api` everywhere,
+  `catalogue::api` from rank 3 up).
 - `audit.api` created (enum and recorder moved, names unchanged); event records moved into their
   publishers' `api.events` packages; the error model of §5.5 — **done 2026-10-04** (P1-12, see
   §5.5).
@@ -772,6 +803,55 @@ hub where it has one: `dashboard` (0 inbound edges), `admin` (4), `promotion` (1
 mission detach command), then `exchange` (11) and `bank` (18) as packages. Exchange and bank enter
 their "must stay green" period here (D-01).
 
+- `dashboard` — **done 2026-10-05** (P2-1). The announcement banner moved out of the layer
+  packages: `dashboard.web` holds `AnnouncementController`, `AnnouncementDto` and
+  `AnnouncementMapper`, `dashboard.internal` the `Announcement` entity, its repository and
+  `AnnouncementService`. The module publishes nothing (no other class uses it), so it is declared
+  like `mission`: closed, no named interface, in no other module's `allowedDependencies`. The
+  domain map's `name ^Announcement` rule became the `package dashboard` rule; the module baseline is
+  unchanged at 110 edges, because dashboard had no edge in it. Entity name, table, bean names, REST
+  paths, schema names, the authorization matrix and the OpenAPI document are unchanged; the one
+  visible difference is the persistent class name in the log context of an announcement 409,
+  which is now `dashboard.internal.Announcement`. The module has no access policy: its gates are
+  the role annotations `isAuthenticated()` and `hasRole('ADMIN')`, nothing of the scope hub.
+  **Correction to §5.2:** a mechanical move cannot satisfy `web`'s "no `@Transactional`, no
+  entity" — `AnnouncementController` keeps its class-level transaction and maps the entity in the
+  controller, as before. Those two rules are the target of the module's REST wave, which moves the
+  transaction boundary and the mapping into the module; a move keeps both where they are, because
+  either change alters the transaction boundary.
+- `orgchart` — **done 2026-10-05.** All 24 classes moved: the controllers `OrgChartController` and
+  `LeitungController` into `orgchart.web`, the rest (entity `OrgChartPosition`, its repository, the
+  enums, `OrgChartService`, `OrgChartReadService`, `LeitungViewService`, `OrgChartPositionMapper`
+  and the 14 DTOs, `AreaLeadershipDto` with them as §7.3 P1-1 deferred) into `orgchart.internal`.
+  The module is declared (floor 19, after `dashboard`) and publishes nothing: no other module uses
+  it, and orgunit reaches it only through `MembershipChangeObserver`. The domain map trades its two `name` rules
+  and the `AreaLeadershipDto` class rule for one `package` rule. No access policy left the scope
+  hub — the org chart has none: its reads are `isAuthenticated()`, its writes `hasRole('ADMIN')`,
+  and neither touches `OwnerScopeService` or `AccessGateService`. The module baseline is unchanged
+  at 110 edges: the org chart had no frozen edge left after P1-1. `OrgChartModuleContractTest`
+  pins its endpoints and the observer before and after the move. **Correction to §5.2:** the
+  `web` package cannot hold the REST DTOs yet — the services return them, so `internal -> web`
+  would close a layer cycle inside the module (ADR-0047); they stay in `internal` until the module
+  API returns its own records.
+- `admin` — **done 2026-10-05** (P2-2). The admin building blocks of §5.1 — the runtime system
+  settings, the Android version policy and the liveness probe — moved out of the layer packages:
+  `admin.web` holds `SystemSettingController`, `AppVersionPolicyController`, `SystemController`,
+  `AppVersionPolicyDto` and `PingResponse`; `admin.internal` the `SystemSetting` entity, its
+  repository, `SystemSettingService`, `SystemSettingMapper`, the setting records the service returns,
+  `AndroidClientProperties` and `AndroidVersionPolicyReport`. The `/admin` endpoints of other
+  domains are not part of it; they move with their domains. The module's four inbound edges (bank
+  transfer fee, operation payout, the default-blueprint bootstrap's entity and repository) now go
+  through one API type, `admin.api.SystemSettings` (`getSettingValue`, and `putSettingValue` for
+  the bootstrap's seed flag, the same find-or-create-and-save inside the caller's transaction),
+  implemented by `SystemSettingService`; every declared module of a higher rank allows
+  `admin::api`. The module baseline is unchanged at 110 edges (none of the four was a violation);
+  the authorization matrix and the OpenAPI document are unchanged. No access policy: every gate is
+  a role annotation. The setting records stay in `internal` beside the service that returns them, as
+  for `orgchart`. **Finding:**
+  the selection floor of `ArchitectureTest`'s `squadron_id` join-column rule counts the legacy
+  `model` package tree as well as every entity by role, so each move of `model.dto` records lowers
+  it (by 4 here) without the rule checking any entity less.
+
 ### 7.5 Phase 3 — the business core
 
 In dependency order, each with its command API, its observer SPIs, its access policy and its REST
@@ -807,11 +887,82 @@ domain stays a package.
 | Step | Content |
 | --- | --- |
 | F0 | Guards (Phase 0.4) |
-| F1 | Kernel extraction: `BackendErrorMapper` (a sealed outcome type with a pattern switch), template overloads for write verbs, the eleven bypassing controllers moved onto the kernel, the `WebClient` confinement rule at zero |
+| F1 — **done 2026-10-04** | Kernel extraction: `BackendErrorMapper` (a sealed outcome type with a pattern switch), template overloads for write verbs, the eleven bypassing controllers moved onto the kernel, the `WebClient` confinement rule at zero |
 | F2 — **done 2026-10-04** | Exact session allow-list in its own release (D-10): `SessionTypeAllowList.SESSION_BOUND_TYPES`, 21 exact names; the `…frontend.model.` prefix is gone, `SessionBoundTypeClosureTest` holds the list equal to the derived set in both directions. Corrections: the list lives in the security class, not in the G-16 golden file (`session-bound-types.txt` is deleted, so `-PupdateSnapshots` can no longer widen the allow-list); the admitted application classes fall from 325 to 21, not "about 20" of "about eleven" forms — the 21 are 10 flashed forms and DTOs with their nested types and enums |
-| F3 | Typed client per domain, small domains first (audit, notification, settings, dashboard, exchange, orgchart), then the large four; untyped `Map` relays typed in the same step |
+| F3 — **done 2026-10-05** | Typed client per domain, small domains first (audit, notification, settings, dashboard, exchange, orgchart), then the large four; untyped `Map` relays typed in the same step |
 | F4 | Package-by-domain move in one pull request; route/gate snapshot byte-identical |
 | F5 | Templates and assets per domain (§8.2), with the page chrome as one layout fragment |
+
+*F1 as built (2026-10-04).* `service.BackendErrorMapper` classifies every failed call into one case
+of its sealed `Outcome` (`Problem`, `Reauthentication`, `CircuitOpen`, `BulkheadFull`, `Timeout`,
+`Unexpected`) and maps it in one exhaustive switch, writing to `BackendApiClient`'s logger so log
+categories, levels, messages, statuses, problem codes and the `basetool_backend_client_errors_total`
+labels are unchanged; `BackendErrorResponses` parses raw refusals through it. Every write verb has a
+URI-template twin, and the 235 write calls that concatenated an id, plus the bank proxies' helper
+calls, pass their values as template variables; `WriteUriTemplateTest` (with a planted fixture and
+a floor of 344 write sites) keeps them there, with one reviewed exception, the UEX override's
+allow-listed entity kind. The two remaining `WebClient` holders outside the kernel — the SSE relay
+and the live-sync probe — now call `service.BackendSideChannels`, so `WebClientConfinementTest`
+names only kernel classes and `ArchitectureTest#noControllerHoldsARawWebClient` has no allow-list.
+Corrections: the eleven bypassing controllers had already returned to the kernel with Phase 0.4,
+so F1 only verified it; the "zero" in this row was reached by moving the two named
+exceptions into the kernel, not by removing them; the 130 concatenating GET call sites are left for
+F3, where the typed clients replace them.
+
+*F3 as built, part 1 (2026-10-05).* The six small domains call typed clients:
+`audit.client.AuditBackendClient`, `notification.client.NotificationBackendClient`,
+`settings.client.SettingsBackendClient`, `dashboard.client.DashboardBackendClient`,
+`exchange.client.ExchangeBackendClient` and `orgchart.client.OrgChartBackendClient` — `@Service`
+classes over `BackendApiClient` in the `<domain>.client` packages of §5.9, so F4 moves only the
+controllers. A client owns its domain's paths and returns typed records; the announcement and the
+org-chart position relays, untyped `Map`s before, are `AnnouncementDto`/`AnnouncementRequest` and
+`OrgChartPosition{Create,Update}Request`/`OrgChartPositionDto`. Catalogue evictions go through the
+kernel's `CatalogueCacheEviction`. `TypedBackendClientTest` confines `BackendApiClient` to the
+kernel packages and the client packages (the controllers not yet moved are an exact list that
+only shrinks) and checks the client rules (no `URI`/`UriBuilderFactory` parameter, no cache
+annotation, `@Service`, `*BackendClient`) against planted fixtures. Every `get` and `execute(…)`
+passes its runtime values as template variables — `ReadUriTemplateTest` with a floor and a
+planted fixture, so with `WriteUriTemplateTest` no verb concatenates; `BackendApiClient` gained the
+`Class`-typed template `get`. Each client's requests are pinned against a MockWebServer through
+`BackendClientHarness`. Corrections: the "130 GET call sites" were 114 methods with a
+concatenated `get` (113 seen by the F1 scanner) and 8 with a concatenated `execute(…)` when the
+guard was introduced, all converted without a reviewed exception and without changing the bytes
+sent (a repeated placeholder takes the next value, pinned in `BackendApiClientHappyPathTest`); the F1 scanner under-reported, because a `String` parameter without an in-class caller
+folded to nothing inside a conditional, so `/api/v1/audit/" + (domain or "BANK")` read as the
+literal `BANK` branch only (`AdminAuditLogPageController#auditLog`), and a builder chain longer
+than ten links did not fold at all — both fixed, and a switch expression now folds too. A
+controller's typed client is the one of its own domain, page-composition reads of other backend
+roots included (the audit page reads the exchange registry, the settings page the squadron and
+Spezialkommando lists), so a page never needs a second domain's client; the duplicated reads are
+two lines each. Typed clients consolidate repeated call sites, so the write-site floor of
+`WriteUriTemplateTest` and the resolved-site floor of `BackendCallExistenceTest` fall with each
+domain (the four settings PUTs, written twice, are one `write` now).
+
+*F3 as built, parts 2–4 (2026-10-05).* Fifteen more clients bring the count to 21, one per frontend
+domain of the evidence table (`identity`, `orgunit`, `leadership`, `hangar`, `promotion`,
+`catalogue`, `blueprint`, `personalinventory`, `materialexchange`, `mission`, `operation`, `bank`,
+`joborder`, `inventory`, `refinery`); every controller calls only its own domain's client and
+`TypedBackendClientTest` holds no allow-list. Each call moved verbatim (verb, template,
+variables, body, response type), so the controller tests kept stubbing `BackendApiClient` around
+the real client; each client's requests are pinned against a MockWebServer. The UEX override's
+concatenated entity kind became an exhaustive switch over the allow-list, so `WriteUriTemplateTest`
+has no reviewed exception left and no backend call concatenates for any verb. The untyped relays
+became records mirrored from the backend: the identity, org-unit, Leitung, promotion, hangar,
+catalogue, material-exchange, job-order, bank and mission bodies and answers. Corrections and
+what stays open: the "large four" were not a fixed set — the domains moved in four stacked
+parts by size; the call-site floors fell from 611 resolved / 344 write sites to 524 / 289 as the
+clients merged duplicate calls; a typed relay now refuses a malformed browser value at the
+frontend's own binding (400) instead of relaying it for the backend's 400, and its answer is
+re-serialised from the record (additive keys, `BigDecimal` scale kept). The cached `TERMINALS`
+catalogue is read as `TerminalDto` rows. Two relays stay untyped by design, not as open work: the
+org-unit bank path-only writes, because the backend endpoint binds no request body (the browser
+body is relayed as sent, only the answer is typed), and the refinery import's extract, a
+`JsonNode` passed through unchanged because the extractor's file is its own JSON contract
+(ADR-0008) that the backend validates. The blueprint
+import's file part goes out as `application/json` for a `.json` file although the builder names
+`application/octet-stream` — unchanged by the move, now pinned. The next step for the clients is
+F4 (the controllers move next to them) and, per domain with its REST cut, the HTTP interface of
+§5.9.
 
 ### 7.9 REST API track
 
@@ -865,13 +1016,13 @@ JSpecify stays out for now (ADR-0192).
 
 | Proposal | Pros | Cons and risks | Guard |
 | --- | --- | --- | --- |
-| **Document the browser baseline — decided: "Baseline 2025", ES2025** (D-16). The features already shipped imply Chrome 105, Firefox 121, Safari 16.4; the decided floor is at least Chrome 122, Firefox 131, Safari/iOS 18.4 (iterator helpers; `Promise.try`, `RegExp.escape` and `Float16Array` need newer releases), which brings Set methods, iterator helpers, popover and same-document view transitions. Raise the type check's `lib`/`target` and ESLint's `ecmaVersion` from 2023 to 2025 once TypeScript 7 is proven to accept the `ES2025` lib; write the floor into `ui-design-system.md` and REQ-FE-018 | Every other modern-feature decision needs this answer; today a newer API in an unchecked file passes every gate | Members who cannot update iOS to 18.4 or later lose functions; the rejected alternative was "Baseline widely available" (ES2024, Safari 17.4) | `typecheckJs`, `lintJs`, the E2E browser matrix |
-| **ESLint core autofix rules** (`prefer-template` for 664 concatenations, `prefer-arrow-callback`, `prefer-object-has-own`, `radix`, `logical-assignment-operators`); `?.`/`??` by hand while a file opts into `@ts-check` (the semantics differ for falsy values) | Consistent modern code with no new dependency | About 1,800 sites; conflicts with in-flight branches | `lintJs`, `typecheckJs`, E2E |
+| **Document the browser baseline — decided: "Baseline 2025", ES2025** (D-16). **Done 2026-10-04**: TypeScript 7.0.2 accepts the `ES2025` lib (proven by a planted checked file), `tsconfig.json` and `eslint.config.mjs` are at 2025, the floor is in `ui-design-system.md` and REQ-FE-018, and ESLint rejects the three ES2025 APIs above the floor, which the `ES2025` lib declares. The features already shipped imply Chrome 105, Firefox 121, Safari 16.4; the decided floor is at least Chrome 122, Firefox 131, Safari/iOS 18.4 (iterator helpers; `Promise.try`, `RegExp.escape` and `Float16Array` need newer releases), which brings Set methods, iterator helpers, popover and same-document view transitions. Raise the type check's `lib`/`target` and ESLint's `ecmaVersion` from 2023 to 2025 once TypeScript 7 is proven to accept the `ES2025` lib; write the floor into `ui-design-system.md` and REQ-FE-018 | Every other modern-feature decision needs this answer; today a newer API in an unchecked file passes every gate | Members who cannot update iOS to 18.4 or later lose functions; the rejected alternative was "Baseline widely available" (ES2024, Safari 17.4) | `typecheckJs`, `lintJs`, the E2E browser matrix |
+| **ESLint core autofix rules** — **done 2026-10-04**: all five are errors for the browser and Node scripts, autofix applied (1,345 arrow callbacks, 723 template literals, 9 logical assignments, 1 `Object.hasOwn`; 5 `parseInt` radixes and 3 `||=` by hand); `?.`/`??` stay a by-hand change in `@ts-check` files (`prefer-template` for 664 concatenations, `prefer-arrow-callback`, `prefer-object-has-own`, `radix`, `logical-assignment-operators`); `?.`/`??` by hand while a file opts into `@ts-check` (the semantics differ for falsy values) | Consistent modern code with no new dependency | About 1,800 sites; conflicts with in-flight branches | `lintJs`, `typecheckJs`, E2E |
 | **Type-check ratchet per domain folder**; the three largest scripts (mission detail, bank, order detail — 20 % of all JavaScript) split before they are checked | Null safety reaches the files that change most | Cast churn in DOM-heavy code | A folder is "migrated" only when fully checked |
-| **Finish ADR-0069**: the 70 inline script blocks (1,860 lines, never linted) move into modules; one page puts eleven `[[#{…}]]` markers into a script without `th:inline` (a likely i18n defect) | Lintable, checkable code | Timing of inline versus module code | `InlineScriptLoadOrderTest`, E2E |
-| **One read path**: `krtFetch.get`/`getJson` with re-authentication, the terms gate, refusal of redirected or non-JSON answers and `AbortController`; then forbid `fetch(` outside the transport and ban `XMLHttpRequest` | 56 raw reads behave the same way on session loss | Pickers that silently emptied now send the user to the login — the intended contract | A new E2E for a picker after session loss |
-| **Trusted Types**, report-only first through the existing `csp_violation` beacon, then enforced: two named policies, a tagged-template HTML builder, no default policy | DOM-XSS becomes a browser-enforced property | Every future sink must use the helpers; under enforcement even `innerHTML = ''` throws | A violation collector in the dialog page-walk E2E |
-| **CSS**: lint the 54 page stylesheets with the standard config; a custom-property existence test (it finds an undefined token that makes the material-demand search header transparent); `color-mix()` for alpha variants; a z-index scale; container queries and nesting only where a design decision asks for them | One lint standard; tokens as the single colour source | Visual changes | `CascadeLayerOrderTest`, screenshot review |
+| **Finish ADR-0069**: the 70 inline script blocks (1,860 lines, never linted) move into modules; one page puts eleven `[[#{…}]]` markers into a script without `th:inline` (a likely i18n defect). **Done 2026-10-04** (ADR-0069 amendment): on that day 67 blocks with 1,645 lines remained, 55 of them already pure data bootstraps; the eleven blocks with code moved into their modules (one new, `org-unit-bank.js`), five empty error-page blocks were deleted. Every inline script is now a `th:inline="javascript"` bootstrap of literals, checked against a grammar by `InlineScriptDataOnlyTest` (planted fixture, floors of 100 templates / 55 blocks); the head's `krtEvents` stub is its one listed exception. *Correction:* the eleven-marker defect had already been fixed (B-04); what was still broken was the `'[[#{…}]]'` form inside inlined string literals on the mission-data and special-commands admin pages, which rendered the texts in quotes — fixed by the move | Lintable, checkable code | Timing of inline versus module code | `InlineScriptLoadOrderTest`, `InlineScriptDataOnlyTest`, E2E |
+| **One read path**: `krtFetch.get`/`getJson` with re-authentication, the terms gate, refusal of redirected or non-JSON answers and `AbortController`; then forbid `fetch(` outside the transport and ban `XMLHttpRequest`. **Done 2026-10-04** (REQ-FE-031): 61 raw reads in 33 scripts plus one inline read in `members.html` migrated, `swap` reads through `get` too; ESLint bans `fetch`/`XMLHttpRequest`, and `BackgroundReadGateContractTest` pins the same for templates, which ESLint never sees | 56 raw reads behave the same way on session loss | Pickers that silently emptied now send the user to the login — the intended contract | A new E2E for a picker after session loss |
+| **Trusted Types**, report-only first through the existing `csp_violation` beacon, then enforced: two named policies, a tagged-template HTML builder, no default policy. **Done 2026-10-04 except the production switch** (ADR-0239): `krt-html` behind the `krtHtml` builder, `krt-fragment` inside `krt-fetch.js`; 42 builder sites, 26 clears and one `DOMParser` read migrated, `escape-html.js` removed; ESLint bans every sink and policy outside the two helpers; the report-only header is the default of `APP_SECURITY_TRUSTED_TYPES` (`report` / `enforce`), with the gauge `basetool_trusted_types_mode`. **The only remaining step** is switching production to `enforce`, a production configuration change the owner approves after a quiet period (`deployment.md` → *Trusted Types: report, then enforce*) | DOM-XSS becomes a browser-enforced property | Every future sink must use the helpers; under enforcement even `innerHTML = ''` throws | A violation collector in the dialog page-walk E2E (proven by a planted violation), `:frontend:testEslintBans`, `:frontend:testTrustedTypesJs`, `TrustedTypesModeTest` |
+| **CSS** — **done 2026-10-04** (ADR-0243): lint the page stylesheets with the standard config (74 by then, not 54; 66 findings fixed without visual change); a custom-property existence test (it finds an undefined token that makes the material-demand search header transparent; B-03 was already fixed in Phase −1, and the test now also reads templates and scripts); `color-mix()` for alpha variants (120 hand-written token copies replaced, `ColourTokenCopyTest`); a z-index scale (18 `--z-*` tokens with the numbers they replaced, `ZIndexScaleTest`); container queries and nesting only where a design decision asks for them (none asked) | One lint standard; tokens as the single colour source | Visual changes | `CascadeLayerOrderTest`, screenshot review; a computed-style comparison of every touched declaration against `main` |
 | **One layout fragment** carrying head, sidebar, header and toast (83 pages copy the header in five variants) — native Thymeleaf, no Layout Dialect dependency | Chrome changes once | Touches 83–90 templates | Render tests, E2E |
 | **ES modules** only after the global-scope and inline-script work, and only behind a server-rendered import map (unversioned asset URLs are cached immutably for a year) | Explicit dependencies, lint-enforced boundaries | Import-map and nonce plumbing | Every specifier must be in the map |
 | **No bundler** | — | A compromised bundler release would be site-wide script injection the nonce CSP cannot stop; the served file would no longer be the checked file (ADR-0125) | — |
@@ -934,7 +1085,7 @@ They are fixed before the refactor starts (D-07), independently of this plan.
 | --- | --- | --- | --- |
 | B-01 | A stored refinery order can be set back from COMPLETED to OPEN with `PUT` and **stored again**, which duplicates its inventory rows and its `INVENTORY_RECEIVED_FROM_REFINERY` / `REFINERY_ORDER_STORED` audit events; `store` also skips the "the job order needs this material" check that `POST /inventory` applies (REQ-ORDERS-018) | Low (own inventory only), but the audit trail records a second receipt | Refuse to reopen or re-store a stored order (a stored marker, not the status alone); apply the same material check as the inventory path |
 | B-02 | The Android app (v0.3.1) creates operations with `POST /api/v1/operations`, which the edge's API allow-list does not admit, so the call answers 404; whether v0.4.0 still sends it is unknown | Functional | Admit and freeze it, or remove the call from the app — decided with the operation domain's wave |
-| B-03 | `var(--color-black)` does not exist (the token is `--color-bg-black`), so the sticky search header of the material-demand page is transparent; `var(--color-text)` in `bank.css` is undefined too | UI | Correct the tokens | A custom-property existence test |
+| B-03 | `var(--color-black)` does not exist (the token is `--color-bg-black`), so the sticky search header of the material-demand page is transparent; `var(--color-text)` in `bank.css` is undefined too | UI | Correct the tokens (re-verified 2026-10-04: neither occurs any more) | A custom-property existence test |
 | B-04 | `templates/members.html` puts eleven `[[#{…}]]` message markers into a script without `th:inline` — wrong-context escaping at best, literal markers in three dialogs at worst | UI/i18n, to confirm with a render | A `th:inline="javascript"` dictionary | A render test of `/members` |
 | B-05 | A personal-inventory sort with a direction is double-encoded and never works (no page sends one today) | Functional, latent | Route through `RelayParams` and a template variable | MockWebServer path assertion |
 | B-06 | `OrgUnitMembershipService.removeOlMember` pattern-matches on an `OrgUnit` that can be a Hibernate proxy, so the Grand Admiral pointer is not cleared in that case (display only; no authorization reads it) | Low | Unproxy, or dispatch on the kind | An integration test that reproduces the proxy case |
@@ -975,7 +1126,7 @@ They are fixed before the refactor starts (D-07), independently of this plan.
 | Hibernate `@Audited`, Jakarta Data repositories | Reject | Personal data outside the GDPR flow; stateless repositories do not fit the concurrency rules |
 | Generated client DTOs (openapi-generator) | Reject for production code | The generator emits mutable classes, not records, and hand mirrors are an output allow-list; generation stays in the test source set for the agreement test |
 | A JavaScript bundler | Reject | Supply-chain risk for every shipped asset; breaks "served equals checked" |
-| Trusted Types | Adopt, report-only first | No dependency; the existing CSP-violation beacon provides the report-only phase |
+| Trusted Types | Adopt, report-only first — **report-only since 2026-10-04**; enforcing in production waits for the owner | No dependency; the existing CSP-violation beacon provides the report-only phase |
 | `oasdiff` or another external API-diff tool | Reject | An unverified binary outside Gradle's dependency verification; the ingest's `SchemaCompatibility` helper generalises instead |
 
 ## 11 Previous audits re-evaluated

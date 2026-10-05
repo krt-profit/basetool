@@ -93,7 +93,7 @@ class OfficerRefineryAccessTest {
             null,
             false);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);
-    when(backendApiClient.get(eq("/api/v1/users/" + userId), eq(UserDto.class)))
+    when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(userId)))
         .thenReturn(userDto);
 
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
@@ -219,7 +219,8 @@ class OfficerRefineryAccessTest {
             null,
             1L,
             null);
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
+    when(backendApiClient.get(
+            eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(orderId)))
         .thenReturn(orderDto);
 
     when(backendApiClient.get(
@@ -257,6 +258,6 @@ class OfficerRefineryAccessTest {
         .andExpect(
             PageStylesheets.content(
                 containsString(
-                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+                    ".form-group input:where(:not([type='checkbox'], [type='radio']))")));
   }
 }

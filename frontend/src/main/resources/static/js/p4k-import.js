@@ -44,31 +44,19 @@
     }
 
     /**
-     * The headers every read of the jobs proxy carries.
-     *
-     * X-Requested-With makes the consent and re-auth gates answer with a status code instead of a
-     * redirect (REQ-SEC-028, REQ-SEC-012).
-     *
-     * @returns {Record<string, string>} a fresh header object for the job-list poll
-     */
-    function ajaxHeaders() {
-        return { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
-    }
-
-    /**
      * Reads a jobs-proxy answer as JSON, or resolves to null when the answer is not job data.
      *
-     * The re-auth and consent gates are honoured first; a redirected, non-OK or unparseable answer
-     * yields null, which makes the callers disarm the poll.
+     * A null response means `krtFetch.get` handed the answer to the re-auth or consent gate or
+     * refused it as redirected; that and a non-OK or unparseable answer yield null, which makes the
+     * callers disarm the poll.
      *
-     * @param {Response} resp the jobs-proxy response
+     * @param {Response | null} resp the jobs-proxy response
      * @returns {Promise<any> | null} the parsed body, or null when the answer is not job data
      */
     function readJson(resp) {
-        if (window.krtReauth && window.krtReauth.check(resp)) return gateTookOver();
-        if (window.krtTermsGate && window.krtTermsGate.check(resp)) return gateTookOver();
-        if (resp.redirected || !resp.ok) return null;
-        return resp.json().catch(function () {
+        if (!resp) return gateTookOver();
+        if (!resp.ok) return null;
+        return resp.json().catch(() => {
             return null;
         });
     }
@@ -194,7 +182,7 @@
                     return true;
                 },
             })
-            .then(function (result) {
+            .then((result) => {
                 const job = jobFromWrite(result, reported);
                 if (!job) {
                     if (result.ok && !gated) toastError();
@@ -207,13 +195,10 @@
     }
 
     function loadJobs() {
-        fetch(jobsUrl(), {
-            method: 'GET',
-            credentials: 'same-origin',
-            headers: ajaxHeaders(),
-        })
+        window.krtFetch
+            .get(jobsUrl(), { accept: 'application/json' })
             .then(readJson)
-            .then(function (jobs) {
+            .then((jobs) => {
                 if (!Array.isArray(jobs)) {
                     stopPolling();
                     return;
@@ -222,7 +207,7 @@
                 renderJobs(jobs);
                 pollControl(jobs);
             })
-            .catch(function () {});
+            .catch(() => {});
     }
 
     function isActive(job) {
@@ -274,54 +259,40 @@
         if (tableWrap instanceof HTMLElement) tableWrap.hidden = jobs.length === 0;
         const kindHeader = window.krtI18nText(i18n().colKind, 'krtP4kImportI18n.colKind');
         const summaryHeader = window.krtI18nText(i18n().colSummary, 'krtP4kImportI18n.colSummary');
-        let html = '';
-        jobs.forEach(function (job) {
-            html +=
-                '<tr data-testid="p4k-job-row">' +
-                '<td><span class="cell-title">' +
-                escapeHtml(job.sourceFilename || '') +
-                '</span><span class="cell-sub">' +
-                escapeHtml(fmtTime(job.createdAt)) +
-                '</span></td>' +
-                '<td data-label="' +
-                escapeAttr(kindHeader) +
-                '">' +
-                escapeHtml(kindLabel(job)) +
-                '</td>' +
-                '<td class="cell-status"><span class="chip ' +
-                escapeAttr(statusChip(job)) +
-                '">' +
-                escapeHtml(statusLabel(job)) +
-                '</span></td>' +
-                '<td data-label="' +
-                escapeAttr(summaryHeader) +
-                '">' +
-                escapeHtml(summaryText(job)) +
-                '</td>' +
-                '<td class="cell-actions">';
+        /** @type {KrtHtml[]} */
+        const html = [];
+        jobs.forEach((job) => {
+            html.push(
+                krtHtml`<tr data-testid="p4k-job-row"><td><span class="cell-title">${
+                    job.sourceFilename || ''
+                }</span><span class="cell-sub">${fmtTime(job.createdAt)}</span></td><td data-label="${
+                    kindHeader
+                }">${kindLabel(job)}</td><td class="cell-status"><span class="chip ${statusChip(
+                    job,
+                )}">${statusLabel(job)}</span></td><td data-label="${summaryHeader}">${summaryText(
+                    job,
+                )}</td><td class="cell-actions">`,
+            );
             if (job.status === 'SUCCEEDED') {
-                html +=
-                    '<button type="button" class="btn btn-ghost btn-xs" data-action="view" data-job-id="' +
-                    escapeAttr(job.id) +
-                    '">' +
-                    escapeHtml(
-                        window.krtI18nText(i18n().actionView, 'krtP4kImportI18n.actionView'),
-                    ) +
-                    '</button>';
+                html.push(
+                    krtHtml`<button type="button" class="btn btn-ghost btn-xs" data-action="view" data-job-id="${
+                        job.id
+                    }">${window.krtI18nText(i18n().actionView, 'krtP4kImportI18n.actionView')}</button>`,
+                );
                 if (job.kind === 'PREVIEW') {
-                    html +=
-                        ' <button type="button" class="btn btn-success btn-xs" data-action="apply" data-job-id="' +
-                        escapeAttr(job.id) +
-                        '">' +
-                        escapeHtml(
-                            window.krtI18nText(i18n().actionApply, 'krtP4kImportI18n.actionApply'),
-                        ) +
-                        '</button>';
+                    html.push(
+                        krtHtml` <button type="button" class="btn btn-success btn-xs" data-action="apply" data-job-id="${
+                            job.id
+                        }">${window.krtI18nText(
+                            i18n().actionApply,
+                            'krtP4kImportI18n.actionApply',
+                        )}</button>`,
+                    );
                 }
             }
-            html += '</td>' + '</tr>';
+            html.push(krtHtml`</td></tr>`);
         });
-        jobsBody.innerHTML = html;
+        krtHtml.set(jobsBody, html);
     }
 
     function kindLabel(job) {
@@ -364,7 +335,7 @@
             result.blueprints,
         ];
         let sum = 0;
-        blocks.forEach(function (c) {
+        blocks.forEach((c) => {
             if (c && typeof c.created === 'number') sum += c.created;
         });
         return sum;
@@ -377,17 +348,16 @@
                 window.krtI18nText(i18n().statusFailed, 'krtP4kImportI18n.statusFailed')
             );
         if (job.status === 'SUCCEEDED')
-            return (
-                String(createdTotal(job.result)) +
-                ' ' +
-                window.krtI18nText(i18n().colCreated, 'krtP4kImportI18n.colCreated')
-            );
+            return `${String(createdTotal(job.result))} ${window.krtI18nText(
+                i18n().colCreated,
+                'krtP4kImportI18n.colCreated',
+            )}`;
         return window.krtI18nText(i18n().summaryRunning, 'krtP4kImportI18n.summaryRunning');
     }
 
     function findJob(id) {
         return (
-            lastJobs.find(function (j) {
+            lastJobs.find((j) => {
                 return j && j.id === id;
             }) || null
         );
@@ -447,24 +417,20 @@
             ],
         ];
         const body = $('krt-p4k-rows');
-        let html = '';
-        rows.forEach(function (pair) {
+        const html = rows.map((pair) => {
             const c = pair[1] || {};
-            html += '<tr>' + '<th scope="row">' + escapeHtml(pair[0]) + '</th>';
-            [
+            const cells = [
                 c.matched,
                 c.uuidBackfilled,
                 c.uuidConflicts,
                 c.enriched,
                 c.created,
                 c.unmatched,
-            ].forEach(function (v) {
-                html += '<td>' + escapeHtml(v == null ? 0 : v) + '</td>';
-            });
-            html += '</tr>';
+            ].map((v) => krtHtml`<td>${v == null ? 0 : v}</td>`);
+            return krtHtml`<tr><th scope="row">${pair[0]}</th>${cells}</tr>`;
         });
         if (body) {
-            body.innerHTML = html;
+            krtHtml.set(body, html);
         }
 
         const ingredientsEl = $('krt-p4k-ingredients');
@@ -503,12 +469,9 @@
     function confirmApply() {
         if (!applyTargetId) return;
         const seed = !!(seedEl && seedEl.checked);
-        const url =
-            jobsUrl() +
-            '/' +
-            encodeURIComponent(applyTargetId) +
-            '/apply?seedNew=' +
-            (seed ? 'true' : 'false');
+        const url = `${jobsUrl()}/${encodeURIComponent(applyTargetId)}/apply?seedNew=${
+            seed ? 'true' : 'false'
+        }`;
         if (!window.krtFetch) return;
         let reported = false;
         window.krtFetch
@@ -528,7 +491,7 @@
                     return true;
                 },
             })
-            .then(function (result) {
+            .then((result) => {
                 const job = jobFromWrite(result, reported);
                 if (!job) {
                     if (result.ok && !gated) toastError();

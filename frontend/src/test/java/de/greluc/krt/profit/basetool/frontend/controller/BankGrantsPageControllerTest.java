@@ -31,6 +31,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDetailDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankApprovalLimitsDto;
@@ -83,14 +84,15 @@ class BankGrantsPageControllerTest {
   @Test
   void grants_ShouldFilterByAccount_andSeedSelectedAccountForCombobox() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankGrantsPageController controller = new BankGrantsPageController(backendApiClient);
+    BankGrantsPageController controller =
+        new BankGrantsPageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID accountId = UUID.randomUUID();
     UUID user = UUID.randomUUID();
     when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenReturn(List.of(grant(user, "alpha", accountId)));
     when(backendApiClient.get(
-            eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
+            eq("/api/v1/bank/accounts/{id}"), eq(BankAccountDetailDto.class), eq(accountId)))
         .thenReturn(detail(accountId));
 
     String view = controller.grants(null, accountId, null, null, model);
@@ -107,7 +109,8 @@ class BankGrantsPageControllerTest {
   @Test
   void grants_ShouldFilterByUserInEmployeeViewAndCollectGrantees() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankGrantsPageController controller = new BankGrantsPageController(backendApiClient);
+    BankGrantsPageController controller =
+        new BankGrantsPageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID userId = UUID.randomUUID();
     UUID otherUser = UUID.randomUUID();
@@ -135,7 +138,8 @@ class BankGrantsPageControllerTest {
   @Test
   void grants_fragmentGrantsMatrix_rendersOnlyMatrixFragment_andSkipsFilterAndModalLookups() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankGrantsPageController controller = new BankGrantsPageController(backendApiClient);
+    BankGrantsPageController controller =
+        new BankGrantsPageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID accountId = UUID.randomUUID();
     UUID user = UUID.randomUUID();
@@ -149,7 +153,7 @@ class BankGrantsPageControllerTest {
     assertNotNull(grants);
     assertEquals(1, grants.size());
     verify(backendApiClient, never())
-        .get(eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class));
+        .get(eq("/api/v1/bank/accounts/{id}"), eq(BankAccountDetailDto.class), eq(accountId));
     verify(backendApiClient, never()).get(eq("/api/v1/bank/grants"), anyTypeRef());
   }
 }

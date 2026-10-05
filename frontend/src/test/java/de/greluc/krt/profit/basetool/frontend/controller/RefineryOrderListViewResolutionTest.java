@@ -63,27 +63,18 @@ class RefineryOrderListViewResolutionTest {
 
   /**
    * Each segment maps onto one backend filter: the open segments by end, {@code READY} with the
-   * ready filter, the closed ones by start; the search becomes the {@code q} template variable.
+   * ready filter, the closed ones by start.
    */
   @Test
   void segmentsMapOntoOneServerSidePage() {
-    assertThat(
-            RefineryOrderPageController.orderPageUri(
-                "/api/v1/refinery-orders/all",
-                RefineryOrderPageController.segmentQuery("RUNNING", null),
-                2,
-                10))
+    assertThat(RefineryOrderPageController.segmentQuery("RUNNING", null))
         .isEqualTo(
-            "/api/v1/refinery-orders/all?page=2&size=10&sort=endsAt,asc&status=OPEN,IN_PROGRESS");
-    assertThat(
-            RefineryOrderPageController.orderPageUri(
-                "/api/v1/refinery-orders/my-orders",
-                RefineryOrderPageController.segmentQuery("READY", "Gold"),
-                0,
-                50))
+            new RefineryOrderPageController.ListQuery(
+                List.of("OPEN", "IN_PROGRESS"), false, null, "endsAt,asc"));
+    assertThat(RefineryOrderPageController.segmentQuery("READY", "Gold"))
         .isEqualTo(
-            "/api/v1/refinery-orders/my-orders?page=0&size=50&sort=endsAt,asc"
-                + "&status=OPEN,IN_PROGRESS&ready=true&q={q}");
+            new RefineryOrderPageController.ListQuery(
+                List.of("OPEN", "IN_PROGRESS"), true, "Gold", "endsAt,asc"));
     assertThat(RefineryOrderPageController.segmentQuery("COMPLETED", null))
         .isEqualTo(
             new RefineryOrderPageController.ListQuery(

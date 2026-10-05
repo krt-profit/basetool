@@ -76,7 +76,7 @@ frontend renders `type` + `params` via `notifications.type.*` messages.
 - [x] The schema validates against the entity under `ddl-auto = validate` (V155).
 
 **Enforced by:** `NotificationRepositoryIntegrationTest`, `NotificationParamsCodecTest` ·
-**Code:** `model/Notification`, `model/NotificationType`, `support/NotificationParamsCodec`,
+**Code:** `model/Notification`, `model/NotificationType`, `notification/internal/NotificationParamsCodec`,
 `db/migration/V155__create_notification.sql`
 
 ### REQ-NOTIF-002 — Event-driven, after-commit production
@@ -290,7 +290,7 @@ which is the question a half that has quietly stopped raises (REQ-OBS-011).
 
 **Enforced by:** `NotificationRetentionTaskTest`, `NotificationRepositoryIntegrationTest`
 (`deleteReadOlderThan`, `deleteUnreadOlderThan`), `BackendPropertiesValidationTest` (the bounds) ·
-**Code:** `task/NotificationRetentionTask`, `support/NotificationRetentionProperties`,
+**Code:** `task/NotificationRetentionTask`, `notification/internal/NotificationRetentionProperties`,
 `service/NotificationService#purgeReadOlderThan` / `#purgeUnreadOlderThan`,
 `metrics/ScheduledJob#NOTIFICATION_RETENTION`, `metrics/MetricNames#NOTIFICATION_RETENTION_DELETED`
 
@@ -464,9 +464,10 @@ events + clean timeout completion), `DisconnectedClientHandlingTest`,
 `AnonymousSurfaceSweepMvcTest#anonymousEventSourceGets401`,
 `NotificationStreamReconnectContractTest`, full build (bean wiring), frontend lint gate · **Code:**
 `service/NotificationStreamService`, `service/NotificationFanout` / `RedisNotificationFanout` /
-`LocalNotificationFanout`, `support/NotificationFanoutProperties`,
+`LocalNotificationFanout`, `notification/internal/NotificationFanoutProperties`,
 `controller/NotificationController#stream`, frontend
-`controller/NotificationPageController#stream`, `config/WebClientConfig#sseWebClient`,
+`controller/NotificationPageController#stream`, `service/BackendSideChannels#notificationStream`,
+`config/WebClientConfig#sseWebClient`,
 `exception/GlobalExceptionHandler#handleDisconnectedClient`, `static/js/notifications.js`
 
 ### REQ-NOTIF-011 — UC2/UC3: notify on the bank booking-request lifecycle

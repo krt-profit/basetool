@@ -26,8 +26,9 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BereichCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitNodeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitParentUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrganisationsleitungCreateRequest;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.Comparator;
 import java.util.List;
@@ -35,7 +36,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -78,19 +78,6 @@ public class AdminOrgStructurePageController {
   private static final List<String> KIND_DISPLAY_ORDER =
       List.of(KIND_OL, KIND_BEREICH, "SQUADRON", "SPECIAL_COMMAND");
 
-  /** Backend admin list of every active org unit with its parent edge + version. */
-  private static final String BACKEND_ORG_UNITS = "/api/v1/org-hierarchy/org-units";
-
-  /** Backend create endpoint for a Bereich. */
-  private static final String BACKEND_BEREICHE = "/api/v1/org-hierarchy/bereiche";
-
-  /** Backend create endpoint for the Organisationsleitung. */
-  private static final String BACKEND_OL = "/api/v1/org-hierarchy/organisationsleitung";
-
-  /** Response type for the flat org-unit node list. */
-  private static final ParameterizedTypeReference<List<OrgUnitNodeDto>> NODE_LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
-
   /**
    * The six Kartell departments, mirroring the backend {@code Department} enum (REQ-ORG-026), for
    * the create-Bereich picker; labels come from the {@code department.*} message keys.
@@ -99,7 +86,11 @@ public class AdminOrgStructurePageController {
       List.of(
           "PROFIT", "SUB_RADAR", "RAUMUEBERLEGENHEIT", "FORSCHUNG", "MARINEKORPS", "SEARCH_RESCUE");
 
-  private final BackendApiClient backendApiClient;
+  /** Reads the org units and sends the hierarchy writes. */
+  private final OrgUnitBackendClient orgUnitClient;
+
+  /** Drops the cached org-unit catalogues after a write. */
+  private final CatalogueCacheEviction cacheEviction;
 
   /**
    * Renders the org-structure page: the create-OL and create-Bereich forms and the table of every
@@ -115,7 +106,7 @@ public class AdminOrgStructurePageController {
   public String page(@RequestParam(required = false) String fragment, Model model) {
     List<OrgUnitNodeDto> nodes = List.of();
     try {
-      List<OrgUnitNodeDto> fetched = backendApiClient.get(BACKEND_ORG_UNITS, NODE_LIST_TYPE);
+      List<OrgUnitNodeDto> fetched = orgUnitClient.orgUnitNodes();
       if (fetched != null) {
         nodes = fetched;
       }
@@ -169,8 +160,8 @@ public class AdminOrgStructurePageController {
         log,
         "create Bereich (ajax)",
         () -> {
-          Object created = backendApiClient.post(BACKEND_BEREICHE, request, Object.class);
-          backendApiClient.evict(CacheDomain.ORG_UNIT);
+          Object created = orgUnitClient.createBereich(request);
+          cacheEviction.evict(CacheDomain.ORG_UNIT);
           return ResponseEntity.ok(created);
         });
   }
@@ -189,8 +180,8 @@ public class AdminOrgStructurePageController {
         log,
         "create Organisationsleitung (ajax)",
         () -> {
-          Object created = backendApiClient.post(BACKEND_OL, request, Object.class);
-          backendApiClient.evict(CacheDomain.ORG_UNIT);
+          Object created = orgUnitClient.createOrganisationsleitung(request);
+          cacheEviction.evict(CacheDomain.ORG_UNIT);
           return ResponseEntity.ok(created);
         });
   }
@@ -211,10 +202,8 @@ public class AdminOrgStructurePageController {
         log,
         "set parent for org unit " + id + " (ajax)",
         () -> {
-          Object updated =
-              backendApiClient.patch(
-                  "/api/v1/org-hierarchy/org-units/" + id + "/parent", request, Object.class);
-          backendApiClient.evict(CacheDomain.ORG_UNIT);
+          Object updated = orgUnitClient.setParent(id, request);
+          cacheEviction.evict(CacheDomain.ORG_UNIT);
           return ResponseEntity.ok(updated);
         });
   }

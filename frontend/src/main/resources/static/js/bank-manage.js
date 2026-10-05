@@ -40,7 +40,7 @@
      */
     function valueOf(form, tier) {
         const input = /** @type {HTMLInputElement | null} */ (
-            form.querySelector('[data-tier-input="' + tier + '"]')
+            form.querySelector(`[data-tier-input="${tier}"]`)
         );
         if (!input || input.value.trim() === '') return null;
         const n = Number(input.value);
@@ -97,11 +97,24 @@
         );
     }
 
-    document.addEventListener('input', function (event) {
+    document.addEventListener('input', (event) => {
         const target = event.target;
         if (!(target instanceof HTMLInputElement) || !target.hasAttribute('data-tier-input'))
             return;
         const form = target.closest('form[data-bank-tiers]');
         if (form instanceof HTMLFormElement) render(form);
     });
+
+    /** Binds the manage view's filters and pager to an in-place fragment swap. */
+    function bindBankManageSwaps() {
+        if (window.krtFetch) {
+            window.krtFetch.bindSwap({
+                container: '#bank-manage-results',
+                fragmentValue: 'manageBody',
+                history: true,
+            });
+        }
+    }
+    document.addEventListener('DOMContentLoaded', bindBankManageSwaps);
+    document.addEventListener('krt:swapped', bindBankManageSwaps);
 })();

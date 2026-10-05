@@ -20,8 +20,9 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartPositionCreateRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartPositionUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.orgchart.client.OrgChartBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.HashMap;
@@ -56,7 +57,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @Slf4j
 public class OrgChartPageController {
 
-  private final BackendApiClient backendApiClient;
+  /** Reads the chart and sends the editor's writes. */
+  private final OrgChartBackendClient orgChartClient;
 
   /**
    * Renders the read-only org-chart page, on which admins edit free-text holders inline;
@@ -73,7 +75,7 @@ public class OrgChartPageController {
   @PreAuthorize("isAuthenticated()")
   public String orgChart(@RequestParam(required = false) String fragment, Model model) {
     try {
-      model.addAttribute("orgChart", backendApiClient.get("/api/v1/org-chart", OrgChartDto.class));
+      model.addAttribute("orgChart", orgChartClient.orgChart());
     } catch (Exception e) {
       log.error("Failed to load org chart", e);
       model.addAttribute("error", "error.orgChart.load");
@@ -95,10 +97,9 @@ public class OrgChartPageController {
   @PostMapping("/positions/ajax")
   @ResponseBody
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
-  public ResponseEntity<Object> createPosition(@RequestBody Map<String, Object> body) {
+  public ResponseEntity<Object> createPosition(@RequestBody OrgChartPositionCreateRequest body) {
     try {
-      return ResponseEntity.ok(
-          backendApiClient.post("/api/v1/org-chart/positions", body, Object.class));
+      return ResponseEntity.ok(orgChartClient.createPosition(body));
     } catch (BackendServiceException e) {
       return relayError("Create org-chart position failed", e);
     } catch (Exception e) {
@@ -117,10 +118,9 @@ public class OrgChartPageController {
   @ResponseBody
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> updatePosition(
-      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
+      @PathVariable @NotNull UUID id, @RequestBody OrgChartPositionUpdateRequest body) {
     try {
-      return ResponseEntity.ok(
-          backendApiClient.put("/api/v1/org-chart/positions/" + id, body, Object.class));
+      return ResponseEntity.ok(orgChartClient.updatePosition(id, body));
     } catch (BackendServiceException e) {
       return relayError("Update org-chart position failed", e);
     } catch (Exception e) {
@@ -143,8 +143,7 @@ public class OrgChartPageController {
   public ResponseEntity<Object> vacateLeader(
       @PathVariable @NotNull UUID id, @RequestParam("version") long version) {
     try {
-      backendApiClient.delete(
-          "/api/v1/org-chart/positions/" + id + "/leader?version=" + version, Void.class);
+      orgChartClient.vacateLeader(id, version);
       return ResponseEntity.ok().build();
     } catch (BackendServiceException e) {
       return relayError("Vacate org-chart Kommandoleiter failed", e);
@@ -164,7 +163,7 @@ public class OrgChartPageController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> deletePosition(@PathVariable @NotNull UUID id) {
     try {
-      backendApiClient.delete("/api/v1/org-chart/positions/" + id, Void.class);
+      orgChartClient.deletePosition(id);
       return ResponseEntity.ok().build();
     } catch (BackendServiceException e) {
       return relayError("Delete org-chart position failed", e);

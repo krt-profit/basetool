@@ -25,7 +25,11 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer;
@@ -37,10 +41,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemStolenMarkDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
-import de.greluc.krt.profit.basetool.backend.support.InventoryProperties;
-import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -79,13 +79,16 @@ public class InventoryStolenMarkService {
    * Sets or removes the marker on a row or on part of it. A row that already carries the requested
    * marker is left as it is and nothing is recorded.
    *
-   * @param itemId the row; the caller's edit right on it is checked by the controller
+   * @param itemId the row; the caller's scope on it is checked by the controller
    * @param dto the version, the requested marker and the amount to change, {@code null} for the
    *     whole row
    * @param callerId the authenticated caller, recorded as the actor
+   * @param isLogistician whether the caller is a logistician or above and so may mark another
+   *     member's row
    * @return the row carrying the requested marker, or the merge survivor it was folded into
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the row is
    *     unknown
+   * @throws AccessDeniedException when the caller neither owns the row nor is a logistician
    * @throws BusinessConflictException when marking is switched off, or a split would leave the row
    *     below the amount it offers on the Materialbörse
    * @throws BadRequestException when the amount is not positive, exceeds the row or is fractional
@@ -96,12 +99,19 @@ public class InventoryStolenMarkService {
    */
   @Transactional
   public @NotNull InventoryItemDto mark(
-      @NotNull UUID itemId, @NotNull InventoryItemStolenMarkDto dto, @NotNull UUID callerId) {
+      @NotNull UUID itemId,
+      @NotNull InventoryItemStolenMarkDto dto,
+      @NotNull UUID callerId,
+      boolean isLogistician) {
     requireEnabled();
     InventoryItem item =
         Entities.require(
             inventoryItemRepository.findByIdForRebook(itemId),
             () -> "Inventory item not found: " + itemId);
+    boolean isOwner = item.getUser() != null && callerId.equals(item.getUser().getId());
+    if (!isOwner && !isLogistician) {
+      throw new AccessDeniedException("You are not allowed to mark this inventory item: " + itemId);
+    }
     OptimisticLock.checkOptionalClient(
         item.getVersion(), dto.version(), InventoryItem.class, itemId);
     boolean target = Boolean.TRUE.equals(dto.stolen());

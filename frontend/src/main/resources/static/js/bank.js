@@ -148,7 +148,7 @@
             const url = window.location.pathname + window.location.search;
             const errorMessage = bankRefreshError();
             const done = {};
-            keys.forEach(function (key) {
+            keys.forEach((key) => {
                 const cfg = sectionMap[key];
                 if (!cfg || done[cfg.container] || !document.querySelector(cfg.container)) {
                     return;
@@ -211,7 +211,7 @@
                 ? BANK_ACCOUNT_SECTIONS
                 : ORGUNIT_ACCOUNT_SECTIONS;
             window.krtLiveSync.createReceiver({
-                topic: 'bank:' + accountId,
+                topic: `bank:${accountId}`,
                 sections: sectionMap,
                 refresh: makeBankReceiverRefresh(sectionMap),
                 pill: pill(),
@@ -269,7 +269,7 @@
      * @param {HTMLFormElement} form the bank AJAX form
      */
     function clearErrors(form) {
-        form.querySelectorAll('.bank-field-error').forEach(function (el) {
+        form.querySelectorAll('.bank-field-error').forEach((el) => {
             el.textContent = '';
             el.classList.remove('visible');
         });
@@ -284,7 +284,7 @@
      * @param {string} message the localized message
      */
     function showError(form, field, message) {
-        let slot = form.querySelector('.bank-field-error[data-error-for="' + field + '"]');
+        let slot = form.querySelector(`.bank-field-error[data-error-for="${field}"]`);
         if (!slot) {
             slot = form.querySelector('.bank-field-error[data-error-for="_global"]');
         }
@@ -325,7 +325,7 @@
                     }
                 }
             }
-            modal.querySelectorAll('[data-bank-label]').forEach(function (el) {
+            modal.querySelectorAll('[data-bank-label]').forEach((el) => {
                 if (el.getAttribute('data-bank-label').toLowerCase() === key) {
                     el.textContent = attr.value;
                 }
@@ -355,7 +355,7 @@
         }
     }
 
-    document.addEventListener('click', function (event) {
+    document.addEventListener('click', (event) => {
         const trigger = event.target.closest('[data-trigger="open-modal-display"][data-modal-id]');
         if (!trigger) {
             return;
@@ -379,7 +379,7 @@
      */
     async function fillCounterpartyOrgUnits(userSelect, orgSelect) {
         const placeholder = orgSelect.querySelector('option[value=""]');
-        orgSelect.innerHTML = '';
+        orgSelect.replaceChildren();
         if (placeholder) {
             orgSelect.appendChild(placeholder);
         }
@@ -389,24 +389,18 @@
         if (!userId) {
             return;
         }
-        let memberships = [];
+        let memberships;
         try {
-            const response = await fetch(
-                '/users/' + encodeURIComponent(userId) + '/memberships?allKinds=true',
-                {
-                    headers: { Accept: 'application/json' },
-                },
+            memberships = await window.krtFetch.getJson(
+                `/users/${encodeURIComponent(userId)}/memberships?allKinds=true`,
             );
-            if (response.ok) {
-                memberships = await response.json();
-            }
         } catch {
             memberships = [];
         }
         if (!Array.isArray(memberships) || memberships.length === 0) {
             return;
         }
-        memberships.forEach(function (membership) {
+        memberships.forEach((membership) => {
             const option = document.createElement('option');
             option.value = membership.orgUnitId;
             option.textContent = membership.orgUnitName;
@@ -418,7 +412,7 @@
         }
     }
 
-    document.addEventListener('change', function (event) {
+    document.addEventListener('change', (event) => {
         const userSelect = event.target.closest('[data-counterparty-user]');
         if (!userSelect) {
             return;
@@ -436,7 +430,7 @@
      */
     function resetCounterpartyOrgUnitOptions(select) {
         const placeholder = select.querySelector('option[value=""]');
-        select.innerHTML = '';
+        select.replaceChildren();
         if (placeholder) {
             select.appendChild(placeholder);
         }
@@ -480,7 +474,7 @@
                 const form = toggle.closest('form');
                 const source = form ? form.querySelector('[data-bank-all-orgunits]') : null;
                 if (source) {
-                    Array.prototype.forEach.call(source.options, function (option) {
+                    Array.prototype.forEach.call(source.options, (option) => {
                         if (option.value) {
                             orgSelect.appendChild(option.cloneNode(true));
                         }
@@ -493,7 +487,7 @@
         }
     }
 
-    document.addEventListener('change', function (event) {
+    document.addEventListener('change', (event) => {
         const toggle = event.target.closest('[data-role="bank-cp-external-toggle"]');
         if (toggle) {
             toggleCounterpartyExternal(toggle);
@@ -560,7 +554,7 @@
         }
         const endpoint = form
             .getAttribute('data-endpoint')
-            .replace(/\{([^}]+)\}/g, function (match, name) {
+            .replace(/\{([^}]+)\}/g, (match, name) => {
                 const filled = placeholders[name.toLowerCase()];
                 return filled !== undefined ? encodeURIComponent(filled) : match;
             });
@@ -591,7 +585,7 @@
                     Array.isArray(payload.fieldErrors) &&
                     payload.fieldErrors.length > 0
                 ) {
-                    payload.fieldErrors.forEach(function (fe) {
+                    payload.fieldErrors.forEach((fe) => {
                         showError(form, fe.field, fe.message);
                     });
                     return true;
@@ -657,7 +651,7 @@
         const sent = {};
         spec.trim()
             .split(/\s+/)
-            .forEach(function (entry) {
+            .forEach((entry) => {
                 const slash = entry.indexOf('/');
                 if (slash < 0) {
                     return;
@@ -676,9 +670,9 @@
                     if (!id) {
                         return;
                     }
-                    topic = topic.slice(0, at) + ':' + id;
+                    topic = `${topic.slice(0, at)}:${id}`;
                 }
-                const key = topic + '|' + sections.join(',');
+                const key = `${topic}|${sections.join(',')}`;
                 if (sent[key]) {
                     return;
                 }
@@ -722,7 +716,7 @@
                   ),
               )
             : [];
-        frozen.forEach(function (button) {
+        frozen.forEach((button) => {
             button.disabled = true;
         });
         window.krtFetch
@@ -732,16 +726,16 @@
                 fragmentValue: form.getAttribute('data-refresh'),
                 errorMessage: refreshError || genericError(),
             })
-            .then(function (swapped) {
+            .then((swapped) => {
                 if (!swapped) {
-                    frozen.forEach(function (button) {
+                    frozen.forEach((button) => {
                         button.disabled = false;
                     });
                 }
             });
     }
 
-    document.addEventListener('submit', function (event) {
+    document.addEventListener('submit', (event) => {
         const form = event.target.closest('form.bank-ajax-form');
         if (!form) {
             return;
@@ -990,7 +984,7 @@
         }
     }
 
-    document.addEventListener('change', function (event) {
+    document.addEventListener('change', (event) => {
         const toggle = event.target.closest('[data-role="bank-split-toggle"]');
         if (toggle) {
             toggleSplitRow(toggle);
@@ -1020,7 +1014,7 @@
         }
         const reserved = Number(panel.getAttribute('data-reserved'));
         const own = balance - (Number.isFinite(reserved) ? reserved : 0);
-        ownEl.textContent = Math.round(own).toLocaleString('de-DE') + ' aUEC';
+        ownEl.textContent = `${Math.round(own).toLocaleString('de-DE')} aUEC`;
         ownEl.classList.toggle('bank-amount--neg', own < 0);
         ownEl.classList.toggle('bank-amount--pos', own > 0);
         result.hidden = false;
@@ -1042,10 +1036,10 @@
         }
     }
 
-    document.addEventListener('input', function (event) {
+    document.addEventListener('input', (event) => {
         onBankFieldEdit(event.target);
     });
-    document.addEventListener('change', function (event) {
+    document.addEventListener('change', (event) => {
         onBankFieldEdit(event.target);
     });
 
@@ -1081,7 +1075,7 @@
      * Grants matrix: clicking a flag cell PATCHes the grant with all three flags and the row's
      * version, then patches the row in place.
      */
-    document.addEventListener('click', async function (event) {
+    document.addEventListener('click', async (event) => {
         const flagButton = event.target.closest('button.matrix-flag[data-flag]');
         if (!flagButton) {
             return;
@@ -1092,19 +1086,15 @@
         }
         const flag = flagButton.getAttribute('data-flag');
         const newValue = row.getAttribute(FLAG_ATTR[flag]) !== 'true';
-        const endpoint =
-            '/api/proxy/bank/grants/' +
-            encodeURIComponent(row.getAttribute('data-user-id')) +
-            '/' +
-            encodeURIComponent(row.getAttribute('data-account-id'));
+        const endpoint = `/api/proxy/bank/grants/${encodeURIComponent(
+            row.getAttribute('data-user-id'),
+        )}/${encodeURIComponent(row.getAttribute('data-account-id'))}`;
         await window.krtFetch.write({
             method: 'PATCH',
             url: endpoint,
-            serialize:
-                'bank-grant:' +
-                row.getAttribute('data-user-id') +
-                ':' +
-                row.getAttribute('data-account-id'),
+            serialize: `bank-grant:${row.getAttribute('data-user-id')}:${row.getAttribute(
+                'data-account-id',
+            )}`,
             payload() {
                 const p = {
                     canDeposit: row.getAttribute('data-can-deposit') === 'true',
@@ -1140,7 +1130,7 @@
         });
     });
 
-    document.addEventListener('change', function (event) {
+    document.addEventListener('change', (event) => {
         const select = event.target.closest('[data-role="bank-grants-filter"]');
         if (!select) {
             return;
@@ -1150,7 +1140,7 @@
         if (select.value) {
             params.set(select.getAttribute('data-param'), select.value);
         }
-        window.location.assign('/bank/grants?' + params.toString());
+        window.location.assign(`/bank/grants?${params.toString()}`);
     });
 
     /**
@@ -1188,7 +1178,7 @@
         }
         control.required = type === 'ORG_UNIT' || type === 'AREA';
         let currentStillVisible = false;
-        Array.prototype.forEach.call(control.options, function (option) {
+        Array.prototype.forEach.call(control.options, (option) => {
             if (!option.value) {
                 return;
             }
@@ -1205,7 +1195,7 @@
         }
     }
 
-    document.addEventListener('change', function (event) {
+    document.addEventListener('change', (event) => {
         const select = event.target.closest('select[data-role="bank-account-type"]');
         if (select) {
             syncAccountTypeRows(select);
@@ -1263,7 +1253,7 @@
         const account = form.querySelector('select[data-role="org-unit-request-account"]');
         if (account) {
             let currentVisible = false;
-            Array.prototype.forEach.call(account.options, function (option) {
+            Array.prototype.forEach.call(account.options, (option) => {
                 const debitable = option.getAttribute('data-can-debit') === 'true';
                 const visible = isDeposit || debitable;
                 option.hidden = !visible;
@@ -1273,7 +1263,7 @@
                 }
             });
             if (!currentVisible) {
-                const first = Array.prototype.find.call(account.options, function (o) {
+                const first = Array.prototype.find.call(account.options, (o) => {
                     return !o.disabled;
                 });
                 account.value = first ? first.value : '';
@@ -1337,7 +1327,7 @@
             .querySelectorAll(
                 'select, .krt-combobox input[type="hidden"], input:not(.krt-combobox__input)',
             )
-            .forEach(function (control) {
+            .forEach((control) => {
                 control.disabled = !on;
                 const box = control.closest ? control.closest('.krt-combobox') : null;
                 const textbox = box ? box.querySelector('.krt-combobox__input') : null;
@@ -1355,7 +1345,7 @@
         }
     }
 
-    document.addEventListener('change', function (event) {
+    document.addEventListener('change', (event) => {
         const select = event.target.closest('select[data-role="org-unit-request-type"]');
         if (select) {
             syncRequestTypeRows(select);
@@ -1399,7 +1389,7 @@
         row.hidden = !on;
         row.querySelectorAll(
             'input:not(.krt-combobox__input), select, textarea, .krt-combobox input[type="hidden"]',
-        ).forEach(function (control) {
+        ).forEach((control) => {
             setMovementControlActive(control, on);
         });
     }
@@ -1455,7 +1445,7 @@
             form.setAttribute('data-endpoint', spec.endpoint);
             form.setAttribute('data-account-id-field', spec.accountField);
         }
-        form.querySelectorAll('[data-movement-types]').forEach(function (row) {
+        form.querySelectorAll('[data-movement-types]').forEach((row) => {
             const types = row.getAttribute('data-movement-types').split(/\s+/);
             setMovementRowActive(row, types.indexOf(type) !== -1);
         });
@@ -1463,21 +1453,21 @@
         if (splitToggle) {
             toggleSplitRow(splitToggle);
         }
-        form.querySelectorAll('[data-role="bank-cp-external-toggle"]').forEach(function (t) {
+        form.querySelectorAll('[data-role="bank-cp-external-toggle"]').forEach((t) => {
             if (!t.disabled) {
                 toggleCounterpartyExternal(t);
             }
         });
         const submit = form.querySelector('button[type="submit"][data-label-deposit]');
         if (submit) {
-            const label = submit.getAttribute('data-label-' + type.toLowerCase());
+            const label = submit.getAttribute(`data-label-${type.toLowerCase()}`);
             if (label) {
                 submit.textContent = label;
             }
         }
         const accountLabel = form.querySelector('[data-role="bank-movement-account-label"]');
         if (accountLabel) {
-            const accountLabelText = accountLabel.getAttribute('data-label-' + type.toLowerCase());
+            const accountLabelText = accountLabel.getAttribute(`data-label-${type.toLowerCase()}`);
             if (accountLabelText) {
                 accountLabel.textContent = accountLabelText;
             }
@@ -1486,14 +1476,14 @@
         updateMovementJustification(form);
     }
 
-    document.addEventListener('change', function (event) {
+    document.addEventListener('change', (event) => {
         const select = event.target.closest('select[data-role="bank-movement-type"]');
         if (select) {
             syncMovementRows(select);
         }
     });
 
-    document.addEventListener('change', function (event) {
+    document.addEventListener('change', (event) => {
         const source = event.target.closest('[data-role="bank-movement-source"]');
         if (!source) {
             return;
@@ -1577,7 +1567,7 @@
         }
     }
 
-    document.addEventListener('change', function (event) {
+    document.addEventListener('change', (event) => {
         const checkbox = event.target.closest('[data-owner-approval-check]');
         if (!checkbox) {
             return;
@@ -1608,7 +1598,7 @@
         }
         let response;
         try {
-            response = await fetch(url, { method: 'GET', headers });
+            response = await window.krtFetch.get(url, { headers });
         } catch {
             response = null;
         }
@@ -1627,7 +1617,7 @@
         URL.revokeObjectURL(objectUrl);
     }
 
-    document.addEventListener('click', function (event) {
+    document.addEventListener('click', (event) => {
         const button = event.target.closest('.bank-download-btn[data-download-url]');
         if (!button) {
             return;
@@ -1636,12 +1626,12 @@
         downloadBankPdf(
             button.getAttribute('data-download-url'),
             button.getAttribute('data-filename') || 'report.pdf',
-            function (message) {
+            (message) => {
                 if (typeof window.showFrontendErrorToast === 'function') {
                     window.showFrontendErrorToast(message);
                 }
             },
-        ).finally(function () {
+        ).finally(() => {
             button.disabled = false;
         });
     });
@@ -1650,7 +1640,7 @@
      * Type-to-confirm hurdle: the named submit button stays disabled until the input exactly matches
      * `data-confirm-token`.
      */
-    document.addEventListener('input', function (event) {
+    document.addEventListener('input', (event) => {
         const input = event.target.closest('input[data-confirm-token][data-confirm-submit]');
         if (!input) {
             return;
@@ -1665,7 +1655,7 @@
      * Admin wipe-reset: posts in place and reports the outcome as a toast; on success the modal
      * closes and the confirm input resets. Without krtFetch the form submits natively.
      */
-    document.addEventListener('submit', function (event) {
+    document.addEventListener('submit', (event) => {
         const form = event.target.closest('form[data-bank-wipe]');
         if (!form) {
             return;
@@ -1681,7 +1671,7 @@
         if (submitBtn) {
             submitBtn.disabled = true;
         }
-        const url = form.getAttribute('action') + '?confirm=' + encodeURIComponent(confirmValue);
+        const url = `${form.getAttribute('action')}?confirm=${encodeURIComponent(confirmValue)}`;
         window.krtFetch
             .write({
                 method: 'POST',
@@ -1714,7 +1704,7 @@
                     }
                 },
             })
-            .finally(function () {
+            .finally(() => {
                 if (submitBtn && confirmInput) {
                     submitBtn.disabled =
                         confirmInput.value !== confirmInput.getAttribute('data-confirm-token');
@@ -1727,7 +1717,7 @@
     /**
      * Statement export form: requires the hidden UTC `from`/`to` instants, then downloads the PDF.
      */
-    document.addEventListener('submit', function (event) {
+    document.addEventListener('submit', (event) => {
         const form = event.target.closest('form.bank-download-form');
         if (!form) {
             return;
@@ -1749,19 +1739,12 @@
         if (!valid) {
             return;
         }
-        const url =
-            form.getAttribute('data-endpoint') +
-            '?from=' +
-            encodeURIComponent(from.value) +
-            '&to=' +
-            encodeURIComponent(to.value);
-        downloadBankPdf(
-            url,
-            form.getAttribute('data-filename') || 'kontoauszug.pdf',
-            function (message) {
-                showError(form, '_global', message);
-            },
-        );
+        const url = `${form.getAttribute('data-endpoint')}?from=${encodeURIComponent(
+            from.value,
+        )}&to=${encodeURIComponent(to.value)}`;
+        downloadBankPdf(url, form.getAttribute('data-filename') || 'kontoauszug.pdf', (message) => {
+            showError(form, '_global', message);
+        });
     });
 
     /**
@@ -1779,7 +1762,7 @@
         const term = input.value.trim().toLowerCase();
         const items = scope.querySelectorAll('[data-filter-name]');
         let visible = 0;
-        items.forEach(function (item) {
+        items.forEach((item) => {
             const name = (item.getAttribute('data-filter-name') || '').toLowerCase();
             const match = term === '' || name.indexOf(term) !== -1;
             item.hidden = !match;
@@ -1787,10 +1770,10 @@
                 visible += 1;
             }
         });
-        scope.querySelectorAll('[data-bank-acc-group]').forEach(function (groupEl) {
+        scope.querySelectorAll('[data-bank-acc-group]').forEach((groupEl) => {
             const anyVisible = Array.prototype.some.call(
                 groupEl.querySelectorAll('[data-filter-name]'),
-                function (item) {
+                (item) => {
                     return !item.hidden;
                 },
             );
@@ -1803,7 +1786,7 @@
         }
     }
 
-    document.addEventListener('input', function (event) {
+    document.addEventListener('input', (event) => {
         const input = event.target.closest ? event.target.closest('[data-bank-acc-filter]') : null;
         if (input) {
             applyAccountNameFilter(input);
@@ -1826,7 +1809,7 @@
         }
     }
 
-    document.addEventListener('click', function (event) {
+    document.addEventListener('click', (event) => {
         const toggle = event.target.closest
             ? event.target.closest('[data-trigger="bank-row-expand"]')
             : null;
@@ -1855,7 +1838,7 @@
     function storageKey() {
         const main = document.querySelector('main[data-user-id]');
         const uid = main ? main.getAttribute('data-user-id') : 'unknown';
-        return 'bank_dashboard_view_' + uid;
+        return `bank_dashboard_view_${uid}`;
     }
 
     function layoutCheckbox() {
@@ -1922,17 +1905,17 @@
         }
         window.krtFetch
             .swap({
-                url: '/bank?layout=' + state.layout + '&group=' + state.group,
+                url: `/bank?layout=${state.layout}&group=${state.group}`,
                 container: '#bank-grid-results',
                 fragmentValue: 'bankGrid',
                 history: true,
             })
-            .then(function () {
+            .then(() => {
                 reapplyNameFilter();
             });
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', () => {
         if (!viewToggles()) {
             return;
         }
@@ -1952,7 +1935,7 @@
         }
     });
 
-    document.addEventListener('change', function (event) {
+    document.addEventListener('change', (event) => {
         const checkbox = event.target.closest
             ? event.target.closest('input[data-bank-view-layout],input[data-bank-view-group]')
             : null;
@@ -1977,7 +1960,7 @@
     function storageKey() {
         const main = document.querySelector('main[data-user-id]');
         const uid = main ? main.getAttribute('data-user-id') : 'unknown';
-        return 'org_unit_bank_view_' + uid;
+        return `org_unit_bank_view_${uid}`;
     }
 
     function renderedLayout() {
@@ -2018,17 +2001,17 @@
         }
         window.krtFetch
             .swap({
-                url: '/org-unit-bank?layout=' + layout,
+                url: `/org-unit-bank?layout=${layout}`,
                 container: '#ou-acc-results',
                 fragmentValue: 'orgUnitBankAccounts',
                 history: true,
             })
-            .then(function () {
+            .then(() => {
                 reapplyNameFilter();
             });
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', () => {
         if (!toggleGroup()) {
             return;
         }
@@ -2050,7 +2033,7 @@
         }
     });
 
-    document.addEventListener('change', function (event) {
+    document.addEventListener('change', (event) => {
         const checkbox = event.target.closest
             ? event.target.closest('input[data-ou-view-layout]')
             : null;
@@ -2067,7 +2050,7 @@
     function storageKey() {
         const main = document.querySelector('main[data-user-id]');
         const uid = main ? main.getAttribute('data-user-id') : 'unknown';
-        return 'bank_grants_view_' + uid;
+        return `bank_grants_view_${uid}`;
     }
 
     function onGrantsPage() {
@@ -2108,7 +2091,7 @@
         };
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', () => {
         if (!onGrantsPage()) {
             return;
         }
@@ -2130,11 +2113,11 @@
             if (saved.view === 'employee' && saved.userId) {
                 params.set('userId', saved.userId);
             }
-            window.location.replace('/bank/grants?' + params.toString());
+            window.location.replace(`/bank/grants?${params.toString()}`);
         }
     });
 
-    document.addEventListener('change', function (event) {
+    document.addEventListener('change', (event) => {
         const select = event.target.closest
             ? event.target.closest('[data-role="bank-grants-filter"]')
             : null;
@@ -2156,7 +2139,7 @@
     function storageKey() {
         const main = document.querySelector('main[data-user-id]');
         const uid = main ? main.getAttribute('data-user-id') : 'unknown';
-        return 'bank_chart_range_' + uid;
+        return `bank_chart_range_${uid}`;
     }
 
     function chartContainer() {
@@ -2193,7 +2176,7 @@
         } catch {}
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', () => {
         const container = chartContainer();
         if (!container) {
             return;
@@ -2209,13 +2192,13 @@
         if (saved === null || saved === renderedRange()) {
             return;
         }
-        const link = container.querySelector('a.bank-chart-range-btn[data-range="' + saved + '"]');
+        const link = container.querySelector(`a.bank-chart-range-btn[data-range="${saved}"]`);
         if (link) {
             link.click();
         }
     });
 
-    document.addEventListener('krt:swapped', function (event) {
+    document.addEventListener('krt:swapped', (event) => {
         const container = event.detail && event.detail.container;
         if (!container || CHART_CONTAINER_IDS.indexOf(container.id) === -1) {
             return;

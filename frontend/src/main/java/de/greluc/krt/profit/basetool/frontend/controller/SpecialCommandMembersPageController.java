@@ -22,29 +22,24 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitKind;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.MembershipFlagsForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
-import de.greluc.krt.profit.basetool.frontend.support.MapPayloadValues;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -87,17 +82,10 @@ public class SpecialCommandMembersPageController {
   /** Where a non-admin SK lead returns to: the Leitung page that links them here. */
   private static final String LEITUNG_BACK_URL = "/organisation/leitung";
 
-  /** Response type for a single raw-JSON SK read ({@code /special-commands/{id}}). */
-  private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
-      new ParameterizedTypeReference<>() {};
+  /** Reads the Spezialkommando and its roster and sends the roster writes. */
+  private final OrgUnitBackendClient orgUnitClient;
 
-  /**
-   * Response type for the raw-JSON SK member list read ({@code /special-commands/{id}/members}).
-   */
-  private static final ParameterizedTypeReference<List<Map<String, Object>>> MAP_LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Tells an admin apart from a Spezialkommando lead. */
   private final FrontendAuthHelperService authHelperService;
 
   /**
@@ -168,8 +156,7 @@ public class SpecialCommandMembersPageController {
       @RequestParam @NotNull UUID userId,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.post(
-          "/api/v1/special-commands/" + id + "/members/" + userId, null, Void.class);
+      orgUnitClient.addSpecialCommandMember(id, userId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Add SpecialCommand member failed", e);
@@ -202,7 +189,7 @@ public class SpecialCommandMembersPageController {
       @PathVariable @NotNull UUID userId,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/special-commands/" + id + "/members/" + userId, Void.class);
+      orgUnitClient.removeSpecialCommandMember(id, userId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (Exception e) {
       log.error("Remove SpecialCommand member failed", e);
@@ -231,8 +218,7 @@ public class SpecialCommandMembersPageController {
       @ModelAttribute MembershipFlagsForm form,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.patch(
-          "/api/v1/special-commands/" + id + "/members/" + userId, flagsBody(form), Void.class);
+      orgUnitClient.patchSpecialCommandMemberFlags(id, userId, flagsBody(form));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Patch SpecialCommand member flags failed", e);
@@ -260,10 +246,7 @@ public class SpecialCommandMembersPageController {
   @PostMapping(value = "/{id}/members", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> addMemberAjax(
       @PathVariable @NotNull UUID id, @RequestParam @NotNull UUID userId) {
-    return okOrRelay(
-        () ->
-            backendApiClient.post(
-                "/api/v1/special-commands/" + id + "/members/" + userId, null, Void.class));
+    return okOrRelay(() -> orgUnitClient.addSpecialCommandMember(id, userId));
   }
 
   /**
@@ -277,10 +260,7 @@ public class SpecialCommandMembersPageController {
   @PostMapping(value = "/{id}/members/{userId}/delete", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> removeMemberAjax(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
-    return okOrRelay(
-        () ->
-            backendApiClient.delete(
-                "/api/v1/special-commands/" + id + "/members/" + userId, Void.class));
+    return okOrRelay(() -> orgUnitClient.removeSpecialCommandMember(id, userId));
   }
 
   /**
@@ -299,11 +279,7 @@ public class SpecialCommandMembersPageController {
       @PathVariable @NotNull UUID userId,
       @ModelAttribute MembershipFlagsForm form) {
     return okOrRelay(
-        () ->
-            backendApiClient.patch(
-                "/api/v1/special-commands/" + id + "/members/" + userId,
-                flagsBody(form),
-                Void.class));
+        () -> orgUnitClient.patchSpecialCommandMemberFlags(id, userId, flagsBody(form)));
   }
 
   /**
@@ -311,15 +287,12 @@ public class SpecialCommandMembersPageController {
    * plus the optimistic-lock version the page last rendered.
    *
    * @param form the bound flags form.
-   * @return a mutable map with {@code isLogistician}, {@code isMissionManager} and {@code version}.
+   * @return the patch with {@code isLogistician}, {@code isMissionManager} and {@code version}.
    */
   @NotNull
-  private static Map<String, Object> flagsBody(@NotNull MembershipFlagsForm form) {
-    Map<String, Object> body = new HashMap<>();
-    body.put("isLogistician", form.isLogistician());
-    body.put("isMissionManager", form.isMissionManager());
-    body.put("version", form.version());
-    return body;
+  private static MembershipFlagsPatchRequest flagsBody(@NotNull MembershipFlagsForm form) {
+    return new MembershipFlagsPatchRequest(
+        form.isLogistician(), form.isMissionManager(), form.version());
   }
 
   /**
@@ -342,8 +315,8 @@ public class SpecialCommandMembersPageController {
   }
 
   /**
-   * Reads one Spezialkommando from the backend and maps its raw JSON onto {@link
-   * SpecialCommandDto}.
+   * Reads one Spezialkommando from the backend, rendering an absent flag as {@code false} and an
+   * absent version as {@code 0}.
    *
    * @param id Spezialkommando id.
    * @return the SK, or {@code null} when the backend answered with an empty body.
@@ -352,23 +325,24 @@ public class SpecialCommandMembersPageController {
    */
   @Nullable
   private SpecialCommandDto fetchSpecialCommand(@NotNull UUID id) {
-    Map<String, Object> map = backendApiClient.get("/api/v1/special-commands/" + id, MAP_TYPE);
-    if (map == null) {
+    SpecialCommandDto sc = orgUnitClient.specialCommand(id);
+    if (sc == null) {
       return null;
     }
     return new SpecialCommandDto(
-        MapPayloadValues.uuidOrNull(map.get("id")),
-        MapPayloadValues.stringOrNull(map.get("name")),
-        MapPayloadValues.stringOrNull(map.get("shorthand")),
-        MapPayloadValues.stringOrNull(map.get("description")),
-        MapPayloadValues.booleanOrFalse(map.get("active")),
-        MapPayloadValues.booleanOrFalse(map.get("isProfitEligible")),
-        MapPayloadValues.longOrZero(map.get("version")));
+        sc.id(),
+        sc.name(),
+        sc.shorthand(),
+        sc.description(),
+        Boolean.TRUE.equals(sc.active()),
+        Boolean.TRUE.equals(sc.isProfitEligible()),
+        sc.version() == null ? 0L : sc.version());
   }
 
   /**
-   * Reads the member roster of one Spezialkommando and maps it onto {@link OrgUnitMembershipDto},
-   * sorted case-insensitively by display name.
+   * Reads the member roster of one Spezialkommando, sorted case-insensitively by display name, with
+   * an absent flag as {@code false}, an absent version as {@code 0} and an absent kind as {@link
+   * OrgUnitKind#SPECIAL_COMMAND}.
    *
    * @param specialCommandId Spezialkommando id.
    * @return the sorted, mutable roster; empty when the backend answered with an empty body.
@@ -376,9 +350,7 @@ public class SpecialCommandMembersPageController {
    */
   @NotNull
   private List<OrgUnitMembershipDto> fetchMembers(@NotNull UUID specialCommandId) {
-    List<Map<String, Object>> raw =
-        backendApiClient.get(
-            "/api/v1/special-commands/" + specialCommandId + "/members", MAP_LIST_TYPE);
+    List<OrgUnitMembershipDto> raw = orgUnitClient.specialCommandMembers(specialCommandId);
     if (raw == null) {
       return List.of();
     }
@@ -387,65 +359,20 @@ public class SpecialCommandMembersPageController {
             .map(
                 m ->
                     new OrgUnitMembershipDto(
-                        MapPayloadValues.uuidOrNull(m.get("userId")),
-                        MapPayloadValues.stringOrNull(m.get("userDisplayName")),
-                        MapPayloadValues.uuidOrNull(m.get("orgUnitId")),
-                        parseKind(m.get("kind")),
-                        MapPayloadValues.booleanOrFalse(m.get("isLogistician")),
-                        MapPayloadValues.booleanOrFalse(m.get("isMissionManager")),
-                        MapPayloadValues.booleanOrFalse(m.get("isLead")),
-                        parseInstant(m.get("joinedAt")),
-                        MapPayloadValues.longOrZero(m.get("version"))))
+                        m.userId(),
+                        m.userDisplayName(),
+                        m.orgUnitId(),
+                        m.kind() == null ? OrgUnitKind.SPECIAL_COMMAND : m.kind(),
+                        Boolean.TRUE.equals(m.isLogistician()),
+                        Boolean.TRUE.equals(m.isMissionManager()),
+                        Boolean.TRUE.equals(m.isLead()),
+                        m.joinedAt(),
+                        m.version() == null ? 0L : m.version()))
             .collect(Collectors.toCollection(ArrayList::new));
     members.sort(
         Comparator.comparing(
             m -> m.userDisplayName() == null ? "" : m.userDisplayName(),
             String.CASE_INSENSITIVE_ORDER));
     return members;
-  }
-
-  /**
-   * Parses an ISO-8601 instant, or epoch millis as a fallback, into an {@link Instant}.
-   *
-   * @param o the raw {@code joinedAt} value.
-   * @return the parsed instant, or {@code null} when absent or unparsable.
-   */
-  @Contract("null -> null")
-  @Nullable
-  private static Instant parseInstant(@Nullable Object o) {
-    if (o == null) {
-      return null;
-    }
-    if (o instanceof Instant i) {
-      return i;
-    }
-    try {
-      return Instant.parse(String.valueOf(o));
-    } catch (Exception ignored) {
-      try {
-        return Instant.ofEpochMilli(Long.parseLong(String.valueOf(o)));
-      } catch (Exception ignoredToo) {
-        return null;
-      }
-    }
-  }
-
-  /**
-   * Parses the {@code kind} string into an {@link OrgUnitKind}, defaulting to {@link
-   * OrgUnitKind#SPECIAL_COMMAND} for a missing or unknown value.
-   *
-   * @param o the raw {@code kind} value.
-   * @return the parsed kind; never {@code null}.
-   */
-  @NotNull
-  private static OrgUnitKind parseKind(@Nullable Object o) {
-    if (o == null) {
-      return OrgUnitKind.SPECIAL_COMMAND;
-    }
-    try {
-      return OrgUnitKind.valueOf(String.valueOf(o));
-    } catch (Exception ignored) {
-      return OrgUnitKind.SPECIAL_COMMAND;
-    }
   }
 }

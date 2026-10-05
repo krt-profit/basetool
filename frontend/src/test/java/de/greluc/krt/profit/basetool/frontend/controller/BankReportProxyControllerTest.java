@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 
+import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.time.Instant;
 import java.util.UUID;
@@ -59,7 +60,8 @@ class BankReportProxyControllerTest {
 
   @BeforeEach
   void setUp() {
-    controller = new BankReportProxyController(RealBackendApiClient.over(webClient));
+    controller =
+        new BankReportProxyController(new BankBackendClient(RealBackendApiClient.over(webClient)));
   }
 
   @Test
@@ -68,9 +70,10 @@ class BankReportProxyControllerTest {
     UUID id = UUID.randomUUID();
     byte[] fakePdf = new byte[] {0x25, 0x50, 0x44, 0x46};
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<Object> idCaptor = ArgumentCaptor.forClass(Object.class);
 
     doReturn(requestHeadersUriSpec).when(webClient).get();
-    doReturn(requestHeadersSpec).when(requestHeadersUriSpec).uri(anyString());
+    doReturn(requestHeadersSpec).when(requestHeadersUriSpec).uri(anyString(), any(Object[].class));
     doReturn(requestHeadersSpec).when(requestHeadersSpec).headers(any(Consumer.class));
     doReturn(responseSpec).when(requestHeadersSpec).retrieve();
     doReturn(Mono.just(fakePdf)).when(responseSpec).bodyToMono(byte[].class);
@@ -89,8 +92,9 @@ class BankReportProxyControllerTest {
     assertNotNull(disposition);
     assertTrue(disposition.contains("attachment"));
     assertTrue(disposition.contains("kontoauszug-" + id + ".pdf"));
-    org.mockito.Mockito.verify(requestHeadersUriSpec).uri(uriCaptor.capture());
-    assertTrue(uriCaptor.getValue().contains("/api/v1/bank/accounts/" + id + "/statement"));
+    org.mockito.Mockito.verify(requestHeadersUriSpec).uri(uriCaptor.capture(), idCaptor.capture());
+    assertTrue(uriCaptor.getValue().startsWith("/api/v1/bank/accounts/{id}/statement?"));
+    assertEquals(id, idCaptor.getValue());
     assertTrue(uriCaptor.getValue().contains("from=2026-01-01T00:00:00Z"));
     assertTrue(uriCaptor.getValue().contains("to=2026-02-01T00:00:00Z"));
   }
@@ -100,7 +104,7 @@ class BankReportProxyControllerTest {
   void downloadStatement_shouldPropagateBackendStatus() {
     UUID id = UUID.randomUUID();
     doReturn(requestHeadersUriSpec).when(webClient).get();
-    doReturn(requestHeadersSpec).when(requestHeadersUriSpec).uri(anyString());
+    doReturn(requestHeadersSpec).when(requestHeadersUriSpec).uri(anyString(), any(Object[].class));
     doReturn(requestHeadersSpec).when(requestHeadersSpec).headers(any(Consumer.class));
     doReturn(responseSpec).when(requestHeadersSpec).retrieve();
     doReturn(Mono.error(WebClientResponseException.create(403, "Forbidden", null, null, null)))

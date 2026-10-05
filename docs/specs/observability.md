@@ -388,7 +388,7 @@ is `DEBUG`, because at any higher level it is a log-flood vector; an operator-ac
 - **Optimistic-lock 409** (`GlobalExceptionHandler`) — level unchanged (`WARN`); the line now carries
   `entity`, `entityId` and `versions` (`expected=<client> persisted=<persisted>`), degrading to the
   exception text alone for the bare JPA variant that names no entity. Numbers and ids only. All
-  `support.OptimisticLock` call sites pass a `UUID`, an `entity.getId()` or `null`; the single
+  `kernel.OptimisticLock` call sites pass a `UUID`, an `entity.getId()` or `null`; the single
   exception (`SystemSettingService`) passes a setting key that must already have matched a persisted
   row, so it is a bounded seeded key and not free text.
 - **Rate-limit rejection** (`RateLimitingFilter`) — level unchanged (`DEBUG`, attacker-paced); the
@@ -680,6 +680,26 @@ cache names); per-user, per-entity-id or otherwise unbounded label values are fo
 both as a privacy rule (metrics have 180-day retention) and as a cardinality guard for the
 Prometheus TSDB. This applies to every meter exposed on `/actuator/prometheus`, including
 the future `basetool_*` business metrics (epic #936 Phase 1c).
+
+**The `uri` tag is bounded by the route table, and its cap must sit above it.** Spring tags
+`http.server.requests` and `http.client.requests` with the route template, never the raw path, so
+the set of `uri` values is the set of routes. Micrometer still caps it
+(`management.metrics.web.server.max-uri-tags` / `.client.max-uri-tags`, default **100**) and, once
+the cap is reached, drops every further `uri` without a metric — one WARN from
+`MaximumAllowableTagsMeterFilter`, then silence. The backend has about 450 route templates and the
+frontend about 420, so the default cut both off within hours of a restart: on 2026-10-04 the
+backend had reached exactly 100 by evening and the frontend's backend calls 94, and every route
+first hit after that was missing from `Http5xxRateHigh`, `HttpLatencyP95High` and the dashboards.
+
+- The backend sets the server cap and the frontend both caps to **1000** in `application.yml`; the
+  ingest keeps the default (16 mappings).
+- `UriTagCapacityTest` (backend, frontend) counts the dispatcher's route templates and fails when
+  they plus 50 fixed tags (`UNKNOWN`, `NOT_FOUND`, `REDIRECTION`, …) reach the bound cap; the
+  frontend test also holds the client cap at 1000 or more, because the frontend relays to every
+  backend route.
+- `HttpUriTagCapNear` (`apps.yml`, warning) fires when an application reports 900 distinct `uri`
+  values on either meter for 15 minutes — the drift a test cannot see, such as a raw path leaking
+  into the tag.
 
 ### REQ-OBS-007 — Log ingestion into the monitoring plane (per-stream rules)
 
@@ -2277,6 +2297,11 @@ A fifth frontend session meter came with the session type allow-list (REQ-SEC-06
   can: `basetool_session_type_allow_list_mode{mode="enforce"} == 1` per frontend instance proves the
   setting reached the process, as the startup line `Session type allow-list mode: ENFORCE` does for
   one start only. No alert: a mode is a configuration, not a fault.
+- `basetool_trusted_types_mode{mode}` — gauge (`TrustedTypesModeMetric`), one series per mode
+  (`report` / `enforce`, a closed set), `1` on the mode the frontend process resolved from
+  `app.security.trusted-types` and `0` on the other (REQ-SEC-064, ADR-0239). It shows whether the
+  Trusted Types directives of the CSP are report-only or enforced on each instance; the violations
+  themselves are `csp_violation` reports below. No alert, for the same reason.
 
 Two frontend meters were added by the 2026-08 logging audit:
 
@@ -2330,7 +2355,14 @@ Two frontend meters were added by the 2026-08 logging audit:
   `ClientErrorReportController.originOnly` repeats the reduction server-side, so a path, query or
   user info never reaches the `DEBUG` line even from a crafted beacon. It rides the same panel 43
   and the same `ClientErrorSpike` rule; browser extensions that inject inline code are part of its
-  permanent background, which is exactly what the step-change shape tolerates.
+  permanent background, which is exactly what the step-change shape tolerates. Since 2026-10-04 it
+  also carries the **Trusted Types** violations of the report-only policy (ADR-0239): `message` is
+  `require-trusted-types-for` followed by the sink the browser names (`Element innerHTML`, never the
+  sample's markup), or `trusted-types` for a policy name the CSP does not list, and `source` is
+  `trusted-types-sink` / `trusted-types-policy`. The browser dispatches `securitypolicyviolation`
+  for a report-only policy too, which is why the beacon needs no `report-uri` for this phase.
+  `sum(increase(basetool_client_error_total{kind="csp_violation"}[7d]))` staying empty is the
+  precondition for switching production to `enforce` (`deployment.md`).
 
 The auth surfaces (#1041 item 18) add `basetool_login_total{outcome,reason}` (`SecurityConfig`'s
 OAuth2 success/failure handlers: `outcome` = `success` / `failure`; on failure `reason` =
@@ -3357,7 +3389,7 @@ client if the exchange registry holds it and `other` if not (`ClientAttribution.
 REQ-XCH-010, REQ-XCH-028). `ApiUnknownClient` (warning) fires on a sustained
 `other`; the `none` rule ships staged (below).
 
-That mapping is **not private to this counter**. It lives in `support.ClientAttribution` and is
+That mapping is **not private to this counter**. It lives in `platform.api.ClientAttribution` and is
 shared with the audit trail's `client_id` column (REQ-AUDIT-005), which records the same bounded
 value on every audited mutation. The sharing is the requirement, not an implementation detail: an
 operator who sees a burst on this counter and then filters the audit log for the same client is

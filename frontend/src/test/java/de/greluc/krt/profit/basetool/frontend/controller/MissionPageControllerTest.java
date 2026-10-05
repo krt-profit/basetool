@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.MissionForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ParticipantForm;
@@ -64,7 +65,9 @@ class MissionPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
         new MissionPageController(
-            backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL);
+            new MissionBackendClient(backendApiClient),
+            mock(FrontendAuthHelperService.class),
+            PARALLEL);
     Model model = new ConcurrentModel();
 
     String viewName = controller.createMissionForm(model, null, null);
@@ -90,7 +93,9 @@ class MissionPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
         new MissionPageController(
-            backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL);
+            new MissionBackendClient(backendApiClient),
+            mock(FrontendAuthHelperService.class),
+            PARALLEL);
     Model model = new ConcurrentModel();
     OidcUser principal = mock(OidcUser.class);
 
@@ -106,7 +111,9 @@ class MissionPageControllerTest {
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(null);
     MissionPageController controller =
         new MissionPageController(
-            backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL);
+            new MissionBackendClient(backendApiClient),
+            mock(FrontendAuthHelperService.class),
+            PARALLEL);
     Model model = new ConcurrentModel();
     OidcUser principal = mock(OidcUser.class);
 
@@ -122,13 +129,16 @@ class MissionPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionWriteController controller =
         new MissionWriteController(
-            backendApiClient,
+            new MissionBackendClient(backendApiClient),
             mock(MessageSource.class),
             new MissionPageController(
-                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
+                new MissionBackendClient(backendApiClient),
+                mock(FrontendAuthHelperService.class),
+                PARALLEL),
             mock(LiveSyncLocalBus.class));
 
-    when(backendApiClient.post(anyString(), any(), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.post(anyString(), any(), eq(Void.class), any(Object[].class)))
+        .thenReturn(null);
 
     String view =
         controller.addParticipant(
@@ -141,7 +151,7 @@ class MissionPageControllerTest {
 
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
-        .post(eq("/api/v1/missions/" + id + "/participants/add"), any(), eq(Void.class));
+        .post(eq("/api/v1/missions/{id}/participants/add"), any(), eq(Void.class), eq(id));
   }
 
   @Test
@@ -150,14 +160,16 @@ class MissionPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionWriteController controller =
         new MissionWriteController(
-            backendApiClient,
+            new MissionBackendClient(backendApiClient),
             mock(MessageSource.class),
             new MissionPageController(
-                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
+                new MissionBackendClient(backendApiClient),
+                mock(FrontendAuthHelperService.class),
+                PARALLEL),
             mock(LiveSyncLocalBus.class));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
-    when(backendApiClient.post(anyString(), any(), eq(Void.class)))
+    when(backendApiClient.post(anyString(), any(), eq(Void.class), any(Object[].class)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "ambiguous", null, 409));
@@ -186,14 +198,17 @@ class MissionPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionWriteController controller =
         new MissionWriteController(
-            backendApiClient,
+            new MissionBackendClient(backendApiClient),
             mock(MessageSource.class),
             new MissionPageController(
-                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
+                new MissionBackendClient(backendApiClient),
+                mock(FrontendAuthHelperService.class),
+                PARALLEL),
             mock(LiveSyncLocalBus.class));
     OidcUser user = mock(OidcUser.class);
 
-    when(backendApiClient.post(anyString(), any(), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.post(anyString(), any(), eq(Void.class), any(Object[].class)))
+        .thenReturn(null);
 
     String view =
         controller.addParticipant(
@@ -206,7 +221,7 @@ class MissionPageControllerTest {
 
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
-        .post(eq("/api/v1/missions/" + id + "/participants/add"), any(), eq(Void.class));
+        .post(eq("/api/v1/missions/{id}/participants/add"), any(), eq(Void.class), eq(id));
   }
 
   @Test
@@ -216,20 +231,23 @@ class MissionPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionWriteController controller =
         new MissionWriteController(
-            backendApiClient,
+            new MissionBackendClient(backendApiClient),
             mock(MessageSource.class),
             new MissionPageController(
-                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
+                new MissionBackendClient(backendApiClient),
+                mock(FrontendAuthHelperService.class),
+                PARALLEL),
             mock(LiveSyncLocalBus.class));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
-    when(backendApiClient.put(anyString(), any(), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.put(anyString(), any(), eq(Void.class), any(Object[].class)))
+        .thenReturn(null);
 
     String view = controller.setPartyLead(id, userId, "Alice", 2L, redirectAttributes);
 
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
-        .put(eq("/api/v1/missions/" + id + "/party-lead"), any(), eq(Void.class));
+        .put(eq("/api/v1/missions/{id}/party-lead"), any(), eq(Void.class), eq(id));
     verify(redirectAttributes).addFlashAttribute("successToast", "notification.success.save");
   }
 
@@ -239,14 +257,16 @@ class MissionPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionWriteController controller =
         new MissionWriteController(
-            backendApiClient,
+            new MissionBackendClient(backendApiClient),
             mock(MessageSource.class),
             new MissionPageController(
-                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
+                new MissionBackendClient(backendApiClient),
+                mock(FrontendAuthHelperService.class),
+                PARALLEL),
             mock(LiveSyncLocalBus.class));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
-    when(backendApiClient.put(anyString(), any(), eq(Void.class)))
+    when(backendApiClient.put(anyString(), any(), eq(Void.class), any(Object[].class)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "conflict", null, 409));
@@ -266,14 +286,17 @@ class MissionPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionWriteController controller =
         new MissionWriteController(
-            backendApiClient,
+            new MissionBackendClient(backendApiClient),
             mock(MessageSource.class),
             new MissionPageController(
-                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
+                new MissionBackendClient(backendApiClient),
+                mock(FrontendAuthHelperService.class),
+                PARALLEL),
             mock(LiveSyncLocalBus.class));
     OidcUser user = mock(OidcUser.class);
 
-    when(backendApiClient.delete(anyString(), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.delete(anyString(), eq(Void.class), any(Object[].class)))
+        .thenReturn(null);
 
     String view =
         controller.deleteParticipant(id, participantId, user, mock(RedirectAttributes.class));
@@ -281,8 +304,10 @@ class MissionPageControllerTest {
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
         .delete(
-            eq("/api/v1/missions/" + id + "/participants/" + participantId + "/slim"),
-            eq(Void.class));
+            eq("/api/v1/missions/{id}/participants/{participantId}/slim"),
+            eq(Void.class),
+            eq(id),
+            eq(participantId));
   }
 
   @Test
@@ -292,13 +317,16 @@ class MissionPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionWriteController controller =
         new MissionWriteController(
-            backendApiClient,
+            new MissionBackendClient(backendApiClient),
             mock(MessageSource.class),
             new MissionPageController(
-                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
+                new MissionBackendClient(backendApiClient),
+                mock(FrontendAuthHelperService.class),
+                PARALLEL),
             mock(LiveSyncLocalBus.class));
 
-    when(backendApiClient.delete(anyString(), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.delete(anyString(), eq(Void.class), any(Object[].class)))
+        .thenReturn(null);
 
     String view =
         controller.deleteParticipant(id, participantId, null, mock(RedirectAttributes.class));
@@ -306,8 +334,10 @@ class MissionPageControllerTest {
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
         .delete(
-            eq("/api/v1/missions/" + id + "/participants/" + participantId + "/slim"),
-            eq(Void.class));
+            eq("/api/v1/missions/{id}/participants/{participantId}/slim"),
+            eq(Void.class),
+            eq(id),
+            eq(participantId));
   }
 
   @Test
@@ -317,14 +347,17 @@ class MissionPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionWriteController controller =
         new MissionWriteController(
-            backendApiClient,
+            new MissionBackendClient(backendApiClient),
             mock(MessageSource.class),
             new MissionPageController(
-                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
+                new MissionBackendClient(backendApiClient),
+                mock(FrontendAuthHelperService.class),
+                PARALLEL),
             mock(LiveSyncLocalBus.class));
     OidcUser user = mock(OidcUser.class);
 
-    when(backendApiClient.put(anyString(), any(), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.put(anyString(), any(), eq(Void.class), any(Object[].class)))
+        .thenReturn(null);
 
     String view =
         controller.updateParticipant(
@@ -340,9 +373,11 @@ class MissionPageControllerTest {
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
         .put(
-            eq("/api/v1/missions/" + id + "/participants/" + participantId + "/slim"),
+            eq("/api/v1/missions/{id}/participants/{participantId}/slim"),
             any(),
-            eq(Void.class));
+            eq(Void.class),
+            eq(id),
+            eq(participantId));
   }
 
   @Test
@@ -352,13 +387,16 @@ class MissionPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionWriteController controller =
         new MissionWriteController(
-            backendApiClient,
+            new MissionBackendClient(backendApiClient),
             mock(MessageSource.class),
             new MissionPageController(
-                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
+                new MissionBackendClient(backendApiClient),
+                mock(FrontendAuthHelperService.class),
+                PARALLEL),
             mock(LiveSyncLocalBus.class));
 
-    when(backendApiClient.put(anyString(), any(), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.put(anyString(), any(), eq(Void.class), any(Object[].class)))
+        .thenReturn(null);
 
     String view =
         controller.updateParticipant(
@@ -374,9 +412,11 @@ class MissionPageControllerTest {
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
         .put(
-            eq("/api/v1/missions/" + id + "/participants/" + participantId + "/slim"),
+            eq("/api/v1/missions/{id}/participants/{participantId}/slim"),
             any(),
-            eq(Void.class));
+            eq(Void.class),
+            eq(id),
+            eq(participantId));
   }
 
   @Test
@@ -384,7 +424,9 @@ class MissionPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
         new MissionPageController(
-            backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL);
+            new MissionBackendClient(backendApiClient),
+            mock(FrontendAuthHelperService.class),
+            PARALLEL);
     Model model = new ConcurrentModel();
     OidcUser user = mock(OidcUser.class);
 
@@ -412,7 +454,9 @@ class MissionPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
         new MissionPageController(
-            backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL);
+            new MissionBackendClient(backendApiClient),
+            mock(FrontendAuthHelperService.class),
+            PARALLEL);
     Model model = new ConcurrentModel();
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
@@ -436,7 +480,9 @@ class MissionPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
         new MissionPageController(
-            backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL);
+            new MissionBackendClient(backendApiClient),
+            mock(FrontendAuthHelperService.class),
+            PARALLEL);
     Model model = new ConcurrentModel();
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
@@ -461,7 +507,7 @@ class MissionPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     FrontendAuthHelperService authHelper = mock(FrontendAuthHelperService.class);
     MissionPageController controller =
-        new MissionPageController(backendApiClient, authHelper, PARALLEL);
+        new MissionPageController(new MissionBackendClient(backendApiClient), authHelper, PARALLEL);
     Model model = new ConcurrentModel();
 
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto mission =
@@ -503,14 +549,15 @@ class MissionPageControllerTest {
             null,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/missions/" + id), anyTypeRef())).thenReturn(mission);
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(id)))
+        .thenReturn(mission);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
     String view = controller.missionDetail(id, model, null, null);
 
     assertEquals("mission-detail", view);
-    verify(backendApiClient).get(eq("/api/v1/missions/" + id), anyTypeRef());
+    verify(backendApiClient).get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(id));
     verify(backendApiClient).getCached(eq(CachedCatalog.JOB_TYPES_MISSION), anyTypeRef());
     verify(backendApiClient).getCached(eq(CachedCatalog.JOB_TYPES_CREW), anyTypeRef());
     verify(backendApiClient).getCached(eq(CachedCatalog.SQUADRONS_UNSORTED), anyTypeRef());
@@ -522,7 +569,9 @@ class MissionPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MissionPageController controller =
         new MissionPageController(
-            backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL);
+            new MissionBackendClient(backendApiClient),
+            mock(FrontendAuthHelperService.class),
+            PARALLEL);
     Model model = new ConcurrentModel();
 
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto mission =
@@ -564,7 +613,8 @@ class MissionPageControllerTest {
             null,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/missions/" + id), anyTypeRef())).thenReturn(mission);
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(id)))
+        .thenReturn(mission);
     when(backendApiClient.get(eq("/api/v1/missions/" + id + "/units?size=1000"), anyTypeRef()))
         .thenReturn(
             new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
@@ -576,9 +626,12 @@ class MissionPageControllerTest {
 
     controller.missionDetail(id, model, null, null);
 
-    verify(backendApiClient, never()).get(contains("/finance-entries"), anyTypeRef());
-    verify(backendApiClient, never()).get(contains("/refinery-orders"), anyTypeRef());
-    verify(backendApiClient, never()).get(contains("/finance-entries"), anyClass());
+    verify(backendApiClient, never())
+        .get(contains("/finance-entries"), anyTypeRef(), any(Object[].class));
+    verify(backendApiClient, never())
+        .get(contains("/refinery-orders"), anyTypeRef(), any(Object[].class));
+    verify(backendApiClient, never())
+        .get(contains("/finance-entries"), anyClass(), any(Object[].class));
   }
 
   @Test
@@ -588,7 +641,7 @@ class MissionPageControllerTest {
     FrontendAuthHelperService authHelper = mock(FrontendAuthHelperService.class);
     when(authHelper.isMemberOrAbove()).thenReturn(true);
     MissionPageController controller =
-        new MissionPageController(backendApiClient, authHelper, PARALLEL);
+        new MissionPageController(new MissionBackendClient(backendApiClient), authHelper, PARALLEL);
     Model model = new ConcurrentModel();
 
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto mission =
@@ -630,12 +683,14 @@ class MissionPageControllerTest {
             null,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/missions/" + id), anyTypeRef())).thenReturn(mission);
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(id)))
+        .thenReturn(mission);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + id + "/finance-entries/summary"),
-            eq(de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto.class)))
+            eq("/api/v1/missions/{id}/finance-entries/summary"),
+            eq(de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto.class),
+            eq(id)))
         .thenReturn(
             new de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto(
                 java.math.BigDecimal.ZERO,
@@ -644,21 +699,23 @@ class MissionPageControllerTest {
                 java.math.BigDecimal.ZERO,
                 0L));
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + id + "/finance-entries?size=200"), anyTypeRef()))
+            eq("/api/v1/missions/{id}/finance-entries?size={size}"), anyTypeRef(), eq(id), eq(200)))
         .thenReturn(
             new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
                 Collections.emptyList(), 0, 200, 0, 0, Collections.emptyList()));
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/mission/" + id), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/refinery-orders/mission/{id}"), anyTypeRef(), eq(id)))
         .thenReturn(Collections.emptyList());
 
     controller.missionDetail(id, model, null, null);
 
     verify(backendApiClient)
         .get(
-            eq("/api/v1/missions/" + id + "/finance-entries/summary"),
-            eq(de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto.class));
+            eq("/api/v1/missions/{id}/finance-entries/summary"),
+            eq(de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto.class),
+            eq(id));
     verify(backendApiClient)
-        .get(eq("/api/v1/missions/" + id + "/finance-entries?size=200"), anyTypeRef());
-    verify(backendApiClient).get(eq("/api/v1/refinery-orders/mission/" + id), anyTypeRef());
+        .get(
+            eq("/api/v1/missions/{id}/finance-entries?size={size}"), anyTypeRef(), eq(id), eq(200));
+    verify(backendApiClient).get(eq("/api/v1/refinery-orders/mission/{id}"), anyTypeRef(), eq(id));
   }
 }

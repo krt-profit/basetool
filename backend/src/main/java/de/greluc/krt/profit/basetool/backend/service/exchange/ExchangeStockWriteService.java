@@ -23,6 +23,9 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeChange;
@@ -53,9 +56,6 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryStolenMarkService;
 import de.greluc.krt.profit.basetool.backend.service.MaterialExchangeOfferRatchet;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
-import de.greluc.krt.profit.basetool.backend.support.InventoryProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -684,7 +684,8 @@ public class ExchangeStockWriteService {
           row.getId(),
           new InventoryItemStolenMarkDto(
               row.getVersion(), stolen, take.compareTo(rowAmount) == 0 ? null : take.doubleValue()),
-          member);
+          member,
+          false);
       left = left.subtract(take);
     }
     return amount.subtract(left);

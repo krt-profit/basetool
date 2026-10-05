@@ -25,7 +25,7 @@ async function persistOrderReorder(orderId, targetPriority) {
     if (window.krtFetch) {
         res = await window.krtFetch.write({
             method: 'PUT',
-            url: '/orders/' + orderId + '/priority/ajax?priority=' + targetPriority,
+            url: `/orders/${orderId}/priority/ajax?priority=${targetPriority}`,
             toast: false,
             errorMessage: KRT_ORDERS_REORDER_I18N.error,
             conflict: {
@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let draggedRow = null;
     let oldIndex = -1;
 
-    container.addEventListener('dragstart', function (e) {
+    container.addEventListener('dragstart', (e) => {
         draggedRow = e.target.closest('tr.draggable-row');
         if (!draggedRow) return;
 
@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
         oldIndex = rows.indexOf(draggedRow);
     });
 
-    container.addEventListener('dragend', function (_e) {
+    container.addEventListener('dragend', (_e) => {
         window.__ordersDragging = false;
         if (!draggedRow) return;
         draggedRow.style.opacity = '1';
@@ -81,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
         oldIndex = -1;
     });
 
-    container.addEventListener('dragover', function (e) {
+    container.addEventListener('dragover', (e) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
 
@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    container.addEventListener('drop', function (e) {
+    container.addEventListener('drop', (e) => {
         e.preventDefault();
         if (!draggedRow || oldIndex === -1) return;
 

@@ -81,7 +81,12 @@ class ShipDataVisibilityAjaxControllerTest {
         .andExpect(status().isNoContent());
 
     verify(backendApiClient)
-        .put(eq("/api/v1/ship-types/" + id + "/visibility?hidden=true"), any(), eq(Void.class));
+        .put(
+            eq("/api/v1/ship-types/{id}/visibility?hidden={hidden}"),
+            any(),
+            eq(Void.class),
+            eq(id),
+            eq(true));
   }
 
   @Test
@@ -99,7 +104,12 @@ class ShipDataVisibilityAjaxControllerTest {
         .andExpect(status().isNoContent());
 
     verify(backendApiClient)
-        .put(eq("/api/v1/manufacturers/" + id + "/visibility?hidden=false"), any(), eq(Void.class));
+        .put(
+            eq("/api/v1/manufacturers/{id}/visibility?hidden={hidden}"),
+            any(),
+            eq(Void.class),
+            eq(id),
+            eq(false));
   }
 
   @Test
@@ -121,7 +131,11 @@ class ShipDataVisibilityAjaxControllerTest {
       throws Exception {
     UUID id = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/ship-types/" + id + "/visibility?hidden=true"), any(), eq(Void.class)))
+            eq("/api/v1/ship-types/{id}/visibility?hidden={hidden}"),
+            any(),
+            eq(Void.class),
+            eq(id),
+            eq(true)))
         .thenThrow(
             new BackendServiceException(
                 "down", null, 503, "SERVICE_UNAVAILABLE", null, Collections.emptyList(), null));

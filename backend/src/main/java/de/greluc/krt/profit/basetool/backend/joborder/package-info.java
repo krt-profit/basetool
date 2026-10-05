@@ -20,7 +20,9 @@
 /** The job-order module (Aufträge): orders, their production allocations and deliveries. */
 @ApplicationModule(
     allowedDependencies = {
+      "admin::api",
       "audit::api",
+      "catalogue::api",
       "identity::api",
       "inventory::api",
       "kernel",
@@ -28,6 +30,7 @@
       "materialexchange::api",
       "notification::api",
       "orgunit::api",
+      "platform::api",
       "scope::api"
     })
 package de.greluc.krt.profit.basetool.backend.joborder;

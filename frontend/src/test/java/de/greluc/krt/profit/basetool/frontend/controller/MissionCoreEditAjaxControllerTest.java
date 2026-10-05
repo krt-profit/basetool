@@ -39,11 +39,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PatchMissionScheduleRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.time.Instant;
 import java.util.Collections;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -95,7 +95,7 @@ class MissionCoreEditAjaxControllerTest {
     when(refreshed.coreVersion()).thenReturn(22L);
     when(refreshed.scheduleVersion()).thenReturn(33L);
     when(refreshed.flagsVersion()).thenReturn(44L);
-    when(backendApiClient.get(eq("/api/v1/missions/" + MISSION_ID), eq(MissionDto.class)))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), eq(MissionDto.class), eq(MISSION_ID)))
         .thenReturn(refreshed);
 
     mockMvc
@@ -116,11 +116,11 @@ class MissionCoreEditAjaxControllerTest {
         .andExpect(jsonPath("$.flagsVersion").value(44));
 
     verify(backendApiClient)
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/schedule"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/schedule"), any(), eq(Void.class), eq(MISSION_ID));
     verify(backendApiClient)
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/core"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/core"), any(), eq(Void.class), eq(MISSION_ID));
     verify(backendApiClient)
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/flags"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/flags"), any(), eq(Void.class), eq(MISSION_ID));
   }
 
   @Test
@@ -130,7 +130,7 @@ class MissionCoreEditAjaxControllerTest {
     when(refreshed.coreVersion()).thenReturn(1L);
     when(refreshed.scheduleVersion()).thenReturn(1L);
     when(refreshed.flagsVersion()).thenReturn(1L);
-    when(backendApiClient.get(eq("/api/v1/missions/" + MISSION_ID), eq(MissionDto.class)))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), eq(MissionDto.class), eq(MISSION_ID)))
         .thenReturn(refreshed);
 
     mockMvc
@@ -144,15 +144,16 @@ class MissionCoreEditAjaxControllerTest {
                 .param("plannedStartTime", "2026-06-21T11:59:58.222717")
                 .param("scheduleVersion", "5"))
         .andExpect(status().isOk());
-    ArgumentCaptor<Map<String, Object>> scheduleBody = ArgumentCaptor.captor();
+    ArgumentCaptor<PatchMissionScheduleRequest> scheduleBody = ArgumentCaptor.captor();
     verify(backendApiClient)
         .patch(
-            eq("/api/v1/missions/" + MISSION_ID + "/schedule"),
+            eq("/api/v1/missions/{id}/schedule"),
             scheduleBody.capture(),
-            eq(Void.class));
+            eq(Void.class),
+            eq(MISSION_ID));
     assertEquals(
         Instant.parse("2026-06-21T09:59:58.222717Z"),
-        scheduleBody.getValue().get("plannedStartTime"),
+        scheduleBody.getValue().plannedStartTime(),
         "an unedited microsecond zoneless schedule time must round-trip, not be nulled on save");
   }
 
@@ -163,7 +164,7 @@ class MissionCoreEditAjaxControllerTest {
     when(refreshed.coreVersion()).thenReturn(2L);
     when(refreshed.scheduleVersion()).thenReturn(3L);
     when(refreshed.flagsVersion()).thenReturn(4L);
-    when(backendApiClient.get(eq("/api/v1/missions/" + MISSION_ID), eq(MissionDto.class)))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), eq(MissionDto.class), eq(MISSION_ID)))
         .thenReturn(refreshed);
 
     mockMvc
@@ -183,11 +184,11 @@ class MissionCoreEditAjaxControllerTest {
         .andExpect(status().isOk());
 
     verify(backendApiClient)
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/core"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/core"), any(), eq(Void.class), eq(MISSION_ID));
     verify(backendApiClient, never())
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/schedule"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/schedule"), any(), eq(Void.class), eq(MISSION_ID));
     verify(backendApiClient, never())
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/flags"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/flags"), any(), eq(Void.class), eq(MISSION_ID));
   }
 
   @Test
@@ -197,7 +198,7 @@ class MissionCoreEditAjaxControllerTest {
     when(refreshed.coreVersion()).thenReturn(1L);
     when(refreshed.scheduleVersion()).thenReturn(2L);
     when(refreshed.flagsVersion()).thenReturn(1L);
-    when(backendApiClient.get(eq("/api/v1/missions/" + MISSION_ID), eq(MissionDto.class)))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), eq(MissionDto.class), eq(MISSION_ID)))
         .thenReturn(refreshed);
 
     mockMvc
@@ -216,11 +217,11 @@ class MissionCoreEditAjaxControllerTest {
         .andExpect(status().isOk());
 
     verify(backendApiClient)
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/schedule"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/schedule"), any(), eq(Void.class), eq(MISSION_ID));
     verify(backendApiClient, never())
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/core"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/core"), any(), eq(Void.class), eq(MISSION_ID));
     verify(backendApiClient, never())
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/flags"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/flags"), any(), eq(Void.class), eq(MISSION_ID));
   }
 
   @Test
@@ -230,7 +231,7 @@ class MissionCoreEditAjaxControllerTest {
     when(refreshed.coreVersion()).thenReturn(1L);
     when(refreshed.scheduleVersion()).thenReturn(1L);
     when(refreshed.flagsVersion()).thenReturn(1L);
-    when(backendApiClient.get(eq("/api/v1/missions/" + MISSION_ID), eq(MissionDto.class)))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), eq(MissionDto.class), eq(MISSION_ID)))
         .thenReturn(refreshed);
 
     mockMvc
@@ -245,11 +246,11 @@ class MissionCoreEditAjaxControllerTest {
         .andExpect(status().isOk());
 
     verify(backendApiClient)
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/schedule"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/schedule"), any(), eq(Void.class), eq(MISSION_ID));
     verify(backendApiClient)
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/core"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/core"), any(), eq(Void.class), eq(MISSION_ID));
     verify(backendApiClient)
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/flags"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/flags"), any(), eq(Void.class), eq(MISSION_ID));
   }
 
   @Test
@@ -278,7 +279,7 @@ class MissionCoreEditAjaxControllerTest {
             new BackendServiceException(
                 "conflict", null, 409, "OPTIMISTIC_LOCK", null, Collections.emptyList(), null))
         .when(backendApiClient)
-        .patch(eq("/api/v1/missions/" + MISSION_ID + "/schedule"), any(), eq(Void.class));
+        .patch(eq("/api/v1/missions/{id}/schedule"), any(), eq(Void.class), eq(MISSION_ID));
 
     mockMvc
         .perform(

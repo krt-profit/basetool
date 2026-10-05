@@ -34,6 +34,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.admin.api.SystemSettings;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.FinanceType;
@@ -83,7 +84,7 @@ class OperationPayoutServiceTest {
   @Mock private UserService userService;
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private AuthHelperService authHelperService;
-  @Mock private SystemSettingService systemSettingService;
+  @Mock private SystemSettings systemSettings;
 
   @Mock private AuditService auditService;
 
@@ -795,7 +796,7 @@ class OperationPayoutServiceTest {
 
     @Test
     void transferFee_usesRateFromSystemSetting_whenPresent() {
-      when(systemSettingService.getSettingValue("operation.transfer_fee_rate"))
+      when(systemSettings.getSettingValue("operation.transfer_fee_rate"))
           .thenReturn(Optional.of("0.01"));
       Mission m = newMission(T0, T0_PLUS_60M);
       User alice = newUser("alice");
@@ -815,7 +816,7 @@ class OperationPayoutServiceTest {
 
     @Test
     void transferFee_fallsBackToDefault_whenSettingIsBlank() {
-      when(systemSettingService.getSettingValue("operation.transfer_fee_rate"))
+      when(systemSettings.getSettingValue("operation.transfer_fee_rate"))
           .thenReturn(Optional.of("   "));
       Mission m = newMission(T0, T0_PLUS_60M);
       User alice = newUser("alice");
@@ -835,7 +836,7 @@ class OperationPayoutServiceTest {
 
     @Test
     void transferFee_fallsBackToDefault_whenSettingIsUnparseable() {
-      when(systemSettingService.getSettingValue("operation.transfer_fee_rate"))
+      when(systemSettings.getSettingValue("operation.transfer_fee_rate"))
           .thenReturn(Optional.of("five percent"));
       Mission m = newMission(T0, T0_PLUS_60M);
       User alice = newUser("alice");
@@ -855,7 +856,7 @@ class OperationPayoutServiceTest {
 
     @Test
     void transferFee_fallsBackToDefault_whenSettingIsOutOfRange() {
-      when(systemSettingService.getSettingValue("operation.transfer_fee_rate"))
+      when(systemSettings.getSettingValue("operation.transfer_fee_rate"))
           .thenReturn(Optional.of("1.5"));
       Mission m = newMission(T0, T0_PLUS_60M);
       User alice = newUser("alice");
@@ -875,7 +876,7 @@ class OperationPayoutServiceTest {
 
     @Test
     void transferFee_acceptsZeroRate_disablingTheFee() {
-      when(systemSettingService.getSettingValue("operation.transfer_fee_rate"))
+      when(systemSettings.getSettingValue("operation.transfer_fee_rate"))
           .thenReturn(Optional.of("0"));
       Mission m = newMission(T0, T0_PLUS_60M);
       User alice = newUser("alice");

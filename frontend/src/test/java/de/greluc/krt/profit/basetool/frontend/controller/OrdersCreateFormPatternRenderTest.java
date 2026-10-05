@@ -198,7 +198,9 @@ class OrdersCreateFormPatternRenderTest {
             1L,
             null,
             false);
-    doReturn(order).when(backendApiClient).get(eq("/api/v1/orders/" + id), eq(JobOrderDto.class));
+    doReturn(order)
+        .when(backendApiClient)
+        .get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id));
 
     String html = render("/orders/" + id + "/items/edit");
 

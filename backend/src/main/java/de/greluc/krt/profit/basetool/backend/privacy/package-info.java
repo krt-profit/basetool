@@ -23,8 +23,10 @@
  */
 @ApplicationModule(
     allowedDependencies = {
+      "admin::api",
       "audit::api",
       "bank::api",
+      "catalogue::api",
       "exchange::api",
       "identity::api",
       "inventory::api",
@@ -34,6 +36,7 @@
       "materialexchange::api",
       "notification::api",
       "orgunit::api",
+      "platform::api",
       "refinery::api",
       "scope::api"
     })

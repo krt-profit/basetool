@@ -21,13 +21,13 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
+import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintProductDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.DefaultBlueprintAddResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.DefaultBlueprintAddSelectionRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.DefaultBlueprintCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.DefaultBlueprintDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
@@ -39,7 +39,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -57,7 +56,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 /**
  * Admin page for curating the auto-granted default-blueprint set (REQ-INV-017): renders the set,
  * proxies the product type-ahead and relays add and remove to the backend via {@link
- * BackendApiClient}.
+ * BlueprintBackendClient}.
  *
  * <p>Mutations run in place through JSON twins (REQ-FE-001); the POST-redirect handlers are the
  * no-JS fallback.
@@ -77,22 +76,8 @@ public class AdminDefaultBlueprintsPageController {
    */
   private static final int MAX_LOGGED_QUERY = 80;
 
-  /** Backend admin API the page relays its reads and writes to. */
-  private static final String BACKEND_BASE = "/api/v1/admin/default-blueprints";
-
-  /**
-   * Response type for the blueprint product type-ahead search results. A shared static {@link
-   * ParameterizedTypeReference} is behaviourally identical to a fresh anonymous instance per call
-   * (Q10).
-   */
-  private static final ParameterizedTypeReference<List<BlueprintProductDto>>
-      BLUEPRINT_PRODUCT_LIST_TYPE = new ParameterizedTypeReference<>() {};
-
-  /** Response type for the current default-blueprint set read. */
-  private static final ParameterizedTypeReference<List<DefaultBlueprintDto>>
-      DEFAULT_BLUEPRINT_LIST_TYPE = new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Reads and writes the default-blueprint set and searches the products. */
+  private final BlueprintBackendClient blueprintClient;
 
   /**
    * Renders the default-blueprint set with the add bar.
@@ -118,8 +103,7 @@ public class AdminDefaultBlueprintsPageController {
   @NotNull
   @GetMapping(params = "fragment=rows")
   public String rows(@NotNull Model model) {
-    List<DefaultBlueprintDto> defaults =
-        backendApiClient.get(BACKEND_BASE, DEFAULT_BLUEPRINT_LIST_TYPE);
+    List<DefaultBlueprintDto> defaults = blueprintClient.defaults();
     model.addAttribute("defaults", defaults == null ? List.of() : defaults);
     return "admin/default-blueprints :: rows";
   }
@@ -138,9 +122,7 @@ public class AdminDefaultBlueprintsPageController {
     try {
       String query = q == null ? "" : q;
       int effectiveLimit = limit == null ? 25 : Math.min(200, Math.max(1, limit));
-      String uri = "/api/v1/blueprints/products/search?q={q}&limit=" + effectiveLimit;
-      List<BlueprintProductDto> result =
-          backendApiClient.get(uri, BLUEPRINT_PRODUCT_LIST_TYPE, query);
+      List<BlueprintProductDto> result = blueprintClient.searchProducts(query, effectiveLimit);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
       log.debug(
@@ -202,7 +184,7 @@ public class AdminDefaultBlueprintsPageController {
   @PostMapping("/{id}/delete")
   public String remove(@PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
+      blueprintClient.removeDefault(id);
       redirectAttributes.addFlashAttribute("successToast", "admin.defaultBlueprints.toast.removed");
     } catch (Exception e) {
       log.error("Failed to remove default blueprint {}", id, e);
@@ -226,7 +208,7 @@ public class AdminDefaultBlueprintsPageController {
         log,
         "remove default blueprint " + id + " (ajax)",
         () -> {
-          backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
+          blueprintClient.removeDefault(id);
           return ResponseEntity.ok().build();
         });
   }
@@ -251,8 +233,7 @@ public class AdminDefaultBlueprintsPageController {
       }
       String key = raw.trim();
       try {
-        backendApiClient.post(
-            BACKEND_BASE, new DefaultBlueprintCreateRequest(key), DefaultBlueprintDto.class);
+        blueprintClient.addDefault(new DefaultBlueprintCreateRequest(key));
         added++;
       } catch (BackendServiceException e) {
         if (e.getStatusCode() == HttpStatus.CONFLICT.value()) {
@@ -280,8 +261,7 @@ public class AdminDefaultBlueprintsPageController {
    */
   private List<DefaultBlueprintDto> fetchDefaults() {
     try {
-      List<DefaultBlueprintDto> result =
-          backendApiClient.get(BACKEND_BASE, DEFAULT_BLUEPRINT_LIST_TYPE);
+      List<DefaultBlueprintDto> result = blueprintClient.defaults();
       return result == null ? Collections.emptyList() : result;
     } catch (BackendServiceException e) {
       log.debug("Failed to fetch default blueprints", e);

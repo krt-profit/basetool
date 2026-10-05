@@ -295,7 +295,7 @@ cross-cutting and stay here:
 - **Optimistic locking via `@Version`** — every write DTO carries the `version` field; the frontend echoes it back; concurrent modifications surface as `ObjectOptimisticLockingFailureException` → HTTP 409. Don't strip the version from DTOs to "make it simpler."
 - **Lock as fine-grained as the data allows.** Every part of the frontend must be locked as narrowly as possible: an edit to one part of a screen must **not** 409 a concurrent edit to an unrelated part. Prefer the smallest optimistic-lock scope an aggregate's parts can carry — split a large aggregate's single coarse lock into **independent per-section version counters**, each bumped and echoed on its own, so editing one section never collides with a concurrent edit of another. Each form / fragment should write the smallest entity that owns the data it touches rather than re-saving the whole aggregate. A coarse, screen-wide lock that forces unrelated concurrent edits to collide is a defect, not a simplification.
 
-The full landmine list — the `support.OptimisticLock` helper family, `Mission`'s manual
+The full landmine list — the `kernel.OptimisticLock` helper family, `Mission`'s manual
 section counters and their DB-enforced atomic bump, pessimistic locking for bulk reorders, the
 `…WithinTransaction` pattern, bulk-updates-inside-loops, and the find-or-create retry — lives in
 [`backend/CLAUDE.md`](backend/CLAUDE.md) and loads when you work under `backend/`. **Read it

@@ -23,14 +23,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronProfitEligibleToggleRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronPromotionToggleRequest;
+import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
-import java.util.Map;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
@@ -42,38 +45,46 @@ import org.springframework.http.ResponseEntity;
 @ExtendWith(MockitoExtension.class)
 class SquadronAdminProxyControllerTest {
 
+  private static final UUID ID = UUID.fromString("2b8e4f1c-6d3a-4e7b-9c0f-5a1d2e3f4a5b");
+
   @Mock private BackendApiClient backendApiClient;
 
-  @InjectMocks private SquadronAdminProxyController controller;
+  private SquadronAdminProxyController controller;
+
+  @BeforeEach
+  void setUp() {
+    controller =
+        new SquadronAdminProxyController(
+            new OrgUnitBackendClient(backendApiClient),
+            new CatalogueCacheEviction(backendApiClient));
+  }
 
   @Test
   void setPromotionEnabled_forwardsPatch_thenEvictsStaticDataCache() {
-    UUID id = UUID.randomUUID();
-    Map<String, Object> body = Map.of("enabled", true);
+    SquadronPromotionToggleRequest body = new SquadronPromotionToggleRequest(true);
 
-    ResponseEntity<Void> response = controller.setPromotionEnabled(id, body);
+    ResponseEntity<Void> response = controller.setPromotionEnabled(ID, body);
 
     assertEquals(204, response.getStatusCode().value());
     InOrder inOrder = inOrder(backendApiClient);
     inOrder
         .verify(backendApiClient)
-        .patch(eq("/api/v1/squadrons/" + id + "/promotion-enabled"), eq(body), eq(Void.class));
+        .patch(eq("/api/v1/squadrons/{id}/promotion-enabled"), eq(body), eq(Void.class), eq(ID));
     inOrder.verify(backendApiClient).evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
     inOrder.verifyNoMoreInteractions();
   }
 
   @Test
   void setProfitEligible_forwardsPatch_thenEvictsStaticDataCache() {
-    UUID id = UUID.randomUUID();
-    Map<String, Object> body = Map.of("eligible", false);
+    SquadronProfitEligibleToggleRequest body = new SquadronProfitEligibleToggleRequest(false);
 
-    ResponseEntity<Void> response = controller.setProfitEligible(id, body);
+    ResponseEntity<Void> response = controller.setProfitEligible(ID, body);
 
     assertEquals(204, response.getStatusCode().value());
     InOrder inOrder = inOrder(backendApiClient);
     inOrder
         .verify(backendApiClient)
-        .patch(eq("/api/v1/squadrons/" + id + "/profit-eligible"), eq(body), eq(Void.class));
+        .patch(eq("/api/v1/squadrons/{id}/profit-eligible"), eq(body), eq(Void.class), eq(ID));
     inOrder.verify(backendApiClient).evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
     inOrder.verifyNoMoreInteractions();
   }

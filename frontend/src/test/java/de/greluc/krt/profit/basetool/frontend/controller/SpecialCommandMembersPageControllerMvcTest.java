@@ -39,13 +39,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitKind;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -86,27 +87,16 @@ class SpecialCommandMembersPageControllerMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
-  /** Stubs the backend SK read and a one-member roster in the raw {@code Map} wire shape. */
+  /** Stubs the backend SK read and a one-member roster as the client decodes them. */
   private void stubSpecialCommandWithOneMember() {
-    Map<String, Object> sc = new HashMap<>();
-    sc.put("id", skId.toString());
-    sc.put("name", "Detail SK");
-    sc.put("shorthand", "DSK");
-    sc.put("description", "desc");
-    sc.put("active", true);
-    sc.put("isProfitEligible", false);
-    sc.put("version", 0);
-    Map<String, Object> member = new HashMap<>();
-    member.put("userId", memberId.toString());
-    member.put("userDisplayName", "Pilot");
-    member.put("orgUnitId", skId.toString());
-    member.put("kind", "SPECIAL_COMMAND");
-    member.put("isLogistician", false);
-    member.put("isMissionManager", false);
-    member.put("isLead", false);
-    member.put("version", 3);
-    when(backendApiClient.get(eq("/api/v1/special-commands/" + skId), anyTypeRef())).thenReturn(sc);
-    when(backendApiClient.get(eq("/api/v1/special-commands/" + skId + "/members"), anyTypeRef()))
+    SpecialCommandDto sc = new SpecialCommandDto(skId, "Detail SK", "DSK", "desc", true, false, 0L);
+    OrgUnitMembershipDto member =
+        new OrgUnitMembershipDto(
+            memberId, "Pilot", skId, OrgUnitKind.SPECIAL_COMMAND, false, false, false, null, 3L);
+    when(backendApiClient.get(
+            eq("/api/v1/special-commands/{id}"), eq(SpecialCommandDto.class), eq(skId)))
+        .thenReturn(sc);
+    when(backendApiClient.get(eq("/api/v1/special-commands/{id}/members"), anyTypeRef(), eq(skId)))
         .thenReturn(List.of(member));
   }
 
@@ -226,13 +216,15 @@ class SpecialCommandMembersPageControllerMvcTest {
         .perform(get("/organisation/special-commands/" + skId))
         .andExpect(status().isForbidden());
 
-    verify(backendApiClient, never()).get(eq("/api/v1/special-commands/" + skId), anyTypeRef());
+    verify(backendApiClient, never())
+        .get(eq("/api/v1/special-commands/{id}"), eq(SpecialCommandDto.class), eq(skId));
   }
 
   @Test
   @WithMockUser(roles = "OFFICER")
   void detail_backendRefuses_returns403Page() throws Exception {
-    when(backendApiClient.get(eq("/api/v1/special-commands/" + skId), anyTypeRef()))
+    when(backendApiClient.get(
+            eq("/api/v1/special-commands/{id}"), eq(SpecialCommandDto.class), eq(skId)))
         .thenThrow(new BackendServiceException("forbidden", null, 403));
 
     mockMvc
@@ -243,7 +235,8 @@ class SpecialCommandMembersPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "OFFICER")
   void detail_backendFails_redirectsToBackUrlWithError() throws Exception {
-    when(backendApiClient.get(eq("/api/v1/special-commands/" + skId), anyTypeRef()))
+    when(backendApiClient.get(
+            eq("/api/v1/special-commands/{id}"), eq(SpecialCommandDto.class), eq(skId)))
         .thenThrow(new BackendServiceException("backend down", null, 503));
 
     mockMvc
@@ -270,7 +263,11 @@ class SpecialCommandMembersPageControllerMvcTest {
   void addMemberAjax_officer_returns200WithoutEviction() throws Exception {
     UUID userId = UUID.randomUUID();
     when(backendApiClient.post(
-            eq("/api/v1/special-commands/" + skId + "/members/" + userId), any(), eq(Void.class)))
+            eq("/api/v1/special-commands/{id}/members/{userId}"),
+            any(),
+            eq(Void.class),
+            eq(skId),
+            eq(userId)))
         .thenReturn(null);
 
     mockMvc
@@ -288,7 +285,10 @@ class SpecialCommandMembersPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void removeMemberAjax_backendRefuses_relays403() throws Exception {
     when(backendApiClient.delete(
-            eq("/api/v1/special-commands/" + skId + "/members/" + memberId), eq(Void.class)))
+            eq("/api/v1/special-commands/{id}/members/{userId}"),
+            eq(Void.class),
+            eq(skId),
+            eq(memberId)))
         .thenThrow(new BackendServiceException("forbidden", null, 403));
 
     mockMvc

@@ -20,12 +20,15 @@
 /** The inventory module (Lager): stock, holders, allocations, checkout and rebooking. */
 @ApplicationModule(
     allowedDependencies = {
+      "admin::api",
       "audit::api",
+      "catalogue::api",
       "identity::api",
       "kernel",
       "livesync::api",
       "notification::api",
       "orgunit::api",
+      "platform::api",
       "scope::api"
     })
 package de.greluc.krt.profit.basetool.backend.inventory;

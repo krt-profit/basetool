@@ -32,15 +32,18 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialMatrixItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialPriceOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MatrixGridDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -57,7 +60,8 @@ class MaterialsPageControllerTest {
   @Test
   void listMaterials_ShouldAddMaterialsToModel() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MaterialsPageController controller = new MaterialsPageController(backendApiClient);
+    MaterialsPageController controller =
+        new MaterialsPageController(new CatalogueBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
 
     MaterialPriceOverviewDto dto =
@@ -91,7 +95,8 @@ class MaterialsPageControllerTest {
   @Test
   void listMaterials_ShouldHandleErrorAndAddEmptyListToModel() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MaterialsPageController controller = new MaterialsPageController(backendApiClient);
+    MaterialsPageController controller =
+        new MaterialsPageController(new CatalogueBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
 
     when(backendApiClient.get(
@@ -111,7 +116,8 @@ class MaterialsPageControllerTest {
   @Test
   void getMaterialDetail_ShouldAddMaterialAndPricesToModel() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MaterialsPageController controller = new MaterialsPageController(backendApiClient);
+    MaterialsPageController controller =
+        new MaterialsPageController(new CatalogueBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID id = UUID.randomUUID();
 
@@ -132,7 +138,7 @@ class MaterialsPageControllerTest {
             false,
             true,
             0L);
-    when(backendApiClient.get(eq("/api/v1/materials/" + id), eq(MaterialDto.class)))
+    when(backendApiClient.get(eq("/api/v1/materials/{id}"), eq(MaterialDto.class), eq(id)))
         .thenReturn(materialDto);
 
     MaterialPriceDto priceDto =
@@ -149,8 +155,10 @@ class MaterialsPageControllerTest {
         new PageResponse<>(List.of(priceDto), 0, 10000, 1, 1, Collections.emptyList());
 
     when(backendApiClient.get(
-            eq("/api/v1/materials/" + id + "/prices?size=10000&sort=terminal.name,asc&page=0"),
-            anyTypeRef()))
+            eq("/api/v1/materials/{id}/prices?size=10000&sort=terminal.name,asc&page={page}"),
+            anyTypeRef(),
+            eq(id),
+            eq(0)))
         .thenReturn(pageResponse);
 
     String viewName = controller.getMaterialDetail(id, model);
@@ -179,14 +187,31 @@ class MaterialsPageControllerTest {
   @Test
   void getMatrixOverview_addsUexAgeFromTheTerminalCatalogue() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MaterialsPageController controller = new MaterialsPageController(backendApiClient);
+    MaterialsPageController controller =
+        new MaterialsPageController(new CatalogueBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef()))
         .thenReturn(matrixPage());
     when(backendApiClient.getCached(eq(CachedCatalog.TERMINALS), anyTypeRef()))
         .thenReturn(
             new PageResponse<>(
-                List.of(Map.of("uexSyncedAt", "2020-01-01T00:00:00Z")),
+                List.of(
+                    new TerminalDto(
+                        UUID.fromString("0d6b3e1a-7c42-4f58-9a1e-3b5c7d9e2f40"),
+                        "Area 18 TDD",
+                        null,
+                        "Stanton",
+                        "ArcCorp",
+                        "Area18",
+                        null,
+                        true,
+                        false,
+                        false,
+                        false,
+                        true,
+                        false,
+                        Instant.parse("2020-01-01T00:00:00Z"),
+                        false)),
                 0,
                 10000,
                 1,
@@ -203,7 +228,8 @@ class MaterialsPageControllerTest {
   @Test
   void getMatrixOverview_withoutTerminalCatalogue_rendersWithoutUexAge() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MaterialsPageController controller = new MaterialsPageController(backendApiClient);
+    MaterialsPageController controller =
+        new MaterialsPageController(new CatalogueBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef()))
         .thenReturn(matrixPage());
@@ -218,11 +244,12 @@ class MaterialsPageControllerTest {
   @Test
   void getMaterialDetail_ShouldHandleErrorAndAddEmptyDataToModel() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MaterialsPageController controller = new MaterialsPageController(backendApiClient);
+    MaterialsPageController controller =
+        new MaterialsPageController(new CatalogueBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID id = UUID.randomUUID();
 
-    when(backendApiClient.get(eq("/api/v1/materials/" + id), eq(MaterialDto.class)))
+    when(backendApiClient.get(eq("/api/v1/materials/{id}"), eq(MaterialDto.class), eq(id)))
         .thenThrow(new RuntimeException("API Detail Error"));
 
     String viewName = controller.getMaterialDetail(id, model);
@@ -236,7 +263,8 @@ class MaterialsPageControllerTest {
   @Test
   void getMatrixOverview_ShouldPopulateFilterLists() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MaterialsPageController controller = new MaterialsPageController(backendApiClient);
+    MaterialsPageController controller =
+        new MaterialsPageController(new CatalogueBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
 
     when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef()))
@@ -256,7 +284,8 @@ class MaterialsPageControllerTest {
   @Test
   void getMatrixData_ShouldTagTerminalsWithPlanetCssClass() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MaterialsPageController controller = new MaterialsPageController(backendApiClient);
+    MaterialsPageController controller =
+        new MaterialsPageController(new CatalogueBackendClient(backendApiClient));
 
     when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef()))
         .thenReturn(matrixPage());
@@ -280,7 +309,8 @@ class MaterialsPageControllerTest {
   @Test
   void getMatrixData_ShouldReturnEmptyGridOnError() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MaterialsPageController controller = new MaterialsPageController(backendApiClient);
+    MaterialsPageController controller =
+        new MaterialsPageController(new CatalogueBackendClient(backendApiClient));
 
     when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef()))
         .thenThrow(new RuntimeException("backend down"));
@@ -295,10 +325,11 @@ class MaterialsPageControllerTest {
   @Test
   void getMatrixData_withFilters_relaysFilterParamsToBackendPageWalk() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MaterialsPageController controller = new MaterialsPageController(backendApiClient);
+    MaterialsPageController controller =
+        new MaterialsPageController(new CatalogueBackendClient(backendApiClient));
 
     when(backendApiClient.<PageResponse<MaterialMatrixItemDto>>get(
-            anyString(), anyTypeRef(), any(), any()))
+            anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(matrixPage());
 
     MatrixGridDto grid =
@@ -306,12 +337,13 @@ class MaterialsPageControllerTest {
 
     assertNotNull(grid);
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), any(), any());
+    verify(backendApiClient)
+        .get(uriCaptor.capture(), anyTypeRef(), eq("Aluminum"), eq("Stanton"), eq(0));
     String template = uriCaptor.getValue();
-    assertTrue(template.contains("materialNames={f0}"), template);
-    assertTrue(template.contains("starSystems={f1}"), template);
+    assertTrue(template.contains("materialNames={materialName}"), template);
+    assertTrue(template.contains("starSystems={starSystem}"), template);
     assertTrue(template.contains("hasLoadingDock=true"), template);
-    assertTrue(template.contains("page=0"), template);
+    assertTrue(template.contains("page={page}"), template);
     assertFalse(template.contains("isAutoLoad"), template);
     verify(backendApiClient, never()).getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef());
   }
@@ -319,7 +351,8 @@ class MaterialsPageControllerTest {
   @Test
   void getMatrixOverview_ShouldHandleBackendError() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MaterialsPageController controller = new MaterialsPageController(backendApiClient);
+    MaterialsPageController controller =
+        new MaterialsPageController(new CatalogueBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
 
     when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef()))

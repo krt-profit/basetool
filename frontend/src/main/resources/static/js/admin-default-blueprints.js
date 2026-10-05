@@ -66,7 +66,7 @@
         let timer;
         return function (value) {
             window.clearTimeout(timer);
-            timer = window.setTimeout(function () {
+            timer = window.setTimeout(() => {
                 fn(value);
             }, wait);
         };
@@ -98,7 +98,7 @@
     function syncDefaultKeys() {
         const keys = new Set();
         if (listHost) {
-            listHost.querySelectorAll('tr[data-product-key]').forEach(function (row) {
+            listHost.querySelectorAll('tr[data-product-key]').forEach((row) => {
                 const key = row.getAttribute('data-product-key');
                 if (key) {
                     keys.add(key);
@@ -161,7 +161,7 @@
         }
         const host = resultsEl;
         host.replaceChildren();
-        items.forEach(function (item) {
+        items.forEach((item) => {
             const key = str(item.productKey);
             const isDefault = defaultKeys.has(key);
             const button = document.createElement('button');
@@ -176,12 +176,10 @@
             if (item.variantCount != null && item.variantCount > 1) {
                 const variants = document.createElement('span');
                 variants.className = 'krt-pi-typeahead-variants';
-                variants.textContent =
-                    ' (' +
-                    item.variantCount +
-                    ' ' +
-                    window.krtI18nText(i18n.variants, 'krtDefaultBlueprints.i18n.variants') +
-                    ')';
+                variants.textContent = ` (${item.variantCount} ${window.krtI18nText(
+                    i18n.variants,
+                    'krtDefaultBlueprints.i18n.variants',
+                )})`;
                 label.appendChild(variants);
             }
             button.appendChild(label);
@@ -189,12 +187,10 @@
             const tag = document.createElement('span');
             tag.className = 'krt-pi-typeahead-tag';
             if (isDefault) {
-                tag.textContent =
-                    ' · ' +
-                    window.krtI18nText(
-                        i18n.alreadyDefault,
-                        'krtDefaultBlueprints.i18n.alreadyDefault',
-                    );
+                tag.textContent = ` · ${window.krtI18nText(
+                    i18n.alreadyDefault,
+                    'krtDefaultBlueprints.i18n.alreadyDefault',
+                )}`;
             }
             button.appendChild(tag);
 
@@ -213,14 +209,11 @@
             return;
         }
         renderMessage(window.krtI18nText(i18n.searching, 'krtDefaultBlueprints.i18n.searching'));
-        const url = cfg.searchUrl + '?q=' + encodeURIComponent(q.trim()) + '&limit=25';
-        window
-            .fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
-            .then(function (resp) {
-                return resp.ok ? resp.json() : [];
-            })
+        const url = `${cfg.searchUrl}?q=${encodeURIComponent(q.trim())}&limit=25`;
+        window.krtFetch
+            .getJson(url)
             .then(renderResults)
-            .catch(function () {
+            .catch(() => {
                 renderMessage(
                     window.krtI18nText(i18n.noResults, 'krtDefaultBlueprints.i18n.noResults'),
                 );
@@ -242,7 +235,7 @@
     function unstageProduct(key) {
         staged.delete(key);
         if (stagingList) {
-            stagingList.querySelectorAll('.krt-bp-chip').forEach(function (chip) {
+            stagingList.querySelectorAll('.krt-bp-chip').forEach((chip) => {
                 if (chip.getAttribute('data-key') === key) {
                     chip.remove();
                 }
@@ -274,7 +267,7 @@
         removeBtn.className = 'krt-bp-chip-remove';
         removeBtn.setAttribute('aria-label', i18n.chipRemove || '');
         removeBtn.textContent = '×';
-        removeBtn.addEventListener('click', function () {
+        removeBtn.addEventListener('click', () => {
             unstageProduct(stagedKey);
             refreshStagingEmptyState();
         });
@@ -298,7 +291,7 @@
      */
     function applyAddResult(result) {
         const failed = new Set((result && result.failedKeys) || []);
-        Array.from(staged).forEach(function (key) {
+        Array.from(staged).forEach((key) => {
             if (!failed.has(key)) {
                 unstageProduct(key);
             }
@@ -316,7 +309,7 @@
 
     if (addForm) {
         const form = addForm;
-        form.addEventListener('submit', function (event) {
+        form.addEventListener('submit', (event) => {
             if (!window.krtFetch) {
                 return;
             }
@@ -333,7 +326,7 @@
                     errorMessage: i18n.addError,
                     onSuccess: applyAddResult,
                 })
-                .finally(function () {
+                .finally(() => {
                     refreshStagingEmptyState();
                 });
         });
@@ -355,7 +348,7 @@
                 i18n.removeBody,
                 'krtDefaultBlueprints.i18n.removeBody',
             );
-            deleteMessage.textContent = name ? base + ' (' + name + ')' : base;
+            deleteMessage.textContent = name ? `${base} (${name})` : base;
         }
         window.krtModal.open(deleteModal);
     }
@@ -368,7 +361,7 @@
 
     if (deleteConfirm) {
         const confirmBtn = deleteConfirm;
-        confirmBtn.addEventListener('click', function () {
+        confirmBtn.addEventListener('click', () => {
             const form = pendingForm;
             if (!form) {
                 return;
@@ -395,13 +388,13 @@
     if (searchInput) {
         const input = searchInput;
         const debouncedSearch = debounce(runSearch, 200);
-        input.addEventListener('input', function () {
+        input.addEventListener('input', () => {
             debouncedSearch(input.value);
         });
     }
 
     if (resultsEl) {
-        resultsEl.addEventListener('click', function (e) {
+        resultsEl.addEventListener('click', (e) => {
             const target = /** @type {Element | null} */ (e.target);
             /** @type {HTMLButtonElement | null} */
             const item = target ? target.closest('.krt-pi-typeahead-item') : null;
@@ -417,7 +410,7 @@
         });
     }
 
-    document.addEventListener('click', function (e) {
+    document.addEventListener('click', (e) => {
         const target = /** @type {Element | null} */ (e.target);
         if (!target || typeof target.closest !== 'function') {
             return;
@@ -439,14 +432,14 @@
         }
     });
 
-    document.addEventListener('keydown', function (e) {
+    document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             closeDeleteModal();
             hideResults();
         }
     });
 
-    document.addEventListener('click', function (e) {
+    document.addEventListener('click', (e) => {
         const target = /** @type {Element | null} */ (e.target);
         if (
             resultsEl &&

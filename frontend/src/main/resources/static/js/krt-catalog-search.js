@@ -45,24 +45,19 @@
     }
 
     function fetchCatalog(path, query, toOption) {
-        return fetch(
-            path + (path.indexOf('?') >= 0 ? '&' : '?') + 'q=' + encodeURIComponent(query || ''),
-            {
-                headers: { Accept: 'application/json' },
-            },
-        )
-            .then(function (response) {
-                return response.ok ? response.json() : [];
-            })
-            .then(function (list) {
+        return window.krtFetch
+            .getJson(
+                `${path + (path.indexOf('?') >= 0 ? '&' : '?')}q=${encodeURIComponent(query || '')}`,
+            )
+            .then((list) => {
                 return (list || []).map(toOption);
             })
-            .catch(function () {
+            .catch(() => {
                 return [];
             });
     }
 
-    window.krtComboboxRemoteSources = window.krtComboboxRemoteSources || {};
+    window.krtComboboxRemoteSources ||= {};
     window.krtComboboxRemoteSources['remote-materials'] = function (query) {
         return fetchCatalog('/catalog/material-search', query, toMaterialOption);
     };

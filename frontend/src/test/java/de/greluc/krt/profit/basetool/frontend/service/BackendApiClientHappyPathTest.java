@@ -110,6 +110,33 @@ class BackendApiClientHappyPathTest {
   }
 
   @Test
+  void get_withARepeatedPlaceholder_fillsEachOccurrenceWithTheNextValue() throws Exception {
+    server.enqueue(jsonOk("{}"));
+    server.enqueue(jsonOk("{}"));
+
+    client.get(
+        "/api/v1/materials/{id}/terminals?starSystemNames={s}&starSystemNames={s}",
+        String.class,
+        "0b5e0b5e-0000-4000-8000-000000000001",
+        "Stanton",
+        "Pyro & Nyx");
+    client.get(
+        "/api/v1/missions/search?status={status}&status={status}&size={size}",
+        new ParameterizedTypeReference<String>() {},
+        "PLANNED",
+        "ACTIVE",
+        20);
+
+    assertEquals(
+        "/api/v1/materials/0b5e0b5e-0000-4000-8000-000000000001/terminals"
+            + "?starSystemNames=Stanton&starSystemNames=Pyro%20%26%20Nyx",
+        server.takeRequest(1, TimeUnit.SECONDS).getPath());
+    assertEquals(
+        "/api/v1/missions/search?status=PLANNED&status=ACTIVE&size=20",
+        server.takeRequest(1, TimeUnit.SECONDS).getPath());
+  }
+
+  @Test
   void get_withUriVariables_percentEncodesSpacesAndQuotes_notFormEncoding() throws Exception {
     server.enqueue(jsonOk("[]"));
 
@@ -394,6 +421,41 @@ class BackendApiClientHappyPathTest {
     assertNull(result);
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertEquals("DELETE", req.getMethod());
+  }
+
+  /**
+   * Every write verb has a URI-template twin that expands its variables in order and encodes each
+   * value, so a relayed value carrying URI syntax stays one path segment (REQ-SEC-051).
+   *
+   * @throws Exception if a request could not be read back from the stub server
+   */
+  @Test
+  void everyWriteVerbExpandsAndEncodesUriTemplateVariables() throws Exception {
+    for (int i = 0; i < 5; i++) {
+      server.enqueue(jsonOk("\"x\""));
+    }
+    String hostile = "a/b?c=d&e#f";
+
+    client.post("/api/v1/things/{id}/items/{item}", "body", String.class, hostile, 7);
+    client.put("/api/v1/things/{id}?v={v}", null, String.class, hostile, 3L);
+    client.patch("/api/v1/things/{id}", "body", String.class, hostile);
+    client.delete("/api/v1/things/{id}", String.class, hostile);
+    client.delete("/api/v1/things/{id}/slice", "body", String.class, hostile);
+
+    String encoded = "a%2Fb%3Fc%3Dd%26e%23f";
+    List<String> expected =
+        List.of(
+            "POST /api/v1/things/" + encoded + "/items/7",
+            "PUT /api/v1/things/" + encoded + "?v=3",
+            "PATCH /api/v1/things/" + encoded,
+            "DELETE /api/v1/things/" + encoded,
+            "DELETE /api/v1/things/" + encoded + "/slice");
+    for (String line : expected) {
+      RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+      assertNotNull(req);
+      assertEquals(line, req.getMethod() + " " + req.getPath());
+      assertEquals("authenticated", req.getHeader("X-Auth"));
+    }
   }
 
   private static MockResponse jsonOk(String body) {

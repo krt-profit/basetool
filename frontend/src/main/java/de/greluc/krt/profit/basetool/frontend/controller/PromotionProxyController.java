@@ -19,9 +19,18 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MemberEvaluationDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MemberEvaluationUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionCategoryDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionCategoryWriteRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionLevelContentDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionLevelContentWriteRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionTopicDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionTopicWriteRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.RankRequirementDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.RankRequirementWriteRequest;
+import de.greluc.krt.profit.basetool.frontend.promotion.client.PromotionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -37,14 +46,16 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Same-origin proxy through which the promotion admin pages reach the backend's {@code
- * /api/v1/promotion/...} endpoints via {@link BackendApiClient}; restricted to ADMIN and OFFICER.
+ * /api/v1/promotion/...} endpoints via {@link PromotionBackendClient}; restricted to ADMIN and
+ * OFFICER.
  */
 @RestController
 @RequestMapping("/api/proxy/promotion")
 @RequiredArgsConstructor
 public class PromotionProxyController {
 
-  private final BackendApiClient backendApiClient;
+  /** Sends the promotion writes to the backend. */
+  private final PromotionBackendClient promotionClient;
 
   /**
    * Forwards a "create promotion topic" request to the backend.
@@ -54,8 +65,8 @@ public class PromotionProxyController {
    */
   @PostMapping("/topics")
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
-  public Map<?, ?> createTopic(@RequestBody @NotNull Map<String, Object> body) {
-    return backendApiClient.post("/api/v1/promotion/topics", body, Map.class);
+  public PromotionTopicDto createTopic(@RequestBody @NotNull PromotionTopicWriteRequest body) {
+    return promotionClient.createTopic(body);
   }
 
   /**
@@ -67,9 +78,9 @@ public class PromotionProxyController {
    */
   @PutMapping("/topics/{id}")
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
-  public Map<?, ?> updateTopic(
-      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return backendApiClient.put("/api/v1/promotion/topics/" + id, body, Map.class);
+  public PromotionTopicDto updateTopic(
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull PromotionTopicWriteRequest body) {
+    return promotionClient.updateTopic(id, body);
   }
 
   /**
@@ -81,7 +92,7 @@ public class PromotionProxyController {
   @DeleteMapping("/topics/{id}")
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public ResponseEntity<Void> deleteTopic(@PathVariable @NotNull UUID id) {
-    backendApiClient.delete("/api/v1/promotion/topics/" + id, Void.class);
+    promotionClient.deleteTopic(id);
     return ResponseEntity.noContent().build();
   }
 
@@ -93,8 +104,9 @@ public class PromotionProxyController {
    */
   @PostMapping("/categories")
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
-  public Map<?, ?> createCategory(@RequestBody @NotNull Map<String, Object> body) {
-    return backendApiClient.post("/api/v1/promotion/categories", body, Map.class);
+  public PromotionCategoryDto createCategory(
+      @RequestBody @NotNull PromotionCategoryWriteRequest body) {
+    return promotionClient.createCategory(body);
   }
 
   /**
@@ -106,9 +118,9 @@ public class PromotionProxyController {
    */
   @PutMapping("/categories/{id}")
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
-  public Map<?, ?> updateCategory(
-      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return backendApiClient.put("/api/v1/promotion/categories/" + id, body, Map.class);
+  public PromotionCategoryDto updateCategory(
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull PromotionCategoryWriteRequest body) {
+    return promotionClient.updateCategory(id, body);
   }
 
   /**
@@ -120,7 +132,7 @@ public class PromotionProxyController {
   @DeleteMapping("/categories/{id}")
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public ResponseEntity<Void> deleteCategory(@PathVariable @NotNull UUID id) {
-    backendApiClient.delete("/api/v1/promotion/categories/" + id, Void.class);
+    promotionClient.deleteCategory(id);
     return ResponseEntity.noContent().build();
   }
 
@@ -132,8 +144,9 @@ public class PromotionProxyController {
    */
   @PostMapping("/rank-requirements")
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
-  public Map<?, ?> createRankRequirement(@RequestBody @NotNull Map<String, Object> body) {
-    return backendApiClient.post("/api/v1/promotion/rank-requirements", body, Map.class);
+  public RankRequirementDto createRankRequirement(
+      @RequestBody @NotNull RankRequirementWriteRequest body) {
+    return promotionClient.createRankRequirement(body);
   }
 
   /**
@@ -145,9 +158,9 @@ public class PromotionProxyController {
    */
   @PutMapping("/rank-requirements/{id}")
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
-  public Map<?, ?> updateRankRequirement(
-      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return backendApiClient.put("/api/v1/promotion/rank-requirements/" + id, body, Map.class);
+  public RankRequirementDto updateRankRequirement(
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull RankRequirementWriteRequest body) {
+    return promotionClient.updateRankRequirement(id, body);
   }
 
   /**
@@ -159,7 +172,7 @@ public class PromotionProxyController {
   @DeleteMapping("/rank-requirements/{id}")
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public ResponseEntity<Void> deleteRankRequirement(@PathVariable @NotNull UUID id) {
-    backendApiClient.delete("/api/v1/promotion/rank-requirements/" + id, Void.class);
+    promotionClient.deleteRankRequirement(id);
     return ResponseEntity.noContent().build();
   }
 
@@ -171,8 +184,9 @@ public class PromotionProxyController {
    */
   @PostMapping("/level-contents")
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
-  public Map<?, ?> createLevelContent(@RequestBody @NotNull Map<String, Object> body) {
-    return backendApiClient.post("/api/v1/promotion/level-contents", body, Map.class);
+  public PromotionLevelContentDto createLevelContent(
+      @RequestBody @NotNull PromotionLevelContentWriteRequest body) {
+    return promotionClient.createLevelContent(body);
   }
 
   /**
@@ -184,9 +198,10 @@ public class PromotionProxyController {
    */
   @PutMapping("/level-contents/{id}")
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
-  public Map<?, ?> updateLevelContent(
-      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return backendApiClient.put("/api/v1/promotion/level-contents/" + id, body, Map.class);
+  public PromotionLevelContentDto updateLevelContent(
+      @PathVariable @NotNull UUID id,
+      @RequestBody @NotNull PromotionLevelContentWriteRequest body) {
+    return promotionClient.updateLevelContent(id, body);
   }
 
   /**
@@ -198,7 +213,7 @@ public class PromotionProxyController {
   @DeleteMapping("/level-contents/{id}")
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public ResponseEntity<Void> deleteLevelContent(@PathVariable @NotNull UUID id) {
-    backendApiClient.delete("/api/v1/promotion/level-contents/" + id, Void.class);
+    promotionClient.deleteLevelContent(id);
     return ResponseEntity.noContent().build();
   }
 
@@ -212,15 +227,10 @@ public class PromotionProxyController {
    */
   @PutMapping("/evaluations/user/{userId}/category/{categoryId}")
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
-  public Map<?, ?> updateEvaluation(
+  public MemberEvaluationDto updateEvaluation(
       @PathVariable @NotNull UUID userId,
       @PathVariable @NotNull UUID categoryId,
-      @RequestBody @NotNull Map<String, Object> body) {
-    String uri =
-        org.springframework.web.util.UriComponentsBuilder.fromPath(
-                "/api/v1/promotion/evaluations/user/{userId}/category/{categoryId}")
-            .buildAndExpand(userId, categoryId)
-            .toUriString();
-    return backendApiClient.put(uri, body, Map.class);
+      @RequestBody @NotNull MemberEvaluationUpdateRequest body) {
+    return promotionClient.upsertEvaluation(userId, categoryId, body);
   }
 }

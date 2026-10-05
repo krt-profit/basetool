@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -150,7 +151,8 @@ class MaterialboersePatternRenderTest {
     when(backendApiClient.get(contains("/material-exchange/offers?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(offers, 0, 200, offers.size(), 1, List.of()));
     if (!offers.isEmpty()) {
-      when(backendApiClient.get(contains("/material-exchange/offers/"), anyClass()))
+      when(backendApiClient.get(
+              eq("/api/v1/material-exchange/offers/{id}"), anyClass(), eq(offers.get(0).id())))
           .thenReturn(offers.get(0));
     }
   }
@@ -164,7 +166,7 @@ class MaterialboersePatternRenderTest {
         .thenReturn(new MaterialExchangeCountsDto(12, 2));
     when(backendApiClient.get(contains("/material-requests?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(request), 0, 200, 1, 1, List.of()));
-    when(backendApiClient.get(contains("/material-requests/" + request.id()), anyClass()))
+    when(backendApiClient.get(eq("/api/v1/material-requests/{id}"), anyClass(), eq(request.id())))
         .thenReturn(request);
   }
 

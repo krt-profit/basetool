@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexCommodityDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexCommodityPriceDto;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
@@ -29,7 +30,6 @@ import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialPriceRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
-import de.greluc.krt.profit.basetool.backend.support.StalePriceSweep;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
 import java.util.ArrayList;
 import java.util.HashSet;

@@ -32,9 +32,9 @@
         if (!window.krtFetch) {
             return;
         }
-        document.querySelectorAll('[data-bank-swap][id]').forEach(function (el) {
+        document.querySelectorAll('[data-bank-swap][id]').forEach((el) => {
             window.krtFetch.bindSwap({
-                container: '#' + el.id,
+                container: `#${el.id}`,
                 fragmentValue: el.getAttribute('data-bank-swap') || undefined,
                 history: el.getAttribute('data-bank-swap-history') === 'true',
             });
@@ -84,7 +84,7 @@
             params.set('size', size);
         }
         params.set('page', '0');
-        return base + '?' + params.toString();
+        return `${base}?${params.toString()}`;
     }
 
     /**
@@ -116,7 +116,7 @@
         const range = /** @type {HTMLElement | null} */ (
             form.querySelector('[data-bank-history-range]')
         );
-        const days = Object.prototype.hasOwnProperty.call(PERIOD_DAYS, preset)
+        const days = Object.hasOwn(PERIOD_DAYS, preset)
             ? PERIOD_DAYS[/** @type {'30d' | '90d'} */ (preset)]
             : null;
         if (days === null) {
@@ -151,7 +151,7 @@
         applyHistoryFilter(form);
     }
 
-    document.addEventListener('submit', function (event) {
+    document.addEventListener('submit', (event) => {
         const target = /** @type {Element | null} */ (event.target);
         const form =
             target && target.closest ? target.closest('form[data-bank-history-filter]') : null;
@@ -162,7 +162,7 @@
         applyHistoryFilter(/** @type {HTMLFormElement} */ (form));
     });
 
-    document.addEventListener('change', function (event) {
+    document.addEventListener('change', (event) => {
         const target = /** @type {Element | null} */ (event.target);
         if (!target || !target.closest) {
             return;
@@ -253,14 +253,14 @@
         if (!tabs.length) {
             return;
         }
-        const keys = tabs.map(function (t) {
+        const keys = tabs.map((t) => {
             return t.getAttribute('data-tab');
         });
         let key = activeTab !== null ? activeTab : readSavedTab(nav);
         if (key === null || keys.indexOf(key) === -1) {
             key = keys[0];
         }
-        tabs.forEach(function (t) {
+        tabs.forEach((t) => {
             const on = t.getAttribute('data-tab') === key;
             t.classList.toggle('active', on);
             t.setAttribute('aria-selected', on ? 'true' : 'false');
@@ -268,7 +268,7 @@
                 /** @type {HTMLElement} */ (t).focus();
             }
         });
-        document.querySelectorAll('main [data-tabpanel]').forEach(function (panel) {
+        document.querySelectorAll('main [data-tabpanel]').forEach((panel) => {
             /** @type {HTMLElement} */ (panel).hidden = panel.getAttribute('data-tabpanel') !== key;
         });
     }
@@ -290,7 +290,7 @@
         applyTabs(focus);
     }
 
-    document.addEventListener('click', function (event) {
+    document.addEventListener('click', (event) => {
         const target = /** @type {Element | null} */ (event.target);
         const tab =
             target && target.closest
@@ -301,7 +301,7 @@
         }
     });
 
-    document.addEventListener('keydown', function (event) {
+    document.addEventListener('keydown', (event) => {
         if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') {
             return;
         }
@@ -321,12 +321,12 @@
         selectTab(tabs[next], true);
     });
 
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', () => {
         bindDetailSwaps();
         applyTabs(false);
     });
 
-    document.addEventListener('krt:swapped', function () {
+    document.addEventListener('krt:swapped', () => {
         bindDetailSwaps();
         applyTabs(false);
     });

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.frontend.dashboard.client.DashboardBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import jakarta.servlet.http.HttpSession;
 import java.util.Collections;
@@ -37,7 +38,7 @@ class HomeControllerTest {
   @Test
   void home_ShouldUsePreferredUsername_InsteadOfFullName() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    HomeController controller = new HomeController(backendApiClient);
+    HomeController controller = new HomeController(new DashboardBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     HttpSession session = mock(HttpSession.class);
     OidcUser user = mock(OidcUser.class);
@@ -57,22 +58,22 @@ class HomeControllerTest {
   @Test
   void markAnnouncementAsReadAjax_success_returns200() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    HomeController controller = new HomeController(backendApiClient);
+    HomeController controller = new HomeController(new DashboardBackendClient(backendApiClient));
 
     var response = controller.markAnnouncementAsReadAjax(ANNOUNCEMENT_ID);
 
     assertEquals(200, response.getStatusCode().value());
     verify(backendApiClient)
-        .put("/api/v1/users/me/read-announcement/" + ANNOUNCEMENT_ID, null, Void.class);
+        .put("/api/v1/users/me/read-announcement/{id}", null, Void.class, ANNOUNCEMENT_ID);
   }
 
   @Test
   void markAnnouncementAsReadAjax_backendFailure_returns502AndDoesNotThrow() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    HomeController controller = new HomeController(backendApiClient);
+    HomeController controller = new HomeController(new DashboardBackendClient(backendApiClient));
     doThrow(new RuntimeException("backend down"))
         .when(backendApiClient)
-        .put(anyString(), any(), any());
+        .put(anyString(), any(), any(), any(Object[].class));
 
     var response = controller.markAnnouncementAsReadAjax(ANNOUNCEMENT_ID);
 

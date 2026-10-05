@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
@@ -85,6 +86,7 @@ class PersonalInventoryPageControllerMvcTest {
     PageResponse<PersonalInventoryItemDto> empty =
         new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(empty);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(empty);
 
     mockMvc
         .perform(get("/personal-inventory"))
@@ -100,6 +102,7 @@ class PersonalInventoryPageControllerMvcTest {
     PageResponse<PersonalInventoryItemDto> empty =
         new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(empty);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(empty);
 
     mockMvc
         .perform(get("/personal-inventory").param("fragment", "results"))
@@ -121,7 +124,7 @@ class PersonalInventoryPageControllerMvcTest {
   void view_relaysASortWithADirectionAsAUriVariable() throws Exception {
     PageResponse<PersonalInventoryItemDto> empty =
         new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(empty);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(empty);
 
     mockMvc
         .perform(get("/personal-inventory").param("sort", "productName,desc"))
@@ -129,8 +132,8 @@ class PersonalInventoryPageControllerMvcTest {
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
     ArgumentCaptor<Object> variables = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), variables.capture());
-    assertEquals("/api/v1/personal-inventory?size=50&sort={sort}", uriCaptor.getValue());
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), eq(50), variables.capture());
+    assertEquals("/api/v1/personal-inventory?size={size}&sort={sort}", uriCaptor.getValue());
     assertEquals("productName,desc", variables.getValue());
   }
 
@@ -141,14 +144,15 @@ class PersonalInventoryPageControllerMvcTest {
     PageResponse<PersonalInventoryItemDto> empty =
         new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(empty);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(empty);
 
     mockMvc
         .perform(get("/personal-inventory").param("sort", "a&admin=true,asc"))
         .andExpect(status().isOk());
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient, atLeastOnce()).get(uriCaptor.capture(), anyTypeRef());
-    assertEquals("/api/v1/personal-inventory?size=50", uriCaptor.getAllValues().getFirst());
+    verify(backendApiClient, atLeastOnce()).get(uriCaptor.capture(), anyTypeRef(), eq(50));
+    assertEquals("/api/v1/personal-inventory?size={size}", uriCaptor.getAllValues().getFirst());
   }
 
   /**
@@ -175,7 +179,8 @@ class PersonalInventoryPageControllerMvcTest {
         new PageResponse<>(List.of(item), 0, 50, 1, 1, List.of());
     PageResponse<PersonalInventoryItemDto> blueprints =
         new PageResponse<>(List.of(), 0, 1, 42, 42, List.of());
-    when(backendApiClient.get(startsWith("/api/v1/personal-inventory?"), anyTypeRef()))
+    when(backendApiClient.get(
+            startsWith("/api/v1/personal-inventory?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(items);
     when(backendApiClient.get(startsWith("/api/v1/personal-blueprints?"), anyTypeRef()))
         .thenReturn(blueprints);
@@ -206,7 +211,8 @@ class PersonalInventoryPageControllerMvcTest {
   @Test
   @WithMockUser
   void uexSearch_passesMultiWordQueryAsUriVariable() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(List.of());
 
     mockMvc
         .perform(get("/personal-inventory/uex-search").param("q", "Port Olisar"))
@@ -214,7 +220,7 @@ class PersonalInventoryPageControllerMvcTest {
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
     ArgumentCaptor<Object> qCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture());
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture(), eq(25));
     assertTrue(uriCaptor.getValue().contains("q={q}"), uriCaptor.getValue());
     assertEquals("Port Olisar", qCaptor.getValue());
   }
@@ -222,7 +228,8 @@ class PersonalInventoryPageControllerMvcTest {
   @Test
   @WithMockUser
   void uexSearch_passesUmlautQueryAsUriVariable_notFormEncoded() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(List.of());
 
     String term = "Müller Hütte";
     mockMvc
@@ -231,7 +238,7 @@ class PersonalInventoryPageControllerMvcTest {
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
     ArgumentCaptor<Object> qCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture());
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture(), eq(25));
     assertTrue(uriCaptor.getValue().contains("q={q}"), uriCaptor.getValue());
     assertEquals(term, qCaptor.getValue());
   }

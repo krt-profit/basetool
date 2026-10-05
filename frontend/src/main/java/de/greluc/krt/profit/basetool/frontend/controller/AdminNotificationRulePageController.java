@@ -24,14 +24,13 @@ import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorRespons
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationRuleDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationRuleWriteRequest;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -48,8 +47,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
  * Admin page and AJAX relay for the data-driven notification rules (REQ-NOTIF-007), proxied through
- * {@link BackendApiClient}. Backend failures are relayed as {@code application/problem+json}; after
- * a write the rules table is re-fetched in place (REQ-FE-001).
+ * {@link NotificationBackendClient}. Backend failures are relayed as {@code
+ * application/problem+json}; after a write the rules table is re-fetched in place (REQ-FE-001).
  */
 @Controller
 @UsesLayoutModel
@@ -58,10 +57,6 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 @Slf4j
 public class AdminNotificationRulePageController {
-
-  private static final String BACKEND_BASE = "/api/v1/notification-rules";
-  private static final ParameterizedTypeReference<List<NotificationRuleDto>> LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
 
   /** The {@code fragment} value that renders only the rules table, for the in-place swap. */
   static final String RULES_FRAGMENT = "rules";
@@ -142,7 +137,7 @@ public class AdminNotificationRulePageController {
       List.of(
           Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER, Roles.BANK_EMPLOYEE, Roles.BANK_MANAGEMENT);
 
-  private final BackendApiClient backendApiClient;
+  private final NotificationBackendClient notificationClient;
 
   /**
    * Renders the rules admin page, or with {@code fragment=rules} only the rules table for the
@@ -157,7 +152,7 @@ public class AdminNotificationRulePageController {
   @GetMapping
   public String page(@RequestParam(required = false) String fragment, Model model) {
     try {
-      List<NotificationRuleDto> rules = backendApiClient.get(BACKEND_BASE, LIST_TYPE);
+      List<NotificationRuleDto> rules = notificationClient.rules();
       model.addAttribute("rules", rules == null ? List.of() : rules);
     } catch (Exception e) {
       log.debug("Failed to load notification rules", e);
@@ -188,8 +183,7 @@ public class AdminNotificationRulePageController {
         log,
         "load notification rule " + id + " (ajax)",
         () -> {
-          return ResponseEntity.ok(
-              backendApiClient.get(BACKEND_BASE + "/" + id, NotificationRuleDto.class));
+          return ResponseEntity.ok(notificationClient.rule(id));
         });
   }
 
@@ -206,8 +200,7 @@ public class AdminNotificationRulePageController {
         log,
         "create notification rule (ajax)",
         () -> {
-          return ResponseEntity.ok(
-              backendApiClient.post(BACKEND_BASE, request, NotificationRuleDto.class));
+          return ResponseEntity.ok(notificationClient.createRule(request));
         });
   }
 
@@ -226,8 +219,7 @@ public class AdminNotificationRulePageController {
         log,
         "update notification rule " + id + " (ajax)",
         () -> {
-          return ResponseEntity.ok(
-              backendApiClient.put(BACKEND_BASE + "/" + id, request, NotificationRuleDto.class));
+          return ResponseEntity.ok(notificationClient.updateRule(id, request));
         });
   }
 
@@ -244,7 +236,7 @@ public class AdminNotificationRulePageController {
         log,
         "delete notification rule " + id + " (ajax)",
         () -> {
-          backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
+          notificationClient.deleteRule(id);
           return ResponseEntity.noContent().build();
         });
   }

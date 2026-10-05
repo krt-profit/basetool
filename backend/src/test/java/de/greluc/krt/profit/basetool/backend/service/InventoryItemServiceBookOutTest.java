@@ -34,6 +34,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
@@ -61,7 +62,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepos
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -400,7 +400,7 @@ class InventoryItemServiceBookOutTest {
                       newDto(1.0, OWNER_ID, LOCATION_ID, CheckoutType.TRANSFER, null, null, 1L),
                       OWNER_ID,
                       false));
-      assert ex.getMessage().toLowerCase().contains("change");
+      assertEquals("error.inventory.transfer.unchanged", ex.getMessage());
     }
 
     @Test

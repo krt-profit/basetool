@@ -123,7 +123,7 @@ models, and the entity-returning ones are a list that may only shrink (`REQ-DATA
 ## 8.4 Concurrency — the landmine field
 
 Optimistic locking with `@Version`, surfaced as HTTP 409, with the **finest granularity the data
-allows** (§4.5, §6.3). The specific traps — the `support.OptimisticLock` helper family, Mission's
+allows** (§4.5, §6.3). The specific traps — the `kernel.OptimisticLock` helper family, Mission's
 manual per-section counters and their DB-enforced atomic bump, pessimistic locking for bulk
 reorders, the `…WithinTransaction` pattern, bulk updates inside loops, and the find-or-create retry
 — are enumerated in [`backend/CLAUDE.md`](../../backend/CLAUDE.md). **Read that before touching any
@@ -172,10 +172,23 @@ Two binding rules shape every UI change:
 - **Live update is binding** — every create/update/delete/toggle/reorder/filter/paginate updates
   the DOM in place via `krtFetch`, with no full-page reload on success, and on shared surfaces a
   peer's change propagates without a manual reload.
-- **Two browser-side safety rules are lint-enforced, not review-enforced** (2026-09-22): a `fetch`
-  write outside `krtFetch` fails `:frontend:lintJs` (REQ-FE-002), and so does an HTML sink that is
-  neither escaped through `escapeHtml` / `escapeAttr` nor a server fragment inserted through
-  `krtFetch.setTrustedHtml` (REQ-FE-022, `eslint-plugin-no-unsanitized`).
+- **Two browser-side safety rules are lint-enforced, not review-enforced** (2026-09-22): any
+  `fetch` or `XMLHttpRequest` outside the transport fails `:frontend:lintJs` — writes go through
+  `krtFetch.write` / `submitForm` (REQ-FE-002), reads through `krtFetch.get` / `getJson`, which
+  hand a lost session to the login and refuse a redirected answer (REQ-FE-031, since 2026-10-04) —
+  and so does any HTML or script sink outside the two Trusted Types helpers (REQ-FE-022, since
+  2026-10-04).
+- **Every DOM sink takes a Trusted Types policy value** (ADR-0239, 2026-10-04). Markup built in
+  script goes through the tagged-template builder `krtHtml` (policy `krt-html`, escaping every
+  interpolation) and `krtHtml.set`; a server fragment through `krtFetch.setTrustedHtml` /
+  `replaceWithTrustedHtml` / `parseTrustedDocument` (policy `krt-fragment`); a clear is
+  `replaceChildren()`. No `default` policy exists. The CSP carries `require-trusted-types-for
+  'script'; trusted-types krt-html krt-fragment`, report-only by default and enforced by
+  `APP_SECURITY_TRUSTED_TYPES=enforce`; violations reach the client-error beacon as `csp_violation`
+  (REQ-SEC-064). The dialog page walk fails on any violation. Enforcing in production is the one
+  open step, an owner-approved configuration change.
+- **The browser baseline is "Baseline 2025"**: Chrome 122, Firefox 131, Safari / iOS 18.4; the type
+  check and ESLint run at ES2025 (ADR-0239, REQ-FE-018).
 - **An ETag only where it pays** (FE-PERF-03, 2026-09-22; assets out 2026-09-23). The frontend's
   `ShallowEtagHeaderFilter` covers the web app manifest and `assetlinks.json` — publicly
   cacheable and not content-hashed. The static assets are hashed, `immutable` and revalidate by
@@ -192,11 +205,13 @@ Two binding rules shape every UI change:
   linked where its `<style>` block stood; the icon sprite stays inline by measurement (2.4 KB gzip).
   A page is 33–42 % smaller raw and about half the size gzipped (REQ-UI-023,
   `TemplateCommentHygieneTest`).
-- **Every script is deferred; an inline script runs nothing at parse time** (FE-PERF-05,
-  2026-09-23). Only `krt-client-error.js` stays synchronous and first. Page modules keep their order
-  behind the head scripts; inline page scripts run their code on `DOMContentLoaded`. A head-side
-  `krtEvents` watchdog throws into the client-error beacon when `event-delegation.js` never ran
-  (REQ-FE-023, `InlineScriptLoadOrderTest`, `ScriptLoadOrderE2eTest`).
+- **Every script is deferred; an inline script is data only** (FE-PERF-05, 2026-09-23; ADR-0069
+  finished 2026-10-04). Only `krt-client-error.js` stays synchronous and first. Page modules keep
+  their order behind the head scripts. An inline script is a `th:inline="javascript"` bootstrap of
+  literals that hands Thymeleaf values to its module; all page logic is in linted, type-checked
+  files. The one exception is the head-side `krtEvents` stub, whose watchdog throws into the
+  client-error beacon when `event-delegation.js` never ran (REQ-FE-023, `InlineScriptLoadOrderTest`,
+  `InlineScriptDataOnlyTest`, `ScriptLoadOrderE2eTest`).
 - **Only data forms arm the unsaved-changes guard** (2026-10-02). `unsaved-changes.js` warns before
   a link leaves a page with an edited form; a form marked `no-track` or with `method="get"` is a
   query and never arms it, and a submit triggered by the same edit clears it (REQ-FE-024,
@@ -231,6 +246,11 @@ Two binding rules shape every UI change:
   phones, a sectioned form with a sticky action bar. The markup lives in `fragments/page-head` and
   `fragments/components`, driven by two global scripts; breakpoints are only 768, 1024 and 1440 px,
   enforced by Stylelint (REQ-UI-027, REQ-UI-009, ADR-0242, `PagePatternFragmentsRenderTest`).
+- **Colours and stacking layers go through tokens** (2026-10-04). A colour token's value is written
+  only in its declaration on `:root` — alpha variants are `color-mix()` of the token — and every
+  page-level `z-index` is a step of the ascending `--z-*` scale beside it; every `var()` must name a
+  declared property (REQ-UI-001, ADR-0243, `ColourTokenCopyTest`, `ZIndexScaleTest`,
+  `CustomPropertyExistenceTest`).
 
 Authority: [`ui-design-system.md`](../specs/ui-design-system.md),
 [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (`REQ-FE-*`),
@@ -247,9 +267,13 @@ a matching log line. The per-domain typed clients the frontend gets are built ov
 **The backend clients stay in the kernel and address only the backend** (REQ-FE-029, 2026-10-03).
 `WebClientConfig` builds four clients: `webClient` and the anonymous `termsDocumentClient` carry the
 Resilience4j chain, the SSE relay's `sseWebClient` and the live-sync probe's
-`liveSyncAuthWebClient` deliberately do not. Only `WebClientConfig` builds a client, and only
-`BackendApiClient`, the SSE relay and the probe hold one (`WebClientConfinementTest`); every other
-class calls `BackendApiClient`. The first filter of all four refuses any request whose scheme, host
+`liveSyncAuthWebClient` deliberately do not. Only `WebClientConfig` builds a client, and only the
+kernel holds one — `BackendApiClient`, and `BackendSideChannels` for the SSE relay and the probe
+(`WebClientConfinementTest`); a controller calls its domain's typed client in
+`frontend.<domain>.client`, a thin service over `BackendApiClient` (plan F3,
+`TypedBackendClientTest`). `BackendErrorMapper` maps every failed `BackendApiClient` call in one
+exhaustive switch, and a runtime value enters a backend URI only as a template variable, for every
+verb (REQ-SEC-051, `WriteUriTemplateTest` and `ReadUriTemplateTest`). The first filter of all four refuses any request whose scheme, host
 and port differ from `app.backend-url`, before the OAuth2 filter can attach the member's bearer —
 an absolute URL handed to a client would otherwise carry the token to that host. Future
 HTTP-interface clients are created over the same `webClient` bean and take no `URI`,

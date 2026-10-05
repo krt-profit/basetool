@@ -113,7 +113,7 @@
 
     document.addEventListener(
         'click',
-        function (event) {
+        (event) => {
             const target = /** @type {Element | null} */ (
                 event.target instanceof Element ? event.target : null
             );
@@ -125,7 +125,7 @@
         true,
     );
 
-    document.addEventListener('click', function (event) {
+    document.addEventListener('click', (event) => {
         const target = /** @type {Element | null} */ (
             event.target instanceof Element ? event.target : null
         );
@@ -140,7 +140,7 @@
         if (!target || !target.closest('[data-overflow-menu]')) closeAll(null);
     });
 
-    document.addEventListener('keydown', function (event) {
+    document.addEventListener('keydown', (event) => {
         const target = /** @type {Element | null} */ (
             event.target instanceof Element ? event.target : null
         );

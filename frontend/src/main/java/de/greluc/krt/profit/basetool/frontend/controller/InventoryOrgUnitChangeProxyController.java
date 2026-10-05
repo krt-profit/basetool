@@ -21,11 +21,11 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BulkOrgUnitChangeRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BulkOrgUnitChangeResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemOrgUnitChangeDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -53,7 +53,8 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class InventoryOrgUnitChangeProxyController {
 
-  private final BackendApiClient backendApiClient;
+  /** The inventory domain's typed backend client. */
+  private final InventoryBackendClient inventoryClient;
 
   /**
    * Forwards the org-unit change of one personal row to {@code POST
@@ -70,9 +71,7 @@ public class InventoryOrgUnitChangeProxyController {
       return validationError();
     }
     try {
-      InventoryItemDto result =
-          backendApiClient.post(
-              "/api/v1/inventory/" + id + "/org-unit", dto, InventoryItemDto.class);
+      InventoryItemDto result = inventoryClient.changeOrgUnit(id, dto);
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       log.debug(
@@ -99,9 +98,7 @@ public class InventoryOrgUnitChangeProxyController {
       return validationError();
     }
     try {
-      BulkOrgUnitChangeResultDto result =
-          backendApiClient.post(
-              "/api/v1/inventory/bulk-org-unit", request, BulkOrgUnitChangeResultDto.class);
+      BulkOrgUnitChangeResultDto result = inventoryClient.bulkChangeOrgUnit(request);
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       log.debug("Failed to bulk-change inventory org units: {}", e.getMessage());

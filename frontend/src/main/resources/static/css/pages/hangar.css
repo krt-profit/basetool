@@ -113,7 +113,7 @@
     .ship-insurance-months {
         margin-top: var(--space-4);
     }
-    .form-group input:where(:not([type='checkbox']):not([type='radio'])),
+    .form-group input:where(:not([type='checkbox'], [type='radio'])),
     .form-group select,
     .form-group textarea {
         width: 100%;

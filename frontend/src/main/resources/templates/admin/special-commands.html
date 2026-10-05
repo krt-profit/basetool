@@ -135,18 +135,18 @@
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     var SC_MSG = {
-        saved:   '[[#{notification.success.save}]]',
-        deleted: '[[#{notification.success.delete}]]',
-        error:   '[[#{notification.error.save}]]',
-        createTitle: '[[#{admin.specialcommands.create}]]',
-        editTitle:   '[[#{admin.specialcommands.edit}]]'
+        saved:   /*[[#{notification.success.save}]]*/ '',
+        deleted: /*[[#{notification.success.delete}]]*/ '',
+        error:   /*[[#{notification.error.save}]]*/ '',
+        createTitle: /*[[#{admin.specialcommands.create}]]*/ '',
+        editTitle:   /*[[#{admin.specialcommands.edit}]]*/ ''
     };
     var SC_CONFLICT = {
-        title:                '[[#{frontend.ajax.conflict.title}]]',
-        reloadDetailFallback: '[[#{frontend.ajax.conflict.detail}]]',
-        reloadLabel:          '[[#{frontend.ajax.conflict.reload}]]',
-        dismissLabel:         '[[#{frontend.ajax.conflict.dismiss}]]',
-        reloadQuestion:       '[[#{frontend.ajax.conflict.question}]]'
+        title:                /*[[#{frontend.ajax.conflict.title}]]*/ '',
+        reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ '',
+        reloadLabel:          /*[[#{frontend.ajax.conflict.reload}]]*/ '',
+        dismissLabel:         /*[[#{frontend.ajax.conflict.dismiss}]]*/ '',
+        reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ ''
     };
 </script>
 <script th:src="@{/js/special-commands.js}" defer th:attr="nonce=${cspNonce}"></script>

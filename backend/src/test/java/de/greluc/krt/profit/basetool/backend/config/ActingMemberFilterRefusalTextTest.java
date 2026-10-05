@@ -22,12 +22,12 @@ package de.greluc.krt.profit.basetool.backend.config;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-import de.greluc.krt.profit.basetool.backend.support.ActingMemberAuthorities;
-import de.greluc.krt.profit.basetool.backend.support.ActingMemberHeader;
-import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ActingMemberAuthorities;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ActingMemberHeader;
+import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
+import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
-import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
-import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.FilterChain;
 import java.util.List;
