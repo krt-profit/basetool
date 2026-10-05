@@ -1064,6 +1064,59 @@ return nothing. A hit names a class: if it is one of ours, add it to `SESSION_BO
 is the previous frontend image, or `APP_SESSION_TYPE_ALLOW_LIST=report` as above — a production
 write, so it waits for the owner's yes.
 
+### Trusted Types: report, then enforce
+
+The frontend sends the Trusted Types directives `require-trusted-types-for 'script'; trusted-types
+krt-html krt-fragment` (REQ-SEC-064, REQ-FE-022, ADR-0239). It ships in **`report`** mode: the
+directives travel in a `Content-Security-Policy-Report-Only` header, so a DOM sink written without
+a policy value still works and the browser reports it, through the client-error beacon, as
+`basetool_client_error_total{kind="csp_violation"}`. **`enforce`** moves them into the enforced
+`Content-Security-Policy`, where such a write throws. The switch is `APP_SECURITY_TRUSTED_TYPES` in
+`.env` (`report` when unset, blank or mistyped) plus a frontend restart: a production write, so it
+waits for the owner's yes. **This switch is the only step of ADR-0239 still open.**
+
+**Precondition** — over at least a week of ordinary use since the release carrying the report-only
+policy went live, no CSP violation was reported, and the dialog page walk of the E2E suite
+(`DialogA11yE2eTest`, which fails on any Trusted Types violation) is green on `main`:
+
+```text
+# Grafana → Explore → Prometheus: must return nothing
+sum(increase(basetool_client_error_total{kind="csp_violation"}[7d])) > 0
+```
+
+A hit is a violation, not necessarily a Trusted Types one. To name it, raise
+`de.greluc.krt.profit.basetool.frontend.controller.ClientErrorReportController` to DEBUG through
+`/actuator/loggers` (REQ-OBS-016; a production write as well) and read `{app="frontend"} |= "Client
+error reported [kind=csp_violation"`: a Trusted Types sink shows as `message=require-trusted-types-for
+Element innerHTML` (the directive and the sink, never the markup), an unlisted policy as
+`message=trusted-types`. Convert the sink in a PR and restart the week; do not enforce around it.
+
+**Apply** (as root, from `/`; `${UCTL}` from [Shell conventions](#shell-conventions-used-below)):
+
+```bash
+cd /
+cp -p /var/iri/code/.env /var/iri/code/.env.backup-$(date +%Y%m%d-%H%M%S)
+sudo -u deploy "${EDITOR:-vi}" /var/iri/code/.env      # set APP_SECURITY_TRUSTED_TYPES=enforce (one line)
+grep -c '^APP_SECURITY_TRUSTED_TYPES=' /var/iri/code/.env       # 1
+sudo -u deploy /var/iri/code/scripts/render-env-d.py \
+  --env /var/iri/code/.env --templates /var/iri/code/quadlet/env.d --out /var/iri/code/env.d
+grep -c '^APP_SECURITY_TRUSTED_TYPES=enforce$' /var/iri/code/env.d/frontend.env   # 1
+${UCTL} restart frontend.service                        # blocks until healthy; sessions live in Redis
+```
+
+**Reading the effective mode** (no write needed): Grafana → Explore → Prometheus,
+`basetool_trusted_types_mode == 1` returns one series per frontend instance whose `mode` label is the
+mode the process runs with. From outside, `curl -sI https://profit-base.online/ | grep -i
+'^content-security-policy'` shows the directives at the end of `Content-Security-Policy` under
+`enforce`, and as the whole `Content-Security-Policy-Report-Only` header under `report`.
+
+**Expected effect:** none a member can see. Watch for a day: `ClientErrorSpike` stays silent for
+`csp_violation`, and `sum(increase(basetool_client_error_total{kind="csp_violation"}[1h]))` stays
+empty. A violation under `enforce` means a page part silently stopped working (the write threw).
+
+**Rollback:** edit the line to `APP_SECURITY_TRUSTED_TYPES=report` (deleting it also means
+`report`), render `env.d/` again with the same command and `${UCTL} restart frontend.service`.
+
 ### Internal JWKS for the backend
 
 The backend can fetch the keys that sign access tokens from the **internal** Keycloak

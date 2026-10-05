@@ -304,7 +304,7 @@
             el.description.value = '';
             el.enabled.checked = true;
             el.excludeActor.checked = true;
-            el.container.innerHTML = '';
+            el.container.replaceChildren();
             addSelectorRow(null);
         }
 
@@ -319,7 +319,7 @@
             el.description.value = rule.description || '';
             el.enabled.checked = !!rule.enabled;
             el.excludeActor.checked = !!rule.excludeActor;
-            el.container.innerHTML = '';
+            el.container.replaceChildren();
             const selectors = Array.isArray(rule.selectors) ? rule.selectors : [];
             if (selectors.length === 0) {
                 addSelectorRow(null);

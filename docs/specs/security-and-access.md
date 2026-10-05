@@ -5098,7 +5098,7 @@ requirement stated it.*
 Each module emits a fixed set of security response headers from its Spring Security chain, and the
 set is shaped by what the module serves.
 
-- **Frontend (HTML)** — `SecurityHeaders.frontend(issuerUri)`: a per-request
+- **Frontend (HTML)** — `SecurityHeaders.frontend(issuerUri, trustedTypes)`: a per-request
   `Content-Security-Policy` whose `script-src` is `'nonce-…' 'strict-dynamic'` and whose `style-src`
   is `'self' 'nonce-…'`, with `style-src-attr 'none'` (no inline `style=""` attributes, ADR-0093 /
   REQ-UI in [`ui-design-system.md`](ui-design-system.md)), `object-src 'none'`, `base-uri 'self'`,
@@ -5108,6 +5108,20 @@ set is shaped by what the module serves.
   strict-origin-when-cross-origin`, `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy`
   `same-origin`, HSTS (one year, `includeSubDomains`, `preload`), a `Permissions-Policy` that denies
   every listed feature, and `X-Content-Type-Options: nosniff`.
+- **Frontend Trusted Types (ADR-0239)** — the directives `require-trusted-types-for 'script';
+  trusted-types krt-html krt-fragment` make every DOM script sink take a value of one of the two
+  named policies (REQ-FE-022) and forbid any other policy, a `default` one included.
+  `app.security.trusted-types` (`APP_SECURITY_TRUSTED_TYPES`, parsed by `TrustedTypesMode`) places
+  them: `report` (the default, and the fallback for a blank or unknown value) sends them as a
+  separate `Content-Security-Policy-Report-Only` header, so a violation is reported — the
+  client-error beacon's `securitypolicyviolation` listener counts it as
+  `basetool_client_error_total{kind="csp_violation"}` with the directive as its message — and the
+  page keeps working; `enforce` appends them to the enforced `Content-Security-Policy` and sends no
+  report-only header, so an unconverted sink throws. The effective mode is the gauge
+  `basetool_trusted_types_mode{mode}`. Switching production to `enforce` is a production
+  configuration change the owner approves after a quiet period in which the dialog page walk and
+  production report no violation ([`deployment.md` → *Trusted Types: report, then
+  enforce*](../deployment.md#trusted-types-report-then-enforce)).
 - **Backend and ingest (JSON only)** — `Content-Security-Policy: default-src 'none';
   frame-ancestors 'none'; base-uri 'none'; form-action 'none'`, because neither serves a document,
   plus `X-Frame-Options: DENY` and HSTS; the backend additionally sends the frontend's
@@ -5118,20 +5132,32 @@ set is shaped by what the module serves.
 
 A new inline script or style in a template MUST carry the request nonce rather than widening the
 policy; `'unsafe-inline'` and `'unsafe-eval'` are never added. Widening any directive is a change to
-this requirement first.
+this requirement first. An inline script is only ever a data bootstrap (REQ-FE-023,
+`InlineScriptDataOnlyTest`), and a new Trusted Types policy name is such a widening.
+
+> [!note] Amended 2026-10-04 — Trusted Types (ADR-0239)
+> The frontend sends the Trusted Types directives, report-only by default; the enforced mode is a
+> configuration switch. The only step left is the owner-approved switch of production to `enforce`.
 
 **Acceptance**
 
 - [x] A frontend page carries the nonce-gated CSP with `style-src-attr 'none'` and the Keycloak
   `form-action` origin, and every static header above.
+- [x] A frontend page carries the Trusted Types directives: report-only by default, in the enforced
+  policy with `app.security.trusted-types=enforce`.
+- [ ] Production runs `enforce`. _(Pending the owner's approval after a quiet period with no
+  `csp_violation` report; see `deployment.md`.)_
 - [x] An API response carries the `default-src 'none'` policy and the static headers.
 - [x] The public edge sends HSTS on its first response; its absence raises `EdgeHstsHeaderMissing`.
 
-**Enforced by:** `SecurityHeadersTest` (frontend and backend), ingest `SecurityConfigTest`, the
-`blackbox-hsts*` probes behind `EdgeHstsHeaderMissing` · **Code:** `frontend/…/config/SecurityHeaders`,
-`frontend/…/config/CspNonceFilter`, the `headers(...)` blocks of the backend and ingest
+**Enforced by:** `SecurityHeadersTest` (frontend and backend),
+`TrustedTypesModeTest`, the Trusted Types collector of `DialogA11yE2eTest`, ingest
+`SecurityConfigTest`, the `blackbox-hsts*` probes behind `EdgeHstsHeaderMissing` · **Code:**
+`frontend/…/config/SecurityHeaders`, `frontend/…/config/TrustedTypesMode`,
+`frontend/…/config/TrustedTypesModeMetric`, `frontend/…/config/CspNonceFilter`, the `headers(...)` blocks of the backend and ingest
 `SecurityConfig`, `docker/edge/conf.d/00-maps.conf` · **ADR:**
-[ADR-0093](../adr/0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md)
+[ADR-0093](../adr/0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md),
+[ADR-0239](../adr/0239-the-browser-baseline-is-baseline-2025-and-trusted-types-follow.md)
 
 ### REQ-SEC-066 — The Keycloak login form works with password managers, and "remember me" is opt-in
 

@@ -104,4 +104,17 @@
         const form = target.closest('form[data-bank-tiers]');
         if (form instanceof HTMLFormElement) render(form);
     });
+
+    /** Binds the manage view's filters and pager to an in-place fragment swap. */
+    function bindBankManageSwaps() {
+        if (window.krtFetch) {
+            window.krtFetch.bindSwap({
+                container: '#bank-manage-results',
+                fragmentValue: 'manageBody',
+                history: true,
+            });
+        }
+    }
+    document.addEventListener('DOMContentLoaded', bindBankManageSwaps);
+    document.addEventListener('krt:swapped', bindBankManageSwaps);
 })();

@@ -446,50 +446,6 @@
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:attr="nonce=${cspNonce}">
-    document.addEventListener('DOMContentLoaded', function () {
-        function panels() { return document.querySelectorAll('[data-tabpanel]'); }
-        function tabs() { return document.querySelectorAll('.tab-nav .tab[data-tab]'); }
-
-        function activate(key, focus) {
-            var ps = panels();
-            if (!ps.length) { return; }
-            var ts = Array.prototype.slice.call(tabs());
-            var keys = ts.map(function (t) { return t.getAttribute('data-tab'); });
-            if (keys.indexOf(key) === -1) { key = keys.length ? keys[0] : null; }
-            if (!key) { return; }
-            ts.forEach(function (t) {
-                var on = t.getAttribute('data-tab') === key;
-                t.classList.toggle('active', on);
-                t.setAttribute('aria-selected', on ? 'true' : 'false');
-                if (on && focus) { t.focus(); }
-            });
-            ps.forEach(function (p) { p.hidden = p.getAttribute('data-tabpanel') !== key; });
-            if (history.replaceState) { history.replaceState(history.state, '', '#tab=' + key); }
-        }
-
-        document.addEventListener('click', function (e) {
-            var t = e.target.closest ? e.target.closest('.tab-nav .tab[data-tab]') : null;
-            if (t) { activate(t.getAttribute('data-tab')); }
-        });
-        document.addEventListener('keydown', function (e) {
-            if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') { return; }
-            var t = e.target.closest ? e.target.closest('.tab-nav .tab[data-tab]') : null;
-            if (!t) { return; }
-            e.preventDefault();
-            var ts = Array.prototype.slice.call(tabs());
-            var i = ts.indexOf(t);
-            var n = (i + (e.key === 'ArrowRight' ? 1 : ts.length - 1)) % ts.length;
-            activate(ts[n].getAttribute('data-tab'), true);
-        });
-
-        function applyFromHash() {
-            var m = (location.hash.match(/tab=(\w+)/) || [])[1];
-            if (m) { activate(m); }
-        }
-        applyFromHash();
-        document.addEventListener('krt:swapped', applyFromHash);
-    });
-</script>
+<script th:src="@{/js/org-unit-bank.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

@@ -13,7 +13,7 @@
 (function () {
     'use strict';
 
-    const i18n = window.materialgesuchI18n || {};
+    const i18n = { ...window.materialgesuchModalI18n, ...window.materialgesuchI18n };
     const modal = document.getElementById('mg-modal');
     if (!modal || !window.krtFetch) {
         return;
@@ -83,7 +83,7 @@
         const counter = q('[data-mg-charcount]');
         if (ta && counter) {
             counter.textContent = fmt(
-                window.krtI18nText(i18n.charCounter, 'materialgesuchI18n.charCounter'),
+                window.krtI18nText(i18n.charCounter, 'materialgesuchModalI18n.charCounter'),
                 ta.value.length.toLocaleString('de-DE'),
             );
         }
@@ -96,7 +96,7 @@
         const input = q('[data-mg-qty]');
         if (unit) {
             unit.textContent = isPiece
-                ? window.krtI18nText(i18n.unitPiece, 'materialgesuchI18n.unitPiece')
+                ? window.krtI18nText(i18n.unitPiece, 'materialgesuchModalI18n.unitPiece')
                 : i18n.unitScu || 'SCU';
         }
         if (input) {
@@ -290,25 +290,25 @@
             return;
         }
         if (!materialItems.length) {
-            list.innerHTML = `<li class="krt-combobox__notice">${escapeHtml(
-                i18n.materialPickerEmpty || '',
-            )}</li>`;
+            krtHtml.set(
+                list,
+                krtHtml`<li class="krt-combobox__notice">${i18n.materialPickerEmpty || ''}</li>`,
+            );
             list.hidden = !materialListOpen;
             return;
         }
-        let html = '';
-        materialItems.forEach((it) => {
+        const html = materialItems.map((it) => {
             const unit =
                 it.quantityType === 'PIECE'
-                    ? window.krtI18nText(i18n.unitPiece, 'materialgesuchI18n.unitPiece')
+                    ? window.krtI18nText(i18n.unitPiece, 'materialgesuchModalI18n.unitPiece')
                     : i18n.unitScu || 'SCU';
-            html += `<li class="krt-combobox__option" role="option" data-material-id="${escapeAttr(
-                it.id,
-            )}" data-name="${escapeAttr(it.name)}" data-quantity-type="${escapeAttr(
-                it.quantityType,
-            )}"><strong>${escapeHtml(it.name)}</strong> <small>${escapeHtml(unit)}</small></li>`;
+            return krtHtml`<li class="krt-combobox__option" role="option" data-material-id="${
+                it.id
+            }" data-name="${it.name}" data-quantity-type="${
+                it.quantityType
+            }"><strong>${it.name}</strong> <small>${unit}</small></li>`;
         });
-        list.innerHTML = html;
+        krtHtml.set(list, html);
         list.hidden = !materialListOpen;
     }
 
@@ -372,23 +372,22 @@
             return;
         }
         if (!productItems.length) {
-            list.innerHTML = `<li class="krt-combobox__notice">${escapeHtml(
-                i18n.itemPickerEmpty || '',
-            )}</li>`;
+            krtHtml.set(
+                list,
+                krtHtml`<li class="krt-combobox__notice">${i18n.itemPickerEmpty || ''}</li>`,
+            );
             list.hidden = !itemListOpen;
             return;
         }
-        let html = '';
-        productItems.forEach((it) => {
-            html += `<li class="krt-combobox__option" role="option" data-product-key="${escapeAttr(
-                it.productKey,
-            )}" data-name="${escapeAttr(it.name)}"><strong>${escapeHtml(it.name)}</strong>`;
-            if (it.manufacturerName) {
-                html += ` <small>${escapeHtml(it.manufacturerName)}</small>`;
-            }
-            html += '</li>';
-        });
-        list.innerHTML = html;
+        const html = productItems.map(
+            (it) =>
+                krtHtml`<li class="krt-combobox__option" role="option" data-product-key="${
+                    it.productKey
+                }" data-name="${it.name}"><strong>${it.name}</strong>${
+                    it.manufacturerName ? krtHtml` <small>${it.manufacturerName}</small>` : ''
+                }</li>`,
+        );
+        krtHtml.set(list, html);
         list.hidden = !itemListOpen;
     }
 

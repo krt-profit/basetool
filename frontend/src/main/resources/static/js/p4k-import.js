@@ -259,38 +259,40 @@
         if (tableWrap instanceof HTMLElement) tableWrap.hidden = jobs.length === 0;
         const kindHeader = window.krtI18nText(i18n().colKind, 'krtP4kImportI18n.colKind');
         const summaryHeader = window.krtI18nText(i18n().colSummary, 'krtP4kImportI18n.colSummary');
-        let html = '';
+        /** @type {KrtHtml[]} */
+        const html = [];
         jobs.forEach((job) => {
-            html +=
-                `<tr data-testid="p4k-job-row">` +
-                `<td><span class="cell-title">${escapeHtml(
-                    job.sourceFilename || '',
-                )}</span><span class="cell-sub">${escapeHtml(fmtTime(job.createdAt))}</span></td>` +
-                `<td data-label="${escapeAttr(kindHeader)}">${escapeHtml(kindLabel(job))}</td>` +
-                `<td class="cell-status"><span class="chip ${escapeAttr(
-                    statusChip(job),
-                )}">${escapeHtml(statusLabel(job))}</span></td>` +
-                `<td data-label="${escapeAttr(summaryHeader)}">${escapeHtml(
-                    summaryText(job),
-                )}</td>` +
-                `<td class="cell-actions">`;
+            html.push(
+                krtHtml`<tr data-testid="p4k-job-row"><td><span class="cell-title">${
+                    job.sourceFilename || ''
+                }</span><span class="cell-sub">${fmtTime(job.createdAt)}</span></td><td data-label="${
+                    kindHeader
+                }">${kindLabel(job)}</td><td class="cell-status"><span class="chip ${statusChip(
+                    job,
+                )}">${statusLabel(job)}</span></td><td data-label="${summaryHeader}">${summaryText(
+                    job,
+                )}</td><td class="cell-actions">`,
+            );
             if (job.status === 'SUCCEEDED') {
-                html += `<button type="button" class="btn btn-ghost btn-xs" data-action="view" data-job-id="${escapeAttr(
-                    job.id,
-                )}">${escapeHtml(
-                    window.krtI18nText(i18n().actionView, 'krtP4kImportI18n.actionView'),
-                )}</button>`;
+                html.push(
+                    krtHtml`<button type="button" class="btn btn-ghost btn-xs" data-action="view" data-job-id="${
+                        job.id
+                    }">${window.krtI18nText(i18n().actionView, 'krtP4kImportI18n.actionView')}</button>`,
+                );
                 if (job.kind === 'PREVIEW') {
-                    html += ` <button type="button" class="btn btn-success btn-xs" data-action="apply" data-job-id="${escapeAttr(
-                        job.id,
-                    )}">${escapeHtml(
-                        window.krtI18nText(i18n().actionApply, 'krtP4kImportI18n.actionApply'),
-                    )}</button>`;
+                    html.push(
+                        krtHtml` <button type="button" class="btn btn-success btn-xs" data-action="apply" data-job-id="${
+                            job.id
+                        }">${window.krtI18nText(
+                            i18n().actionApply,
+                            'krtP4kImportI18n.actionApply',
+                        )}</button>`,
+                    );
                 }
             }
-            html += '</td>' + '</tr>';
+            html.push(krtHtml`</td></tr>`);
         });
-        jobsBody.innerHTML = html;
+        krtHtml.set(jobsBody, html);
     }
 
     function kindLabel(job) {
@@ -415,24 +417,20 @@
             ],
         ];
         const body = $('krt-p4k-rows');
-        let html = '';
-        rows.forEach((pair) => {
+        const html = rows.map((pair) => {
             const c = pair[1] || {};
-            html += `<tr>` + `<th scope="row">${escapeHtml(pair[0])}</th>`;
-            [
+            const cells = [
                 c.matched,
                 c.uuidBackfilled,
                 c.uuidConflicts,
                 c.enriched,
                 c.created,
                 c.unmatched,
-            ].forEach((v) => {
-                html += `<td>${escapeHtml(v == null ? 0 : v)}</td>`;
-            });
-            html += '</tr>';
+            ].map((v) => krtHtml`<td>${v == null ? 0 : v}</td>`);
+            return krtHtml`<tr><th scope="row">${pair[0]}</th>${cells}</tr>`;
         });
         if (body) {
-            body.innerHTML = html;
+            krtHtml.set(body, html);
         }
 
         const ingredientsEl = $('krt-p4k-ingredients');
