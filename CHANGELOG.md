@@ -323,6 +323,11 @@
 
 ### Fixed
 
+- **Hinweis-Toasts schlucken keine Klicks mehr.** Ein eingeblendeter Erfolgs- oder Fehler-Toast
+  (unten rechts) fing fünf Sekunden lang jeden Klick auf das ab, was er verdeckte – etwa den
+  Löschen-Knopf einer gerade angelegten Materialkategorie. Toasts sind jetzt für die Maus
+  durchlässig (styles.css, REQ-UI-008).
+
 - **Admin-Seiten Missionsdaten und Spezialkommandos: Meldungen ohne Anführungszeichen.** Toasts
   und Dialogtitel zeigten ihren Text in `"…"`, weil das Inline-Skript die Übersetzung in ein
   JavaScript-Stringliteral schrieb; die Werte kommen jetzt sauber aus dem Seiten-Bootstrap

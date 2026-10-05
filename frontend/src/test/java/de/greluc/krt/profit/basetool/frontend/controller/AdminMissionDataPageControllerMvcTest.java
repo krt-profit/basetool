@@ -35,13 +35,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.FrequencyTypeDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -78,71 +80,31 @@ class AdminMissionDataPageControllerMvcTest {
 
   /**
    * Stubs the three backend catalogue calls (squadrons / job-types / frequency-types) with one row
-   * each in the raw {@code Map} wire shape the controller parses, so every section table renders.
+   * each, so every section table renders.
    */
   private void stubAllThree() {
-    PageResponse<Map<String, Object>> squadrons =
+    PageResponse<SquadronDto> squadrons =
         new PageResponse<>(
             List.of(
-                Map.of(
-                    "id",
-                    UUID.randomUUID().toString(),
-                    "name",
-                    "Frag SQ",
-                    "shorthand",
-                    "FSQ",
-                    "description",
-                    "d",
-                    "active",
-                    true,
-                    "isPromotionEnabled",
-                    true,
-                    "isProfitEligible",
-                    false,
-                    "version",
-                    0)),
+                new SquadronDto(UUID.randomUUID(), "Frag SQ", "FSQ", "d", true, true, false, 0L)),
             0,
             1000,
             1L,
             1,
             List.of());
-    PageResponse<Map<String, Object>> jobTypes =
+    PageResponse<JobTypeDto> jobTypes =
         new PageResponse<>(
             List.of(
-                Map.of(
-                    "id",
-                    UUID.randomUUID().toString(),
-                    "name",
-                    "Frag JT",
-                    "description",
-                    "d",
-                    "archetype",
-                    "MISSION",
-                    "active",
-                    true,
-                    "isLeadershipRole",
-                    false,
-                    "version",
-                    0)),
+                new JobTypeDto(
+                    UUID.randomUUID(), "Frag JT", "d", "MISSION", null, true, false, null, 0L)),
             0,
             1000,
             1L,
             1,
             List.of());
-    PageResponse<Map<String, Object>> freqTypes =
+    PageResponse<FrequencyTypeDto> freqTypes =
         new PageResponse<>(
-            List.of(
-                Map.of(
-                    "id",
-                    UUID.randomUUID().toString(),
-                    "name",
-                    "Frag FT",
-                    "description",
-                    "d",
-                    "active",
-                    true,
-                    "version",
-                    0)),
+            List.of(new FrequencyTypeDto(UUID.randomUUID(), "Frag FT", "d", true, null, 0L)),
             0,
             1000,
             1L,

@@ -28,11 +28,12 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryLocationType;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UexLocationDto;
+import de.greluc.krt.profit.basetool.frontend.personalinventory.client.PersonalInventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -49,7 +50,13 @@ class PersonalInventoryUexSearchTest {
 
   @Mock private BackendApiClient backendApiClient;
 
-  @InjectMocks private PersonalInventoryPageController controller;
+  private PersonalInventoryPageController controller;
+
+  @BeforeEach
+  void setUp() {
+    controller =
+        new PersonalInventoryPageController(new PersonalInventoryBackendClient(backendApiClient));
+  }
 
   @Test
   void uexSearch_delegatesToBackend_andDefaultsLimitTo25() {

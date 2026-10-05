@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
 class ReadUriTemplateTest {
 
   /** The {@code get} call sites when the guard was introduced; fewer means the scan broke. */
-  private static final int MIN_READ_SITES = 256;
+  private static final int MIN_READ_SITES = 243;
 
   /** The {@code execute(…)} call sites when the guard was introduced. */
   private static final int MIN_EXECUTE_SITES = 17;

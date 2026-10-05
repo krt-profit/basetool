@@ -819,6 +819,20 @@ their "must stay green" period here (D-01).
   controller, as before. Those two rules are the target of the module's REST wave, which moves the
   transaction boundary and the mapping into the module; a move keeps both where they are, because
   either change alters the transaction boundary.
+- `orgchart` — **done 2026-10-05.** All 24 classes moved: the controllers `OrgChartController` and
+  `LeitungController` into `orgchart.web`, the rest (entity `OrgChartPosition`, its repository, the
+  enums, `OrgChartService`, `OrgChartReadService`, `LeitungViewService`, `OrgChartPositionMapper`
+  and the 14 DTOs, `AreaLeadershipDto` with them as §7.3 P1-1 deferred) into `orgchart.internal`.
+  The module is declared (floor 19, after `dashboard`) and publishes nothing: no other module uses
+  it, and orgunit reaches it only through `MembershipChangeObserver`. The domain map trades its two `name` rules
+  and the `AreaLeadershipDto` class rule for one `package` rule. No access policy left the scope
+  hub — the org chart has none: its reads are `isAuthenticated()`, its writes `hasRole('ADMIN')`,
+  and neither touches `OwnerScopeService` or `AccessGateService`. The module baseline is unchanged
+  at 110 edges: the org chart had no frozen edge left after P1-1. `OrgChartModuleContractTest`
+  pins its endpoints and the observer before and after the move. **Correction to §5.2:** the
+  `web` package cannot hold the REST DTOs yet — the services return them, so `internal -> web`
+  would close a layer cycle inside the module (ADR-0047); they stay in `internal` until the module
+  API returns its own records.
 - `admin` — **done 2026-10-05** (P2-2). The admin building blocks of §5.1 — the runtime system
   settings, the Android version policy and the liveness probe — moved out of the layer packages:
   `admin.web` holds `SystemSettingController`, `AppVersionPolicyController`, `SystemController`,
@@ -832,11 +846,11 @@ their "must stay green" period here (D-01).
   implemented by `SystemSettingService`; every declared module of a higher rank allows
   `admin::api`. The module baseline is unchanged at 110 edges (none of the four was a violation);
   the authorization matrix and the OpenAPI document are unchanged. No access policy: every gate is
-  a role annotation. **Correction to §5.2:** where a service returns REST records, the records stay
-  in `internal` beside it; in `web` they would close an `internal ⇄ web` layer cycle. **Finding:**
+  a role annotation. The setting records stay in `internal` beside the service that returns them, as
+  for `orgchart`. **Finding:**
   the selection floor of `ArchitectureTest`'s `squadron_id` join-column rule counts the legacy
   `model` package tree as well as every entity by role, so each move of `model.dto` records lowers
-  it (604 → 600 here) without the rule checking any entity less.
+  it (by 4 here) without the rule checking any entity less.
 
 ### 7.5 Phase 3 — the business core
 

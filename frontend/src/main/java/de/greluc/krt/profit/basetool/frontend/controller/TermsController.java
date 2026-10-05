@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,12 +40,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 public class TermsController {
 
   /**
-   * Reads the wording in force through the one bearer-less call the frontend makes: {@code GET
-   * /api/v1/terms/document} is one of the four backend paths REQ-SEC-052 serves without a token,
-   * because a document everyone must be able to read before agreeing to anything cannot require
-   * having agreed (ADR-0138). Every other call this module makes carries the caller's bearer.
+   * Reads the wording in force through the one bearer-less call the frontend makes (REQ-SEC-052,
+   * ADR-0138).
    */
-  private final BackendApiClient backendApiClient;
+  private final IdentityBackendClient identityClient;
 
   /**
    * Renders the wording in force, or the "temporarily unavailable" notice when the backend read
@@ -58,7 +56,7 @@ public class TermsController {
   @GetMapping("/terms")
   public String showTerms(Model model) {
     try {
-      model.addAttribute("terms", backendApiClient.getTermsDocumentAnonymously());
+      model.addAttribute("terms", identityClient.publicTermsDocument());
     } catch (BackendServiceException e) {
       log.debug("Terms document unavailable; rendering the notice instead", e);
       model.addAttribute("terms", null);

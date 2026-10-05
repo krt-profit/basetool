@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.hangar.client.HangarBackendClient;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ManufacturerDto;
@@ -33,7 +34,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.ShipRequestDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.ShipForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalogListLoader;
@@ -86,8 +86,13 @@ import org.springframework.web.util.UriComponentsBuilder;
 @PreAuthorize("isAuthenticated()")
 public class HangarPageController {
 
-  private final BackendApiClient backendApiClient;
+  /** Reads the hangar pages and sends the ship writes. */
+  private final HangarBackendClient hangarClient;
+
+  /** Runs the page's independent reads in parallel. */
   private final ParallelPageLoader parallelPageLoader;
+
+  /** Reads the cached reference catalogues behind the ship form. */
   private final CachedCatalogListLoader catalogListLoader;
 
   /**
@@ -98,29 +103,6 @@ public class HangarPageController {
   @ModelAttribute("hangarImportMaxBytes")
   public long hangarImportMaxBytes() {
     return HangarImportProxyController.MAX_IMPORT_BYTES;
-  }
-
-  /**
-   * Runs a backend GET with the pre-set paging params plus an optional {@code search} term passed
-   * as a URI-template variable, so the term is encoded exactly once. A {@code null}/blank term is
-   * omitted.
-   *
-   * @param uri the pre-built URI carrying only the safe paging params
-   * @param search the free-text ship-name filter, or {@code null}/blank for no filter
-   * @param responseType the decoded response type
-   * @param <T> the response body type
-   * @return the decoded backend response
-   */
-  private <T> T backendSearch(
-      @NotNull UriComponentsBuilder uri,
-      String search,
-      ParameterizedTypeReference<T> responseType) {
-    String base = uri.toUriString();
-    if (search == null || search.isBlank()) {
-      return backendApiClient.get(base, responseType);
-    }
-    String separator = base.indexOf('?') >= 0 ? "&" : "?";
-    return backendApiClient.get(base + separator + "search={search}", responseType, search);
   }
 
   /**
@@ -172,7 +154,6 @@ public class HangarPageController {
     String effectiveSearch = search == null || search.isBlank() ? null : search.trim();
     Boolean fittedFilter = parseFitted(fitted);
 
-    UriComponentsBuilder myShipsUri = myShipsUri(effectivePage, effectiveSize, fittedFilter);
     AtomicBoolean shipsFailed = new AtomicBoolean(false);
 
     CompletableFuture<PageResponse<ShipDto>> shipsFuture =
@@ -180,7 +161,8 @@ public class HangarPageController {
             .<PageResponse<ShipDto>>loadAsync(
                 () -> {
                   PageResponse<ShipDto> p =
-                      backendSearch(myShipsUri, effectiveSearch, MY_SHIPS_PAGE_TYPE);
+                      hangarClient.myShips(
+                          effectivePage, effectiveSize, fittedFilter, effectiveSearch);
                   return p != null
                       ? p
                       : new PageResponse<>(
@@ -195,11 +177,11 @@ public class HangarPageController {
                       List.of(), effectivePage, effectiveSize, 0L, 0, List.of());
                 });
 
-    UriComponentsBuilder counterpartUri =
-        myShipsUri(0, 1, fittedFilter == null ? Boolean.TRUE : null);
+    Boolean counterpartFitted = fittedFilter == null ? Boolean.TRUE : null;
     CompletableFuture<Long> counterpartFuture =
         parallelPageLoader
-            .<Long>loadAsync(() -> totalOf(counterpartUri, effectiveSearch, MY_SHIPS_PAGE_TYPE))
+            .<Long>loadAsync(
+                () -> totalOf(hangarClient.myShips(0, 1, counterpartFitted, effectiveSearch)))
             .exceptionally(
                 e -> {
                   log.warn("Failed to count my ships for the readiness counter", e);
@@ -210,8 +192,7 @@ public class HangarPageController {
         fragmentOnly
             ? CompletableFuture.completedFuture(null)
             : parallelPageLoader
-                .<Long>loadAsync(
-                    () -> totalOf(squadronOverviewUri(0, 1), null, SQUADRON_OVERVIEW_PAGE_TYPE))
+                .<Long>loadAsync(() -> totalOf(hangarClient.squadronOverview(0, 1, null)))
                 .exceptionally(
                     e -> {
                       log.warn("Failed to count the org-unit overview for the hangar tab", e);
@@ -240,9 +221,7 @@ public class HangarPageController {
         parallelPageLoader
             .<List<LocationDto>>loadAsync(
                 () -> {
-                  List<LocationDto> hl =
-                      backendApiClient.getCached(
-                          CachedCatalog.LOCATIONS_HOME, HOME_LOCATION_LIST_TYPE);
+                  List<LocationDto> hl = hangarClient.homeLocations();
                   return hl != null ? new ArrayList<>(hl) : new ArrayList<>();
                 })
             .exceptionally(
@@ -345,53 +324,14 @@ public class HangarPageController {
   }
 
   /**
-   * Builds the {@code /my-ships} URI carrying only the safe paging params and the fitted filter.
-   *
-   * @param page zero-based page index
-   * @param size page size
-   * @param fitted the fitted filter, or {@code null} for none
-   * @return the URI builder; the search term is appended by {@link #backendSearch}
-   */
-  private static @NotNull UriComponentsBuilder myShipsUri(
-      int page, int size, @Nullable Boolean fitted) {
-    UriComponentsBuilder uri =
-        UriComponentsBuilder.fromPath("/api/v1/hangar/my-ships")
-            .queryParam("page", page)
-            .queryParam("size", size);
-    if (fitted != null) {
-      uri.queryParam("fitted", fitted);
-    }
-    return uri;
-  }
-
-  /**
-   * Builds the {@code /squadron-overview} URI carrying only the safe paging params.
-   *
-   * @param page zero-based page index
-   * @param size page size
-   * @return the URI builder; the search term is appended by {@link #backendSearch}
-   */
-  private static @NotNull UriComponentsBuilder squadronOverviewUri(int page, int size) {
-    return UriComponentsBuilder.fromPath("/api/v1/hangar/squadron-overview")
-        .queryParam("page", page)
-        .queryParam("size", size);
-  }
-
-  /**
    * Reads only the total of a backend page, for a tab or readiness counter.
    *
-   * @param uri the paging URI, usually asking for a single entry
-   * @param search the optional search term
-   * @param responseType the decoded page type
-   * @param <T> the page element type
+   * @param response the page, usually asking for a single entry, or {@code null}
    * @return the page's {@code totalElements}, or {@code null} when the backend returned no body
    */
+  @Contract("null -> null")
   @Nullable
-  private <T> Long totalOf(
-      @NotNull UriComponentsBuilder uri,
-      @Nullable String search,
-      @NotNull ParameterizedTypeReference<PageResponse<T>> responseType) {
-    PageResponse<T> response = backendSearch(uri, search, responseType);
+  private static Long totalOf(@Nullable PageResponse<?> response) {
     return response == null ? null : response.totalElements();
   }
 
@@ -426,8 +366,7 @@ public class HangarPageController {
    */
   private List<OrgUnitMembershipOptionDto> fetchCallerMembershipOptions() {
     try {
-      List<OrgUnitMembershipOptionDto> options =
-          backendApiClient.get("/api/v1/users/me/pickable-org-units", PICKABLE_ORG_UNIT_LIST_TYPE);
+      List<OrgUnitMembershipOptionDto> options = hangarClient.pickableOrgUnits();
       return options != null ? options : List.of();
     } catch (Exception e) {
       log.warn("Failed to fetch pickable org units for hangar add-ship owner-picker", e);
@@ -453,13 +392,6 @@ public class HangarPageController {
   private static final String TAB_UNIT = "unit";
 
   /**
-   * Response type for the uncached {@code /my-ships} call — one server-side-paginated page of the
-   * caller's ships (REQ-HANGAR-002).
-   */
-  private static final ParameterizedTypeReference<PageResponse<ShipDto>> MY_SHIPS_PAGE_TYPE =
-      new ParameterizedTypeReference<PageResponse<ShipDto>>() {};
-
-  /**
    * Response type for the cached ship-type catalog page ({@code /ship-types}), unwrapped into the
    * hangar's ship-type dropdown.
    */
@@ -479,29 +411,6 @@ public class HangarPageController {
    */
   private static final ParameterizedTypeReference<PageResponse<ManufacturerDto>>
       MANUFACTURER_PAGE_TYPE = new ParameterizedTypeReference<PageResponse<ManufacturerDto>>() {};
-
-  /**
-   * Response type for the cached curated home-locations call ({@code /locations/home-locations}),
-   * which returns a bare list (already ordered Z-&gt;A) rather than a paginated envelope.
-   */
-  private static final ParameterizedTypeReference<List<LocationDto>> HOME_LOCATION_LIST_TYPE =
-      new ParameterizedTypeReference<List<LocationDto>>() {};
-
-  /**
-   * Response type for the caller's pickable org units ({@code /users/me/pickable-org-units}) that
-   * populate the add-ship owner-picker; a bare list resolved server-side for the caller.
-   */
-  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
-      PICKABLE_ORG_UNIT_LIST_TYPE =
-          new ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>() {};
-
-  /**
-   * Response type for the squadron-wide hangar overview page ({@code /hangar/squadron-overview}),
-   * one server-side-paginated page of per-ship-type counts (REQ-HANGAR-001).
-   */
-  private static final ParameterizedTypeReference<PageResponse<SquadronShipOverviewDto>>
-      SQUADRON_OVERVIEW_PAGE_TYPE =
-          new ParameterizedTypeReference<PageResponse<SquadronShipOverviewDto>>() {};
 
   /**
    * Renders the hangar page on its org-unit tab: ship counts per type in the caller's scope,
@@ -533,7 +442,7 @@ public class HangarPageController {
         fragmentOnly
             ? CompletableFuture.completedFuture(null)
             : parallelPageLoader
-                .<Long>loadAsync(() -> totalOf(myShipsUri(0, 1, null), null, MY_SHIPS_PAGE_TYPE))
+                .<Long>loadAsync(() -> totalOf(hangarClient.myShips(0, 1, null, null)))
                 .exceptionally(
                     e -> {
                       log.warn("Failed to count my ships for the hangar tab", e);
@@ -543,11 +452,7 @@ public class HangarPageController {
     List<SquadronShipOverviewDto> overview = new ArrayList<>();
     PageResponse<SquadronShipOverviewDto> res = null;
     try {
-      res =
-          backendSearch(
-              squadronOverviewUri(effectivePage, effectiveSize),
-              effectiveSearch,
-              SQUADRON_OVERVIEW_PAGE_TYPE);
+      res = hangarClient.squadronOverview(effectivePage, effectiveSize, effectiveSearch);
       if (res != null && res.content() != null) {
         overview = new ArrayList<>(res.content());
       }
@@ -607,7 +512,7 @@ public class HangarPageController {
               form.isFitted(),
               null,
               form.getOwningOrgUnitId());
-      backendApiClient.post("/api/v1/hangar/ships", request, ShipDto.class);
+      hangarClient.createShip(request);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.ship_add");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "POST /api/v1/hangar/ships", e);
@@ -658,7 +563,7 @@ public class HangarPageController {
               form.isFitted(),
               form.getVersion(),
               null);
-      backendApiClient.put("/api/v1/hangar/ships/{id}", request, ShipDto.class, id);
+      hangarClient.updateShip(id, request);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.ship_update");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "PUT /api/v1/hangar/ships", id, e);
@@ -681,7 +586,7 @@ public class HangarPageController {
   @PostMapping("/{id}/delete")
   public String deleteShip(@PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/hangar/ships/{id}", Void.class, id);
+      hangarClient.deleteShip(id);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.ship_delete");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "DELETE /api/v1/hangar/ships", id, e);
@@ -705,10 +610,7 @@ public class HangarPageController {
   public String setHomeLocation(
       @RequestParam("locationId") @NotNull UUID locationId, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.post(
-          "/api/v1/hangar/ships/home-location",
-          new SetHomeLocationRequestDto(locationId),
-          Void.class);
+      hangarClient.setHomeLocation(new SetHomeLocationRequestDto(locationId));
       redirectAttributes.addFlashAttribute(
           "successToast", "notification.success.home_location_set");
     } catch (Exception e) {
@@ -736,8 +638,7 @@ public class HangarPageController {
         log,
         "add ship (ajax)",
         () -> {
-          backendApiClient.post(
-              "/api/v1/hangar/ships",
+          hangarClient.createShip(
               new ShipRequestDto(
                   request.name(),
                   request.shipTypeId(),
@@ -745,8 +646,7 @@ public class HangarPageController {
                   request.locationId(),
                   request.fitted(),
                   null,
-                  request.owningOrgUnitId()),
-              ShipDto.class);
+                  request.owningOrgUnitId()));
           return ResponseEntity.noContent().build();
         });
   }
@@ -771,8 +671,8 @@ public class HangarPageController {
         log,
         "update ship (ajax)",
         () -> {
-          backendApiClient.put(
-              "/api/v1/hangar/ships/{id}",
+          hangarClient.updateShip(
+              id,
               new ShipRequestDto(
                   request.name(),
                   request.shipTypeId(),
@@ -780,9 +680,7 @@ public class HangarPageController {
                   request.locationId(),
                   request.fitted(),
                   request.version(),
-                  null),
-              ShipDto.class,
-              id);
+                  null));
           return ResponseEntity.noContent().build();
         });
   }
@@ -800,7 +698,7 @@ public class HangarPageController {
         log,
         "delete ship (ajax)",
         () -> {
-          backendApiClient.delete("/api/v1/hangar/ships/{id}", Void.class, id);
+          hangarClient.deleteShip(id);
           return ResponseEntity.noContent().build();
         });
   }
@@ -824,7 +722,7 @@ public class HangarPageController {
         log,
         "set home location (ajax)",
         () -> {
-          backendApiClient.post("/api/v1/hangar/ships/home-location", request, Void.class);
+          hangarClient.setHomeLocation(request);
           return ResponseEntity.noContent().build();
         });
   }

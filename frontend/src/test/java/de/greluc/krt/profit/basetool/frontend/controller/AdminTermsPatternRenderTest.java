@@ -30,6 +30,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PendingCountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.TermsAcceptanceStatusDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.time.Instant;
@@ -74,7 +75,7 @@ class AdminTermsPatternRenderTest {
       throws Exception {
     when(backendApiClient.get(startsWith("/api/v1/admin/terms?"), anyTypeRef())).thenReturn(rows);
     when(backendApiClient.get(eq("/api/v1/admin/terms/pending-count"), anyClass()))
-        .thenReturn(new AdminTermsPageController.PendingCountView(3, "v1"));
+        .thenReturn(new PendingCountDto(3, "v1"));
     MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     return mockMvc
         .perform(get("/admin/terms?" + query).locale(Locale.GERMAN))

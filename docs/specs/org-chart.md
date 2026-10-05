@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-05.
 > **Owner area:** ORG · **Related ADRs:** ADR-0029
 
 # Organisation org chart (Funktionsränge)
@@ -12,10 +12,10 @@ Spezialkommandos. It grants no permission — authorization stays with the role 
 org-unit-scoped. An admin edits its free-text holders and structure inline; everyone else reads it.
 The aggregate is the `OrgChartPosition` row (Flyway `V136`, extended by `V138`, `V167`, `V171` and
 `V186`); the read model is assembled by
-[`OrgChartReadService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OrgChartReadService.java),
+[`OrgChartReadService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/orgchart/internal/OrgChartReadService.java),
 the write rules and the rank mirror live in
-[`OrgChartService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OrgChartService.java),
-behind [`OrgChartController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/OrgChartController.java).
+[`OrgChartService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/orgchart/internal/OrgChartService.java),
+behind [`OrgChartController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/orgchart/web/OrgChartController.java).
 
 > **Numbering note.** The ORG ids are shared with [`org-unit-tenancy.md`](org-unit-tenancy.md). Four
 > of them had each named one requirement here and a different one there; on 2026-09-22, on the

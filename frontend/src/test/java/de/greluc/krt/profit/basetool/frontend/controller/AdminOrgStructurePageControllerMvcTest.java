@@ -35,12 +35,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.BereichDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitNodeDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitParentResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrganisationsleitungDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -222,8 +224,17 @@ class AdminOrgStructurePageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void createBereich_ajax_admin_returns200() throws Exception {
-    when(backendApiClient.post(eq("/api/v1/org-hierarchy/bereiche"), any(), eq(Object.class)))
-        .thenReturn(Map.of("id", "00000000-0000-0000-0000-000000000001", "version", 0));
+    when(backendApiClient.post(eq("/api/v1/org-hierarchy/bereiche"), any(), eq(BereichDto.class)))
+        .thenReturn(
+            new BereichDto(
+                UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                "Profit",
+                "PRF",
+                null,
+                true,
+                null,
+                null,
+                0L));
 
     mockMvc
         .perform(
@@ -251,8 +262,14 @@ class AdminOrgStructurePageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void setParent_ajax_admin_returns200() throws Exception {
-    when(backendApiClient.patch(contains("/parent"), any(), eq(Object.class)))
-        .thenReturn(Map.of("version", 1));
+    when(backendApiClient.patch(
+            contains("/parent"), any(), eq(OrgUnitParentResponse.class), any(Object[].class)))
+        .thenReturn(
+            new OrgUnitParentResponse(
+                UUID.fromString("00000000-0000-0000-0000-000000000002"),
+                "SQUADRON",
+                UUID.fromString("00000000-0000-0000-0000-000000000003"),
+                1L));
 
     mockMvc
         .perform(
@@ -268,8 +285,17 @@ class AdminOrgStructurePageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void createBereich_ajax_evictsStaticDataCache() throws Exception {
-    when(backendApiClient.post(any(String.class), any(), eq(Object.class)))
-        .thenReturn(Map.of("id", "00000000-0000-0000-0000-000000000001", "version", 0));
+    when(backendApiClient.post(any(String.class), any(), eq(BereichDto.class)))
+        .thenReturn(
+            new BereichDto(
+                UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                "Profit",
+                "PRF",
+                null,
+                true,
+                null,
+                null,
+                0L));
 
     mockMvc
         .perform(
@@ -286,8 +312,15 @@ class AdminOrgStructurePageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void createOrganisationsleitung_ajax_evictsStaticDataCache() throws Exception {
-    when(backendApiClient.post(any(String.class), any(), eq(Object.class)))
-        .thenReturn(Map.of("id", "00000000-0000-0000-0000-000000000004", "version", 0));
+    when(backendApiClient.post(any(String.class), any(), eq(OrganisationsleitungDto.class)))
+        .thenReturn(
+            new OrganisationsleitungDto(
+                UUID.fromString("00000000-0000-0000-0000-000000000004"),
+                "Kartellleitung",
+                "OL",
+                null,
+                true,
+                0L));
 
     mockMvc
         .perform(
@@ -304,8 +337,14 @@ class AdminOrgStructurePageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void setParent_ajax_evictsStaticDataCache() throws Exception {
-    when(backendApiClient.patch(contains("/parent"), any(), eq(Object.class)))
-        .thenReturn(Map.of("version", 1));
+    when(backendApiClient.patch(
+            contains("/parent"), any(), eq(OrgUnitParentResponse.class), any(Object[].class)))
+        .thenReturn(
+            new OrgUnitParentResponse(
+                UUID.fromString("00000000-0000-0000-0000-000000000002"),
+                "SQUADRON",
+                UUID.fromString("00000000-0000-0000-0000-000000000003"),
+                1L));
 
     mockMvc
         .perform(

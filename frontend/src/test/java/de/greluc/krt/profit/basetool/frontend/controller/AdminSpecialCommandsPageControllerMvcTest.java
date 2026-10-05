@@ -39,13 +39,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -84,17 +83,18 @@ class AdminSpecialCommandsPageControllerMvcTest {
   /**
    * Stubs the backend SK catalogue with one active special command so the list table renders.
    *
-   * @return a single-row page envelope in the raw {@code Map} wire shape the controller parses
+   * @return a single-row page envelope as the client decodes it
    */
-  private PageResponse<Map<String, Object>> oneSpecialCommand() {
-    Map<String, Object> sc = new HashMap<>();
-    sc.put("id", UUID.randomUUID().toString());
-    sc.put("name", "Fragment SK");
-    sc.put("shorthand", "FSK");
-    sc.put("description", "desc");
-    sc.put("active", true);
-    sc.put("isProfitEligible", false);
-    sc.put("version", 0);
+  private PageResponse<SpecialCommandDto> oneSpecialCommand() {
+    SpecialCommandDto sc =
+        new SpecialCommandDto(
+            UUID.fromString("3f2c8a10-5b7e-4c1d-9a6f-0e4b2d7c9a11"),
+            "Fragment SK",
+            "FSK",
+            "desc",
+            true,
+            false,
+            0L);
     return new PageResponse<>(List.of(sc), 0, 1000, 1L, 1, List.of());
   }
 

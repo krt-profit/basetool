@@ -22,13 +22,13 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import java.util.LinkedHashMap;
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AdminDeletionRequestDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.CreateDeletionRequestRequest;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -51,10 +51,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @Slf4j
 public class DeletionRequestProxyController {
 
-  private static final ParameterizedTypeReference<Map<String, Object>> STRING_OBJECT_MAP_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Reads and writes the member's erasure request on the backend. */
+  private final IdentityBackendClient identityClient;
 
   /**
    * Re-renders the profile page's deletion card as a fragment for the in-place swap after a write
@@ -68,11 +66,10 @@ public class DeletionRequestProxyController {
   @GetMapping(params = "fragment=card")
   @PreAuthorize("isAuthenticated()")
   public String card(Model model) {
-    Map<String, Object> deletionRequest = null;
+    AdminDeletionRequestDto deletionRequest = null;
     boolean unavailable = false;
     try {
-      deletionRequest =
-          backendApiClient.get("/api/v1/users/me/deletion-request", STRING_OBJECT_MAP_TYPE);
+      deletionRequest = identityClient.myDeletionRequest();
     } catch (Exception e) {
       log.debug("Could not load the member's deletion request for the card fragment", e);
       unavailable = true;
@@ -94,14 +91,13 @@ public class DeletionRequestProxyController {
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<Object> request(@NotNull @RequestBody Map<String, Object> request) {
     Object eraseHistory = request.get("eraseHistory");
-    Map<String, Object> body = new LinkedHashMap<>();
-    body.put("eraseHistory", Boolean.TRUE.equals(eraseHistory));
+    CreateDeletionRequestRequest body =
+        new CreateDeletionRequestRequest(Boolean.TRUE.equals(eraseHistory));
     return relay(
         log,
         "raising an account-deletion request (ajax)",
         () -> {
-          Object created =
-              backendApiClient.post("/api/v1/users/me/deletion-request", body, Object.class);
+          AdminDeletionRequestDto created = identityClient.requestDeletion(body);
           return ResponseEntity.ok(created);
         });
   }
@@ -119,7 +115,7 @@ public class DeletionRequestProxyController {
         log,
         "withdrawing an account-deletion request (ajax)",
         () -> {
-          backendApiClient.delete("/api/v1/users/me/deletion-request", Void.class);
+          identityClient.withdrawDeletionRequest();
           return ResponseEntity.noContent().build();
         });
   }

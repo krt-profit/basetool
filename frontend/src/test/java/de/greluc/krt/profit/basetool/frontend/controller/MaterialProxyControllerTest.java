@@ -24,14 +24,17 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialSellingTerminalDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.ProfitCalculationDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -45,20 +48,27 @@ class MaterialProxyControllerTest {
 
   @Mock private BackendApiClient backendApiClient;
 
-  @InjectMocks private MaterialProxyController controller;
+  private MaterialProxyController controller;
+
+  @BeforeEach
+  void setUp() {
+    controller = new MaterialProxyController(new CatalogueBackendClient(backendApiClient));
+  }
 
   @Test
   void getMaterialTerminals_proxiesById_andReturnsBackendResponse() {
     UUID materialId = UUID.randomUUID();
-    List<Map<String, Object>> backendData =
+    List<MaterialSellingTerminalDto> backendData =
         List.of(
-            Map.of("terminalName", "Lorville TDD", "priceBuy", 12.5),
-            Map.of("terminalName", "Area18 TDD", "priceBuy", 13.0));
-    when(backendApiClient.<List<Map<String, Object>>>get(
+            new MaterialSellingTerminalDto(
+                UUID.randomUUID(), "Lorville TDD", new BigDecimal("12.5")),
+            new MaterialSellingTerminalDto(
+                UUID.randomUUID(), "Area18 TDD", new BigDecimal("13.0")));
+    when(backendApiClient.<List<MaterialSellingTerminalDto>>get(
             eq("/api/v1/materials/{id}/terminals"), anyTypeRef(), eq(materialId)))
         .thenReturn(backendData);
 
-    List<Map<String, Object>> result = controller.getMaterialTerminals(materialId);
+    List<MaterialSellingTerminalDto> result = controller.getMaterialTerminals(materialId);
 
     assertEquals(backendData, result);
     verify(backendApiClient)
@@ -68,11 +78,11 @@ class MaterialProxyControllerTest {
   @Test
   void getMaterialTerminals_withNullBackendResponse_returnsEmptyList() {
     UUID materialId = UUID.randomUUID();
-    when(backendApiClient.<List<Map<String, Object>>>get(
+    when(backendApiClient.<List<MaterialSellingTerminalDto>>get(
             eq("/api/v1/materials/{id}/terminals"), anyTypeRef(), eq(materialId)))
         .thenReturn(null);
 
-    List<Map<String, Object>> result = controller.getMaterialTerminals(materialId);
+    List<MaterialSellingTerminalDto> result = controller.getMaterialTerminals(materialId);
 
     assertNotNull(result);
     assertTrue(result.isEmpty());
@@ -81,7 +91,7 @@ class MaterialProxyControllerTest {
   @Test
   void getProfitCalculation_withoutStarSystemNames_buildsBaseUri() {
     UUID shipId = UUID.randomUUID();
-    when(backendApiClient.<List<Map<String, Object>>>get(
+    when(backendApiClient.<List<ProfitCalculationDto>>get(
             anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of());
 
@@ -95,7 +105,7 @@ class MaterialProxyControllerTest {
   @Test
   void getProfitCalculation_withEmptyStarSystemList_buildsBaseUri() {
     UUID shipId = UUID.randomUUID();
-    when(backendApiClient.<List<Map<String, Object>>>get(
+    when(backendApiClient.<List<ProfitCalculationDto>>get(
             anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of());
 
@@ -109,7 +119,7 @@ class MaterialProxyControllerTest {
   @Test
   void getProfitCalculation_withMultipleStarSystems_appendsEachAsRepeatedPlaceholder() {
     UUID shipId = UUID.randomUUID();
-    when(backendApiClient.<List<Map<String, Object>>>get(
+    when(backendApiClient.<List<ProfitCalculationDto>>get(
             anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of());
 
@@ -130,7 +140,7 @@ class MaterialProxyControllerTest {
   @Test
   void getProfitCalculation_withSingleStarSystem_appendsOnePlaceholder() {
     UUID shipId = UUID.randomUUID();
-    when(backendApiClient.<List<Map<String, Object>>>get(
+    when(backendApiClient.<List<ProfitCalculationDto>>get(
             anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of());
 
@@ -149,7 +159,7 @@ class MaterialProxyControllerTest {
   void getProfitCalculation_withUriSyntaxInStarSystemName_relaysItAsAVariableNotAsQuerySyntax() {
     UUID shipId = UUID.randomUUID();
     String hostile = "Stanton&shipId=00000000-0000-0000-0000-000000000000&page=99";
-    when(backendApiClient.<List<Map<String, Object>>>get(
+    when(backendApiClient.<List<ProfitCalculationDto>>get(
             anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of());
 
@@ -170,18 +180,25 @@ class MaterialProxyControllerTest {
   @Test
   void getProfitCalculation_relaysTheRouteTerminalsUnchanged() {
     UUID shipId = UUID.randomUUID();
-    Map<String, Object> row =
-        Map.of(
-            "materialName", "Laranite",
-            "buyTerminalName", "TDD Lorville",
-            "buyTerminalLocation", "Hurston · Lorville",
-            "sellTerminalName", "Admin - ARC-L1",
-            "sellTerminalLocation", "Stanton · ARC-L1");
-    when(backendApiClient.<List<Map<String, Object>>>get(
+    ProfitCalculationDto row =
+        new ProfitCalculationDto(
+            UUID.randomUUID(),
+            "Laranite",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "TDD Lorville",
+            "Hurston · Lorville",
+            "Admin - ARC-L1",
+            "Stanton · ARC-L1");
+    when(backendApiClient.<List<ProfitCalculationDto>>get(
             anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of(row));
 
-    List<Map<String, Object>> result = controller.getProfitCalculation(shipId, null);
+    List<ProfitCalculationDto> result = controller.getProfitCalculation(shipId, null);
 
     assertEquals(List.of(row), result);
   }
@@ -189,11 +206,11 @@ class MaterialProxyControllerTest {
   @Test
   void getProfitCalculation_withNullBackendResponse_returnsEmptyList() {
     UUID shipId = UUID.randomUUID();
-    when(backendApiClient.<List<Map<String, Object>>>get(
+    when(backendApiClient.<List<ProfitCalculationDto>>get(
             anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(null);
 
-    List<Map<String, Object>> result = controller.getProfitCalculation(shipId, null);
+    List<ProfitCalculationDto> result = controller.getProfitCalculation(shipId, null);
 
     assertNotNull(result);
     assertTrue(result.isEmpty());
