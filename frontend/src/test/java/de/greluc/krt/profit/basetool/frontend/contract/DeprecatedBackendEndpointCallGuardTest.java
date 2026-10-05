@@ -40,7 +40,7 @@ import tools.jackson.databind.json.JsonMapper;
 class DeprecatedBackendEndpointCallGuardTest {
 
   /** Fewer resolved calls than this means the scanner broke, not that the frontend got smaller. */
-  private static final int MIN_RESOLVED_CALL_SITES = 544;
+  private static final int MIN_RESOLVED_CALL_SITES = 546;
 
   /**
    * Deprecated operations the frontend still relays on purpose, keyed {@code VERB template}, each

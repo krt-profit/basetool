@@ -21,21 +21,44 @@ package de.greluc.krt.profit.basetool.frontend.bank.client;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDetailDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountLifecycleRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountRefDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingOutcomeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankDashboardDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankDepositRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankGrantDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderBookingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderTransferRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankTransactionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankTransferFeeRateDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankTransferRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankWipeResetResultDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankWithdrawalRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.CancelBankBookingRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.ConfirmBankBookingRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.CreateBankAccountRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.CreateBankBookingRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.CreateBankGrantRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBalanceTargetRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankAccountDetailDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankAccountSettingsDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankBalanceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.RegisterBankHolderRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.RejectBankBookingRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.RenameBankAccountRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.ReverseBankTransactionRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SetBankApprovalLimitRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SetBankBalanceTargetRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SetCartelApprovalTiersRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateBankBookingRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateBankGrantRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateBankHolderRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.time.Instant;
@@ -55,8 +78,9 @@ import org.springframework.web.util.UriComponentsBuilder;
  * org-unit bank view under {@code /api/v1/org-units/bank}, their PDF exports and the admin wipe
  * reset (REQ-BANK-*), over {@link BackendApiClient} (plan §5.9, ADR-0032).
  *
- * <p>The write relays forward the browser's JSON payload unchanged and return the backend's JSON
- * answer as a raw map, so the browser contract stays the backend's own.
+ * <p>Every write sends the backend's own request record and decodes its answer into the mirrored
+ * response record; the path-only org-unit writes relay the browser's body, which the backend does
+ * not bind.
  */
 @Service
 @RequiredArgsConstructor
@@ -83,9 +107,6 @@ public class BankBackendClient {
   private static final ParameterizedTypeReference<PageResponse<BankBookingRequestDto>>
       BOOKING_REQUEST_PAGE = new ParameterizedTypeReference<>() {};
 
-  private static final ParameterizedTypeReference<PageResponse<Map<String, Object>>>
-      ACCOUNT_SEARCH_PAGE = new ParameterizedTypeReference<>() {};
-
   private static final ParameterizedTypeReference<List<OrgUnitBankBalanceDto>> BALANCE_LIST =
       new ParameterizedTypeReference<>() {};
 
@@ -94,9 +115,6 @@ public class BankBackendClient {
 
   private static final ParameterizedTypeReference<List<BankAccountRefDto>> ACCOUNT_REF_LIST =
       new ParameterizedTypeReference<>() {};
-
-  /** The template variables of a relay whose path has none. */
-  private static final Object[] NO_VARIABLES = {};
 
   /** Sends every call through the one filter chain and error mapping. */
   private final BackendApiClient backendApiClient;
@@ -311,203 +329,218 @@ public class BankBackendClient {
    *
    * @param query the filter, empty to match all
    * @param size the number of matches to return
-   * @return the page of raw account records, or {@code null} when the backend sent no body
+   * @return the page of matching accounts, or {@code null} when the backend sent no body
    */
   @Nullable
-  public PageResponse<Map<String, Object>> searchActiveAccounts(@NotNull String query, int size) {
+  public PageResponse<BankAccountDto> searchActiveAccounts(@NotNull String query, int size) {
     String uri =
         UriComponentsBuilder.fromPath("/api/v1/bank/accounts")
             .queryParam("status", "ACTIVE")
             .queryParam("size", size)
             .queryParam("sort", "name,asc")
             .toUriString();
-    return backendApiClient.get(uri + "&query={query}", ACCOUNT_SEARCH_PAGE, query);
+    return backendApiClient.get(uri + "&query={query}", ACCOUNT_PAGE, query);
   }
 
   /**
-   * Books a deposit.
+   * Books a deposit (REQ-BANK-004).
    *
-   * @param body the browser's booking payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the deposit
+   * @return the booked transaction, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> deposit(@NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/deposits", body, NO_VARIABLES);
+  public BankTransactionDto deposit(@NotNull BankDepositRequest request) {
+    return backendApiClient.post("/api/v1/bank/deposits", request, BankTransactionDto.class);
   }
 
   /**
-   * Books a withdrawal.
+   * Books a withdrawal, or files a pending request when it exceeds the KRT ceiling (REQ-BANK-047).
    *
-   * @param body the browser's booking payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the withdrawal
+   * @return the outcome, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> withdrawal(@NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/withdrawals", body, NO_VARIABLES);
+  public BankBookingOutcomeDto withdrawal(@NotNull BankWithdrawalRequest request) {
+    return backendApiClient.post("/api/v1/bank/withdrawals", request, BankBookingOutcomeDto.class);
   }
 
   /**
-   * Books an account-to-account transfer.
+   * Books an account-to-account transfer, or files a pending request when it exceeds the KRT
+   * ceiling (REQ-BANK-047).
    *
-   * @param body the browser's booking payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the transfer
+   * @return the outcome, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> transfer(@NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/transfers", body, NO_VARIABLES);
+  public BankBookingOutcomeDto transfer(@NotNull BankTransferRequest request) {
+    return backendApiClient.post("/api/v1/bank/transfers", request, BankBookingOutcomeDto.class);
   }
 
   /**
    * Books a holder-to-holder custody move (REQ-BANK-031).
    *
-   * @param body the browser's Umbuchung payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the Umbuchung
+   * @return the booked transaction, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> holderTransfer(@NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/holders/transfer", body, NO_VARIABLES);
+  public BankTransactionDto holderTransfer(@NotNull BankHolderTransferRequest request) {
+    return backendApiClient.post(
+        "/api/v1/bank/holders/transfer", request, BankTransactionDto.class);
   }
 
   /**
    * Reverses one transaction.
    *
    * @param id the transaction
-   * @param body the browser's correction-note payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the correction note
+   * @return the reversal transaction, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> reverseTransaction(
-      @NotNull UUID id, @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/transactions/{id}/reversal", body, id);
+  public BankTransactionDto reverseTransaction(
+      @NotNull UUID id, @NotNull ReverseBankTransactionRequest request) {
+    return backendApiClient.post(
+        "/api/v1/bank/transactions/{id}/reversal", request, BankTransactionDto.class, id);
   }
 
   /**
    * Confirms a pending booking request (REQ-BANK-023).
    *
    * @param id the request
-   * @param body the browser's confirm payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the recorded holders and the echoed version
+   * @return the confirmed request, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> confirmRequest(@NotNull UUID id, @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/requests/{id}/confirm", body, id);
+  public BankBookingRequestDto confirmRequest(
+      @NotNull UUID id, @NotNull ConfirmBankBookingRequest request) {
+    return backendApiClient.post(
+        "/api/v1/bank/requests/{id}/confirm", request, BankBookingRequestDto.class, id);
   }
 
   /**
    * Rejects a pending booking request (REQ-BANK-023).
    *
    * @param id the request
-   * @param body the browser's reject payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the reason and the echoed version
+   * @return the rejected request, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> rejectRequest(@NotNull UUID id, @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/requests/{id}/reject", body, id);
+  public BankBookingRequestDto rejectRequest(
+      @NotNull UUID id, @NotNull RejectBankBookingRequest request) {
+    return backendApiClient.post(
+        "/api/v1/bank/requests/{id}/reject", request, BankBookingRequestDto.class, id);
   }
 
   /**
    * Creates an account (REQ-BANK-030).
    *
-   * @param body the browser's creation payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the new account
+   * @return the created account, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> createAccount(@NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/accounts", body, NO_VARIABLES);
+  public BankAccountDto createAccount(@NotNull CreateBankAccountRequest request) {
+    return backendApiClient.post("/api/v1/bank/accounts", request, BankAccountDto.class);
   }
 
   /**
    * Renames an account.
    *
    * @param id the account
-   * @param body the browser's rename payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the new name and the echoed version
+   * @return the updated account, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> renameAccount(@NotNull UUID id, @NotNull Map<String, Object> body) {
-    return patchMap("/api/v1/bank/accounts/{id}", body, id);
+  public BankAccountDto renameAccount(@NotNull UUID id, @NotNull RenameBankAccountRequest request) {
+    return backendApiClient.patch("/api/v1/bank/accounts/{id}", request, BankAccountDto.class, id);
   }
 
   /**
    * Sets or clears an account's balance target (REQ-BANK-036).
    *
    * @param id the account
-   * @param body the browser's target payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the target and the echoed version
+   * @return the updated account, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> setBalanceTarget(@NotNull UUID id, @NotNull Map<String, Object> body) {
-    return patchMap("/api/v1/bank/accounts/{id}/balance-target", body, id);
+  public BankAccountDto setBalanceTarget(
+      @NotNull UUID id, @NotNull SetBankBalanceTargetRequest request) {
+    return backendApiClient.patch(
+        "/api/v1/bank/accounts/{id}/balance-target", request, BankAccountDto.class, id);
   }
 
   /**
    * Sets or clears the KRT account's approval thresholds (REQ-BANK-047).
    *
    * @param id the KRT account
-   * @param body the browser's thresholds payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the thresholds and the echoed version
+   * @return the updated account, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> setApprovalTiers(@NotNull UUID id, @NotNull Map<String, Object> body) {
-    return patchMap("/api/v1/bank/accounts/{id}/approval-tiers", body, id);
+  public BankAccountDto setApprovalTiers(
+      @NotNull UUID id, @NotNull SetCartelApprovalTiersRequest request) {
+    return backendApiClient.patch(
+        "/api/v1/bank/accounts/{id}/approval-tiers", request, BankAccountDto.class, id);
   }
 
   /**
    * Closes an account.
    *
    * @param id the account
-   * @param body the browser's lifecycle payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the echoed version
+   * @return the updated account, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> closeAccount(@NotNull UUID id, @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/accounts/{id}/close", body, id);
+  public BankAccountDto closeAccount(
+      @NotNull UUID id, @NotNull BankAccountLifecycleRequest request) {
+    return backendApiClient.post(
+        "/api/v1/bank/accounts/{id}/close", request, BankAccountDto.class, id);
   }
 
   /**
    * Reopens an account.
    *
    * @param id the account
-   * @param body the browser's lifecycle payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the echoed version
+   * @return the updated account, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> reopenAccount(@NotNull UUID id, @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/accounts/{id}/reopen", body, id);
+  public BankAccountDto reopenAccount(
+      @NotNull UUID id, @NotNull BankAccountLifecycleRequest request) {
+    return backendApiClient.post(
+        "/api/v1/bank/accounts/{id}/reopen", request, BankAccountDto.class, id);
   }
 
   /**
-   * Registers a holder.
+   * Registers a holder (REQ-BANK-003).
    *
-   * @param body the browser's registration payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the user to register
+   * @return the created holder, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> registerHolder(@NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/holders", body, NO_VARIABLES);
+  public BankHolderDto registerHolder(@NotNull RegisterBankHolderRequest request) {
+    return backendApiClient.post("/api/v1/bank/holders", request, BankHolderDto.class);
   }
 
   /**
    * Toggles a holder's activity.
    *
    * @param id the holder row
-   * @param body the browser's toggle payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the new flag and the echoed version
+   * @return the updated holder, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> updateHolder(@NotNull UUID id, @NotNull Map<String, Object> body) {
-    return patchMap("/api/v1/bank/holders/{id}", body, id);
+  public BankHolderDto updateHolder(@NotNull UUID id, @NotNull UpdateBankHolderRequest request) {
+    return backendApiClient.patch("/api/v1/bank/holders/{id}", request, BankHolderDto.class, id);
   }
 
   /**
-   * Creates a grant.
+   * Creates a grant (REQ-BANK-009).
    *
-   * @param body the browser's creation payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the grantee, the account and the initial flags
+   * @return the created grant, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> createGrant(@NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/grants", body, NO_VARIABLES);
+  public BankGrantDto createGrant(@NotNull CreateBankGrantRequest request) {
+    return backendApiClient.post("/api/v1/bank/grants", request, BankGrantDto.class);
   }
 
   /**
@@ -515,13 +548,14 @@ public class BankBackendClient {
    *
    * @param userId the grantee half of the composite key
    * @param accountId the account half of the composite key
-   * @param body the browser's flag payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the three flags and the echoed version
+   * @return the updated grant, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> updateGrant(
-      @NotNull UUID userId, @NotNull UUID accountId, @NotNull Map<String, Object> body) {
-    return patchMap("/api/v1/bank/grants/{userId}/{accountId}", body, userId, accountId);
+  public BankGrantDto updateGrant(
+      @NotNull UUID userId, @NotNull UUID accountId, @NotNull UpdateBankGrantRequest request) {
+    return backendApiClient.patch(
+        "/api/v1/bank/grants/{userId}/{accountId}", request, BankGrantDto.class, userId, accountId);
   }
 
   /**
@@ -690,51 +724,58 @@ public class BankBackendClient {
   /**
    * Raises a booking request against an overseen org unit's account (REQ-BANK-022).
    *
-   * @param body the browser's create payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the new request
+   * @return the created request, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> createOrgUnitRequest(@NotNull Map<String, Object> body) {
-    return postMap("/api/v1/org-units/bank/requests", body, NO_VARIABLES);
+  public BankBookingRequestDto createOrgUnitRequest(@NotNull CreateBankBookingRequest request) {
+    return backendApiClient.post(
+        "/api/v1/org-units/bank/requests", request, BankBookingRequestDto.class);
   }
 
   /**
    * Cancels the caller's own pending booking request (REQ-BANK-022).
    *
    * @param id the request
-   * @param body the browser's lifecycle payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the echoed version
+   * @return the cancelled request, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> cancelOrgUnitRequest(
-      @NotNull UUID id, @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/org-units/bank/requests/{id}/cancel", body, id);
+  public BankBookingRequestDto cancelOrgUnitRequest(
+      @NotNull UUID id, @NotNull CancelBankBookingRequest request) {
+    return backendApiClient.post(
+        "/api/v1/org-units/bank/requests/{id}/cancel", request, BankBookingRequestDto.class, id);
   }
 
   /**
    * Corrects the caller's own still-pending, unapproved booking request (REQ-BANK-056).
    *
    * @param id the request
-   * @param body the browser's corrected values with the echoed version
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the corrected values with the echoed version
+   * @return the updated request, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> updateOrgUnitRequest(
-      @NotNull UUID id, @NotNull Map<String, Object> body) {
-    return putMap("/api/v1/org-units/bank/requests/{id}", body, id);
+  public BankBookingRequestDto updateOrgUnitRequest(
+      @NotNull UUID id, @NotNull UpdateBankBookingRequest request) {
+    return backendApiClient.put(
+        "/api/v1/org-units/bank/requests/{id}", request, BankBookingRequestDto.class, id);
   }
 
   /**
    * Sets or clears an account's balance target through the org-unit view (REQ-BANK-036).
    *
    * @param id the account
-   * @param body the browser's target payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the target and the echoed version
+   * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> setOrgUnitBalanceTarget(
-      @NotNull UUID id, @NotNull Map<String, Object> body) {
-    return putMap("/api/v1/org-units/bank/accounts/{id}/balance-target", body, id);
+  public OrgUnitBankAccountSettingsDto setOrgUnitBalanceTarget(
+      @NotNull UUID id, @NotNull OrgUnitBalanceTargetRequest request) {
+    return backendApiClient.put(
+        "/api/v1/org-units/bank/accounts/{id}/balance-target",
+        request,
+        OrgUnitBankAccountSettingsDto.class,
+        id);
   }
 
   /**
@@ -742,14 +783,18 @@ public class BankBackendClient {
    *
    * @param id the account
    * @param roleCode the role bucket, already checked to be a constant name
-   * @param body the browser's payload, empty for this path-only write
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param body the browser's body, which the backend does not bind
+   * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> addRoleVisibility(
+  public OrgUnitBankAccountSettingsDto addRoleVisibility(
       @NotNull UUID id, @NotNull String roleCode, @NotNull Map<String, Object> body) {
-    return postMap(
-        "/api/v1/org-units/bank/accounts/{id}/visibility/role/{roleCode}", body, id, roleCode);
+    return backendApiClient.post(
+        "/api/v1/org-units/bank/accounts/{id}/visibility/role/{roleCode}",
+        body,
+        OrgUnitBankAccountSettingsDto.class,
+        id,
+        roleCode);
   }
 
   /**
@@ -757,12 +802,16 @@ public class BankBackendClient {
    *
    * @param id the account
    * @param roleCode the role bucket, already checked to be a constant name
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> removeRoleVisibility(@NotNull UUID id, @NotNull String roleCode) {
-    return deleteMap(
-        "/api/v1/org-units/bank/accounts/{id}/visibility/role/{roleCode}", id, roleCode);
+  public OrgUnitBankAccountSettingsDto removeRoleVisibility(
+      @NotNull UUID id, @NotNull String roleCode) {
+    return backendApiClient.delete(
+        "/api/v1/org-units/bank/accounts/{id}/visibility/role/{roleCode}",
+        OrgUnitBankAccountSettingsDto.class,
+        id,
+        roleCode);
   }
 
   /**
@@ -770,14 +819,18 @@ public class BankBackendClient {
    *
    * @param id the account
    * @param enabled whether all members may view the account
-   * @param body the browser's payload, empty for this path-only write
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param body the browser's body, which the backend does not bind
+   * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> setAllMembersVisibility(
+  public OrgUnitBankAccountSettingsDto setAllMembersVisibility(
       @NotNull UUID id, boolean enabled, @NotNull Map<String, Object> body) {
-    return putMap(
-        "/api/v1/org-units/bank/accounts/{id}/visibility/all-members/{enabled}", body, id, enabled);
+    return backendApiClient.put(
+        "/api/v1/org-units/bank/accounts/{id}/visibility/all-members/{enabled}",
+        body,
+        OrgUnitBankAccountSettingsDto.class,
+        id,
+        enabled);
   }
 
   /**
@@ -785,15 +838,16 @@ public class BankBackendClient {
    *
    * @param id the account
    * @param enabled whether the whole area cascade may view the account
-   * @param body the browser's payload, empty for this path-only write
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param body the browser's body, which the backend does not bind
+   * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> setAreaMembersVisibility(
+  public OrgUnitBankAccountSettingsDto setAreaMembersVisibility(
       @NotNull UUID id, boolean enabled, @NotNull Map<String, Object> body) {
-    return putMap(
+    return backendApiClient.put(
         "/api/v1/org-units/bank/accounts/{id}/visibility/area-members/{enabled}",
         body,
+        OrgUnitBankAccountSettingsDto.class,
         id,
         enabled);
   }
@@ -803,14 +857,18 @@ public class BankBackendClient {
    *
    * @param id the account
    * @param userId the user to grant
-   * @param body the browser's payload, empty for this path-only write
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param body the browser's body, which the backend does not bind
+   * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> addUserVisibility(
+  public OrgUnitBankAccountSettingsDto addUserVisibility(
       @NotNull UUID id, @NotNull UUID userId, @NotNull Map<String, Object> body) {
-    return postMap(
-        "/api/v1/org-units/bank/accounts/{id}/visibility/user/{userId}", body, id, userId);
+    return backendApiClient.post(
+        "/api/v1/org-units/bank/accounts/{id}/visibility/user/{userId}",
+        body,
+        OrgUnitBankAccountSettingsDto.class,
+        id,
+        userId);
   }
 
   /**
@@ -818,11 +876,16 @@ public class BankBackendClient {
    *
    * @param id the account
    * @param userId the user to revoke
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> removeUserVisibility(@NotNull UUID id, @NotNull UUID userId) {
-    return deleteMap("/api/v1/org-units/bank/accounts/{id}/visibility/user/{userId}", id, userId);
+  public OrgUnitBankAccountSettingsDto removeUserVisibility(
+      @NotNull UUID id, @NotNull UUID userId) {
+    return backendApiClient.delete(
+        "/api/v1/org-units/bank/accounts/{id}/visibility/user/{userId}",
+        OrgUnitBankAccountSettingsDto.class,
+        id,
+        userId);
   }
 
   /**
@@ -830,14 +893,18 @@ public class BankBackendClient {
    *
    * @param id the account
    * @param roleCode the role bucket, already checked to be a constant name
-   * @param body the browser's limit payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the limit
+   * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> setRoleApprovalLimit(
-      @NotNull UUID id, @NotNull String roleCode, @NotNull Map<String, Object> body) {
-    return putMap(
-        "/api/v1/org-units/bank/accounts/{id}/approval-limit/role/{roleCode}", body, id, roleCode);
+  public OrgUnitBankAccountSettingsDto setRoleApprovalLimit(
+      @NotNull UUID id, @NotNull String roleCode, @NotNull SetBankApprovalLimitRequest request) {
+    return backendApiClient.put(
+        "/api/v1/org-units/bank/accounts/{id}/approval-limit/role/{roleCode}",
+        request,
+        OrgUnitBankAccountSettingsDto.class,
+        id,
+        roleCode);
   }
 
   /**
@@ -845,60 +912,78 @@ public class BankBackendClient {
    *
    * @param id the account
    * @param roleCode the role bucket, already checked to be a constant name
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> clearRoleApprovalLimit(@NotNull UUID id, @NotNull String roleCode) {
-    return deleteMap(
-        "/api/v1/org-units/bank/accounts/{id}/approval-limit/role/{roleCode}", id, roleCode);
+  public OrgUnitBankAccountSettingsDto clearRoleApprovalLimit(
+      @NotNull UUID id, @NotNull String roleCode) {
+    return backendApiClient.delete(
+        "/api/v1/org-units/bank/accounts/{id}/approval-limit/role/{roleCode}",
+        OrgUnitBankAccountSettingsDto.class,
+        id,
+        roleCode);
   }
 
   /**
    * Sets the all-members approval limit on an account (REQ-BANK-041).
    *
    * @param id the account
-   * @param body the browser's limit payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the limit
+   * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> setAllMembersApprovalLimit(
-      @NotNull UUID id, @NotNull Map<String, Object> body) {
-    return putMap("/api/v1/org-units/bank/accounts/{id}/approval-limit/all-members", body, id);
+  public OrgUnitBankAccountSettingsDto setAllMembersApprovalLimit(
+      @NotNull UUID id, @NotNull SetBankApprovalLimitRequest request) {
+    return backendApiClient.put(
+        "/api/v1/org-units/bank/accounts/{id}/approval-limit/all-members",
+        request,
+        OrgUnitBankAccountSettingsDto.class,
+        id);
   }
 
   /**
    * Clears the all-members approval limit on an account (REQ-BANK-041).
    *
    * @param id the account
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> clearAllMembersApprovalLimit(@NotNull UUID id) {
-    return deleteMap("/api/v1/org-units/bank/accounts/{id}/approval-limit/all-members", id);
+  public OrgUnitBankAccountSettingsDto clearAllMembersApprovalLimit(@NotNull UUID id) {
+    return backendApiClient.delete(
+        "/api/v1/org-units/bank/accounts/{id}/approval-limit/all-members",
+        OrgUnitBankAccountSettingsDto.class,
+        id);
   }
 
   /**
    * Sets the area-cascade approval limit on a Bereichskonto (REQ-BANK-048).
    *
    * @param id the account
-   * @param body the browser's limit payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the limit
+   * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> setAreaMembersApprovalLimit(
-      @NotNull UUID id, @NotNull Map<String, Object> body) {
-    return putMap("/api/v1/org-units/bank/accounts/{id}/approval-limit/area-members", body, id);
+  public OrgUnitBankAccountSettingsDto setAreaMembersApprovalLimit(
+      @NotNull UUID id, @NotNull SetBankApprovalLimitRequest request) {
+    return backendApiClient.put(
+        "/api/v1/org-units/bank/accounts/{id}/approval-limit/area-members",
+        request,
+        OrgUnitBankAccountSettingsDto.class,
+        id);
   }
 
   /**
    * Clears the area-cascade approval limit on a Bereichskonto (REQ-BANK-048).
    *
    * @param id the account
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> clearAreaMembersApprovalLimit(@NotNull UUID id) {
-    return deleteMap("/api/v1/org-units/bank/accounts/{id}/approval-limit/area-members", id);
+  public OrgUnitBankAccountSettingsDto clearAreaMembersApprovalLimit(@NotNull UUID id) {
+    return backendApiClient.delete(
+        "/api/v1/org-units/bank/accounts/{id}/approval-limit/area-members",
+        OrgUnitBankAccountSettingsDto.class,
+        id);
   }
 
   /**
@@ -906,14 +991,18 @@ public class BankBackendClient {
    *
    * @param id the account
    * @param userId the user the limit addresses
-   * @param body the browser's limit payload
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param request the limit
+   * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> setUserApprovalLimit(
-      @NotNull UUID id, @NotNull UUID userId, @NotNull Map<String, Object> body) {
-    return putMap(
-        "/api/v1/org-units/bank/accounts/{id}/approval-limit/user/{userId}", body, id, userId);
+  public OrgUnitBankAccountSettingsDto setUserApprovalLimit(
+      @NotNull UUID id, @NotNull UUID userId, @NotNull SetBankApprovalLimitRequest request) {
+    return backendApiClient.put(
+        "/api/v1/org-units/bank/accounts/{id}/approval-limit/user/{userId}",
+        request,
+        OrgUnitBankAccountSettingsDto.class,
+        id,
+        userId);
   }
 
   /**
@@ -921,36 +1010,45 @@ public class BankBackendClient {
    *
    * @param id the account
    * @param userId the user whose limit to clear
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> clearUserApprovalLimit(@NotNull UUID id, @NotNull UUID userId) {
-    return deleteMap(
-        "/api/v1/org-units/bank/accounts/{id}/approval-limit/user/{userId}", id, userId);
+  public OrgUnitBankAccountSettingsDto clearUserApprovalLimit(
+      @NotNull UUID id, @NotNull UUID userId) {
+    return backendApiClient.delete(
+        "/api/v1/org-units/bank/accounts/{id}/approval-limit/user/{userId}",
+        OrgUnitBankAccountSettingsDto.class,
+        id,
+        userId);
   }
 
   /**
    * Grants the responsible holder's in-app approval of an over-limit request (REQ-BANK-041).
    *
    * @param id the request
-   * @param body the browser's payload, empty for this path-only write
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @param body the browser's body, which the backend does not bind
+   * @return the updated request, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> grantOwnerApproval(
+  public BankBookingRequestDto grantOwnerApproval(
       @NotNull UUID id, @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/org-units/bank/requests/{id}/owner-approval", body, id);
+    return backendApiClient.post(
+        "/api/v1/org-units/bank/requests/{id}/owner-approval",
+        body,
+        BankBookingRequestDto.class,
+        id);
   }
 
   /**
    * Revokes a previously granted in-app approval (REQ-BANK-041).
    *
    * @param id the request
-   * @return the backend's answer, or {@code null} when it sent no body
+   * @return the updated request, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Map<String, Object> revokeOwnerApproval(@NotNull UUID id) {
-    return deleteMap("/api/v1/org-units/bank/requests/{id}/owner-approval", id);
+  public BankBookingRequestDto revokeOwnerApproval(@NotNull UUID id) {
+    return backendApiClient.delete(
+        "/api/v1/org-units/bank/requests/{id}/owner-approval", BankBookingRequestDto.class, id);
   }
 
   /**
@@ -1011,70 +1109,5 @@ public class BankBackendClient {
                       }
                     }),
         spec -> spec.bodyToMono(byte[].class));
-  }
-
-  /**
-   * Posts a relayed payload and returns the backend's JSON answer as a raw map.
-   *
-   * @param uriTemplate the backend endpoint as a URI template
-   * @param body the relayed payload
-   * @param uriVariables the values expanded into the template, in order
-   * @return the backend's answer, or {@code null} when it sent no body
-   */
-  @Nullable
-  @SuppressWarnings("unchecked")
-  private Map<String, Object> postMap(
-      @NotNull String uriTemplate,
-      @NotNull Map<String, Object> body,
-      @NotNull Object... uriVariables) {
-    return backendApiClient.post(uriTemplate, body, Map.class, uriVariables);
-  }
-
-  /**
-   * Patches with a relayed payload and returns the backend's JSON answer as a raw map.
-   *
-   * @param uriTemplate the backend endpoint as a URI template
-   * @param body the relayed payload
-   * @param uriVariables the values expanded into the template, in order
-   * @return the backend's answer, or {@code null} when it sent no body
-   */
-  @Nullable
-  @SuppressWarnings("unchecked")
-  private Map<String, Object> patchMap(
-      @NotNull String uriTemplate,
-      @NotNull Map<String, Object> body,
-      @NotNull Object... uriVariables) {
-    return backendApiClient.patch(uriTemplate, body, Map.class, uriVariables);
-  }
-
-  /**
-   * Puts a relayed payload and returns the backend's JSON answer as a raw map.
-   *
-   * @param uriTemplate the backend endpoint as a URI template
-   * @param body the relayed payload
-   * @param uriVariables the values expanded into the template, in order
-   * @return the backend's answer, or {@code null} when it sent no body
-   */
-  @Nullable
-  @SuppressWarnings("unchecked")
-  private Map<String, Object> putMap(
-      @NotNull String uriTemplate,
-      @NotNull Map<String, Object> body,
-      @NotNull Object... uriVariables) {
-    return backendApiClient.put(uriTemplate, body, Map.class, uriVariables);
-  }
-
-  /**
-   * Deletes and returns the backend's JSON answer as a raw map.
-   *
-   * @param uriTemplate the backend endpoint as a URI template
-   * @param uriVariables the values expanded into the template, in order
-   * @return the backend's answer, or {@code null} when it sent no body
-   */
-  @Nullable
-  @SuppressWarnings("unchecked")
-  private Map<String, Object> deleteMap(
-      @NotNull String uriTemplate, @NotNull Object... uriVariables) {
-    return backendApiClient.delete(uriTemplate, Map.class, uriVariables);
   }
 }

@@ -19,27 +19,60 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.client;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddCrewRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddCustomFrequencyRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddExternalParticipantRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddFrequencyRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddMissionObjectiveRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddMissionStepRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddUnitRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.CreateMissionRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobTypeDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceEntryCreateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceEntryDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceEntryUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFrequencyDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionObjectiveDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionStepDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionUnitDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PatchMissionCoreRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PatchMissionFlagsRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PatchMissionScheduleRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderListDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.ReorderMissionObjectivesRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.ReorderMissionStepsRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SetPartyLeadRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.ToggleMissionStepRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateCrewRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateCustomFrequencyRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateMissionObjectiveRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateMissionOwnerRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateMissionOwningOrgUnitRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateMissionStepRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateParticipantRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UpdatePayoutPreferenceRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateUnitRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -52,8 +85,8 @@ import org.springframework.stereotype.Service;
  * catalogues, every mission section write, managers and ownership, and the mission finance ledger,
  * over {@link BackendApiClient} (plan §5.9, ADR-0032).
  *
- * <p>Methods ending in {@code Json} return the backend's answer decoded as untyped JSON for an AJAX
- * relay; their plain twins send the identical request and discard the answer.
+ * <p>Methods ending in {@code Json} decode the backend's answer for an AJAX relay; their plain
+ * twins send the identical request and discard the answer.
  */
 @Service
 @RequiredArgsConstructor
@@ -68,9 +101,14 @@ public class MissionBackendClient {
   private static final ParameterizedTypeReference<MissionDto> MISSION =
       new ParameterizedTypeReference<MissionDto>() {};
 
-  private static final ParameterizedTypeReference<PageResponse<Map<String, Object>>>
-      STRING_OBJECT_MAP_PAGE =
-          new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {};
+  private static final ParameterizedTypeReference<PageResponse<JobTypeDto>> JOB_TYPE_PAGE =
+      new ParameterizedTypeReference<PageResponse<JobTypeDto>>() {};
+
+  private static final ParameterizedTypeReference<PageResponse<SquadronDto>> SQUADRON_PAGE =
+      new ParameterizedTypeReference<PageResponse<SquadronDto>>() {};
+
+  private static final ParameterizedTypeReference<PageResponse<FrequencyTypeDto>>
+      FREQUENCY_TYPE_PAGE = new ParameterizedTypeReference<PageResponse<FrequencyTypeDto>>() {};
 
   private static final ParameterizedTypeReference<List<ShipDto>> SHIP_LIST =
       new ParameterizedTypeReference<List<ShipDto>>() {};
@@ -88,8 +126,8 @@ public class MissionBackendClient {
   private static final ParameterizedTypeReference<List<InventoryItemDto>> INVENTORY_ITEM_LIST =
       new ParameterizedTypeReference<List<InventoryItemDto>>() {};
 
-  private static final ParameterizedTypeReference<Object> OBJECT =
-      new ParameterizedTypeReference<Object>() {};
+  private static final ParameterizedTypeReference<List<MissionParticipantDto>> PARTICIPANT_LIST =
+      new ParameterizedTypeReference<List<MissionParticipantDto>>() {};
 
   private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
       ORG_UNIT_MEMBERSHIP_OPTION_LIST = new ParameterizedTypeReference<>() {};
@@ -208,33 +246,33 @@ public class MissionBackendClient {
   }
 
   /**
-   * Reads the cached mission job-type catalogue as untyped rows.
+   * Reads the cached mission job-type catalogue.
    *
    * @return the catalogue page, or {@code null} when the backend sent no body
    */
   @Nullable
-  public PageResponse<Map<String, Object>> missionJobTypes() {
-    return backendApiClient.getCached(CachedCatalog.JOB_TYPES_MISSION, STRING_OBJECT_MAP_PAGE);
+  public PageResponse<JobTypeDto> missionJobTypes() {
+    return backendApiClient.getCached(CachedCatalog.JOB_TYPES_MISSION, JOB_TYPE_PAGE);
   }
 
   /**
-   * Reads the cached crew job-type catalogue as untyped rows.
+   * Reads the cached crew job-type catalogue.
    *
    * @return the catalogue page, or {@code null} when the backend sent no body
    */
   @Nullable
-  public PageResponse<Map<String, Object>> crewJobTypes() {
-    return backendApiClient.getCached(CachedCatalog.JOB_TYPES_CREW, STRING_OBJECT_MAP_PAGE);
+  public PageResponse<JobTypeDto> crewJobTypes() {
+    return backendApiClient.getCached(CachedCatalog.JOB_TYPES_CREW, JOB_TYPE_PAGE);
   }
 
   /**
-   * Reads the cached squadron catalogue as untyped rows.
+   * Reads the cached squadron catalogue.
    *
    * @return the catalogue page, or {@code null} when the backend sent no body
    */
   @Nullable
-  public PageResponse<Map<String, Object>> squadrons() {
-    return backendApiClient.getCached(CachedCatalog.SQUADRONS_UNSORTED, STRING_OBJECT_MAP_PAGE);
+  public PageResponse<SquadronDto> squadrons() {
+    return backendApiClient.getCached(CachedCatalog.SQUADRONS_UNSORTED, SQUADRON_PAGE);
   }
 
   /**
@@ -249,13 +287,13 @@ public class MissionBackendClient {
   }
 
   /**
-   * Reads the cached active frequency-type catalogue as untyped rows.
+   * Reads the cached active frequency-type catalogue.
    *
    * @return the catalogue page, or {@code null} when the backend sent no body
    */
   @Nullable
-  public PageResponse<Map<String, Object>> frequencyTypes() {
-    return backendApiClient.getCached(CachedCatalog.FREQUENCY_TYPES_ACTIVE, STRING_OBJECT_MAP_PAGE);
+  public PageResponse<FrequencyTypeDto> frequencyTypes() {
+    return backendApiClient.getCached(CachedCatalog.FREQUENCY_TYPES_ACTIVE, FREQUENCY_TYPE_PAGE);
   }
 
   /**
@@ -338,14 +376,15 @@ public class MissionBackendClient {
   }
 
   /**
-   * Lists the mission's participants not yet assigned to a crew, as untyped JSON for the relay.
+   * Lists the mission's participants not yet assigned to a crew.
    *
    * @param id the mission
    * @return the participants, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object unassignedParticipants(@NotNull UUID id) {
-    return backendApiClient.get("/api/v1/missions/{id}/participants/unassigned", OBJECT, id);
+  public List<MissionParticipantDto> unassignedParticipants(@NotNull UUID id) {
+    return backendApiClient.get(
+        "/api/v1/missions/{id}/participants/unassigned", PARTICIPANT_LIST, id);
   }
 
   /**
@@ -362,22 +401,25 @@ public class MissionBackendClient {
    * Adds a participant through the classic form post.
    *
    * @param id the mission
-   * @param body the participant fields
+   * @param request the participant
    */
-  public void addParticipant(@NotNull UUID id, @NotNull Map<String, Object> body) {
-    backendApiClient.post("/api/v1/missions/{id}/participants/add", body, Void.class, id);
+  public void addParticipant(@NotNull UUID id, @NotNull AddExternalParticipantRequest request) {
+    backendApiClient.post("/api/v1/missions/{id}/participants/add", request, Void.class, id);
   }
 
   /**
    * Adds a participant and answers the resulting participant list.
    *
    * @param id the mission
-   * @param body the participant fields
+   * @param request the participant
    * @return the participant list, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object addParticipantJson(@NotNull UUID id, @Nullable Map<String, Object> body) {
-    return backendApiClient.post("/api/v1/missions/{id}/participants/slim", body, Object.class, id);
+  public List<MissionParticipantDto> addParticipantJson(
+      @NotNull UUID id, @NotNull AddExternalParticipantRequest request) {
+    return listOf(
+        backendApiClient.post(
+            "/api/v1/missions/{id}/participants/slim", request, MissionParticipantDto[].class, id));
   }
 
   /**
@@ -385,13 +427,13 @@ public class MissionBackendClient {
    *
    * @param id the mission
    * @param participantId the participant
-   * @param body the participant fields, carrying the optimistic-lock version
+   * @param request the participant fields, carrying the optimistic-lock version
    */
   public void updateParticipant(
-      @NotNull UUID id, @NotNull UUID participantId, @NotNull Map<String, Object> body) {
+      @NotNull UUID id, @NotNull UUID participantId, @NotNull UpdateParticipantRequest request) {
     backendApiClient.put(
         "/api/v1/missions/{id}/participants/{participantId}/slim",
-        body,
+        request,
         Void.class,
         id,
         participantId);
@@ -402,16 +444,16 @@ public class MissionBackendClient {
    *
    * @param id the mission
    * @param participantId the participant
-   * @param body the participant fields, carrying the optimistic-lock version
+   * @param request the participant fields, carrying the optimistic-lock version
    * @return the participant, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object updateParticipantJson(
-      @NotNull UUID id, @NotNull UUID participantId, @Nullable Map<String, Object> body) {
+  public MissionParticipantDto updateParticipantJson(
+      @NotNull UUID id, @NotNull UUID participantId, @NotNull UpdateParticipantRequest request) {
     return backendApiClient.put(
         "/api/v1/missions/{id}/participants/{participantId}/slim",
-        body,
-        Object.class,
+        request,
+        MissionParticipantDto.class,
         id,
         participantId);
   }
@@ -450,11 +492,12 @@ public class MissionBackendClient {
    * @return the participant, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object checkInParticipantJson(@NotNull UUID id, @NotNull UUID participantId) {
+  public MissionParticipantDto checkInParticipantJson(
+      @NotNull UUID id, @NotNull UUID participantId) {
     return backendApiClient.post(
         "/api/v1/missions/{id}/participants/{participantId}/check-in/slim",
         null,
-        Object.class,
+        MissionParticipantDto.class,
         id,
         participantId);
   }
@@ -482,11 +525,12 @@ public class MissionBackendClient {
    * @return the participant, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object checkOutParticipantJson(@NotNull UUID id, @NotNull UUID participantId) {
+  public MissionParticipantDto checkOutParticipantJson(
+      @NotNull UUID id, @NotNull UUID participantId) {
     return backendApiClient.post(
         "/api/v1/missions/{id}/participants/{participantId}/check-out/slim",
         null,
-        Object.class,
+        MissionParticipantDto.class,
         id,
         participantId);
   }
@@ -500,14 +544,14 @@ public class MissionBackendClient {
    * @return the updated participant, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object updatePayoutPreference(
+  public MissionParticipantDto updatePayoutPreference(
       @NotNull UUID id,
       @NotNull UUID participantId,
       @Nullable UpdatePayoutPreferenceRequest request) {
     return backendApiClient.put(
         "/api/v1/missions/{id}/participants/{participantId}/payout-preference/slim",
         request,
-        Object.class,
+        MissionParticipantDto.class,
         id,
         participantId);
   }
@@ -516,60 +560,61 @@ public class MissionBackendClient {
    * Assigns or clears the mission's party lead.
    *
    * @param id the mission
-   * @param body the lead's {@code userId} or {@code guestName}, and the {@code version}
+   * @param request the lead's user or handle, and the party-lead version
    */
-  public void setPartyLead(@NotNull UUID id, @NotNull Map<String, Object> body) {
-    backendApiClient.put("/api/v1/missions/{id}/party-lead", body, Void.class, id);
+  public void setPartyLead(@NotNull UUID id, @NotNull SetPartyLeadRequest request) {
+    backendApiClient.put("/api/v1/missions/{id}/party-lead", request, Void.class, id);
   }
 
   /**
    * Hands the mission to another owner.
    *
    * @param id the mission
-   * @param body the new owner's {@code userId} and the {@code version}
+   * @param request the new owner and the ownership version
    */
-  public void setOwner(@NotNull UUID id, @NotNull Map<String, Object> body) {
-    backendApiClient.put("/api/v1/missions/{id}/owner", body, Void.class, id);
+  public void setOwner(@NotNull UUID id, @NotNull UpdateMissionOwnerRequest request) {
+    backendApiClient.put("/api/v1/missions/{id}/owner", request, Void.class, id);
   }
 
   /**
    * Reassigns the mission's owning org unit (REQ-ORG-018).
    *
    * @param id the mission
-   * @param body the {@code owningOrgUnitId} and the {@code version}
+   * @param request the owning org unit and its version
    */
-  public void setOwningOrgUnit(@NotNull UUID id, @NotNull Map<String, Object> body) {
-    backendApiClient.put("/api/v1/missions/{id}/owning-org-unit", body, Void.class, id);
+  public void setOwningOrgUnit(
+      @NotNull UUID id, @NotNull UpdateMissionOwningOrgUnitRequest request) {
+    backendApiClient.put("/api/v1/missions/{id}/owning-org-unit", request, Void.class, id);
   }
 
   /**
    * Patches the mission's schedule section.
    *
    * @param id the mission
-   * @param schedulePatch the five schedule instants and the schedule {@code version}
+   * @param request the five schedule instants and the schedule version
    */
-  public void patchSchedule(@NotNull UUID id, @NotNull Map<String, Object> schedulePatch) {
-    backendApiClient.patch("/api/v1/missions/{id}/schedule", schedulePatch, Void.class, id);
+  public void patchSchedule(@NotNull UUID id, @NotNull PatchMissionScheduleRequest request) {
+    backendApiClient.patch("/api/v1/missions/{id}/schedule", request, Void.class, id);
   }
 
   /**
    * Patches the mission's core section.
    *
    * @param id the mission
-   * @param corePatch the core fields and the core {@code version}
+   * @param request the core fields and the core version
    */
-  public void patchCore(@NotNull UUID id, @NotNull Map<String, Object> corePatch) {
-    backendApiClient.patch("/api/v1/missions/{id}/core", corePatch, Void.class, id);
+  public void patchCore(@NotNull UUID id, @NotNull PatchMissionCoreRequest request) {
+    backendApiClient.patch("/api/v1/missions/{id}/core", request, Void.class, id);
   }
 
   /**
    * Patches the mission's flags section.
    *
    * @param id the mission
-   * @param flagsPatch the {@code isInternal} flag and the flags {@code version}
+   * @param request the internal flag and the flags version
    */
-  public void patchFlags(@NotNull UUID id, @NotNull Map<String, Object> flagsPatch) {
-    backendApiClient.patch("/api/v1/missions/{id}/flags", flagsPatch, Void.class, id);
+  public void patchFlags(@NotNull UUID id, @NotNull PatchMissionFlagsRequest request) {
+    backendApiClient.patch("/api/v1/missions/{id}/flags", request, Void.class, id);
   }
 
   /**
@@ -615,29 +660,31 @@ public class MissionBackendClient {
    */
   public void removeManager(@NotNull UUID missionId, @NotNull UUID userId) {
     backendApiClient.delete(
-        "/api/v1/missions/{missionUuid}/managers/{userUuid}/slim", Object.class, missionId, userId);
+        "/api/v1/missions/{missionUuid}/managers/{userUuid}/slim", Void.class, missionId, userId);
   }
 
   /**
    * Adds a unit.
    *
    * @param id the mission
-   * @param body the unit fields
+   * @param request the unit
    */
-  public void addUnit(@NotNull UUID id, @NotNull Map<String, Object> body) {
-    backendApiClient.post("/api/v1/missions/{id}/units/slim", body, Void.class, id);
+  public void addUnit(@NotNull UUID id, @NotNull AddUnitRequest request) {
+    backendApiClient.post("/api/v1/missions/{id}/units/slim", request, Void.class, id);
   }
 
   /**
    * Adds a unit and answers the resulting unit list.
    *
    * @param id the mission
-   * @param body the unit fields
+   * @param request the unit
    * @return the unit list, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object addUnitJson(@NotNull UUID id, @Nullable Map<String, Object> body) {
-    return backendApiClient.post("/api/v1/missions/{id}/units/slim", body, Object.class, id);
+  public List<MissionUnitDto> addUnitJson(@NotNull UUID id, @NotNull AddUnitRequest request) {
+    return listOf(
+        backendApiClient.post(
+            "/api/v1/missions/{id}/units/slim", request, MissionUnitDto[].class, id));
   }
 
   /**
@@ -645,11 +692,12 @@ public class MissionBackendClient {
    *
    * @param id the mission
    * @param unitId the unit
-   * @param body the unit fields
+   * @param request the unit fields
    */
   public void updateUnit(
-      @NotNull UUID id, @NotNull UUID unitId, @NotNull Map<String, Object> body) {
-    backendApiClient.put("/api/v1/missions/{id}/units/{unitId}/slim", body, Void.class, id, unitId);
+      @NotNull UUID id, @NotNull UUID unitId, @NotNull UpdateUnitRequest request) {
+    backendApiClient.put(
+        "/api/v1/missions/{id}/units/{unitId}/slim", request, Void.class, id, unitId);
   }
 
   /**
@@ -657,14 +705,14 @@ public class MissionBackendClient {
    *
    * @param id the mission
    * @param unitId the unit
-   * @param body the unit fields
+   * @param request the unit fields
    * @return the unit, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object updateUnitJson(
-      @NotNull UUID id, @NotNull UUID unitId, @Nullable Map<String, Object> body) {
+  public MissionUnitDto updateUnitJson(
+      @NotNull UUID id, @NotNull UUID unitId, @NotNull UpdateUnitRequest request) {
     return backendApiClient.put(
-        "/api/v1/missions/{id}/units/{unitId}/slim", body, Object.class, id, unitId);
+        "/api/v1/missions/{id}/units/{unitId}/slim", request, MissionUnitDto.class, id, unitId);
   }
 
   /**
@@ -682,11 +730,11 @@ public class MissionBackendClient {
    *
    * @param id the mission
    * @param unitId the unit
-   * @param body the crew fields
+   * @param request the participant and its crew job types
    */
-  public void addCrew(@NotNull UUID id, @NotNull UUID unitId, @NotNull Map<String, Object> body) {
+  public void addCrew(@NotNull UUID id, @NotNull UUID unitId, @NotNull AddCrewRequest request) {
     backendApiClient.post(
-        "/api/v1/missions/{id}/units/{unitId}/crew/slim", body, Void.class, id, unitId);
+        "/api/v1/missions/{id}/units/{unitId}/crew/slim", request, Void.class, id, unitId);
   }
 
   /**
@@ -694,14 +742,19 @@ public class MissionBackendClient {
    *
    * @param id the mission
    * @param unitId the unit
-   * @param body the crew fields
+   * @param request the participant and its crew job types
    * @return the crew list, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object addCrewJson(
-      @NotNull UUID id, @NotNull UUID unitId, @Nullable Map<String, Object> body) {
-    return backendApiClient.post(
-        "/api/v1/missions/{id}/units/{unitId}/crew/slim", body, Object.class, id, unitId);
+  public List<MissionCrewDto> addCrewJson(
+      @NotNull UUID id, @NotNull UUID unitId, @NotNull AddCrewRequest request) {
+    return listOf(
+        backendApiClient.post(
+            "/api/v1/missions/{id}/units/{unitId}/crew/slim",
+            request,
+            MissionCrewDto[].class,
+            id,
+            unitId));
   }
 
   /**
@@ -710,16 +763,16 @@ public class MissionBackendClient {
    * @param id the mission
    * @param unitId the unit
    * @param crewId the crew member
-   * @param body the crew fields
+   * @param request the crew job types
    */
   public void updateCrew(
       @NotNull UUID id,
       @NotNull UUID unitId,
       @NotNull UUID crewId,
-      @NotNull Map<String, Object> body) {
+      @NotNull UpdateCrewRequest request) {
     backendApiClient.put(
         "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim",
-        body,
+        request,
         Void.class,
         id,
         unitId,
@@ -732,19 +785,19 @@ public class MissionBackendClient {
    * @param id the mission
    * @param unitId the unit
    * @param crewId the crew member
-   * @param body the crew fields
+   * @param request the crew job types
    * @return the crew entry, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object updateCrewJson(
+  public MissionCrewDto updateCrewJson(
       @NotNull UUID id,
       @NotNull UUID unitId,
       @NotNull UUID crewId,
-      @Nullable Map<String, Object> body) {
+      @NotNull UpdateCrewRequest request) {
     return backendApiClient.put(
         "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim",
-        body,
-        Object.class,
+        request,
+        MissionCrewDto.class,
         id,
         unitId,
         crewId);
@@ -766,26 +819,29 @@ public class MissionBackendClient {
    * Creates or updates a catalogue frequency of the mission.
    *
    * @param id the mission
-   * @param body the frequency type and value
+   * @param request the frequency type and value
    */
-  public void putFrequency(@NotNull UUID id, @NotNull Map<String, Object> body) {
-    backendApiClient.post("/api/v1/missions/{id}/frequencies/slim", body, Void.class, id);
+  public void putFrequency(@NotNull UUID id, @NotNull AddFrequencyRequest request) {
+    backendApiClient.post("/api/v1/missions/{id}/frequencies/slim", request, Void.class, id);
   }
 
   /**
    * Creates or updates a catalogue frequency and answers the resulting frequency list.
    *
    * @param id the mission
-   * @param body the frequency type and value
+   * @param request the frequency type and value
    * @return the frequency list, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object putFrequencyJson(@NotNull UUID id, @Nullable Map<String, Object> body) {
-    return backendApiClient.post("/api/v1/missions/{id}/frequencies/slim", body, Object.class, id);
+  public List<MissionFrequencyDto> putFrequencyJson(
+      @NotNull UUID id, @NotNull AddFrequencyRequest request) {
+    return listOf(
+        backendApiClient.post(
+            "/api/v1/missions/{id}/frequencies/slim", request, MissionFrequencyDto[].class, id));
   }
 
   /**
-   * Removes a frequency.
+   * Removes a frequency; the backend answers without a body.
    *
    * @param id the mission
    * @param frequencyId the frequency
@@ -796,29 +852,21 @@ public class MissionBackendClient {
   }
 
   /**
-   * Removes a frequency and answers the remaining frequency list.
-   *
-   * @param id the mission
-   * @param frequencyId the frequency
-   * @return the frequency list, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public Object deleteFrequencyJson(@NotNull UUID id, @NotNull UUID frequencyId) {
-    return backendApiClient.delete(
-        "/api/v1/missions/{id}/frequencies/{frequencyId}/slim", Object.class, id, frequencyId);
-  }
-
-  /**
    * Adds a custom frequency (REQ-MISSION-014).
    *
    * @param id the mission
-   * @param body the frequency's name and value
+   * @param request the frequency's name and value
    * @return the frequency list, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object addCustomFrequency(@NotNull UUID id, @Nullable Map<String, Object> body) {
-    return backendApiClient.post(
-        "/api/v1/missions/{id}/frequencies/custom/slim", body, Object.class, id);
+  public List<MissionFrequencyDto> addCustomFrequency(
+      @NotNull UUID id, @NotNull AddCustomFrequencyRequest request) {
+    return listOf(
+        backendApiClient.post(
+            "/api/v1/missions/{id}/frequencies/custom/slim",
+            request,
+            MissionFrequencyDto[].class,
+            id));
   }
 
   /**
@@ -826,30 +874,33 @@ public class MissionBackendClient {
    *
    * @param id the mission
    * @param frequencyId the custom frequency
-   * @param body the frequency's name, value and version
+   * @param request the frequency's name, value and version
    * @return the frequency list, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object updateCustomFrequency(
-      @NotNull UUID id, @NotNull UUID frequencyId, @Nullable Map<String, Object> body) {
-    return backendApiClient.put(
-        "/api/v1/missions/{id}/frequencies/custom/{frequencyId}/slim",
-        body,
-        Object.class,
-        id,
-        frequencyId);
+  public List<MissionFrequencyDto> updateCustomFrequency(
+      @NotNull UUID id, @NotNull UUID frequencyId, @NotNull UpdateCustomFrequencyRequest request) {
+    return listOf(
+        backendApiClient.put(
+            "/api/v1/missions/{id}/frequencies/custom/{frequencyId}/slim",
+            request,
+            MissionFrequencyDto[].class,
+            id,
+            frequencyId));
   }
 
   /**
    * Appends an Ablauf step.
    *
    * @param id the mission
-   * @param body the step and the expected steps version
+   * @param request the step and the expected steps version
    * @return the ordered step list, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object addStep(@NotNull UUID id, @Nullable Map<String, Object> body) {
-    return backendApiClient.post("/api/v1/missions/{id}/steps/slim", body, Object.class, id);
+  public List<MissionStepDto> addStep(@NotNull UUID id, @NotNull AddMissionStepRequest request) {
+    return listOf(
+        backendApiClient.post(
+            "/api/v1/missions/{id}/steps/slim", request, MissionStepDto[].class, id));
   }
 
   /**
@@ -857,14 +908,19 @@ public class MissionBackendClient {
    *
    * @param id the mission
    * @param stepId the step
-   * @param body the step and the expected steps version
+   * @param request the step and the expected steps version
    * @return the ordered step list, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object updateStep(
-      @NotNull UUID id, @NotNull UUID stepId, @Nullable Map<String, Object> body) {
-    return backendApiClient.put(
-        "/api/v1/missions/{id}/steps/{stepId}/slim", body, Object.class, id, stepId);
+  public List<MissionStepDto> updateStep(
+      @NotNull UUID id, @NotNull UUID stepId, @NotNull UpdateMissionStepRequest request) {
+    return listOf(
+        backendApiClient.put(
+            "/api/v1/missions/{id}/steps/{stepId}/slim",
+            request,
+            MissionStepDto[].class,
+            id,
+            stepId));
   }
 
   /**
@@ -876,25 +932,30 @@ public class MissionBackendClient {
    * @return the ordered step list, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object deleteStep(@NotNull UUID id, @NotNull UUID stepId, @NotNull Long stepsVersion) {
-    return backendApiClient.delete(
-        "/api/v1/missions/{id}/steps/{stepId}/slim?stepsVersion={stepsVersion}",
-        Object.class,
-        id,
-        stepId,
-        stepsVersion);
+  public List<MissionStepDto> deleteStep(
+      @NotNull UUID id, @NotNull UUID stepId, @NotNull Long stepsVersion) {
+    return listOf(
+        backendApiClient.delete(
+            "/api/v1/missions/{id}/steps/{stepId}/slim?stepsVersion={stepsVersion}",
+            MissionStepDto[].class,
+            id,
+            stepId,
+            stepsVersion));
   }
 
   /**
    * Reorders the Ablauf steps.
    *
    * @param id the mission
-   * @param body the step-id order and the expected steps version
+   * @param request the step-id order and the expected steps version
    * @return the ordered step list, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object reorderSteps(@NotNull UUID id, @Nullable Map<String, Object> body) {
-    return backendApiClient.put("/api/v1/missions/{id}/steps/reorder/slim", body, Object.class, id);
+  public List<MissionStepDto> reorderSteps(
+      @NotNull UUID id, @NotNull ReorderMissionStepsRequest request) {
+    return listOf(
+        backendApiClient.put(
+            "/api/v1/missions/{id}/steps/reorder/slim", request, MissionStepDto[].class, id));
   }
 
   /**
@@ -902,26 +963,34 @@ public class MissionBackendClient {
    *
    * @param id the mission
    * @param stepId the step
-   * @param body the done state and the expected steps version
+   * @param request the done state and the expected steps version
    * @return the ordered step list, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object setStepDone(
-      @NotNull UUID id, @NotNull UUID stepId, @Nullable Map<String, Object> body) {
-    return backendApiClient.patch(
-        "/api/v1/missions/{id}/steps/{stepId}/done/slim", body, Object.class, id, stepId);
+  public List<MissionStepDto> setStepDone(
+      @NotNull UUID id, @NotNull UUID stepId, @NotNull ToggleMissionStepRequest request) {
+    return listOf(
+        backendApiClient.patch(
+            "/api/v1/missions/{id}/steps/{stepId}/done/slim",
+            request,
+            MissionStepDto[].class,
+            id,
+            stepId));
   }
 
   /**
    * Appends a goal.
    *
    * @param id the mission
-   * @param body the goal and the expected objectives version
+   * @param request the goal and the expected objectives version
    * @return the ordered goal list, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object addObjective(@NotNull UUID id, @Nullable Map<String, Object> body) {
-    return backendApiClient.post("/api/v1/missions/{id}/objectives/slim", body, Object.class, id);
+  public List<MissionObjectiveDto> addObjective(
+      @NotNull UUID id, @NotNull AddMissionObjectiveRequest request) {
+    return listOf(
+        backendApiClient.post(
+            "/api/v1/missions/{id}/objectives/slim", request, MissionObjectiveDto[].class, id));
   }
 
   /**
@@ -929,14 +998,19 @@ public class MissionBackendClient {
    *
    * @param id the mission
    * @param objectiveId the goal
-   * @param body the goal and the expected objectives version
+   * @param request the goal and the expected objectives version
    * @return the ordered goal list, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object updateObjective(
-      @NotNull UUID id, @NotNull UUID objectiveId, @Nullable Map<String, Object> body) {
-    return backendApiClient.put(
-        "/api/v1/missions/{id}/objectives/{objectiveId}/slim", body, Object.class, id, objectiveId);
+  public List<MissionObjectiveDto> updateObjective(
+      @NotNull UUID id, @NotNull UUID objectiveId, @NotNull UpdateMissionObjectiveRequest request) {
+    return listOf(
+        backendApiClient.put(
+            "/api/v1/missions/{id}/objectives/{objectiveId}/slim",
+            request,
+            MissionObjectiveDto[].class,
+            id,
+            objectiveId));
   }
 
   /**
@@ -948,69 +1022,78 @@ public class MissionBackendClient {
    * @return the ordered goal list, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object deleteObjective(
+  public List<MissionObjectiveDto> deleteObjective(
       @NotNull UUID id, @NotNull UUID objectiveId, @NotNull Long objectivesVersion) {
-    return backendApiClient.delete(
-        "/api/v1/missions/{id}/objectives/{objectiveId}/slim?objectivesVersion={version}",
-        Object.class,
-        id,
-        objectiveId,
-        objectivesVersion);
+    return listOf(
+        backendApiClient.delete(
+            "/api/v1/missions/{id}/objectives/{objectiveId}/slim?objectivesVersion={version}",
+            MissionObjectiveDto[].class,
+            id,
+            objectiveId,
+            objectivesVersion));
   }
 
   /**
    * Reorders the goals.
    *
    * @param id the mission
-   * @param body the goal-id order and the expected objectives version
+   * @param request the goal-id order and the expected objectives version
    * @return the ordered goal list, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object reorderObjectives(@NotNull UUID id, @Nullable Map<String, Object> body) {
-    return backendApiClient.put(
-        "/api/v1/missions/{id}/objectives/reorder/slim", body, Object.class, id);
+  public List<MissionObjectiveDto> reorderObjectives(
+      @NotNull UUID id, @NotNull ReorderMissionObjectivesRequest request) {
+    return listOf(
+        backendApiClient.put(
+            "/api/v1/missions/{id}/objectives/reorder/slim",
+            request,
+            MissionObjectiveDto[].class,
+            id));
   }
 
   /**
    * Books a finance entry on a mission.
    *
-   * @param body the entry, carrying its {@code missionId}
+   * @param request the entry, carrying its mission
    */
-  public void addFinanceEntry(@NotNull Map<String, Object> body) {
-    backendApiClient.post("/api/v1/finance-entries", body, Void.class);
+  public void addFinanceEntry(@NotNull MissionFinanceEntryCreateDto request) {
+    backendApiClient.post("/api/v1/finance-entries", request, Void.class);
   }
 
   /**
    * Books a finance entry and answers the created entry.
    *
-   * @param body the entry, carrying its {@code missionId}
+   * @param request the entry, carrying its mission
    * @return the entry, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object addFinanceEntryJson(@NotNull Map<String, Object> body) {
-    return backendApiClient.post("/api/v1/finance-entries", body, Object.class);
+  public MissionFinanceEntryDto addFinanceEntryJson(@NotNull MissionFinanceEntryCreateDto request) {
+    return backendApiClient.post("/api/v1/finance-entries", request, MissionFinanceEntryDto.class);
   }
 
   /**
    * Edits a finance entry.
    *
    * @param entryId the entry
-   * @param body the entry fields, carrying the optimistic-lock version
+   * @param request the entry fields, carrying the optimistic-lock version
    */
-  public void updateFinanceEntry(@NotNull UUID entryId, @NotNull Map<String, Object> body) {
-    backendApiClient.put("/api/v1/finance-entries/{entryId}", body, Void.class, entryId);
+  public void updateFinanceEntry(
+      @NotNull UUID entryId, @NotNull MissionFinanceEntryUpdateDto request) {
+    backendApiClient.put("/api/v1/finance-entries/{entryId}", request, Void.class, entryId);
   }
 
   /**
    * Edits a finance entry and answers the updated entry.
    *
    * @param entryId the entry
-   * @param body the entry fields, carrying the optimistic-lock version
+   * @param request the entry fields, carrying the optimistic-lock version
    * @return the entry, or {@code null} when the backend sent no body
    */
   @Nullable
-  public Object updateFinanceEntryJson(@NotNull UUID entryId, @Nullable Map<String, Object> body) {
-    return backendApiClient.put("/api/v1/finance-entries/{entryId}", body, Object.class, entryId);
+  public MissionFinanceEntryDto updateFinanceEntryJson(
+      @NotNull UUID entryId, @NotNull MissionFinanceEntryUpdateDto request) {
+    return backendApiClient.put(
+        "/api/v1/finance-entries/{entryId}", request, MissionFinanceEntryDto.class, entryId);
   }
 
   /**
@@ -1020,5 +1103,17 @@ public class MissionBackendClient {
    */
   public void deleteFinanceEntry(@NotNull UUID entryId) {
     backendApiClient.delete("/api/v1/finance-entries/{entryId}", Void.class, entryId);
+  }
+
+  /**
+   * Wraps a decoded JSON array as a fixed-size list backed by it.
+   *
+   * @param rows the decoded array, or {@code null}
+   * @param <T> the element type
+   * @return the list, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  private static <T> List<T> listOf(T @Nullable [] rows) {
+    return rows == null ? null : Arrays.asList(rows);
   }
 }

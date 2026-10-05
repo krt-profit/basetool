@@ -21,14 +21,38 @@ package de.greluc.krt.profit.basetool.frontend.mission.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddCrewRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddCustomFrequencyRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddExternalParticipantRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddFrequencyRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddMissionObjectiveRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddMissionStepRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddUnitRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.CreateMissionRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.FinanceType;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceEntryCreateDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceEntryUpdateDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PatchMissionCoreRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PatchMissionFlagsRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PatchMissionScheduleRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.ReorderMissionObjectivesRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.ReorderMissionStepsRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SetPartyLeadRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.ToggleMissionStepRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateCrewRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateCustomFrequencyRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateMissionObjectiveRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateMissionOwnerRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateMissionOwningOrgUnitRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateMissionStepRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateParticipantRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UpdatePayoutPreferenceRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateUnitRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Instant;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,7 +61,7 @@ import org.springframework.web.util.DefaultUriBuilderFactory;
 
 /**
  * Pins the requests {@link MissionBackendClient} sends (plan F3), each the exact request the
- * mission controllers sent before the client existed.
+ * mission controllers sent before the client existed, with the backend's request records as bodies.
  */
 class MissionBackendClientTest {
 
@@ -133,7 +157,7 @@ class MissionBackendClientTest {
     backend.answerJson("[]");
     backend.answerJson("[]");
     backend.answerJson("[]");
-    backend.answerJson("[]");
+    backend.answerJson("[{\"id\":\"" + OTHER + "\"}]");
     backend.answerJson("{\"id\":\"refinery.rounding.mode\",\"value\":\"DOWN\",\"version\":3}");
 
     assertThat(client.operationReferences()).isEmpty();
@@ -146,7 +170,9 @@ class MissionBackendClientTest {
     assertThat(client.refineryOrders(ID)).isEmpty();
     assertThat(client.inventory(ID)).isEmpty();
     assertThat(client.pickableOrgUnits()).isEmpty();
-    assertThat(client.unassignedParticipants(ID)).isEqualTo(List.of());
+    assertThat(client.unassignedParticipants(ID))
+        .singleElement()
+        .satisfies(participant -> assertThat(participant.id()).isEqualTo(OTHER));
     assertThat(client.refineryRoundingMode().value()).isEqualTo("DOWN");
 
     backend.expect("GET", "/api/v1/operations/lookup");
@@ -165,18 +191,36 @@ class MissionBackendClientTest {
 
   @Test
   void cachedCatalogues() {
+    String jobTypes =
+        "{\"content\":[{\"id\":\""
+            + OTHER
+            + "\",\"name\":\"Pilot\",\"archetype\":\"CREW\"}],"
+            + "\"page\":0,\"size\":1000,\"totalElements\":1,\"totalPages\":1}";
+    String frequencyTypes =
+        "{\"content\":[{\"id\":\""
+            + THIRD
+            + "\",\"name\":\"Ops\",\"active\":true,\"sortIndex\":1}],"
+            + "\"page\":0,\"size\":1000,\"totalElements\":1,\"totalPages\":1}";
     backend.answerJson(EMPTY_PAGE);
-    backend.answerJson(EMPTY_PAGE);
+    backend.answerJson(jobTypes);
     backend.answerJson(EMPTY_PAGE);
     backend.answerJson("[]");
-    backend.answerJson(EMPTY_PAGE);
+    backend.answerJson(frequencyTypes);
     backend.answerJson(EMPTY_PAGE);
 
     assertThat(client.missionJobTypes().content()).isEmpty();
-    assertThat(client.crewJobTypes().content()).isEmpty();
+    assertThat(client.crewJobTypes().content())
+        .singleElement()
+        .satisfies(
+            jobType -> {
+              assertThat(jobType.id()).isEqualTo(OTHER);
+              assertThat(jobType.name()).isEqualTo("Pilot");
+            });
     assertThat(client.squadrons().content()).isEmpty();
     assertThat(client.activeOrgUnits()).isEmpty();
-    assertThat(client.frequencyTypes().content()).isEmpty();
+    assertThat(client.frequencyTypes().content())
+        .singleElement()
+        .satisfies(frequencyType -> assertThat(frequencyType.id()).isEqualTo(THIRD));
     assertThat(client.shipTypes().content()).isEmpty();
 
     backend.expect("GET", "/api/v1/job-types?archetype=MISSION&size=1000&page=0");
@@ -190,7 +234,10 @@ class MissionBackendClientTest {
 
   @Test
   void participantWrites() {
-    Map<String, Object> body = body();
+    AddExternalParticipantRequest add =
+        new AddExternalParticipantRequest(THIRD, null, OTHER, "Hi", List.of(ID), "DONATE");
+    UpdateParticipantRequest update =
+        new UpdateParticipantRequest(OTHER, null, "Hi", null, START, null, null, "PAYOUT", 4L);
     for (int i = 0; i < 4; i++) {
       backend.answerEmpty();
     }
@@ -202,27 +249,40 @@ class MissionBackendClientTest {
     backend.answerJson("{}");
     backend.answerJson("{}");
 
-    client.addParticipant(ID, body);
-    client.updateParticipant(ID, OTHER, body);
+    client.addParticipant(ID, add);
+    client.updateParticipant(ID, OTHER, update);
     client.deleteParticipant(ID, OTHER);
     client.checkInParticipant(ID, OTHER);
-    assertThat(client.addParticipantJson(ID, body)).isEqualTo(List.of());
-    assertThat(client.updateParticipantJson(ID, OTHER, body)).isEqualTo(Map.of());
+    assertThat(client.addParticipantJson(ID, add)).isEmpty();
+    assertThat(client.updateParticipantJson(ID, OTHER, update)).isNotNull();
     client.checkOutParticipant(ID, OTHER);
     client.deleteParticipant(ID, OTHER);
-    assertThat(client.checkInParticipantJson(ID, OTHER)).isEqualTo(Map.of());
-    assertThat(client.checkOutParticipantJson(ID, OTHER)).isEqualTo(Map.of());
+    assertThat(client.checkInParticipantJson(ID, OTHER)).isNotNull();
+    assertThat(client.checkOutParticipantJson(ID, OTHER)).isNotNull();
     assertThat(client.updatePayoutPreference(ID, OTHER, new UpdatePayoutPreferenceRequest(null)))
-        .isEqualTo(Map.of());
+        .isNotNull();
 
-    String json = bodyJson();
+    String addJson =
+        "{\"userId\":\""
+            + THIRD
+            + "\",\"guestName\":null,\"desiredJobTypeId\":\""
+            + OTHER
+            + "\",\"comment\":\"Hi\",\"orgUnitIds\":[\""
+            + ID
+            + "\"],\"payoutPreference\":\"DONATE\"}";
+    String updateJson =
+        "{\"desiredMissionJobTypeId\":\""
+            + OTHER
+            + "\",\"plannedMissionJobTypeId\":null,\"comment\":\"Hi\",\"guestName\":null,"
+            + "\"startTime\":\"2026-09-01T10:15:30Z\",\"endTime\":null,\"orgUnitIds\":null,"
+            + "\"payoutPreference\":\"PAYOUT\",\"version\":4}";
     String participant = M + "/participants/" + OTHER;
-    backend.expect("POST", M + "/participants/add", json);
-    backend.expect("PUT", participant + "/slim", json);
+    backend.expect("POST", M + "/participants/add", addJson);
+    backend.expect("PUT", participant + "/slim", updateJson);
     backend.expect("DELETE", participant + "/slim");
     backend.expect("POST", participant + "/check-in/slim", null);
-    backend.expect("POST", M + "/participants/slim", json);
-    backend.expect("PUT", participant + "/slim", json);
+    backend.expect("POST", M + "/participants/slim", addJson);
+    backend.expect("PUT", participant + "/slim", updateJson);
     backend.expect("POST", participant + "/check-out/slim", null);
     backend.expect("DELETE", participant + "/slim");
     backend.expect("POST", participant + "/check-in/slim", null);
@@ -232,7 +292,6 @@ class MissionBackendClientTest {
 
   @Test
   void sectionAndOwnershipWrites() {
-    Map<String, Object> body = body();
     for (int i = 0; i < 9; i++) {
       backend.answerEmpty();
     }
@@ -241,24 +300,38 @@ class MissionBackendClientTest {
         new CreateMissionRequest(
             "Op", null, null, "PLANNED", null, null, null, false, null, null, null, null, null);
 
-    client.setPartyLead(ID, body);
-    client.setOwner(ID, body);
-    client.setOwningOrgUnit(ID, body);
-    client.patchSchedule(ID, body);
-    client.patchCore(ID, body);
-    client.patchFlags(ID, body);
+    client.setPartyLead(ID, new SetPartyLeadRequest(THIRD, null, 4L));
+    client.setOwner(ID, new UpdateMissionOwnerRequest(THIRD, 4L));
+    client.setOwningOrgUnit(ID, new UpdateMissionOwningOrgUnitRequest(null, 4L));
+    client.patchSchedule(ID, new PatchMissionScheduleRequest(START, null, null, null, null, 4L));
+    client.patchCore(
+        ID, new PatchMissionCoreRequest("Alpha", null, null, "PLANNED", OTHER, 4L, null));
+    client.patchFlags(ID, new PatchMissionFlagsRequest(true, 4L));
     client.deleteMission(ID);
     client.addManager(ID, OTHER);
     client.removeManager(ID, OTHER);
     assertThat(client.createMission(create).id()).isEqualTo(ID);
 
-    String json = bodyJson();
-    backend.expect("PUT", M + "/party-lead", json);
-    backend.expect("PUT", M + "/owner", json);
-    backend.expect("PUT", M + "/owning-org-unit", json);
-    backend.expect("PATCH", M + "/schedule", json);
-    backend.expect("PATCH", M + "/core", json);
-    backend.expect("PATCH", M + "/flags", json);
+    backend.expect(
+        "PUT",
+        M + "/party-lead",
+        "{\"userId\":\"" + THIRD + "\",\"guestName\":null,\"version\":4}");
+    backend.expect("PUT", M + "/owner", "{\"userId\":\"" + THIRD + "\",\"version\":4}");
+    backend.expect("PUT", M + "/owning-org-unit", "{\"owningOrgUnitId\":null,\"version\":4}");
+    backend.expect(
+        "PATCH",
+        M + "/schedule",
+        "{\"meetingTime\":\"2026-09-01T10:15:30Z\",\"plannedStartTime\":null,"
+            + "\"plannedEndTime\":null,\"actualStartTime\":null,\"actualEndTime\":null,"
+            + "\"version\":4}");
+    backend.expect(
+        "PATCH",
+        M + "/core",
+        "{\"name\":\"Alpha\",\"description\":null,\"calendarLink\":null,\"status\":\"PLANNED\","
+            + "\"operationId\":\""
+            + OTHER
+            + "\",\"version\":4,\"meetingPoint\":null}");
+    backend.expect("PATCH", M + "/flags", "{\"isInternal\":true,\"version\":4}");
     backend.expect("DELETE", M);
     backend.expect("POST", M + "/managers/" + OTHER + "/slim", null);
     backend.expect("DELETE", M + "/managers/" + OTHER + "/slim");
@@ -273,7 +346,11 @@ class MissionBackendClientTest {
 
   @Test
   void unitAndCrewWrites() {
-    Map<String, Object> body = body();
+    AddUnitRequest add = new AddUnitRequest("Alpha", OTHER, null, true, 123.45, null, null);
+    UpdateUnitRequest update =
+        new UpdateUnitRequest("Alpha", OTHER, null, false, null, THIRD, "Lead", 4L);
+    AddCrewRequest crew = new AddCrewRequest(THIRD, List.of(OTHER));
+    UpdateCrewRequest crewUpdate = new UpdateCrewRequest(List.of(), null);
     backend.answerEmpty();
     backend.answerJson("[]");
     backend.answerEmpty();
@@ -285,118 +362,141 @@ class MissionBackendClientTest {
     backend.answerJson("{}");
     backend.answerEmpty();
 
-    client.addUnit(ID, body);
-    assertThat(client.addUnitJson(ID, body)).isEqualTo(List.of());
-    client.updateUnit(ID, OTHER, body);
-    assertThat(client.updateUnitJson(ID, OTHER, body)).isEqualTo(Map.of());
+    client.addUnit(ID, add);
+    assertThat(client.addUnitJson(ID, add)).isEmpty();
+    client.updateUnit(ID, OTHER, update);
+    assertThat(client.updateUnitJson(ID, OTHER, update)).isNotNull();
     client.deleteUnit(ID, OTHER);
-    client.addCrew(ID, OTHER, body);
-    assertThat(client.addCrewJson(ID, OTHER, body)).isEqualTo(List.of());
-    client.updateCrew(ID, OTHER, THIRD, body);
-    assertThat(client.updateCrewJson(ID, OTHER, THIRD, body)).isEqualTo(Map.of());
+    client.addCrew(ID, OTHER, crew);
+    assertThat(client.addCrewJson(ID, OTHER, crew)).isEmpty();
+    client.updateCrew(ID, OTHER, THIRD, crewUpdate);
+    assertThat(client.updateCrewJson(ID, OTHER, THIRD, crewUpdate)).isNotNull();
     client.deleteCrew(ID, OTHER, THIRD);
 
-    String json = bodyJson();
+    String addJson =
+        "{\"name\":\"Alpha\",\"shipTypeId\":\""
+            + OTHER
+            + "\",\"shipId\":null,\"highValueUnit\":true,\"frequency\":123.45,"
+            + "\"responsibleUserId\":null,\"note\":null}";
+    String updateJson =
+        "{\"name\":\"Alpha\",\"shipTypeId\":\""
+            + OTHER
+            + "\",\"shipId\":null,\"highValueUnit\":false,\"frequency\":null,"
+            + "\"responsibleUserId\":\""
+            + THIRD
+            + "\",\"note\":\"Lead\",\"version\":4}";
+    String crewJson = "{\"participantId\":\"" + THIRD + "\",\"jobTypeIds\":[\"" + OTHER + "\"]}";
+    String crewUpdateJson = "{\"jobTypeIds\":[],\"version\":null}";
     String unit = M + "/units/" + OTHER;
-    backend.expect("POST", M + "/units/slim", json);
-    backend.expect("POST", M + "/units/slim", json);
-    backend.expect("PUT", unit + "/slim", json);
-    backend.expect("PUT", unit + "/slim", json);
+    backend.expect("POST", M + "/units/slim", addJson);
+    backend.expect("POST", M + "/units/slim", addJson);
+    backend.expect("PUT", unit + "/slim", updateJson);
+    backend.expect("PUT", unit + "/slim", updateJson);
     backend.expect("DELETE", unit + "/slim");
-    backend.expect("POST", unit + "/crew/slim", json);
-    backend.expect("POST", unit + "/crew/slim", json);
-    backend.expect("PUT", unit + "/crew/" + THIRD + "/slim", json);
-    backend.expect("PUT", unit + "/crew/" + THIRD + "/slim", json);
+    backend.expect("POST", unit + "/crew/slim", crewJson);
+    backend.expect("POST", unit + "/crew/slim", crewJson);
+    backend.expect("PUT", unit + "/crew/" + THIRD + "/slim", crewUpdateJson);
+    backend.expect("PUT", unit + "/crew/" + THIRD + "/slim", crewUpdateJson);
     backend.expect("DELETE", unit + "/crew/" + THIRD + "/slim");
   }
 
   @Test
   void frequencyStepAndObjectiveWrites() {
-    Map<String, Object> body = body();
+    AddFrequencyRequest frequency = new AddFrequencyRequest(OTHER, new BigDecimal("123.45"));
     backend.answerEmpty();
     backend.answerJson("[]");
     backend.answerEmpty();
-    for (int i = 0; i < 12; i++) {
+    for (int i = 0; i < 11; i++) {
       backend.answerJson("[]");
     }
 
-    client.putFrequency(ID, body);
-    assertThat(client.putFrequencyJson(ID, body)).isEqualTo(List.of());
+    client.putFrequency(ID, frequency);
+    assertThat(client.putFrequencyJson(ID, frequency)).isEmpty();
     client.deleteFrequency(ID, OTHER);
-    assertThat(client.deleteFrequencyJson(ID, OTHER)).isEqualTo(List.of());
-    client.addCustomFrequency(ID, body);
-    client.updateCustomFrequency(ID, OTHER, body);
-    client.addStep(ID, body);
-    client.updateStep(ID, OTHER, body);
-    client.deleteStep(ID, OTHER, 7L);
-    client.reorderSteps(ID, body);
-    client.setStepDone(ID, OTHER, body);
-    client.addObjective(ID, body);
-    client.updateObjective(ID, OTHER, body);
-    client.deleteObjective(ID, OTHER, 8L);
-    client.reorderObjectives(ID, body);
+    assertThat(
+            client.addCustomFrequency(
+                ID, new AddCustomFrequencyRequest("Ops", new BigDecimal("101.10"))))
+        .isEmpty();
+    client.updateCustomFrequency(
+        ID, OTHER, new UpdateCustomFrequencyRequest("Ops", new BigDecimal("101.10"), 4L));
+    assertThat(client.addStep(ID, new AddMissionStepRequest("Brief", null, 4L))).isEmpty();
+    client.updateStep(ID, OTHER, new UpdateMissionStepRequest("Brief", "19:00", 4L));
+    assertThat(client.deleteStep(ID, OTHER, 7L)).isEmpty();
+    client.reorderSteps(ID, new ReorderMissionStepsRequest(List.of(OTHER, THIRD), 4L));
+    client.setStepDone(ID, OTHER, new ToggleMissionStepRequest(true, 4L));
+    assertThat(client.addObjective(ID, new AddMissionObjectiveRequest("Win", "PRIMARY", 4L)))
+        .isEmpty();
+    client.updateObjective(ID, OTHER, new UpdateMissionObjectiveRequest("Win", "PRIMARY", 5L));
+    assertThat(client.deleteObjective(ID, OTHER, 8L)).isEmpty();
+    client.reorderObjectives(ID, new ReorderMissionObjectivesRequest(List.of(THIRD), 4L));
 
-    String json = bodyJson();
-    backend.expect("POST", M + "/frequencies/slim", json);
-    backend.expect("POST", M + "/frequencies/slim", json);
+    String frequencyJson = "{\"frequencyTypeId\":\"" + OTHER + "\",\"value\":123.45}";
+    backend.expect("POST", M + "/frequencies/slim", frequencyJson);
+    backend.expect("POST", M + "/frequencies/slim", frequencyJson);
     backend.expect("DELETE", M + "/frequencies/" + OTHER + "/slim");
-    backend.expect("DELETE", M + "/frequencies/" + OTHER + "/slim");
-    backend.expect("POST", M + "/frequencies/custom/slim", json);
-    backend.expect("PUT", M + "/frequencies/custom/" + OTHER + "/slim", json);
-    backend.expect("POST", M + "/steps/slim", json);
-    backend.expect("PUT", M + "/steps/" + OTHER + "/slim", json);
+    backend.expect("POST", M + "/frequencies/custom/slim", "{\"name\":\"Ops\",\"value\":101.10}");
+    backend.expect(
+        "PUT",
+        M + "/frequencies/custom/" + OTHER + "/slim",
+        "{\"name\":\"Ops\",\"value\":101.10,\"version\":4}");
+    backend.expect(
+        "POST", M + "/steps/slim", "{\"title\":\"Brief\",\"meta\":null,\"stepsVersion\":4}");
+    backend.expect(
+        "PUT",
+        M + "/steps/" + OTHER + "/slim",
+        "{\"title\":\"Brief\",\"meta\":\"19:00\",\"stepsVersion\":4}");
     backend.expect("DELETE", M + "/steps/" + OTHER + "/slim?stepsVersion=7");
-    backend.expect("PUT", M + "/steps/reorder/slim", json);
-    backend.expect("PATCH", M + "/steps/" + OTHER + "/done/slim", json);
-    backend.expect("POST", M + "/objectives/slim", json);
-    backend.expect("PUT", M + "/objectives/" + OTHER + "/slim", json);
+    backend.expect(
+        "PUT",
+        M + "/steps/reorder/slim",
+        "{\"stepIds\":[\"" + OTHER + "\",\"" + THIRD + "\"],\"stepsVersion\":4}");
+    backend.expect(
+        "PATCH", M + "/steps/" + OTHER + "/done/slim", "{\"done\":true,\"stepsVersion\":4}");
+    backend.expect(
+        "POST",
+        M + "/objectives/slim",
+        "{\"title\":\"Win\",\"kind\":\"PRIMARY\",\"objectivesVersion\":4}");
+    backend.expect(
+        "PUT",
+        M + "/objectives/" + OTHER + "/slim",
+        "{\"title\":\"Win\",\"kind\":\"PRIMARY\",\"objectivesVersion\":5}");
     backend.expect("DELETE", M + "/objectives/" + OTHER + "/slim?objectivesVersion=8");
-    backend.expect("PUT", M + "/objectives/reorder/slim", json);
+    backend.expect(
+        "PUT",
+        M + "/objectives/reorder/slim",
+        "{\"objectiveIds\":[\"" + THIRD + "\"],\"objectivesVersion\":4}");
   }
 
   @Test
   void financeEntryWrites() {
-    Map<String, Object> body = body();
+    MissionFinanceEntryCreateDto create =
+        new MissionFinanceEntryCreateDto(
+            ID, THIRD, null, FinanceType.INCOME, new BigDecimal("250"));
+    MissionFinanceEntryUpdateDto update =
+        new MissionFinanceEntryUpdateDto("Sale", FinanceType.EXPENSE, new BigDecimal("99"), 4L);
     backend.answerEmpty();
     backend.answerJson("{}");
     backend.answerEmpty();
     backend.answerJson("{}");
     backend.answerEmpty();
 
-    client.addFinanceEntry(body);
-    assertThat(client.addFinanceEntryJson(body)).isEqualTo(Map.of());
-    client.updateFinanceEntry(OTHER, body);
-    assertThat(client.updateFinanceEntryJson(OTHER, body)).isEqualTo(Map.of());
+    client.addFinanceEntry(create);
+    assertThat(client.addFinanceEntryJson(create)).isNotNull();
+    client.updateFinanceEntry(OTHER, update);
+    assertThat(client.updateFinanceEntryJson(OTHER, update)).isNotNull();
     client.deleteFinanceEntry(OTHER);
 
-    String json = bodyJson();
-    backend.expect("POST", "/api/v1/finance-entries", json);
-    backend.expect("POST", "/api/v1/finance-entries", json);
-    backend.expect("PUT", "/api/v1/finance-entries/" + OTHER, json);
-    backend.expect("PUT", "/api/v1/finance-entries/" + OTHER, json);
+    String createJson =
+        "{\"missionId\":\""
+            + ID
+            + "\",\"participantId\":\""
+            + THIRD
+            + "\",\"note\":null,\"type\":\"INCOME\",\"amount\":250}";
+    String updateJson = "{\"note\":\"Sale\",\"type\":\"EXPENSE\",\"amount\":99,\"version\":4}";
+    backend.expect("POST", "/api/v1/finance-entries", createJson);
+    backend.expect("POST", "/api/v1/finance-entries", createJson);
+    backend.expect("PUT", "/api/v1/finance-entries/" + OTHER, updateJson);
+    backend.expect("PUT", "/api/v1/finance-entries/" + OTHER, updateJson);
     backend.expect("DELETE", "/api/v1/finance-entries/" + OTHER);
-  }
-
-  /**
-   * Builds the relayed body every write test sends.
-   *
-   * @return an ordered body with an id, a text, a missing value and a version
-   */
-  private static Map<String, Object> body() {
-    Map<String, Object> body = new LinkedHashMap<>();
-    body.put("userId", THIRD);
-    body.put("name", "Alpha");
-    body.put("note", null);
-    body.put("version", 4L);
-    return body;
-  }
-
-  /**
-   * Spells the JSON {@link #body()} serializes to.
-   *
-   * @return the exact request body
-   */
-  private static String bodyJson() {
-    return "{\"userId\":\"" + THIRD + "\",\"name\":\"Alpha\",\"note\":null,\"version\":4}";
   }
 }

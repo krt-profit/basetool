@@ -23,17 +23,21 @@ import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorRespons
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.CrewForm;
@@ -46,7 +50,6 @@ import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -344,19 +347,19 @@ public class MissionPageController {
       model.addAttribute("roundingMode", needFinance ? fetchRoundingMode() : "UP");
 
       try {
-        PageResponse<Map<String, Object>> jobTypesPage = missionClient.missionJobTypes();
+        PageResponse<JobTypeDto> jobTypesPage = missionClient.missionJobTypes();
         model.addAttribute("jobTypes", jobTypesPage.content());
       } catch (Exception ignored) {
       }
 
       try {
-        PageResponse<Map<String, Object>> crewJobTypesPage = missionClient.crewJobTypes();
+        PageResponse<JobTypeDto> crewJobTypesPage = missionClient.crewJobTypes();
         model.addAttribute("crewJobTypes", crewJobTypesPage.content());
       } catch (Exception ignored) {
       }
 
       try {
-        PageResponse<Map<String, Object>> squadronsPage = missionClient.squadrons();
+        PageResponse<SquadronDto> squadronsPage = missionClient.squadrons();
         model.addAttribute("squadrons", squadronsPage.content());
       } catch (Exception ignored) {
       }
@@ -369,7 +372,7 @@ public class MissionPageController {
       }
 
       try {
-        PageResponse<Map<String, Object>> freqTypesPage = missionClient.frequencyTypes();
+        PageResponse<FrequencyTypeDto> freqTypesPage = missionClient.frequencyTypes();
         model.addAttribute("frequencyTypes", freqTypesPage.content());
       } catch (Exception ignored) {
       }
@@ -577,7 +580,7 @@ public class MissionPageController {
   public org.springframework.http.ResponseEntity<Object> getUnassignedParticipantsAjax(
       @PathVariable @NotNull UUID id) {
     try {
-      Object result = missionClient.unassignedParticipants(id);
+      List<MissionParticipantDto> result = missionClient.unassignedParticipants(id);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
