@@ -20,22 +20,21 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PendingCountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.TermsAcceptanceStatusDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Read-only admin overview of who has and has not accepted the Terms of Use (REQ-SEC-028).
@@ -49,22 +48,14 @@ import org.springframework.web.util.UriComponentsBuilder;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminTermsPageController {
 
-  /** Backend endpoint listing users with their consent state. */
-  private static final String ADMIN_TERMS_URI = "/api/v1/admin/terms";
-
-  /** Backend endpoint reporting how many users still owe consent. */
-  private static final String PENDING_COUNT_URI = "/api/v1/admin/terms/pending-count";
-
   /** Filters the page offers, mirroring what the backend accepts. */
   private static final Set<String> ALLOWED_FILTERS = Set.of("ALL", "ACCEPTED", "PENDING");
 
   /** Rows per page. */
   private static final int PAGE_SIZE = 25;
 
-  private static final ParameterizedTypeReference<PageResponse<TermsAcceptanceStatusDto>>
-      STATUS_PAGE = new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Reads the consent overview from the backend. */
+  private final IdentityBackendClient identityClient;
 
   /**
    * Renders the consent overview, or its results fragment for an in-place swap.
@@ -88,17 +79,8 @@ public class AdminTermsPageController {
     PageResponse<TermsAcceptanceStatusDto> rows = null;
     Long pending = null;
     try {
-      rows =
-          backendApiClient.get(
-              UriComponentsBuilder.fromPath(ADMIN_TERMS_URI)
-                  .queryParam("filter", effectiveFilter)
-                  .queryParam("page", effectivePage)
-                  .queryParam("size", PAGE_SIZE)
-                  .queryParam("sort", "username,asc")
-                  .build()
-                  .toUriString(),
-              STATUS_PAGE);
-      PendingCountView count = backendApiClient.get(PENDING_COUNT_URI, PendingCountView.class);
+      rows = identityClient.termsAcceptances(effectiveFilter, effectivePage, PAGE_SIZE);
+      PendingCountDto count = identityClient.termsPendingCount();
       pending = count == null ? null : count.pending();
     } catch (BackendServiceException e) {
       log.debug("Terms consent overview could not be read from the backend.", e);
@@ -125,12 +107,4 @@ public class AdminTermsPageController {
     String normalized = filter.toUpperCase(java.util.Locale.ROOT);
     return ALLOWED_FILTERS.contains(normalized) ? normalized : "PENDING";
   }
-
-  /**
-   * Frontend view of the backend's pending-count response.
-   *
-   * @param pending how many login-capable users still owe consent
-   * @param termsVersion the wording that count refers to
-   */
-  public record PendingCountView(long pending, String termsVersion) {}
 }

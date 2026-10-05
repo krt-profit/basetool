@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
+import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintCraftabilityDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintProductDto;
@@ -32,7 +33,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintRecipeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.StringNormalization;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
@@ -45,7 +45,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -92,35 +91,8 @@ public class PersonalInventoryBlueprintsPageController {
    */
   private static final int MAX_LOGGED_QUERY = 80;
 
-  /**
-   * Response type for the product type-ahead search ({@code /api/v1/blueprints/products/search})
-   * backing the multi-select add bar.
-   */
-  private static final ParameterizedTypeReference<List<BlueprintProductDto>>
-      BLUEPRINT_PRODUCT_LIST = new ParameterizedTypeReference<>() {};
-
-  /**
-   * Response type of the per-blueprint craftability endpoint ({@code
-   * /api/v1/personal-blueprints/craftability}).
-   */
-  private static final ParameterizedTypeReference<List<BlueprintCraftabilityDto>>
-      BLUEPRINT_CRAFTABILITY_LIST = new ParameterizedTypeReference<>() {};
-
-  /**
-   * Response type for one page of the caller's owned blueprints ({@code
-   * /api/v1/personal-blueprints}).
-   */
-  private static final ParameterizedTypeReference<PageResponse<PersonalBlueprintDto>>
-      PERSONAL_BLUEPRINT_PAGE = new ParameterizedTypeReference<>() {};
-
-  /**
-   * Response type for one page of the caller's personal-inventory items ({@code
-   * /api/v1/personal-inventory}), read only for its total.
-   */
-  private static final ParameterizedTypeReference<PageResponse<PersonalInventoryItemDto>>
-      PERSONAL_INVENTORY_ITEM_PAGE = new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Sends the page's blueprint and item-count requests. */
+  private final BlueprintBackendClient blueprintClient;
 
   /**
    * Names the caller's own blueprints live-sync room, which the page subscribes to so a connected
@@ -171,8 +143,7 @@ public class PersonalInventoryBlueprintsPageController {
   @Nullable
   private Long countItems() {
     try {
-      PageResponse<PersonalInventoryItemDto> page =
-          backendApiClient.get("/api/v1/personal-inventory?size=1", PERSONAL_INVENTORY_ITEM_PAGE);
+      PageResponse<PersonalInventoryItemDto> page = blueprintClient.inventoryItemCountPage();
       return page == null ? null : page.totalElements();
     } catch (Exception e) {
       log.debug("Failed to count personal inventory items: {}", e.getMessage());
@@ -197,8 +168,7 @@ public class PersonalInventoryBlueprintsPageController {
     try {
       String query = q == null ? "" : q;
       int effectiveLimit = limit == null ? 25 : Math.min(200, Math.max(1, limit));
-      String uri = "/api/v1/blueprints/products/search?q={q}&limit=" + effectiveLimit;
-      List<BlueprintProductDto> result = backendApiClient.get(uri, BLUEPRINT_PRODUCT_LIST, query);
+      List<BlueprintProductDto> result = blueprintClient.searchProducts(query, effectiveLimit);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
       log.debug(
@@ -222,9 +192,7 @@ public class PersonalInventoryBlueprintsPageController {
   @ResponseBody
   public PersonalBlueprintRecipeDto recipe(@PathVariable @NotNull UUID id) {
     try {
-      PersonalBlueprintRecipeDto result =
-          backendApiClient.get(
-              "/api/v1/personal-blueprints/" + id + "/recipe", PersonalBlueprintRecipeDto.class);
+      PersonalBlueprintRecipeDto result = blueprintClient.recipe(id);
       return result == null ? emptyRecipe() : result;
     } catch (Exception e) {
       log.warn("Failed to fetch blueprint recipe {}: {}", id, e.getMessage());
@@ -245,10 +213,7 @@ public class PersonalInventoryBlueprintsPageController {
   public List<BlueprintCraftabilityDto> craftability(
       @RequestParam(required = false, defaultValue = "false") boolean includeRefinery) {
     try {
-      List<BlueprintCraftabilityDto> result =
-          backendApiClient.get(
-              "/api/v1/personal-blueprints/craftability?includeRefinery=" + includeRefinery,
-              BLUEPRINT_CRAFTABILITY_LIST);
+      List<BlueprintCraftabilityDto> result = blueprintClient.craftability(includeRefinery);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
       log.warn("Failed to fetch blueprint craftability: {}", e.getMessage());
@@ -286,10 +251,7 @@ public class PersonalInventoryBlueprintsPageController {
     }
     try {
       PersonalBlueprintBatchResultDto result =
-          backendApiClient.post(
-              "/api/v1/personal-blueprints/batch",
-              new PersonalBlueprintBatchCreateRequest(keys),
-              PersonalBlueprintBatchResultDto.class);
+          blueprintClient.addOwned(new PersonalBlueprintBatchCreateRequest(keys));
       return result == null ? new PersonalBlueprintBatchResultDto(0, 0, 0) : result;
     } catch (Exception e) {
       log.error("Batch blueprint add failed for {} key(s)", keys.size(), e);
@@ -317,12 +279,10 @@ public class PersonalInventoryBlueprintsPageController {
       @RequestParam Long version,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.put(
-          "/api/v1/personal-blueprints/{id}",
+      blueprintClient.updateOwned(
+          id,
           new PersonalBlueprintUpdateRequest(
-              parseInstantOrNull(acquiredAt), StringNormalization.blankToNull(note), version),
-          PersonalBlueprintDto.class,
-          id);
+              parseInstantOrNull(acquiredAt), StringNormalization.blankToNull(note), version));
       redirectAttributes.addFlashAttribute(
           "successToast", "personalInventory.blueprints.toast.noteUpdated");
     } catch (Exception e) {
@@ -344,7 +304,7 @@ public class PersonalInventoryBlueprintsPageController {
   @PostMapping("/{id}/delete")
   public String delete(@PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/personal-blueprints/{id}", Void.class, id);
+      blueprintClient.deleteOwned(id);
       redirectAttributes.addFlashAttribute(
           "successToast", "personalInventory.blueprints.toast.removed");
     } catch (Exception e) {
@@ -366,8 +326,7 @@ public class PersonalInventoryBlueprintsPageController {
   @PostMapping("/delete-all")
   public String deleteAll(RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete(
-          "/api/v1/personal-blueprints", PersonalBlueprintBulkDeleteResultDto.class);
+      blueprintClient.deleteAllOwned();
       redirectAttributes.addFlashAttribute(
           "successToast", "personalInventory.blueprints.toast.removedAll");
     } catch (Exception e) {
@@ -398,14 +357,12 @@ public class PersonalInventoryBlueprintsPageController {
         "update blueprint note " + id + " (ajax)",
         () -> {
           PersonalBlueprintDto dto =
-              backendApiClient.put(
-                  "/api/v1/personal-blueprints/{id}",
+              blueprintClient.updateOwned(
+                  id,
                   new PersonalBlueprintUpdateRequest(
                       request.acquiredAt(),
                       StringNormalization.blankToNull(request.note()),
-                      request.version()),
-                  PersonalBlueprintDto.class,
-                  id);
+                      request.version()));
           return ResponseEntity.ok(dto);
         });
   }
@@ -427,7 +384,7 @@ public class PersonalInventoryBlueprintsPageController {
         log,
         "remove blueprint " + id + " (ajax)",
         () -> {
-          backendApiClient.delete("/api/v1/personal-blueprints/{id}", Void.class, id);
+          blueprintClient.deleteOwned(id);
           return ResponseEntity.noContent().build();
         });
   }
@@ -449,9 +406,7 @@ public class PersonalInventoryBlueprintsPageController {
         log,
         "clear all owned blueprints (ajax)",
         () -> {
-          PersonalBlueprintBulkDeleteResultDto result =
-              backendApiClient.delete(
-                  "/api/v1/personal-blueprints", PersonalBlueprintBulkDeleteResultDto.class);
+          PersonalBlueprintBulkDeleteResultDto result = blueprintClient.deleteAllOwned();
           return ResponseEntity.ok(
               result == null ? new PersonalBlueprintBulkDeleteResultDto(0) : result);
         });
@@ -496,17 +451,7 @@ public class PersonalInventoryBlueprintsPageController {
    * @return the requested page of owned blueprints
    */
   private PageResponse<PersonalBlueprintDto> fetchOwnedPage(String q, int page) {
-    StringBuilder uri =
-        new StringBuilder("/api/v1/personal-blueprints?size=")
-            .append(FETCH_PAGE_SIZE)
-            .append("&page=")
-            .append(page)
-            .append("&sort=productName,asc");
-    if (q != null && !q.isBlank()) {
-      uri.append("&q={q}");
-      return backendApiClient.get(uri.toString(), PERSONAL_BLUEPRINT_PAGE, q);
-    }
-    return backendApiClient.get(uri.toString(), PERSONAL_BLUEPRINT_PAGE);
+    return blueprintClient.ownedPage(q, FETCH_PAGE_SIZE, page);
   }
 
   /**

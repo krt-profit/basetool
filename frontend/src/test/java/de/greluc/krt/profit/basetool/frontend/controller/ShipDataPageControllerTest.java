@@ -26,6 +26,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ManufacturerDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
@@ -46,11 +47,13 @@ class ShipDataPageControllerTest {
     PageResponse<ShipTypeDto> emptyShipTypePage =
         new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 1, Collections.emptyList());
 
-    when(backendApiClient.get(anyString(), anyTypeRef()))
+    when(backendApiClient.get(
+            anyString(), anyTypeRef(), org.mockito.ArgumentMatchers.any(Object[].class)))
         .thenReturn(emptyManufacturerPage)
         .thenReturn(emptyShipTypePage);
 
-    ShipDataPageController controller = new ShipDataPageController(backendApiClient);
+    ShipDataPageController controller =
+        new ShipDataPageController(new CatalogueBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
 
     String view = controller.listData(model);
@@ -61,7 +64,8 @@ class ShipDataPageControllerTest {
   @Test
   void listData_concatenatesAllShipTypePages() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    ShipDataPageController controller = new ShipDataPageController(backendApiClient);
+    ShipDataPageController controller =
+        new ShipDataPageController(new CatalogueBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
 
     ManufacturerDto rsi = new ManufacturerDto(null, "RSI", "RSI", null, null, null, false);
@@ -69,15 +73,21 @@ class ShipDataPageControllerTest {
     ShipTypeDto zeus = new ShipTypeDto(null, "Zeus", rsi, null, null, false);
     when(backendApiClient.get(
             org.mockito.ArgumentMatchers.eq(
-                "/api/v1/manufacturers?size=1000&sort=name,asc&includeHidden=true&page=0"),
-            anyTypeRef()))
+                "/api/v1/manufacturers?size=1000&sort=name,asc&includeHidden=true&page={page}"),
+            anyTypeRef(),
+            org.mockito.ArgumentMatchers.eq(0)))
         .thenReturn(new PageResponse<>(java.util.List.of(rsi), 0, 1000, 1, 1, null));
-    String shipTypesBase = "/api/v1/ship-types?size=1000&sort=name,asc&includeHidden=true";
+    String shipTypesTemplate =
+        "/api/v1/ship-types?size=1000&sort=name,asc&includeHidden=true&page={page}";
     when(backendApiClient.get(
-            org.mockito.ArgumentMatchers.eq(shipTypesBase + "&page=0"), anyTypeRef()))
+            org.mockito.ArgumentMatchers.eq(shipTypesTemplate),
+            anyTypeRef(),
+            org.mockito.ArgumentMatchers.eq(0)))
         .thenReturn(new PageResponse<>(java.util.List.of(zeus), 0, 1000, 2, 2, null));
     when(backendApiClient.get(
-            org.mockito.ArgumentMatchers.eq(shipTypesBase + "&page=1"), anyTypeRef()))
+            org.mockito.ArgumentMatchers.eq(shipTypesTemplate),
+            anyTypeRef(),
+            org.mockito.ArgumentMatchers.eq(1)))
         .thenReturn(new PageResponse<>(java.util.List.of(aurora), 1, 1000, 2, 2, null));
 
     controller.listData(model);
@@ -94,7 +104,8 @@ class ShipDataPageControllerTest {
   @Test
   void testResetAllFitted_Success() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    ShipDataPageController controller = new ShipDataPageController(backendApiClient);
+    ShipDataPageController controller =
+        new ShipDataPageController(new CatalogueBackendClient(backendApiClient));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
     String view = controller.resetAllFitted(redirectAttributes);

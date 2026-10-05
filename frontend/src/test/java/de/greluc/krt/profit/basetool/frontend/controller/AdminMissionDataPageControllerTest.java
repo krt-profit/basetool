@@ -25,10 +25,13 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -42,32 +45,43 @@ class AdminMissionDataPageControllerTest {
   void listData_ShouldSortListsAscendingByName() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     AdminMissionDataPageController controller =
-        new AdminMissionDataPageController(backendApiClient, new ParallelPageLoader());
+        new AdminMissionDataPageController(
+            new CatalogueBackendClient(backendApiClient),
+            new ParallelPageLoader(),
+            new CatalogueCacheEviction(backendApiClient));
     Model model = new ConcurrentModel();
 
-    List<Map<String, Object>> jobTypes = new ArrayList<>();
-    jobTypes.add(Map.of("name", "Alpha"));
-    jobTypes.add(Map.of("name", "Charlie"));
-    jobTypes.add(Map.of("name", "Bravo"));
+    List<JobTypeDto> jobTypes = new ArrayList<>();
+    jobTypes.add(jobType("Alpha"));
+    jobTypes.add(jobType("Charlie"));
+    jobTypes.add(jobType("Bravo"));
 
-    List<Map<String, Object>> squadrons = new ArrayList<>();
-    squadrons.add(Map.of("name", "X-Ray"));
-    squadrons.add(Map.of("name", "Zulu"));
-    squadrons.add(Map.of("name", "Yankee"));
+    List<SquadronDto> squadrons = new ArrayList<>();
+    squadrons.add(squadron("X-Ray"));
+    squadrons.add(squadron("Zulu"));
+    squadrons.add(squadron("Yankee"));
 
-    PageResponse<Map<String, Object>> jobTypesPage =
+    PageResponse<JobTypeDto> jobTypesPage =
         new PageResponse<>(jobTypes, 0, 1000, jobTypes.size(), 1, List.of("name,asc"));
-    PageResponse<Map<String, Object>> squadronsPage =
+    PageResponse<SquadronDto> squadronsPage =
         new PageResponse<>(squadrons, 0, 1000, squadrons.size(), 1, List.of("name,asc"));
 
     when(backendApiClient.get(
-            eq("/api/v1/job-types?size=1000&sort=name,asc&includeInactive=false&page=0"),
-            anyTypeRef()))
+            eq(
+                "/api/v1/job-types?size=1000&sort=name,asc"
+                    + "&includeInactive={includeInactive}&page={page}"),
+            anyTypeRef(),
+            eq(false),
+            eq(0)))
         .thenReturn(jobTypesPage);
 
     when(backendApiClient.get(
-            eq("/api/v1/squadrons?size=1000&sort=name,asc&includeInactive=false&page=0"),
-            anyTypeRef()))
+            eq(
+                "/api/v1/squadrons?size=1000&sort=name,asc"
+                    + "&includeInactive={includeInactive}&page={page}"),
+            anyTypeRef(),
+            eq(false),
+            eq(0)))
         .thenReturn(squadronsPage);
 
     controller.listData(false, false, false, null, model);
@@ -92,22 +106,26 @@ class AdminMissionDataPageControllerTest {
   void listData_concatenatesAllJobTypePages() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     AdminMissionDataPageController controller =
-        new AdminMissionDataPageController(backendApiClient, new ParallelPageLoader());
+        new AdminMissionDataPageController(
+            new CatalogueBackendClient(backendApiClient),
+            new ParallelPageLoader(),
+            new CatalogueCacheEviction(backendApiClient));
     Model model = new ConcurrentModel();
 
-    PageResponse<Map<String, Object>> firstPage =
+    PageResponse<JobTypeDto> firstPage =
         new PageResponse<>(
-            List.of(Map.of("name", "Zerspaner"), Map.of("name", "Aufklaerer")),
+            List.of(jobType("Zerspaner"), jobType("Aufklaerer")),
             0,
             1000,
             3,
             2,
             List.of("name,asc"));
-    PageResponse<Map<String, Object>> secondPage =
-        new PageResponse<>(List.of(Map.of("name", "Miner")), 1, 1000, 3, 2, List.of("name,asc"));
-    String base = "/api/v1/job-types?size=1000&sort=name,asc&includeInactive=false";
-    when(backendApiClient.get(eq(base + "&page=0"), anyTypeRef())).thenReturn(firstPage);
-    when(backendApiClient.get(eq(base + "&page=1"), anyTypeRef())).thenReturn(secondPage);
+    PageResponse<JobTypeDto> secondPage =
+        new PageResponse<>(List.of(jobType("Miner")), 1, 1000, 3, 2, List.of("name,asc"));
+    String template =
+        "/api/v1/job-types?size=1000&sort=name,asc&includeInactive={includeInactive}&page={page}";
+    when(backendApiClient.get(eq(template), anyTypeRef(), eq(false), eq(0))).thenReturn(firstPage);
+    when(backendApiClient.get(eq(template), anyTypeRef(), eq(false), eq(1))).thenReturn(secondPage);
 
     controller.listData(false, false, false, null, model);
 
@@ -124,21 +142,56 @@ class AdminMissionDataPageControllerTest {
   void listData_capHit_setsPerSectionTruncatedFlags() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     AdminMissionDataPageController controller =
-        new AdminMissionDataPageController(backendApiClient, new ParallelPageLoader());
+        new AdminMissionDataPageController(
+            new CatalogueBackendClient(backendApiClient),
+            new ParallelPageLoader(),
+            new CatalogueCacheEviction(backendApiClient));
     Model model = new ConcurrentModel();
 
     int reportedPages =
         de.greluc.krt.profit.basetool.frontend.support.CatalogPages.MAX_CATALOG_PAGES + 1;
-    PageResponse<Map<String, Object>> endlessPage =
+    PageResponse<Object> endlessPage =
         new PageResponse<>(
-            List.of(Map.of("name", "Row")), 0, 1000, reportedPages, reportedPages, List.of());
-    when(backendApiClient.get(org.mockito.ArgumentMatchers.anyString(), anyTypeRef()))
+            List.of(jobType("Row")), 0, 1000, reportedPages, reportedPages, List.of());
+    PageResponse<Object> endlessSquadrons =
+        new PageResponse<>(
+            List.of(squadron("Row")), 0, 1000, reportedPages, reportedPages, List.of());
+    PageResponse<Object> endlessFrequencyTypes =
+        new PageResponse<>(
+            List.of(new FrequencyTypeDto(UUID.randomUUID(), "Row", null, true, 0, 0L)),
+            0,
+            1000,
+            reportedPages,
+            reportedPages,
+            List.of());
+    when(backendApiClient.get(
+            org.mockito.ArgumentMatchers.startsWith("/api/v1/job-types"),
+            anyTypeRef(),
+            org.mockito.ArgumentMatchers.any(Object[].class)))
         .thenReturn(endlessPage);
+    when(backendApiClient.get(
+            org.mockito.ArgumentMatchers.startsWith("/api/v1/squadrons"),
+            anyTypeRef(),
+            org.mockito.ArgumentMatchers.any(Object[].class)))
+        .thenReturn(endlessSquadrons);
+    when(backendApiClient.get(
+            org.mockito.ArgumentMatchers.startsWith("/api/v1/frequency-types"),
+            anyTypeRef(),
+            org.mockito.ArgumentMatchers.any(Object[].class)))
+        .thenReturn(endlessFrequencyTypes);
 
     controller.listData(false, false, false, null, model);
 
     assertEquals(Boolean.TRUE, model.getAttribute("jobTypesTruncated"));
     assertEquals(Boolean.TRUE, model.getAttribute("squadronsTruncated"));
     assertEquals(Boolean.TRUE, model.getAttribute("frequencyTypesTruncated"));
+  }
+
+  private static JobTypeDto jobType(String name) {
+    return new JobTypeDto(UUID.randomUUID(), name, null, "MISSION", null, true, false, false, 0L);
+  }
+
+  private static SquadronDto squadron(String name) {
+    return new SquadronDto(UUID.randomUUID(), name, null, null, true, false, false, 0L);
   }
 }

@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
@@ -30,7 +30,6 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -64,11 +63,8 @@ public class AdminBlueprintsPageController {
    */
   private static final int MAX_LOGGED_QUERY = 80;
 
-  /** Response type for the paginated blueprint list ({@code GET /api/v1/blueprints}). */
-  private static final ParameterizedTypeReference<PageResponse<BlueprintDto>> BLUEPRINT_PAGE_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Reads the blueprint catalogue pages. */
+  private final BlueprintBackendClient blueprintClient;
 
   /**
    * Loads one page of blueprints, optionally filtered, for the {@code admin/blueprints} view.
@@ -90,22 +86,9 @@ public class AdminBlueprintsPageController {
     int safePage = Math.max(page, 0);
     String trimmed = (search == null || search.isBlank()) ? null : search.trim();
 
-    StringBuilder uri =
-        new StringBuilder("/api/v1/blueprints?size=")
-            .append(PAGE_SIZE)
-            .append("&page=")
-            .append(safePage)
-            .append("&sort=outputName,asc");
-    boolean hasSearch = trimmed != null;
-    if (hasSearch) {
-      uri.append("&search={search}");
-    }
-
     try {
       PageResponse<BlueprintDto> response =
-          hasSearch
-              ? backendApiClient.get(uri.toString(), BLUEPRINT_PAGE_TYPE, trimmed)
-              : backendApiClient.get(uri.toString(), BLUEPRINT_PAGE_TYPE);
+          blueprintClient.blueprintPage(PAGE_SIZE, safePage, trimmed);
       if (response != null) {
         model.addAttribute(
             "blueprints", response.content() == null ? List.of() : response.content());

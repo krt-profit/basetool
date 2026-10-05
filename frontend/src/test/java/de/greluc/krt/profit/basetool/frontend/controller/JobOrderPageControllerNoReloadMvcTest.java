@@ -240,7 +240,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   void unlinkInventoryItemAjax_AsLogistician_RelaysAndReturnsRefreshedOrder() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID invId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(materialOrder(orderId, 9L));
 
     mockMvc
@@ -381,7 +381,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createHandoverAjax_AsLogistician_RelaysAndReturnsRefreshedOrder() throws Exception {
     UUID orderId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(materialOrder(orderId, 3L));
 
     mockMvc
@@ -426,7 +426,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createItemHandoverAjax_AsLogistician_RelaysAndReturnsRefreshedOrder() throws Exception {
     UUID orderId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(materialOrder(orderId, 6L));
 
     mockMvc
@@ -455,7 +455,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   void bookProductionAjax_AsLogistician_RelaysAndReturnsRefreshedOrder() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(materialOrder(orderId, 7L));
 
     mockMvc
@@ -498,7 +498,8 @@ class JobOrderPageControllerNoReloadMvcTest {
         .andExpect(status().isConflict())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
 
-    verify(backendApiClient, never()).get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class));
+    verify(backendApiClient, never())
+        .get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId));
   }
 
   @Test
@@ -682,7 +683,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   void viewOrderDetail_AssigneesFragment_RendersTheAssigneesSection() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(materialOrder(orderId, 1L));
 
     var result =
@@ -703,7 +704,7 @@ class JobOrderPageControllerNoReloadMvcTest {
   void viewOrderDetail_FragmentBackendError_ReturnsNonRedirectErrorFragment() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenThrow(new RuntimeException("backend unavailable"));
 
     var result =

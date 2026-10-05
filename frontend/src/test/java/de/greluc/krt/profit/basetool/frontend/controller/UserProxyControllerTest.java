@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -31,24 +32,32 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 class UserProxyControllerTest {
 
+  /** The URI template of the per-user membership lookup. */
+  private static final String MEMBERSHIPS_URI =
+      "/api/v1/users/{userId}/memberships?allKinds={allKinds}";
+
   @Test
   void searchUsers_ShouldCallWebClient() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    UserProxyController controller = new UserProxyController(backendApiClient);
+    UserProxyController controller =
+        new UserProxyController(new IdentityBackendClient(backendApiClient));
 
-    PageResponse<Map<String, Object>> mockPageResponse =
+    PageResponse<UserReferenceDto> mockPageResponse =
         new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList());
     when(backendApiClient.get(
             eq("/api/v1/users/search/references?size=51&sort=username,asc&query={query}"),
@@ -56,7 +65,7 @@ class UserProxyControllerTest {
             eq("query")))
         .thenReturn(mockPageResponse);
 
-    List<Map<String, Object>> result = controller.searchUsers("query");
+    List<UserReferenceDto> result = controller.searchUsers("query");
 
     assertNotNull(result);
     verify(backendApiClient)
@@ -69,9 +78,10 @@ class UserProxyControllerTest {
   @Test
   void searchUsers_passesMultiWordQueryAsUriVariable() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    UserProxyController controller = new UserProxyController(backendApiClient);
+    UserProxyController controller =
+        new UserProxyController(new IdentityBackendClient(backendApiClient));
 
-    PageResponse<Map<String, Object>> mockPageResponse =
+    PageResponse<UserReferenceDto> mockPageResponse =
         new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList());
     when(backendApiClient.get(
             eq("/api/v1/users/search/references?size=51&sort=username,asc&query={query}"),
@@ -79,7 +89,7 @@ class UserProxyControllerTest {
             eq("John Doe")))
         .thenReturn(mockPageResponse);
 
-    List<Map<String, Object>> result = controller.searchUsers("John Doe");
+    List<UserReferenceDto> result = controller.searchUsers("John Doe");
 
     assertNotNull(result);
     verify(backendApiClient)
@@ -92,9 +102,10 @@ class UserProxyControllerTest {
   @Test
   void searchUsers_NullQuery_ForwardsEmptyMatchAllFilter() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    UserProxyController controller = new UserProxyController(backendApiClient);
+    UserProxyController controller =
+        new UserProxyController(new IdentityBackendClient(backendApiClient));
 
-    PageResponse<Map<String, Object>> mockPageResponse =
+    PageResponse<UserReferenceDto> mockPageResponse =
         new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList());
     when(backendApiClient.get(
             eq("/api/v1/users/search/references?size=51&sort=username,asc&query={query}"),
@@ -102,7 +113,7 @@ class UserProxyControllerTest {
             eq("")))
         .thenReturn(mockPageResponse);
 
-    List<Map<String, Object>> result = controller.searchUsers(null);
+    List<UserReferenceDto> result = controller.searchUsers(null);
 
     assertNotNull(result);
     verify(backendApiClient)
@@ -115,9 +126,10 @@ class UserProxyControllerTest {
   @Test
   void searchUsersForBank_ShouldCallBankSearchEndpoint() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    UserProxyController controller = new UserProxyController(backendApiClient);
+    UserProxyController controller =
+        new UserProxyController(new IdentityBackendClient(backendApiClient));
 
-    PageResponse<Map<String, Object>> mockPageResponse =
+    PageResponse<UserReferenceDto> mockPageResponse =
         new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList());
     when(backendApiClient.get(
             eq("/api/v1/users/search-bank/references?size=51&sort=username,asc&query={query}"),
@@ -125,7 +137,7 @@ class UserProxyControllerTest {
             eq("query")))
         .thenReturn(mockPageResponse);
 
-    List<Map<String, Object>> result = controller.searchUsersForBank("query");
+    List<UserReferenceDto> result = controller.searchUsersForBank("query");
 
     assertNotNull(result);
     verify(backendApiClient)
@@ -138,7 +150,8 @@ class UserProxyControllerTest {
   @Test
   void bothUserSearches_fetchOneRowPastTheRenderCap() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    UserProxyController controller = new UserProxyController(backendApiClient);
+    UserProxyController controller =
+        new UserProxyController(new IdentityBackendClient(backendApiClient));
 
     controller.searchUsers("a");
     controller.searchUsersForBank("a");
@@ -156,40 +169,49 @@ class UserProxyControllerTest {
   @Test
   void userMemberships_ShouldForwardAllKindsTrueToBackend() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    UserProxyController controller = new UserProxyController(backendApiClient);
+    UserProxyController controller =
+        new UserProxyController(new IdentityBackendClient(backendApiClient));
     UUID id = UUID.fromString("00000000-0000-0000-0000-000000000044");
-    when(backendApiClient.get(anyString(), anyTypeRef()))
-        .thenReturn(List.of(Map.of("orgUnitId", "u1", "orgUnitName", "IRIDIUM")));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(
+            List.of(
+                new OrgUnitMembershipOptionDto(
+                    UUID.fromString("6e5d4c3b-2a19-4f08-b7e6-d5c4b3a29180"),
+                    "IRIDIUM",
+                    "IRI",
+                    "SQUADRON",
+                    true)));
 
-    List<Map<String, Object>> result = controller.userMemberships(id, true);
+    List<OrgUnitMembershipOptionDto> result = controller.userMemberships(id, true);
 
     assertNotNull(result);
-    verify(backendApiClient)
-        .get(eq("/api/v1/users/" + id + "/memberships?allKinds=true"), anyTypeRef());
+    verify(backendApiClient).get(eq(MEMBERSHIPS_URI), anyTypeRef(), eq(id), eq(true));
   }
 
   @Test
   void userMemberships_ShouldForwardAllKindsFalseByDefault() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    UserProxyController controller = new UserProxyController(backendApiClient);
+    UserProxyController controller =
+        new UserProxyController(new IdentityBackendClient(backendApiClient));
     UUID id = UUID.fromString("00000000-0000-0000-0000-000000000045");
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(List.of());
 
-    List<Map<String, Object>> result = controller.userMemberships(id, false);
+    List<OrgUnitMembershipOptionDto> result = controller.userMemberships(id, false);
 
     assertNotNull(result);
-    verify(backendApiClient)
-        .get(eq("/api/v1/users/" + id + "/memberships?allKinds=false"), anyTypeRef());
+    verify(backendApiClient).get(eq(MEMBERSHIPS_URI), anyTypeRef(), eq(id), eq(false));
   }
 
   @Test
   void userMemberships_ShouldReturnEmptyListOnNullBackendResponse() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    UserProxyController controller = new UserProxyController(backendApiClient);
+    UserProxyController controller =
+        new UserProxyController(new IdentityBackendClient(backendApiClient));
     UUID id = UUID.fromString("00000000-0000-0000-0000-000000000046");
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(null);
 
-    List<Map<String, Object>> result = controller.userMemberships(id, true);
+    List<OrgUnitMembershipOptionDto> result = controller.userMemberships(id, true);
 
     assertNotNull(result);
     assertTrue(result.isEmpty());
@@ -198,23 +220,30 @@ class UserProxyControllerTest {
   @Test
   void getUser_ShouldResolveSingleUserById() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    UserProxyController controller = new UserProxyController(backendApiClient);
+    UserProxyController controller =
+        new UserProxyController(new IdentityBackendClient(backendApiClient));
     UUID id = UUID.fromString("00000000-0000-0000-0000-000000000042");
-    Map<String, Object> user = Map.of("id", id.toString(), "effectiveName", "Alice");
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(user);
+    UserDto user =
+        new UserDto(
+            id, "alice", "Alice", "Alice", null, null, null, null, null, null, null, null, null,
+            null, null, 1L, null, null);
+    when(backendApiClient.get(anyString(), eq(UserDto.class), any(Object[].class)))
+        .thenReturn(user);
 
-    Map<String, Object> result = controller.getUser(id);
+    UserDto result = controller.getUser(id);
 
-    assertNotNull(result);
-    verify(backendApiClient).get(eq("/api/v1/users/" + id), anyTypeRef());
+    assertEquals(user, result);
+    verify(backendApiClient).get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(id));
   }
 
   @Test
   void getUser_ShouldReturnNullOnFailure() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    UserProxyController controller = new UserProxyController(backendApiClient);
+    UserProxyController controller =
+        new UserProxyController(new IdentityBackendClient(backendApiClient));
     UUID id = UUID.fromString("00000000-0000-0000-0000-000000000043");
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenThrow(new RuntimeException("boom"));
+    when(backendApiClient.get(anyString(), eq(UserDto.class), any(Object[].class)))
+        .thenThrow(new RuntimeException("boom"));
 
     assertNull(controller.getUser(id));
   }

@@ -26,9 +26,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.P4kImportJobDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -65,7 +67,10 @@ class AdminP4kImportPageControllerTest {
     server.start();
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
     backendApiClient = spy(RealBackendApiClient.over(webClient));
-    controller = new AdminP4kImportPageController(backendApiClient);
+    controller =
+        new AdminP4kImportPageController(
+            new CatalogueBackendClient(backendApiClient),
+            new CatalogueCacheEviction(backendApiClient));
   }
 
   @AfterEach

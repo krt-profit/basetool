@@ -56,4 +56,17 @@
             renderBar(target);
         }
     });
+
+    /** Binds the bookings pager of the holder detail to an in-place fragment swap. */
+    function bindBankHolderBookingsPager() {
+        if (window.krtFetch) {
+            window.krtFetch.bindSwap({
+                container: '#bank-holder-bookings-results',
+                fragmentValue: 'holderBookings',
+                history: true,
+            });
+        }
+    }
+    document.addEventListener('DOMContentLoaded', bindBankHolderBookingsPager);
+    document.addEventListener('krt:swapped', bindBankHolderBookingsPager);
 })();

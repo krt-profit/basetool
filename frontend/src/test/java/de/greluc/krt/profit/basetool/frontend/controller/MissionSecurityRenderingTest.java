@@ -154,9 +154,10 @@ class MissionSecurityRenderingTest {
             null);
 
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + missionId),
+            eq("/api/v1/missions/{id}"),
             org.mockito.ArgumentMatchers
-                .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
+                .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
+            eq(missionId)))
         .thenReturn(mission);
     when(backendApiClient.getCached(
             any(CachedCatalog.class),
@@ -254,9 +255,10 @@ class MissionSecurityRenderingTest {
             null);
 
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + missionId),
+            eq("/api/v1/missions/{id}"),
             org.mockito.ArgumentMatchers
-                .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
+                .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
+            eq(missionId)))
         .thenReturn(mission);
     when(backendApiClient.getCached(
             any(CachedCatalog.class),
@@ -351,9 +353,10 @@ class MissionSecurityRenderingTest {
             null);
 
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + missionId),
+            eq("/api/v1/missions/{id}"),
             org.mockito.ArgumentMatchers
-                .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
+                .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
+            eq(missionId)))
         .thenReturn(mission);
     when(backendApiClient.getCached(
             any(CachedCatalog.class),
@@ -455,9 +458,10 @@ class MissionSecurityRenderingTest {
             null);
 
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + missionId),
+            eq("/api/v1/missions/{id}"),
             org.mockito.ArgumentMatchers
-                .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
+                .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
+            eq(missionId)))
         .thenReturn(mission);
     when(backendApiClient.getCached(
             any(CachedCatalog.class),

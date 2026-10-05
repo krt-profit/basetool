@@ -22,13 +22,14 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingUpdateDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
+import de.greluc.krt.profit.basetool.frontend.settings.client.SettingsBackendClient;
+import de.greluc.krt.profit.basetool.frontend.settings.client.SettingsBackendClient.SystemSetting;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages.CompleteCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
@@ -43,7 +44,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.context.MessageSource;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -84,15 +84,12 @@ public class AdminSettingsPageController {
    */
   private static final BigDecimal DEFAULT_TRANSFER_FEE_PERCENT = new BigDecimal("0.5");
 
-  /** Response type for the active-squadron list backing the promotion-toggle section. */
-  private static final ParameterizedTypeReference<PageResponse<SquadronDto>> SQUADRON_PAGE_TYPE =
-      new ParameterizedTypeReference<>() {};
+  /** Reads and writes the settings and the toggle lists. */
+  private final SettingsBackendClient settingsClient;
 
-  /** Response type for the active-Spezialkommando list backing the SK profit-toggle section. */
-  private static final ParameterizedTypeReference<PageResponse<SpecialCommandDto>>
-      SPECIAL_COMMAND_PAGE_TYPE = new ParameterizedTypeReference<>() {};
+  /** Clears the catalogue caches after a settings write. */
+  private final CatalogueCacheEviction cacheEviction;
 
-  private final BackendApiClient backendApiClient;
   private final MessageSource messageSource;
 
   /**
@@ -113,9 +110,7 @@ public class AdminSettingsPageController {
     Long refineryRoundingVersion = 0L;
 
     try {
-      SystemSettingDto yellowSetting =
-          backendApiClient.get(
-              "/api/v1/settings/job_order.age_yellow_days", SystemSettingDto.class);
+      SystemSettingDto yellowSetting = settingsClient.read(SystemSetting.JOB_ORDER_AGE_YELLOW_DAYS);
       yellowDays = Integer.parseInt(yellowSetting.value());
       yellowVersion = yellowSetting.version();
     } catch (BackendServiceException e) {
@@ -125,8 +120,7 @@ public class AdminSettingsPageController {
     }
 
     try {
-      SystemSettingDto redSetting =
-          backendApiClient.get("/api/v1/settings/job_order.age_red_days", SystemSettingDto.class);
+      SystemSettingDto redSetting = settingsClient.read(SystemSetting.JOB_ORDER_AGE_RED_DAYS);
       redDays = Integer.parseInt(redSetting.value());
       redVersion = redSetting.version();
     } catch (BackendServiceException e) {
@@ -136,8 +130,7 @@ public class AdminSettingsPageController {
     }
 
     try {
-      SystemSettingDto roundingSetting =
-          backendApiClient.get("/api/v1/settings/refinery.rounding.mode", SystemSettingDto.class);
+      SystemSettingDto roundingSetting = settingsClient.read(SystemSetting.REFINERY_ROUNDING_MODE);
       refineryRoundingMode = roundingSetting.value();
       refineryRoundingVersion = roundingSetting.version();
     } catch (BackendServiceException e) {
@@ -149,9 +142,7 @@ public class AdminSettingsPageController {
     BigDecimal transferFeePercent = DEFAULT_TRANSFER_FEE_PERCENT;
     Long transferFeeVersion = 0L;
     try {
-      SystemSettingDto feeSetting =
-          backendApiClient.get(
-              "/api/v1/settings/operation.transfer_fee_rate", SystemSettingDto.class);
+      SystemSettingDto feeSetting = settingsClient.read(SystemSetting.OPERATION_TRANSFER_FEE_RATE);
       transferFeePercent =
           new BigDecimal(feeSetting.value()).multiply(ONE_HUNDRED).stripTrailingZeros();
       if (transferFeePercent.scale() < 0) {
@@ -192,12 +183,7 @@ public class AdminSettingsPageController {
    */
   private CompleteCatalog<SquadronDto> fetchSquadronsForPromotionToggle() {
     try {
-      CompleteCatalog<SquadronDto> catalog =
-          CatalogPages.fetchAll(
-              page ->
-                  backendApiClient.get(
-                      "/api/v1/squadrons?size=1000&sort=name,asc&page=" + page,
-                      SQUADRON_PAGE_TYPE));
+      CompleteCatalog<SquadronDto> catalog = CatalogPages.fetchAll(settingsClient::squadronPage);
       List<SquadronDto> sorted =
           catalog.items().stream()
               .sorted(
@@ -220,11 +206,7 @@ public class AdminSettingsPageController {
   private CompleteCatalog<SpecialCommandDto> fetchSpecialCommandsForProfitToggle() {
     try {
       CompleteCatalog<SpecialCommandDto> catalog =
-          CatalogPages.fetchAll(
-              page ->
-                  backendApiClient.get(
-                      "/api/v1/special-commands?size=1000&sort=name,asc&page=" + page,
-                      SPECIAL_COMMAND_PAGE_TYPE));
+          CatalogPages.fetchAll(settingsClient::specialCommandPage);
       List<SpecialCommandDto> sorted =
           catalog.items().stream()
               .sorted(
@@ -285,25 +267,21 @@ public class AdminSettingsPageController {
       BigDecimal transferFeeRate = transferFeePercent.divide(ONE_HUNDRED, 6, RoundingMode.HALF_UP);
 
       try {
-        backendApiClient.put(
-            "/api/v1/settings/job_order.age_yellow_days",
-            new SystemSettingUpdateDto(String.valueOf(yellowDays), ageYellowVersion),
-            SystemSettingDto.class);
-        backendApiClient.put(
-            "/api/v1/settings/job_order.age_red_days",
-            new SystemSettingUpdateDto(String.valueOf(redDays), ageRedVersion),
-            SystemSettingDto.class);
-        backendApiClient.put(
-            "/api/v1/settings/refinery.rounding.mode",
-            new SystemSettingUpdateDto(refineryRoundingMode, refineryRoundingVersion),
-            SystemSettingDto.class);
-        backendApiClient.put(
-            "/api/v1/settings/operation.transfer_fee_rate",
+        settingsClient.write(
+            SystemSetting.JOB_ORDER_AGE_YELLOW_DAYS,
+            new SystemSettingUpdateDto(String.valueOf(yellowDays), ageYellowVersion));
+        settingsClient.write(
+            SystemSetting.JOB_ORDER_AGE_RED_DAYS,
+            new SystemSettingUpdateDto(String.valueOf(redDays), ageRedVersion));
+        settingsClient.write(
+            SystemSetting.REFINERY_ROUNDING_MODE,
+            new SystemSettingUpdateDto(refineryRoundingMode, refineryRoundingVersion));
+        settingsClient.write(
+            SystemSetting.OPERATION_TRANSFER_FEE_RATE,
             new SystemSettingUpdateDto(
-                transferFeeRate.stripTrailingZeros().toPlainString(), transferFeeVersion),
-            SystemSettingDto.class);
+                transferFeeRate.stripTrailingZeros().toPlainString(), transferFeeVersion));
       } finally {
-        backendApiClient.clearStaticDataCache();
+        cacheEviction.clearStaticDataCache();
       }
 
       redirectAttributes.addFlashAttribute("successToast", "success.settings.update");
@@ -345,28 +323,24 @@ public class AdminSettingsPageController {
 
       try {
         final SystemSettingDto yellow =
-            backendApiClient.put(
-                "/api/v1/settings/job_order.age_yellow_days",
-                new SystemSettingUpdateDto(String.valueOf(yellowDays), request.ageYellowVersion()),
-                SystemSettingDto.class);
+            settingsClient.write(
+                SystemSetting.JOB_ORDER_AGE_YELLOW_DAYS,
+                new SystemSettingUpdateDto(String.valueOf(yellowDays), request.ageYellowVersion()));
         final SystemSettingDto red =
-            backendApiClient.put(
-                "/api/v1/settings/job_order.age_red_days",
-                new SystemSettingUpdateDto(String.valueOf(redDays), request.ageRedVersion()),
-                SystemSettingDto.class);
+            settingsClient.write(
+                SystemSetting.JOB_ORDER_AGE_RED_DAYS,
+                new SystemSettingUpdateDto(String.valueOf(redDays), request.ageRedVersion()));
         final SystemSettingDto rounding =
-            backendApiClient.put(
-                "/api/v1/settings/refinery.rounding.mode",
+            settingsClient.write(
+                SystemSetting.REFINERY_ROUNDING_MODE,
                 new SystemSettingUpdateDto(
-                    request.refineryRoundingMode(), request.refineryRoundingVersion()),
-                SystemSettingDto.class);
+                    request.refineryRoundingMode(), request.refineryRoundingVersion()));
         final SystemSettingDto fee =
-            backendApiClient.put(
-                "/api/v1/settings/operation.transfer_fee_rate",
+            settingsClient.write(
+                SystemSetting.OPERATION_TRANSFER_FEE_RATE,
                 new SystemSettingUpdateDto(
                     transferFeeRate.stripTrailingZeros().toPlainString(),
-                    request.transferFeeVersion()),
-                SystemSettingDto.class);
+                    request.transferFeeVersion()));
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("ageYellowVersion", yellow.version());
@@ -376,7 +350,7 @@ public class AdminSettingsPageController {
         result.put("transferFeePercent", transferFeePercent.stripTrailingZeros().toPlainString());
         return ResponseEntity.ok(result);
       } finally {
-        backendApiClient.clearStaticDataCache();
+        cacheEviction.clearStaticDataCache();
       }
     } catch (NumberFormatException e) {
       return validationProblem("error.settings.invalid.format", locale);

@@ -21,8 +21,8 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.BackendRoleSyncFilter;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RegistrationStatusDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -47,9 +47,6 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @PreAuthorize("isAuthenticated()")
 public class PendingApprovalPageController {
 
-  /** Backend endpoint returning the caller's own approval status. */
-  private static final String REGISTRATION_STATUS_URI = "/api/v1/users/me/registration-status";
-
   /** Approved registration — nothing to wait for, so this page is not the right surface. */
   private static final String STATE_ACTIVE = "ACTIVE";
 
@@ -70,7 +67,8 @@ public class PendingApprovalPageController {
    */
   static final String MODEL_NO_ROLE = "registrationNoRole";
 
-  private final BackendApiClient backendApiClient;
+  /** Reads the caller's approval status from the backend. */
+  private final IdentityBackendClient identityClient;
 
   /**
    * Renders the account-status page, choosing its copy from the caller's live approval status.
@@ -125,8 +123,7 @@ public class PendingApprovalPageController {
   @Nullable
   private String readApprovalStatus() {
     try {
-      RegistrationStatusDto dto =
-          backendApiClient.get(REGISTRATION_STATUS_URI, RegistrationStatusDto.class);
+      RegistrationStatusDto dto = identityClient.registrationStatus();
       return dto == null ? null : dto.approvalStatus();
     } catch (BackendServiceException e) {
       log.debug("Approval status could not be read; reporting an unknown status.", e);

@@ -229,11 +229,24 @@
         true,
     );
 
+    /**
+     * The violated directive; for a Trusted Types sink violation also the sink the browser names in
+     * front of the sample's `|`, never the sample's markup.
+     */
+    function violationMessage(event) {
+        const directive = event.effectiveDirective || event.violatedDirective;
+        if (directive !== 'require-trusted-types-for' || typeof event.sample !== 'string') {
+            return directive;
+        }
+        const sink = event.sample.split('|')[0].trim();
+        return sink ? `${directive} ${sink}` : directive;
+    }
+
     document.addEventListener('securitypolicyviolation', (event) => {
         try {
             report(
                 KIND_CSP_VIOLATION,
-                event ? event.effectiveDirective || event.violatedDirective : null,
+                event ? violationMessage(event) : null,
                 event ? blockedOrigin(event.blockedURI) : null,
                 null,
                 null,

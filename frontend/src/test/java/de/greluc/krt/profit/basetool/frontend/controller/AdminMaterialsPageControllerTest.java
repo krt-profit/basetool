@@ -26,6 +26,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialCreateAjaxRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialUpdateAjaxRequest;
@@ -33,6 +34,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -47,7 +49,10 @@ class AdminMaterialsPageControllerTest {
   @Test
   void updateMaterialAjax_ShouldUpdateAndReturnMaterial() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    AdminMaterialsPageController controller = new AdminMaterialsPageController(backendApiClient);
+    AdminMaterialsPageController controller =
+        new AdminMaterialsPageController(
+            new CatalogueBackendClient(backendApiClient),
+            new CatalogueCacheEviction(backendApiClient));
 
     UUID matId = UUID.randomUUID();
     MaterialDto currentMaterial =
@@ -59,7 +64,7 @@ class AdminMaterialsPageControllerTest {
             matId, "Alpha", "RAW", "PIECE", "Desc", null, null, false, false, false, false, false,
             false, true, 2L);
 
-    when(backendApiClient.get("/api/v1/materials/" + matId, MaterialDto.class))
+    when(backendApiClient.get("/api/v1/materials/{id}", MaterialDto.class, matId))
         .thenReturn(currentMaterial)
         .thenReturn(updatedMaterial);
 
@@ -76,7 +81,10 @@ class AdminMaterialsPageControllerTest {
   @Test
   void listMaterials_ShouldSortListsAscendingByName() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    AdminMaterialsPageController controller = new AdminMaterialsPageController(backendApiClient);
+    AdminMaterialsPageController controller =
+        new AdminMaterialsPageController(
+            new CatalogueBackendClient(backendApiClient),
+            new CatalogueCacheEviction(backendApiClient));
     Model model = new ConcurrentModel();
 
     List<MaterialDto> materials = new ArrayList<>();
@@ -170,8 +178,9 @@ class AdminMaterialsPageControllerTest {
         new PageResponse<>(materials, 0, 1000, materials.size(), 1, List.of("name,asc"));
 
     when(backendApiClient.get(
-            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page=0"),
-            anyTypeRef()))
+            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page={page}"),
+            anyTypeRef(),
+            eq(0)))
         .thenReturn(materialsPage);
 
     controller.listMaterials(model);
@@ -197,7 +206,10 @@ class AdminMaterialsPageControllerTest {
   @Test
   void listMaterials_concatenatesAllBackendPages() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    AdminMaterialsPageController controller = new AdminMaterialsPageController(backendApiClient);
+    AdminMaterialsPageController controller =
+        new AdminMaterialsPageController(
+            new CatalogueBackendClient(backendApiClient),
+            new CatalogueCacheEviction(backendApiClient));
     Model model = new ConcurrentModel();
 
     MaterialDto first =
@@ -234,10 +246,10 @@ class AdminMaterialsPageControllerTest {
             false,
             true,
             0L);
-    String base = "/api/v1/materials?size=1000&sort=name,asc&includeHidden=true";
-    when(backendApiClient.get(eq(base + "&page=0"), anyTypeRef()))
+    String template = "/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page={page}";
+    when(backendApiClient.get(eq(template), anyTypeRef(), eq(0)))
         .thenReturn(new PageResponse<>(List.of(first), 0, 1000, 2, 2, List.of("name,asc")));
-    when(backendApiClient.get(eq(base + "&page=1"), anyTypeRef()))
+    when(backendApiClient.get(eq(template), anyTypeRef(), eq(1)))
         .thenReturn(new PageResponse<>(List.of(second), 1, 1000, 2, 2, List.of("name,asc")));
 
     controller.listMaterials(model);
@@ -252,7 +264,10 @@ class AdminMaterialsPageControllerTest {
   @Test
   void createMaterialAjax_success_returnsBackendDto() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    AdminMaterialsPageController controller = new AdminMaterialsPageController(backendApiClient);
+    AdminMaterialsPageController controller =
+        new AdminMaterialsPageController(
+            new CatalogueBackendClient(backendApiClient),
+            new CatalogueCacheEviction(backendApiClient));
 
     MaterialCreateAjaxRequest req =
         new MaterialCreateAjaxRequest(
@@ -289,7 +304,10 @@ class AdminMaterialsPageControllerTest {
   @Test
   void createMaterialAjax_backendValidationFailure_propagatesStatus() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    AdminMaterialsPageController controller = new AdminMaterialsPageController(backendApiClient);
+    AdminMaterialsPageController controller =
+        new AdminMaterialsPageController(
+            new CatalogueBackendClient(backendApiClient),
+            new CatalogueCacheEviction(backendApiClient));
 
     MaterialCreateAjaxRequest req =
         new MaterialCreateAjaxRequest(

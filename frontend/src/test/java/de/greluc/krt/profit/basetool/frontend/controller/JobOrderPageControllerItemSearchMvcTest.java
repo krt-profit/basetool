@@ -73,7 +73,7 @@ class JobOrderPageControllerItemSearchMvcTest {
     PageResponse<GameItemReferenceDto> page =
         new PageResponse<>(
             List.of(new GameItemReferenceDto(id, "P8-SC SMG", "WEAPON")), 0, 25, 1L, 1, List.of());
-    doReturn(page).when(backendApiClient).get(any(), anyTypeRef(), any());
+    doReturn(page).when(backendApiClient).get(any(), anyTypeRef(), any(Object[].class));
 
     mockMvc
         .perform(get("/orders/item-search").param("q", "p8"))
@@ -88,7 +88,7 @@ class JobOrderPageControllerItemSearchMvcTest {
   void itemSearch_backendFailure_returnsEmptyList() throws Exception {
     doThrow(new RuntimeException("backend down"))
         .when(backendApiClient)
-        .get(any(), anyTypeRef(), any());
+        .get(any(), anyTypeRef(), any(Object[].class));
 
     mockMvc
         .perform(get("/orders/item-search").param("q", "x"))

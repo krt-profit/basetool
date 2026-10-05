@@ -94,7 +94,7 @@ class BankAccountDetailFragmentMvcTest {
             BigDecimal.ZERO,
             null,
             null);
-    when(backendApiClient.get(contains("/transactions"), anyTypeRef()))
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef(), eq(accountId)))
         .thenReturn(new PageResponse<>(List.of(booking), 0, 20, 25L, 2, List.of()));
 
     mockMvc
@@ -113,7 +113,8 @@ class BankAccountDetailFragmentMvcTest {
   @WithMockUser(roles = "BANK_EMPLOYEE")
   void accountDetail_fragmentBalanceChart_rendersRangeSelectorAndChart() throws Exception {
     UUID accountId = UUID.randomUUID();
-    when(backendApiClient.get(contains("/balance-series"), eq(BankBalanceSeriesDto.class)))
+    when(backendApiClient.get(
+            contains("/balance-series"), eq(BankBalanceSeriesDto.class), eq(accountId)))
         .thenReturn(
             new BankBalanceSeriesDto(
                 List.of(
@@ -137,7 +138,8 @@ class BankAccountDetailFragmentMvcTest {
   @WithMockUser(roles = "BANK_EMPLOYEE")
   void accountDetail_fragmentBalanceChart_emptySeries_rendersEmptyState() throws Exception {
     UUID accountId = UUID.randomUUID();
-    when(backendApiClient.get(contains("/balance-series"), eq(BankBalanceSeriesDto.class)))
+    when(backendApiClient.get(
+            contains("/balance-series"), eq(BankBalanceSeriesDto.class), eq(accountId)))
         .thenReturn(new BankBalanceSeriesDto(List.of(), null));
 
     mockMvc

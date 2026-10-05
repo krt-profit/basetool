@@ -100,3 +100,23 @@ The named exceptions of the rules above are gone: the SSE relay and the live-syn
 own clients without the resilience filters, but reach them through `BackendSideChannels`, a kernel
 class offering exactly those two calls. Only `WebClientConfig`, `BackendApiClient` and
 `BackendSideChannels` hold a `WebClient` (REQ-FE-029, `WebClientConfinementTest`).
+
+## Amendment — 2026-10-05: the typed clients (plan F3)
+
+Each domain gets its typed client as a thin `@Service` over `BackendApiClient`, named
+`<Domain>BackendClient` and placed in `frontend.<domain>.client`, the package plan §5.9 gives it:
+the client owns the domain's backend paths, takes typed arguments and returns typed records, and a
+controller reaches the backend only through its own domain's client. The cached catalogue reads
+stay in the kernel and the catalogue evictions after an admin write go through the kernel's
+`CatalogueCacheEviction`. No client builds or holds a `WebClient` and none caches a response, so
+the decision above holds for all of them: one resilience pass on the `webClient` bean, one error
+mapping in `BackendErrorMapper`, one metric. `TypedBackendClientTest` keeps
+`BackendApiClient` confined to the kernel and the client packages and checks the client rules
+against planted fixtures.
+
+Every verb now has a URI-template twin, `get` with a `Class` response included, and no call
+concatenates a runtime value into its URI: `ReadUriTemplateTest` covers `get` and
+`execute(…)` as `WriteUriTemplateTest` covers the writes (REQ-SEC-051). A converted call sends the
+same bytes as before: an id, number, boolean or enum name goes in as a template variable, a value
+with reserved characters (an `Instant`) keeps its `UriComponentsBuilder.queryParam` encoding,
+with only the path variable left in the template (`encode().build()`).

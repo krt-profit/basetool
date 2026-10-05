@@ -77,7 +77,7 @@
         </th:block>
     </th:block>
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-        window.materialgesuchI18n = Object.assign(window.materialgesuchI18n || {}, {
+        window.materialgesuchModalI18n = {
             requestTitle: /*[[#{materialgesuch.modal.request.title}]]*/ 'Material suchen',
             itemRequestTitle: /*[[#{materialgesuch.modal.itemRequest.title}]]*/ 'Item suchen',
             editTitle: /*[[#{materialgesuch.modal.edit.title}]]*/ 'Gesuch bearbeiten',
@@ -94,14 +94,14 @@
             minQualityInvalid: /*[[#{materialgesuch.modal.minQuality.invalid}]]*/ 'Bitte eine Qualität zwischen 0 und 1000 angeben.',
             unitScu: /*[[#{material.quantity.scu}]]*/ 'SCU',
             unitPiece: /*[[#{material.quantity.piece}]]*/ 'Stück',
-            conflict: window.materialgesuchI18n && window.materialgesuchI18n.conflict ? window.materialgesuchI18n.conflict : {
+            conflict: {
                 title: /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
                 reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Neu laden.',
                 reloadLabel: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Neu laden',
                 dismissLabel: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
                 reloadQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Neu laden?'
             }
-        });
+        };
     </script>
     <script th:src="@{/js/materialgesuch-modal.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>

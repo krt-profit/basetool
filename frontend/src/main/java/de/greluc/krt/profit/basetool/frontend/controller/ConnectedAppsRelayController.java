@@ -21,9 +21,8 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
+import de.greluc.krt.profit.basetool.frontend.exchange.client.ExchangeBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeUndoRequestDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeUndoResultDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -50,14 +49,11 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class ConnectedAppsRelayController {
 
-  /** The backend's connected-apps endpoints. */
-  static final String BACKEND = "/api/v1/connected-apps";
-
   /** The shape of a registry client id, identical to the backend's rule. */
   private static final Pattern CLIENT_ID = Pattern.compile("^[a-z0-9][a-z0-9-]{1,62}$");
 
   /** Talks to the backend. */
-  private final BackendApiClient backendApiClient;
+  private final ExchangeBackendClient exchangeClient;
 
   /**
    * Disconnects a whole client for the member.
@@ -74,7 +70,7 @@ public class ConnectedAppsRelayController {
         log,
         "disconnect exchange client (ajax)",
         () -> {
-          backendApiClient.delete(BACKEND + "/{clientId}", Void.class, clientId);
+          exchangeClient.disconnectClient(clientId);
           return ResponseEntity.noContent().build();
         });
   }
@@ -93,8 +89,7 @@ public class ConnectedAppsRelayController {
         log,
         "mark exchange installation seen (ajax)",
         () -> {
-          backendApiClient.post(
-              BACKEND + "/installations/{installationId}/seen", null, Void.class, installationId);
+          exchangeClient.markInstallationSeen(installationId);
           return ResponseEntity.noContent().build();
         });
   }
@@ -117,10 +112,7 @@ public class ConnectedAppsRelayController {
     return relay(
         log,
         "undo exchange client writes (ajax)",
-        () ->
-            ResponseEntity.ok(
-                backendApiClient.post(
-                    BACKEND + "/{clientId}/undo", request, ExchangeUndoResultDto.class, clientId)));
+        () -> ResponseEntity.ok(exchangeClient.undoClientWrites(clientId, request)));
   }
 
   /**
@@ -137,8 +129,7 @@ public class ConnectedAppsRelayController {
         log,
         "disconnect exchange installation (ajax)",
         () -> {
-          backendApiClient.delete(
-              BACKEND + "/installations/{installationId}", Void.class, installationId);
+          exchangeClient.disconnectInstallation(installationId);
           return ResponseEntity.noContent().build();
         });
   }
