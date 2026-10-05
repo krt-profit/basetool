@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.personalinventory.internal;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -25,18 +25,11 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.mapper.PersonalInventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.City;
-import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryLocationType;
 import de.greluc.krt.profit.basetool.backend.model.SpaceStation;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemCreateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemUpdateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.UexLocationDto;
 import de.greluc.krt.profit.basetool.backend.repository.CityRepository;
-import de.greluc.krt.profit.basetool.backend.repository.PersonalInventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpaceStationRepository;
+import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;

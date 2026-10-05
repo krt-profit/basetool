@@ -90,8 +90,6 @@ class RefineryYield catalogue UEX refinery-yield matrix row, written by UexRefin
 class RefineryYieldRepository catalogue repository of the UEX yield matrix
 class RefineryImportProperties refinery refinery screenshot import tuning
 class ShipTypeMatcher hangar ShipType resolver for the hangar import
-class UexLocationController personalinventory UEX location picker served by PersonalInventoryItemService
-class UexLocationDto personalinventory UEX location picker row of the personal inventory
 class MaterialCollectionController joborder material collection overview of a job order
 class JobOrderItemStockController joborder order-detail item stock panel
 class MeController identity the caller's own profile surface (/me)
@@ -196,6 +194,7 @@ package orgunit orgunit the org-unit module's package tree (plan 5.2)
 package platform platform the platform's package tree (plan 5.1 rank 0)
 package catalogue catalogue the catalogue module's package tree (plan 5.2)
 package mission mission the mission module's package tree (plan 5.2)
+package personalinventory personalinventory the personal-inventory module's package tree (plan 5.2)
 
 name ^OrgUnitBank bank
 name ^(Bank|CreateBank|CancelBank|ConfirmBank|RegisterBank|RejectBank|RenameBank|ReverseBank|SetBank|UpdateBank|SetCartel|OrgUnitBalanceTarget) bank
@@ -203,7 +202,6 @@ name ^(Exchange|ConnectedApp|FirstPartyClientIds|RedisExchange|DisabledExchange|
 name ^(MaterialExchange|MaterialRequest|MaterialItemRequest) materialexchange
 name ^(MaterialClaim|ClaimBucket|ClaimDto|CreateClaim|MaterialDemand) joborder
 name ^(JobOrder|CreateJobOrder|UpdateJobOrder|HandoverReport) joborder
-name ^PersonalInventory personalinventory
 name ^(Inventory|BulkCheckout|BulkRebook|BulkStolenMark|BulkOrgUnitChange|AggregatedInventory|GroupedInventory|AllocationReduction|StockViewerAccess|OwnedStockSlice) inventory
 name ^(PersonalBlueprint|DefaultBlueprint|BlueprintImport|BlueprintExport|BlueprintCraftability|Craftability|BlueprintOverview|BlueprintProduct|BlueprintUploadPreview|BlueprintOwner|BlueprintModifierMath|BlueprintVariant|BlueprintSource|BlueprintExternalAlias) blueprint
 name ^(Blueprint) catalogue
@@ -220,7 +218,6 @@ name ^Leitung orgchart the Leitung view belongs to the org chart (plan 7.3)
 name ^(OrgRoleManagement|AddOlMember|SquadronRole|AssignSquadronRank) orgunit leadership writes merged into orgunit (plan 7.3)
 name ^(OrgUnit|Squadron|SpecialCommand|Bereich|Organisationsleitung|KommandoGroup|CreateKommandoGroup|UpdateKommandoGroup|OrgHierarchy|Membership) orgunit
 name ^(User|Role|Registration|PendingRegistration|ApproveRegistration|RejectRegistration|ReopenRegistration|LinkRegistration|MyRegistration|Discord|Keycloak|Terms|DeletionRequest|CreateDeletionRequest|DecideDeletionRequest|DataExport|AdminDataExport|AccountDeletion|AccountConsolidation|ConsolidateAccount|MergeAccount|Handle|PersonSearch|AdminPersonSearch|AdminTerms|AdminDeletion|RejectedRegistration|ApprovalDecision|ApprovalStatus|AdminController$) identity
-name ^AdminPersonalInventory personalinventory
 name ^(AdminPersonalBlueprint|AdminDefaultBlueprint) blueprint
 name ^(AdminExchange) exchange
 name ^(AdminP4k) catalogue

@@ -17,29 +17,19 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/**
- * The GDPR module, transitional until its participants become identity-owned SPIs (plan §5.1 rank
- * 13, §7.6).
- */
-@ApplicationModule(
-    allowedDependencies = {
-      "audit::api",
-      "bank::api",
-      "catalogue::api",
-      "exchange::api",
-      "identity::api",
-      "inventory::api",
-      "joborder::api",
-      "kernel",
-      "livesync::api",
-      "materialexchange::api",
-      "notification::api",
-      "orgunit::api",
-      "personalinventory::api",
-      "platform::api",
-      "refinery::api",
-      "scope::api"
-    })
-package de.greluc.krt.profit.basetool.backend.privacy;
+package de.greluc.krt.profit.basetool.backend.personalinventory.api;
 
-import org.springframework.modulith.ApplicationModule;
+import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
+
+/** The personal-inventory module's erasure command for the GDPR user deletion (plan §5.3, §7.6). */
+public interface PersonalInventoryErasure {
+
+  /**
+   * Deletes every "Mein Inventar" row of an owner, inside the caller's transaction.
+   *
+   * @param ownerUserId the departing owner's {@code app_user.id}
+   * @return the number of deleted rows
+   */
+  int deleteAllItemsOf(@NotNull UUID ownerUserId);
+}

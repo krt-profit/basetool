@@ -17,12 +17,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.mapper;
+package de.greluc.krt.profit.basetool.backend.personalinventory.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemCreateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.mapper.CentralMapperConfig;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

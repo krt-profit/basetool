@@ -17,9 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.repository;
+package de.greluc.krt.profit.basetool.backend.personalinventory.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryItem;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;

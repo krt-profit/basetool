@@ -17,23 +17,21 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.personalinventory.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryLocationType;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 /**
- * Write DTO for updating an existing personal inventory entry. The {@code version} field is
- * mandatory: it carries the entity's last-seen optimistic-locking version, so concurrent
- * modifications are rejected with HTTP 409 (see AGENTS.md "CONCURRENCY AND OPTIMISTIC LOCKING").
+ * Write DTO for creating a personal inventory entry. The location display name is NOT accepted from
+ * the client; the server resolves it from the local UEX City/Space-Station mirror and persists a
+ * snapshot to keep the entry renderable offline.
  */
-public record PersonalInventoryItemUpdateRequest(
+public record PersonalInventoryItemCreateRequest(
     @NotBlank @Size(max = 120) String name,
     @Size(max = 2000) String note,
     @NotNull Integer locationUexId,
     @NotNull PersonalInventoryLocationType locationType,
-    @NotNull @Min(1) Integer quantity,
-    @NotNull @Min(0) Long version) {}
+    @NotNull @Min(1) Integer quantity) {}

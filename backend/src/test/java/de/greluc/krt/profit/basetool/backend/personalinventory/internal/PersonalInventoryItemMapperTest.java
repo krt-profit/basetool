@@ -17,17 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.mapper;
+package de.greluc.krt.profit.basetool.backend.personalinventory.internal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryLocationType;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemCreateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemUpdateRequest;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
