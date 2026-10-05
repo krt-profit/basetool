@@ -19,18 +19,17 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.AdminDeletionRequestDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import java.util.HashMap;
-import java.util.Map;
+import java.time.Instant;
+import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -87,18 +86,23 @@ class ProfileDeletionCardRenderMvcTest {
    * @param status the request status
    * @return the request as the backend returns it
    */
-  private static @NotNull Map<String, Object> request(@NotNull String status) {
-    Map<String, Object> request = new HashMap<>();
-    request.put("status", status);
-    request.put("eraseHistoryRequested", false);
-    request.put("decisionNote", "Offene Buchungen");
-    return request;
+  private static @NotNull AdminDeletionRequestDto request(@NotNull String status) {
+    return new AdminDeletionRequestDto(
+        UUID.fromString("9f8e7d6c-5b4a-4392-8170-6f5e4d3c2b1a"),
+        UUID.fromString("1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"),
+        null,
+        status,
+        false,
+        Instant.parse("2026-09-01T10:15:30Z"),
+        null,
+        "Offene Buchungen",
+        1L);
   }
 
   /** A pending request shows the warning alert and the withdraw action as a quiet button. */
   @Test
   void aPendingRequestShowsAWarningAlert() throws Exception {
-    when(backendApiClient.get(eq(URI), anyTypeRef())).thenReturn(request("PENDING"));
+    when(backendApiClient.get(URI, AdminDeletionRequestDto.class)).thenReturn(request("PENDING"));
 
     String html = render();
 
@@ -114,7 +118,7 @@ class ProfileDeletionCardRenderMvcTest {
   /** A declined request shows the decision note in the same alert. */
   @Test
   void aDeclinedRequestShowsTheNoteInAWarningAlert() throws Exception {
-    when(backendApiClient.get(eq(URI), anyTypeRef())).thenReturn(request("DECLINED"));
+    when(backendApiClient.get(URI, AdminDeletionRequestDto.class)).thenReturn(request("DECLINED"));
 
     String html = render();
 
@@ -130,7 +134,7 @@ class ProfileDeletionCardRenderMvcTest {
   /** A backend outage says so in the alert instead of offering a new request. */
   @Test
   void anOutageShowsTheUnavailableAlert() throws Exception {
-    when(backendApiClient.get(eq(URI), anyTypeRef()))
+    when(backendApiClient.get(URI, AdminDeletionRequestDto.class))
         .thenThrow(new BackendServiceException("down", null, 503));
 
     String html = render();

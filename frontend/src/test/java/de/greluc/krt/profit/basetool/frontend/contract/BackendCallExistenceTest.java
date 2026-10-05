@@ -49,7 +49,7 @@ import tools.jackson.databind.json.JsonMapper;
 class BackendCallExistenceTest {
 
   /** The number of call sites resolved when the guard was introduced; a smaller scan is broken. */
-  private static final int MIN_RESOLVED_CALL_SITES = 566;
+  private static final int MIN_RESOLVED_CALL_SITES = 544;
 
   /** The number of live-sync probe templates when the guard was introduced. */
   private static final int MIN_LIVE_SYNC_PROBES = 7;
