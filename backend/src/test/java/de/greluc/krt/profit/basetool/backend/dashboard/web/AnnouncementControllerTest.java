@@ -17,15 +17,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.dashboard.web;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import de.greluc.krt.profit.basetool.backend.mapper.AnnouncementMapper;
-import de.greluc.krt.profit.basetool.backend.model.Announcement;
-import de.greluc.krt.profit.basetool.backend.model.dto.AnnouncementDto;
-import de.greluc.krt.profit.basetool.backend.service.AnnouncementService;
+import de.greluc.krt.profit.basetool.backend.dashboard.internal.Announcement;
+import de.greluc.krt.profit.basetool.backend.dashboard.internal.AnnouncementService;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;

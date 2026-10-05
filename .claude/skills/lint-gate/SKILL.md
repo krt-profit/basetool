@@ -21,14 +21,15 @@ the how-to behind that rule.
 | --- | --- | --- |
 | `:frontend:lintCss` | Stylelint | `static/css/**`, the page stylesheets under `static/css/pages/` included — e.g. media-query *range* notation `(width <= Npx)` not `(max-width: Npx)`, modern `rgb(r g b / a%)` not `rgba(...)`, complex `:not(a, b)`, kebab-case id selectors. A colour token's alpha variant is `color-mix()`, not `rgb()` — that and the `--z-*` scale are checked by `ColourTokenCopyTest` / `ZIndexScaleTest` in `:frontend:test`, not by Stylelint |
 | `:frontend:lintCssInline` | Stylelint (+ postcss-html for templates) | any `<style>` block that comes back into a template — with the tiny `.stylelintrc.templates.json` rule set, not the strict one |
-| `:frontend:lintJs` | ESLint | `static/js/**` and the Node scripts `scripts/**/*.mjs` at ES2025 — `no-var` → `let`/`const`, `prefer-const`, `object-shorthand`, `prefer-template`, `prefer-arrow-callback`, `prefer-object-has-own`, `logical-assignment-operators` (all autofixable), `radix`, unused caught errors `_`-prefixed, any raw `fetch` / `XMLHttpRequest` outside the transport (REQ-FE-002, REQ-FE-031), `Promise.try` / `RegExp.escape` / `Float16Array` (above the browser floor, ADR-0239), unescaped HTML sinks (REQ-FE-022), … |
+| `:frontend:lintJs` | ESLint | `static/js/**` and the Node scripts `scripts/**/*.mjs` at ES2025 — `no-var` → `let`/`const`, `prefer-const`, `object-shorthand`, `prefer-template`, `prefer-arrow-callback`, `prefer-object-has-own`, `logical-assignment-operators` (all autofixable), `radix`, unused caught errors `_`-prefixed, any raw `fetch` / `XMLHttpRequest` outside the transport (REQ-FE-002, REQ-FE-031), `Promise.try` / `RegExp.escape` / `Float16Array` (above the browser floor, ADR-0239), any HTML or script sink outside `krt-html.js` / `krt-fetch.js` — `innerHTML =` (even `''`; use `replaceChildren()`), `insertAdjacentHTML`, `parseFromString`, `createPolicy`, `eval` — so markup goes through ``krtHtml.set(el, krtHtml`…`)`` (Trusted Types, REQ-FE-022), … |
 | `:frontend:lintProbeJs` | ESLint | the e2e probe script, extracted from its Java text block |
 | `:frontend:lintHtml` | HTMLHint | `templates/**` |
 | `:frontend:prettierCheck` | Prettier | CSS / JS / `types/**/*.d.ts` / `scripts/**/*.mjs` formatting |
 | `:frontend:typecheckJs` | `tsc --noEmit` | files carrying `// @ts-check` (REQ-FE-018, ADR-0125) |
 | `:frontend:testGenApiTypes` | Node | the self-test of the OpenAPI → `.d.ts` emitter |
 | `:frontend:testKrtFetchReadJs` | Node | the read path `krtFetch.get` / `getJson` (REQ-FE-031) |
-| `:frontend:testEslintBans` | Node + ESLint API | the transport and baseline bans fire on planted sources |
+| `:frontend:testEslintBans` | Node + ESLint API | the transport, baseline and Trusted Types sink bans fire on planted sources |
+| `:frontend:testTrustedTypesJs` | Node | the `krtHtml` builder and the two Trusted Types policies (ADR-0239) |
 
 Before pushing, run the whole sweep and get it to **zero findings**:
 

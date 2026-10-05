@@ -128,6 +128,15 @@ viewer-access SPI are internal, and no other module may depend on it. The helper
 dependency leaves — they may use only each other, the entity model and the repositories
 (`ArchitectureTest.LEAF_HELPER_CLASSES`).
 
+Phase 2 (plan §7.4) moves whole domains out of the layer packages, each into
+`<module>.api` (what other modules use), `<module>.internal` (entities, repositories, services,
+mappers no other module needs) and `<module>.web` (controllers and their REST DTOs):
+
+| Module | `api` | `internal` | `web` |
+| --- | --- | --- | --- |
+| `dashboard` | — (publishes nothing) | `Announcement`, `AnnouncementRepository`, `AnnouncementService` | `AnnouncementController`, `AnnouncementDto`, `AnnouncementMapper` |
+| `admin` | `SystemSettings` (setting read, system flag write) | `SystemSetting`, its repository, `SystemSettingService`, `SystemSettingMapper`, the setting records, `AndroidClientProperties`, `AndroidVersionPolicyReport` | `SystemSettingController`, `AppVersionPolicyController`, `SystemController`, `AppVersionPolicyDto`, `PingResponse` |
+
 The platform modules reach the domains only through SPIs they own and the domains implement
 (plan §5.3); Spring injects the implementations, so the platform names no domain class:
 
@@ -147,7 +156,8 @@ The platform modules reach the domains only through SPIs they own and the domain
 | Package | What lives there |
 | --- | --- |
 | `controller` | Thymeleaf page and fragment endpoints; AJAX mutation endpoints that return fragments; the domain-specific view shaping (`MissionDetailModelBuilder`, `BankDashboardViewAssembler`, …) |
-| `service` | The backend kernel — `BackendApiClient` with its catalogue cache and URI-template verbs, `BackendErrorMapper` (the one mapping of a failed call, a sealed `Outcome`), `BackendSideChannels` (the SSE relay and the live-sync probe) — plus `ParallelPageLoader`, the ingest handoff, live-sync presence, Markdown rendering |
+| `<domain>.client` | One typed backend client per domain (`AuditBackendClient`, `NotificationBackendClient`, …): a thin `@Service` over `BackendApiClient` that owns its domain's backend paths, passes every runtime value as a URI-template variable and returns typed records; a controller reaches the backend only through its domain's client (plan F3, `TypedBackendClientTest`) |
+| `service` | The backend kernel — `BackendApiClient` with its catalogue cache and URI-template verbs for every verb, `BackendErrorMapper` (the one mapping of a failed call, a sealed `Outcome`), `BackendSideChannels` (the SSE relay and the live-sync probe), `CatalogueCacheEviction` (the evictions a controller triggers after an admin write) — plus `ParallelPageLoader`, the ingest handoff, live-sync presence, Markdown rendering |
 | `model` | The hand-mirrored DTO records (`model.dto`) and the form objects (`model.form`) |
 | `view` | `MoneyFormat` |
 | `websocket` | `/ws/sync`, the handler and the Redis fanout |

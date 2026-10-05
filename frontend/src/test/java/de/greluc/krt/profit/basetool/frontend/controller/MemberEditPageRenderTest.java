@@ -77,7 +77,7 @@ class MemberEditPageRenderTest {
    */
   private @NotNull UUID stubMember() {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class)))
+    when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(id)))
         .thenReturn(
             new UserDto(
                 id,
@@ -145,7 +145,7 @@ class MemberEditPageRenderTest {
   @WithMockUser(roles = "ADMIN")
   void editPage_rendersTheFormPatternWithTabs() throws Exception {
     UUID id = stubMember();
-    when(backendApiClient.get(eq("/api/v1/users/" + id + "/memberships"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/users/{id}/memberships"), anyTypeRef(), eq(id)))
         .thenReturn(
             List.of(
                 new OrgUnitMembershipOptionDto(
@@ -192,7 +192,7 @@ class MemberEditPageRenderTest {
   @WithMockUser(roles = "ADMIN")
   void editPage_rendersTheMembershipEmptyState() throws Exception {
     UUID id = stubMember();
-    when(backendApiClient.get(eq("/api/v1/users/" + id + "/memberships"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/users/{id}/memberships"), anyTypeRef(), eq(id)))
         .thenReturn(List.of());
 
     String html = render(id, "members");

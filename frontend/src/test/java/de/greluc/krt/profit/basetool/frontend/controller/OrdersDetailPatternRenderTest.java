@@ -218,7 +218,7 @@ class OrdersDetailPatternRenderTest {
    * @param order the order the backend returns
    */
   private void stubOrder(@NotNull JobOrderDto order) {
-    when(backendApiClient.get(eq("/api/v1/orders/" + order.id()), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(order.id())))
         .thenReturn(order);
   }
 

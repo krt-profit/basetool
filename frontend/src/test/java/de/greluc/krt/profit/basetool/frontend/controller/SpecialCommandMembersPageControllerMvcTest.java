@@ -105,8 +105,9 @@ class SpecialCommandMembersPageControllerMvcTest {
     member.put("isMissionManager", false);
     member.put("isLead", false);
     member.put("version", 3);
-    when(backendApiClient.get(eq("/api/v1/special-commands/" + skId), anyTypeRef())).thenReturn(sc);
-    when(backendApiClient.get(eq("/api/v1/special-commands/" + skId + "/members"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/special-commands/{id}"), anyTypeRef(), eq(skId)))
+        .thenReturn(sc);
+    when(backendApiClient.get(eq("/api/v1/special-commands/{id}/members"), anyTypeRef(), eq(skId)))
         .thenReturn(List.of(member));
   }
 
@@ -226,13 +227,14 @@ class SpecialCommandMembersPageControllerMvcTest {
         .perform(get("/organisation/special-commands/" + skId))
         .andExpect(status().isForbidden());
 
-    verify(backendApiClient, never()).get(eq("/api/v1/special-commands/" + skId), anyTypeRef());
+    verify(backendApiClient, never())
+        .get(eq("/api/v1/special-commands/{id}"), anyTypeRef(), eq(skId));
   }
 
   @Test
   @WithMockUser(roles = "OFFICER")
   void detail_backendRefuses_returns403Page() throws Exception {
-    when(backendApiClient.get(eq("/api/v1/special-commands/" + skId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/special-commands/{id}"), anyTypeRef(), eq(skId)))
         .thenThrow(new BackendServiceException("forbidden", null, 403));
 
     mockMvc
@@ -243,7 +245,7 @@ class SpecialCommandMembersPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "OFFICER")
   void detail_backendFails_redirectsToBackUrlWithError() throws Exception {
-    when(backendApiClient.get(eq("/api/v1/special-commands/" + skId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/special-commands/{id}"), anyTypeRef(), eq(skId)))
         .thenThrow(new BackendServiceException("backend down", null, 503));
 
     mockMvc

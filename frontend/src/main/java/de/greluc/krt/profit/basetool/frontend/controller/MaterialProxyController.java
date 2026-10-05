@@ -62,7 +62,7 @@ public class MaterialProxyController {
   @PreAuthorize("isAuthenticated()")
   public List<Map<String, Object>> getMaterialTerminals(@PathVariable UUID id) {
     List<Map<String, Object>> response =
-        backendApiClient.get("/api/v1/materials/" + id + "/terminals", MAP_LIST_TYPE);
+        backendApiClient.get("/api/v1/materials/{id}/terminals", MAP_LIST_TYPE, id);
     return response != null ? response : List.of();
   }
 
@@ -81,11 +81,12 @@ public class MaterialProxyController {
       @RequestParam UUID shipId, @RequestParam(required = false) List<String> starSystemNames) {
 
     StringBuilder uriTemplate =
-        new StringBuilder("/api/v1/materials/profit-calculation?shipId=").append(shipId);
+        new StringBuilder("/api/v1/materials/profit-calculation?shipId={shipId}");
     List<Object> uriVariables = new ArrayList<>();
+    uriVariables.add(shipId);
     if (starSystemNames != null) {
       for (String starSystemName : starSystemNames) {
-        uriTemplate.append("&starSystemNames={f").append(uriVariables.size()).append('}');
+        uriTemplate.append("&starSystemNames={starSystemName}");
         uriVariables.add(starSystemName);
       }
     }

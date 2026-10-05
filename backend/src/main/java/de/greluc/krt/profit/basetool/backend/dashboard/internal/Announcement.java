@@ -17,8 +17,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model;
+package de.greluc.krt.profit.basetool.backend.dashboard.internal;
 
+import de.greluc.krt.profit.basetool.backend.model.AbstractEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;

@@ -286,7 +286,7 @@ public class MissionWriteController {
           }
           out.put("version", body.get("version") != null ? body.get("version") : 0L);
           backendApiClient.put("/api/v1/missions/{id}/party-lead", out, Void.class, id);
-          MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION);
+          MissionDto mission = backendApiClient.get("/api/v1/missions/{id}", MISSION, id);
           return ResponseEntity.ok(mission);
         });
   }
@@ -399,7 +399,7 @@ public class MissionWriteController {
       return ResponseEntity.badRequest().build();
     }
     try {
-      MissionDto current = backendApiClient.get("/api/v1/missions/" + id, MissionDto.class);
+      MissionDto current = backendApiClient.get("/api/v1/missions/{id}", MissionDto.class, id);
       if (current == null) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
       }
@@ -418,7 +418,7 @@ public class MissionWriteController {
       schedulePatch.put("version", request.version());
 
       backendApiClient.patch("/api/v1/missions/{id}/schedule", schedulePatch, Void.class, id);
-      MissionDto refreshed = backendApiClient.get("/api/v1/missions/" + id, MissionDto.class);
+      MissionDto refreshed = backendApiClient.get("/api/v1/missions/{id}", MissionDto.class, id);
       return ResponseEntity.ok(refreshed);
     } catch (BackendServiceException e) {
       log.debug("Update actual time failed with status {}: {}", e.getStatusCode(), e.getMessage());
@@ -977,7 +977,8 @@ public class MissionWriteController {
         () -> {
           applyMissionUpdate(id, form);
           liveSyncLocalBus.publish("missions", MISSIONS_LIST_SECTION);
-          MissionDto refreshed = backendApiClient.get("/api/v1/missions/" + id, MissionDto.class);
+          MissionDto refreshed =
+              backendApiClient.get("/api/v1/missions/{id}", MissionDto.class, id);
           Map<String, Object> versions = new LinkedHashMap<>();
           versions.put("version", refreshed.version());
           versions.put("coreVersion", refreshed.coreVersion());
@@ -1156,7 +1157,7 @@ public class MissionWriteController {
       out.put("userId", userId);
       out.put("version", body.get("version") != null ? body.get("version") : 0L);
       backendApiClient.put("/api/v1/missions/{id}/owner", out, Void.class, id);
-      MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION);
+      MissionDto mission = backendApiClient.get("/api/v1/missions/{id}", MISSION, id);
       return ResponseEntity.ok(mission);
     } catch (BackendServiceException e) {
       if (e.getStatusCode() == 409) {
@@ -1197,7 +1198,7 @@ public class MissionWriteController {
                   : null);
           out.put("version", body.get("version") != null ? body.get("version") : 0L);
           backendApiClient.put("/api/v1/missions/{id}/owning-org-unit", out, Void.class, id);
-          MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION);
+          MissionDto mission = backendApiClient.get("/api/v1/missions/{id}", MISSION, id);
           return ResponseEntity.ok(mission);
         });
   }

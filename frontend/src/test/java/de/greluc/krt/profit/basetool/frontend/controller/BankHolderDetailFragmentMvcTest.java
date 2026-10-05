@@ -131,11 +131,12 @@ class BankHolderDetailFragmentMvcTest {
   @WithMockUser(roles = "BANK_EMPLOYEE")
   void holderDetail_rendersHeaderAndHistory() throws Exception {
     UUID holderId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/bank/holders/" + holderId), eq(BankHolderDto.class)))
+    when(backendApiClient.get(
+            eq("/api/v1/bank/holders/{id}"), eq(BankHolderDto.class), eq(holderId)))
         .thenReturn(
             new BankHolderDto(
                 holderId, UUID.randomUUID(), "greluc", true, new BigDecimal("1000000"), false, 0L));
-    when(backendApiClient.get(contains("/transactions"), anyTypeRef()))
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef(), eq(holderId), eq(0)))
         .thenReturn(
             new PageResponse<>(
                 List.of(depositRow(), umbuchungRow(), withdrawalRow()), 0, 20, 3L, 1, List.of()));
@@ -168,7 +169,7 @@ class BankHolderDetailFragmentMvcTest {
   @WithMockUser(roles = "BANK_EMPLOYEE")
   void holderDetail_fragmentHolderBookings_rendersOnlyHistoryFragment() throws Exception {
     UUID holderId = UUID.randomUUID();
-    when(backendApiClient.get(contains("/transactions"), anyTypeRef()))
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef(), eq(holderId), eq(0)))
         .thenReturn(new PageResponse<>(List.of(umbuchungRow()), 0, 20, 25L, 2, List.of()));
 
     mockMvc

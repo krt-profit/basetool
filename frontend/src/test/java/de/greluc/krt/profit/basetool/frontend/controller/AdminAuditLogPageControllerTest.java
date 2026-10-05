@@ -27,11 +27,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
-import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.audit.client.AuditBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.AuditEventDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.AuditRowView;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAuditEventDto;
@@ -51,7 +51,6 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 import tools.jackson.databind.JsonNode;
@@ -90,7 +89,7 @@ class AdminAuditLogPageControllerTest {
   @BeforeEach
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
-    controller = new AdminAuditLogPageController(backendApiClient);
+    controller = new AdminAuditLogPageController(new AuditBackendClient(backendApiClient));
   }
 
   @Test
@@ -141,7 +140,7 @@ class AdminAuditLogPageControllerTest {
             null,
             "qty=5.0",
             "basetool-android");
-    when(backendApiClient.get(contains("/api/v1/audit/INVENTORY"), anyTypeRef()))
+    when(backendApiClient.get(contains("/api/v1/audit/{domain}"), anyTypeRef(), eq("INVENTORY")))
         .thenReturn(new PageResponse<>(List.of(genericRow), 0, 50, 1, 1, List.of()));
 
     String view = controller.auditLog("INVENTORY", null, null, null, null, null, 0, null, model);
@@ -171,7 +170,7 @@ class AdminAuditLogPageControllerTest {
             null,
             null,
             "basetool-frontend");
-    when(backendApiClient.get(contains("/api/v1/audit/PROMOTION"), anyTypeRef()))
+    when(backendApiClient.get(contains("/api/v1/audit/{domain}"), anyTypeRef(), eq("PROMOTION")))
         .thenReturn(new PageResponse<>(List.of(genericRow), 0, 50, 1, 1, List.of()));
 
     String view = controller.auditLog("PROMOTION", null, null, null, null, null, 0, null, model);
@@ -191,8 +190,7 @@ class AdminAuditLogPageControllerTest {
   @Test
   void roleTab_offersRolePermissionsChangedFilterWithLabel() throws Exception {
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(any(String.class), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    stubEveryTrailRead(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     controller.auditLog("ROLE", null, null, null, null, null, 0, null, model);
 
@@ -211,8 +209,7 @@ class AdminAuditLogPageControllerTest {
   @Test
   void unknownDomain_fallsBackToBankTab() {
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(any(String.class), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    stubEveryTrailRead(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     controller.auditLog("NONSENSE", null, null, null, null, null, 0, null, model);
 
@@ -222,8 +219,7 @@ class AdminAuditLogPageControllerTest {
   @Test
   void fragmentResults_returnsResultsFragmentSelector() {
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(any(String.class), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    stubEveryTrailRead(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     String view =
         controller.auditLog("REFINERY", null, null, null, null, null, 0, "results", model);
@@ -237,8 +233,7 @@ class AdminAuditLogPageControllerTest {
     assertTrue(produced.contains("HOLDER_TRANSFER"), "sanity: openapi should list HOLDER_TRANSFER");
 
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(any(String.class), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    stubEveryTrailRead(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
     controller.auditLog("BANK", null, null, null, null, null, 0, null, model);
     List<String> filterTypes = (List<String>) model.getAttribute("eventTypes");
     assertNotNull(filterTypes);
@@ -262,8 +257,7 @@ class AdminAuditLogPageControllerTest {
         produced.contains("MEMBERSHIP_GRANTED"),
         "sanity: openapi should list the ROLE-domain MEMBERSHIP_GRANTED");
 
-    when(backendApiClient.get(any(String.class), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    stubEveryTrailRead(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
     Set<String> filterable = new HashSet<>();
     for (String domain : GENERIC_DOMAINS) {
       Model model = new ConcurrentModel();
@@ -376,7 +370,7 @@ class AdminAuditLogPageControllerTest {
             UUID.randomUUID(),
             "rank=OL",
             "basetool-android");
-    when(backendApiClient.get(contains("/api/v1/audit/ROLE"), anyTypeRef()))
+    when(backendApiClient.get(contains("/api/v1/audit/{domain}"), anyTypeRef(), eq("ROLE")))
         .thenReturn(new PageResponse<>(List.of(row), 0, 50, 1, 1, List.of()));
 
     controller.auditLog("ROLE", null, null, null, null, "basetool-android", 0, null, model);
@@ -411,7 +405,7 @@ class AdminAuditLogPageControllerTest {
                     Instant.now(),
                     null,
                     0L)));
-    when(backendApiClient.get(contains("/api/v1/audit/INVENTORY"), anyTypeRef()))
+    when(backendApiClient.get(contains("/api/v1/audit/{domain}"), anyTypeRef(), eq("INVENTORY")))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     controller.auditLog("INVENTORY", null, null, null, null, "versekit", 0, null, model);
@@ -426,8 +420,7 @@ class AdminAuditLogPageControllerTest {
   @Test
   void unknownClientFilter_isDroppedRatherThanRelayed() {
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(any(String.class), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    stubEveryTrailRead(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     controller.auditLog("MISSION", null, null, null, null, "other&size=9999", 0, null, model);
 
@@ -441,8 +434,7 @@ class AdminAuditLogPageControllerTest {
   @Test
   void eventTypeFilter_isNarrowedToTheActiveTabsOwnTypes() {
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(any(String.class), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    stubEveryTrailRead(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     controller.auditLog("MISSION", null, null, null, "ACCOUNT_CREATED", null, 0, null, model);
 
@@ -459,8 +451,7 @@ class AdminAuditLogPageControllerTest {
     Instant from = Instant.parse("2026-01-01T00:00:00Z");
     Instant to = Instant.parse("2026-02-01T00:00:00Z");
     UUID actor = UUID.fromString("11111111-2222-3333-4444-555555555555");
-    when(backendApiClient.get(any(String.class), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    stubEveryTrailRead(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     controller.auditLog("MISSION", from, to, actor, null, null, 0, null, model);
 
@@ -473,8 +464,7 @@ class AdminAuditLogPageControllerTest {
   @Test
   void genericTab_keepsTheClientFilterAcrossPaging() {
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(any(String.class), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    stubEveryTrailRead(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     controller.auditLog("MISSION", null, null, null, null, "other", 0, null, model);
 
@@ -488,8 +478,7 @@ class AdminAuditLogPageControllerTest {
   @Test
   void bankTab_offersAndForwardsTheClientFilterToo() {
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(any(String.class), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    stubEveryTrailRead(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     controller.auditLog("BANK", null, null, null, null, "basetool-android", 0, null, model);
 
@@ -530,8 +519,7 @@ class AdminAuditLogPageControllerTest {
   @Test
   void everyOfferedClientFilterValue_carriesALabel() throws Exception {
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(any(String.class), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    stubEveryTrailRead(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
     controller.auditLog("INVENTORY", null, null, null, null, null, 0, null, model);
 
     List<String> clientIds = (List<String>) model.getAttribute("clientIds");
@@ -552,6 +540,8 @@ class AdminAuditLogPageControllerTest {
     Model model = new ConcurrentModel();
     when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenThrow(new RuntimeException("down"));
+    when(backendApiClient.get(any(String.class), anyTypeRef(), any()))
+        .thenThrow(new RuntimeException("down"));
 
     controller.auditLog("JOB_ORDER", null, null, null, null, null, 0, null, model);
 
@@ -564,11 +554,24 @@ class AdminAuditLogPageControllerTest {
    * @return the audit path with its query
    */
   private String auditUri() {
-    ArgumentCaptor<String> uri = ArgumentCaptor.forClass(String.class);
-    verify(backendApiClient, atLeastOnce()).get(uri.capture(), anyTypeRef());
-    return uri.getAllValues().stream()
+    List<String> uris = new java.util.ArrayList<>();
+    org.mockito.Mockito.mockingDetails(backendApiClient).getInvocations().stream()
+        .filter(i -> "get".equals(i.getMethod().getName()))
+        .forEach(i -> uris.add(i.getArgument(0)));
+    return uris.stream()
         .filter(u -> !u.startsWith("/api/v1/admin/exchange-clients"))
         .findFirst()
         .orElseThrow();
+  }
+
+  /**
+   * Answers every audit-trail read, the bank trail's plain read and an area trail's template read
+   * alike, with the given page.
+   *
+   * @param page the page every read returns
+   */
+  private void stubEveryTrailRead(PageResponse<?> page) {
+    when(backendApiClient.get(any(String.class), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(any(String.class), anyTypeRef(), any())).thenReturn(page);
   }
 }

@@ -107,15 +107,15 @@ public class AdminUexPageController {
   public String listData(Model model) {
     try {
       CompleteCatalog<Map<String, Object>> citiesCatalog =
-          loadCatalog("/api/v1/cities?size=10000&sort=name,asc");
+          loadCatalog("/api/v1/cities?size=10000&sort=name,asc&page={page}");
       CompleteCatalog<Map<String, Object>> stationsCatalog =
-          loadCatalog("/api/v1/space-stations?size=10000&sort=name,asc");
+          loadCatalog("/api/v1/space-stations?size=10000&sort=name,asc&page={page}");
       CompleteCatalog<Map<String, Object>> outpostsCatalog =
-          loadCatalog("/api/v1/outposts?size=10000&sort=name,asc");
+          loadCatalog("/api/v1/outposts?size=10000&sort=name,asc&page={page}");
       CompleteCatalog<Map<String, Object>> poisCatalog =
-          loadCatalog("/api/v1/pois?size=10000&sort=name,asc");
+          loadCatalog("/api/v1/pois?size=10000&sort=name,asc&page={page}");
       CompleteCatalog<Map<String, Object>> terminalsCatalog =
-          loadCatalog("/api/v1/terminals?size=10000&sort=name,asc");
+          loadCatalog("/api/v1/terminals?size=10000&sort=name,asc&page={page}");
 
       List<CityDto> cities = parseCities(citiesCatalog.items());
       List<SpaceStationDto> stations = parseStations(stationsCatalog.items());
@@ -229,7 +229,7 @@ public class AdminUexPageController {
       @RequestParam boolean hidden,
       RedirectAttributes redirectAttributes) {
     try {
-      TerminalDto current = backendApiClient.get("/api/v1/terminals/" + id, TerminalDto.class);
+      TerminalDto current = backendApiClient.get("/api/v1/terminals/{id}", TerminalDto.class, id);
       TerminalDto body =
           new TerminalDto(
               id,
@@ -315,7 +315,8 @@ public class AdminUexPageController {
         log,
         "toggle terminal visibility (ajax)",
         () -> {
-          TerminalDto current = backendApiClient.get("/api/v1/terminals/" + id, TerminalDto.class);
+          TerminalDto current =
+              backendApiClient.get("/api/v1/terminals/{id}", TerminalDto.class, id);
           TerminalDto body =
               new TerminalDto(
                   id,
@@ -538,15 +539,13 @@ public class AdminUexPageController {
 
   /**
    * Walks every page of one UEX-entity resource into a complete catalogue (REQ-ADMIN-001,
-   * ADR-0102). The zero-based page index is appended to the given query string, which already
-   * carries {@code size} and {@code sort}.
+   * ADR-0102). The zero-based page index is expanded into the template's {@code {page}} variable.
    *
-   * @param resource backend path plus query string, without a {@code page} parameter
+   * @param uriTemplate backend path plus literal query string ending in {@code &page={page}}
    * @return the assembled catalogue of raw {@code Map} rows; never {@code null}
    */
-  private CompleteCatalog<Map<String, Object>> loadCatalog(String resource) {
-    return CatalogPages.fetchAll(
-        page -> backendApiClient.get(resource + "&page=" + page, MAP_PAGE_TYPE));
+  private CompleteCatalog<Map<String, Object>> loadCatalog(String uriTemplate) {
+    return CatalogPages.fetchAll(page -> backendApiClient.get(uriTemplate, MAP_PAGE_TYPE, page));
   }
 
   private List<CityDto> parseCities(List<Map<String, Object>> rows) {

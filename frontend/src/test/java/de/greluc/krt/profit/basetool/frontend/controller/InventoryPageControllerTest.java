@@ -50,6 +50,12 @@ class InventoryPageControllerTest {
    */
   private static final ParallelPageLoader PARALLEL = new ParallelPageLoader();
 
+  private static final String MATERIAL_DRILLDOWN =
+      "/api/v1/inventory/material/{id}?page={page}&size={size}";
+
+  private static final String GAME_ITEM_DRILLDOWN =
+      "/api/v1/inventory/game-item/{id}?page={page}&size={size}";
+
   private BackendApiClient backendApiClient;
   private InventoryPageController controller;
   private InventoryWriteController writeController;
@@ -79,7 +85,7 @@ class InventoryPageControllerTest {
     Model model = new ConcurrentModel();
     PageResponse<AggregatedInventoryDto> page =
         new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     String view = controller.viewAggregatedInventory(null, null, null, null, model);
 
@@ -91,7 +97,7 @@ class InventoryPageControllerTest {
   @Test
   void viewAggregatedInventory_shouldHandleException() {
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(anyString(), anyTypeRef()))
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
         .thenThrow(new RuntimeException("Backend error"));
 
     String view = controller.viewAggregatedInventory(null, null, null, null, model);
@@ -105,7 +111,7 @@ class InventoryPageControllerTest {
     Model model = new ConcurrentModel();
     PageResponse<AggregatedInventoryDto> page =
         new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     String view = controller.viewAggregatedInventory(null, null, null, "results", model);
 
@@ -118,7 +124,7 @@ class InventoryPageControllerTest {
     UUID materialId = UUID.randomUUID();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 0, 50, 0, 1, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     String view = controller.viewMaterialInventory(materialId, null, null, null, model);
 
@@ -139,7 +145,7 @@ class InventoryPageControllerTest {
     UUID materialId = UUID.randomUUID();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 0, 50, 0, 1, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
     when(backendApiClient.getCached(any(), anyTypeRef()))
         .thenReturn(
             List.of(
@@ -157,12 +163,12 @@ class InventoryPageControllerTest {
     UUID materialId = UUID.randomUUID();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 3, 100, 350, 4, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     controller.viewMaterialInventory(materialId, 3, 100, null, model);
 
     verify(backendApiClient)
-        .get(eq("/api/v1/inventory/material/" + materialId + "?page=3&size=100"), anyTypeRef());
+        .get(eq(MATERIAL_DRILLDOWN), anyTypeRef(), eq(materialId), eq(3), eq(100));
   }
 
   @Test
@@ -171,12 +177,12 @@ class InventoryPageControllerTest {
     UUID materialId = UUID.randomUUID();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 0, 50, 0, 1, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     controller.viewMaterialInventory(materialId, -1, 1000, null, model);
 
     verify(backendApiClient)
-        .get(eq("/api/v1/inventory/material/" + materialId + "?page=0&size=50"), anyTypeRef());
+        .get(eq(MATERIAL_DRILLDOWN), anyTypeRef(), eq(materialId), eq(0), eq(50));
   }
 
   @Test
@@ -185,13 +191,13 @@ class InventoryPageControllerTest {
     UUID materialId = UUID.randomUUID();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 1, 50, 120, 3, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     String view = controller.viewMaterialInventory(materialId, 1, null, "results", model);
 
     assertEquals("inventory-material :: inventoryMaterialResults", view);
     verify(backendApiClient, never()).getCached(any(), anyTypeRef());
-    verify(backendApiClient, times(1)).get(anyString(), anyTypeRef());
+    verify(backendApiClient, times(1)).get(anyString(), anyTypeRef(), any(Object[].class));
   }
 
   @Test
@@ -200,7 +206,7 @@ class InventoryPageControllerTest {
     UUID gameItemId = UUID.randomUUID();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 2, 100, 250, 3, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     String view = controller.viewGameItemInventory(gameItemId, 2, 100, null, model);
 
@@ -210,7 +216,7 @@ class InventoryPageControllerTest {
     assertEquals(List.of(50, 100, 200), model.getAttribute("pageSizes"));
     assertEquals(gameItemId, model.getAttribute("selectedGameItemId"));
     verify(backendApiClient)
-        .get(eq("/api/v1/inventory/game-item/" + gameItemId + "?page=2&size=100"), anyTypeRef());
+        .get(eq(GAME_ITEM_DRILLDOWN), anyTypeRef(), eq(gameItemId), eq(2), eq(100));
   }
 
   @Test
@@ -219,32 +225,35 @@ class InventoryPageControllerTest {
     UUID gameItemId = UUID.randomUUID();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 0, 50, 0, 1, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     String view = controller.viewGameItemInventory(gameItemId, null, 1000, "results", model);
 
     assertEquals("inventory-game-item :: inventoryGameItemResults", view);
     verify(backendApiClient)
-        .get(eq("/api/v1/inventory/game-item/" + gameItemId + "?page=0&size=50"), anyTypeRef());
+        .get(eq(GAME_ITEM_DRILLDOWN), anyTypeRef(), eq(gameItemId), eq(0), eq(50));
   }
 
   @Test
   void viewMaterialInventory_clampsOutOfRangePageToLastPage() {
     Model model = new ConcurrentModel();
     UUID materialId = UUID.randomUUID();
-    String base = "/api/v1/inventory/material/" + materialId;
     PageResponse<InventoryItemDto> overrun =
         new PageResponse<>(List.of(), 5, 50, 40, 1, Collections.emptyList());
     PageResponse<InventoryItemDto> lastPage =
         new PageResponse<>(List.of(), 0, 50, 40, 1, Collections.emptyList());
-    when(backendApiClient.get(eq(base + "?page=5&size=50"), anyTypeRef())).thenReturn(overrun);
-    when(backendApiClient.get(eq(base + "?page=0&size=50"), anyTypeRef())).thenReturn(lastPage);
+    when(backendApiClient.get(eq(MATERIAL_DRILLDOWN), anyTypeRef(), eq(materialId), eq(5), eq(50)))
+        .thenReturn(overrun);
+    when(backendApiClient.get(eq(MATERIAL_DRILLDOWN), anyTypeRef(), eq(materialId), eq(0), eq(50)))
+        .thenReturn(lastPage);
 
     controller.viewMaterialInventory(materialId, 5, null, null, model);
 
     assertSame(lastPage, model.getAttribute("inventoryMaterialPage"));
-    verify(backendApiClient).get(eq(base + "?page=5&size=50"), anyTypeRef());
-    verify(backendApiClient).get(eq(base + "?page=0&size=50"), anyTypeRef());
+    verify(backendApiClient)
+        .get(eq(MATERIAL_DRILLDOWN), anyTypeRef(), eq(materialId), eq(5), eq(50));
+    verify(backendApiClient)
+        .get(eq(MATERIAL_DRILLDOWN), anyTypeRef(), eq(materialId), eq(0), eq(50));
   }
 
   @Test
@@ -253,18 +262,17 @@ class InventoryPageControllerTest {
     UUID materialId = UUID.randomUUID();
     PageResponse<InventoryItemDto> empty =
         new PageResponse<>(List.of(), 0, 50, 0, 0, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(empty);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(empty);
 
     controller.viewMaterialInventory(materialId, 0, null, null, model);
 
-    verify(backendApiClient, times(1)).get(anyString(), anyTypeRef());
+    verify(backendApiClient, times(1)).get(anyString(), anyTypeRef(), any(Object[].class));
   }
 
   @Test
   void viewGameItemInventory_clampsOverrunPageAndResolvesTitleFromLastPage() {
     Model model = new ConcurrentModel();
     UUID gameItemId = UUID.randomUUID();
-    String base = "/api/v1/inventory/game-item/" + gameItemId;
     PageResponse<InventoryItemDto> overrun =
         new PageResponse<>(List.of(), 3, 50, 20, 1, Collections.emptyList());
     InventoryItemDto row =
@@ -289,8 +297,10 @@ class InventoryPageControllerTest {
             null);
     PageResponse<InventoryItemDto> lastPage =
         new PageResponse<>(List.of(row), 0, 50, 20, 1, Collections.emptyList());
-    when(backendApiClient.get(eq(base + "?page=3&size=50"), anyTypeRef())).thenReturn(overrun);
-    when(backendApiClient.get(eq(base + "?page=0&size=50"), anyTypeRef())).thenReturn(lastPage);
+    when(backendApiClient.get(eq(GAME_ITEM_DRILLDOWN), anyTypeRef(), eq(gameItemId), eq(3), eq(50)))
+        .thenReturn(overrun);
+    when(backendApiClient.get(eq(GAME_ITEM_DRILLDOWN), anyTypeRef(), eq(gameItemId), eq(0), eq(50)))
+        .thenReturn(lastPage);
 
     controller.viewGameItemInventory(gameItemId, 3, null, null, model);
 

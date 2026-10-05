@@ -151,7 +151,8 @@ class RefineryOrderDetailFragmentMvcTest {
             null,
             1L,
             null);
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
+    when(backendApiClient.get(
+            eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(orderId)))
         .thenReturn(order);
   }
 
@@ -232,7 +233,8 @@ class RefineryOrderDetailFragmentMvcTest {
   void fragmentLoadFailure_degradesToTheSectionError_neverARedirect() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
+    when(backendApiClient.get(
+            eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(orderId)))
         .thenThrow(
             new BackendServiceException(
                 "boom", null, 500, null, null, Collections.emptyList(), null));
@@ -246,7 +248,8 @@ class RefineryOrderDetailFragmentMvcTest {
   void fullPageLoadFailure_stillRedirectsToTheList() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
+    when(backendApiClient.get(
+            eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(orderId)))
         .thenThrow(
             new BackendServiceException(
                 "boom", null, 500, null, null, Collections.emptyList(), null));

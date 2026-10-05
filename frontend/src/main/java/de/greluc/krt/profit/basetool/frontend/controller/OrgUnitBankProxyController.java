@@ -408,9 +408,11 @@ public class OrgUnitBankProxyController {
       @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
       @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
     String uri =
-        UriComponentsBuilder.fromPath("/api/v1/org-units/bank/accounts/" + id + "/statement")
+        UriComponentsBuilder.fromPath("/api/v1/org-units/bank/accounts/{id}/statement")
             .queryParam("from", from)
             .queryParam("to", to)
+            .encode()
+            .build()
             .toUriString();
     byte[] pdf =
         withBackendStatus(
@@ -421,7 +423,7 @@ public class OrgUnitBankProxyController {
                     webClient ->
                         webClient
                             .get()
-                            .uri(uri)
+                            .uri(uri, id)
                             .headers(
                                 h -> {
                                   if (userTimeZone != null && !userTimeZone.isBlank()) {

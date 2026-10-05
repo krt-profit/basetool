@@ -83,7 +83,7 @@ class BankInPlaceFragmentMvcTest {
   @WithMockUser(roles = {"BANK_MANAGEMENT"})
   void manage_fragmentManageBody_rendersPanelWithoutTheCreationModals() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
-    when(backendApiClient.get(startsWith("/api/v1/bank/accounts?"), anyTypeRef()))
+    when(backendApiClient.get(startsWith("/api/v1/bank/accounts?"), anyTypeRef(), eq(0), eq(25)))
         .thenReturn(
             new PageResponse<>(
                 List.of(account(UUID.randomUUID(), "KB-0001", "ACTIVE", "0")),
@@ -144,9 +144,9 @@ class BankInPlaceFragmentMvcTest {
                 java.util.List.of()));
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(
-            eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
+            eq("/api/v1/bank/accounts/{id}"), eq(BankAccountDetailDto.class), eq(accountId)))
         .thenReturn(detail);
-    when(backendApiClient.get(contains("/transactions"), anyTypeRef()))
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef(), eq(accountId)))
         .thenReturn(
             new PageResponse<BankBookingDto>(List.of(), 0, 20, 0, 0, Collections.emptyList()));
     when(backendApiClient.get(eq("/api/v1/bank/holders"), anyTypeRef()))

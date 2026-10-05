@@ -120,7 +120,8 @@ class RefineryOrderDurationTest {
             null,
             1L,
             null);
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
+    when(backendApiClient.get(
+            eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(orderId)))
         .thenReturn(order);
 
     mockMvc
@@ -212,7 +213,8 @@ class RefineryOrderDurationTest {
     verify(backendApiClient, org.mockito.Mockito.atLeastOnce())
         .get(
             org.mockito.ArgumentMatchers.contains("/api/v1/refinery-orders/my-orders"),
-            anyTypeRef());
+            anyTypeRef(),
+            any(Object[].class));
   }
 
   @Test
@@ -223,11 +225,15 @@ class RefineryOrderDurationTest {
         .andExpect(model().attribute("onlyMine", false));
 
     verify(backendApiClient, org.mockito.Mockito.atLeastOnce())
-        .get(org.mockito.ArgumentMatchers.contains("/api/v1/refinery-orders/all"), anyTypeRef());
+        .get(
+            org.mockito.ArgumentMatchers.contains("/api/v1/refinery-orders/all"),
+            anyTypeRef(),
+            any(Object[].class));
     verify(backendApiClient, org.mockito.Mockito.never())
         .get(
             org.mockito.ArgumentMatchers.contains("/api/v1/refinery-orders/my-orders"),
-            anyTypeRef());
+            anyTypeRef(),
+            any(Object[].class));
   }
 
   @Test

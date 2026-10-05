@@ -329,11 +329,12 @@ class MemberManagementControllerTest {
     void showsTheMembersRsiHandleReadOnly() {
       UUID id = UUID.randomUUID();
       Model model = new ConcurrentModel();
-      when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class)))
+      when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(id)))
           .thenReturn(newUser("alice"));
       when(backendApiClient.get(
-              eq("/api/v1/users/" + id + "/rsi-handle"),
-              de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef()))
+              eq("/api/v1/users/{id}/rsi-handle"),
+              de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef(),
+              eq(id)))
           .thenReturn(java.util.Map.of("rsiHandle", "Alice_RSI"));
 
       controller.editMember(id, null, model, redirectAttributes);
@@ -345,11 +346,12 @@ class MemberManagementControllerTest {
     void anUnreadableRsiHandleStillRendersThePage() {
       UUID id = UUID.randomUUID();
       Model model = new ConcurrentModel();
-      when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class)))
+      when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(id)))
           .thenReturn(newUser("alice"));
       when(backendApiClient.get(
-              eq("/api/v1/users/" + id + "/rsi-handle"),
-              de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef()))
+              eq("/api/v1/users/{id}/rsi-handle"),
+              de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef(),
+              eq(id)))
           .thenThrow(new IllegalStateException("backend down"));
 
       String view = controller.editMember(id, null, model, redirectAttributes);
@@ -363,7 +365,8 @@ class MemberManagementControllerTest {
       UUID id = UUID.randomUUID();
       UserDto user = newUser("alice");
       Model model = new ConcurrentModel();
-      when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class))).thenReturn(user);
+      when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(id)))
+          .thenReturn(user);
 
       String view = controller.editMember(id, null, model, redirectAttributes);
 
@@ -387,7 +390,8 @@ class MemberManagementControllerTest {
               5, "old desc", "alice", 1L, null, null, null, null, null, null, null, null);
       model.addAttribute("memberEditForm", existingForm);
 
-      when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class))).thenReturn(user);
+      when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(id)))
+          .thenReturn(user);
 
       controller.editMember(id, "profile", model, redirectAttributes);
 
@@ -421,7 +425,8 @@ class MemberManagementControllerTest {
               null);
       model.addAttribute("memberEditForm", existingForm);
 
-      when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class))).thenReturn(user);
+      when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(id)))
+          .thenReturn(user);
 
       controller.editMember(id, "different-source", model, redirectAttributes);
 
@@ -435,7 +440,7 @@ class MemberManagementControllerTest {
       Model model = new ConcurrentModel();
       doThrow(new RuntimeException("not found"))
           .when(backendApiClient)
-          .get(anyString(), anyClass());
+          .get(anyString(), anyClass(), any(Object[].class));
 
       String view = controller.editMember(id, null, model, redirectAttributes);
 
@@ -449,11 +454,14 @@ class MemberManagementControllerTest {
       UUID id = UUID.randomUUID();
       UserDto user = newUser("alice");
       Model model = new ConcurrentModel();
-      when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class))).thenReturn(user);
+      when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(id)))
+          .thenReturn(user);
       doThrow(new RuntimeException("detail unavailable"))
           .when(backendApiClient)
           .get(
-              eq("/api/v1/users/" + id + "/memberships/detail"), eq(MembershipDeltaResponse.class));
+              eq("/api/v1/users/{id}/memberships/detail"),
+              eq(MembershipDeltaResponse.class),
+              eq(id));
 
       String view = controller.editMember(id, null, model, redirectAttributes);
 
@@ -475,7 +483,8 @@ class MemberManagementControllerTest {
       UUID squadronId = UUID.randomUUID();
       UserDto user = newUser("alice");
       Model model = new ConcurrentModel();
-      when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class))).thenReturn(user);
+      when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(id)))
+          .thenReturn(user);
       MembershipDeltaResponse detail =
           new MembershipDeltaResponse(
               List.of(
@@ -490,7 +499,9 @@ class MemberManagementControllerTest {
                       null,
                       1L)));
       when(backendApiClient.get(
-              eq("/api/v1/users/" + id + "/memberships/detail"), eq(MembershipDeltaResponse.class)))
+              eq("/api/v1/users/{id}/memberships/detail"),
+              eq(MembershipDeltaResponse.class),
+              eq(id)))
           .thenReturn(detail);
 
       controller.editMember(id, null, model, redirectAttributes);
@@ -517,7 +528,8 @@ class MemberManagementControllerTest {
       MemberEditForm form =
           new MemberEditForm(5, "x", "alice", 1L, null, null, null, null, null, null, null, null);
 
-      when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class))).thenReturn(user);
+      when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(id)))
+          .thenReturn(user);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(true);
 
@@ -687,7 +699,7 @@ class MemberManagementControllerTest {
               5, "desc", "Alice", 4L, null, null, null, null, null, null, null, null);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
-      when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class)))
+      when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(id)))
           .thenReturn(newUser("alice"));
 
       org.springframework.http.ResponseEntity<Object> response =

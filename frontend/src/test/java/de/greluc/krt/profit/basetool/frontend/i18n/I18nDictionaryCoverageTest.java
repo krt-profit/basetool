@@ -65,6 +65,17 @@ class I18nDictionaryCoverageTest {
   private static final Pattern FALLBACK =
       Pattern.compile("\\|\\|\\s*'([^'\\n]*[A-ZÄÖÜ ][^'\\n]*)'|\\|\\|\\s*'([A-Za-zäöüß][^'\\n]*)'");
 
+  /** A template literal's body. */
+  private static final Pattern TEMPLATE_LITERAL = Pattern.compile("`((?:[^`\\\\]++|\\\\.)*+)`");
+
+  /** Text of at least three letters between two tags, entities aside. */
+  private static final Pattern TEXT_NODE = Pattern.compile(">([^<>&]*\\p{L}{3,}[^<>]*)<");
+
+  /** A literal with a letter after a {@code typeof X !== 'undefined' ? X :} guard. */
+  private static final Pattern GUARDED_FALLBACK =
+      Pattern.compile(
+          "typeof\\s+(\\w+)\\s*!==\\s*'undefined'\\s*\\?\\s*\\1\\s*:\\s*['\"]([^'\"]*\\p{L}[^'\"]*)['\"]");
+
   /**
    * Lists every script below a root, in subfolders too, so a per-domain folder stays covered.
    *
@@ -269,6 +280,73 @@ class I18nDictionaryCoverageTest {
   }
 
   /**
+   * No script writes a literal text node into the markup it builds, nor falls back to a literal
+   * after a {@code typeof X !== 'undefined'} guard.
+   *
+   * @throws IOException if a script cannot be read
+   */
+  @Test
+  void noScriptHardcodesATextNodeOrAGuardedFallback() throws IOException {
+    assertThat(hardcodedTexts(JS))
+        .as("hardcoded UI text in a script; read it from the page bootstrap via window.krtI18nText")
+        .isEmpty();
+  }
+
+  /**
+   * Collects every literal text between two tags of a template literal and every literal after a
+   * {@code typeof X !== 'undefined' ? X :} guard, in the scripts below a root.
+   *
+   * @param root the scripts root, walked recursively
+   * @return one {@code script: 'text'} entry per hit
+   * @throws IOException if a script cannot be read
+   */
+  static TreeSet<String> hardcodedTexts(Path root) throws IOException {
+    TreeSet<String> hits = new TreeSet<>();
+    for (Path file : scripts(root)) {
+      String js = Files.readString(file, StandardCharsets.UTF_8).replaceAll("(?s)/\\*.*?\\*/", "");
+      Matcher literal = TEMPLATE_LITERAL.matcher(js);
+      while (literal.find()) {
+        Matcher text = TEXT_NODE.matcher(withoutInterpolations(literal.group(1)));
+        while (text.find()) {
+          hits.add(nameOf(root, file) + ": '" + text.group(1).strip() + "'");
+        }
+      }
+      Matcher guarded = GUARDED_FALLBACK.matcher(js);
+      while (guarded.find()) {
+        hits.add(nameOf(root, file) + ": '" + guarded.group(2) + "'");
+      }
+    }
+    return hits;
+  }
+
+  /**
+   * Removes every {@code ${…}} interpolation, nested braces included, from a template literal body.
+   *
+   * @param body the template literal body
+   * @return the static text only
+   */
+  static String withoutInterpolations(String body) {
+    StringBuilder out = new StringBuilder(body.length());
+    int depth = 0;
+    for (int i = 0; i < body.length(); i++) {
+      char c = body.charAt(i);
+      if (depth == 0 && c == '$' && i + 1 < body.length() && body.charAt(i + 1) == '{') {
+        depth = 1;
+        i++;
+      } else if (depth > 0) {
+        if (c == '{') {
+          depth++;
+        } else if (c == '}') {
+          depth--;
+        }
+      } else {
+        out.append(c);
+      }
+    }
+    return out.toString();
+  }
+
+  /**
    * A script in a per-domain subfolder is scanned for keys and for literal fallbacks alike.
    *
    * @param root a temporary scripts root
@@ -280,7 +358,10 @@ class I18nDictionaryCoverageTest {
     Files.createDirectories(script.getParent());
     Files.writeString(
         script,
-        "const t = window.krtI18nText(el, 'missionPanel.title');\nconst f = x || 'Hallo Welt';\n",
+        "const t = window.krtI18nText(el, 'missionPanel.title');\nconst f = x || 'Hallo Welt';\n"
+            + "const h = krtHtml`<td>${t}</td><div class=\"x\">Fehler beim Laden.</div>`;\n"
+            + "const g = typeof MSG_X !== 'undefined' ? MSG_X : 'Bitte wählen';\n"
+            + "const ok = krtHtml`<span>&times;</span><b>${t}</b>`;\n",
         StandardCharsets.UTF_8);
 
     assertThat(scripts(root)).containsExactly(script);
@@ -288,5 +369,9 @@ class I18nDictionaryCoverageTest {
         .containsEntry("missionPanel.title", "mission/detail/mission-panel.js");
     assertThat(literalFallbacks(root))
         .containsExactly("mission/detail/mission-panel.js: 'Hallo Welt'");
+    assertThat(hardcodedTexts(root))
+        .containsExactly(
+            "mission/detail/mission-panel.js: 'Bitte wählen'",
+            "mission/detail/mission-panel.js: 'Fehler beim Laden.'");
   }
 }

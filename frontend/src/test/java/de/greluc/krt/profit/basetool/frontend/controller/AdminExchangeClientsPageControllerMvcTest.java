@@ -317,7 +317,7 @@ class AdminExchangeClientsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void oneClientIsReturnedForTheEditForm() throws Exception {
     stubRegistry();
-    when(backendApiClient.get("/api/v1/admin/exchange-clients/" + ID, ExchangeClientDto.class))
+    when(backendApiClient.get("/api/v1/admin/exchange-clients/{id}", ExchangeClientDto.class, ID))
         .thenReturn(
             new ExchangeClientDto(
                 ID,
@@ -464,12 +464,13 @@ class AdminExchangeClientsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void theInstallationsAndARunsSkippedEntriesAreRelayed() throws Exception {
     when(backendApiClient.get(
-            eq("/api/v1/admin/exchange-clients/" + ID + "/undo/installations?since={since}"),
+            eq("/api/v1/admin/exchange-clients/{id}/undo/installations?since={since}"),
             anyTypeRef(),
+            eq(ID),
             eq("2026-09-27T12:00:00Z")))
         .thenReturn(List.of());
     when(backendApiClient.get(
-            "/api/v1/admin/exchange-undo-runs/" + RUN, ExchangeBulkUndoRunDetailDto.class))
+            "/api/v1/admin/exchange-undo-runs/{runId}", ExchangeBulkUndoRunDetailDto.class, RUN))
         .thenReturn(
             new ExchangeBulkUndoRunDetailDto(
                 run("COMPLETED"),

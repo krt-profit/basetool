@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -113,7 +114,8 @@ class ItemCollectionRenderTest {
             List.of(
                 new JobOrderItemStockEntryDto(
                     entryId, 7L, "Alice", ownerId, "Lorville", locationId, 4L, 3L, false)));
-    when(backendApiClient.get(contains("/item-stock"), anyTypeRef())).thenReturn(List.of(group));
+    when(backendApiClient.get(contains("/item-stock"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(List.of(group));
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenReturn(List.of(new LocationReferenceDto(locationId, "Lorville")));
 
@@ -161,7 +163,8 @@ class ItemCollectionRenderTest {
   void itemCollection_emptyStock_rendersEmptyState() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(contains("/item-stock"), anyTypeRef())).thenReturn(List.of());
+    when(backendApiClient.get(contains("/item-stock"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(List.of());
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenReturn(List.of());
 

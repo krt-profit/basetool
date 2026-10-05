@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -61,10 +62,11 @@ class OrdersListPatternRenderTest {
   private static final String ORDER_ID = "00000000-0000-0000-0000-000000000042";
 
   private static final String QUEUE_URL =
-      "/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS";
+      "/api/v1/orders?page={page}&size={size}&sort=priority,asc&status={status},{status}";
 
   private static final String REQUESTED_URL =
-      "/api/v1/orders/requested?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS";
+      "/api/v1/orders/requested?page={page}&size={size}&sort=priority,asc"
+          + "&status={status},{status}";
 
   @Autowired private WebApplicationContext context;
 
@@ -128,7 +130,9 @@ class OrdersListPatternRenderTest {
   @Test
   @WithMockUser
   void rendersTheListPattern() throws Exception {
-    when(backendApiClient.get(eq(QUEUE_URL), anyTypeRef())).thenReturn(onePage("OPEN"));
+    when(backendApiClient.get(
+            eq(QUEUE_URL), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS")))
+        .thenReturn(onePage("OPEN"));
 
     String html = render(true, "");
 
@@ -163,7 +167,8 @@ class OrdersListPatternRenderTest {
   @Test
   @WithMockUser
   void rendersTheEmptyState() throws Exception {
-    when(backendApiClient.get(eq(QUEUE_URL), anyTypeRef()))
+    when(backendApiClient.get(
+            eq(QUEUE_URL), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS")))
         .thenReturn(new PageResponse<>(List.<JobOrderDto>of(), 0, 100, 0L, 0, List.of()));
 
     String html = render(true, "");
@@ -179,12 +184,14 @@ class OrdersListPatternRenderTest {
   @Test
   @WithMockUser
   void mineScopeReadsTheRequestedList() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/orders/requested?"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/orders/requested?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(onePage("IN_PROGRESS"));
 
     String html = render(true, "scope=MINE");
 
-    verify(backendApiClient).get(eq(REQUESTED_URL), anyTypeRef());
+    verify(backendApiClient)
+        .get(eq(REQUESTED_URL), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS"));
     assertThat(html)
         .containsPattern("name=\"scope\" value=\"MINE\" checked=\"checked\"")
         .containsPattern("id=\"ordersSquadronField\"[^>]*hidden")
@@ -199,12 +206,19 @@ class OrdersListPatternRenderTest {
   @Test
   @WithMockUser
   void toProcessScopeReadsTheQueueOfTheCallersUnits() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef()))
+    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(onePage("OPEN").content(), 0, 100, 300L, 3, List.of()));
 
     String html = render(true, "scope=TO_PROCESS&squadronId=" + UUID.randomUUID());
 
-    verify(backendApiClient).get(eq(QUEUE_URL + "&toProcess=true"), anyTypeRef());
+    verify(backendApiClient)
+        .get(
+            eq(QUEUE_URL + "&toProcess=true"),
+            anyTypeRef(),
+            eq(0),
+            eq(100),
+            eq("OPEN"),
+            eq("IN_PROGRESS"));
     assertThat(html)
         .contains("data-testid=\"segment-scope-mine\"")
         .contains("data-testid=\"segment-scope-to_process\"")
@@ -221,12 +235,13 @@ class OrdersListPatternRenderTest {
   @Test
   @WithMockUser
   void allScopeSendsNoProcessingFlag() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef()))
+    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(onePage("OPEN"));
 
     String html = render(true, "scope=ALL");
 
-    verify(backendApiClient).get(eq(QUEUE_URL), anyTypeRef());
+    verify(backendApiClient)
+        .get(eq(QUEUE_URL), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS"));
     assertThat(html)
         .containsPattern("name=\"scope\" value=\"ALL\" checked=\"checked\"")
         .doesNotContainPattern("id=\"ordersSquadronField\"[^>]*hidden");
@@ -236,12 +251,14 @@ class OrdersListPatternRenderTest {
   @Test
   @WithMockUser
   void requesterSeesNoScopeSegment() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/orders/requested?"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/orders/requested?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(onePage("OPEN"));
 
     String html = render(false, "scope=ALL");
 
-    verify(backendApiClient).get(eq(REQUESTED_URL), anyTypeRef());
+    verify(backendApiClient)
+        .get(eq(REQUESTED_URL), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS"));
     assertThat(html)
         .contains("data-testid=\"order-row\"")
         .doesNotContain("data-testid=\"segment-scope-mine\"")
@@ -253,11 +270,13 @@ class OrdersListPatternRenderTest {
   @Test
   @WithMockUser
   void requesterAskingForToProcessStillReadsTheirOwnOrders() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/orders/requested?"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/orders/requested?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(onePage("OPEN"));
 
     render(false, "scope=TO_PROCESS");
 
-    verify(backendApiClient).get(eq(REQUESTED_URL), anyTypeRef());
+    verify(backendApiClient)
+        .get(eq(REQUESTED_URL), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS"));
   }
 }

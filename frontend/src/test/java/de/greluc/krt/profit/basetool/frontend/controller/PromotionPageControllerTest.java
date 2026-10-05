@@ -202,7 +202,8 @@ class PromotionPageControllerTest {
 
     when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(t));
-    when(backendApiClient.get(contains("/api/v1/promotion/categories/by-topic/"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/categories/by-topic/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of(c));
     when(backendApiClient.get(contains("/api/v1/promotion/evaluations/my"), anyTypeRef()))
         .thenReturn(List.of(eval));
@@ -284,11 +285,14 @@ class PromotionPageControllerTest {
 
     when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(topic(topic1, "T1", 0), topic(topic2, "T2", 1)));
-    when(backendApiClient.get(contains("/categories/by-topic/" + topic1 + "/all"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/categories/by-topic/{topicId}/all"), anyTypeRef(), eq(topic1.toString())))
         .thenReturn(List.of(c1a, c1b));
-    when(backendApiClient.get(contains("/categories/by-topic/" + topic2 + "/all"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/categories/by-topic/{topicId}/all"), anyTypeRef(), eq(topic2.toString())))
         .thenReturn(List.of(c2a));
-    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/all"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 10000, 0, 0, List.of()));
     when(backendApiClient.get(contains("/api/v1/users?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));
@@ -311,7 +315,8 @@ class PromotionPageControllerTest {
 
     when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/all"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(e1), 0, 10000, 1, 1, List.of()));
     when(backendApiClient.get(contains("/api/v1/users?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));
@@ -338,7 +343,8 @@ class PromotionPageControllerTest {
 
     when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/all"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(oldA, newB, midA), 0, 10000, 3, 1, List.of()));
     when(backendApiClient.get(contains("/api/v1/users?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));
@@ -365,9 +371,11 @@ class PromotionPageControllerTest {
 
     when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/all"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 10000, 0, 0, List.of()));
-    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/members"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/members"), anyTypeRef(), any(Object[].class)))
         .thenReturn(
             new PageResponse<>(
                 List.of(member(id1, "a", 20), member(id2, "b", 19), nullIdMember),
@@ -376,9 +384,11 @@ class PromotionPageControllerTest {
                 3,
                 1,
                 List.of()));
-    when(backendApiClient.get(contains("/api/v1/promotion/eligibility/user/" + id1), anyTypeRef()))
+    when(backendApiClient.get(
+            eq("/api/v1/promotion/eligibility/user/{userId}"), anyTypeRef(), eq(id1)))
         .thenReturn(List.of(elig1));
-    when(backendApiClient.get(contains("/api/v1/promotion/eligibility/user/" + id2), anyTypeRef()))
+    when(backendApiClient.get(
+            eq("/api/v1/promotion/eligibility/user/{userId}"), anyTypeRef(), eq(id2)))
         .thenReturn(List.of(elig2));
     Model model = new ConcurrentModel();
 
@@ -390,14 +400,15 @@ class PromotionPageControllerTest {
     assertEquals(List.of(elig1), byUser.get(id1.toString()));
     assertEquals(List.of(elig2), byUser.get(id2.toString()));
     verify(backendApiClient, times(2))
-        .get(contains("/api/v1/promotion/eligibility/user/"), anyTypeRef());
+        .get(contains("/api/v1/promotion/eligibility/user/"), anyTypeRef(), any(Object[].class));
   }
 
   @Test
   void manage_emptyMembers_yieldsEmptyEligibilityMap() {
     when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/all"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 10000, 0, 0, List.of()));
     when(backendApiClient.get(contains("/api/v1/users?"), anyTypeRef())).thenReturn(null);
     Model model = new ConcurrentModel();
@@ -423,9 +434,10 @@ class PromotionPageControllerTest {
 
     when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(t));
-    when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef()))
+    when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of(c));
-    when(backendApiClient.get(contains("/level-contents/by-category/"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/level-contents/by-category/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of(lc));
     Model model = new ConcurrentModel();
 
@@ -453,7 +465,8 @@ class PromotionPageControllerTest {
         .thenReturn(new PageResponse<>(List.of(r1, r2), 0, 1000, 2, 1, List.of()));
     when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(t));
-    when(backendApiClient.get(contains("/categories/by-topic/" + topicId + "/all"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/categories/by-topic/{topicId}/all"), anyTypeRef(), eq(topicId.toString())))
         .thenReturn(List.of(c));
     when(backendApiClient.get(contains("/api/v1/promotion/categories?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(c), 0, 1000, 1, 1, List.of()));
@@ -491,7 +504,7 @@ class PromotionPageControllerTest {
     UUID second = UUID.randomUUID();
     when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(topic(first, "A", 0), topic(second, "B", 1)));
-    when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef()))
+    when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of());
 
     Model requested = new ConcurrentModel();
@@ -515,7 +528,7 @@ class PromotionPageControllerTest {
         .thenReturn(new PageResponse<>(List.of(global, low, high), 0, 1000, 3, 1, List.of()));
     when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(topic(topicId, "T", 0)));
-    when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef()))
+    when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of());
     when(backendApiClient.get(contains("/api/v1/promotion/categories?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));

@@ -126,22 +126,18 @@
      * @param {string | null | undefined} terminal the terminal's name
      * @param {string | null | undefined} place the terminal's location
      * @param {number | null | undefined} price the price per SCU
-     * @returns {string} the line's HTML
+     * @returns {KrtHtml} the line's HTML
      */
     function routeLine(cls, side, terminal, place, price) {
         const placeHtml = place
-            ? ` <span class="profit-route__place" data-testid="profit-route-place">(${escapeHtml(
-                  place,
-              )})</span>`
+            ? krtHtml` <span class="profit-route__place" data-testid="profit-route-place">(${place})</span>`
             : '';
         const terminalHtml = terminal
-            ? `<span class="profit-route__terminal" data-testid="profit-route-terminal">${escapeHtml(
-                  terminal,
-              )}</span>${placeHtml} · `
+            ? krtHtml`<span class="profit-route__terminal" data-testid="profit-route-terminal">${terminal}</span>${placeHtml} · `
             : '';
-        return `<span class="profit-route__line"><span class="${cls}">${escapeHtml(side)}</span> ${
+        return krtHtml`<span class="profit-route__line"><span class="${cls}">${side}</span> ${
             terminalHtml
-        }${escapeHtml(num(PRICE, price))}</span>`;
+        }${num(PRICE, price)}</span>`;
     }
 
     /**
@@ -162,18 +158,15 @@
                       sensitivity: 'base',
                   });
         });
-        let html = '';
-        rows.forEach((item, index) => {
+        const html = rows.map((item, index) => {
             const rank = index + 1;
-            html += `<tr class="profit-row${
+            return krtHtml`<tr class="profit-row${
                 rank === 1 ? ' profit-row--top' : ''
-            }" data-testid="profit-row"><td><a class="row-link" data-testid="row-link" href="/materials/${escapeAttr(
-                encodeURIComponent(item.materialId || ''),
-            )}"><span class="profit-rank">${escapeHtml(
-                rank,
-            )}</span><span class="cell-title">${escapeHtml(
-                item.materialName,
-            )}</span></a></td><td class="profit-route">${routeLine(
+            }" data-testid="profit-row"><td><a class="row-link" data-testid="row-link" href="/materials/${encodeURIComponent(
+                item.materialId || '',
+            )}"><span class="profit-rank">${rank}</span><span class="cell-title">${
+                item.materialName
+            }</span></a></td><td class="profit-route">${routeLine(
                 'profit-route__buy',
                 label('buy'),
                 item.buyTerminalName,
@@ -185,17 +178,15 @@
                 item.sellTerminalName,
                 item.sellTerminalLocation,
                 item.maxSellPrice,
-            )}</td><td class="num">${escapeHtml(
-                num(PER_SCU, item.profitPerScu),
-            )}</td><td class="num">${escapeHtml(
-                num(PERCENT, item.marginPercent),
-            )}\u00a0%</td><td class="num">${escapeHtml(
-                num(WHOLE, item.fullLoadCost),
-            )}</td><td class="num profit-max">${escapeHtml(
-                num(WHOLE, item.maxProfitFullLoad),
-            )}</td></tr>`;
+            )}</td><td class="num">${num(PER_SCU, item.profitPerScu)}</td><td class="num">${num(
+                PERCENT,
+                item.marginPercent,
+            )}\u00a0%</td><td class="num">${num(
+                WHOLE,
+                item.fullLoadCost,
+            )}</td><td class="num profit-max">${num(WHOLE, item.maxProfitFullLoad)}</td></tr>`;
         });
-        window.krtFetch.setTrustedHtml(body, html);
+        krtHtml.set(body, html);
     }
 
     let requestToken = 0;
@@ -207,7 +198,7 @@
         const shipId = select ? select.value : '';
         const token = ++requestToken;
         if (!shipId) {
-            if (body) body.innerHTML = '';
+            if (body) body.replaceChildren();
             setState('idle', label('select-ship'));
             return;
         }
@@ -223,7 +214,7 @@
             );
             if (token !== requestToken) return;
             if (!Array.isArray(data) || data.length === 0) {
-                if (body) body.innerHTML = '';
+                if (body) body.replaceChildren();
                 setState('empty', label('no-data'));
                 return;
             }
@@ -231,7 +222,7 @@
             setState('ready');
         } catch (_error) {
             if (token !== requestToken) return;
-            if (body) body.innerHTML = '';
+            if (body) body.replaceChildren();
             setState('error', label('fetch-error'));
         }
     }

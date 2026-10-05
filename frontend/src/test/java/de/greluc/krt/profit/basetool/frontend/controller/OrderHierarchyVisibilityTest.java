@@ -90,7 +90,7 @@ class OrderHierarchyVisibilityTest {
             null,
             false);
 
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(order);
     when(backendApiClient.get(
             eq("/api/v1/users/me"),

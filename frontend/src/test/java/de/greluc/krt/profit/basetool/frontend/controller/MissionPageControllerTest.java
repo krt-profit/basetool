@@ -518,14 +518,15 @@ class MissionPageControllerTest {
             null,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/missions/" + id), anyTypeRef())).thenReturn(mission);
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(id)))
+        .thenReturn(mission);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
     String view = controller.missionDetail(id, model, null, null);
 
     assertEquals("mission-detail", view);
-    verify(backendApiClient).get(eq("/api/v1/missions/" + id), anyTypeRef());
+    verify(backendApiClient).get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(id));
     verify(backendApiClient).getCached(eq(CachedCatalog.JOB_TYPES_MISSION), anyTypeRef());
     verify(backendApiClient).getCached(eq(CachedCatalog.JOB_TYPES_CREW), anyTypeRef());
     verify(backendApiClient).getCached(eq(CachedCatalog.SQUADRONS_UNSORTED), anyTypeRef());
@@ -579,7 +580,8 @@ class MissionPageControllerTest {
             null,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/missions/" + id), anyTypeRef())).thenReturn(mission);
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(id)))
+        .thenReturn(mission);
     when(backendApiClient.get(eq("/api/v1/missions/" + id + "/units?size=1000"), anyTypeRef()))
         .thenReturn(
             new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
@@ -591,9 +593,12 @@ class MissionPageControllerTest {
 
     controller.missionDetail(id, model, null, null);
 
-    verify(backendApiClient, never()).get(contains("/finance-entries"), anyTypeRef());
-    verify(backendApiClient, never()).get(contains("/refinery-orders"), anyTypeRef());
-    verify(backendApiClient, never()).get(contains("/finance-entries"), anyClass());
+    verify(backendApiClient, never())
+        .get(contains("/finance-entries"), anyTypeRef(), any(Object[].class));
+    verify(backendApiClient, never())
+        .get(contains("/refinery-orders"), anyTypeRef(), any(Object[].class));
+    verify(backendApiClient, never())
+        .get(contains("/finance-entries"), anyClass(), any(Object[].class));
   }
 
   @Test
@@ -645,12 +650,14 @@ class MissionPageControllerTest {
             null,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/missions/" + id), anyTypeRef())).thenReturn(mission);
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(id)))
+        .thenReturn(mission);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + id + "/finance-entries/summary"),
-            eq(de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto.class)))
+            eq("/api/v1/missions/{id}/finance-entries/summary"),
+            eq(de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto.class),
+            eq(id)))
         .thenReturn(
             new de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto(
                 java.math.BigDecimal.ZERO,
@@ -659,21 +666,23 @@ class MissionPageControllerTest {
                 java.math.BigDecimal.ZERO,
                 0L));
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + id + "/finance-entries?size=200"), anyTypeRef()))
+            eq("/api/v1/missions/{id}/finance-entries?size={size}"), anyTypeRef(), eq(id), eq(200)))
         .thenReturn(
             new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
                 Collections.emptyList(), 0, 200, 0, 0, Collections.emptyList()));
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/mission/" + id), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/refinery-orders/mission/{id}"), anyTypeRef(), eq(id)))
         .thenReturn(Collections.emptyList());
 
     controller.missionDetail(id, model, null, null);
 
     verify(backendApiClient)
         .get(
-            eq("/api/v1/missions/" + id + "/finance-entries/summary"),
-            eq(de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto.class));
+            eq("/api/v1/missions/{id}/finance-entries/summary"),
+            eq(de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto.class),
+            eq(id));
     verify(backendApiClient)
-        .get(eq("/api/v1/missions/" + id + "/finance-entries?size=200"), anyTypeRef());
-    verify(backendApiClient).get(eq("/api/v1/refinery-orders/mission/" + id), anyTypeRef());
+        .get(
+            eq("/api/v1/missions/{id}/finance-entries?size={size}"), anyTypeRef(), eq(id), eq(200));
+    verify(backendApiClient).get(eq("/api/v1/refinery-orders/mission/{id}"), anyTypeRef(), eq(id));
   }
 }

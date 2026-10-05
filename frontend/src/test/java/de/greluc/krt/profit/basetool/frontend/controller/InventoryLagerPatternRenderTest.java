@@ -95,6 +95,12 @@ class InventoryLagerPatternRenderTest {
               String url = inv.getArgument(0);
               return url.contains(urlPart) ? body : Collections.emptyList();
             });
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenAnswer(
+            inv -> {
+              String url = inv.getArgument(0);
+              return url.contains(urlPart) ? body : Collections.emptyList();
+            });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
     MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();

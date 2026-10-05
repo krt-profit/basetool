@@ -179,7 +179,7 @@ class RefineryOrderDetailPatternRenderTest {
             3L,
             null);
     when(backendApiClient.get(
-            eq("/api/v1/refinery-orders/" + ORDER_ID), eq(RefineryOrderDto.class)))
+            eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(ORDER_ID)))
         .thenReturn(order);
     return mockMvc
         .perform(
