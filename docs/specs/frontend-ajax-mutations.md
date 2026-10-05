@@ -2391,7 +2391,11 @@ the breaker, the error mapping.
   owns the domain's backend paths, passes runtime values as URI-template variables and returns
   typed records; only the kernel packages (`service`, `config`, `websocket`) and these clients
   call `BackendApiClient`. A typed client takes no `java.net.URI` or `UriBuilderFactory` and
-  carries no cache annotation. Twenty-one clients cover every controller, and no class outside
+  carries no cache annotation. A client sends and returns records, never an untyped `Map`, with
+  two exceptions by design: the org-unit bank path-only writes, whose backend endpoint binds no
+  request body, and the refinery import's extract, a `JsonNode` relayed unchanged because the
+  extractor's file is its own JSON contract (ADR-0008). Twenty-one clients cover every
+  controller, and no class outside
   the kernel and the client packages calls `BackendApiClient` (`TypedBackendClientTest`, no
   allow-list).
 - **HTTP-interface clients** (Spring `@HttpExchange`, none yet) are created only by the kernel,

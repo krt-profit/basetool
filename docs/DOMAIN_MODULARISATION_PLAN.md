@@ -873,9 +873,12 @@ what stays open: the "large four" were not a fixed set — the domains moved in 
 parts by size; the call-site floors fell from 611 resolved / 344 write sites to 524 / 289 as the
 clients merged duplicate calls; a typed relay now refuses a malformed browser value at the
 frontend's own binding (400) instead of relaying it for the backend's 400, and its answer is
-re-serialised from the record (additive keys, `BigDecimal` scale kept). Left untyped on purpose:
-the org-unit bank path-only writes, whose backend endpoint binds no body, the raw extract the
-refinery import relays, and the cached `TERMINALS` catalogue rows `UexAge` reads. The blueprint
+re-serialised from the record (additive keys, `BigDecimal` scale kept). The cached `TERMINALS`
+catalogue is read as `TerminalDto` rows. Two relays stay untyped by design, not as open work: the
+org-unit bank path-only writes, because the backend endpoint binds no request body (the browser
+body is relayed as sent, only the answer is typed), and the refinery import's extract, a
+`JsonNode` passed through unchanged because the extractor's file is its own JSON contract
+(ADR-0008) that the backend validates. The blueprint
 import's file part goes out as `application/json` for a `.json` file although the builder names
 `application/octet-stream` — unchanged by the move, now pinned. The next step for the clients is
 F4 (the controllers move next to them) and, per domain with its REST cut, the HTTP interface of

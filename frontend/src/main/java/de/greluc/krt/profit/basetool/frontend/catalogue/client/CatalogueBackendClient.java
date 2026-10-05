@@ -51,7 +51,6 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -95,9 +94,6 @@ public class CatalogueBackendClient {
 
   private static final ParameterizedTypeReference<PageResponse<MaterialPriceDto>>
       MATERIAL_PRICE_PAGE = new ParameterizedTypeReference<>() {};
-
-  private static final ParameterizedTypeReference<PageResponse<Map<String, Object>>>
-      TERMINAL_MAP_PAGE = new ParameterizedTypeReference<>() {};
 
   private static final ParameterizedTypeReference<PageResponse<ShipTypeDto>> SHIP_TYPE_PAGE =
       new ParameterizedTypeReference<>() {};
@@ -260,13 +256,13 @@ public class CatalogueBackendClient {
   }
 
   /**
-   * Reads the cached terminal catalogue as raw rows, mined for star systems and the last UEX sweep.
+   * Reads the complete cached terminal catalogue, mined for star systems and the last UEX sweep.
    *
    * @return the catalogue, or {@code null} when the backend sent no body
    */
   @Nullable
-  public PageResponse<Map<String, Object>> terminalCatalogue() {
-    return backendApiClient.getCached(CachedCatalog.TERMINALS, TERMINAL_MAP_PAGE);
+  public PageResponse<TerminalDto> terminalCatalogue() {
+    return backendApiClient.getCached(CachedCatalog.TERMINALS, TERMINAL_PAGE);
   }
 
   /**
