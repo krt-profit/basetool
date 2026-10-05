@@ -39,6 +39,8 @@ import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.frontend.audit.client.AuditBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.AppHttpProperties;
 import de.greluc.krt.profit.basetool.frontend.exception.GlobalExceptionHandler;
+import de.greluc.krt.profit.basetool.frontend.hangar.client.HangarBackendClient;
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
 import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
@@ -145,17 +147,22 @@ class RelayedBackendStatusMvcTest {
                 .param("to", TO)),
         relay(
             "DataExportProxyController#json",
-            wc -> new DataExportProxyController(RealBackendApiClient.over(wc), exportTimeouts()),
+            wc ->
+                new DataExportProxyController(
+                    new IdentityBackendClient(RealBackendApiClient.over(wc)), exportTimeouts()),
             get("/api/proxy/me/export/json")),
         relay(
             "HangarDeleteAllProxyController#deleteAllShips",
-            wc -> new HangarDeleteAllProxyController(RealBackendApiClient.over(wc)),
+            wc ->
+                new HangarDeleteAllProxyController(
+                    new HangarBackendClient(RealBackendApiClient.over(wc))),
             delete("/hangar/ships/all")),
         relay(
             "HangarImportProxyController#importShips",
             wc ->
                 new HangarImportProxyController(
-                    RealBackendApiClient.over(wc), new StaticMessageSource()),
+                    new HangarBackendClient(RealBackendApiClient.over(wc)),
+                    new StaticMessageSource()),
             multipart("/hangar/import/ships").file(upload())),
         relay(
             "InventoryDeleteAllProxyController#deleteAllGlobalInventory",
@@ -248,7 +255,10 @@ class RelayedBackendStatusMvcTest {
   void aBackend404OnADownloadNavigationRendersTheErrorPageWith404() throws Exception {
     backend.enqueue(new MockResponse().setResponseCode(404));
 
-    mockMvc(wc -> new DataExportProxyController(RealBackendApiClient.over(wc), exportTimeouts()))
+    mockMvc(
+            wc ->
+                new DataExportProxyController(
+                    new IdentityBackendClient(RealBackendApiClient.over(wc)), exportTimeouts()))
         .perform(get("/api/proxy/me/export/pdf"))
         .andExpect(status().isNotFound());
   }
@@ -257,7 +267,10 @@ class RelayedBackendStatusMvcTest {
   void aBackend503StaysA503AndIsTheOneFaultLoggedAtError() throws Exception {
     backend.enqueue(new MockResponse().setResponseCode(503));
 
-    mockMvc(wc -> new HangarDeleteAllProxyController(RealBackendApiClient.over(wc)))
+    mockMvc(
+            wc ->
+                new HangarDeleteAllProxyController(
+                    new HangarBackendClient(RealBackendApiClient.over(wc))))
         .perform(delete("/hangar/ships/all").header("X-Requested-With", "XMLHttpRequest"))
         .andExpect(status().isServiceUnavailable())
         .andExpect(jsonPath("$.code").value("SERVICE_UNAVAILABLE"));

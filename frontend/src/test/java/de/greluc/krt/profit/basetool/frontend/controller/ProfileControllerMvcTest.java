@@ -19,19 +19,17 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,19 +57,34 @@ class ProfileControllerMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
+  private static UserDto me(LocalDate joinDate) {
+    return new UserDto(
+        UUID.fromString("7d3e2f1a-6b5c-4d4e-8f9a-0b1c2d3e4f5a"),
+        "testuser",
+        "TestUser",
+        "TestUser",
+        null,
+        3,
+        "Test",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        1L,
+        joinDate,
+        null);
+  }
+
   @Test
   void profile_ShouldSetMonthsInSquadron_WhenJoinDateIsPresent() throws Exception {
     LocalDate joinDate = LocalDate.now().minusMonths(14);
     long expectedMonths = ChronoUnit.MONTHS.between(joinDate, LocalDate.now());
 
-    when(backendApiClient.get(eq("/api/v1/users/me"), anyTypeRef()))
-        .thenReturn(
-            Map.of(
-                "rank", "Pilot",
-                "description", "Test",
-                "displayName", "TestUser",
-                "version", 1L,
-                "joinDate", joinDate.toString()));
+    when(backendApiClient.get("/api/v1/users/me", UserDto.class)).thenReturn(me(joinDate));
 
     mockMvc
         .perform(get("/profile").with(oidcLogin()))
@@ -81,32 +94,8 @@ class ProfileControllerMvcTest {
   }
 
   @Test
-  void profile_ShouldNotSetMonthsInSquadron_WhenJoinDateIsAbsent() throws Exception {
-    when(backendApiClient.get(eq("/api/v1/users/me"), anyTypeRef()))
-        .thenReturn(
-            Map.of(
-                "rank", "Pilot",
-                "description", "Test",
-                "displayName", "TestUser",
-                "version", 1L));
-
-    mockMvc
-        .perform(get("/profile").with(oidcLogin()))
-        .andExpect(status().isOk())
-        .andExpect(view().name("profile"))
-        .andExpect(model().attributeDoesNotExist("monthsInSquadron"));
-  }
-
-  @Test
   void profile_ShouldNotSetMonthsInSquadron_WhenJoinDateIsNull() throws Exception {
-    Map<String, Object> userMap = new HashMap<>();
-    userMap.put("rank", "Pilot");
-    userMap.put("description", "Test");
-    userMap.put("displayName", "TestUser");
-    userMap.put("version", 1L);
-    userMap.put("joinDate", null);
-
-    when(backendApiClient.get(eq("/api/v1/users/me"), anyTypeRef())).thenReturn(userMap);
+    when(backendApiClient.get("/api/v1/users/me", UserDto.class)).thenReturn(me(null));
 
     mockMvc
         .perform(get("/profile").with(oidcLogin()))

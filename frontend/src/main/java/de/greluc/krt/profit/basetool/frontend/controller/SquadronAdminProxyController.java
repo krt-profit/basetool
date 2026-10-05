@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronProfitEligibleToggleRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronPromotionToggleRequest;
+import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -36,7 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Same-origin proxy for the admin-only squadron toggles (promotion feature and profit eligibility),
- * relayed via {@link BackendApiClient}.
+ * relayed via {@link OrgUnitBackendClient}.
  *
  * <p>Each toggle evicts the {@code CacheDomain.SQUADRON} and {@code CacheDomain.ORG_UNIT} caches
  * (REQ-DATA-007). The backend re-checks the {@code ADMIN} role.
@@ -46,7 +48,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class SquadronAdminProxyController {
 
-  private final BackendApiClient backendApiClient;
+  /** Sends the toggles to the backend. */
+  private final OrgUnitBackendClient orgUnitClient;
+
+  /** Drops the cached squadron and org-unit catalogues after a toggle. */
+  private final CatalogueCacheEviction cacheEviction;
 
   /**
    * Forwards a request to set a squadron's promotion-enabled flag.
@@ -58,9 +64,9 @@ public class SquadronAdminProxyController {
   @PatchMapping("/{id}/promotion-enabled")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Void> setPromotionEnabled(
-      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    backendApiClient.patch("/api/v1/squadrons/{id}/promotion-enabled", body, Void.class, id);
-    backendApiClient.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull SquadronPromotionToggleRequest body) {
+    orgUnitClient.setSquadronPromotionEnabled(id, body);
+    cacheEviction.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
     return ResponseEntity.noContent().build();
   }
 
@@ -74,9 +80,10 @@ public class SquadronAdminProxyController {
   @PatchMapping("/{id}/profit-eligible")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Void> setProfitEligible(
-      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    backendApiClient.patch("/api/v1/squadrons/{id}/profit-eligible", body, Void.class, id);
-    backendApiClient.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
+      @PathVariable @NotNull UUID id,
+      @RequestBody @NotNull SquadronProfitEligibleToggleRequest body) {
+    orgUnitClient.setSquadronProfitEligible(id, body);
+    cacheEviction.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
     return ResponseEntity.noContent().build();
   }
 }

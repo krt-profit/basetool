@@ -21,32 +21,28 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.withBackendStatus;
 
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.hangar.client.HangarBackendClient;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.reactive.function.client.WebClient;
 
 /**
  * Frontend proxy for the "delete all ships" endpoint.
  *
  * <p>Forwards {@code DELETE /hangar/ships/all} to the backend {@code DELETE /api/v1/hangar/ships}
- * through {@link BackendApiClient#execute} (authenticated client, shared error mapping), and
- * returns 204 No Content on success.
+ * through {@link HangarBackendClient} (authenticated client, shared error mapping), and returns 204
+ * No Content on success.
  */
 @RestController
 @RequestMapping("/hangar/ships")
 @RequiredArgsConstructor
 public class HangarDeleteAllProxyController {
 
-  /** Backend path that clears the caller's hangar. */
-  private static final String SHIPS_URI = "/api/v1/hangar/ships";
-
-  private final BackendApiClient backendApiClient;
+  /** Clears the caller's hangar at the backend. */
+  private final HangarBackendClient hangarClient;
 
   /**
    * Proxies a "delete all ships" request to the backend.
@@ -57,12 +53,10 @@ public class HangarDeleteAllProxyController {
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<Void> deleteAllShips() {
     withBackendStatus(
-        () ->
-            backendApiClient.execute(
-                HttpMethod.DELETE,
-                SHIPS_URI,
-                webClient -> webClient.delete().uri(SHIPS_URI),
-                WebClient.ResponseSpec::toBodilessEntity));
+        () -> {
+          hangarClient.deleteAllShips();
+          return null;
+        });
     return ResponseEntity.noContent().build();
   }
 }

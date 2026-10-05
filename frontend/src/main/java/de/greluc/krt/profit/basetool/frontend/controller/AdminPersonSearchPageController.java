@@ -20,15 +20,14 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonSearchResultDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -49,15 +48,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 @Slf4j
 public class AdminPersonSearchPageController {
 
-  /**
-   * The result type, as a {@link ParameterizedTypeReference} rather than a {@code Class}, because
-   * only that overload of {@code BackendApiClient#get} takes URI-template variables — and binding
-   * the term as a variable is the whole point here.
-   */
-  private static final ParameterizedTypeReference<PersonSearchResultDto> RESULT_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Runs the person search on the backend. */
+  private final IdentityBackendClient identityClient;
 
   /**
    * Renders the page, and the results when a term was given.
@@ -83,8 +75,7 @@ public class AdminPersonSearchPageController {
 
     if (term.length() >= 3) {
       try {
-        PersonSearchResultDto result =
-            backendApiClient.get("/api/v1/admin/person-search?q={q}", RESULT_TYPE, term);
+        PersonSearchResultDto result = identityClient.personSearch(term);
         model.addAttribute("hits", result == null ? List.of() : result.hits());
         model.addAttribute("truncated", result != null && result.truncated());
         model.addAttribute(

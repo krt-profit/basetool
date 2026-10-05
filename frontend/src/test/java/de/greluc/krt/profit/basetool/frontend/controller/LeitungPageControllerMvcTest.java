@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.LeitungMemberDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LeitungUnitDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LeitungViewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitKind;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import java.util.UUID;
@@ -316,10 +317,12 @@ class LeitungPageControllerMvcTest {
     when(backendApiClient.put(
             eq("/api/v1/squadrons/{squadronId}/ranks/{userId}"),
             any(),
-            eq(Object.class),
+            eq(OrgUnitMembershipDto.class),
             eq(squadronId),
             eq(userId)))
-        .thenReturn(new Object());
+        .thenReturn(
+            new OrgUnitMembershipDto(
+                userId, "Pilot", squadronId, OrgUnitKind.SQUADRON, false, false, false, null, 1L));
 
     mockMvc
         .perform(
