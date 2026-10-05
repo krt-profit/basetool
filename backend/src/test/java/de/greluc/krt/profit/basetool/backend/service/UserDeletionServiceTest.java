@@ -74,7 +74,7 @@ class UserDeletionServiceTest {
   @Mock private PersonalBlueprintRepository personalBlueprintRepository;
   @Mock private NotificationRepository notificationRepository;
   @Mock private NotificationRuleRepository notificationRuleRepository;
-  @Mock private MemberEvaluationRepository memberEvaluationRepository;
+  @Mock private MemberEvaluationErasure memberEvaluationErasure;
 
   @Mock private UserService userService;
 
@@ -137,7 +137,7 @@ class UserDeletionServiceTest {
     verify(personalBlueprintRepository).deleteAllByOwnerUserId(userId);
     verify(notificationRepository).deleteAllForRecipient(userId);
     verify(notificationRuleRepository).deleteSelectorsByUserId(userId);
-    verify(memberEvaluationRepository).deleteAllByUserId(userId);
+    verify(memberEvaluationErasure).deleteAllEvaluationsOf(userId);
     verify(refineryOrderRepository).updateOwner(user, admin);
     verify(missionRepository).updateOwner(user, admin);
     verify(missionOwnershipRepository).updateOwner(user, admin);

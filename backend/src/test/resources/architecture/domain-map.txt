@@ -176,6 +176,7 @@ class BlueprintPackTags blueprint log-name clean-up used only by BlueprintImport
 class BasetoolErrorController platform container error dispatch as RFC 7807
 class ConnectedInstallationDto exchange connected-apps installation row
 class CounterpartySnapshot bank bank counterparty snapshot (REQ-BANK-044)
+class MemberEvaluationErasure promotion GDPR erasure command; in service until 7.6, a promotion package would close a service-promotion package cycle
 
 package dto catalogue external feed DTO packages of the UEX, SC Wiki and P4K imports
 package integration catalogue outbound catalogue clients
@@ -196,6 +197,7 @@ package orgunit orgunit the org-unit module's package tree (plan 5.2)
 package platform platform the platform's package tree (plan 5.1 rank 0)
 package catalogue catalogue the catalogue module's package tree (plan 5.2)
 package mission mission the mission module's package tree (plan 5.2)
+package promotion promotion the promotion module's package tree (plan 5.2)
 
 name ^OrgUnitBank bank
 name ^(Bank|CreateBank|CancelBank|ConfirmBank|RegisterBank|RejectBank|RenameBank|ReverseBank|SetBank|UpdateBank|SetCartel|OrgUnitBalanceTarget) bank
@@ -214,7 +216,6 @@ name ^Refining catalogue
 name ^(Hangar|Ship(?!Type)|Fleet|Starjump|Shiplist|SquadronShip|SetHomeLocation) hangar
 name ^(Notification|LocalNotification|RedisNotification|RuleEvaluation|RecipientResolution|SelectorKind|OrgRelativeRole|Mail|SmtpMail) notification
 name ^Audit audit
-name ^(Promotion|RankRequirement|MemberEvaluation) promotion
 name ^(OrgChart|BereichChart|CommandChart|OlChart|SpecialCommandChart|SquadronChart) orgchart
 name ^Leitung orgchart the Leitung view belongs to the org chart (plan 7.3)
 name ^(OrgRoleManagement|AddOlMember|SquadronRole|AssignSquadronRank) orgunit leadership writes merged into orgunit (plan 7.3)
