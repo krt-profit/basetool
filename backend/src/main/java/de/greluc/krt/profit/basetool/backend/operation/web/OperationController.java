@@ -17,25 +17,25 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.operation.web;
 
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.OperationMapper;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceSummaryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationFinanceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationFinanceSummaryDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutStatusDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutStatusUpdateDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutSummaryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationFinanceDto;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationFinanceService;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationFinanceSummaryDto;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationPayoutService;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationPayoutStatusDto;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationPayoutStatusUpdateDto;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationPayoutSummaryDto;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationService;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.OperationFinanceService;
-import de.greluc.krt.profit.basetool.backend.service.OperationPayoutService;
-import de.greluc.krt.profit.basetool.backend.service.OperationService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

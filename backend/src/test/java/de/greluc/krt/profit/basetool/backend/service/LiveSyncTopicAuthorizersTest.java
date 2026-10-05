@@ -26,6 +26,8 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncAuthorization;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationLiveSyncTopicAuthorizer;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

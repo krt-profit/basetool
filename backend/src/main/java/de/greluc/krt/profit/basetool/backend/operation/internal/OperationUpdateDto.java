@@ -17,17 +17,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.operation.internal;
 
-import java.math.BigDecimal;
-import java.util.UUID;
+import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
-/**
- * One mission's line in the operation finance summary: its id, name and signed bottom line, without
- * per-entry lists (those load via {@code GET /api/v1/operations/{id}/finances/{missionId}}).
- *
- * @param missionId the mission's id
- * @param missionName the mission's display name
- * @param totalSum the mission's signed bottom line in aUEC (income − expense + refinery profit)
- */
-public record OperationMissionFinanceDto(UUID missionId, String missionName, BigDecimal totalSum) {}
+/** Data transfer record carrying Operation Update payload. */
+public record OperationUpdateDto(
+    @NotBlank String name,
+    String description,
+    @NotNull OperationStatus status,
+    @NotNull Long version) {}

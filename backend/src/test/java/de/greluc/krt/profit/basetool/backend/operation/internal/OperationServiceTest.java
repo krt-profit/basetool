@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.operation.internal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -41,9 +41,13 @@ import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
+import de.greluc.krt.profit.basetool.backend.service.AuditService;
+import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
+import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;

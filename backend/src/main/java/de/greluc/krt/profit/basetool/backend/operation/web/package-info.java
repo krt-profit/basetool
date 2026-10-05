@@ -17,15 +17,5 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
-
-import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-
-/** Data transfer record carrying Operation Update payload. */
-public record OperationUpdateDto(
-    @NotBlank String name,
-    String description,
-    @NotNull OperationStatus status,
-    @NotNull Long version) {}
+/** The operation module's REST controller for /api/v1/operations (plan §5.2). */
+package de.greluc.krt.profit.basetool.backend.operation.web;

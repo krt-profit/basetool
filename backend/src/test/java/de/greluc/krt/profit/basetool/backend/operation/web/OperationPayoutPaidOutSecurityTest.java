@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.operation.web;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -29,9 +29,9 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutStatusDto;
-import de.greluc.krt.profit.basetool.backend.service.OperationAccessPolicy;
-import de.greluc.krt.profit.basetool.backend.service.OperationPayoutService;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationPayoutService;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationPayoutStatusDto;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

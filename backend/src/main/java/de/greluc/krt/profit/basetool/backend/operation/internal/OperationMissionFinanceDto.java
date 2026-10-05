@@ -17,20 +17,17 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.operation.internal;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import java.math.BigDecimal;
+import java.util.UUID;
 
 /**
- * Payload of {@code PUT /api/v1/operations/{id}/payouts/paid-out}, which sets one participant's
- * paid-out flag.
+ * One mission's line in the operation finance summary: its id, name and signed bottom line, without
+ * per-entry lists (those load via {@code GET /api/v1/operations/{id}/finances/{missionId}}).
  *
- * <p>Last writer wins; no version is required. Repeating the same value still refreshes {@code
- * paidOutAt} and {@code paidOutByUser}.
- *
- * @param participantKey opaque participant key from {@link OperationPayoutDto#participantId()}
- * @param paidOut new value of the paid-out flag
+ * @param missionId the mission's id
+ * @param missionName the mission's display name
+ * @param totalSum the mission's signed bottom line in aUEC (income − expense + refinery profit)
  */
-public record OperationPayoutStatusUpdateDto(
-    @NotBlank @Size(max = 255) String participantKey, boolean paidOut) {}
+public record OperationMissionFinanceDto(UUID missionId, String missionName, BigDecimal totalSum) {}

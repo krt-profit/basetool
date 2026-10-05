@@ -203,6 +203,7 @@ import de.greluc.krt.profit.basetool.backend.notification.api.events.Notificatio
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationFanoutProperties;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationParamsCodec;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationRetentionProperties;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.orgunit.internal.OrgUnitLabels;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject;
@@ -263,7 +264,6 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.service.MaterialClaimService;
 import de.greluc.krt.profit.basetool.backend.service.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.service.MissionService;
-import de.greluc.krt.profit.basetool.backend.service.OperationService;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitBankAccessService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitBankApprovalLimitService;
@@ -1824,7 +1824,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 589);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 581);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 

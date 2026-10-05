@@ -196,6 +196,7 @@ package platform platform the platform's package tree (plan 5.1 rank 0)
 package catalogue catalogue the catalogue module's package tree (plan 5.2)
 package mission mission the mission module's package tree (plan 5.2)
 package orgchart orgchart the org chart module's package tree (plan 5.2)
+package operation operation the operation module's package tree (plan 5.2)
 
 name ^OrgUnitBank bank
 name ^(Bank|CreateBank|CancelBank|ConfirmBank|RegisterBank|RejectBank|RenameBank|ReverseBank|SetBank|UpdateBank|SetCartel|OrgUnitBalanceTarget) bank

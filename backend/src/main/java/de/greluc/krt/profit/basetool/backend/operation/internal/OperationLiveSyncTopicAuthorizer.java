@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.operation.internal;
 
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncAuthorization;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;

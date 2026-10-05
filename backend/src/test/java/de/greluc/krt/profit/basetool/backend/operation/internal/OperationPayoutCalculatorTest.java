@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.operation.internal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -31,7 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.service.OperationPayoutCalculator.ParticipationBreakdown;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationPayoutCalculator.ParticipationBreakdown;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;

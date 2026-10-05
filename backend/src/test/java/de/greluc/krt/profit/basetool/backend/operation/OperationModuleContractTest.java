@@ -46,13 +46,16 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.GrantedAuthority;
@@ -67,6 +70,8 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Pins the operation module's externally visible contract: the scope and participant gates of
@@ -98,6 +103,8 @@ class OperationModuleContractTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;
 
+  @Autowired private ObjectMapper objectMapper;
+
   @Autowired private MissionCommands missionCommands;
 
   @Autowired private PlatformTransactionManager transactionManager;
@@ -120,7 +127,8 @@ class OperationModuleContractTest {
   void anUnknownOperationIsForbiddenOnEveryGatedEndpoint() throws Exception {
     User admin = user("op-admin", home);
     UUID unknown = UUID.randomUUID();
-    RequestPostProcessor caller = as(admin, "ROLE_ADMIN", "ROLE_MISSION_MANAGER", "ROLE_MEMBER");
+    RequestPostProcessor caller =
+        as(admin, "ROLE_ADMIN", "ROLE_MISSION_MANAGER", "ROLE_KRT_MEMBER");
 
     for (String path : readPaths(unknown)) {
       mockMvc.perform(get(path).with(caller)).andExpect(status().isForbidden());
@@ -141,7 +149,7 @@ class OperationModuleContractTest {
     Operation operation = operation(home);
 
     for (String path : readPaths(operation.getId())) {
-      mockMvc.perform(get(path).with(as(member, "ROLE_MEMBER"))).andExpect(status().isOk());
+      mockMvc.perform(get(path).with(as(member, "ROLE_KRT_MEMBER"))).andExpect(status().isOk());
     }
   }
 
@@ -152,7 +160,7 @@ class OperationModuleContractTest {
 
     for (String path : readPaths(operation.getId())) {
       mockMvc
-          .perform(get(path).with(as(outsider, "ROLE_MEMBER")))
+          .perform(get(path).with(as(outsider, "ROLE_KRT_MEMBER")))
           .andExpect(status().isForbidden());
     }
   }
@@ -169,10 +177,10 @@ class OperationModuleContractTest {
     UUID id = operation.getId();
 
     mockMvc
-        .perform(get(OPERATIONS + id).with(as(participant, "ROLE_MEMBER")))
+        .perform(get(OPERATIONS + id).with(as(participant, "ROLE_KRT_MEMBER")))
         .andExpect(status().isOk());
     mockMvc
-        .perform(get(OPERATIONS + id + "/payouts").with(as(participant, "ROLE_MEMBER")))
+        .perform(get(OPERATIONS + id + "/payouts").with(as(participant, "ROLE_KRT_MEMBER")))
         .andExpect(status().isOk());
     for (String ledger :
         List.of(
@@ -180,7 +188,7 @@ class OperationModuleContractTest {
             OPERATIONS + id + "/finance-summary",
             OPERATIONS + id + "/finances/" + mission.getId())) {
       mockMvc
-          .perform(get(ledger).with(as(participant, "ROLE_MEMBER")))
+          .perform(get(ledger).with(as(participant, "ROLE_KRT_MEMBER")))
           .andExpect(status().isForbidden());
     }
   }
@@ -190,7 +198,7 @@ class OperationModuleContractTest {
     User manager = user("op-foreign-manager", foreign);
     Operation owned = operation(home);
     Operation ownerless = operation(null);
-    RequestPostProcessor caller = as(manager, "ROLE_MEMBER", "ROLE_MISSION_MANAGER");
+    RequestPostProcessor caller = as(manager, "ROLE_KRT_MEMBER", "ROLE_MISSION_MANAGER");
 
     mockMvc.perform(update(owned).with(caller)).andExpect(status().isForbidden());
     mockMvc.perform(update(ownerless).with(caller)).andExpect(status().isOk());
@@ -227,6 +235,53 @@ class OperationModuleContractTest {
                 String.class,
                 operation.getId()))
         .containsExactly("OPERATION_DELETED");
+  }
+
+  @Test
+  void theScopedListAndThePerRowGateAdmitTheSameOperations() throws Exception {
+    User caller = user("op-list-member", home);
+    Operation own = operation(home);
+    Operation foreignOnly = operation(foreign);
+    Operation foreignJoined = operation(foreign);
+    Operation ownerless = operation(null);
+    MissionParticipant row = new MissionParticipant();
+    row.setMission(mission(foreignJoined));
+    row.setUser(caller);
+    missionParticipantRepository.save(row);
+    entityManager.flush();
+    Set<UUID> created =
+        Set.of(own.getId(), foreignOnly.getId(), foreignJoined.getId(), ownerless.getId());
+
+    String body =
+        mockMvc
+            .perform(get(OPERATIONS + "lookup").with(as(caller, "ROLE_KRT_MEMBER")))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    Set<UUID> listed = new HashSet<>();
+    for (JsonNode node : objectMapper.readTree(body)) {
+      UUID id = UUID.fromString(node.get("id").asText());
+      if (created.contains(id)) {
+        listed.add(id);
+      }
+    }
+    Set<UUID> admitted = new HashSet<>();
+    for (UUID id : created) {
+      int status =
+          mockMvc
+              .perform(get(OPERATIONS + id).with(as(caller, "ROLE_KRT_MEMBER")))
+              .andReturn()
+              .getResponse()
+              .getStatus();
+      if (status == HttpStatus.OK.value()) {
+        admitted.add(id);
+      }
+    }
+
+    assertThat(listed).isEqualTo(admitted);
+    assertThat(admitted)
+        .containsExactlyInAnyOrder(own.getId(), foreignJoined.getId(), ownerless.getId());
   }
 
   @Test
