@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.*;
 import de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -76,8 +77,9 @@ class InventoryPageControllerTest {
   @BeforeEach
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
-    controller = new InventoryPageController(backendApiClient, PARALLEL, ROLE_HIERARCHY);
-    writeController = new InventoryWriteController(backendApiClient, controller);
+    InventoryBackendClient inventoryClient = new InventoryBackendClient(backendApiClient);
+    controller = new InventoryPageController(inventoryClient, PARALLEL, ROLE_HIERARCHY);
+    writeController = new InventoryWriteController(inventoryClient, controller);
   }
 
   @Test
