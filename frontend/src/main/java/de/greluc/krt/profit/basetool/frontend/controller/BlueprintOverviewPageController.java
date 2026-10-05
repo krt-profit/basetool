@@ -19,17 +19,16 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintOverviewEntryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintOverviewOwnerDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -56,19 +55,8 @@ public class BlueprintOverviewPageController {
   /** Page size applied when the request carries none (or a non-whitelisted one). */
   private static final int DEFAULT_PAGE_SIZE = 50;
 
-  /**
-   * Response type for one server-side page of the blueprint availability list. A shared static
-   * {@link ParameterizedTypeReference} is behaviourally identical to a fresh anonymous instance per
-   * call (Q10).
-   */
-  private static final ParameterizedTypeReference<PageResponse<BlueprintOverviewEntryDto>>
-      OVERVIEW_PAGE_TYPE = new ParameterizedTypeReference<>() {};
-
-  /** Response type for the lazy owner drill-down list returned by {@code /overview/owners}. */
-  private static final ParameterizedTypeReference<List<BlueprintOverviewOwnerDto>> OWNER_LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Reads the availability overview and its owners. */
+  private final BlueprintBackendClient blueprintClient;
 
   /**
    * Renders one page of the blueprint availability list. {@code size} is limited to {@link
@@ -97,16 +85,7 @@ public class BlueprintOverviewPageController {
     List<BlueprintOverviewEntryDto> overview = new ArrayList<>();
     PageResponse<BlueprintOverviewEntryDto> res = null;
     try {
-      String uri = "/api/v1/personal-blueprints/overview?page={page}&size={size}";
-      res =
-          trimmedSearch != null
-              ? backendApiClient.get(
-                  uri + "&search={search}",
-                  OVERVIEW_PAGE_TYPE,
-                  effectivePage,
-                  effectiveSize,
-                  trimmedSearch)
-              : backendApiClient.get(uri, OVERVIEW_PAGE_TYPE, effectivePage, effectiveSize);
+      res = blueprintClient.overviewPage(effectivePage, effectiveSize, trimmedSearch);
       if (res != null && res.content() != null) {
         overview = new ArrayList<>(res.content());
       }
@@ -131,11 +110,7 @@ public class BlueprintOverviewPageController {
   @ResponseBody
   public List<BlueprintOverviewOwnerDto> owners(@RequestParam String productKey) {
     try {
-      List<BlueprintOverviewOwnerDto> owners =
-          backendApiClient.get(
-              "/api/v1/personal-blueprints/overview/owners?productKey={productKey}",
-              OWNER_LIST_TYPE,
-              productKey);
+      List<BlueprintOverviewOwnerDto> owners = blueprintClient.overviewOwners(productKey);
       return owners != null ? owners : List.of();
     } catch (Exception e) {
       log.warn(

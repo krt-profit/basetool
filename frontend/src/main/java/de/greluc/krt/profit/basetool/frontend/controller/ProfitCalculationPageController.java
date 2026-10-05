@@ -19,11 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +31,6 @@ import java.util.TreeSet;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -50,15 +48,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @RequiredArgsConstructor
 public class ProfitCalculationPageController {
 
-  private final BackendApiClient backendApiClient;
-
-  /** Response type for the cached ship-type catalog page fed into the ship dropdown. */
-  private static final ParameterizedTypeReference<PageResponse<ShipTypeDto>> SHIP_TYPE_PAGE_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  /** Response type for the cached terminal catalog page, mined for its distinct star systems. */
-  private static final ParameterizedTypeReference<PageResponse<Map<String, Object>>>
-      TERMINAL_PAGE_TYPE = new ParameterizedTypeReference<>() {};
+  /** Reads the cached ship-type and terminal catalogues. */
+  private final CatalogueBackendClient catalogueClient;
 
   /**
    * Renders the profit-calculation page; a backend failure renders an empty form with a page-level
@@ -75,8 +66,7 @@ public class ProfitCalculationPageController {
   public String showProfitCalculationPage(Model model) {
     log.debug("Showing profit calculation page");
     try {
-      PageResponse<ShipTypeDto> shipTypesPage =
-          backendApiClient.getCached(CachedCatalog.SHIP_TYPES_SORTED, SHIP_TYPE_PAGE_TYPE);
+      PageResponse<ShipTypeDto> shipTypesPage = catalogueClient.shipTypesSorted();
 
       List<ShipTypeDto> shipTypes =
           (shipTypesPage != null && shipTypesPage.content() != null)
@@ -92,8 +82,7 @@ public class ProfitCalculationPageController {
           .findFirst()
           .ifPresent(c2 -> model.addAttribute("defaultShipId", c2.id()));
 
-      PageResponse<Map<String, Object>> terminalsPage =
-          backendApiClient.getCached(CachedCatalog.TERMINALS, TERMINAL_PAGE_TYPE);
+      PageResponse<Map<String, Object>> terminalsPage = catalogueClient.terminalCatalogue();
 
       Set<String> starSystems = new TreeSet<>();
       if (terminalsPage != null && terminalsPage.content() != null) {

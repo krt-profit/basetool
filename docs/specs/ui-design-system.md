@@ -248,7 +248,14 @@ The shared `krtFetch` mutation layer (REQ-FE-001..005,
 optimistic-lock outcome through the KRT toast/confirm infrastructure precisely so this rule holds
 app-wide; new AJAX call sites inherit it for free.
 
-**Enforced by:** code/design review only. The rule is grep-able, but ESLint's `no-alert` is **not**
+A `.notification-toast` carries no control and is transparent to the pointer
+(`pointer-events: none`) for its whole life, so it never swallows a click on the control it covers
+in the bottom-right corner. Until 2026-10-05 a shown toast took pointer events: for five seconds it
+blocked what lay beneath it, and because it turned hit-testable 100 ms after it was appended, it
+could take the second half of a click already in progress.
+
+**Enforced by:** code/design review only for the native-dialog ban; the toast's pointer
+transparency by `MaterialsCategoryEmptyStateInPlaceE2eTest`. The native-dialog rule is grep-able, but ESLint's `no-alert` is **not**
 enabled in `frontend/eslint.config.mjs` (checked 2026-09-22) — see Open questions.
 
 ### REQ-UI-013 — Canonical modal shell + one close convention (S12, #918; one shape, #1891)

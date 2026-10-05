@@ -27,12 +27,14 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitKind;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SpecialCommandDto;
+import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,15 +58,16 @@ class SpecialCommandMembersPageControllerTest {
   void setUp() {
     client = mock(BackendApiClient.class);
     authHelper = mock(FrontendAuthHelperService.class);
-    controller = new SpecialCommandMembersPageController(client, authHelper);
+    controller =
+        new SpecialCommandMembersPageController(new OrgUnitBackendClient(client), authHelper);
   }
 
   /** Stubs a minimal SK read plus a two-member roster delivered out of name order. */
   private void stubSkWithTwoMembers() {
-    when(client.get(eq("/api/v1/special-commands/{id}"), anyTypeRef(), eq(skId)))
-        .thenReturn(Map.of("id", skId.toString(), "name", "Alpha SK", "shorthand", "ASK"));
+    when(client.get(eq("/api/v1/special-commands/{id}"), eq(SpecialCommandDto.class), eq(skId)))
+        .thenReturn(new SpecialCommandDto(skId, "Alpha SK", "ASK", null, null, null, null));
     when(client.get(eq("/api/v1/special-commands/{id}/members"), anyTypeRef(), eq(skId)))
-        .thenReturn(List.of(Map.of("userDisplayName", "zulu"), Map.of("userDisplayName", "Alpha")));
+        .thenReturn(List.of(member("zulu"), member("Alpha")));
   }
 
   @Test
@@ -95,14 +98,17 @@ class SpecialCommandMembersPageControllerTest {
     assertEquals(2, members.size());
     assertEquals(
         "Alpha", assertInstanceOf(OrgUnitMembershipDto.class, members.get(0)).userDisplayName());
-    assertEquals(
-        "zulu", assertInstanceOf(OrgUnitMembershipDto.class, members.get(1)).userDisplayName());
+    OrgUnitMembershipDto last = assertInstanceOf(OrgUnitMembershipDto.class, members.get(1));
+    assertEquals("zulu", last.userDisplayName());
+    assertEquals(OrgUnitKind.SPECIAL_COMMAND, last.kind());
+    assertEquals(Boolean.FALSE, last.isLogistician());
+    assertEquals(0L, last.version());
   }
 
   @Test
   void detail_backendForbidden_throwsAccessDenied() {
     when(authHelper.isAdmin()).thenReturn(false);
-    when(client.get(eq("/api/v1/special-commands/{id}"), anyTypeRef(), eq(skId)))
+    when(client.get(eq("/api/v1/special-commands/{id}"), eq(SpecialCommandDto.class), eq(skId)))
         .thenThrow(new BackendServiceException("forbidden", null, 403));
 
     assertThrows(
@@ -112,10 +118,15 @@ class SpecialCommandMembersPageControllerTest {
   @Test
   void detail_emptySkRead_redirectsToBackUrl() {
     when(authHelper.isAdmin()).thenReturn(true);
-    when(client.get(eq("/api/v1/special-commands/{id}"), anyTypeRef(), eq(skId))).thenReturn(null);
+    when(client.get(eq("/api/v1/special-commands/{id}"), eq(SpecialCommandDto.class), eq(skId)))
+        .thenReturn(null);
 
     String view = controller.detail(skId, null, new ConcurrentModel());
 
     assertEquals("redirect:/admin/special-commands?error=SpecialCommandNotFound", view);
+  }
+
+  private static OrgUnitMembershipDto member(String displayName) {
+    return new OrgUnitMembershipDto(null, displayName, null, null, null, null, null, null, null);
   }
 }

@@ -27,16 +27,18 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ui.ConcurrentModel;
@@ -53,7 +55,15 @@ class AdminLocationsPageControllerTest {
 
   @Mock private BackendApiClient backendApiClient;
 
-  @InjectMocks private AdminLocationsPageController controller;
+  private AdminLocationsPageController controller;
+
+  @BeforeEach
+  void setUp() {
+    controller =
+        new AdminLocationsPageController(
+            new CatalogueBackendClient(backendApiClient),
+            new CatalogueCacheEviction(backendApiClient));
+  }
 
   @Test
   void toggleHomeLocation_readsCurrentAndPutsFlippedFlag_preservingOtherFields() {

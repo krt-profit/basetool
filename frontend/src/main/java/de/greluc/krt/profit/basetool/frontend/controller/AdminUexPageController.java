@@ -21,16 +21,17 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient.UexEntity;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.CityDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OutpostDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PoiDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SpaceStationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.TerminalDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages.CompleteCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
@@ -45,14 +46,12 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
-import java.util.stream.Collectors;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -79,18 +78,20 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminUexPageController {
 
-  /** URL segments accepted as the {@code kind} path variable for the loading-dock dispatcher. */
-  private static final Set<String> ALLOWED_LOADING_DOCK_KINDS =
-      Set.of("cities", "space-stations", "outposts", "pois", "terminals");
+  /** URL segments accepted as the {@code kind} path variable, each with the entity it names. */
+  private static final Map<String, UexEntity> ALLOWED_LOADING_DOCK_KINDS =
+      Map.of(
+          "cities", UexEntity.CITIES,
+          "space-stations", UexEntity.SPACE_STATIONS,
+          "outposts", UexEntity.OUTPOSTS,
+          "pois", UexEntity.POIS,
+          "terminals", UexEntity.TERMINALS);
 
-  /**
-   * Response type for the generic UEX-entity page pulls (cities, stations, outposts, POIs,
-   * terminals), each read as an untyped {@code Map} page before being parsed into its DTO.
-   */
-  private static final ParameterizedTypeReference<PageResponse<Map<String, Object>>> MAP_PAGE_TYPE =
-      new ParameterizedTypeReference<>() {};
+  /** Reads the UEX-mirrored universe and writes its overrides. */
+  private final CatalogueBackendClient catalogueClient;
 
-  private final BackendApiClient backendApiClient;
+  /** Evicts the terminal catalogue after a write. */
+  private final CatalogueCacheEviction cacheEviction;
 
   /**
    * Loads every page of the cities, stations, outposts, POIs and terminals (REQ-ADMIN-001) and
@@ -106,22 +107,20 @@ public class AdminUexPageController {
   @GetMapping
   public String listData(Model model) {
     try {
-      CompleteCatalog<Map<String, Object>> citiesCatalog =
-          loadCatalog("/api/v1/cities?size=10000&sort=name,asc&page={page}");
-      CompleteCatalog<Map<String, Object>> stationsCatalog =
-          loadCatalog("/api/v1/space-stations?size=10000&sort=name,asc&page={page}");
-      CompleteCatalog<Map<String, Object>> outpostsCatalog =
-          loadCatalog("/api/v1/outposts?size=10000&sort=name,asc&page={page}");
-      CompleteCatalog<Map<String, Object>> poisCatalog =
-          loadCatalog("/api/v1/pois?size=10000&sort=name,asc&page={page}");
-      CompleteCatalog<Map<String, Object>> terminalsCatalog =
-          loadCatalog("/api/v1/terminals?size=10000&sort=name,asc&page={page}");
+      CompleteCatalog<CityDto> citiesCatalog = CatalogPages.fetchAll(catalogueClient::cityPage);
+      CompleteCatalog<SpaceStationDto> stationsCatalog =
+          CatalogPages.fetchAll(catalogueClient::spaceStationPage);
+      CompleteCatalog<OutpostDto> outpostsCatalog =
+          CatalogPages.fetchAll(catalogueClient::outpostPage);
+      CompleteCatalog<PoiDto> poisCatalog = CatalogPages.fetchAll(catalogueClient::poiPage);
+      CompleteCatalog<TerminalDto> terminalsCatalog =
+          CatalogPages.fetchAll(catalogueClient::terminalPage);
 
-      List<CityDto> cities = parseCities(citiesCatalog.items());
-      List<SpaceStationDto> stations = parseStations(stationsCatalog.items());
-      List<OutpostDto> outposts = parseOutposts(outpostsCatalog.items());
-      List<PoiDto> pois = parsePois(poisCatalog.items());
-      List<TerminalDto> terminals = parseTerminals(terminalsCatalog.items());
+      List<CityDto> cities = sortedByName(citiesCatalog.items(), CityDto::name);
+      List<SpaceStationDto> stations = sortedByName(stationsCatalog.items(), SpaceStationDto::name);
+      List<OutpostDto> outposts = sortedByName(outpostsCatalog.items(), OutpostDto::name);
+      List<PoiDto> pois = sortedByName(poisCatalog.items(), PoiDto::name);
+      List<TerminalDto> terminals = sortedByName(terminalsCatalog.items(), TerminalDto::name);
 
       List<StarSystemGroup> systems = buildHierarchy(cities, stations, outposts, pois, terminals);
 
@@ -174,16 +173,15 @@ public class AdminUexPageController {
       @PathVariable @NotNull UUID id,
       @RequestParam String action,
       RedirectAttributes redirectAttributes) {
-    if (!ALLOWED_LOADING_DOCK_KINDS.contains(kind)) {
+    UexEntity entity = ALLOWED_LOADING_DOCK_KINDS.get(kind);
+    if (entity == null) {
       redirectAttributes.addFlashAttribute("errorToast", "error.admin.uex.flag.update");
       return "redirect:/admin/uex-data";
     }
     return dispatchOverride(
-        "/api/v1/" + kind + "/{id}",
-        id,
         action,
-        "loading-dock",
-        "loading-dock-override",
+        () -> catalogueClient.clearLoadingDockPin(entity, id),
+        value -> catalogueClient.pinLoadingDock(entity, id, value),
         redirectAttributes);
   }
 
@@ -204,11 +202,9 @@ public class AdminUexPageController {
       @RequestParam String action,
       RedirectAttributes redirectAttributes) {
     return dispatchOverride(
-        "/api/v1/terminals/{id}",
-        id,
         action,
-        "auto-load",
-        "auto-load-override",
+        () -> catalogueClient.clearTerminalAutoLoadPin(id),
+        value -> catalogueClient.pinTerminalAutoLoad(id, value),
         redirectAttributes);
   }
 
@@ -229,7 +225,7 @@ public class AdminUexPageController {
       @RequestParam boolean hidden,
       RedirectAttributes redirectAttributes) {
     try {
-      TerminalDto current = backendApiClient.get("/api/v1/terminals/{id}", TerminalDto.class, id);
+      TerminalDto current = catalogueClient.terminal(id);
       TerminalDto body =
           new TerminalDto(
               id,
@@ -247,8 +243,8 @@ public class AdminUexPageController {
               current.uexIsAutoLoad(),
               current.uexSyncedAt(),
               hidden);
-      backendApiClient.put("/api/v1/terminals/{id}", body, Void.class, id);
-      backendApiClient.evict(CacheDomain.TERMINAL);
+      catalogueClient.updateTerminal(id, body);
+      cacheEviction.evict(CacheDomain.TERMINAL);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Toggle terminal visibility failed", e);
@@ -274,11 +270,14 @@ public class AdminUexPageController {
       @PathVariable @NotNull String kind,
       @PathVariable @NotNull UUID id,
       @RequestParam String action) {
-    if (!ALLOWED_LOADING_DOCK_KINDS.contains(kind)) {
+    UexEntity entity = ALLOWED_LOADING_DOCK_KINDS.get(kind);
+    if (entity == null) {
       return ResponseEntity.badRequest().build();
     }
     return dispatchOverrideAjax(
-        "/api/v1/" + kind + "/{id}", id, action, "loading-dock", "loading-dock-override");
+        action,
+        () -> catalogueClient.clearLoadingDockPin(entity, id),
+        value -> catalogueClient.pinLoadingDock(entity, id, value));
   }
 
   /**
@@ -295,7 +294,9 @@ public class AdminUexPageController {
   public ResponseEntity<Object> updateTerminalAutoLoadOverrideAjax(
       @PathVariable @NotNull UUID id, @RequestParam String action) {
     return dispatchOverrideAjax(
-        "/api/v1/terminals/{id}", id, action, "auto-load", "auto-load-override");
+        action,
+        () -> catalogueClient.clearTerminalAutoLoadPin(id),
+        value -> catalogueClient.pinTerminalAutoLoad(id, value));
   }
 
   /**
@@ -315,8 +316,7 @@ public class AdminUexPageController {
         log,
         "toggle terminal visibility (ajax)",
         () -> {
-          TerminalDto current =
-              backendApiClient.get("/api/v1/terminals/{id}", TerminalDto.class, id);
+          TerminalDto current = catalogueClient.terminal(id);
           TerminalDto body =
               new TerminalDto(
                   id,
@@ -334,8 +334,8 @@ public class AdminUexPageController {
                   current.uexIsAutoLoad(),
                   current.uexSyncedAt(),
                   !current.hidden());
-          backendApiClient.put("/api/v1/terminals/{id}", body, Void.class, id);
-          backendApiClient.evict(CacheDomain.TERMINAL);
+          catalogueClient.updateTerminal(id, body);
+          cacheEviction.evict(CacheDomain.TERMINAL);
           return ResponseEntity.ok().build();
         });
   }
@@ -344,29 +344,22 @@ public class AdminUexPageController {
    * AJAX counterpart of {@link #dispatchOverride} that returns an HTTP status instead of a
    * redirect.
    *
-   * @param baseTemplate backend URI template ending in the {@code {id}} variable, with no trailing
-   *     slash; its entity kind is an allow-listed literal
-   * @param id the entity id expanded into {@code baseTemplate}
    * @param action button action ({@code uex}, {@code yes}, or {@code no})
-   * @param setPath URL segment that pins the flag on a PATCH
-   * @param clearPath URL segment that drops the pin on a DELETE
+   * @param clear drops the pin
+   * @param pin pins the flag to the given value
    * @return {@code 200} on success, {@code 400} for an unknown action, the relayed backend status
    *     on failure
    */
   private ResponseEntity<Object> dispatchOverrideAjax(
-      String baseTemplate, UUID id, String action, String setPath, String clearPath) {
+      String action, Runnable clear, Consumer<Boolean> pin) {
     return relay(
         log,
         "override update (ajax)",
         () -> {
           switch (action) {
-            case "uex" -> backendApiClient.delete(baseTemplate + "/" + clearPath, Void.class, id);
-            case "yes" ->
-                backendApiClient.patch(
-                    baseTemplate + "/" + setPath + "?value=true", null, Void.class, id);
-            case "no" ->
-                backendApiClient.patch(
-                    baseTemplate + "/" + setPath + "?value=false", null, Void.class, id);
+            case "uex" -> clear.run();
+            case "yes" -> pin.accept(true);
+            case "no" -> pin.accept(false);
             default -> {
               return ResponseEntity.badRequest().build();
             }
@@ -376,36 +369,24 @@ public class AdminUexPageController {
   }
 
   /**
-   * Common backend dispatch for the three-state override buttons. Maps {@code uex} to {@code DELETE
-   * clearPath}, {@code yes} to {@code PATCH setPath?value=true}, {@code no} to {@code PATCH
-   * setPath?value=false}; anything else is rejected without a backend call.
+   * Common backend dispatch for the three-state override buttons. Maps {@code uex} to clearing the
+   * pin, {@code yes} and {@code no} to pinning the flag to {@code true} and {@code false}; anything
+   * else is rejected without a backend call.
    *
-   * @param baseTemplate backend URI template ending in the {@code {id}} variable, with no trailing
-   *     slash; its entity kind is an allow-listed literal
-   * @param id the entity id expanded into {@code baseTemplate}
    * @param action button action ({@code uex}, {@code yes}, or {@code no})
-   * @param setPath URL segment that pins the flag on a PATCH
-   * @param clearPath URL segment that drops the pin on a DELETE
+   * @param clear drops the pin
+   * @param pin pins the flag to the given value
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/uex}
    */
   @NotNull
   private String dispatchOverride(
-      String baseTemplate,
-      UUID id,
-      String action,
-      String setPath,
-      String clearPath,
-      RedirectAttributes redirectAttributes) {
+      String action, Runnable clear, Consumer<Boolean> pin, RedirectAttributes redirectAttributes) {
     try {
       switch (action) {
-        case "uex" -> backendApiClient.delete(baseTemplate + "/" + clearPath, Void.class, id);
-        case "yes" ->
-            backendApiClient.patch(
-                baseTemplate + "/" + setPath + "?value=true", null, Void.class, id);
-        case "no" ->
-            backendApiClient.patch(
-                baseTemplate + "/" + setPath + "?value=false", null, Void.class, id);
+        case "uex" -> clear.run();
+        case "yes" -> pin.accept(true);
+        case "no" -> pin.accept(false);
         default -> {
           redirectAttributes.addFlashAttribute("errorToast", "error.admin.uex.flag.update");
           return "redirect:/admin/uex-data";
@@ -538,100 +519,17 @@ public class AdminUexPageController {
   }
 
   /**
-   * Walks every page of one UEX-entity resource into a complete catalogue (REQ-ADMIN-001,
-   * ADR-0102). The zero-based page index is expanded into the template's {@code {page}} variable.
+   * Copies a catalogue and sorts it case-insensitively by name, a missing name first.
    *
-   * @param uriTemplate backend path plus literal query string ending in {@code &page={page}}
-   * @return the assembled catalogue of raw {@code Map} rows; never {@code null}
+   * @param rows the catalogue rows
+   * @param nameAccessor reads a row's name
+   * @param <T> the row type
+   * @return the sorted, mutable copy
    */
-  private CompleteCatalog<Map<String, Object>> loadCatalog(String uriTemplate) {
-    return CatalogPages.fetchAll(page -> backendApiClient.get(uriTemplate, MAP_PAGE_TYPE, page));
-  }
-
-  private List<CityDto> parseCities(List<Map<String, Object>> rows) {
-    return parseAndSort(
-        rows,
-        m ->
-            new CityDto(
-                parseUuid(m.get("id")),
-                parseString(m.get("name")),
-                parseString(m.get("starSystemName")),
-                parseString(m.get("planetName")),
-                parseNullableBoolean(m.get("hasLoadingDock")),
-                Boolean.TRUE.equals(m.get("hasLoadingDockOverridden"))),
-        CityDto::name);
-  }
-
-  private List<SpaceStationDto> parseStations(List<Map<String, Object>> rows) {
-    return parseAndSort(
-        rows,
-        m ->
-            new SpaceStationDto(
-                parseUuid(m.get("id")),
-                parseString(m.get("name")),
-                parseString(m.get("starSystemName")),
-                parseString(m.get("planetName")),
-                parseNullableBoolean(m.get("hasLoadingDock")),
-                Boolean.TRUE.equals(m.get("hasLoadingDockOverridden"))),
-        SpaceStationDto::name);
-  }
-
-  private List<OutpostDto> parseOutposts(List<Map<String, Object>> rows) {
-    return parseAndSort(
-        rows,
-        m ->
-            new OutpostDto(
-                parseUuid(m.get("id")),
-                parseString(m.get("name")),
-                parseString(m.get("starSystemName")),
-                parseString(m.get("planetName")),
-                parseNullableBoolean(m.get("hasLoadingDock")),
-                Boolean.TRUE.equals(m.get("hasLoadingDockOverridden"))),
-        OutpostDto::name);
-  }
-
-  private List<PoiDto> parsePois(List<Map<String, Object>> rows) {
-    return parseAndSort(
-        rows,
-        m ->
-            new PoiDto(
-                parseUuid(m.get("id")),
-                parseString(m.get("name")),
-                parseString(m.get("starSystemName")),
-                parseString(m.get("planetName")),
-                parseNullableBoolean(m.get("hasLoadingDock")),
-                Boolean.TRUE.equals(m.get("hasLoadingDockOverridden"))),
-        PoiDto::name);
-  }
-
-  private List<TerminalDto> parseTerminals(List<Map<String, Object>> rows) {
-    return parseAndSort(
-        rows,
-        m ->
-            new TerminalDto(
-                parseUuid(m.get("id")),
-                parseString(m.get("name")),
-                parseString(m.get("nickname")),
-                parseString(m.get("starSystemName")),
-                parseString(m.get("planetName")),
-                parseString(m.get("cityName")),
-                parseString(m.get("spaceStationName")),
-                parseNullableBoolean(m.get("hasLoadingDock")),
-                parseNullableBoolean(m.get("isAutoLoad")),
-                Boolean.TRUE.equals(m.get("hasLoadingDockOverridden")),
-                Boolean.TRUE.equals(m.get("isAutoLoadOverridden")),
-                parseNullableBoolean(m.get("uexHasLoadingDock")),
-                parseNullableBoolean(m.get("uexIsAutoLoad")),
-                parseInstant(m.get("uexSyncedAt")),
-                Boolean.TRUE.equals(m.get("hidden"))),
-        TerminalDto::name);
-  }
-
-  private <T> List<T> parseAndSort(
-      @NotNull List<Map<String, Object>> rows,
-      java.util.function.Function<Map<String, Object>, T> mapper,
-      java.util.function.Function<T, String> nameAccessor) {
-    List<T> list = rows.stream().map(mapper).collect(Collectors.toCollection(ArrayList::new));
+  @NotNull
+  private static <T> List<T> sortedByName(
+      @NotNull List<T> rows, @NotNull Function<T, String> nameAccessor) {
+    List<T> list = new ArrayList<>(rows);
     list.sort(
         Comparator.comparing(
             t -> {
@@ -640,52 +538,6 @@ public class AdminUexPageController {
             },
             String.CASE_INSENSITIVE_ORDER));
     return list;
-  }
-
-  @Nullable
-  private String parseString(Object o) {
-    return o == null ? null : o.toString();
-  }
-
-  @Contract("null -> null")
-  @Nullable
-  private UUID parseUuid(Object o) {
-    if (o == null) {
-      return null;
-    }
-    try {
-      return UUID.fromString(o.toString());
-    } catch (Exception e) {
-      return null;
-    }
-  }
-
-  @Contract("null -> null")
-  @Nullable
-  private Boolean parseNullableBoolean(Object o) {
-    if (o == null) {
-      return null;
-    }
-    if (o instanceof Boolean b) {
-      return b;
-    }
-    return Boolean.parseBoolean(o.toString());
-  }
-
-  @Contract("null -> null")
-  @Nullable
-  private Instant parseInstant(Object o) {
-    if (o == null) {
-      return null;
-    }
-    if (o instanceof Instant i) {
-      return i;
-    }
-    try {
-      return Instant.parse(o.toString());
-    } catch (Exception e) {
-      return null;
-    }
   }
 
   private static String nullSafe(String s) {

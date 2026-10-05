@@ -78,8 +78,10 @@ class MaterialsCategoryEmptyStateInPlaceE2eTest {
   }
 
   /**
-   * Creates one material category in place, deletes it in place, and asserts the empty-state
-   * placeholder reappears without a reload.
+   * Creates one material category in place, deletes it in place while the success toast may cover
+   * its delete button, and asserts the empty-state placeholder reappears without a reload.
+   *
+   * <p>The shown toast must be transparent to the pointer (REQ-UI-008).
    */
   @Test
   void deletingLastCategoryRestoresEmptyStateInPlace() {
@@ -111,6 +113,15 @@ class MaterialsCategoryEmptyStateInPlaceE2eTest {
             page.locator("tr[data-category-row]")
                 .filter(new Locator.FilterOptions().setHasText(categoryName));
         assertThat(newRow).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
+
+        Locator createdToast = page.locator(".notification-toast:not(.error-toast)");
+        assertThat(createdToast).hasCount(1);
+        assertEquals(
+            "none",
+            createdToast.evaluate(
+                "toast => { toast.classList.add('visible'); return"
+                    + " getComputedStyle(toast).pointerEvents; }"),
+            "a shown toast must not take pointer events, or it swallows clicks on what it covers");
 
         newRow.locator("button[type='submit']").click();
         page.waitForResponse(

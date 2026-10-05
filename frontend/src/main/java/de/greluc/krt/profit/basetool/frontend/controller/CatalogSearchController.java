@@ -19,15 +19,14 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -47,16 +46,8 @@ import org.springframework.web.bind.annotation.RestController;
 @PreAuthorize("isAuthenticated()")
 public class CatalogSearchController {
 
-  /** Response type of the backend material picker search ({@code GET /api/v1/materials/search}). */
-  private static final ParameterizedTypeReference<PageResponse<MaterialDto>> PAGE_OF_MATERIAL =
-      new ParameterizedTypeReference<PageResponse<MaterialDto>>() {};
-
-  /** Response type of the backend location picker search ({@code GET /api/v1/locations/search}). */
-  private static final ParameterizedTypeReference<PageResponse<LocationReferenceDto>>
-      PAGE_OF_LOCATION_REFERENCE =
-          new ParameterizedTypeReference<PageResponse<LocationReferenceDto>>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Runs the material and location picker searches. */
+  private final CatalogueBackendClient catalogueClient;
 
   /**
    * Live search over the visible material catalog. {@code jobOrder=true} and {@code raw=true}
@@ -75,14 +66,8 @@ public class CatalogSearchController {
       @RequestParam(required = false, defaultValue = "false") boolean raw) {
     try {
       PageResponse<MaterialDto> page =
-          backendApiClient.get(
-              "/api/v1/materials/search?search={q}&jobOrderOnly={jobOrder}&rawOnly={raw}"
-                  + "&size={size}&sort=name,asc",
-              PAGE_OF_MATERIAL,
-              q == null ? "" : q,
-              jobOrder,
-              raw,
-              PickerSearch.PAGE_SIZE);
+          catalogueClient.searchMaterials(
+              q == null ? "" : q, jobOrder, raw, PickerSearch.PAGE_SIZE);
       return page != null && page.content() != null ? page.content() : List.of();
     } catch (Exception e) {
       log.error("Failed to search materials", e);
@@ -102,11 +87,7 @@ public class CatalogSearchController {
   public List<LocationReferenceDto> locationSearch(@RequestParam(required = false) String q) {
     try {
       PageResponse<LocationReferenceDto> page =
-          backendApiClient.get(
-              "/api/v1/locations/search?search={q}&size={size}&sort=name,asc",
-              PAGE_OF_LOCATION_REFERENCE,
-              q == null ? "" : q,
-              PickerSearch.LOCATION_PAGE_SIZE);
+          catalogueClient.searchLocations(q == null ? "" : q, PickerSearch.LOCATION_PAGE_SIZE);
       return page != null && page.content() != null ? page.content() : List.of();
     } catch (Exception e) {
       log.error("Failed to search locations", e);

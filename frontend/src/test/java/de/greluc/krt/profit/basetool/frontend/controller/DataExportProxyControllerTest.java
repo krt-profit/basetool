@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.frontend.config.AppHttpProperties;
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -67,7 +68,7 @@ class DataExportProxyControllerTest {
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
     controller =
         new DataExportProxyController(
-            RealBackendApiClient.over(webClient),
+            new IdentityBackendClient(RealBackendApiClient.over(webClient)),
             new AppHttpProperties(
                 Duration.ofSeconds(3),
                 Duration.ofSeconds(5),

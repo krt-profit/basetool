@@ -27,14 +27,16 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AdminDeletionRequestDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.CreateDeletionRequestRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import java.util.HashMap;
+import java.time.Instant;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.ArgumentMatchers;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.ui.ConcurrentModel;
@@ -49,45 +51,61 @@ class DeletionRequestProxyControllerTest {
 
   private static final String URI = "/api/v1/users/me/deletion-request";
 
+  private static final AdminDeletionRequestDto PENDING =
+      new AdminDeletionRequestDto(
+          UUID.fromString("4b3a2918-0f7e-4d6c-9b5a-48372615f4e3"),
+          UUID.fromString("c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f"),
+          null,
+          "PENDING",
+          true,
+          Instant.parse("2026-09-01T10:15:30Z"),
+          null,
+          null,
+          0L);
+
+  private static DeletionRequestProxyController controller(BackendApiClient client) {
+    return new DeletionRequestProxyController(new IdentityBackendClient(client));
+  }
+
   @Test
   void request_relaysNoUserIdAndCoercesTheFlag() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.post(eq(URI), any(), eq(Object.class))).thenReturn(Map.of("status", "PENDING"));
-    DeletionRequestProxyController controller = new DeletionRequestProxyController(client);
+    when(client.post(eq(URI), any(), eq(AdminDeletionRequestDto.class))).thenReturn(PENDING);
+    DeletionRequestProxyController controller = controller(client);
 
     ResponseEntity<Object> response = controller.request(Map.of("eraseHistory", true));
 
     assertEquals(HttpStatus.OK, response.getStatusCode());
-    assertEquals(Map.of("status", "PENDING"), response.getBody());
-    assertEquals(true, capturePostedBody(client).get("eraseHistory"));
+    assertEquals(PENDING, response.getBody());
+    assertEquals(true, capturePostedBody(client).eraseHistory());
   }
 
   @Test
   void request_aStringFlagIsNotATrueFlag() {
     BackendApiClient client = mock(BackendApiClient.class);
-    DeletionRequestProxyController controller = new DeletionRequestProxyController(client);
+    DeletionRequestProxyController controller = controller(client);
 
     controller.request(Map.of("eraseHistory", "true"));
 
-    assertEquals(false, capturePostedBody(client).get("eraseHistory"));
+    assertEquals(false, capturePostedBody(client).eraseHistory());
   }
 
   @Test
   void request_anAbsentFlagIsFalse() {
     BackendApiClient client = mock(BackendApiClient.class);
-    DeletionRequestProxyController controller = new DeletionRequestProxyController(client);
+    DeletionRequestProxyController controller = controller(client);
 
     controller.request(Map.of());
 
-    assertEquals(false, capturePostedBody(client).get("eraseHistory"));
+    assertEquals(false, capturePostedBody(client).eraseHistory());
   }
 
   @Test
   void request_relaysTheBackendStatusRatherThanFlatteningItTo500() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.post(eq(URI), any(), eq(Object.class)))
+    when(client.post(eq(URI), any(), eq(AdminDeletionRequestDto.class)))
         .thenThrow(new BackendServiceException("already pending", new RuntimeException(), 409));
-    DeletionRequestProxyController controller = new DeletionRequestProxyController(client);
+    DeletionRequestProxyController controller = controller(client);
 
     ResponseEntity<Object> response = controller.request(Map.of());
 
@@ -97,9 +115,9 @@ class DeletionRequestProxyControllerTest {
   @Test
   void request_anUnexpectedFailureIs500() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.post(eq(URI), any(), eq(Object.class)))
+    when(client.post(eq(URI), any(), eq(AdminDeletionRequestDto.class)))
         .thenThrow(new IllegalStateException("boom"));
-    DeletionRequestProxyController controller = new DeletionRequestProxyController(client);
+    DeletionRequestProxyController controller = controller(client);
 
     ResponseEntity<Object> response = controller.request(Map.of());
 
@@ -109,7 +127,7 @@ class DeletionRequestProxyControllerTest {
   @Test
   void withdraw_relaysNoUserIdAndAnswers204() {
     BackendApiClient client = mock(BackendApiClient.class);
-    DeletionRequestProxyController controller = new DeletionRequestProxyController(client);
+    DeletionRequestProxyController controller = controller(client);
 
     ResponseEntity<Object> response = controller.withdraw();
 
@@ -122,7 +140,7 @@ class DeletionRequestProxyControllerTest {
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.delete(eq(URI), eq(Void.class)))
         .thenThrow(new BackendServiceException("gone", new RuntimeException(), 404));
-    DeletionRequestProxyController controller = new DeletionRequestProxyController(client);
+    DeletionRequestProxyController controller = controller(client);
 
     ResponseEntity<Object> response = controller.withdraw();
 
@@ -133,7 +151,7 @@ class DeletionRequestProxyControllerTest {
   void withdraw_anUnexpectedFailureIs500() {
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.delete(eq(URI), eq(Void.class))).thenThrow(new IllegalStateException("boom"));
-    DeletionRequestProxyController controller = new DeletionRequestProxyController(client);
+    DeletionRequestProxyController controller = controller(client);
 
     ResponseEntity<Object> response = controller.withdraw();
 
@@ -143,27 +161,22 @@ class DeletionRequestProxyControllerTest {
   @Test
   void card_publishesTheRequestForTheFragment() {
     BackendApiClient client = mock(BackendApiClient.class);
-    Map<String, Object> pending = new HashMap<>();
-    pending.put("status", "PENDING");
-    when(client.get(
-            eq(URI), ArgumentMatchers.<ParameterizedTypeReference<Map<String, Object>>>any()))
-        .thenReturn(pending);
-    DeletionRequestProxyController controller = new DeletionRequestProxyController(client);
+    when(client.get(URI, AdminDeletionRequestDto.class)).thenReturn(PENDING);
+    DeletionRequestProxyController controller = controller(client);
     Model model = new ConcurrentModel();
 
     String view = controller.card(model);
 
     assertEquals("fragments/profile-deletion-card :: card", view);
-    assertEquals(pending, model.getAttribute("deletionRequest"));
+    assertEquals(PENDING, model.getAttribute("deletionRequest"));
   }
 
   @Test
   void card_saysSoWhenTheBackendIsDownRatherThanClaimingNoRequest() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.get(
-            eq(URI), ArgumentMatchers.<ParameterizedTypeReference<Map<String, Object>>>any()))
+    when(client.get(URI, AdminDeletionRequestDto.class))
         .thenThrow(new BackendServiceException("down", new RuntimeException(), 503));
-    DeletionRequestProxyController controller = new DeletionRequestProxyController(client);
+    DeletionRequestProxyController controller = controller(client);
     Model model = new ConcurrentModel();
 
     String view = controller.card(model);
@@ -176,10 +189,8 @@ class DeletionRequestProxyControllerTest {
   @Test
   void card_marksTheStateAvailableOnASuccessfulLoad() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.get(
-            eq(URI), ArgumentMatchers.<ParameterizedTypeReference<Map<String, Object>>>any()))
-        .thenReturn(null);
-    DeletionRequestProxyController controller = new DeletionRequestProxyController(client);
+    when(client.get(URI, AdminDeletionRequestDto.class)).thenReturn(null);
+    DeletionRequestProxyController controller = controller(client);
     Model model = new ConcurrentModel();
 
     controller.card(model);
@@ -193,10 +204,9 @@ class DeletionRequestProxyControllerTest {
    * @param client the mocked client
    * @return the posted body
    */
-  @SuppressWarnings("unchecked")
-  private static Map<String, Object> capturePostedBody(BackendApiClient client) {
-    ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
-    verify(client).post(eq(URI), captor.capture(), eq(Object.class));
-    return (Map<String, Object>) captor.getValue();
+  private static CreateDeletionRequestRequest capturePostedBody(BackendApiClient client) {
+    ArgumentCaptor<CreateDeletionRequestRequest> captor = ArgumentCaptor.captor();
+    verify(client).post(eq(URI), captor.capture(), eq(AdminDeletionRequestDto.class));
+    return captor.getValue();
   }
 }

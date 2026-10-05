@@ -21,26 +21,24 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.model.dto.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobTypeDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.FrequencyTypeForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.JobTypeForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.SquadronForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages.CompleteCatalog;
-import de.greluc.krt.profit.basetool.frontend.support.MapPayloadValues;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -49,7 +47,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -78,12 +76,14 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminMissionDataPageController {
 
-  /** Captured generic type for decoding a paged raw-{@code Map} catalog response. */
-  private static final ParameterizedTypeReference<PageResponse<Map<String, Object>>> MAP_PAGE =
-      new ParameterizedTypeReference<>() {};
+  /** Reads and writes the job-type, squadron and frequency-type catalogues. */
+  private final CatalogueBackendClient catalogueClient;
 
-  private final BackendApiClient backendApiClient;
+  /** Loads the three catalogues in parallel. */
   private final ParallelPageLoader parallelPageLoader;
+
+  /** Clears the catalogue caches after a write. */
+  private final CatalogueCacheEviction cacheEviction;
 
   /**
    * Renders all three complete catalogs, fetched in parallel via {@link ParallelPageLoader}
@@ -142,7 +142,7 @@ public class AdminMissionDataPageController {
                   return null;
                 });
 
-    CompletableFuture<CompleteCatalog<Map<String, Object>>> freqsFuture =
+    CompletableFuture<CompleteCatalog<FrequencyTypeDto>> freqsFuture =
         parallelPageLoader
             .loadAsync(() -> fetchFrequencyTypes(includeInactiveFrequencyTypes))
             .exceptionally(
@@ -156,7 +156,7 @@ public class AdminMissionDataPageController {
 
     CompleteCatalog<JobTypeDto> jobTypesCatalog = jobTypesFuture.join();
     CompleteCatalog<SquadronDto> squadronsCatalog = squadronsFuture.join();
-    CompleteCatalog<Map<String, Object>> freqsCatalog = freqsFuture.join();
+    CompleteCatalog<FrequencyTypeDto> freqsCatalog = freqsFuture.join();
     model.addAttribute("jobTypes", jobTypesCatalog == null ? null : jobTypesCatalog.items());
     model.addAttribute("squadrons", squadronsCatalog == null ? null : squadronsCatalog.items());
     if (freqsCatalog != null) {
@@ -179,7 +179,7 @@ public class AdminMissionDataPageController {
 
   /**
    * Logs a parallel fragment-load failure (REQ-OBS-001): a {@link BackendServiceException},
-   * possibly wrapped in a {@link CompletionException}, at DEBUG since {@code BackendApiClient}
+   * possibly wrapped in a {@link CompletionException}, at DEBUG since the kernel backend client
    * already logged it; anything else at ERROR.
    *
    * @param what label of the fragment that failed to load (e.g. {@code "job types"})
@@ -200,29 +200,22 @@ public class AdminMissionDataPageController {
    */
   @NotNull
   private CompleteCatalog<JobTypeDto> fetchJobTypes(boolean includeInactive) {
-    CompleteCatalog<Map<String, Object>> catalog =
-        CatalogPages.fetchAll(
-            page ->
-                backendApiClient.get(
-                    "/api/v1/job-types?size=1000&sort=name,asc"
-                        + "&includeInactive={includeInactive}&page={page}",
-                    MAP_PAGE,
-                    includeInactive,
-                    page));
+    CompleteCatalog<JobTypeDto> catalog =
+        CatalogPages.fetchAll(page -> catalogueClient.jobTypePage(includeInactive, page));
     List<JobTypeDto> jobTypes =
         catalog.items().stream()
             .map(
-                m ->
+                j ->
                     new JobTypeDto(
-                        MapPayloadValues.uuidOrNull(m.get("id")),
-                        MapPayloadValues.stringOrNull(m.get("name")),
-                        MapPayloadValues.stringOrNull(m.get("description")),
-                        MapPayloadValues.stringOrNull(m.get("archetype")),
-                        MapPayloadValues.uuidOrNull(m.get("parentId")),
-                        MapPayloadValues.booleanOrFalse(m.get("active")),
-                        MapPayloadValues.booleanOrFalse(m.get("isLeadershipRole")),
-                        MapPayloadValues.booleanOrFalse(m.get("isMissionLead")),
-                        MapPayloadValues.longOrZero(m.get("version"))))
+                        j.id(),
+                        j.name(),
+                        j.description(),
+                        j.archetype(),
+                        j.parentId(),
+                        Boolean.TRUE.equals(j.active()),
+                        Boolean.TRUE.equals(j.isLeadershipRole()),
+                        Boolean.TRUE.equals(j.isMissionLead()),
+                        versionOrZero(j.version())))
             .collect(Collectors.toCollection(ArrayList::new));
     jobTypes.sort(
         Comparator.comparing(j -> j.name() == null ? "" : j.name(), String.CASE_INSENSITIVE_ORDER));
@@ -235,28 +228,21 @@ public class AdminMissionDataPageController {
    */
   @NotNull
   private CompleteCatalog<SquadronDto> fetchSquadrons(boolean includeInactive) {
-    CompleteCatalog<Map<String, Object>> catalog =
-        CatalogPages.fetchAll(
-            page ->
-                backendApiClient.get(
-                    "/api/v1/squadrons?size=1000&sort=name,asc"
-                        + "&includeInactive={includeInactive}&page={page}",
-                    MAP_PAGE,
-                    includeInactive,
-                    page));
+    CompleteCatalog<SquadronDto> catalog =
+        CatalogPages.fetchAll(page -> catalogueClient.squadronPage(includeInactive, page));
     List<SquadronDto> squadrons =
         catalog.items().stream()
             .map(
-                m ->
+                s ->
                     new SquadronDto(
-                        MapPayloadValues.uuidOrNull(m.get("id")),
-                        MapPayloadValues.stringOrNull(m.get("name")),
-                        MapPayloadValues.stringOrNull(m.get("shorthand")),
-                        MapPayloadValues.stringOrNull(m.get("description")),
-                        MapPayloadValues.booleanOrFalse(m.get("active")),
-                        MapPayloadValues.booleanOrFalse(m.get("isPromotionEnabled")),
-                        MapPayloadValues.booleanOrFalse(m.get("isProfitEligible")),
-                        MapPayloadValues.longOrZero(m.get("version"))))
+                        s.id(),
+                        s.name(),
+                        s.shorthand(),
+                        s.description(),
+                        Boolean.TRUE.equals(s.active()),
+                        Boolean.TRUE.equals(s.isPromotionEnabled()),
+                        Boolean.TRUE.equals(s.isProfitEligible()),
+                        versionOrZero(s.version())))
             .collect(Collectors.toCollection(ArrayList::new));
     squadrons.sort(
         Comparator.comparing(s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER));
@@ -264,20 +250,22 @@ public class AdminMissionDataPageController {
   }
 
   /**
-   * Fetches the <em>complete</em> frequency-type catalog from the backend — every page, not one
-   * capped chunk (REQ-ADMIN-001, ADR-0102) — and returns the raw {@code Map} content (this list is
-   * rendered with Thymeleaf utility helpers and does not need a typed DTO). The returned wrapper
-   * carries the truncation flag for the page-level warning banner (REQ-ADMIN-002).
+   * Fetches the complete frequency-type catalog in its admin order (REQ-ADMIN-001), with the
+   * truncation flag (REQ-ADMIN-002).
    */
-  private CompleteCatalog<Map<String, Object>> fetchFrequencyTypes(boolean includeInactive) {
-    return CatalogPages.fetchAll(
-        page ->
-            backendApiClient.get(
-                "/api/v1/frequency-types?size=1000&sort=sortIndex,asc"
-                    + (includeInactive ? "" : "&active=true")
-                    + "&page={page}",
-                MAP_PAGE,
-                page));
+  private CompleteCatalog<FrequencyTypeDto> fetchFrequencyTypes(boolean includeInactive) {
+    return CatalogPages.fetchAll(page -> catalogueClient.frequencyTypePage(includeInactive, page));
+  }
+
+  /**
+   * Reads an optimistic-lock version, an absent one as zero.
+   *
+   * @param version the version the backend sent, or {@code null}
+   * @return the version, or {@code 0L}
+   */
+  @NotNull
+  private static Long versionOrZero(@Nullable Long version) {
+    return version == null ? 0L : version;
   }
 
   /**
@@ -314,8 +302,8 @@ public class AdminMissionDataPageController {
               form.isLeadershipRole(),
               form.isMissionLead(),
               0L);
-      backendApiClient.post("/api/v1/job-types", body, Void.class);
-      backendApiClient.clearStaticDataCache();
+      catalogueClient.createJobType(body);
+      cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Create JobType failed", e);
@@ -367,8 +355,8 @@ public class AdminMissionDataPageController {
               form.isLeadershipRole(),
               form.isMissionLead(),
               form.version());
-      backendApiClient.put("/api/v1/job-types/{id}", body, Void.class, id);
-      backendApiClient.clearStaticDataCache();
+      catalogueClient.updateJobType(id, body);
+      cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Update JobType failed", e);
@@ -400,8 +388,8 @@ public class AdminMissionDataPageController {
   public String deleteJobType(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/job-types/{id}", Void.class, id);
-      backendApiClient.clearStaticDataCache();
+      catalogueClient.deleteJobType(id);
+      cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
       log.debug("Delete JobType failed", e);
@@ -430,8 +418,8 @@ public class AdminMissionDataPageController {
   public String activateJobType(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.post("/api/v1/job-types/{id}/activate", null, Void.class, id);
-      backendApiClient.clearStaticDataCache();
+      catalogueClient.activateJobType(id);
+      cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Activate JobType failed", e);
@@ -468,8 +456,8 @@ public class AdminMissionDataPageController {
       SquadronDto body =
           new SquadronDto(
               null, form.name(), form.shorthand(), form.description(), true, true, false, 0L);
-      backendApiClient.post("/api/v1/squadrons", body, Void.class);
-      backendApiClient.clearStaticDataCache();
+      catalogueClient.createSquadron(body);
+      cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Create Squadron failed", e);
@@ -519,8 +507,8 @@ public class AdminMissionDataPageController {
               true,
               false,
               form.version());
-      backendApiClient.put("/api/v1/squadrons/{id}", body, Void.class, id);
-      backendApiClient.clearStaticDataCache();
+      catalogueClient.updateSquadron(id, body);
+      cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Update Squadron failed", e);
@@ -552,8 +540,8 @@ public class AdminMissionDataPageController {
   public String deleteSquadron(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/squadrons/{id}", Void.class, id);
-      backendApiClient.clearStaticDataCache();
+      catalogueClient.deleteSquadron(id);
+      cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
       log.debug("Delete Squadron failed", e);
@@ -582,8 +570,8 @@ public class AdminMissionDataPageController {
   public String activateSquadron(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.post("/api/v1/squadrons/{id}/activate", null, Void.class, id);
-      backendApiClient.clearStaticDataCache();
+      catalogueClient.activateSquadron(id);
+      cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Activate Squadron failed", e);
@@ -614,12 +602,9 @@ public class AdminMissionDataPageController {
       return listData(false, false, false, null, model);
     }
     try {
-      Map<String, Object> body = new HashMap<>();
-      body.put("name", form.name());
-      body.put("description", form.description());
-      body.put("active", true);
-      backendApiClient.post("/api/v1/frequency-types", body, Void.class);
-      backendApiClient.clearStaticDataCache();
+      catalogueClient.createFrequencyType(
+          new FrequencyTypeDto(null, form.name(), form.description(), true, null, null));
+      cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Create FrequencyType failed", e);
@@ -655,13 +640,16 @@ public class AdminMissionDataPageController {
       return listData(false, false, false, null, model);
     }
     try {
-      Map<String, Object> body = new HashMap<>();
-      body.put("name", form.name());
-      body.put("description", form.description());
-      body.put("active", active != null ? active : true);
-      body.put("version", form.version());
-      backendApiClient.put("/api/v1/frequency-types/{id}", body, Void.class, id);
-      backendApiClient.clearStaticDataCache();
+      catalogueClient.updateFrequencyType(
+          id,
+          new FrequencyTypeDto(
+              null,
+              form.name(),
+              form.description(),
+              active != null ? active : true,
+              null,
+              form.version()));
+      cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Update FrequencyType failed", e);
@@ -689,8 +677,8 @@ public class AdminMissionDataPageController {
   public String deleteFrequencyType(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/frequency-types/{id}", Void.class, id);
-      backendApiClient.clearStaticDataCache();
+      catalogueClient.deleteFrequencyType(id);
+      cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
       log.debug("Delete FrequencyType failed", e);
@@ -719,8 +707,8 @@ public class AdminMissionDataPageController {
   public String activateFrequencyType(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.post("/api/v1/frequency-types/{id}/activate", null, Void.class, id);
-      backendApiClient.clearStaticDataCache();
+      catalogueClient.activateFrequencyType(id);
+      cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Activate FrequencyType failed", e);
@@ -740,8 +728,8 @@ public class AdminMissionDataPageController {
   @ResponseBody
   public ResponseEntity<Void> reorderFrequencyTypes(@RequestBody List<UUID> ids) {
     try {
-      backendApiClient.post("/api/v1/frequency-types/reorder", ids, Void.class);
-      backendApiClient.clearStaticDataCache();
+      catalogueClient.reorderFrequencyTypes(ids);
+      cacheEviction.clearStaticDataCache();
       return ResponseEntity.ok().build();
     } catch (Exception e) {
       log.error("Reorder FrequencyTypes failed", e);
@@ -766,8 +754,7 @@ public class AdminMissionDataPageController {
     }
     return okOrRelay(
         () ->
-            backendApiClient.post(
-                "/api/v1/job-types",
+            catalogueClient.createJobType(
                 new JobTypeDto(
                     null,
                     form.name(),
@@ -777,8 +764,7 @@ public class AdminMissionDataPageController {
                     true,
                     form.isLeadershipRole(),
                     form.isMissionLead(),
-                    0L),
-                Void.class));
+                    0L)));
   }
 
   /**
@@ -801,8 +787,8 @@ public class AdminMissionDataPageController {
     }
     return okOrRelay(
         () ->
-            backendApiClient.put(
-                "/api/v1/job-types/{id}",
+            catalogueClient.updateJobType(
+                id,
                 new JobTypeDto(
                     id,
                     form.name(),
@@ -812,9 +798,7 @@ public class AdminMissionDataPageController {
                     true,
                     form.isLeadershipRole(),
                     form.isMissionLead(),
-                    form.version()),
-                Void.class,
-                id));
+                    form.version())));
   }
 
   /**
@@ -826,7 +810,7 @@ public class AdminMissionDataPageController {
   @ResponseBody
   @PostMapping(value = "/job-types/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> deleteJobTypeAjax(@PathVariable @NotNull UUID id) {
-    return okOrRelay(() -> backendApiClient.delete("/api/v1/job-types/{id}", Void.class, id));
+    return okOrRelay(() -> catalogueClient.deleteJobType(id));
   }
 
   /**
@@ -839,8 +823,7 @@ public class AdminMissionDataPageController {
   @PostMapping(value = "/job-types/{id}/activate", headers = "X-Requested-With=XMLHttpRequest")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> activateJobTypeAjax(@PathVariable @NotNull UUID id) {
-    return okOrRelay(
-        () -> backendApiClient.post("/api/v1/job-types/{id}/activate", null, Void.class, id));
+    return okOrRelay(() -> catalogueClient.activateJobType(id));
   }
 
   /**
@@ -860,11 +843,16 @@ public class AdminMissionDataPageController {
     }
     return okOrRelay(
         () ->
-            backendApiClient.post(
-                "/api/v1/squadrons",
+            catalogueClient.createSquadron(
                 new SquadronDto(
-                    null, form.name(), form.shorthand(), form.description(), true, true, false, 0L),
-                Void.class));
+                    null,
+                    form.name(),
+                    form.shorthand(),
+                    form.description(),
+                    true,
+                    true,
+                    false,
+                    0L)));
   }
 
   /**
@@ -887,8 +875,8 @@ public class AdminMissionDataPageController {
     }
     return okOrRelay(
         () ->
-            backendApiClient.put(
-                "/api/v1/squadrons/{id}",
+            catalogueClient.updateSquadron(
+                id,
                 new SquadronDto(
                     id,
                     form.name(),
@@ -897,9 +885,7 @@ public class AdminMissionDataPageController {
                     true,
                     true,
                     false,
-                    form.version()),
-                Void.class,
-                id));
+                    form.version())));
   }
 
   /**
@@ -911,7 +897,7 @@ public class AdminMissionDataPageController {
   @ResponseBody
   @PostMapping(value = "/squadrons/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> deleteSquadronAjax(@PathVariable @NotNull UUID id) {
-    return okOrRelay(() -> backendApiClient.delete("/api/v1/squadrons/{id}", Void.class, id));
+    return okOrRelay(() -> catalogueClient.deleteSquadron(id));
   }
 
   /**
@@ -924,8 +910,7 @@ public class AdminMissionDataPageController {
   @PostMapping(value = "/squadrons/{id}/activate", headers = "X-Requested-With=XMLHttpRequest")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> activateSquadronAjax(@PathVariable @NotNull UUID id) {
-    return okOrRelay(
-        () -> backendApiClient.post("/api/v1/squadrons/{id}/activate", null, Void.class, id));
+    return okOrRelay(() -> catalogueClient.activateSquadron(id));
   }
 
   /**
@@ -945,13 +930,9 @@ public class AdminMissionDataPageController {
       return ResponseEntity.status(422).build();
     }
     return okOrRelay(
-        () -> {
-          Map<String, Object> body = new HashMap<>();
-          body.put("name", form.name());
-          body.put("description", form.description());
-          body.put("active", true);
-          backendApiClient.post("/api/v1/frequency-types", body, Void.class);
-        });
+        () ->
+            catalogueClient.createFrequencyType(
+                new FrequencyTypeDto(null, form.name(), form.description(), true, null, null)));
   }
 
   /**
@@ -975,14 +956,16 @@ public class AdminMissionDataPageController {
       return ResponseEntity.status(422).build();
     }
     return okOrRelay(
-        () -> {
-          Map<String, Object> body = new HashMap<>();
-          body.put("name", form.name());
-          body.put("description", form.description());
-          body.put("active", active != null ? active : true);
-          body.put("version", form.version());
-          backendApiClient.put("/api/v1/frequency-types/{id}", body, Void.class, id);
-        });
+        () ->
+            catalogueClient.updateFrequencyType(
+                id,
+                new FrequencyTypeDto(
+                    null,
+                    form.name(),
+                    form.description(),
+                    active != null ? active : true,
+                    null,
+                    form.version())));
   }
 
   /**
@@ -994,7 +977,7 @@ public class AdminMissionDataPageController {
   @ResponseBody
   @PostMapping(value = "/frequency-types/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> deleteFrequencyTypeAjax(@PathVariable @NotNull UUID id) {
-    return okOrRelay(() -> backendApiClient.delete("/api/v1/frequency-types/{id}", Void.class, id));
+    return okOrRelay(() -> catalogueClient.deleteFrequencyType(id));
   }
 
   /**
@@ -1008,8 +991,7 @@ public class AdminMissionDataPageController {
       value = "/frequency-types/{id}/activate",
       headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> activateFrequencyTypeAjax(@PathVariable @NotNull UUID id) {
-    return okOrRelay(
-        () -> backendApiClient.post("/api/v1/frequency-types/{id}/activate", null, Void.class, id));
+    return okOrRelay(() -> catalogueClient.activateFrequencyType(id));
   }
 
   /**
@@ -1026,7 +1008,7 @@ public class AdminMissionDataPageController {
         "mission-data write (ajax)",
         () -> {
           backendCall.run();
-          backendApiClient.clearStaticDataCache();
+          cacheEviction.clearStaticDataCache();
           return ResponseEntity.ok().build();
         });
   }

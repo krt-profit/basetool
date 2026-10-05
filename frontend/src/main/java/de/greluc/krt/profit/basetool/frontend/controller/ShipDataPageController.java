@@ -21,13 +21,12 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ManufacturerDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.ManufacturerForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ShipTypeForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages.CompleteCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
@@ -38,7 +37,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -63,15 +61,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Slf4j
 public class ShipDataPageController {
 
-  private final BackendApiClient backendApiClient;
-
-  /** Response type for the manufacturer catalog page fetch (includes hidden entries). */
-  private static final ParameterizedTypeReference<PageResponse<ManufacturerDto>>
-      MANUFACTURER_PAGE_TYPE = new ParameterizedTypeReference<>() {};
-
-  /** Response type for the ship-type catalog page fetch (includes hidden entries). */
-  private static final ParameterizedTypeReference<PageResponse<ShipTypeDto>> SHIP_TYPE_PAGE_TYPE =
-      new ParameterizedTypeReference<>() {};
+  /** Reads and writes the manufacturer and ship-type catalogues. */
+  private final CatalogueBackendClient catalogueClient;
 
   /**
    * Loads the complete manufacturer and ship-type catalogs including hidden entries
@@ -97,25 +88,14 @@ public class ShipDataPageController {
 
     try {
       CompleteCatalog<ManufacturerDto> manufacturersCatalog =
-          CatalogPages.fetchAll(
-              page ->
-                  backendApiClient.get(
-                      "/api/v1/manufacturers?size=1000&sort=name,asc&includeHidden=true"
-                          + "&page={page}",
-                      MANUFACTURER_PAGE_TYPE,
-                      page));
+          CatalogPages.fetchAll(catalogueClient::manufacturerPage);
       List<ManufacturerDto> manufacturers = new ArrayList<>(manufacturersCatalog.items());
       manufacturers.sort(
           Comparator.comparing(ManufacturerDto::name, String.CASE_INSENSITIVE_ORDER));
       model.addAttribute("manufacturers", manufacturers);
 
       CompleteCatalog<ShipTypeDto> shipTypesCatalog =
-          CatalogPages.fetchAll(
-              page ->
-                  backendApiClient.get(
-                      "/api/v1/ship-types?size=1000&sort=name,asc&includeHidden=true&page={page}",
-                      SHIP_TYPE_PAGE_TYPE,
-                      page));
+          CatalogPages.fetchAll(catalogueClient::shipTypePage);
       List<ShipTypeDto> shipTypes = new ArrayList<>(shipTypesCatalog.items());
       shipTypes.sort(Comparator.comparing(ShipTypeDto::name, String.CASE_INSENSITIVE_ORDER));
       model.addAttribute("shipTypes", shipTypes);
@@ -147,8 +127,7 @@ public class ShipDataPageController {
       @RequestParam boolean hidden,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.put(
-          "/api/v1/manufacturers/{id}/visibility?hidden={hidden}", null, Void.class, id, hidden);
+      catalogueClient.setManufacturerHidden(id, hidden);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Update Manufacturer visibility failed", e);
@@ -174,8 +153,7 @@ public class ShipDataPageController {
       @RequestParam boolean hidden,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.put(
-          "/api/v1/ship-types/{id}/visibility?hidden={hidden}", null, Void.class, id, hidden);
+      catalogueClient.setShipTypeHidden(id, hidden);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Update ShipType visibility failed", e);
@@ -196,7 +174,7 @@ public class ShipDataPageController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String resetAllFitted(RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.post("/api/v1/hangar/ships/reset-fitted", null, Void.class);
+      catalogueClient.resetAllFitted();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.ship_unfitted");
     } catch (Exception e) {
       log.error("Reset all fitted failed", e);
@@ -218,7 +196,7 @@ public class ShipDataPageController {
         log,
         "reset all fitted (ajax)",
         () -> {
-          backendApiClient.post("/api/v1/hangar/ships/reset-fitted", null, Void.class);
+          catalogueClient.resetAllFitted();
           return ResponseEntity.noContent().build();
         });
   }
@@ -239,8 +217,7 @@ public class ShipDataPageController {
         log,
         "update ShipType visibility (ajax)",
         () -> {
-          backendApiClient.put(
-              "/api/v1/ship-types/{id}/visibility?hidden={hidden}", null, Void.class, id, hidden);
+          catalogueClient.setShipTypeHidden(id, hidden);
           return ResponseEntity.noContent().build();
         });
   }
@@ -263,12 +240,7 @@ public class ShipDataPageController {
         log,
         "update Manufacturer visibility (ajax)",
         () -> {
-          backendApiClient.put(
-              "/api/v1/manufacturers/{id}/visibility?hidden={hidden}",
-              null,
-              Void.class,
-              id,
-              hidden);
+          catalogueClient.setManufacturerHidden(id, hidden);
           return ResponseEntity.noContent().build();
         });
   }
