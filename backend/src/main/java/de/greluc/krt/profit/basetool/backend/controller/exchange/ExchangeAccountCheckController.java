@@ -21,8 +21,8 @@ package de.greluc.krt.profit.basetool.backend.controller.exchange;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeAccountCheckDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeAccountCheckRequest;
+import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeAccountCheckService;
-import de.greluc.krt.profit.basetool.backend.support.SubjectAuthentication;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;

@@ -91,8 +91,6 @@ mission -> refinery: MissionService -> RefineryOrder
 notification -> orgunit: OrgUnitRef -> OrgUnitKind
 orgunit -> bank: OrgUnitMembershipService -> OrgUnitBankResponsibilityService
 orgunit -> inventory: OrgUnitMembershipService -> InventoryOrgUnitReconciler
-platform -> exchange: ClientAttribution -> IngestGatewayProperties
-platform -> exchange: ClientAttribution -> KnownExchangeClients
 scope -> exchange: CustomJwtGrantedAuthoritiesConverter -> IngestGatewayProperties
 scope -> hangar: AccessGateService -> Ship
 scope -> hangar: AccessGateService -> ShipRepository

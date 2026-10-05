@@ -23,9 +23,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeMirrorProperties;
 import de.greluc.krt.profit.basetool.backend.model.ExchangeClientStatus;
 import de.greluc.krt.profit.basetool.backend.repository.ExchangeSettingsRepository;
-import de.greluc.krt.profit.basetool.backend.support.ExchangeMirrorProperties;
 import de.greluc.krt.profit.basetool.testsupport.containers.TestImages;
 import de.greluc.krt.profit.basetool.testsupport.redis.RedisAclTemplate;
 import io.micrometer.core.instrument.Counter;

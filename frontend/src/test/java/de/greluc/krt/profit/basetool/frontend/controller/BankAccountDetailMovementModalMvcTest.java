@@ -140,10 +140,10 @@ class BankAccountDetailMovementModalMvcTest {
     BankAccountDetailDto detail =
         new BankAccountDetailDto(account, BigDecimal.ZERO, 0L, caps, limits);
     when(backendApiClient.get(
-            startsWith("/api/v1/bank/accounts/" + id), eq(BankAccountDetailDto.class)))
+            eq("/api/v1/bank/accounts/{id}"), eq(BankAccountDetailDto.class), eq(id)))
         .thenReturn(detail);
     when(backendApiClient.get(
-            startsWith("/api/v1/bank/accounts/" + id + "/transactions"), anyTypeRef()))
+            startsWith("/api/v1/bank/accounts/{id}/transactions"), anyTypeRef(), eq(id)))
         .thenReturn(null);
   }
 }

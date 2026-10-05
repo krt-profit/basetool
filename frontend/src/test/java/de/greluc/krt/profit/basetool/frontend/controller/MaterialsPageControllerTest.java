@@ -132,7 +132,7 @@ class MaterialsPageControllerTest {
             false,
             true,
             0L);
-    when(backendApiClient.get(eq("/api/v1/materials/" + id), eq(MaterialDto.class)))
+    when(backendApiClient.get(eq("/api/v1/materials/{id}"), eq(MaterialDto.class), eq(id)))
         .thenReturn(materialDto);
 
     MaterialPriceDto priceDto =
@@ -149,8 +149,10 @@ class MaterialsPageControllerTest {
         new PageResponse<>(List.of(priceDto), 0, 10000, 1, 1, Collections.emptyList());
 
     when(backendApiClient.get(
-            eq("/api/v1/materials/" + id + "/prices?size=10000&sort=terminal.name,asc&page=0"),
-            anyTypeRef()))
+            eq("/api/v1/materials/{id}/prices?size=10000&sort=terminal.name,asc&page={page}"),
+            anyTypeRef(),
+            eq(id),
+            eq(0)))
         .thenReturn(pageResponse);
 
     String viewName = controller.getMaterialDetail(id, model);
@@ -222,7 +224,7 @@ class MaterialsPageControllerTest {
     Model model = new ConcurrentModel();
     UUID id = UUID.randomUUID();
 
-    when(backendApiClient.get(eq("/api/v1/materials/" + id), eq(MaterialDto.class)))
+    when(backendApiClient.get(eq("/api/v1/materials/{id}"), eq(MaterialDto.class), eq(id)))
         .thenThrow(new RuntimeException("API Detail Error"));
 
     String viewName = controller.getMaterialDetail(id, model);
@@ -298,7 +300,7 @@ class MaterialsPageControllerTest {
     MaterialsPageController controller = new MaterialsPageController(backendApiClient);
 
     when(backendApiClient.<PageResponse<MaterialMatrixItemDto>>get(
-            anyString(), anyTypeRef(), any(), any()))
+            anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(matrixPage());
 
     MatrixGridDto grid =
@@ -306,12 +308,13 @@ class MaterialsPageControllerTest {
 
     assertNotNull(grid);
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), any(), any());
+    verify(backendApiClient)
+        .get(uriCaptor.capture(), anyTypeRef(), eq("Aluminum"), eq("Stanton"), eq(0));
     String template = uriCaptor.getValue();
-    assertTrue(template.contains("materialNames={f0}"), template);
-    assertTrue(template.contains("starSystems={f1}"), template);
+    assertTrue(template.contains("materialNames={materialName}"), template);
+    assertTrue(template.contains("starSystems={starSystem}"), template);
     assertTrue(template.contains("hasLoadingDock=true"), template);
-    assertTrue(template.contains("page=0"), template);
+    assertTrue(template.contains("page={page}"), template);
     assertFalse(template.contains("isAutoLoad"), template);
     verify(backendApiClient, never()).getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef());
   }

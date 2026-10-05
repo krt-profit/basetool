@@ -96,17 +96,21 @@ class MissionDetailPatternRenderTest {
    * @param editable the value of both {@code canEdit} and {@code canManageManagers}
    */
   private void stubMission(boolean editable) {
-    when(backendApiClient.get(eq("/api/v1/missions/" + MISSION_ID), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(MISSION_ID)))
         .thenReturn(mission(editable));
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + MISSION_ID + "/finance-entries/summary"),
-            eq(MissionFinanceTotalsDto.class)))
+            eq("/api/v1/missions/{id}/finance-entries/summary"),
+            eq(MissionFinanceTotalsDto.class),
+            eq(MISSION_ID)))
         .thenReturn(
             new MissionFinanceTotalsDto(BigDecimal.ZERO, BigDecimal.ZERO, 0L, BigDecimal.ZERO, 0L));
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + MISSION_ID + "/finance-entries?size=200"), anyTypeRef()))
+            eq("/api/v1/missions/{id}/finance-entries?size={size}"),
+            anyTypeRef(),
+            eq(MISSION_ID),
+            eq(200)))
         .thenReturn(new PageResponse<>(List.of(), 0, 200, 0, 0, List.of()));
   }
 
@@ -253,7 +257,8 @@ class MissionDetailPatternRenderTest {
   void pinsTheHeadPrimaryAndTheRefineryRowLink() throws Exception {
     stubMission(true);
     UUID orderId = UUID.fromString("00000000-0000-0000-0000-000000001042");
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/mission/" + MISSION_ID), anyTypeRef()))
+    when(backendApiClient.get(
+            eq("/api/v1/refinery-orders/mission/{id}"), anyTypeRef(), eq(MISSION_ID)))
         .thenReturn(
             List.of(
                 new RefineryOrderListDto(

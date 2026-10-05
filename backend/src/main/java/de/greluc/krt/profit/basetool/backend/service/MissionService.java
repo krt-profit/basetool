@@ -19,14 +19,16 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.bumpSectionVersion;
-import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.enforceSectionVersion;
+import static de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions.bumpSectionVersion;
+import static de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions.enforceSectionVersion;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions.MissionSection;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFrequency;
 import de.greluc.krt.profit.basetool.backend.model.MissionObjectiveKind;
@@ -48,8 +50,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantReposi
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
-import de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.MissionSection;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;

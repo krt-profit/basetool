@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.dto.ProfitCalculationDto;
 import de.greluc.krt.profit.basetool.backend.service.ProfitCalculationService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

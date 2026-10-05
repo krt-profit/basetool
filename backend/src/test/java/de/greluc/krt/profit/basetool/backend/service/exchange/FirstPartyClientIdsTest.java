@@ -22,10 +22,10 @@ package de.greluc.krt.profit.basetool.backend.service.exchange;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.config.KeycloakSyncProperties;
-import de.greluc.krt.profit.basetool.backend.support.ChangeSourceProperties;
-import de.greluc.krt.profit.basetool.backend.support.ConnectedAppsProperties;
-import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
-import de.greluc.krt.profit.basetool.backend.support.PartialRoleScopeProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ChangeSourceProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ConnectedAppsProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.PartialRoleScopeProperties;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

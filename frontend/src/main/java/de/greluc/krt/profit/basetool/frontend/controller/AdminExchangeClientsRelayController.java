@@ -21,26 +21,18 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeBulkUndoInstallationDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeBulkUndoPreviewDto;
+import de.greluc.krt.profit.basetool.frontend.exchange.client.ExchangeBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeBulkUndoRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeBulkUndoRunDetailDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeBulkUndoRunDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeClientCreateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeClientDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeClientStatusRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeClientUpdateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeSettingsDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeSettingsUpdateRequest;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -63,20 +55,8 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class AdminExchangeClientsRelayController {
 
-  /** The backend's registry endpoints. */
-  static final String CLIENTS = "/api/v1/admin/exchange-clients";
-
-  /** The backend's global switch endpoint. */
-  static final String SETTINGS = "/api/v1/admin/exchange-settings";
-
-  /** The backend's bulk undo runs. */
-  static final String UNDO_RUNS = "/api/v1/admin/exchange-undo-runs";
-
-  private static final ParameterizedTypeReference<List<ExchangeBulkUndoInstallationDto>>
-      INSTALLATIONS_TYPE = new ParameterizedTypeReference<>() {};
-
   /** Talks to the backend. */
-  private final BackendApiClient backendApiClient;
+  private final ExchangeBackendClient exchangeClient;
 
   /**
    * Returns one client so the edit form can prefill.
@@ -89,7 +69,7 @@ public class AdminExchangeClientsRelayController {
     return relay(
         log,
         "load exchange client " + id + " (ajax)",
-        () -> ResponseEntity.ok(backendApiClient.get(CLIENTS + "/" + id, ExchangeClientDto.class)));
+        () -> ResponseEntity.ok(exchangeClient.client(id)));
   }
 
   /**
@@ -103,7 +83,7 @@ public class AdminExchangeClientsRelayController {
     return relay(
         log,
         "register exchange client (ajax)",
-        () -> ResponseEntity.ok(backendApiClient.post(CLIENTS, request, ExchangeClientDto.class)));
+        () -> ResponseEntity.ok(exchangeClient.createClient(request)));
   }
 
   /**
@@ -119,9 +99,7 @@ public class AdminExchangeClientsRelayController {
     return relay(
         log,
         "edit exchange client " + id + " (ajax)",
-        () ->
-            ResponseEntity.ok(
-                backendApiClient.put(CLIENTS + "/{id}", request, ExchangeClientDto.class, id)));
+        () -> ResponseEntity.ok(exchangeClient.updateClient(id, request)));
   }
 
   /**
@@ -137,10 +115,7 @@ public class AdminExchangeClientsRelayController {
     return relay(
         log,
         "suspend exchange client " + id + " (ajax)",
-        () ->
-            ResponseEntity.ok(
-                backendApiClient.post(
-                    CLIENTS + "/{id}/suspend", request, ExchangeClientDto.class, id)));
+        () -> ResponseEntity.ok(exchangeClient.suspendClient(id, request)));
   }
 
   /**
@@ -156,10 +131,7 @@ public class AdminExchangeClientsRelayController {
     return relay(
         log,
         "activate exchange client " + id + " (ajax)",
-        () ->
-            ResponseEntity.ok(
-                backendApiClient.post(
-                    CLIENTS + "/{id}/activate", request, ExchangeClientDto.class, id)));
+        () -> ResponseEntity.ok(exchangeClient.activateClient(id, request)));
   }
 
   /**
@@ -174,8 +146,7 @@ public class AdminExchangeClientsRelayController {
     return relay(
         log,
         "switch the exchange (ajax)",
-        () ->
-            ResponseEntity.ok(backendApiClient.put(SETTINGS, request, ExchangeSettingsDto.class)));
+        () -> ResponseEntity.ok(exchangeClient.updateSettings(request)));
   }
 
   /**
@@ -191,13 +162,7 @@ public class AdminExchangeClientsRelayController {
     return relay(
         log,
         "preview bulk undo of exchange client " + id + " (ajax)",
-        () ->
-            ResponseEntity.ok(
-                backendApiClient.post(
-                    CLIENTS + "/{id}/undo/preview",
-                    request,
-                    ExchangeBulkUndoPreviewDto.class,
-                    id)));
+        () -> ResponseEntity.ok(exchangeClient.previewUndo(id, request)));
   }
 
   /**
@@ -213,10 +178,7 @@ public class AdminExchangeClientsRelayController {
     return relay(
         log,
         "start bulk undo of exchange client " + id + " (ajax)",
-        () ->
-            ResponseEntity.ok(
-                backendApiClient.post(
-                    CLIENTS + "/{id}/undo", request, ExchangeBulkUndoRunDto.class, id)));
+        () -> ResponseEntity.ok(exchangeClient.startUndo(id, request)));
   }
 
   /**
@@ -232,12 +194,7 @@ public class AdminExchangeClientsRelayController {
     return relay(
         log,
         "list installations for a bulk undo of exchange client " + id + " (ajax)",
-        () ->
-            ResponseEntity.ok(
-                backendApiClient.get(
-                    CLIENTS + "/" + id + "/undo/installations?since={since}",
-                    INSTALLATIONS_TYPE,
-                    since.toString())));
+        () -> ResponseEntity.ok(exchangeClient.undoInstallations(id, since)));
   }
 
   /**
@@ -251,8 +208,6 @@ public class AdminExchangeClientsRelayController {
     return relay(
         log,
         "load bulk undo run " + runId + " (ajax)",
-        () ->
-            ResponseEntity.ok(
-                backendApiClient.get(UNDO_RUNS + "/" + runId, ExchangeBulkUndoRunDetailDto.class)));
+        () -> ResponseEntity.ok(exchangeClient.undoRun(runId)));
   }
 }

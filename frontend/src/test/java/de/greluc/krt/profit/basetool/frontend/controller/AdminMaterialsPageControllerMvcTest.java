@@ -107,8 +107,9 @@ class AdminMaterialsPageControllerMvcTest {
         new PageResponse<>(List.of(material), 0, 1000, 1, 1, Collections.emptyList());
 
     when(backendApiClient.get(
-            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page=0"),
-            anyTypeRef()))
+            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page={page}"),
+            anyTypeRef(),
+            eq(0)))
         .thenReturn(materialsPage);
     when(backendApiClient.get(eq("/api/v1/material-categories"), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -135,8 +136,9 @@ class AdminMaterialsPageControllerMvcTest {
       @NotNull List<MaterialDto> materials, @NotNull List<MaterialCategoryDto> categories)
       throws Exception {
     when(backendApiClient.get(
-            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page=0"),
-            anyTypeRef()))
+            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page={page}"),
+            anyTypeRef(),
+            eq(0)))
         .thenReturn(
             new PageResponse<>(materials, 0, 1000, materials.size(), 1, Collections.emptyList()));
     when(backendApiClient.get(eq("/api/v1/material-categories"), anyTypeRef()))
@@ -219,8 +221,9 @@ class AdminMaterialsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void listMaterials_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
     when(backendApiClient.get(
-            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page=0"),
-            anyTypeRef()))
+            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page={page}"),
+            anyTypeRef(),
+            eq(0)))
         .thenReturn(
             new PageResponse<MaterialDto>(
                 Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList()));
@@ -233,7 +236,7 @@ class AdminMaterialsPageControllerMvcTest {
         .andExpect(
             PageStylesheets.content(
                 containsString(
-                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+                    ".form-group input:where(:not([type='checkbox'], [type='radio']))")));
   }
 
   @Test

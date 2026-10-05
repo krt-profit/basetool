@@ -506,8 +506,7 @@ val lintCss =
 val lintCssInline =
   tasks.register<NpxTask>("lintCssInline") {
     group = "verification"
-    description =
-      "Lints the page stylesheets (static/css/pages) and any Thymeleaf <style> block with Stylelint."
+    description = "Lints any Thymeleaf <style> block with Stylelint's template rule set."
     dependsOn(tasks.named("npmInstall"))
     command.set("stylelint")
     args.set(
@@ -515,12 +514,10 @@ val lintCssInline =
         "--config",
         ".stylelintrc.templates.json",
         "src/main/resources/templates/**/*.html",
-        "src/main/resources/static/css/pages/**/*.css",
       )
     )
     ignoreExitValue.set(false)
     inputs.files(fileTree("src/main/resources/templates") { include("**/*.html") })
-    inputs.files(fileTree("src/main/resources/static/css/pages") { include("**/*.css") })
     inputs.file("package.json")
     inputs.file(".stylelintrc.templates.json")
   }
@@ -728,10 +725,25 @@ val testKrtFetchReadJs =
     outputs.upToDateWhen { false }
   }
 
+val testTrustedTypesJs =
+  tasks.register<NodeTask>("testTrustedTypesJs") {
+    group = "verification"
+    description =
+      "Regression tests for the krt-html builder and the krt-fragment policy (ADR-0239)."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/trusted-types.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/trusted-types.test.mjs"))
+    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/krt-html.js"))
+    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/krt-fetch.js"))
+    outputs.upToDateWhen { false }
+  }
+
 val testEslintBans =
   tasks.register<NodeTask>("testEslintBans") {
     group = "verification"
-    description = "Proves the ESLint transport and browser-baseline bans fire on planted sources."
+    description =
+      "Proves the ESLint transport, browser-baseline and Trusted Types sink bans fire on planted sources."
     dependsOn(tasks.named("npmInstall"))
     script.set(layout.projectDirectory.file("scripts/eslint-bans.test.mjs").asFile)
     ignoreExitValue.set(false)
@@ -744,6 +756,7 @@ val testEslintBans =
 tasks.named("check").configure {
   dependsOn(
     testKrtFetchReadJs,
+    testTrustedTypesJs,
     testEslintBans,
     testPromotionCsvEscape,
     lintCss,

@@ -95,7 +95,7 @@ class MissionCoreEditAjaxControllerTest {
     when(refreshed.coreVersion()).thenReturn(22L);
     when(refreshed.scheduleVersion()).thenReturn(33L);
     when(refreshed.flagsVersion()).thenReturn(44L);
-    when(backendApiClient.get(eq("/api/v1/missions/" + MISSION_ID), eq(MissionDto.class)))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), eq(MissionDto.class), eq(MISSION_ID)))
         .thenReturn(refreshed);
 
     mockMvc
@@ -130,7 +130,7 @@ class MissionCoreEditAjaxControllerTest {
     when(refreshed.coreVersion()).thenReturn(1L);
     when(refreshed.scheduleVersion()).thenReturn(1L);
     when(refreshed.flagsVersion()).thenReturn(1L);
-    when(backendApiClient.get(eq("/api/v1/missions/" + MISSION_ID), eq(MissionDto.class)))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), eq(MissionDto.class), eq(MISSION_ID)))
         .thenReturn(refreshed);
 
     mockMvc
@@ -164,7 +164,7 @@ class MissionCoreEditAjaxControllerTest {
     when(refreshed.coreVersion()).thenReturn(2L);
     when(refreshed.scheduleVersion()).thenReturn(3L);
     when(refreshed.flagsVersion()).thenReturn(4L);
-    when(backendApiClient.get(eq("/api/v1/missions/" + MISSION_ID), eq(MissionDto.class)))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), eq(MissionDto.class), eq(MISSION_ID)))
         .thenReturn(refreshed);
 
     mockMvc
@@ -198,7 +198,7 @@ class MissionCoreEditAjaxControllerTest {
     when(refreshed.coreVersion()).thenReturn(1L);
     when(refreshed.scheduleVersion()).thenReturn(2L);
     when(refreshed.flagsVersion()).thenReturn(1L);
-    when(backendApiClient.get(eq("/api/v1/missions/" + MISSION_ID), eq(MissionDto.class)))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), eq(MissionDto.class), eq(MISSION_ID)))
         .thenReturn(refreshed);
 
     mockMvc
@@ -231,7 +231,7 @@ class MissionCoreEditAjaxControllerTest {
     when(refreshed.coreVersion()).thenReturn(1L);
     when(refreshed.scheduleVersion()).thenReturn(1L);
     when(refreshed.flagsVersion()).thenReturn(1L);
-    when(backendApiClient.get(eq("/api/v1/missions/" + MISSION_ID), eq(MissionDto.class)))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), eq(MissionDto.class), eq(MISSION_ID)))
         .thenReturn(refreshed);
 
     mockMvc

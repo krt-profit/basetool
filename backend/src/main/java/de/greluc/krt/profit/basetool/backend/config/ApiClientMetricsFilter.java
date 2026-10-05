@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import de.greluc.krt.profit.basetool.backend.exchange.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.support.ActingMemberHeader;
-import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
-import de.greluc.krt.profit.basetool.backend.support.ClientAttribution;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientAttribution;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

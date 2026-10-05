@@ -391,7 +391,7 @@
         show(emptyBox, empty);
         show(tableCard, !empty);
         if (empty) {
-            bodyEl.innerHTML = '';
+            bodyEl.replaceChildren();
             return;
         }
         renderHead();
@@ -488,31 +488,35 @@
         }
         colsSig = sig;
 
-        let cgHtml = '<col class="mtx-col-first" />';
-        let sysHtml = '<th class="mtx-corner"></th>';
-        let termHtml = `<th class="mtx-corner">${escapeHtml(I18N.material)}</th>`;
+        const cgHtml = [krtHtml`<col class="mtx-col-first" />`];
+        const sysHtml = [krtHtml`<th class="mtx-corner"></th>`];
+        const termHtml = [krtHtml`<th class="mtx-corner">${I18N.material}</th>`];
 
         systemGroups(cols).forEach((sg) => {
-            cgHtml += `<col class="mtx-col-term" span="${escapeAttr(sg.count)}" />`;
-            sysHtml += `<th colspan="${escapeAttr(sg.count)}" class="col-system">${escapeHtml(
-                sg.name ? sg.name : DASH,
-            )}</th>`;
+            cgHtml.push(krtHtml`<col class="mtx-col-term" span="${sg.count}" />`);
+            sysHtml.push(
+                krtHtml`<th colspan="${sg.count}" class="col-system">${
+                    sg.name ? sg.name : DASH
+                }</th>`,
+            );
         });
 
         cols.forEach((c) => {
             const label = c.nickname ? c.nickname : c.name;
             const title = c.planetName ? `${label} — ${c.planetName}` : label;
             const cls = `col-terminal${c.planetCssClass ? ` ${c.planetCssClass}` : ''}`;
-            termHtml += `<th class="${escapeAttr(cls)}" title="${escapeAttr(
-                title,
-            )}"><span class="mtx-term__name">${escapeHtml(
-                label,
-            )}</span><span class="mtx-term__planet">${escapeHtml(c.planetName || '')}</span></th>`;
+            termHtml.push(
+                krtHtml`<th class="${cls}" title="${title}"><span class="mtx-term__name">${
+                    label
+                }</span><span class="mtx-term__planet">${c.planetName || ''}</span></th>`,
+            );
         });
 
-        colgroupEl.innerHTML = cgHtml;
-        headEl.innerHTML =
-            `<tr class="row-system">${sysHtml}</tr>` + `<tr class="row-terminal">${termHtml}</tr>`;
+        krtHtml.set(colgroupEl, cgHtml);
+        krtHtml.set(
+            headEl,
+            krtHtml`<tr class="row-system">${sysHtml}</tr><tr class="row-terminal">${termHtml}</tr>`,
+        );
     }
 
     /**
@@ -558,14 +562,15 @@
 
     /** Renders the visible window of lines, with spacer rows for the rest. */
     function renderBody() {
-        let bodyHtml = '';
+        /** @type {KrtHtml[]} */
+        const bodyHtml = [];
         const span = cols.length + 1;
 
         /** @param {number} heightPx the spacer height */
         function appendSpacer(heightPx) {
-            bodyHtml += `<tr class="row-spacer" aria-hidden="true"><td colspan="${escapeAttr(
-                span,
-            )}" data-krtm-height="${escapeAttr(heightPx)}"></td></tr>`;
+            bodyHtml.push(
+                krtHtml`<tr class="row-spacer" aria-hidden="true"><td colspan="${span}" data-krtm-height="${heightPx}"></td></tr>`,
+            );
         }
 
         /** @param {FlatItem} item the line */
@@ -573,15 +578,15 @@
             const kind = item.kind || '';
             const label = kind === I18N.unsortedSentinel ? I18N.unsorted : kind;
             const open = !collapsed[kind];
-            bodyHtml += `<tr class="row-kind" data-kind="${escapeAttr(
-                kind,
-            )}"><td colspan="${escapeAttr(
-                span,
-            )}" class="mtx-kind-cell"><button type="button" class="mtx-kind-toggle" aria-expanded="${
-                open ? 'true' : 'false'
-            }"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-${
-                open ? 'chevron-down' : 'chevron-right'
-            }"/></svg><span>${escapeHtml(label)}</span></button></td></tr>`;
+            bodyHtml.push(
+                krtHtml`<tr class="row-kind" data-kind="${kind}"><td colspan="${
+                    span
+                }" class="mtx-kind-cell"><button type="button" class="mtx-kind-toggle" aria-expanded="${
+                    open ? 'true' : 'false'
+                }"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-${
+                    open ? 'chevron-down' : 'chevron-right'
+                }"/></svg><span>${label}</span></button></td></tr>`,
+            );
         }
 
         /** @param {MatrixRow} r the material row */
@@ -596,11 +601,13 @@
                 if (!flag[0]) {
                     return;
                 }
-                bodyHtml += `<span class="mtx-warn ${flag[1]}" role="img" title="${escapeAttr(
-                    flag[2],
-                )}" aria-label="${escapeAttr(
-                    flag[2],
-                )}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg></span>`;
+                bodyHtml.push(
+                    krtHtml`<span class="mtx-warn ${flag[1]}" role="img" title="${
+                        flag[2]
+                    }" aria-label="${
+                        flag[2]
+                    }"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg></span>`,
+                );
             });
         }
 
@@ -611,14 +618,15 @@
                 item.bestSell !== null && item.bestBuy !== null
                     ? fmt(item.bestSell - item.bestBuy)
                     : DASH;
-            bodyHtml +=
-                '<tr class="row-material"><td class="mtx-name-cell"><span class="mtx-name">';
+            bodyHtml.push(
+                krtHtml`<tr class="row-material"><td class="mtx-name-cell"><span class="mtx-name">`,
+            );
             appendWarnings(r);
-            bodyHtml += `<span class="mtx-name__text">${escapeHtml(
-                r.materialName,
-            )}</span></span><span class="mtx-spread">${escapeHtml(
-                `${I18N.spread} ${spreadText}`,
-            )}</span></td>`;
+            bodyHtml.push(
+                krtHtml`<span class="mtx-name__text">${
+                    r.materialName
+                }</span></span><span class="mtx-spread">${`${I18N.spread} ${spreadText}`}</span></td>`,
+            );
             for (let i = 0; i < cols.length; i++) {
                 const c = cols[i];
                 const cell = r.prices ? r.prices[c.name] : undefined;
@@ -631,19 +639,19 @@
                 if (buy !== null && buy === item.bestBuy) {
                     cls += ' is-best-buy';
                 }
-                bodyHtml += `<td class="${escapeAttr(cls)}">`;
+                bodyHtml.push(krtHtml`<td class="${cls}">`);
                 if (sell === null && buy === null) {
-                    bodyHtml += `<span class="mtx-empty">${DASH}</span>`;
+                    bodyHtml.push(krtHtml`<span class="mtx-empty">${DASH}</span>`);
                 }
                 if (sell !== null) {
-                    bodyHtml += `<span class="price-sell">+${escapeHtml(fmt(sell))}</span>`;
+                    bodyHtml.push(krtHtml`<span class="price-sell">+${fmt(sell)}</span>`);
                 }
                 if (buy !== null) {
-                    bodyHtml += `<span class="price-buy">${MINUS}${escapeHtml(fmt(buy))}</span>`;
+                    bodyHtml.push(krtHtml`<span class="price-buy">${MINUS}${fmt(buy)}</span>`);
                 }
-                bodyHtml += '</td>';
+                bodyHtml.push(krtHtml`</td>`);
             }
-            bodyHtml += '</tr>';
+            bodyHtml.push(krtHtml`</tr>`);
         }
 
         const rh = rowHeight || 52;
@@ -666,7 +674,7 @@
         if (end < flat.length) {
             appendSpacer((flat.length - end) * rh);
         }
-        window.krtFetch.setTrustedHtml(bodyEl, bodyHtml);
+        krtHtml.set(bodyEl, bodyHtml);
         applySpacerHeights();
         renderedStart = start;
         renderedEnd = end;

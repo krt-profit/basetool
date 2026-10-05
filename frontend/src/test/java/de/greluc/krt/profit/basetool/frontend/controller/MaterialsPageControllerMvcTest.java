@@ -112,7 +112,7 @@ class MaterialsPageControllerMvcTest {
         .andExpect(
             PageStylesheets.content(
                 containsString(
-                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+                    ".form-group input:where(:not([type='checkbox'], [type='radio']))")));
   }
 
   /**
@@ -389,14 +389,14 @@ class MaterialsPageControllerMvcTest {
    * @param prices the price list the backend returns
    */
   private void stubDetail(MaterialDto material, List<MaterialPriceDto> prices) {
-    when(backendApiClient.get(eq("/api/v1/materials/" + material.id()), eq(MaterialDto.class)))
+    when(backendApiClient.get(
+            eq("/api/v1/materials/{id}"), eq(MaterialDto.class), eq(material.id())))
         .thenReturn(material);
     when(backendApiClient.get(
-            eq(
-                "/api/v1/materials/"
-                    + material.id()
-                    + "/prices?size=10000&sort=terminal.name,asc&page=0"),
-            anyTypeRef()))
+            eq("/api/v1/materials/{id}/prices?size=10000&sort=terminal.name,asc&page={page}"),
+            anyTypeRef(),
+            eq(material.id()),
+            eq(0)))
         .thenReturn(new PageResponse<>(prices, 0, 10000, prices.size(), 1, List.of()));
   }
 

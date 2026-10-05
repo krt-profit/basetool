@@ -2,6 +2,24 @@
 (function () {
     'use strict';
 
+    const fragmentPolicy =
+        window.trustedTypes && typeof window.trustedTypes.createPolicy === 'function'
+            ? window.trustedTypes.createPolicy('krt-fragment', { createHTML: (markup) => markup })
+            : null;
+
+    /**
+     * Wraps the text of a same-origin server response for an HTML sink through the `krt-fragment`
+     * Trusted Types policy (ADR-0239); the plain text where the browser has no Trusted Types.
+     *
+     * @param {string} markup the response text
+     * @returns {string} the value the sink accepts, typed as the string the DOM lib expects
+     */
+    function trustedFragment(markup) {
+        return fragmentPolicy
+            ? /** @type {string} */ (/** @type {unknown} */ (fragmentPolicy.createHTML(markup)))
+            : markup;
+    }
+
     /**
      * Returns the caller-supplied localized string, or the page-wide default from
      * `window.krtFetchI18n`; a missing default renders as its key name via `krtI18nText`.
@@ -767,7 +785,18 @@
             return;
         }
         // eslint-disable-next-line no-unsanitized/property
-        el.innerHTML = html == null ? '' : String(html);
+        el.innerHTML = trustedFragment(html == null ? '' : String(html));
+    }
+
+    /**
+     * Parses a same-origin page or fragment response into a detached document, under the trust
+     * contract of {@link setTrustedHtml}.
+     *
+     * @param {string} html the response markup
+     * @returns {Document} the parsed, inert document
+     */
+    function parseTrustedDocument(html) {
+        return new DOMParser().parseFromString(trustedFragment(String(html)), 'text/html');
     }
 
     /**
@@ -1061,6 +1090,7 @@
         bindSwap,
         setTrustedHtml,
         replaceWithTrustedHtml,
+        parseTrustedDocument,
         syncVersion,
         handleProblem,
         ownerOrgUnitRequiredMessage,

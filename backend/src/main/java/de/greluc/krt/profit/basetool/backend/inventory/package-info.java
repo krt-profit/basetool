@@ -21,11 +21,13 @@
 @ApplicationModule(
     allowedDependencies = {
       "audit::api",
+      "catalogue::api",
       "identity::api",
       "kernel",
       "livesync::api",
       "notification::api",
       "orgunit::api",
+      "platform::api",
       "scope::api"
     })
 package de.greluc.krt.profit.basetool.backend.inventory;

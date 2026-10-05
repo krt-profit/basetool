@@ -328,6 +328,15 @@
   Löschen-Knopf einer gerade angelegten Materialkategorie. Toasts sind jetzt für die Maus
   durchlässig (styles.css, REQ-UI-008).
 
+- **Admin-Seiten Missionsdaten und Spezialkommandos: Meldungen ohne Anführungszeichen.** Toasts
+  und Dialogtitel zeigten ihren Text in `"…"`, weil das Inline-Skript die Übersetzung in ein
+  JavaScript-Stringliteral schrieb; die Werte kommen jetzt sauber aus dem Seiten-Bootstrap
+  (Templates, ADR-0069).
+
+- **Auftragsdetail und Einsatzdetail: Fehlermeldungen in der Sprache des Nutzers.** Der Ladefehler der
+  Lagereinträge eines Auftrags und fünf Ersatztexte der Einsatzseite waren fest auf Deutsch; sie
+  kommen jetzt aus den Sprachdateien, ein Test findet fest verdrahteten Text in Skripten (i18n).
+
 - **Request-Metriken fallen nicht mehr nach 100 Endpunkten weg.** Backend und Frontend durften nur
   100 verschiedene `uri`-Werte in `http.server.requests` / `http.client.requests` führen; jeder
   danach erstmals aufgerufene Endpunkt fehlte in 5xx- und Latenz-Alerts und Dashboards. Die Grenze
@@ -426,6 +435,17 @@
   Cookie-Attribut tatsächlich, ein Test hält den gesendeten `Set-Cookie` fest.
 
 ### Security
+
+- **Frontend: Trusted Types im Report-Modus.** Jede Seite sendet zusätzlich den Header
+  `Content-Security-Policy-Report-Only: require-trusted-types-for 'script'; trusted-types krt-html
+  krt-fragment`; ein ungeschützter DOM-Schreibzugriff wird als `csp_violation` gemeldet, nichts wird
+  blockiert. Neue Variable `APP_SECURITY_TRUSTED_TYPES` (`report` als Vorgabe, `enforce` erzwingt);
+  das Umschalten der Produktion ist ein eigener, freizugebender Schritt (REQ-SEC-064, ADR-0239).
+
+- **Lager: „gestohlen"-Markierung und Zuordnungen fremder Einträge nur noch für Logistiker.** Wie
+  Ausbuchen, Notiz und Geliefert verweigern jetzt auch `POST /inventory/{id}/stolen` und
+  `POST`/`PATCH`/`DELETE /inventory/{id}/allocation` einem Mitglied unterhalb von Logistiker den
+  Eintrag eines anderen Mitglieds mit `403`; bisher reichte die Einheit (REQ-INV-053, REQ-INV-027).
 
 - **Frontend: die Session liest nur noch die 21 Anwendungstypen, die wirklich dort landen.** Statt
   aller 325 Klassen unter `frontend.model` nennt die Session-Allow-List die aus dem Code abgeleiteten

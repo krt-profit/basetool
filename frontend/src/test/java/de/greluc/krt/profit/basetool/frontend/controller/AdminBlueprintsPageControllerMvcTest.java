@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -106,7 +107,7 @@ class AdminBlueprintsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fullPage_rendersSwapWrapper() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page(1));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page(1));
 
     mockMvc
         .perform(get("/admin/blueprints"))
@@ -118,7 +119,7 @@ class AdminBlueprintsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fragmentResults_rendersOnlyInnerFragment() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page(60));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page(60));
 
     mockMvc
         .perform(get("/admin/blueprints").param("fragment", "results"))
@@ -138,7 +139,7 @@ class AdminBlueprintsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fullPage_rendersTheListPattern() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page(1));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page(1));
 
     String html =
         mockMvc
@@ -175,7 +176,7 @@ class AdminBlueprintsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_emptyResult_rendersTheEmptyState() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef()))
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.<BlueprintDto>of(), 0, 25, 0, 0, List.of()));
 
     String html =
@@ -196,7 +197,7 @@ class AdminBlueprintsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_passesMultiWordSearchAsUriVariable() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(page(1));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page(1));
 
     mockMvc
         .perform(get("/admin/blueprints").param("search", "Omni Sky").param("fragment", "results"))
@@ -204,7 +205,8 @@ class AdminBlueprintsPageControllerMvcTest {
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
     ArgumentCaptor<Object> termCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), termCaptor.capture());
+    verify(backendApiClient)
+        .get(uriCaptor.capture(), anyTypeRef(), eq(25), eq(0), termCaptor.capture());
     assertTrue(uriCaptor.getValue().contains("search={search}"), uriCaptor.getValue());
     assertEquals("Omni Sky", termCaptor.getValue());
   }
@@ -212,7 +214,7 @@ class AdminBlueprintsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_passesUmlautSearchAsUriVariable_notFormEncoded() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(page(1));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page(1));
 
     String term = "Größe Röhre";
     mockMvc
@@ -221,7 +223,8 @@ class AdminBlueprintsPageControllerMvcTest {
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
     ArgumentCaptor<Object> termCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), termCaptor.capture());
+    verify(backendApiClient)
+        .get(uriCaptor.capture(), anyTypeRef(), eq(25), eq(0), termCaptor.capture());
     assertTrue(uriCaptor.getValue().contains("search={search}"), uriCaptor.getValue());
     assertEquals(term, termCaptor.getValue());
   }

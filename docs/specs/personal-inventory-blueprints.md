@@ -320,7 +320,7 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
   material counted in whole units. The computation is done in the material's **own unit**
   on both sides — `InventoryItem.amount` and the folded-in refinery yield are already piece counts
   for a PIECE material, and the per-craft requirement is **rounded to a whole piece** (the same
-  rounding the job-order path applies, the shared `support.QuantityTypeRounding.roundForQuantityType`),
+  rounding the job-order path applies, the shared `catalogue.api.QuantityTypeRounding.roundForQuantityType`),
   so a recipe never
   demands a fractional piece and the count stays in step with the rest of the app. The breakdown
   carries each material's `quantityType`, so the UI labels every amount "SCU" or "Stück" and formats

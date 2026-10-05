@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -83,14 +84,17 @@ class PromotionAreaPagePatternRenderTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(topic(topicA, "Alpha", 0), topic(topicB, "Bravo", 1)));
-    when(backendApiClient.get(contains("/categories/by-topic/" + topicA), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/categories/by-topic/{topicId}"), anyTypeRef(), eq(topicA.toString())))
         .thenReturn(List.of());
-    when(backendApiClient.get(contains("/categories/by-topic/" + topicB), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/categories/by-topic/{topicId}"), anyTypeRef(), eq(topicB.toString())))
         .thenReturn(
             List.of(
                 new PromotionCategoryDto(
                     categoryB, 3L, topicB, "Bravo", "Funk", "Disziplin", 0, null, null)));
-    when(backendApiClient.get(contains("/level-contents/by-category/"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/level-contents/by-category/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(
             List.of(
                 new PromotionLevelContentDto(

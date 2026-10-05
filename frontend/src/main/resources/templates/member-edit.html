@@ -234,83 +234,15 @@
     </section>
 </main>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    document.addEventListener('DOMContentLoaded', function () {
-        'use strict';
-        var form = document.getElementById('member-edit-form');
-        if (!form || form.getAttribute('data-member-edit') === null || !window.krtFetch || !window.krtCsrf) {
-            return;
-        }
-        var i18n = {
-            saved: /*[[#{notification.success.save}]]*/ 'Saved.',
-            error: /*[[#{error.member.update.failed}]]*/ 'Update failed.',
-            conflictTitle: /*[[#{frontend.ajax.conflict.title}]]*/ 'Conflict',
-            conflictReload: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Load current values',
-            conflictDismiss: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Close',
-            conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Load current values?',
-            conflictDetail: /*[[#{frontend.ajax.conflict.detail}]]*/ 'The data was changed in the meantime.'
-        };
-
-        function clearErrors() {
-            form.querySelectorAll('.field-error[data-error-for]').forEach(function (slot) {
-                slot.textContent = '';
-            });
-        }
-
-        function renderErrors(errors) {
-            clearErrors();
-            if (!errors) {
-                return;
-            }
-            Object.keys(errors).forEach(function (field) {
-                var slot = form.querySelector('.field-error[data-error-for="' + field + '"]');
-                if (slot) {
-                    slot.textContent = errors[field];
-                    var panel = slot.closest('[role="tabpanel"]');
-                    var tab = panel && panel.hidden ? document.getElementById(panel.getAttribute('aria-labelledby') || '') : null;
-                    if (tab) {
-                        tab.click();
-                    }
-                }
-            });
-        }
-
-        function syncVersion(version) {
-            if (version == null) {
-                return;
-            }
-            form.querySelectorAll('input[name="version"]').forEach(function (input) {
-                input.value = String(version);
-            });
-        }
-
-        form.addEventListener('submit', function (event) {
-            event.preventDefault();
-            window.krtFetch.submitForm({
-                form: form,
-                submitter: form.querySelector('button[type="submit"]'),
-                successMessage: i18n.saved,
-                errorMessage: i18n.error,
-                conflict: {
-                    title: i18n.conflictTitle,
-                    reloadLabel: i18n.conflictReload,
-                    dismissLabel: i18n.conflictDismiss,
-                    reloadQuestion: i18n.conflictQuestion,
-                    reloadDetailFallback: i18n.conflictDetail,
-                },
-                onError: function (status, body) {
-                    if (status === 422) {
-                        renderErrors(body || {});
-                        return true;
-                    }
-                    return false;
-                },
-                onSuccess: function (body) {
-                    clearErrors();
-                    syncVersion(body ? body.version : null);
-                },
-            });
-        });
-    });
+    window.krtMemberEditI18n = {
+        saved: /*[[#{notification.success.save}]]*/ 'Saved.',
+        error: /*[[#{error.member.update.failed}]]*/ 'Update failed.',
+        conflictTitle: /*[[#{frontend.ajax.conflict.title}]]*/ 'Conflict',
+        conflictReload: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Load current values',
+        conflictDismiss: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Close',
+        conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Load current values?',
+        conflictDetail: /*[[#{frontend.ajax.conflict.detail}]]*/ 'The data was changed in the meantime.'
+    };
 </script>
 <script th:src="@{/js/member-edit.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>

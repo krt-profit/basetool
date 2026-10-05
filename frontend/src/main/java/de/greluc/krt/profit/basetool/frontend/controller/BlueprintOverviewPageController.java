@@ -97,12 +97,16 @@ public class BlueprintOverviewPageController {
     List<BlueprintOverviewEntryDto> overview = new ArrayList<>();
     PageResponse<BlueprintOverviewEntryDto> res = null;
     try {
-      String uri =
-          "/api/v1/personal-blueprints/overview?page=" + effectivePage + "&size=" + effectiveSize;
+      String uri = "/api/v1/personal-blueprints/overview?page={page}&size={size}";
       res =
           trimmedSearch != null
-              ? backendApiClient.get(uri + "&search={search}", OVERVIEW_PAGE_TYPE, trimmedSearch)
-              : backendApiClient.get(uri, OVERVIEW_PAGE_TYPE);
+              ? backendApiClient.get(
+                  uri + "&search={search}",
+                  OVERVIEW_PAGE_TYPE,
+                  effectivePage,
+                  effectiveSize,
+                  trimmedSearch)
+              : backendApiClient.get(uri, OVERVIEW_PAGE_TYPE, effectivePage, effectiveSize);
       if (res != null && res.content() != null) {
         overview = new ArrayList<>(res.content());
       }

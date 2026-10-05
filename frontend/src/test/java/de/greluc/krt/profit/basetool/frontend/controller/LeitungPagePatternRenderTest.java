@@ -165,7 +165,7 @@ class LeitungPagePatternRenderTest {
                 null,
                 List.of(),
                 List.of()));
-    when(backendApiClient.get(eq("/api/v1/special-commands/" + SK + "/members"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/special-commands/{id}/members"), anyTypeRef(), eq(SK)))
         .thenReturn(
             List.of(
                 Map.of(

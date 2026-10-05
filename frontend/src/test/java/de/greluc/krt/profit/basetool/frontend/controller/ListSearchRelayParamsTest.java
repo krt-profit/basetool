@@ -113,7 +113,7 @@ class ListSearchRelayParamsTest {
 
   @Test
   void missionListDropsAStatusTheBackendDoesNotKnow() throws Exception {
-    when(mockedBackend.get(anyString(), anyTypeRef())).thenReturn(emptyPage());
+    when(mockedBackend.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(emptyPage());
 
     missionsMvc(mockedBackend)
         .perform(
@@ -125,8 +125,9 @@ class ListSearchRelayParamsTest {
 
     verify(mockedBackend)
         .get(
-            eq("/api/v1/missions/search?sort=plannedStartTime,desc&status=COMPLETED&"),
-            anyTypeRef());
+            eq("/api/v1/missions/search?sort=plannedStartTime,desc&status={status}&"),
+            anyTypeRef(),
+            eq("COMPLETED"));
   }
 
   @Test
@@ -156,11 +157,13 @@ class ListSearchRelayParamsTest {
         .get(
             eq(
                 "/api/v1/operations/search?query={query}&start={start}&end={end}"
-                    + "&page=0&size=20&sort=createdAt,desc&status=PLANNED&status=ACTIVE&"),
+                    + "&page={page}&size={size}&sort=createdAt,desc&status=PLANNED&status=ACTIVE&"),
             anyTypeRef(),
             eq(HOSTILE_TERM),
             eq(Instant.parse(START)),
-            eq(Instant.parse(END)));
+            eq(Instant.parse(END)),
+            eq(0),
+            eq(20));
   }
 
   @Test

@@ -204,11 +204,11 @@ public class AdminMissionDataPageController {
         CatalogPages.fetchAll(
             page ->
                 backendApiClient.get(
-                    "/api/v1/job-types?size=1000&sort=name,asc&includeInactive="
-                        + includeInactive
-                        + "&page="
-                        + page,
-                    MAP_PAGE));
+                    "/api/v1/job-types?size=1000&sort=name,asc"
+                        + "&includeInactive={includeInactive}&page={page}",
+                    MAP_PAGE,
+                    includeInactive,
+                    page));
     List<JobTypeDto> jobTypes =
         catalog.items().stream()
             .map(
@@ -239,11 +239,11 @@ public class AdminMissionDataPageController {
         CatalogPages.fetchAll(
             page ->
                 backendApiClient.get(
-                    "/api/v1/squadrons?size=1000&sort=name,asc&includeInactive="
-                        + includeInactive
-                        + "&page="
-                        + page,
-                    MAP_PAGE));
+                    "/api/v1/squadrons?size=1000&sort=name,asc"
+                        + "&includeInactive={includeInactive}&page={page}",
+                    MAP_PAGE,
+                    includeInactive,
+                    page));
     List<SquadronDto> squadrons =
         catalog.items().stream()
             .map(
@@ -275,9 +275,9 @@ public class AdminMissionDataPageController {
             backendApiClient.get(
                 "/api/v1/frequency-types?size=1000&sort=sortIndex,asc"
                     + (includeInactive ? "" : "&active=true")
-                    + "&page="
-                    + page,
-                MAP_PAGE));
+                    + "&page={page}",
+                MAP_PAGE,
+                page));
   }
 
   /**

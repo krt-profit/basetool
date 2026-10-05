@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeQueryParams;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeRequest;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeRequestInterest;
@@ -31,7 +32,6 @@ import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeRequestInterestCount;
-import de.greluc.krt.profit.basetool.backend.support.MaterialExchangeQueryParams;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;

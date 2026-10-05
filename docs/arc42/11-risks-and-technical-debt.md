@@ -364,5 +364,7 @@ interact), ADR-0233 (enforcement), ADR-0234 (the API's hard cut), ADR-0235 (the 
 ADR-0236 (access policies per domain); the rules are §8.14. Status on 2026-10-04: the defects found
 along the way are fixed (Phase −1, merged 2026-10-01), the guards of Phase 0 are on `main`, and
 Phase 1 has begun: `audit.api`, `kernel`, `orgunit.api`/`orgunit.web` and the publishers'
-`api.events` packages exist,
-and the frozen module baseline has shrunk from 138 to 127 class edges.
+`api.events` packages exist, the former `support` package is split into the kernel, the
+`platform` module and the modules' `api`/`internal` packages, and the frozen module baseline has
+shrunk from 138 to 110 class edges. Phase 2 has begun (2026-10-05): `dashboard` is the first
+domain moved whole into its module package.

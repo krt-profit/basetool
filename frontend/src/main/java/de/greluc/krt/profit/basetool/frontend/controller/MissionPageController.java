@@ -298,10 +298,12 @@ public class MissionPageController {
       uriVariables.add(end);
     }
     if (page != null) {
-      uri.append("page=").append(page).append("&");
+      uri.append("page={page}&");
+      uriVariables.add(page);
     }
     if (size != null) {
-      uri.append("size=").append(size).append("&");
+      uri.append("size={size}&");
+      uriVariables.add(size);
     }
     uri.append("sort=plannedStartTime,desc&");
 
@@ -322,7 +324,8 @@ public class MissionPageController {
       }
     } else {
       for (String s : knownStatuses) {
-        uri.append("status=").append(s).append("&");
+        uri.append("status={status}&");
+        uriVariables.add(s);
       }
     }
 
@@ -370,7 +373,7 @@ public class MissionPageController {
       @AuthenticationPrincipal OidcUser principal,
       @RequestParam(required = false) String fragment) {
     try {
-      MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION);
+      MissionDto mission = backendApiClient.get("/api/v1/missions/{id}", MISSION, id);
 
       final boolean fullRender = fragment == null;
       final String frag = fullRender ? null : fragment.toLowerCase(java.util.Locale.ROOT);
@@ -478,7 +481,7 @@ public class MissionPageController {
       if (canEdit != null && canEdit && needCrewBoard) {
         try {
           List<ShipDto> unitShipOptions =
-              backendApiClient.get("/api/v1/missions/" + id + "/unit-ship-options", SHIP_LIST);
+              backendApiClient.get("/api/v1/missions/{id}/unit-ship-options", SHIP_LIST, id);
           model.addAttribute("unitShipOptions", unitShipOptions);
         } catch (Exception ignored) {
         }
@@ -497,26 +500,27 @@ public class MissionPageController {
               parallelPageLoader.loadAsync(
                   () ->
                       backendApiClient.get(
-                          "/api/v1/missions/" + id + "/finance-entries/summary",
-                          MissionFinanceTotalsDto.class));
+                          "/api/v1/missions/{id}/finance-entries/summary",
+                          MissionFinanceTotalsDto.class,
+                          id));
           CompletableFuture<PageResponse<MissionFinanceEntryDto>> entriesFuture =
               parallelPageLoader.loadAsync(
                   () ->
                       backendApiClient.get(
-                          "/api/v1/missions/"
-                              + id
-                              + "/finance-entries?size="
-                              + FINANCE_TABLE_PAGE_SIZE,
-                          MISSION_FINANCE_ENTRY_PAGE));
+                          "/api/v1/missions/{id}/finance-entries?size={size}",
+                          MISSION_FINANCE_ENTRY_PAGE,
+                          id,
+                          FINANCE_TABLE_PAGE_SIZE));
           CompletableFuture<List<RefineryOrderListDto>> refineryFuture =
               parallelPageLoader.loadAsync(
                   () ->
                       backendApiClient.get(
-                          "/api/v1/refinery-orders/mission/" + id, REFINERY_ORDER_LIST));
+                          "/api/v1/refinery-orders/mission/{id}", REFINERY_ORDER_LIST, id));
           CompletableFuture<List<InventoryItemDto>> inventoryFuture =
               parallelPageLoader.loadAsync(
                   () ->
-                      backendApiClient.get("/api/v1/inventory/mission/" + id, INVENTORY_ITEM_LIST));
+                      backendApiClient.get(
+                          "/api/v1/inventory/mission/{id}", INVENTORY_ITEM_LIST, id));
           CompletableFuture.allOf(totalsFuture, entriesFuture, refineryFuture, inventoryFuture)
               .join();
 
@@ -697,7 +701,7 @@ public class MissionPageController {
       @PathVariable @NotNull UUID id) {
     try {
       Object result =
-          backendApiClient.get("/api/v1/missions/" + id + "/participants/unassigned", OBJECT);
+          backendApiClient.get("/api/v1/missions/{id}/participants/unassigned", OBJECT, id);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(

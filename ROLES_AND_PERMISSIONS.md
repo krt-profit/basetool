@@ -129,7 +129,7 @@ answered as a decision rather than as a per-endpoint accident.
 ### 1.3 Data redaction among members (one level)
 
 Mission responses are cleaned up server-side in [`MissionController`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/MissionController.java),
-through [`MissionPeerRedactor`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/support/MissionPeerRedactor.java):
+through [`MissionPeerRedactor`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/mission/internal/MissionPeerRedactor.java):
 
 - **Peer** (`cleanupMissionForPeer` / `cleanupParticipantForPeer` / `cleanupUnitForPeer` /
   `cleanupShipForPeer`, all funnelling into `cleanupUserForPeer`) — for a caller **below
@@ -231,7 +231,7 @@ syncs the token's realm roles by name onto the `app_user` row; the authority is 
 upper-cased with spaces turned into underscores (`KRT Member` → `ROLE_KRT_MEMBER`), plus the role's
 seeded permissions from
 [`DataInitializer`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/DataInitializer.java).
-The constants live in `support.Roles` (backend and frontend). In addition, a **role hierarchy**
+The constants live in `kernel.Roles` (backend) and `support.Roles` (frontend). In addition, a **role hierarchy**
 applies.
 
 ### Role hierarchy (backend + frontend identical)
@@ -459,8 +459,8 @@ somebody's Art. 15 request than to the member themselves.
 | Function (gate)                                                                                                                                                                                                                                                                                                                                                          | Member | Log. | MM  | Officer | Admin |
 |:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:------:|:----:|:---:|:-------:|:-----:|
 | View inventory view (`/inventory`, Member+)                                                                                                                                                                                                                                                                                                                              |   ✅    |  ✅   |  ✅  |    ✅    |   ✅   |
-| Edit inventory / check items in/out / assign entries to job orders & missions (quantity-split allocations, REQ-INV-027) / rebook personal marker (Umbuchung, REQ-INV-007) (`isAuthenticated()` + `canEditInventoryItem`, owner scope) — covers **material and game-item stock rows** alike (REQ-INV-029; item rows allocate only to qualifying ITEM orders, REQ-INV-031) |   ✅¹   |  ✅   | ✅¹  |    ✅    |   ✅   |
-| Mark Lager stock as „gestohlen“ or remove the marker, a whole row or a part (REQ-INV-053) — follows the row's **edit right** (`canEditInventoryItem`), no permission of its own; a selection only of your own rows. Refused while the server switch is off |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Edit inventory / check items in/out / assign entries to job orders & missions (quantity-split allocations, REQ-INV-027) / rebook personal marker (Umbuchung, REQ-INV-007) (`isAuthenticated()` + `canEditInventoryItem`, owner scope; the service then refuses a **non-owner** below Logistician — another member's row is a Logistician's job) — covers **material and game-item stock rows** alike (REQ-INV-029; item rows allocate only to qualifying ITEM orders, REQ-INV-031) |   ✅¹   |  ✅   | ✅¹  |    ✅    |   ✅   |
+| Mark Lager stock as „gestohlen“ or remove the marker, a whole row or a part (REQ-INV-053) — follows the row's **edit right**, no permission of its own: `canEditInventoryItem`, then owner or Logistician and above, like every per-row write; a selection only of your own rows. Refused while the server switch is off |   ✅¹   |  ✅   | ✅¹  |    ✅    |   ✅   |
 | Change the org unit of your **own personal** Lager rows — to one of your direct memberships or to „Keine Einheit", singly or for a selection (REQ-INV-052) (`isAuthenticated()` + `canEditInventoryItem`; the service refuses a shared or a foreign row) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | **Create** job order (material & item order)                                                                                                                                                                                                                                                                                                                             |   ✅    |  ✅   |  ✅  |    ✅    |   ✅   |
 | Read job-order list / detail (`isAuthenticated()` + `canViewJobOrders` + `canSeeJobOrder`)                                                                                                                                                                                                                                                                               |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |

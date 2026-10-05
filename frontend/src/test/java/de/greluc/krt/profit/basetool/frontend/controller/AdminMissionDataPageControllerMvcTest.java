@@ -148,9 +148,12 @@ class AdminMissionDataPageControllerMvcTest {
             1L,
             1,
             List.of());
-    when(backendApiClient.get(contains("/api/v1/squadrons"), anyTypeRef())).thenReturn(squadrons);
-    when(backendApiClient.get(contains("/api/v1/job-types"), anyTypeRef())).thenReturn(jobTypes);
-    when(backendApiClient.get(contains("/api/v1/frequency-types"), anyTypeRef()))
+    when(backendApiClient.get(contains("/api/v1/squadrons"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(squadrons);
+    when(backendApiClient.get(contains("/api/v1/job-types"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(jobTypes);
+    when(backendApiClient.get(
+            contains("/api/v1/frequency-types"), anyTypeRef(), any(Object[].class)))
         .thenReturn(freqTypes);
   }
 
@@ -259,7 +262,7 @@ class AdminMissionDataPageControllerMvcTest {
         .andExpect(
             PageStylesheets.content(
                 containsString(
-                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+                    ".form-group input:where(:not([type='checkbox'], [type='radio']))")));
   }
 
   @Test

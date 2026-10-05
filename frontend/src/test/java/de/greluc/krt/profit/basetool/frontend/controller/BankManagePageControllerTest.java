@@ -23,10 +23,8 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -42,7 +40,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -51,6 +48,13 @@ import org.springframework.ui.Model;
 
 @SuppressWarnings("unchecked")
 class BankManagePageControllerTest {
+
+  /** The URI template of the paged account list. */
+  private static final String ACCOUNTS_PAGE_URI =
+      "/api/v1/bank/accounts?page={page}&size={size}&sort=name,asc";
+
+  /** The URI of the type-filtered CARTEL account lookup. */
+  private static final String CARTEL_URI = "/api/v1/bank/accounts?type=CARTEL&size=1";
 
   /** A bank-management authentication so the controller takes the full (any-type) perspective. */
   private static Authentication management() {
@@ -103,7 +107,7 @@ class BankManagePageControllerTest {
     BankHolderDto holder =
         new BankHolderDto(
             UUID.randomUUID(), UUID.randomUUID(), "greluc", true, BigDecimal.ZERO, false, 0L);
-    when(backendApiClient.get(startsWith("/api/v1/bank/accounts?"), anyTypeRef()))
+    when(backendApiClient.get(eq(ACCOUNTS_PAGE_URI), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(acc), 0, 25, 1, 1, Collections.emptyList()));
     when(backendApiClient.get(eq("/api/v1/bank/holders"), anyTypeRef()))
         .thenReturn(List.of(holder));
@@ -132,23 +136,14 @@ class BankManagePageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankManagePageController controller = new BankManagePageController(backendApiClient);
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(startsWith("/api/v1/bank/accounts?"), anyTypeRef()))
+    when(backendApiClient.get(eq(ACCOUNTS_PAGE_URI), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 2, 50, 130, 3, Collections.emptyList()));
 
     controller.manage(
         "konten", 2, 50, null, management(), oidcUser(UUID.randomUUID().toString()), model);
 
-    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-    verify(backendApiClient, org.mockito.Mockito.atLeastOnce())
-        .get(uriCaptor.capture(), anyTypeRef());
-    assertTrue(
-        uriCaptor.getAllValues().stream()
-            .anyMatch(
-                u -> u.contains("page=2") && u.contains("size=50") && u.contains("sort=name")),
-        "the paged list request carries page=2&size=50&sort=name,asc");
-    assertTrue(
-        uriCaptor.getAllValues().stream().anyMatch(u -> u.contains("type=CARTEL")),
-        "the CARTEL account is fetched via a type-filtered lookup");
+    verify(backendApiClient).get(eq(ACCOUNTS_PAGE_URI), anyTypeRef(), eq(2), eq(50));
+    verify(backendApiClient).get(eq(CARTEL_URI), anyTypeRef());
   }
 
   @Test
@@ -156,22 +151,14 @@ class BankManagePageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankManagePageController controller = new BankManagePageController(backendApiClient);
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(startsWith("/api/v1/bank/accounts?"), anyTypeRef()))
+    when(backendApiClient.get(eq(ACCOUNTS_PAGE_URI), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 25, 0, 0, Collections.emptyList()));
 
     controller.manage(
         "konten", null, 999, null, management(), oidcUser(UUID.randomUUID().toString()), model);
 
-    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-    verify(backendApiClient, org.mockito.Mockito.atLeastOnce())
-        .get(uriCaptor.capture(), anyTypeRef());
-    assertTrue(
-        uriCaptor.getAllValues().stream()
-            .anyMatch(u -> u.contains("page=0") && u.contains("size=25")),
-        "a non-whitelisted size falls back to the default 25");
-    assertTrue(
-        uriCaptor.getAllValues().stream().noneMatch(u -> u.contains("size=999")),
-        "the bogus size is never forwarded");
+    verify(backendApiClient).get(eq(ACCOUNTS_PAGE_URI), anyTypeRef(), eq(0), eq(25));
+    verify(backendApiClient, never()).get(eq(ACCOUNTS_PAGE_URI), anyTypeRef(), any(), eq(999));
   }
 
   @Test
@@ -217,7 +204,7 @@ class BankManagePageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankManagePageController controller = new BankManagePageController(backendApiClient);
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(startsWith("/api/v1/bank/accounts?"), anyTypeRef()))
+    when(backendApiClient.get(eq(ACCOUNTS_PAGE_URI), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 25, 0, 0, Collections.emptyList()));
     when(backendApiClient.get(eq("/api/v1/bank/holders"), anyTypeRef())).thenReturn(List.of());
 
@@ -247,7 +234,7 @@ class BankManagePageControllerTest {
     BankHolderDto ownHolder =
         new BankHolderDto(
             UUID.randomUUID(), UUID.fromString(sub), "emp", true, BigDecimal.ZERO, false, 0L);
-    when(backendApiClient.get(startsWith("/api/v1/bank/accounts?"), anyTypeRef()))
+    when(backendApiClient.get(eq(ACCOUNTS_PAGE_URI), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 25, 0, 0, Collections.emptyList()));
     when(backendApiClient.get(eq("/api/v1/bank/holders"), anyTypeRef()))
         .thenReturn(List.of(ownHolder));

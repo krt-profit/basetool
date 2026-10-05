@@ -22,8 +22,8 @@ package de.greluc.krt.profit.basetool.backend.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.config.SecurityConfig;
-import de.greluc.krt.profit.basetool.backend.support.Permissions;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
+import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;

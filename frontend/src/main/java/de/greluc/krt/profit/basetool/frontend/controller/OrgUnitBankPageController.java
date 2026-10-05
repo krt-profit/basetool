@@ -344,7 +344,7 @@ public class OrgUnitBankPageController {
       try {
         chartDetail =
             backendApiClient.get(
-                "/api/v1/org-units/bank/accounts/" + id, OrgUnitBankAccountDetailDto.class);
+                "/api/v1/org-units/bank/accounts/{id}", OrgUnitBankAccountDetailDto.class, id);
       } catch (RuntimeException e) {
         log.warn("Error loading org-unit account {} for balance-chart fragment", id, e);
       }
@@ -354,7 +354,7 @@ public class OrgUnitBankPageController {
 
     OrgUnitBankAccountDetailDto detail =
         backendApiClient.get(
-            "/api/v1/org-units/bank/accounts/" + id, OrgUnitBankAccountDetailDto.class);
+            "/api/v1/org-units/bank/accounts/{id}", OrgUnitBankAccountDetailDto.class, id);
     model.addAttribute("detail", detail);
 
     boolean canManage =
@@ -366,8 +366,9 @@ public class OrgUnitBankPageController {
     if (canManage) {
       settings =
           backendApiClient.get(
-              "/api/v1/org-units/bank/accounts/" + id + "/settings",
-              OrgUnitBankAccountSettingsDto.class);
+              "/api/v1/org-units/bank/accounts/{id}/settings",
+              OrgUnitBankAccountSettingsDto.class,
+              id);
     }
     model.addAttribute("settings", settings);
 
@@ -443,16 +444,16 @@ public class OrgUnitBankPageController {
         BankAccountDetailSupport.resolveHistoryPeriod(from, to);
     PageResponse<BankBookingDto> bookings = null;
     try {
-      bookings =
-          backendApiClient.get(
-              UriComponentsBuilder.fromPath(
-                      "/api/v1/org-units/bank/accounts/" + id + "/transactions")
-                  .queryParam("page", effectivePage)
-                  .queryParam("size", effectiveSize)
-                  .queryParam("from", period.fromInstant())
-                  .queryParam("to", period.toInstant())
-                  .toUriString(),
-              BANK_BOOKING_PAGE_TYPE);
+      String uri =
+          UriComponentsBuilder.fromPath("/api/v1/org-units/bank/accounts/{id}/transactions")
+              .queryParam("page", effectivePage)
+              .queryParam("size", effectiveSize)
+              .queryParam("from", period.fromInstant())
+              .queryParam("to", period.toInstant())
+              .encode()
+              .build()
+              .toUriString();
+      bookings = backendApiClient.get(uri, BANK_BOOKING_PAGE_TYPE, id);
     } catch (RuntimeException e) {
       log.warn("Error loading org-unit bookings for account {}", id, e);
     }
@@ -487,14 +488,14 @@ public class OrgUnitBankPageController {
       return Map.of();
     }
     try {
-      BankBalanceSeriesDto series =
-          backendApiClient.get(
-              UriComponentsBuilder.fromPath(
-                      "/api/v1/org-units/bank/accounts/" + id + "/balance-series")
-                  .queryParam("from", anchor)
-                  .queryParam("to", anchor)
-                  .toUriString(),
-              BankBalanceSeriesDto.class);
+      String uri =
+          UriComponentsBuilder.fromPath("/api/v1/org-units/bank/accounts/{id}/balance-series")
+              .queryParam("from", anchor)
+              .queryParam("to", anchor)
+              .encode()
+              .build()
+              .toUriString();
+      BankBalanceSeriesDto series = backendApiClient.get(uri, BankBalanceSeriesDto.class, id);
       return BankRunningBalance.balancesAfter(
           bookings.content(), BankRunningBalance.lastBalance(series));
     } catch (RuntimeException e) {
@@ -524,14 +525,14 @@ public class OrgUnitBankPageController {
     Instant chartFrom = BankAccountDetailSupport.chartFromInstant(range, createdAt, now);
     BankBalanceSeriesDto series = null;
     try {
-      series =
-          backendApiClient.get(
-              UriComponentsBuilder.fromPath(
-                      "/api/v1/org-units/bank/accounts/" + id + "/balance-series")
-                  .queryParam("from", chartFrom)
-                  .queryParam("to", now)
-                  .toUriString(),
-              BankBalanceSeriesDto.class);
+      String uri =
+          UriComponentsBuilder.fromPath("/api/v1/org-units/bank/accounts/{id}/balance-series")
+              .queryParam("from", chartFrom)
+              .queryParam("to", now)
+              .encode()
+              .build()
+              .toUriString();
+      series = backendApiClient.get(uri, BankBalanceSeriesDto.class, id);
     } catch (RuntimeException e) {
       log.warn("Error loading org-unit balance series for account {}", id, e);
     }
