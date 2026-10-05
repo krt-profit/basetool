@@ -19,10 +19,11 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SpecialCommandProfitEligibleToggleRequest;
+import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -36,7 +37,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Same-origin proxy for the admin-only Spezialkommando toggles, currently the profit-eligibility
- * flag, relayed via {@link BackendApiClient}; the counterpart of {@link
+ * flag, relayed via {@link OrgUnitBackendClient}; the counterpart of {@link
  * SquadronAdminProxyController}. The backend re-checks the {@code ADMIN} role.
  */
 @RestController
@@ -44,7 +45,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class SpecialCommandAdminProxyController {
 
-  private final BackendApiClient backendApiClient;
+  /** Sends the toggle to the backend. */
+  private final OrgUnitBackendClient orgUnitClient;
+
+  /** Drops the cached org-unit catalogues after the toggle. */
+  private final CatalogueCacheEviction cacheEviction;
 
   /**
    * Forwards a request to set a Spezialkommando's profit-eligible flag.
@@ -56,9 +61,10 @@ public class SpecialCommandAdminProxyController {
   @PatchMapping("/{id}/profit-eligible")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Void> setProfitEligible(
-      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    backendApiClient.patch("/api/v1/special-commands/{id}/profit-eligible", body, Void.class, id);
-    backendApiClient.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
+      @PathVariable @NotNull UUID id,
+      @RequestBody @NotNull SpecialCommandProfitEligibleToggleRequest body) {
+    orgUnitClient.setSpecialCommandProfitEligible(id, body);
+    cacheEviction.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
     return ResponseEntity.noContent().build();
   }
 }

@@ -21,9 +21,8 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.TermsAcceptanceGateFilter;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.model.dto.TermsDocumentDto;
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.TermsStatusDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -51,16 +50,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @PreAuthorize("isAuthenticated()")
 public class TermsAcceptancePageController {
 
-  /** Backend endpoint reporting whether the caller has accepted the version in force. */
-  private static final String TERMS_STATUS_URI = "/api/v1/terms/status";
-
-  /** Backend endpoint recording the caller's consent. */
-  private static final String TERMS_ACCEPTANCE_URI = "/api/v1/terms/acceptance";
-
-  /** Backend endpoint serving the wording the member is being asked to accept (ADR-0138). */
-  private static final String TERMS_DOCUMENT_URI = "/api/v1/terms/document";
-
-  private final BackendApiClient backendApiClient;
+  /** Reads the consent state and the wording, and records the consent, on the backend. */
+  private final IdentityBackendClient identityClient;
 
   /**
    * Renders the consent page, or redirects a user who has already consented into the tool.
@@ -73,14 +64,14 @@ public class TermsAcceptancePageController {
   @GetMapping("/terms/accept")
   public String showAcceptancePage(Model model) {
     try {
-      TermsStatusDto status = backendApiClient.get(TERMS_STATUS_URI, TermsStatusDto.class);
+      TermsStatusDto status = identityClient.termsStatus();
       if (status != null && status.accepted()) {
         return "redirect:/";
       }
     } catch (BackendServiceException e) {
       log.debug("Terms status could not be read; rendering the consent page anyway.", e);
     }
-    model.addAttribute("terms", backendApiClient.get(TERMS_DOCUMENT_URI, TermsDocumentDto.class));
+    model.addAttribute("terms", identityClient.termsDocument());
     return "terms-accept";
   }
 
@@ -94,7 +85,7 @@ public class TermsAcceptancePageController {
   @ResponseBody
   public @NotNull ResponseEntity<Void> recordAcceptance(@NotNull HttpServletRequest request) {
     try {
-      backendApiClient.post(TERMS_ACCEPTANCE_URI, null, Void.class);
+      identityClient.acceptTerms();
       TermsAcceptanceGateFilter.clearCachedVerdict(request);
       return ResponseEntity.noContent().build();
     } catch (BackendServiceException e) {

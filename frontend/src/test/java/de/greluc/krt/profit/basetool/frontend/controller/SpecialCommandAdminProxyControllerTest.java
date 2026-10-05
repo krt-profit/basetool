@@ -23,14 +23,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.SpecialCommandProfitEligibleToggleRequest;
+import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
-import java.util.Map;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
@@ -45,12 +47,21 @@ class SpecialCommandAdminProxyControllerTest {
 
   @Mock private BackendApiClient backendApiClient;
 
-  @InjectMocks private SpecialCommandAdminProxyController controller;
+  private SpecialCommandAdminProxyController controller;
+
+  @BeforeEach
+  void setUp() {
+    controller =
+        new SpecialCommandAdminProxyController(
+            new OrgUnitBackendClient(backendApiClient),
+            new CatalogueCacheEviction(backendApiClient));
+  }
 
   @Test
   void setProfitEligible_forwardsPatch_thenEvictsStaticDataCache() {
-    UUID id = UUID.randomUUID();
-    Map<String, Object> body = Map.of("eligible", true);
+    UUID id = UUID.fromString("7d1e5c2a-3b4f-4a6e-8c9d-1f2a3b4c5d6e");
+    SpecialCommandProfitEligibleToggleRequest body =
+        new SpecialCommandProfitEligibleToggleRequest(true);
 
     ResponseEntity<Void> response = controller.setProfitEligible(id, body);
 

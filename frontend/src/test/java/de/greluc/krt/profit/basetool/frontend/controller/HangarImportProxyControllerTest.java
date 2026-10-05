@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import de.greluc.krt.profit.basetool.frontend.hangar.client.HangarBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.FleetviewImportResponseDto;
 import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.io.IOException;
 import java.io.InputStream;
@@ -65,7 +67,9 @@ class HangarImportProxyControllerTest {
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
     StaticMessageSource messages = new StaticMessageSource();
     messages.addMessage("hangar.import.error.tooLarge", Locale.getDefault(), TOO_LARGE_MESSAGE);
-    controller = new HangarImportProxyController(RealBackendApiClient.over(webClient), messages);
+    controller =
+        new HangarImportProxyController(
+            new HangarBackendClient(RealBackendApiClient.over(webClient)), messages);
   }
 
   @AfterEach
@@ -82,16 +86,19 @@ class HangarImportProxyControllerTest {
         new MockResponse()
             .setResponseCode(200)
             .setHeader("Content-Type", "application/json")
-            .setBody("{\"importedCount\":5}"));
+            .setBody(
+                "{\"importedCount\":5,\"skippedCount\":0,\"duplicateCount\":0,"
+                    + "\"skippedShips\":[],\"duplicateShips\":[]}"));
 
     MultipartFile file =
         new MockMultipartFile(
             "file", "shiplist.json", "application/json", "[]".getBytes(StandardCharsets.UTF_8));
 
-    ResponseEntity<Map<?, ?>> result = controller.importShips(file);
+    ResponseEntity<Object> result = controller.importShips(file);
 
     assertEquals(HttpStatus.OK, result.getStatusCode());
-    assertEquals(5, result.getBody().get("importedCount"));
+    assertEquals(
+        5, assertInstanceOf(FleetviewImportResponseDto.class, result.getBody()).importedCount());
 
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertNotNull(req);
@@ -112,7 +119,9 @@ class HangarImportProxyControllerTest {
         new MockResponse()
             .setResponseCode(200)
             .setHeader("Content-Type", "application/json")
-            .setBody("{\"imported\":3,\"skipped\":1}"));
+            .setBody(
+                "{\"importedCount\":3,\"skippedCount\":1,\"duplicateCount\":0,"
+                    + "\"skippedShips\":[\"Odd\"],\"duplicateShips\":[]}"));
 
     MultipartFile file =
         new MockMultipartFile(
@@ -121,13 +130,14 @@ class HangarImportProxyControllerTest {
             "application/json",
             "{\"ships\":[]}".getBytes(StandardCharsets.UTF_8));
 
-    ResponseEntity<Map<?, ?>> result = controller.importFleetview(file);
+    ResponseEntity<Object> result = controller.importFleetview(file);
 
     assertEquals(HttpStatus.OK, result.getStatusCode());
-    Map<?, ?> body = result.getBody();
-    assertNotNull(body);
-    assertEquals(3, body.get("imported"));
-    assertEquals(1, body.get("skipped"));
+    FleetviewImportResponseDto body =
+        assertInstanceOf(FleetviewImportResponseDto.class, result.getBody());
+    assertEquals(3, body.importedCount());
+    assertEquals(1, body.skippedCount());
+    assertEquals(java.util.List.of("Odd"), body.skippedShips());
 
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertNotNull(req);
@@ -150,7 +160,9 @@ class HangarImportProxyControllerTest {
         new MockResponse()
             .setResponseCode(200)
             .setHeader("Content-Type", "application/json")
-            .setBody("{\"imported\":0}"));
+            .setBody(
+                "{\"importedCount\":0,\"skippedCount\":0,\"duplicateCount\":0,"
+                    + "\"skippedShips\":[],\"duplicateShips\":[]}"));
 
     MultipartFile file =
         new MockMultipartFile(
@@ -255,11 +267,10 @@ class HangarImportProxyControllerTest {
           }
         };
 
-    ResponseEntity<Map<?, ?>> result = controller.importShips(oversized);
+    ResponseEntity<Object> result = controller.importShips(oversized);
 
     assertEquals(HttpStatus.CONTENT_TOO_LARGE, result.getStatusCode());
-    Map<?, ?> body = result.getBody();
-    assertNotNull(body);
+    Map<?, ?> body = assertInstanceOf(Map.class, result.getBody());
     assertEquals("UPLOAD_TOO_LARGE", body.get("code"));
     assertEquals(413, body.get("status"));
     assertEquals(TOO_LARGE_MESSAGE, body.get("detail"), "hangar.js shows the detail field");
@@ -272,12 +283,14 @@ class HangarImportProxyControllerTest {
         new MockResponse()
             .setResponseCode(200)
             .setHeader("Content-Type", "application/json")
-            .setBody("{\"importedCount\":0}"));
+            .setBody(
+                "{\"importedCount\":0,\"skippedCount\":0,\"duplicateCount\":0,"
+                    + "\"skippedShips\":[],\"duplicateShips\":[]}"));
     byte[] content = new byte[(int) HangarImportProxyController.MAX_IMPORT_BYTES];
     Arrays.fill(content, (byte) 'x');
     MultipartFile atCap = new MockMultipartFile("file", "big.json", "application/json", content);
 
-    ResponseEntity<Map<?, ?>> result = controller.importShips(atCap);
+    ResponseEntity<Object> result = controller.importShips(atCap);
 
     assertEquals(HttpStatus.OK, result.getStatusCode());
     RecordedRequest req = server.takeRequest(5, TimeUnit.SECONDS);

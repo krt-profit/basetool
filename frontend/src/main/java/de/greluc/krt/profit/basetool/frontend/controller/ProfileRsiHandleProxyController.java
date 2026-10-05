@@ -21,9 +21,10 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MyRsiHandleRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MyRsiHandleResponse;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfileRsiHandleForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -49,7 +50,9 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class ProfileRsiHandleProxyController {
 
-  private final BackendApiClient backendApiClient;
+  /** Reads and writes the member's profile on the backend. */
+  private final IdentityBackendClient identityClient;
+
   private final MessageSource messageSource;
 
   /**
@@ -81,16 +84,15 @@ public class ProfileRsiHandleProxyController {
           .contentType(MediaType.APPLICATION_PROBLEM_JSON)
           .body(body);
     }
-    Map<String, Object> payload = new LinkedHashMap<>();
-    payload.put("rsiHandle", form.rsiHandle() == null ? "" : form.rsiHandle().trim());
-    payload.put("version", form.version() == null ? 0L : form.version());
+    MyRsiHandleRequest payload =
+        new MyRsiHandleRequest(
+            form.rsiHandle() == null ? "" : form.rsiHandle().trim(),
+            form.version() == null ? 0L : form.version());
     return relay(
         log,
         "updating the RSI handle (ajax)",
         () -> {
-          MyRsiHandleResponse saved =
-              backendApiClient.put(
-                  "/api/v1/users/me/rsi-handle", payload, MyRsiHandleResponse.class);
+          MyRsiHandleResponse saved = identityClient.updateMyRsiHandle(payload);
           return ResponseEntity.ok(saved);
         });
   }
