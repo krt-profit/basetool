@@ -29,6 +29,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AdminDeletionRequestDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.DecideDeletionRequestRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.List;
@@ -58,7 +61,7 @@ class AdminDeletionRequestsPageControllerTest {
   void decline_withoutTheNoteKey_is400AndNoBackendCall() {
     BackendApiClient client = mock(BackendApiClient.class);
     AdminDeletionRequestsPageController controller =
-        new AdminDeletionRequestsPageController(client);
+        new AdminDeletionRequestsPageController(new IdentityBackendClient(client));
 
     ResponseEntity<Object> response = controller.decline(REQUEST_ID, Map.of());
 
@@ -70,7 +73,7 @@ class AdminDeletionRequestsPageControllerTest {
   void decline_withABlankNote_is400AndNoBackendCall() {
     BackendApiClient client = mock(BackendApiClient.class);
     AdminDeletionRequestsPageController controller =
-        new AdminDeletionRequestsPageController(client);
+        new AdminDeletionRequestsPageController(new IdentityBackendClient(client));
 
     ResponseEntity<Object> response = controller.decline(REQUEST_ID, Map.of("note", "   "));
 
@@ -82,7 +85,7 @@ class AdminDeletionRequestsPageControllerTest {
   void decline_withANonStringNote_is400AndNoBackendCall() {
     BackendApiClient client = mock(BackendApiClient.class);
     AdminDeletionRequestsPageController controller =
-        new AdminDeletionRequestsPageController(client);
+        new AdminDeletionRequestsPageController(new IdentityBackendClient(client));
 
     ResponseEntity<Object> response = controller.decline(REQUEST_ID, Map.of("note", 42));
 
@@ -94,25 +97,26 @@ class AdminDeletionRequestsPageControllerTest {
   void decline_withAReason_relaysItAndNeverGrantsTheHistoryErasure() {
     BackendApiClient client = mock(BackendApiClient.class);
     AdminDeletionRequestsPageController controller =
-        new AdminDeletionRequestsPageController(client);
+        new AdminDeletionRequestsPageController(new IdentityBackendClient(client));
 
     ResponseEntity<Object> response =
         controller.decline(
             REQUEST_ID, Map.of("note", "Open bank liabilities.", "grantHistoryErasure", true));
 
     assertEquals(HttpStatus.OK, response.getStatusCode());
-    Map<String, Object> body = capturePostedBody(client, DECLINE_URI);
-    assertEquals("Open bank liabilities.", body.get("note"));
-    assertEquals(false, body.get("grantHistoryErasure"));
+    DecideDeletionRequestRequest body =
+        capturePostedBody(client, DECLINE_URI, AdminDeletionRequestDto.class);
+    assertEquals("Open bank liabilities.", body.note());
+    assertEquals(false, body.grantHistoryErasure());
   }
 
   @Test
   void decline_relaysTheBackendStatusRatherThanFlatteningItTo500() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.post(any(String.class), any(), eq(Object.class), any(Object[].class)))
+    when(client.post(any(String.class), any(), any(), any(Object[].class)))
         .thenThrow(new BackendServiceException("gone", new RuntimeException(), 404));
     AdminDeletionRequestsPageController controller =
-        new AdminDeletionRequestsPageController(client);
+        new AdminDeletionRequestsPageController(new IdentityBackendClient(client));
 
     ResponseEntity<Object> response = controller.decline(REQUEST_ID, Map.of("note", "Reason."));
 
@@ -122,10 +126,10 @@ class AdminDeletionRequestsPageControllerTest {
   @Test
   void decline_anUnexpectedFailureIs500() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.post(any(String.class), any(), eq(Object.class), any(Object[].class)))
+    when(client.post(any(String.class), any(), any(), any(Object[].class)))
         .thenThrow(new IllegalStateException("boom"));
     AdminDeletionRequestsPageController controller =
-        new AdminDeletionRequestsPageController(client);
+        new AdminDeletionRequestsPageController(new IdentityBackendClient(client));
 
     ResponseEntity<Object> response = controller.decline(REQUEST_ID, Map.of("note", "Reason."));
 
@@ -136,45 +140,63 @@ class AdminDeletionRequestsPageControllerTest {
   void execute_readsTheHistoryErasureFromTheAdminsPayload() {
     BackendApiClient client = mock(BackendApiClient.class);
     AdminDeletionRequestsPageController controller =
-        new AdminDeletionRequestsPageController(client);
+        new AdminDeletionRequestsPageController(new IdentityBackendClient(client));
 
     ResponseEntity<Object> response =
         controller.execute(REQUEST_ID, Map.of("grantHistoryErasure", true, "note", "Granted."));
 
     assertEquals(HttpStatus.OK, response.getStatusCode());
-    Map<String, Object> body = capturePostedBody(client, EXECUTE_URI);
-    assertEquals(true, body.get("grantHistoryErasure"));
+    DecideDeletionRequestRequest body = capturePostedBody(client, EXECUTE_URI, Void.class);
+    assertEquals(true, body.grantHistoryErasure());
   }
 
   @Test
   void execute_relaysNoNoteEvenWhenTheClientSendsOne() {
     BackendApiClient client = mock(BackendApiClient.class);
     AdminDeletionRequestsPageController controller =
-        new AdminDeletionRequestsPageController(client);
+        new AdminDeletionRequestsPageController(new IdentityBackendClient(client));
 
     controller.execute(REQUEST_ID, Map.of("grantHistoryErasure", false, "note", "Anything."));
 
-    assertThat(capturePostedBody(client, EXECUTE_URI)).doesNotContainKey("note");
+    assertThat(capturePostedBody(client, EXECUTE_URI, Void.class).note()).isNull();
   }
 
   @Test
   void execute_coercesAMissingOrMalformedFlagToFalse() {
     BackendApiClient client = mock(BackendApiClient.class);
     AdminDeletionRequestsPageController controller =
-        new AdminDeletionRequestsPageController(client);
+        new AdminDeletionRequestsPageController(new IdentityBackendClient(client));
 
     controller.execute(REQUEST_ID, Map.of("grantHistoryErasure", "true"));
 
-    assertEquals(false, capturePostedBody(client, EXECUTE_URI).get("grantHistoryErasure"));
+    assertEquals(false, capturePostedBody(client, EXECUTE_URI, Void.class).grantHistoryErasure());
+  }
+
+  @Test
+  void execute_relaysTheNumericVersionAndDropsAMalformedOne() {
+    BackendApiClient client = mock(BackendApiClient.class);
+    AdminDeletionRequestsPageController controller =
+        new AdminDeletionRequestsPageController(new IdentityBackendClient(client));
+
+    controller.execute(REQUEST_ID, Map.of("grantHistoryErasure", true, "version", 3));
+
+    assertEquals(3L, capturePostedBody(client, EXECUTE_URI, Void.class).version());
+
+    BackendApiClient other = mock(BackendApiClient.class);
+    new AdminDeletionRequestsPageController(new IdentityBackendClient(other))
+        .decline(REQUEST_ID, Map.of("note", "Reason.", "version", "x"));
+
+    assertThat(capturePostedBody(other, DECLINE_URI, AdminDeletionRequestDto.class).version())
+        .isNull();
   }
 
   @Test
   void execute_relaysTheBackendStatusRatherThanFlatteningItTo500() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.post(any(String.class), any(), eq(Object.class), any(Object[].class)))
+    when(client.post(any(String.class), any(), any(), any(Object[].class)))
         .thenThrow(new BackendServiceException("conflict", new RuntimeException(), 409));
     AdminDeletionRequestsPageController controller =
-        new AdminDeletionRequestsPageController(client);
+        new AdminDeletionRequestsPageController(new IdentityBackendClient(client));
 
     ResponseEntity<Object> response = controller.execute(REQUEST_ID, Map.of());
 
@@ -184,10 +206,10 @@ class AdminDeletionRequestsPageControllerTest {
   @Test
   void execute_anUnexpectedFailureIs500() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.post(any(String.class), any(), eq(Object.class), any(Object[].class)))
+    when(client.post(any(String.class), any(), any(), any(Object[].class)))
         .thenThrow(new IllegalStateException("boom"));
     AdminDeletionRequestsPageController controller =
-        new AdminDeletionRequestsPageController(client);
+        new AdminDeletionRequestsPageController(new IdentityBackendClient(client));
 
     ResponseEntity<Object> response = controller.execute(REQUEST_ID, Map.of());
 
@@ -200,7 +222,7 @@ class AdminDeletionRequestsPageControllerTest {
     when(client.get(any(String.class), ArgumentMatchers.<ParameterizedTypeReference<Object>>any()))
         .thenThrow(new BackendServiceException("down", new RuntimeException(), 503));
     AdminDeletionRequestsPageController controller =
-        new AdminDeletionRequestsPageController(client);
+        new AdminDeletionRequestsPageController(new IdentityBackendClient(client));
     Model model = new ConcurrentModel();
 
     String view = controller.page(model);
@@ -216,7 +238,7 @@ class AdminDeletionRequestsPageControllerTest {
     when(client.get(any(String.class), ArgumentMatchers.<ParameterizedTypeReference<Object>>any()))
         .thenThrow(new BackendServiceException("down", new RuntimeException(), 503));
     AdminDeletionRequestsPageController controller =
-        new AdminDeletionRequestsPageController(client);
+        new AdminDeletionRequestsPageController(new IdentityBackendClient(client));
 
     assertThatThrownBy(() -> controller.rows(new ConcurrentModel()))
         .isInstanceOf(BackendServiceException.class);
@@ -228,7 +250,7 @@ class AdminDeletionRequestsPageControllerTest {
     when(client.get(any(String.class), ArgumentMatchers.<ParameterizedTypeReference<Object>>any()))
         .thenReturn(List.of());
     AdminDeletionRequestsPageController controller =
-        new AdminDeletionRequestsPageController(client);
+        new AdminDeletionRequestsPageController(new IdentityBackendClient(client));
     Model model = new ConcurrentModel();
 
     String view = controller.rows(model);
@@ -260,12 +282,13 @@ class AdminDeletionRequestsPageControllerTest {
    *
    * @param client the mocked client
    * @param uri the expected backend URI template, expanded with {@link #REQUEST_ID}
+   * @param responseType the response type the call decodes
    * @return the posted body
    */
-  @SuppressWarnings("unchecked")
-  private static Map<String, Object> capturePostedBody(BackendApiClient client, String uri) {
-    ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
-    verify(client).post(eq(uri), captor.capture(), eq(Object.class), eq(REQUEST_ID));
-    return (Map<String, Object>) captor.getValue();
+  private static DecideDeletionRequestRequest capturePostedBody(
+      BackendApiClient client, String uri, Class<?> responseType) {
+    ArgumentCaptor<DecideDeletionRequestRequest> captor = ArgumentCaptor.captor();
+    verify(client).post(eq(uri), captor.capture(), eq(responseType), eq(REQUEST_ID));
+    return captor.getValue();
   }
 }

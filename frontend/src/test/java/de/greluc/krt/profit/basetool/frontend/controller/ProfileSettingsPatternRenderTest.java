@@ -19,18 +19,20 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.MyBlueprintSharingResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MyPayoutPreferenceResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MyRsiHandleResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.Locale;
-import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
@@ -69,14 +71,35 @@ class ProfileSettingsPatternRenderTest {
    * @throws Exception if the request fails
    */
   private @NotNull String render() throws Exception {
-    when(backendApiClient.get(eq("/api/v1/users/me"), anyTypeRef()))
-        .thenReturn(Map.of("displayName", "Valk", "description", "Hallo", "version", 7));
-    when(backendApiClient.get(eq("/api/v1/users/me/payout-preference"), anyTypeRef()))
-        .thenReturn(Map.of("defaultPayoutPreference", "DONATE", "version", 7));
-    when(backendApiClient.get(eq("/api/v1/users/me/blueprint-sharing"), anyTypeRef()))
-        .thenReturn(Map.of("shareBlueprintsGlobally", true, "version", 7));
-    when(backendApiClient.get(eq("/api/v1/users/me/rsi-handle"), anyTypeRef()))
-        .thenReturn(Map.of("rsiHandle", "Valk_RSI", "version", 7));
+    when(backendApiClient.get("/api/v1/users/me", UserDto.class))
+        .thenReturn(
+            new UserDto(
+                UUID.fromString("3c9d8e7f-1a2b-4c3d-9e4f-5a6b7c8d9e0f"),
+                null,
+                "Valk",
+                "Valk",
+                null,
+                null,
+                "Hallo",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                7L,
+                null,
+                null));
+    when(backendApiClient.get(
+            "/api/v1/users/me/payout-preference", MyPayoutPreferenceResponse.class))
+        .thenReturn(new MyPayoutPreferenceResponse("DONATE", 7L));
+    when(backendApiClient.get(
+            "/api/v1/users/me/blueprint-sharing", MyBlueprintSharingResponse.class))
+        .thenReturn(new MyBlueprintSharingResponse(true, 7L));
+    when(backendApiClient.get("/api/v1/users/me/rsi-handle", MyRsiHandleResponse.class))
+        .thenReturn(new MyRsiHandleResponse("Valk_RSI", 7L));
     MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     return mockMvc
         .perform(get("/profile").with(oidcLogin()).locale(Locale.GERMAN))

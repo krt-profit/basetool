@@ -89,6 +89,9 @@ class DtoMirrorConsistencyTest {
           entry(
               "AnnouncementRequest",
               "body of AnnouncementController.AnnouncementRequest, a class rather than a record"),
+          entry(
+              "UserDescriptionRequest",
+              "body of UserController.UserDescriptionRequest, a class rather than a record"),
           entry("AuditRowView", "page view model merged from BankAuditEventDto and AuditEventDto"),
           entry("BereichCreateRequest", "write subset of BereichDto; the backend assigns the rest"),
           entry("DefaultBlueprintAddResultDto", "toast outcome the frontend counts itself"),

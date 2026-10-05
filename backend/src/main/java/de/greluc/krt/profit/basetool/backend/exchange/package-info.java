@@ -22,6 +22,7 @@
  */
 @ApplicationModule(
     allowedDependencies = {
+      "admin::api",
       "audit::api",
       "bank::api",
       "catalogue::api",

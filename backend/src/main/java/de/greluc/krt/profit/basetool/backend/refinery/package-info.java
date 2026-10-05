@@ -20,6 +20,7 @@
 /** The refinery module (Raffinerie): refinery jobs and their yields. */
 @ApplicationModule(
     allowedDependencies = {
+      "admin::api",
       "audit::api",
       "catalogue::api",
       "identity::api",

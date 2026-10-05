@@ -30,10 +30,11 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SpecialCommandDto;
+import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
@@ -50,15 +51,16 @@ class AdminSpecialCommandsPageControllerTest {
   @Test
   void listSpecialCommands_concatenatesAllPages_andSortsByName() {
     BackendApiClient client = mock(BackendApiClient.class);
-    AdminSpecialCommandsPageController controller = new AdminSpecialCommandsPageController(client);
+    AdminSpecialCommandsPageController controller =
+        new AdminSpecialCommandsPageController(
+            new OrgUnitBackendClient(client), new CatalogueCacheEviction(client));
     String template =
         "/api/v1/special-commands?size=1000&sort=name,asc"
             + "&includeInactive={includeInactive}&page={page}";
-    PageResponse<Map<String, Object>> firstPage =
-        new PageResponse<>(
-            List.of(Map.of("name", "Zulu"), Map.of("name", "Alpha")), 0, 1000, 3, 2, List.of());
-    PageResponse<Map<String, Object>> secondPage =
-        new PageResponse<>(List.of(Map.of("name", "Mike")), 1, 1000, 3, 2, List.of());
+    PageResponse<SpecialCommandDto> firstPage =
+        new PageResponse<>(List.of(named("Zulu"), named("Alpha")), 0, 1000, 3, 2, List.of());
+    PageResponse<SpecialCommandDto> secondPage =
+        new PageResponse<>(List.of(named("Mike")), 1, 1000, 3, 2, List.of());
     when(client.get(eq(template), anyTypeRef(), eq(false), eq(0))).thenReturn(firstPage);
     when(client.get(eq(template), anyTypeRef(), eq(false), eq(1))).thenReturn(secondPage);
     Model model = new ConcurrentModel();
@@ -73,22 +75,29 @@ class AdminSpecialCommandsPageControllerTest {
     assertEquals("Alpha", commands.get(0).name());
     assertEquals("Mike", commands.get(1).name());
     assertEquals("Zulu", commands.get(2).name());
+    assertEquals(Boolean.FALSE, commands.get(0).active());
+    assertEquals(0L, commands.get(0).version());
     assertEquals(Boolean.FALSE, model.getAttribute("catalogTruncated"));
   }
 
   @Test
   void listSpecialCommands_capHit_setsCatalogTruncated() {
     BackendApiClient client = mock(BackendApiClient.class);
-    AdminSpecialCommandsPageController controller = new AdminSpecialCommandsPageController(client);
+    AdminSpecialCommandsPageController controller =
+        new AdminSpecialCommandsPageController(
+            new OrgUnitBackendClient(client), new CatalogueCacheEviction(client));
     int reportedPages = CatalogPages.MAX_CATALOG_PAGES + 1;
-    PageResponse<Map<String, Object>> endlessPage =
-        new PageResponse<>(
-            List.of(Map.of("name", "SK")), 0, 1000, reportedPages, reportedPages, List.of());
+    PageResponse<SpecialCommandDto> endlessPage =
+        new PageResponse<>(List.of(named("SK")), 0, 1000, reportedPages, reportedPages, List.of());
     when(client.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(endlessPage);
     Model model = new ConcurrentModel();
 
     controller.listSpecialCommands(false, null, model);
 
     assertEquals(Boolean.TRUE, model.getAttribute("catalogTruncated"));
+  }
+
+  private static SpecialCommandDto named(String name) {
+    return new SpecialCommandDto(null, name, null, null, null, null, null);
   }
 }

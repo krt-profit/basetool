@@ -41,12 +41,25 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddCrewRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddCustomFrequencyRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddExternalParticipantRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddFrequencyRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddUnitRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFrequencyDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionUnitDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateCustomFrequencyRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateMissionOwnerRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
@@ -55,7 +68,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -972,14 +984,12 @@ class MissionPageControllerMvcTest {
                 .content("{\"userId\":\"" + userId + "\",\"version\":4}"))
         .andExpect(status().isOk());
 
-    @SuppressWarnings("unchecked")
-    org.mockito.ArgumentCaptor<Map<String, Object>> sent =
-        org.mockito.ArgumentCaptor.forClass(Map.class);
     verify(backendApiClient)
-        .put(eq("/api/v1/missions/{id}/owner"), sent.capture(), eq(Void.class), eq(missionId));
-    org.assertj.core.api.Assertions.assertThat(sent.getValue())
-        .containsEntry("userId", userId)
-        .containsEntry("version", 4);
+        .put(
+            "/api/v1/missions/{id}/owner",
+            new UpdateMissionOwnerRequest(userId, 4L),
+            Void.class,
+            missionId);
   }
 
   @Test
@@ -1017,11 +1027,11 @@ class MissionPageControllerMvcTest {
       throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
-    Map<String, Object> row = Map.of("id", participantId.toString(), "version", 7);
+    MissionParticipantDto row = participant(participantId, null, 7L);
     when(backendApiClient.put(
             eq("/api/v1/missions/{id}/participants/{participantId}/payout-preference/slim"),
             any(),
-            eq(Object.class),
+            eq(MissionParticipantDto.class),
             eq(missionId),
             eq(participantId)))
         .thenReturn(row);
@@ -1274,19 +1284,20 @@ class MissionPageControllerMvcTest {
   void addOrUpdateFrequencyAjax_WithValidBody_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID freqTypeId = UUID.randomUUID();
-    java.util.List<Map<String, Object>> slimResponse = new java.util.ArrayList<>();
-    Map<String, Object> freq = new java.util.HashMap<>();
-    freq.put("id", UUID.randomUUID().toString());
-    Map<String, Object> ft = new java.util.HashMap<>();
-    ft.put("id", freqTypeId.toString());
-    ft.put("name", "Tac");
-    freq.put("frequencyType", ft);
-    freq.put("value", 123.45);
-    freq.put("version", 1);
-    slimResponse.add(freq);
+    MissionFrequencyDto[] slimResponse = {
+      new MissionFrequencyDto(
+          UUID.randomUUID(),
+          new MissionFrequencyDto.FrequencyTypeRef(freqTypeId, "Tac"),
+          null,
+          new BigDecimal("123.45"),
+          1L)
+    };
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/{id}/frequencies/slim"), any(), eq(Object.class), eq(missionId)))
+            eq("/api/v1/missions/{id}/frequencies/slim"),
+            eq(new AddFrequencyRequest(freqTypeId, new BigDecimal("123.45"))),
+            eq(MissionFrequencyDto[].class),
+            eq(missionId)))
         .thenReturn(slimResponse);
 
     String body = "{\"frequencyTypeId\":\"" + freqTypeId + "\",\"value\":123.45}";
@@ -1306,7 +1317,10 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID freqTypeId = UUID.randomUUID();
     when(backendApiClient.post(
-            eq("/api/v1/missions/{id}/frequencies/slim"), any(), eq(Object.class), eq(missionId)))
+            eq("/api/v1/missions/{id}/frequencies/slim"),
+            any(),
+            eq(MissionFrequencyDto[].class),
+            eq(missionId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Conflict", null, 409));
@@ -1328,14 +1342,17 @@ class MissionPageControllerMvcTest {
     UUID freqId = UUID.randomUUID();
     when(backendApiClient.delete(
             eq("/api/v1/missions/{id}/frequencies/{frequencyId}/slim"),
-            eq(Object.class),
+            eq(Void.class),
             eq(missionId),
             eq(freqId)))
-        .thenReturn(java.util.Collections.emptyList());
+        .thenReturn(null);
 
     mockMvc
         .perform(delete("/missions/" + missionId + "/frequencies/" + freqId + "/ajax").with(csrf()))
         .andExpect(status().isOk());
+    verify(backendApiClient)
+        .delete(
+            "/api/v1/missions/{id}/frequencies/{frequencyId}/slim", Void.class, missionId, freqId);
   }
 
   @Test
@@ -1343,18 +1360,14 @@ class MissionPageControllerMvcTest {
   void addCustomFrequencyAjax_WithValidBody_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID freqId = UUID.randomUUID();
-    java.util.List<Map<String, Object>> slimResponse = new java.util.ArrayList<>();
-    Map<String, Object> freq = new java.util.HashMap<>();
-    freq.put("id", freqId.toString());
-    freq.put("name", "Recon");
-    freq.put("value", 42.10);
-    freq.put("version", 0);
-    slimResponse.add(freq);
+    MissionFrequencyDto[] slimResponse = {
+      new MissionFrequencyDto(freqId, null, "Recon", new BigDecimal("42.10"), 0L)
+    };
 
     when(backendApiClient.post(
             eq("/api/v1/missions/{id}/frequencies/custom/slim"),
-            any(),
-            eq(Object.class),
+            eq(new AddCustomFrequencyRequest("Recon", new BigDecimal("42.10"))),
+            eq(MissionFrequencyDto[].class),
             eq(missionId)))
         .thenReturn(slimResponse);
 
@@ -1374,18 +1387,14 @@ class MissionPageControllerMvcTest {
   void updateCustomFrequencyAjax_WithValidBody_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID freqId = UUID.randomUUID();
-    java.util.List<Map<String, Object>> slimResponse = new java.util.ArrayList<>();
-    Map<String, Object> freq = new java.util.HashMap<>();
-    freq.put("id", freqId.toString());
-    freq.put("name", "Recon 2");
-    freq.put("value", 43.00);
-    freq.put("version", 1);
-    slimResponse.add(freq);
+    MissionFrequencyDto[] slimResponse = {
+      new MissionFrequencyDto(freqId, null, "Recon 2", new BigDecimal("43.00"), 1L)
+    };
 
     when(backendApiClient.put(
             eq("/api/v1/missions/{id}/frequencies/custom/{frequencyId}/slim"),
-            any(),
-            eq(Object.class),
+            eq(new UpdateCustomFrequencyRequest("Recon 2", new BigDecimal("43.00"), 0L)),
+            eq(MissionFrequencyDto[].class),
             eq(missionId),
             eq(freqId)))
         .thenReturn(slimResponse);
@@ -1409,7 +1418,7 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.put(
             eq("/api/v1/missions/{id}/frequencies/custom/{frequencyId}/slim"),
             any(),
-            eq(Object.class),
+            eq(MissionFrequencyDto[].class),
             eq(missionId),
             eq(freqId)))
         .thenThrow(
@@ -1430,16 +1439,16 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void addUnitAjax_WithValidBody_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
-    java.util.List<Map<String, Object>> slimResponse = new java.util.ArrayList<>();
-    Map<String, Object> unit = new java.util.HashMap<>();
-    unit.put("id", UUID.randomUUID().toString());
-    unit.put("name", "Alpha");
-    unit.put("highValueUnit", false);
-    unit.put("version", 0);
-    slimResponse.add(unit);
+    MissionUnitDto[] slimResponse = {
+      new MissionUnitDto(
+          UUID.randomUUID(), "Alpha", null, null, null, false, null, null, 0L, List.of())
+    };
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/{id}/units/slim"), any(), eq(Object.class), eq(missionId)))
+            eq("/api/v1/missions/{id}/units/slim"),
+            eq(new AddUnitRequest("Alpha", null, null, false, null, null, null)),
+            eq(MissionUnitDto[].class),
+            eq(missionId)))
         .thenReturn(slimResponse);
 
     String body = "{\"name\":\"Alpha\",\"highValueUnit\":false}";
@@ -1461,7 +1470,7 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.put(
             eq("/api/v1/missions/{id}/units/{unitId}/slim"),
             any(),
-            eq(Object.class),
+            eq(MissionUnitDto.class),
             eq(missionId),
             eq(unitId)))
         .thenThrow(
@@ -1499,15 +1508,13 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void addParticipantAjax_WithValidBody_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
-    java.util.List<Map<String, Object>> slimResponse = new java.util.ArrayList<>();
-    Map<String, Object> p = new java.util.HashMap<>();
-    p.put("id", UUID.randomUUID().toString());
-    p.put("guestName", "Guest-X");
-    p.put("version", 0);
-    slimResponse.add(p);
+    MissionParticipantDto[] slimResponse = {participant(UUID.randomUUID(), "Guest-X", 0L)};
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/{id}/participants/slim"), any(), eq(Object.class), eq(missionId)))
+            eq("/api/v1/missions/{id}/participants/slim"),
+            eq(new AddExternalParticipantRequest(null, "Guest-X", null, null, null, null)),
+            eq(MissionParticipantDto[].class),
+            eq(missionId)))
         .thenReturn(slimResponse);
 
     String body = "{\"guestName\":\"Guest-X\"}";
@@ -1529,7 +1536,7 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.put(
             eq("/api/v1/missions/{id}/participants/{participantId}/slim"),
             any(),
-            eq(Object.class),
+            eq(MissionParticipantDto.class),
             eq(missionId),
             eq(participantId)))
         .thenThrow(
@@ -1570,13 +1577,11 @@ class MissionPageControllerMvcTest {
   void checkInParticipantAjax_Success_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
-    Map<String, Object> slimResponse = new java.util.HashMap<>();
-    slimResponse.put("id", participantId.toString());
-    slimResponse.put("version", 2);
+    MissionParticipantDto slimResponse = participant(participantId, null, 2L);
     when(backendApiClient.post(
             eq("/api/v1/missions/{id}/participants/{participantId}/check-in/slim"),
             any(),
-            eq(Object.class),
+            eq(MissionParticipantDto.class),
             eq(missionId),
             eq(participantId)))
         .thenReturn(slimResponse);
@@ -1597,7 +1602,7 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.post(
             eq("/api/v1/missions/{id}/participants/{participantId}/check-out/slim"),
             any(),
-            eq(Object.class),
+            eq(MissionParticipantDto.class),
             eq(missionId),
             eq(participantId)))
         .thenThrow(
@@ -1616,22 +1621,20 @@ class MissionPageControllerMvcTest {
   void addCrewAjax_WithValidBody_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
-    java.util.List<Map<String, Object>> slimResponse = new java.util.ArrayList<>();
-    Map<String, Object> crew = new java.util.HashMap<>();
-    crew.put("id", UUID.randomUUID().toString());
-    crew.put("participantName", "Alice");
-    crew.put("version", 0);
-    slimResponse.add(crew);
+    UUID participantId = UUID.randomUUID();
+    MissionCrewDto[] slimResponse = {
+      new MissionCrewDto(UUID.randomUUID(), participantId, "Alice", 0L, java.util.Set.of())
+    };
 
     when(backendApiClient.post(
             eq("/api/v1/missions/{id}/units/{unitId}/crew/slim"),
-            any(),
-            eq(Object.class),
+            eq(new AddCrewRequest(participantId, List.of())),
+            eq(MissionCrewDto[].class),
             eq(missionId),
             eq(unitId)))
         .thenReturn(slimResponse);
 
-    String body = "{\"participantId\":\"" + UUID.randomUUID() + "\",\"jobTypeIds\":[]}";
+    String body = "{\"participantId\":\"" + participantId + "\",\"jobTypeIds\":[]}";
     mockMvc
         .perform(
             post("/missions/" + missionId + "/units/" + unitId + "/crew/ajax")
@@ -1651,7 +1654,7 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.put(
             eq("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim"),
             any(),
-            eq(Object.class),
+            eq(MissionCrewDto.class),
             eq(missionId),
             eq(unitId),
             eq(crewId)))
@@ -1919,10 +1922,7 @@ class MissionPageControllerMvcTest {
   void getUnassignedParticipantsAjax_ShouldReturn200WithList() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
-    Map<String, Object> participant = new java.util.HashMap<>();
-    participant.put("id", participantId.toString());
-    participant.put("guestName", "Alice");
-    List<Map<String, Object>> response = List.of(participant);
+    List<MissionParticipantDto> response = List.of(participant(participantId, "Alice", 0L));
 
     when(backendApiClient.get(
             eq("/api/v1/missions/{id}/participants/unassigned"), anyTypeRef(), eq(missionId)))
@@ -2342,17 +2342,16 @@ class MissionPageControllerMvcTest {
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
         new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
             Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
-    de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Map<String, Object>>
-        freqTypesPage =
-            new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
-                List.of(
-                    Map.of("id", befehlTypeId.toString(), "name", "Befehl"),
-                    Map.of("id", notfallTypeId.toString(), "name", "Notfall")),
-                0,
-                2,
-                2,
-                1,
-                Collections.emptyList());
+    de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<FrequencyTypeDto> freqTypesPage =
+        new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
+            List.of(
+                new FrequencyTypeDto(befehlTypeId, "Befehl", null, true, 0, 0L),
+                new FrequencyTypeDto(notfallTypeId, "Notfall", null, true, 1, 0L)),
+            0,
+            2,
+            2,
+            1,
+            Collections.emptyList());
 
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
@@ -2675,15 +2674,15 @@ class MissionPageControllerMvcTest {
         .thenReturn(mission);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
-    de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<java.util.Map<String, Object>>
-        crewJobTypesPage =
-            new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
-                List.of(java.util.Map.of("id", jobTypeId, "name", "Gunner")),
-                0,
-                1,
-                1,
-                1,
-                Collections.emptyList());
+    de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<JobTypeDto> crewJobTypesPage =
+        new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
+            List.of(
+                new JobTypeDto(jobTypeId, "Gunner", null, "CREW", null, true, false, false, 0L)),
+            0,
+            1,
+            1,
+            1,
+            Collections.emptyList());
     when(backendApiClient.getCached(eq(CachedCatalog.JOB_TYPES_CREW), anyTypeRef()))
         .thenReturn(crewJobTypesPage);
 
@@ -3240,5 +3239,18 @@ class MissionPageControllerMvcTest {
                 .contentType("application/json")
                 .content(body))
         .andExpect(status().isConflict());
+  }
+
+  /**
+   * Builds a participant row carrying only an id, an optional guest name and a version.
+   *
+   * @param id the participant id
+   * @param guestName the guest name, or {@code null}
+   * @param version the row version
+   * @return the participant row
+   */
+  private static MissionParticipantDto participant(UUID id, String guestName, Long version) {
+    return new MissionParticipantDto(
+        id, null, guestName, null, null, null, null, null, null, null, version);
   }
 }

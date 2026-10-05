@@ -40,14 +40,15 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionRequirementChec
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionTopicDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RankRequirementDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
+import de.greluc.krt.profit.basetool.frontend.promotion.client.PromotionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ui.ConcurrentModel;
@@ -64,7 +65,12 @@ class PromotionPageControllerTest {
 
   @Mock private BackendApiClient backendApiClient;
 
-  @InjectMocks private PromotionPageController controller;
+  private PromotionPageController controller;
+
+  @BeforeEach
+  void setUp() {
+    controller = new PromotionPageController(new PromotionBackendClient(backendApiClient));
+  }
 
   private static PromotionTopicDto topic(UUID id, String name, int sortOrder) {
     return new PromotionTopicDto(id, 0L, name, null, sortOrder, null, null, null);

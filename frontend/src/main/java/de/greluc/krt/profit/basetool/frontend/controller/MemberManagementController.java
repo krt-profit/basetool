@@ -22,18 +22,20 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ConsolidateAccountRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MembershipDeltaResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitKind;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserAttributesUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UserRsiHandleResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.MemberEditForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus;
@@ -49,7 +51,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.context.MessageSource;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -82,20 +83,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class MemberManagementController {
 
-  /** Response type for the paged {@code /users} and {@code /users/search} member listings. */
-  private static final ParameterizedTypeReference<PageResponse<UserDto>> USER_PAGE_TYPE =
-      new ParameterizedTypeReference<>() {};
+  /** Reads and writes the members on the backend. */
+  private final IdentityBackendClient identityClient;
 
-  /** Response type for the {@code /users/{id}/memberships} org-unit membership-option list. */
-  private static final ParameterizedTypeReference<
-          List<de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto>>
-      MEMBERSHIP_OPTION_LIST_TYPE = new ParameterizedTypeReference<>() {};
-
-  /** Response type for the admin-only {@code /users/{id}/rsi-handle} read. */
-  private static final ParameterizedTypeReference<Map<String, Object>> STRING_OBJECT_MAP_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
   private final MessageSource messageSource;
 
   /**
@@ -128,41 +118,23 @@ public class MemberManagementController {
       Model model) {
     try {
       boolean hasSearch = search != null && !search.isBlank();
-      org.springframework.web.util.UriComponentsBuilder uriBuilder =
-          hasSearch
-              ? org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/users/search")
-              : org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/users");
-      if (page != null) {
-        uriBuilder.queryParam("page", page);
-      }
-      if (size != null) {
-        uriBuilder.queryParam("size", size);
-      }
-      uriBuilder.queryParam("sort", "username,asc");
-
-      String uri = uriBuilder.toUriString();
       PageResponse<UserDto> pageResponse =
           hasSearch
-              ? backendApiClient.get(uri + "&query={query}", USER_PAGE_TYPE, search)
-              : backendApiClient.get(uri, USER_PAGE_TYPE);
+              ? identityClient.memberSearchPage(page, size, search)
+              : identityClient.memberPage(page, size);
       List<UserDto> users = pageResponse == null ? null : pageResponse.content();
       model.addAttribute("users", users);
       model.addAttribute("usersPage", pageResponse);
       model.addAttribute("search", search);
 
-      java.util.Map<
-              UUID,
-              List<de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto>>
-          skMemberships = new java.util.HashMap<>();
+      Map<UUID, List<OrgUnitMembershipOptionDto>> skMemberships = new java.util.HashMap<>();
       if (users != null) {
         for (UserDto u : users) {
           if (u == null || u.id() == null) {
             continue;
           }
           try {
-            List<de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto> all =
-                backendApiClient.get(
-                    "/api/v1/users/{id}/memberships", MEMBERSHIP_OPTION_LIST_TYPE, u.id());
+            List<OrgUnitMembershipOptionDto> all = identityClient.memberships(u.id());
             if (all == null) {
               skMemberships.put(u.id(), java.util.Collections.emptyList());
               continue;
@@ -197,13 +169,7 @@ public class MemberManagementController {
   @GetMapping("/api/search")
   @ResponseBody
   public List<UserDto> searchMembers(@RequestParam String query) {
-    String uri =
-        org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/users/search")
-            .queryParam("size", 1000)
-            .queryParam("sort", "username,asc")
-            .toUriString();
-    PageResponse<UserDto> page =
-        backendApiClient.get(uri + "&query={query}", USER_PAGE_TYPE, query);
+    PageResponse<UserDto> page = identityClient.memberTypeahead(query);
     return page == null ? null : page.content();
   }
 
@@ -224,15 +190,14 @@ public class MemberManagementController {
       Model model,
       RedirectAttributes redirectAttributes) {
     try {
-      UserDto user = backendApiClient.get("/api/v1/users/{id}", UserDto.class, id);
+      UserDto user = identityClient.user(id);
       model.addAttribute("user", user);
 
       String memberRsiHandle = null;
       try {
-        Map<String, Object> handle =
-            backendApiClient.get("/api/v1/users/{id}/rsi-handle", STRING_OBJECT_MAP_TYPE, id);
-        if (handle != null && handle.get("rsiHandle") != null) {
-          memberRsiHandle = String.valueOf(handle.get("rsiHandle"));
+        UserRsiHandleResponse handle = identityClient.userRsiHandle(id);
+        if (handle != null && handle.rsiHandle() != null) {
+          memberRsiHandle = handle.rsiHandle();
         }
       } catch (Exception ex) {
         log.debug("Failed to load the RSI handle for the member-edit page", ex);
@@ -240,32 +205,22 @@ public class MemberManagementController {
       model.addAttribute("memberRsiHandle", memberRsiHandle);
 
       try {
-        List<de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto>
-            memberships =
-                backendApiClient.get(
-                    "/api/v1/users/{id}/memberships", MEMBERSHIP_OPTION_LIST_TYPE, id);
+        List<OrgUnitMembershipOptionDto> memberships = identityClient.memberships(id);
         model.addAttribute(
             "memberMemberships",
             memberships != null
                 ? memberships
-                : java.util.Collections
-                    .<de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto>
-                        emptyList());
+                : java.util.Collections.<OrgUnitMembershipOptionDto>emptyList());
       } catch (Exception ex) {
         log.debug("Failed to load memberships for member-edit panel", ex);
         model.addAttribute(
-            "memberMemberships",
-            java.util.Collections
-                .<de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto>
-                    emptyList());
+            "memberMemberships", java.util.Collections.<OrgUnitMembershipOptionDto>emptyList());
       }
 
       List<OrgUnitMembershipDto> staffelRows = List.of();
       boolean staffelDetailLoaded = false;
       try {
-        MembershipDeltaResponse detail =
-            backendApiClient.get(
-                "/api/v1/users/{id}/memberships/detail", MembershipDeltaResponse.class, id);
+        MembershipDeltaResponse detail = identityClient.membershipDetail(id);
         if (detail != null && detail.memberships() != null) {
           staffelRows =
               detail.memberships().stream().filter(m -> m.kind() == OrgUnitKind.SQUADRON).toList();
@@ -424,7 +379,7 @@ public class MemberManagementController {
     UserAttributesUpdateDto body =
         new UserAttributesUpdateDto(
             form.rank(), form.description(), form.displayName(), form.version(), form.joinDate());
-    backendApiClient.put("/api/v1/users/{id}/attributes", body, Void.class, id);
+    identityClient.updateAttributes(id, body);
 
     if (!Boolean.TRUE.equals(form.staffelDetailLoaded())) {
       return;
@@ -441,11 +396,7 @@ public class MemberManagementController {
           new MembershipDeltaRequest.StaffelChange(
               form.staffel2Id(), form.staffel2Logistician(), form.staffel2MissionManager()));
     }
-    backendApiClient.patch(
-        "/api/v1/users/{id}/memberships",
-        new MembershipDeltaRequest(staffeln, null),
-        MembershipDeltaResponse.class,
-        id);
+    identityClient.updateMemberships(id, new MembershipDeltaRequest(staffeln, null));
   }
 
   /**
@@ -457,7 +408,7 @@ public class MemberManagementController {
    */
   private Long currentUserVersion(@NotNull UUID id, Long priorVersion) {
     try {
-      UserDto user = backendApiClient.get("/api/v1/users/{id}", UserDto.class, id);
+      UserDto user = identityClient.user(id);
       if (user != null && user.version() != null) {
         return user.version();
       }
@@ -507,7 +458,7 @@ public class MemberManagementController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String deleteMember(@PathVariable UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/users/{id}", Void.class, id);
+      identityClient.deleteUser(id);
       liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.user.delete");
     } catch (BackendServiceException e) {
@@ -531,7 +482,7 @@ public class MemberManagementController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> deleteMemberAjax(@PathVariable @NotNull UUID id) {
     try {
-      backendApiClient.delete("/api/v1/users/{id}", Void.class, id);
+      identityClient.deleteUser(id);
       liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       return ResponseEntity.ok(Map.of());
     } catch (BackendServiceException e) {
@@ -553,8 +504,7 @@ public class MemberManagementController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> syncMembersAjax() {
     try {
-      UserSyncResultDto result =
-          backendApiClient.post("/api/v1/users/sync", null, UserSyncResultDto.class);
+      UserSyncResultDto result = identityClient.syncUsers();
       int syncedCount = result != null ? result.syncedCount() : 0;
       liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       return ResponseEntity.ok(Map.of("syncedCount", syncedCount));
@@ -582,8 +532,7 @@ public class MemberManagementController {
       @PathVariable @NotNull UUID id,
       @Nullable @RequestBody(required = false) ConsolidateAccountRequest body) {
     try {
-      UserDto survivor =
-          backendApiClient.post("/api/v1/users/{id}/consolidate", body, UserDto.class, id);
+      UserDto survivor = identityClient.consolidate(id, body);
       liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       return ResponseEntity.ok(survivor);
     } catch (BackendServiceException e) {

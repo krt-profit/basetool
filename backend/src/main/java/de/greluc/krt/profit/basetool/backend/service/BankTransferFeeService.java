@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.admin.api.SystemSettings;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Optional;
@@ -54,7 +55,7 @@ public class BankTransferFeeService {
   /** Exclusive upper bound: a rate &gt;= 1 would consume the entire transfer and is rejected. */
   static final BigDecimal MAX_TRANSFER_FEE_RATE = BigDecimal.ONE;
 
-  private final SystemSettingService systemSettingService;
+  private final SystemSettings systemSettings;
 
   /**
    * Computes the fee on delivering {@code amount}: {@code round(amount × rate)} to whole aUEC
@@ -92,7 +93,7 @@ public class BankTransferFeeService {
    */
   @NotNull
   public BigDecimal resolveTransferFeeRate() {
-    Optional<String> raw = systemSettingService.getSettingValue(TRANSFER_FEE_RATE_SETTING_KEY);
+    Optional<String> raw = systemSettings.getSettingValue(TRANSFER_FEE_RATE_SETTING_KEY);
     if (raw.isEmpty() || raw.get().isBlank()) {
       log.warn(
           "System setting '{}' is missing or blank, falling back to default {}",

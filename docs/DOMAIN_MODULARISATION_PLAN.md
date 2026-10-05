@@ -819,6 +819,38 @@ their "must stay green" period here (D-01).
   controller, as before. Those two rules are the target of the module's REST wave, which moves the
   transaction boundary and the mapping into the module; a move keeps both where they are, because
   either change alters the transaction boundary.
+- `orgchart` — **done 2026-10-05.** All 24 classes moved: the controllers `OrgChartController` and
+  `LeitungController` into `orgchart.web`, the rest (entity `OrgChartPosition`, its repository, the
+  enums, `OrgChartService`, `OrgChartReadService`, `LeitungViewService`, `OrgChartPositionMapper`
+  and the 14 DTOs, `AreaLeadershipDto` with them as §7.3 P1-1 deferred) into `orgchart.internal`.
+  The module is declared (floor 19, after `dashboard`) and publishes nothing: no other module uses
+  it, and orgunit reaches it only through `MembershipChangeObserver`. The domain map trades its two `name` rules
+  and the `AreaLeadershipDto` class rule for one `package` rule. No access policy left the scope
+  hub — the org chart has none: its reads are `isAuthenticated()`, its writes `hasRole('ADMIN')`,
+  and neither touches `OwnerScopeService` or `AccessGateService`. The module baseline is unchanged
+  at 110 edges: the org chart had no frozen edge left after P1-1. `OrgChartModuleContractTest`
+  pins its endpoints and the observer before and after the move. **Correction to §5.2:** the
+  `web` package cannot hold the REST DTOs yet — the services return them, so `internal -> web`
+  would close a layer cycle inside the module (ADR-0047); they stay in `internal` until the module
+  API returns its own records.
+- `admin` — **done 2026-10-05** (P2-2). The admin building blocks of §5.1 — the runtime system
+  settings, the Android version policy and the liveness probe — moved out of the layer packages:
+  `admin.web` holds `SystemSettingController`, `AppVersionPolicyController`, `SystemController`,
+  `AppVersionPolicyDto` and `PingResponse`; `admin.internal` the `SystemSetting` entity, its
+  repository, `SystemSettingService`, `SystemSettingMapper`, the setting records the service returns,
+  `AndroidClientProperties` and `AndroidVersionPolicyReport`. The `/admin` endpoints of other
+  domains are not part of it; they move with their domains. The module's four inbound edges (bank
+  transfer fee, operation payout, the default-blueprint bootstrap's entity and repository) now go
+  through one API type, `admin.api.SystemSettings` (`getSettingValue`, and `putSettingValue` for
+  the bootstrap's seed flag, the same find-or-create-and-save inside the caller's transaction),
+  implemented by `SystemSettingService`; every declared module of a higher rank allows
+  `admin::api`. The module baseline is unchanged at 110 edges (none of the four was a violation);
+  the authorization matrix and the OpenAPI document are unchanged. No access policy: every gate is
+  a role annotation. The setting records stay in `internal` beside the service that returns them, as
+  for `orgchart`. **Finding:**
+  the selection floor of `ArchitectureTest`'s `squadron_id` join-column rule counts the legacy
+  `model` package tree as well as every entity by role, so each move of `model.dto` records lowers
+  it (by 4 here) without the rule checking any entity less.
 
 ### 7.5 Phase 3 — the business core
 
@@ -857,7 +889,7 @@ domain stays a package.
 | F0 | Guards (Phase 0.4) |
 | F1 — **done 2026-10-04** | Kernel extraction: `BackendErrorMapper` (a sealed outcome type with a pattern switch), template overloads for write verbs, the eleven bypassing controllers moved onto the kernel, the `WebClient` confinement rule at zero |
 | F2 — **done 2026-10-04** | Exact session allow-list in its own release (D-10): `SessionTypeAllowList.SESSION_BOUND_TYPES`, 21 exact names; the `…frontend.model.` prefix is gone, `SessionBoundTypeClosureTest` holds the list equal to the derived set in both directions. Corrections: the list lives in the security class, not in the G-16 golden file (`session-bound-types.txt` is deleted, so `-PupdateSnapshots` can no longer widen the allow-list); the admitted application classes fall from 325 to 21, not "about 20" of "about eleven" forms — the 21 are 10 flashed forms and DTOs with their nested types and enums |
-| F3 — **in progress since 2026-10-05** | Typed client per domain, small domains first (audit, notification, settings, dashboard, exchange, orgchart), then the large four; untyped `Map` relays typed in the same step |
+| F3 — **done 2026-10-05** | Typed client per domain, small domains first (audit, notification, settings, dashboard, exchange, orgchart), then the large four; untyped `Map` relays typed in the same step |
 | F4 | Package-by-domain move in one pull request; route/gate snapshot byte-identical |
 | F5 | Templates and assets per domain (§8.2), with the page chrome as one layout fragment |
 
@@ -905,6 +937,32 @@ Spezialkommando lists), so a page never needs a second domain's client; the dupl
 two lines each. Typed clients consolidate repeated call sites, so the write-site floor of
 `WriteUriTemplateTest` and the resolved-site floor of `BackendCallExistenceTest` fall with each
 domain (the four settings PUTs, written twice, are one `write` now).
+
+*F3 as built, parts 2–4 (2026-10-05).* Fifteen more clients bring the count to 21, one per frontend
+domain of the evidence table (`identity`, `orgunit`, `leadership`, `hangar`, `promotion`,
+`catalogue`, `blueprint`, `personalinventory`, `materialexchange`, `mission`, `operation`, `bank`,
+`joborder`, `inventory`, `refinery`); every controller calls only its own domain's client and
+`TypedBackendClientTest` holds no allow-list. Each call moved verbatim (verb, template,
+variables, body, response type), so the controller tests kept stubbing `BackendApiClient` around
+the real client; each client's requests are pinned against a MockWebServer. The UEX override's
+concatenated entity kind became an exhaustive switch over the allow-list, so `WriteUriTemplateTest`
+has no reviewed exception left and no backend call concatenates for any verb. The untyped relays
+became records mirrored from the backend: the identity, org-unit, Leitung, promotion, hangar,
+catalogue, material-exchange, job-order, bank and mission bodies and answers. Corrections and
+what stays open: the "large four" were not a fixed set — the domains moved in four stacked
+parts by size; the call-site floors fell from 611 resolved / 344 write sites to 524 / 289 as the
+clients merged duplicate calls; a typed relay now refuses a malformed browser value at the
+frontend's own binding (400) instead of relaying it for the backend's 400, and its answer is
+re-serialised from the record (additive keys, `BigDecimal` scale kept). The cached `TERMINALS`
+catalogue is read as `TerminalDto` rows. Two relays stay untyped by design, not as open work: the
+org-unit bank path-only writes, because the backend endpoint binds no request body (the browser
+body is relayed as sent, only the answer is typed), and the refinery import's extract, a
+`JsonNode` passed through unchanged because the extractor's file is its own JSON contract
+(ADR-0008) that the backend validates. The blueprint
+import's file part goes out as `application/json` for a `.json` file although the builder names
+`application/octet-stream` — unchanged by the move, now pinned. The next step for the clients is
+F4 (the controllers move next to them) and, per domain with its REST cut, the HTTP interface of
+§5.9.
 
 ### 7.9 REST API track
 

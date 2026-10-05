@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -38,15 +36,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.MyRsiHandleRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MyRsiHandleResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.List;
-import java.util.Map;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -80,8 +77,8 @@ class ProfileRsiHandleMvcTest {
 
   @Test
   void theCardShowsTheStoredHandle() throws Exception {
-    when(backendApiClient.get(eq(BACKEND), anyTypeRef()))
-        .thenReturn(Map.of("rsiHandle", "Stored_Handle", "version", 4));
+    when(backendApiClient.get(BACKEND, MyRsiHandleResponse.class))
+        .thenReturn(new MyRsiHandleResponse("Stored_Handle", 4L));
 
     mockMvc
         .perform(get("/profile").with(oidcLogin()))
@@ -90,7 +87,6 @@ class ProfileRsiHandleMvcTest {
         .andExpect(content().string(Matchers.containsString("value=\"Stored_Handle\"")));
   }
 
-  @SuppressWarnings("unchecked")
   @Test
   void anAjaxSaveRelaysTheTrimmedHandleAndAnswersWithTheStoredOne() throws Exception {
     when(backendApiClient.put(eq(BACKEND), any(), eq(MyRsiHandleResponse.class)))
@@ -108,11 +104,8 @@ class ProfileRsiHandleMvcTest {
         .andExpect(jsonPath("$.rsiHandle").value("New_Handle"))
         .andExpect(jsonPath("$.version").value(5));
 
-    ArgumentCaptor<Map<String, Object>> body = ArgumentCaptor.forClass(Map.class);
-    verify(backendApiClient).put(eq(BACKEND), body.capture(), eq(MyRsiHandleResponse.class));
-    assertThat(body.getValue())
-        .containsEntry("rsiHandle", "New_Handle")
-        .containsEntry("version", 4L);
+    verify(backendApiClient)
+        .put(BACKEND, new MyRsiHandleRequest("New_Handle", 4L), MyRsiHandleResponse.class);
   }
 
   @Test
@@ -163,8 +156,7 @@ class ProfileRsiHandleMvcTest {
         .andExpect(redirectedUrl("/profile"))
         .andExpect(flash().attribute("successToast", "notification.success.save"));
 
-    verify(backendApiClient)
-        .put(eq(BACKEND), eq(Map.of("rsiHandle", "Form_Handle", "version", 2L)), eq(Void.class));
+    verify(backendApiClient).put(BACKEND, new MyRsiHandleRequest("Form_Handle", 2L), Void.class);
   }
 
   @Test

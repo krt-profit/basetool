@@ -23,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 
+import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AssigneeNoteRequest;
 import de.greluc.krt.profit.basetool.frontend.support.MutationResponseHelper;
 import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus;
@@ -57,7 +59,7 @@ class JobOrderAssigneeNoteBackendUriTest {
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
     controller =
         new JobOrderWriteController(
-            RealBackendApiClient.over(webClient),
+            new JobOrderBackendClient(RealBackendApiClient.over(webClient)),
             mock(RoleHierarchy.class),
             mock(MutationResponseHelper.class),
             mock(LiveSyncLocalBus.class));
@@ -73,11 +75,7 @@ class JobOrderAssigneeNoteBackendUriTest {
     enqueueOrder();
 
     controller.setAssigneeNote(
-        ORDER,
-        USER,
-        new JobOrderWriteController.AssigneeNoteRequest("Abends ab 20 Uhr", 4L),
-        new ConcurrentModel(),
-        null);
+        ORDER, USER, new AssigneeNoteRequest("Abends ab 20 Uhr", 4L), new ConcurrentModel(), null);
 
     RecordedRequest request = take();
     assertEquals("PUT", request.getMethod());
