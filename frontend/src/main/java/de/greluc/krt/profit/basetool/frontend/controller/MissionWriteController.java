@@ -25,11 +25,39 @@ import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorRespons
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddCrewRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddCustomFrequencyRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddExternalParticipantRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddFrequencyRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddMissionObjectiveRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddMissionStepRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddUnitRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionActualTimeUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFrequencyDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionObjectiveDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionStepDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionUnitDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PatchMissionCoreRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PatchMissionFlagsRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PatchMissionScheduleRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.ReorderMissionObjectivesRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.ReorderMissionStepsRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SetPartyLeadRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.ToggleMissionStepRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateCrewRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateCustomFrequencyRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateMissionObjectiveRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateMissionOwnerRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateMissionOwningOrgUnitRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateMissionStepRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateParticipantRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UpdatePayoutPreferenceRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateUnitRequest;
 import de.greluc.krt.profit.basetool.frontend.model.form.CrewForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.MissionForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ParticipantForm;
@@ -46,7 +74,6 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -166,25 +193,16 @@ public class MissionWriteController {
       return missionPageController.missionDetail(id, model, principal, null);
     }
     try {
-      Map<String, Object> body = new HashMap<>();
-      if (form.userId() != null) {
-        body.put("userId", form.userId());
-      }
-      if (form.guestName() != null && !form.guestName().isBlank()) {
-        body.put("guestName", form.guestName());
-      }
-      if (form.desiredJobTypeId() != null) {
-        body.put("desiredJobTypeId", form.desiredJobTypeId());
-      }
-      if (form.orgUnitIds() != null && !form.orgUnitIds().isEmpty()) {
-        body.put("orgUnitIds", form.orgUnitIds());
-      }
-      if (form.payoutPreference() != null) {
-        body.put("payoutPreference", form.payoutPreference().name());
-      }
-      body.put("comment", form.comment());
+      AddExternalParticipantRequest request =
+          new AddExternalParticipantRequest(
+              form.userId(),
+              form.guestName() != null && !form.guestName().isBlank() ? form.guestName() : null,
+              form.desiredJobTypeId(),
+              form.comment(),
+              form.orgUnitIds() != null && !form.orgUnitIds().isEmpty() ? form.orgUnitIds() : null,
+              form.payoutPreference() != null ? form.payoutPreference().name() : null);
 
-      missionClient.addParticipant(id, body);
+      missionClient.addParticipant(id, request);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Add participant failed with status {}: {}", e.getStatusCode(), e.getMessage());
@@ -222,15 +240,12 @@ public class MissionWriteController {
       @RequestParam(required = false) Long version,
       RedirectAttributes redirectAttributes) {
     try {
-      Map<String, Object> body = new HashMap<>();
-      if (userId != null) {
-        body.put("userId", userId);
-      }
-      if (guestName != null && !guestName.isBlank()) {
-        body.put("guestName", guestName);
-      }
-      body.put("version", version != null ? version : 0L);
-      missionClient.setPartyLead(id, body);
+      missionClient.setPartyLead(
+          id,
+          new SetPartyLeadRequest(
+              userId,
+              guestName != null && !guestName.isBlank() ? guestName : null,
+              version != null ? version : 0L));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Set party lead failed with status {}: {}", e.getStatusCode(), e.getMessage());
@@ -253,7 +268,8 @@ public class MissionWriteController {
    * @param id mission id (path)
    * @param body party-lead JSON ({@code userId} and/or {@code guestName}, plus {@code version}); an
    *     empty {@code userId} and {@code guestName} clear the lead
-   * @return {@code 200} with the refreshed mission, or the upstream RFC 7807 error passed through
+   * @return {@code 200} with the refreshed mission, {@code 400} for a malformed {@code userId} or
+   *     {@code version}, or the upstream RFC 7807 error passed through
    */
   @PutMapping(value = "/{id}/party-lead/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
@@ -263,17 +279,18 @@ public class MissionWriteController {
         log,
         "set party lead (ajax) for mission " + id,
         () -> {
-          Map<String, Object> out = new HashMap<>();
-          Object userId = body.get("userId");
-          if (userId != null && !String.valueOf(userId).isBlank()) {
-            out.put("userId", userId);
+          SetPartyLeadRequest request;
+          try {
+            request =
+                new SetPartyLeadRequest(
+                    uuidOrNull(body.get("userId")),
+                    textOrNull(body.get("guestName")),
+                    versionOrZero(body.get("version")));
+          } catch (IllegalArgumentException _) {
+            log.debug("Party lead change refused: malformed userId or version");
+            return ResponseEntity.badRequest().build();
           }
-          Object guestName = body.get("guestName");
-          if (guestName != null && !String.valueOf(guestName).isBlank()) {
-            out.put("guestName", guestName);
-          }
-          out.put("version", body.get("version") != null ? body.get("version") : 0L);
-          missionClient.setPartyLead(id, out);
+          missionClient.setPartyLead(id, request);
           MissionDto mission = missionClient.mission(id);
           return ResponseEntity.ok(mission);
         });
@@ -351,7 +368,7 @@ public class MissionWriteController {
         log,
         "update payout preference",
         () -> {
-          Object updatedParticipant =
+          MissionParticipantDto updatedParticipant =
               missionClient.updatePayoutPreference(id, participantId, request);
           return ResponseEntity.ok(updatedParticipant);
         });
@@ -382,15 +399,15 @@ public class MissionWriteController {
       Instant newEnd =
           "actualEndTime".equals(request.field()) ? request.value() : current.actualEndTime();
 
-      Map<String, Object> schedulePatch = new LinkedHashMap<>();
-      schedulePatch.put("meetingTime", current.meetingTime());
-      schedulePatch.put("plannedStartTime", current.plannedStartTime());
-      schedulePatch.put("plannedEndTime", current.plannedEndTime());
-      schedulePatch.put("actualStartTime", newStart);
-      schedulePatch.put("actualEndTime", newEnd);
-      schedulePatch.put("version", request.version());
-
-      missionClient.patchSchedule(id, schedulePatch);
+      missionClient.patchSchedule(
+          id,
+          new PatchMissionScheduleRequest(
+              current.meetingTime(),
+              current.plannedStartTime(),
+              current.plannedEndTime(),
+              newStart,
+              newEnd,
+              request.version()));
       MissionDto refreshed = missionClient.reloadMission(id);
       return ResponseEntity.ok(refreshed);
     } catch (BackendServiceException e) {
@@ -455,37 +472,19 @@ public class MissionWriteController {
       return missionPageController.missionDetail(id, model, principal, null);
     }
     try {
-      Map<String, Object> body = new HashMap<>();
-      if (form.desiredJobTypeId() != null) {
-        body.put("desiredMissionJobTypeId", form.desiredJobTypeId());
-      }
-      if (form.plannedMissionJobTypeId() != null) {
-        body.put("plannedMissionJobTypeId", form.plannedMissionJobTypeId());
-      }
-      if (form.orgUnitIds() != null) {
-        body.put("orgUnitIds", form.orgUnitIds());
-      }
-      body.put("comment", form.comment());
-      if (form.startTime() != null && !form.startTime().isBlank()) {
-        Instant parsed = parseToInstant(form.startTime());
-        if (parsed != null) {
-          body.put("startTime", parsed.toString());
-        }
-      }
-      if (form.endTime() != null && !form.endTime().isBlank()) {
-        Instant parsed = parseToInstant(form.endTime());
-        if (parsed != null) {
-          body.put("endTime", parsed.toString());
-        }
-      }
-      if (form.payoutPreference() != null) {
-        body.put("payoutPreference", form.payoutPreference().name());
-      }
-      if (form.version() != null) {
-        body.put("version", form.version());
-      }
+      UpdateParticipantRequest request =
+          new UpdateParticipantRequest(
+              form.desiredJobTypeId(),
+              form.plannedMissionJobTypeId(),
+              form.comment(),
+              null,
+              parseToInstant(form.startTime()),
+              parseToInstant(form.endTime()),
+              form.orgUnitIds(),
+              form.payoutPreference() != null ? form.payoutPreference().name() : null,
+              form.version());
 
-      missionClient.updateParticipant(id, participantId, body);
+      missionClient.updateParticipant(id, participantId, request);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Update participant failed", e);
@@ -512,18 +511,10 @@ public class MissionWriteController {
       @RequestParam(required = false) String note,
       RedirectAttributes redirectAttributes) {
     try {
-      Map<String, Object> body = new HashMap<>();
-      body.put("name", name);
-      body.put("shipTypeId", shipTypeId);
-      if (shipId != null) {
-        body.put("shipId", shipId);
-      }
-      body.put("highValueUnit", highValueUnit);
-      body.put("frequency", frequency);
-      body.put("responsibleUserId", responsibleUserId);
-      body.put("note", note);
-
-      missionClient.addUnit(id, body);
+      missionClient.addUnit(
+          id,
+          new AddUnitRequest(
+              name, shipTypeId, shipId, highValueUnit, frequency, responsibleUserId, note));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Add unit failed", e);
@@ -551,18 +542,11 @@ public class MissionWriteController {
       @RequestParam(required = false) String note,
       RedirectAttributes redirectAttributes) {
     try {
-      Map<String, Object> body = new HashMap<>();
-      body.put("name", name);
-      body.put("shipTypeId", shipTypeId);
-      if (shipId != null) {
-        body.put("shipId", shipId);
-      }
-      body.put("highValueUnit", highValueUnit);
-      body.put("frequency", frequency);
-      body.put("responsibleUserId", responsibleUserId);
-      body.put("note", note);
-
-      missionClient.updateUnit(id, unitId, body);
+      missionClient.updateUnit(
+          id,
+          unitId,
+          new UpdateUnitRequest(
+              name, shipTypeId, shipId, highValueUnit, frequency, responsibleUserId, note, null));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Update unit failed", e);
@@ -613,13 +597,14 @@ public class MissionWriteController {
       return missionPageController.missionDetail(id, model, principal, null);
     }
     try {
-      Map<String, Object> body = new HashMap<>();
-      body.put("participantId", form.participantId());
-      if (form.jobTypeIds() != null && !form.jobTypeIds().isEmpty()) {
-        body.put("jobTypeIds", form.jobTypeIds());
-      }
-
-      missionClient.addCrew(id, unitId, body);
+      missionClient.addCrew(
+          id,
+          unitId,
+          new AddCrewRequest(
+              form.participantId(),
+              form.jobTypeIds() != null && !form.jobTypeIds().isEmpty()
+                  ? form.jobTypeIds()
+                  : null));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Add crew failed", e);
@@ -650,14 +635,15 @@ public class MissionWriteController {
       return missionPageController.missionDetail(id, model, principal, null);
     }
     try {
-      Map<String, Object> body = new HashMap<>();
-      if (form.jobTypeIds() != null && !form.jobTypeIds().isEmpty()) {
-        body.put("jobTypeIds", form.jobTypeIds());
-      } else {
-        body.put("jobTypeIds", List.of());
-      }
-
-      missionClient.updateCrew(id, unitId, crewId, body);
+      missionClient.updateCrew(
+          id,
+          unitId,
+          crewId,
+          new UpdateCrewRequest(
+              form.jobTypeIds() != null && !form.jobTypeIds().isEmpty()
+                  ? form.jobTypeIds()
+                  : List.of(),
+              null));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Update crew failed", e);
@@ -856,14 +842,15 @@ public class MissionWriteController {
               ? parseToInstant(form.actualEndTime())
               : null;
 
-      Map<String, Object> schedulePatch = new LinkedHashMap<>();
-      schedulePatch.put("meetingTime", meetingTime);
-      schedulePatch.put("plannedStartTime", plannedStartTime);
-      schedulePatch.put("plannedEndTime", plannedEndTime);
-      schedulePatch.put("actualStartTime", actualStartTime);
-      schedulePatch.put("actualEndTime", actualEndTime);
-      schedulePatch.put("version", form.scheduleVersion());
-      missionClient.patchSchedule(id, schedulePatch);
+      missionClient.patchSchedule(
+          id,
+          new PatchMissionScheduleRequest(
+              meetingTime,
+              plannedStartTime,
+              plannedEndTime,
+              actualStartTime,
+              actualEndTime,
+              form.scheduleVersion()));
     }
 
     if (saveCore) {
@@ -871,22 +858,23 @@ public class MissionWriteController {
           (form.operationId() != null && !form.operationId().isBlank())
               ? UUID.fromString(form.operationId())
               : null;
-      Map<String, Object> corePatch = new LinkedHashMap<>();
-      corePatch.put("name", form.name());
-      corePatch.put("description", form.description());
-      corePatch.put("calendarLink", form.calendarLink());
-      corePatch.put("status", form.status());
-      corePatch.put("operationId", operationId);
-      corePatch.put("meetingPoint", form.meetingPoint());
-      corePatch.put("version", form.coreVersion());
-      missionClient.patchCore(id, corePatch);
+      missionClient.patchCore(
+          id,
+          new PatchMissionCoreRequest(
+              form.name(),
+              form.description(),
+              form.calendarLink(),
+              form.status(),
+              operationId,
+              form.coreVersion(),
+              form.meetingPoint()));
     }
 
     if (saveFlags) {
-      Map<String, Object> flagsPatch = new LinkedHashMap<>();
-      flagsPatch.put("isInternal", form.isInternal() != null && form.isInternal());
-      flagsPatch.put("version", form.flagsVersion());
-      missionClient.patchFlags(id, flagsPatch);
+      missionClient.patchFlags(
+          id,
+          new PatchMissionFlagsRequest(
+              form.isInternal() != null && form.isInternal(), form.flagsVersion()));
     }
   }
 
@@ -1078,28 +1066,27 @@ public class MissionWriteController {
    * @param id mission id (path)
    * @param body owner-change JSON: {@code userId} (a UUID string) plus {@code version}
    * @return {@code 200} with the refreshed mission, {@code 400} for a missing or malformed {@code
-   *     userId}, or the upstream RFC 7807 error passed through
+   *     userId} or a malformed {@code version}, or the upstream RFC 7807 error passed through
    */
   @PutMapping(value = "/{id}/owner/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
   public ResponseEntity<Object> setMissionOwner(
       @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
-    UUID userId;
+    UpdateMissionOwnerRequest request;
     try {
       Object raw = body.get("userId");
       if (raw == null || String.valueOf(raw).isBlank()) {
         return ResponseEntity.badRequest().build();
       }
-      userId = UUID.fromString(String.valueOf(raw).trim());
-    } catch (IllegalArgumentException e) {
-      log.debug("Owner change refused: userId is not a UUID");
+      request =
+          new UpdateMissionOwnerRequest(
+              UUID.fromString(String.valueOf(raw).trim()), versionOrZero(body.get("version")));
+    } catch (IllegalArgumentException _) {
+      log.debug("Owner change refused: userId is not a UUID or version is not a number");
       return ResponseEntity.badRequest().build();
     }
     try {
-      Map<String, Object> out = new HashMap<>();
-      out.put("userId", userId);
-      out.put("version", body.get("version") != null ? body.get("version") : 0L);
-      missionClient.setOwner(id, out);
+      missionClient.setOwner(id, request);
       MissionDto mission = missionClient.mission(id);
       return ResponseEntity.ok(mission);
     } catch (BackendServiceException e) {
@@ -1122,7 +1109,8 @@ public class MissionWriteController {
    * @param id mission id (path)
    * @param body reassignment JSON: {@code owningOrgUnitId} (a UUID string, or blank/absent for
    *     ownerless) plus {@code version}
-   * @return {@code 200} on success, or the upstream RFC 7807 error passed through
+   * @return {@code 200} on success, {@code 400} for a malformed {@code owningOrgUnitId} or {@code
+   *     version}, or the upstream RFC 7807 error passed through
    */
   @PutMapping(value = "/{id}/owning-org-unit/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
@@ -1132,15 +1120,16 @@ public class MissionWriteController {
         log,
         "set mission owning org unit for mission " + id,
         () -> {
-          Map<String, Object> out = new HashMap<>();
-          Object owningOrgUnitId = body.get("owningOrgUnitId");
-          out.put(
-              "owningOrgUnitId",
-              (owningOrgUnitId != null && !String.valueOf(owningOrgUnitId).isBlank())
-                  ? owningOrgUnitId
-                  : null);
-          out.put("version", body.get("version") != null ? body.get("version") : 0L);
-          missionClient.setOwningOrgUnit(id, out);
+          UpdateMissionOwningOrgUnitRequest request;
+          try {
+            request =
+                new UpdateMissionOwningOrgUnitRequest(
+                    uuidOrNull(body.get("owningOrgUnitId")), versionOrZero(body.get("version")));
+          } catch (IllegalArgumentException _) {
+            log.debug("Owning org unit change refused: malformed owningOrgUnitId or version");
+            return ResponseEntity.badRequest().build();
+          }
+          missionClient.setOwningOrgUnit(id, request);
           MissionDto mission = missionClient.mission(id);
           return ResponseEntity.ok(mission);
         });
@@ -1161,11 +1150,7 @@ public class MissionWriteController {
       @RequestParam @NotNull BigDecimal value,
       RedirectAttributes redirectAttributes) {
     try {
-      Map<String, Object> body = new HashMap<>();
-      body.put("frequencyTypeId", frequencyTypeId);
-      body.put("value", value);
-
-      missionClient.putFrequency(id, body);
+      missionClient.putFrequency(id, new AddFrequencyRequest(frequencyTypeId, value));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Add or update frequency failed", e);
@@ -1206,12 +1191,12 @@ public class MissionWriteController {
   @ResponseBody
   @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   public ResponseEntity<Object> addOrUpdateFrequencyAjax(
-      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
+      @PathVariable @NotNull UUID id, @RequestBody AddFrequencyRequest body) {
     return relay(
         log,
         "add or update frequency (ajax) for mission " + id,
         () -> {
-          Object result = missionClient.putFrequencyJson(id, body);
+          List<MissionFrequencyDto> result = missionClient.putFrequencyJson(id, body);
           return ResponseEntity.ok(result);
         });
   }
@@ -1231,8 +1216,8 @@ public class MissionWriteController {
         log,
         "delete frequency (ajax) for mission " + id + " freq " + frequencyId,
         () -> {
-          Object result = missionClient.deleteFrequencyJson(id, frequencyId);
-          return ResponseEntity.ok(result);
+          missionClient.deleteFrequency(id, frequencyId);
+          return ResponseEntity.ok().build();
         });
   }
 
@@ -1247,12 +1232,12 @@ public class MissionWriteController {
   @ResponseBody
   @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   public ResponseEntity<Object> addCustomFrequencyAjax(
-      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
+      @PathVariable @NotNull UUID id, @RequestBody AddCustomFrequencyRequest body) {
     return relay(
         log,
         "add custom frequency (ajax) for mission " + id,
         () -> {
-          Object result = missionClient.addCustomFrequency(id, body);
+          List<MissionFrequencyDto> result = missionClient.addCustomFrequency(id, body);
           return ResponseEntity.ok(result);
         });
   }
@@ -1274,12 +1259,13 @@ public class MissionWriteController {
   public ResponseEntity<Object> updateCustomFrequencyAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID frequencyId,
-      @RequestBody Map<String, Object> body) {
+      @RequestBody UpdateCustomFrequencyRequest body) {
     return relay(
         log,
         "update custom frequency (ajax) for mission " + id + " freq " + frequencyId,
         () -> {
-          Object result = missionClient.updateCustomFrequency(id, frequencyId, body);
+          List<MissionFrequencyDto> result =
+              missionClient.updateCustomFrequency(id, frequencyId, body);
           return ResponseEntity.ok(result);
         });
   }
@@ -1292,12 +1278,12 @@ public class MissionWriteController {
   @PostMapping(value = "/{id}/units/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
   public ResponseEntity<Object> addUnitAjax(
-      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
+      @PathVariable @NotNull UUID id, @RequestBody AddUnitRequest body) {
     return relay(
         log,
         "add unit (ajax) for mission " + id,
         () -> {
-          Object result = missionClient.addUnitJson(id, body);
+          List<MissionUnitDto> result = missionClient.addUnitJson(id, body);
           return ResponseEntity.ok(result);
         });
   }
@@ -1311,12 +1297,12 @@ public class MissionWriteController {
   public ResponseEntity<Object> updateUnitAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
-      @RequestBody Map<String, Object> body) {
+      @RequestBody UpdateUnitRequest body) {
     return relay(
         log,
         "update unit (ajax) for mission " + id + " unit " + unitId,
         () -> {
-          Object result = missionClient.updateUnitJson(id, unitId, body);
+          MissionUnitDto result = missionClient.updateUnitJson(id, unitId, body);
           return ResponseEntity.ok(result);
         });
   }
@@ -1345,12 +1331,12 @@ public class MissionWriteController {
   @PostMapping(value = "/{id}/steps/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
   public ResponseEntity<Object> addStepAjax(
-      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
+      @PathVariable @NotNull UUID id, @RequestBody AddMissionStepRequest body) {
     return relay(
         log,
         "add step (ajax) for mission " + id,
         () -> {
-          Object result = missionClient.addStep(id, body);
+          List<MissionStepDto> result = missionClient.addStep(id, body);
           return ResponseEntity.ok(result);
         });
   }
@@ -1368,12 +1354,12 @@ public class MissionWriteController {
   public ResponseEntity<Object> updateStepAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID stepId,
-      @RequestBody Map<String, Object> body) {
+      @RequestBody UpdateMissionStepRequest body) {
     return relay(
         log,
         "update step (ajax) for mission " + id + " step " + stepId,
         () -> {
-          Object result = missionClient.updateStep(id, stepId, body);
+          List<MissionStepDto> result = missionClient.updateStep(id, stepId, body);
           return ResponseEntity.ok(result);
         });
   }
@@ -1396,7 +1382,7 @@ public class MissionWriteController {
         log,
         "delete step (ajax) for mission " + id + " step " + stepId,
         () -> {
-          Object result = missionClient.deleteStep(id, stepId, stepsVersion);
+          List<MissionStepDto> result = missionClient.deleteStep(id, stepId, stepsVersion);
           return ResponseEntity.ok(result);
         });
   }
@@ -1411,12 +1397,12 @@ public class MissionWriteController {
   @PutMapping(value = "/{id}/steps/reorder/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
   public ResponseEntity<Object> reorderStepsAjax(
-      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
+      @PathVariable @NotNull UUID id, @RequestBody ReorderMissionStepsRequest body) {
     return relay(
         log,
         "reorder steps (ajax) for mission " + id,
         () -> {
-          Object result = missionClient.reorderSteps(id, body);
+          List<MissionStepDto> result = missionClient.reorderSteps(id, body);
           return ResponseEntity.ok(result);
         });
   }
@@ -1436,12 +1422,12 @@ public class MissionWriteController {
   public ResponseEntity<Object> toggleStepDoneAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID stepId,
-      @RequestBody Map<String, Object> body) {
+      @RequestBody ToggleMissionStepRequest body) {
     return relay(
         log,
         "toggle step done (ajax) for mission " + id + " step " + stepId,
         () -> {
-          Object result = missionClient.setStepDone(id, stepId, body);
+          List<MissionStepDto> result = missionClient.setStepDone(id, stepId, body);
           return ResponseEntity.ok(result);
         });
   }
@@ -1456,12 +1442,12 @@ public class MissionWriteController {
   @PostMapping(value = "/{id}/objectives/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
   public ResponseEntity<Object> addObjectiveAjax(
-      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
+      @PathVariable @NotNull UUID id, @RequestBody AddMissionObjectiveRequest body) {
     return relay(
         log,
         "add objective (ajax) for mission " + id,
         () -> {
-          Object result = missionClient.addObjective(id, body);
+          List<MissionObjectiveDto> result = missionClient.addObjective(id, body);
           return ResponseEntity.ok(result);
         });
   }
@@ -1481,12 +1467,12 @@ public class MissionWriteController {
   public ResponseEntity<Object> updateObjectiveAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID objectiveId,
-      @RequestBody Map<String, Object> body) {
+      @RequestBody UpdateMissionObjectiveRequest body) {
     return relay(
         log,
         "update objective (ajax) for mission " + id + " objective " + objectiveId,
         () -> {
-          Object result = missionClient.updateObjective(id, objectiveId, body);
+          List<MissionObjectiveDto> result = missionClient.updateObjective(id, objectiveId, body);
           return ResponseEntity.ok(result);
         });
   }
@@ -1511,7 +1497,8 @@ public class MissionWriteController {
         log,
         "delete objective (ajax) for mission " + id + " objective " + objectiveId,
         () -> {
-          Object result = missionClient.deleteObjective(id, objectiveId, objectivesVersion);
+          List<MissionObjectiveDto> result =
+              missionClient.deleteObjective(id, objectiveId, objectivesVersion);
           return ResponseEntity.ok(result);
         });
   }
@@ -1526,12 +1513,12 @@ public class MissionWriteController {
   @PutMapping(value = "/{id}/objectives/reorder/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
   public ResponseEntity<Object> reorderObjectivesAjax(
-      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
+      @PathVariable @NotNull UUID id, @RequestBody ReorderMissionObjectivesRequest body) {
     return relay(
         log,
         "reorder objectives (ajax) for mission " + id,
         () -> {
-          Object result = missionClient.reorderObjectives(id, body);
+          List<MissionObjectiveDto> result = missionClient.reorderObjectives(id, body);
           return ResponseEntity.ok(result);
         });
   }
@@ -1546,13 +1533,13 @@ public class MissionWriteController {
   @ResponseBody
   public ResponseEntity<Object> addParticipantAjax(
       @PathVariable @NotNull UUID id,
-      @RequestBody Map<String, Object> body,
+      @RequestBody AddExternalParticipantRequest body,
       @AuthenticationPrincipal OidcUser principal) {
     return relay(
         log,
         "add participant (ajax) for mission " + id,
         () -> {
-          Object result = missionClient.addParticipantJson(id, body);
+          List<MissionParticipantDto> result = missionClient.addParticipantJson(id, body);
           return ResponseEntity.ok(result);
         });
   }
@@ -1568,13 +1555,14 @@ public class MissionWriteController {
   public ResponseEntity<Object> updateParticipantAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
-      @RequestBody Map<String, Object> body,
+      @RequestBody UpdateParticipantRequest body,
       @AuthenticationPrincipal OidcUser principal) {
     return relay(
         log,
         "update participant (ajax) for mission " + id + " participant " + participantId,
         () -> {
-          Object result = missionClient.updateParticipantJson(id, participantId, body);
+          MissionParticipantDto result =
+              missionClient.updateParticipantJson(id, participantId, body);
           return ResponseEntity.ok(result);
         });
   }
@@ -1616,7 +1604,7 @@ public class MissionWriteController {
         log,
         "check in participant (ajax) for mission " + id + " participant " + participantId,
         () -> {
-          Object result = missionClient.checkInParticipantJson(id, participantId);
+          MissionParticipantDto result = missionClient.checkInParticipantJson(id, participantId);
           return ResponseEntity.ok(result);
         });
   }
@@ -1637,7 +1625,7 @@ public class MissionWriteController {
         log,
         "check out participant (ajax) for mission " + id + " participant " + participantId,
         () -> {
-          Object result = missionClient.checkOutParticipantJson(id, participantId);
+          MissionParticipantDto result = missionClient.checkOutParticipantJson(id, participantId);
           return ResponseEntity.ok(result);
         });
   }
@@ -1653,12 +1641,12 @@ public class MissionWriteController {
   public ResponseEntity<Object> addCrewAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
-      @RequestBody Map<String, Object> body) {
+      @RequestBody AddCrewRequest body) {
     return relay(
         log,
         "add crew (ajax) for mission " + id + " unit " + unitId,
         () -> {
-          Object result = missionClient.addCrewJson(id, unitId, body);
+          List<MissionCrewDto> result = missionClient.addCrewJson(id, unitId, body);
           return ResponseEntity.ok(result);
         });
   }
@@ -1675,12 +1663,12 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
       @PathVariable @NotNull UUID crewId,
-      @RequestBody Map<String, Object> body) {
+      @RequestBody UpdateCrewRequest body) {
     return relay(
         log,
         "update crew (ajax) for mission " + id + " unit " + unitId + " crew " + crewId,
         () -> {
-          Object result = missionClient.updateCrewJson(id, unitId, crewId, body);
+          MissionCrewDto result = missionClient.updateCrewJson(id, unitId, crewId, body);
           return ResponseEntity.ok(result);
         });
   }
@@ -1704,6 +1692,53 @@ public class MissionWriteController {
           missionClient.deleteCrew(id, unitId, crewId);
           return ResponseEntity.noContent().build();
         });
+  }
+
+  /**
+   * Reads a browser JSON value as a UUID.
+   *
+   * @param raw the value, or {@code null}
+   * @return the UUID, or {@code null} when the value is absent or blank
+   * @throws IllegalArgumentException when the value is not a UUID
+   */
+  @Nullable
+  private static UUID uuidOrNull(@Nullable Object raw) {
+    if (raw == null || String.valueOf(raw).isBlank()) {
+      return null;
+    }
+    return UUID.fromString(String.valueOf(raw).trim());
+  }
+
+  /**
+   * Reads a browser JSON value as text.
+   *
+   * @param raw the value, or {@code null}
+   * @return the text, or {@code null} when the value is absent or blank
+   */
+  @Nullable
+  private static String textOrNull(@Nullable Object raw) {
+    if (raw == null || String.valueOf(raw).isBlank()) {
+      return null;
+    }
+    return String.valueOf(raw);
+  }
+
+  /**
+   * Reads a browser JSON value as an optimistic-lock version.
+   *
+   * @param raw the value, or {@code null}
+   * @return the version, or {@code 0} when the value is absent
+   * @throws NumberFormatException when the value is neither a number nor numeric text
+   */
+  @NotNull
+  private static Long versionOrZero(@Nullable Object raw) {
+    if (raw == null) {
+      return 0L;
+    }
+    if (raw instanceof Number number) {
+      return number.longValue();
+    }
+    return Long.valueOf(String.valueOf(raw).trim());
   }
 
   /** Time zone in which zoneless mission schedule values are interpreted. */

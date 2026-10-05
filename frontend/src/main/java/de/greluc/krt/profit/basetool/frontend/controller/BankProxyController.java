@@ -20,7 +20,24 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountLifecycleRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankDepositRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderTransferRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankTransferRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankWithdrawalRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.ConfirmBankBookingRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.CreateBankAccountRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.CreateBankGrantRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.RegisterBankHolderRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.RejectBankBookingRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.RenameBankAccountRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.ReverseBankTransactionRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SetBankBalanceTargetRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SetCartelApprovalTiersRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateBankGrantRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateBankHolderRequest;
 import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
 import java.util.List;
 import java.util.Map;
@@ -68,12 +85,12 @@ public class BankProxyController {
    * active accounts matching the query, sorted by name. Returns an empty list on backend failure.
    *
    * @param query the name / account-number filter, or {@code null} / blank to match all
-   * @return matching active-account records as raw JSON maps, never {@code null}
+   * @return the matching active accounts, never {@code null}
    */
   @GetMapping("/accounts/search")
   @PreAuthorize("isAuthenticated()")
-  public List<Map<String, Object>> searchAccounts(@RequestParam(required = false) String query) {
-    PageResponse<Map<String, Object>> response =
+  public List<BankAccountDto> searchAccounts(@RequestParam(required = false) String query) {
+    PageResponse<BankAccountDto> response =
         bankClient.searchActiveAccounts(query == null ? "" : query, ACCOUNT_SEARCH_PAGE_SIZE);
     return response != null && response.content() != null ? response.content() : List.of();
   }
@@ -81,69 +98,72 @@ public class BankProxyController {
   /**
    * Forwards a deposit booking.
    *
-   * @param body the raw booking payload
-   * @return the backend acknowledgement
+   * @param request the deposit
+   * @return the booked transaction, or an empty object for a bodyless answer
    */
   @PostMapping("/deposits")
   @PreAuthorize("isAuthenticated()")
   @ResponseStatus(HttpStatus.CREATED)
-  public Map<String, Object> bookDeposit(@RequestBody @NotNull Map<String, Object> body) {
-    return orEmpty(bankClient.deposit(body));
+  public Object bookDeposit(@RequestBody @NotNull BankDepositRequest request) {
+    return orEmpty(bankClient.deposit(request));
   }
 
   /**
    * Forwards a withdrawal booking.
    *
-   * @param body the raw booking payload
-   * @return the backend acknowledgement
+   * @param request the withdrawal
+   * @return the booking outcome, or an empty object for a bodyless answer
    */
   @PostMapping("/withdrawals")
   @PreAuthorize("isAuthenticated()")
   @ResponseStatus(HttpStatus.CREATED)
-  public Map<String, Object> bookWithdrawal(@RequestBody @NotNull Map<String, Object> body) {
-    return orEmpty(bankClient.withdrawal(body));
+  public Object bookWithdrawal(@RequestBody @NotNull BankWithdrawalRequest request) {
+    return orEmpty(bankClient.withdrawal(request));
   }
 
   /**
    * Forwards an account-to-account transfer.
    *
-   * @param body the raw booking payload
-   * @return the backend acknowledgement
+   * @param request the transfer
+   * @return the booking outcome, or an empty object for a bodyless answer
    */
   @PostMapping("/transfers")
   @PreAuthorize("isAuthenticated()")
   @ResponseStatus(HttpStatus.CREATED)
-  public Map<String, Object> bookTransfer(@RequestBody @NotNull Map<String, Object> body) {
-    return orEmpty(bankClient.transfer(body));
+  public Object bookTransfer(@RequestBody @NotNull BankTransferRequest request) {
+    return orEmpty(bankClient.transfer(request));
   }
 
   /**
    * Forwards a holder→holder Umbuchung (REQ-BANK-031): moves custody between two holders, touching
    * no account. Open to bank employees on the backend.
    *
-   * @param body the raw Umbuchung payload (source/destination holder, amount, note)
-   * @return the backend acknowledgement
+   * @param request the source and destination holder, amount and note
+   * @return the booked transaction, or an empty object for a bodyless answer
    */
   @PostMapping("/holders/transfer")
   @PreAuthorize("isAuthenticated()")
   @ResponseStatus(HttpStatus.CREATED)
-  public Map<String, Object> bookHolderTransfer(@RequestBody @NotNull Map<String, Object> body) {
-    return orEmpty(bankClient.holderTransfer(body));
+  public Object bookHolderTransfer(@RequestBody @NotNull BankHolderTransferRequest request) {
+    return orEmpty(bankClient.holderTransfer(request));
   }
 
   /**
    * Forwards a reversal of one transaction (management-only on the backend).
    *
    * @param id the transaction to reverse
-   * @param body the optional correction note payload
-   * @return the backend acknowledgement
+   * @param request the optional correction note
+   * @return the reversal transaction, or an empty object for a bodyless answer
    */
   @PostMapping("/transactions/{id}/reversal")
   @PreAuthorize("isAuthenticated()")
   @ResponseStatus(HttpStatus.CREATED)
-  public Map<String, Object> reverseTransaction(
-      @PathVariable @NotNull UUID id, @RequestBody(required = false) Map<String, Object> body) {
-    return orEmpty(bankClient.reverseTransaction(id, body == null ? Map.of() : body));
+  public Object reverseTransaction(
+      @PathVariable @NotNull UUID id,
+      @RequestBody(required = false) @Nullable ReverseBankTransactionRequest request) {
+    return orEmpty(
+        bankClient.reverseTransaction(
+            id, request == null ? new ReverseBankTransactionRequest(null) : request));
   }
 
   /**
@@ -151,155 +171,155 @@ public class BankProxyController {
    * booking the ledger (REQ-BANK-023).
    *
    * @param id the request to confirm
-   * @param body the confirm payload (holderId and echoed version)
-   * @return the confirmed request
+   * @param request the recorded holders and the echoed version
+   * @return the confirmed request, or an empty object for a bodyless answer
    */
   @PostMapping("/requests/{id}/confirm")
   @PreAuthorize("isAuthenticated()")
-  public Map<String, Object> confirmBookingRequest(
-      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return orEmpty(bankClient.confirmRequest(id, body));
+  public Object confirmBookingRequest(
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull ConfirmBankBookingRequest request) {
+    return orEmpty(bankClient.confirmRequest(id, request));
   }
 
   /**
    * Forwards a bank employee's rejection of a pending booking request with a reason (REQ-BANK-023).
    *
    * @param id the request to reject
-   * @param body the reject payload (reason and echoed version)
-   * @return the rejected request
+   * @param request the reason and the echoed version
+   * @return the rejected request, or an empty object for a bodyless answer
    */
   @PostMapping("/requests/{id}/reject")
   @PreAuthorize("isAuthenticated()")
-  public Map<String, Object> rejectBookingRequest(
-      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return orEmpty(bankClient.rejectRequest(id, body));
+  public Object rejectBookingRequest(
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull RejectBankBookingRequest request) {
+    return orEmpty(bankClient.rejectRequest(id, request));
   }
 
   /**
    * Forwards an account creation (the backend lets management create any type and employees create
    * SPECIAL only, REQ-BANK-030; singleton 409s surface inline).
    *
-   * @param body the raw creation payload
-   * @return the created account
+   * @param request the new account
+   * @return the created account, or an empty object for a bodyless answer
    */
   @PostMapping("/accounts")
   @PreAuthorize("isAuthenticated()")
   @ResponseStatus(HttpStatus.CREATED)
-  public Map<String, Object> createAccount(@RequestBody @NotNull Map<String, Object> body) {
-    return orEmpty(bankClient.createAccount(body));
+  public Object createAccount(@RequestBody @NotNull CreateBankAccountRequest request) {
+    return orEmpty(bankClient.createAccount(request));
   }
 
   /**
    * Forwards an account rename.
    *
    * @param id the account
-   * @param body the rename payload (name + echoed version)
-   * @return the updated account
+   * @param request the new name and the echoed version
+   * @return the updated account, or an empty object for a bodyless answer
    */
   @PatchMapping("/accounts/{id}")
   @PreAuthorize("isAuthenticated()")
-  public Map<String, Object> renameAccount(
-      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return orEmpty(bankClient.renameAccount(id, body));
+  public Object renameAccount(
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull RenameBankAccountRequest request) {
+    return orEmpty(bankClient.renameAccount(id, request));
   }
 
   /**
-   * Forwards setting/clearing an account's balance target (REQ-BANK-036). A {@code null} target in
-   * the body clears it.
+   * Forwards setting/clearing an account's balance target (REQ-BANK-036). A {@code null} target
+   * clears it.
    *
    * @param id the account
-   * @param body the target payload (target + echoed version)
-   * @return the updated account
+   * @param request the target and the echoed version
+   * @return the updated account, or an empty object for a bodyless answer
    */
   @PatchMapping("/accounts/{id}/balance-target")
   @PreAuthorize("isAuthenticated()")
-  public Map<String, Object> setBalanceTarget(
-      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return orEmpty(bankClient.setBalanceTarget(id, body));
+  public Object setBalanceTarget(
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull SetBankBalanceTargetRequest request) {
+    return orEmpty(bankClient.setBalanceTarget(id, request));
   }
 
   /**
    * Forwards setting/clearing the KRT-account (CARTEL) 3-stage approval thresholds T1/T2
-   * (REQ-BANK-047). Bank-management-only, enforced by the backend. A {@code null} ceiling in the
-   * body clears that band.
+   * (REQ-BANK-047). Bank-management-only, enforced by the backend. A {@code null} ceiling clears
+   * that band.
    *
    * @param id the KRT account
-   * @param body the thresholds payload (employeeCeiling + areaLeadCeiling + echoed version)
-   * @return the updated account
+   * @param request the two ceilings and the echoed version
+   * @return the updated account, or an empty object for a bodyless answer
    */
   @PatchMapping("/accounts/{id}/approval-tiers")
   @PreAuthorize("isAuthenticated()")
-  public Map<String, Object> setCartelApprovalTiers(
-      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return orEmpty(bankClient.setApprovalTiers(id, body));
+  public Object setCartelApprovalTiers(
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull SetCartelApprovalTiersRequest request) {
+    return orEmpty(bankClient.setApprovalTiers(id, request));
   }
 
   /**
    * Forwards an account close (zero-balance rule enforced by the backend, 409 inline).
    *
    * @param id the account
-   * @param body the lifecycle payload (echoed version)
-   * @return the updated account
+   * @param request the echoed version
+   * @return the updated account, or an empty object for a bodyless answer
    */
   @PostMapping("/accounts/{id}/close")
   @PreAuthorize("isAuthenticated()")
-  public Map<String, Object> closeAccount(
-      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return orEmpty(bankClient.closeAccount(id, body));
+  public Object closeAccount(
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull BankAccountLifecycleRequest request) {
+    return orEmpty(bankClient.closeAccount(id, request));
   }
 
   /**
    * Forwards an account reopen.
    *
    * @param id the account
-   * @param body the lifecycle payload (echoed version)
-   * @return the updated account
+   * @param request the echoed version
+   * @return the updated account, or an empty object for a bodyless answer
    */
   @PostMapping("/accounts/{id}/reopen")
   @PreAuthorize("isAuthenticated()")
-  public Map<String, Object> reopenAccount(
-      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return orEmpty(bankClient.reopenAccount(id, body));
+  public Object reopenAccount(
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull BankAccountLifecycleRequest request) {
+    return orEmpty(bankClient.reopenAccount(id, request));
   }
 
   /**
    * Forwards a holder registration.
    *
-   * @param body the registration payload (userId)
-   * @return the created holder row
+   * @param request the user to register
+   * @return the created holder row, or an empty object for a bodyless answer
    */
   @PostMapping("/holders")
   @PreAuthorize("isAuthenticated()")
   @ResponseStatus(HttpStatus.CREATED)
-  public Map<String, Object> registerHolder(@RequestBody @NotNull Map<String, Object> body) {
-    return orEmpty(bankClient.registerHolder(body));
+  public Object registerHolder(@RequestBody @NotNull RegisterBankHolderRequest request) {
+    return orEmpty(bankClient.registerHolder(request));
   }
 
   /**
    * Forwards a holder activity toggle.
    *
    * @param id the holder row
-   * @param body the toggle payload (active + echoed version)
-   * @return the updated holder row
+   * @param request the new flag and the echoed version
+   * @return the updated holder row, or an empty object for a bodyless answer
    */
   @PatchMapping("/holders/{id}")
   @PreAuthorize("isAuthenticated()")
-  public Map<String, Object> updateHolder(
-      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return orEmpty(bankClient.updateHolder(id, body));
+  public Object updateHolder(
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull UpdateBankHolderRequest request) {
+    return orEmpty(bankClient.updateHolder(id, request));
   }
 
   /**
    * Forwards a grant creation (grantee-role rule enforced by the backend, 409 inline).
    *
-   * @param body the creation payload
-   * @return the created grant row
+   * @param request the grantee, the account and the initial flags
+   * @return the created grant row, or an empty object for a bodyless answer
    */
   @PostMapping("/grants")
   @PreAuthorize("isAuthenticated()")
   @ResponseStatus(HttpStatus.CREATED)
-  public Map<String, Object> createGrant(@RequestBody @NotNull Map<String, Object> body) {
-    return orEmpty(bankClient.createGrant(body));
+  public Object createGrant(@RequestBody @NotNull CreateBankGrantRequest request) {
+    return orEmpty(bankClient.createGrant(request));
   }
 
   /**
@@ -307,16 +327,16 @@ public class BankProxyController {
    *
    * @param userId the grantee half of the composite key
    * @param accountId the account half of the composite key
-   * @param body the flag payload (three flags and echoed version)
-   * @return the updated grant row
+   * @param request the three flags and the echoed version
+   * @return the updated grant row, or an empty object for a bodyless answer
    */
   @PatchMapping("/grants/{userId}/{accountId}")
   @PreAuthorize("isAuthenticated()")
-  public Map<String, Object> updateGrant(
+  public Object updateGrant(
       @PathVariable @NotNull UUID userId,
       @PathVariable @NotNull UUID accountId,
-      @RequestBody @NotNull Map<String, Object> body) {
-    return orEmpty(bankClient.updateGrant(userId, accountId, body));
+      @RequestBody @NotNull UpdateBankGrantRequest request) {
+    return orEmpty(bankClient.updateGrant(userId, accountId, request));
   }
 
   /**
@@ -334,14 +354,14 @@ public class BankProxyController {
   }
 
   /**
-   * Returns the backend's answer, or an empty map for a bodyless 2xx, keeping the browser contract
-   * uniform.
+   * Returns the backend's answer, or an empty object for a bodyless 2xx, keeping the browser
+   * contract uniform.
    *
    * @param response the backend's answer, or {@code null}
    * @return the answer, or an empty map
    */
   @NotNull
-  private static Map<String, Object> orEmpty(@Nullable Map<String, Object> response) {
+  private static Object orEmpty(@Nullable Object response) {
     return response == null ? Map.of() : response;
   }
 }
