@@ -546,7 +546,7 @@ val lintProbeJs =
   tasks.register<NpxTask>("lintProbeJs") {
     group = "verification"
     description = "Lints the extracted e2e probe script (Java text blocks hide JavaScript defects)."
-    dependsOn(extractProbeJs)
+    dependsOn(tasks.named("npmInstall"), extractProbeJs)
     command.set("eslint")
     args.set(
       listOf(
