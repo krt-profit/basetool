@@ -128,6 +128,14 @@ viewer-access SPI are internal, and no other module may depend on it. The helper
 dependency leaves — they may use only each other, the entity model and the repositories
 (`ArchitectureTest.LEAF_HELPER_CLASSES`).
 
+Phase 2 (plan §7.4) moves whole domains out of the layer packages, each into
+`<module>.api` (what other modules use), `<module>.internal` (entities, repositories, services,
+mappers no other module needs) and `<module>.web` (controllers and their REST DTOs):
+
+| Module | `api` | `internal` | `web` |
+| --- | --- | --- | --- |
+| `dashboard` | — (publishes nothing) | `Announcement`, `AnnouncementRepository`, `AnnouncementService` | `AnnouncementController`, `AnnouncementDto`, `AnnouncementMapper` |
+
 The platform modules reach the domains only through SPIs they own and the domains implement
 (plan §5.3); Spring injects the implementations, so the platform names no domain class:
 

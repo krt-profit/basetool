@@ -17,12 +17,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.dashboard.web;
 
+import de.greluc.krt.profit.basetool.backend.dashboard.internal.AnnouncementService;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.mapper.AnnouncementMapper;
-import de.greluc.krt.profit.basetool.backend.model.dto.AnnouncementDto;
-import de.greluc.krt.profit.basetool.backend.service.AnnouncementService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;

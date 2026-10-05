@@ -803,6 +803,23 @@ hub where it has one: `dashboard` (0 inbound edges), `admin` (4), `promotion` (1
 mission detach command), then `exchange` (11) and `bank` (18) as packages. Exchange and bank enter
 their "must stay green" period here (D-01).
 
+- `dashboard` — **done 2026-10-05** (P2-1). The announcement banner moved out of the layer
+  packages: `dashboard.web` holds `AnnouncementController`, `AnnouncementDto` and
+  `AnnouncementMapper`, `dashboard.internal` the `Announcement` entity, its repository and
+  `AnnouncementService`. The module publishes nothing (no other class uses it), so it is declared
+  like `mission`: closed, no named interface, in no other module's `allowedDependencies`. The
+  domain map's `name ^Announcement` rule became the `package dashboard` rule; the module baseline is
+  unchanged at 110 edges, because dashboard had no edge in it. Entity name, table, bean names, REST
+  paths, schema names, the authorization matrix and the OpenAPI document are unchanged; the one
+  visible difference is the persistent class name in the log context of an announcement 409,
+  which is now `dashboard.internal.Announcement`. The module has no access policy: its gates are
+  the role annotations `isAuthenticated()` and `hasRole('ADMIN')`, nothing of the scope hub.
+  **Correction to §5.2:** a mechanical move cannot satisfy `web`'s "no `@Transactional`, no
+  entity" — `AnnouncementController` keeps its class-level transaction and maps the entity in the
+  controller, as before. Those two rules are the target of the module's REST wave, which moves the
+  transaction boundary and the mapping into the module; a move keeps both where they are, because
+  either change alters the transaction boundary.
+
 ### 7.5 Phase 3 — the business core
 
 In dependency order, each with its command API, its observer SPIs, its access policy and its REST
