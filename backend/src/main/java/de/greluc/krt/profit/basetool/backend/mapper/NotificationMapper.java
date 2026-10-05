@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 
 import de.greluc.krt.profit.basetool.backend.model.Notification;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationDto;
-import de.greluc.krt.profit.basetool.backend.support.NotificationParamsCodec;
+import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationParamsCodec;
 import org.mapstruct.Mapper;
 
 /**

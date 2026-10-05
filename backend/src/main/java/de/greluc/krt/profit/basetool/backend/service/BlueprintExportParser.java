@@ -20,9 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintExportEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintExportFileDto;
-import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;

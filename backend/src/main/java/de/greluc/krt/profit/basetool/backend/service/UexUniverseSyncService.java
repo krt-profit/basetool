@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexValues;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexCityDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexFactionDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexJurisdictionDto;
@@ -52,7 +53,6 @@ import de.greluc.krt.profit.basetool.backend.repository.PlanetRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PoiRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpaceStationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
-import de.greluc.krt.profit.basetool.backend.support.UexValues;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;

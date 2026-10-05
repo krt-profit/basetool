@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service.pdf;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.support.DataExportSections;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.DataExportSections;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;

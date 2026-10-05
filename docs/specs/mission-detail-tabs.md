@@ -306,7 +306,7 @@ not excluded from the row lock. Three concrete defects (round-2 audit, epic #110
 **Fix.** Each section's check-and-bump is now a **single DB-enforced atomic conditional**
 `UPDATE Mission … SET xVersion = xVersion + 1 WHERE id = :id AND xVersion = :expected`
 (`MissionRepository.bump*VersionIfMatches`, dispatched by the `MissionSection` enum through
-`support.MissionSectionVersions.enforceSectionVersion`); **0 rows affected → 409**. The statement row-locks
+`mission.internal.MissionSectionVersions.enforceSectionVersion`); **0 rows affected → 409**. The statement row-locks
 the mission, so two racing same-section writers genuinely serialise — the loser blocks, re-reads the
 bumped counter and 409s. This is safe only because **every mutable `Mission` scalar and association is
 `@OptimisticLock(excluded = true)` and the entity is `@DynamicUpdate`**: a section edit dirties only
