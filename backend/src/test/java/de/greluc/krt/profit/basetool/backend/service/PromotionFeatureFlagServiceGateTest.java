@@ -90,6 +90,7 @@ class PromotionFeatureFlagServiceGateTest {
   @Mock private StaffelMembershipResolver staffelMembershipResolver;
 
   private OwnerScopeService ownerScopeService;
+  private PromotionAccessPolicy policy;
 
   private static Squadron squadron(UUID id, boolean enabled) {
     Squadron s = new Squadron();
@@ -124,14 +125,15 @@ class PromotionFeatureFlagServiceGateTest {
             requestScopeResolver,
             mock(AccessGateService.class),
             mock(OrgUnitStampingService.class));
+    policy = new PromotionAccessPolicy(ownerScopeService, authHelper);
   }
 
   @Test
   @DisplayName("Admin without an active pin passes the gate (re-enable a locked-out squadron)")
   void adminWithoutPinPassesGate() {
     when(authHelper.isAdmin()).thenReturn(true);
-    assertTrue(ownerScopeService.isPromotionFeatureEnabledForCurrentScope());
-    ownerScopeService.assertPromotionFeatureEnabled();
+    assertTrue(policy.isFeatureEnabledForCurrentScope());
+    policy.assertFeatureEnabled();
   }
 
   @Test
@@ -142,8 +144,8 @@ class PromotionFeatureFlagServiceGateTest {
     when(request.getHeader("X-Active-Org-Unit-Id")).thenReturn(pinnedId.toString());
     when(orgUnitRepository.findById(pinnedId)).thenReturn(Optional.of(squadron(pinnedId, true)));
 
-    assertTrue(ownerScopeService.isPromotionFeatureEnabledForCurrentScope());
-    ownerScopeService.assertPromotionFeatureEnabled();
+    assertTrue(policy.isFeatureEnabledForCurrentScope());
+    policy.assertFeatureEnabled();
   }
 
   @Test
@@ -156,10 +158,9 @@ class PromotionFeatureFlagServiceGateTest {
     when(request.getHeader("X-Active-Org-Unit-Id")).thenReturn(pinnedId.toString());
     when(orgUnitRepository.findById(pinnedId)).thenReturn(Optional.of(squadron(pinnedId, false)));
 
-    assertFalse(ownerScopeService.isPromotionFeatureEnabledForCurrentScope());
+    assertFalse(policy.isFeatureEnabledForCurrentScope());
     AccessDeniedException ex =
-        assertThrows(
-            AccessDeniedException.class, () -> ownerScopeService.assertPromotionFeatureEnabled());
+        assertThrows(AccessDeniedException.class, () -> policy.assertFeatureEnabled());
     assertTrue(ex.getMessage().toLowerCase().contains("promotion"));
   }
 
@@ -174,8 +175,8 @@ class PromotionFeatureFlagServiceGateTest {
     when(orgUnitRepository.findById(squadronId))
         .thenReturn(Optional.of(squadron(squadronId, true)));
 
-    assertTrue(ownerScopeService.isPromotionFeatureEnabledForCurrentScope());
-    ownerScopeService.assertPromotionFeatureEnabled();
+    assertTrue(policy.isFeatureEnabledForCurrentScope());
+    policy.assertFeatureEnabled();
   }
 
   @Test
@@ -189,10 +190,9 @@ class PromotionFeatureFlagServiceGateTest {
     when(orgUnitRepository.findById(squadronId))
         .thenReturn(Optional.of(squadron(squadronId, false)));
 
-    assertFalse(ownerScopeService.isPromotionFeatureEnabledForCurrentScope());
+    assertFalse(policy.isFeatureEnabledForCurrentScope());
     AccessDeniedException ex =
-        assertThrows(
-            AccessDeniedException.class, () -> ownerScopeService.assertPromotionFeatureEnabled());
+        assertThrows(AccessDeniedException.class, () -> policy.assertFeatureEnabled());
     assertTrue(ex.getMessage().toLowerCase().contains("promotion"));
   }
 
@@ -207,14 +207,14 @@ class PromotionFeatureFlagServiceGateTest {
   @DisplayName("Non-admin without an effective squadron defaults to enabled")
   void nonAdminWithoutSquadronDefaultsToEnabled() {
     when(authHelper.currentUserId()).thenReturn(Optional.empty());
-    assertTrue(ownerScopeService.isPromotionFeatureEnabledForCurrentScope());
+    assertTrue(policy.isFeatureEnabledForCurrentScope());
   }
 
   @Test
   @DisplayName("hasPromotionReadAccess: an admin always has access (all-scopes or pinned)")
   void hasPromotionReadAccess_adminTrue() {
     when(authHelper.isAdmin()).thenReturn(true);
-    assertTrue(ownerScopeService.hasPromotionReadAccess());
+    assertTrue(policy.hasReadAccess());
   }
 
   @Test
@@ -225,7 +225,7 @@ class PromotionFeatureFlagServiceGateTest {
     when(authHelper.currentUserId()).thenReturn(Optional.of(userId));
     when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
         .thenReturn(List.of(staffelMembership(userId, squadronId)));
-    assertTrue(ownerScopeService.hasPromotionReadAccess());
+    assertTrue(policy.hasReadAccess());
   }
 
   @Test
@@ -234,7 +234,7 @@ class PromotionFeatureFlagServiceGateTest {
           + " short-circuits to empty so they never see another squadron's system")
   void hasPromotionReadAccess_squadronlessNonAdminFalse() {
     when(authHelper.currentUserId()).thenReturn(Optional.empty());
-    assertFalse(ownerScopeService.hasPromotionReadAccess());
+    assertFalse(policy.hasReadAccess());
   }
 
   @Test
@@ -243,9 +243,11 @@ class PromotionFeatureFlagServiceGateTest {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
     OwnerScopeService scopeStub = mock(OwnerScopeService.class);
+    PromotionAccessPolicy policyStub = mock(PromotionAccessPolicy.class);
     PromotionTopicService service =
-        new PromotionTopicService(topicRepository, mapper, scopeStub, mock(AuditService.class));
-    when(scopeStub.isPromotionFeatureEnabledForCurrentScope()).thenReturn(false);
+        new PromotionTopicService(
+            topicRepository, mapper, scopeStub, policyStub, mock(AuditService.class));
+    when(policyStub.isFeatureEnabledForCurrentScope()).thenReturn(false);
     Pageable pageable = PageRequest.of(0, 20);
 
     Page<?> result = service.list(pageable);
@@ -260,9 +262,11 @@ class PromotionFeatureFlagServiceGateTest {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
     OwnerScopeService scopeStub = mock(OwnerScopeService.class);
+    PromotionAccessPolicy policyStub = mock(PromotionAccessPolicy.class);
     PromotionTopicService service =
-        new PromotionTopicService(topicRepository, mapper, scopeStub, mock(AuditService.class));
-    when(scopeStub.isPromotionFeatureEnabledForCurrentScope()).thenReturn(false);
+        new PromotionTopicService(
+            topicRepository, mapper, scopeStub, policyStub, mock(AuditService.class));
+    when(policyStub.isFeatureEnabledForCurrentScope()).thenReturn(false);
 
     assertTrue(service.listAll().isEmpty());
     verify(topicRepository, never()).findAllScoped(any());
@@ -274,9 +278,11 @@ class PromotionFeatureFlagServiceGateTest {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
     OwnerScopeService scopeStub = mock(OwnerScopeService.class);
+    PromotionAccessPolicy policyStub = mock(PromotionAccessPolicy.class);
     PromotionTopicService service =
-        new PromotionTopicService(topicRepository, mapper, scopeStub, mock(AuditService.class));
-    doThrow(new AccessDeniedException("disabled")).when(scopeStub).assertPromotionFeatureEnabled();
+        new PromotionTopicService(
+            topicRepository, mapper, scopeStub, policyStub, mock(AuditService.class));
+    doThrow(new AccessDeniedException("disabled")).when(policyStub).assertFeatureEnabled();
 
     assertThrows(
         AccessDeniedException.class,
@@ -290,9 +296,11 @@ class PromotionFeatureFlagServiceGateTest {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
     OwnerScopeService scopeStub = mock(OwnerScopeService.class);
+    PromotionAccessPolicy policyStub = mock(PromotionAccessPolicy.class);
     PromotionTopicService service =
-        new PromotionTopicService(topicRepository, mapper, scopeStub, mock(AuditService.class));
-    doThrow(new AccessDeniedException("disabled")).when(scopeStub).assertPromotionFeatureEnabled();
+        new PromotionTopicService(
+            topicRepository, mapper, scopeStub, policyStub, mock(AuditService.class));
+    doThrow(new AccessDeniedException("disabled")).when(policyStub).assertFeatureEnabled();
 
     assertThrows(
         AccessDeniedException.class,
@@ -308,9 +316,11 @@ class PromotionFeatureFlagServiceGateTest {
     PromotionTopicRepository topicRepository = mock(PromotionTopicRepository.class);
     PromotionTopicMapper mapper = mock(PromotionTopicMapper.class);
     OwnerScopeService scopeStub = mock(OwnerScopeService.class);
+    PromotionAccessPolicy policyStub = mock(PromotionAccessPolicy.class);
     PromotionTopicService service =
-        new PromotionTopicService(topicRepository, mapper, scopeStub, mock(AuditService.class));
-    doThrow(new AccessDeniedException("disabled")).when(scopeStub).assertPromotionFeatureEnabled();
+        new PromotionTopicService(
+            topicRepository, mapper, scopeStub, policyStub, mock(AuditService.class));
+    doThrow(new AccessDeniedException("disabled")).when(policyStub).assertFeatureEnabled();
 
     assertThrows(AccessDeniedException.class, () -> service.delete(UUID.randomUUID()));
     verify(topicRepository, never()).findById(any());

@@ -181,7 +181,7 @@ class PromotionAccessPolicyVerdictTest {
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("matrix")
-  void policyGivesTheVerdictOfTheScopeHub(Case c) {
+  void policyGivesTheRecordedVerdict(Case c) {
     AuthHelperService authHelper = mock(AuthHelperService.class);
     OrgUnitMembershipRepository memberships = mock(OrgUnitMembershipRepository.class);
     OrgUnitRepository orgUnits = mock(OrgUnitRepository.class);
@@ -221,19 +221,12 @@ class PromotionAccessPolicyVerdictTest {
 
     assertThat(policy.isFeatureEnabledForCurrentScope())
         .as("feature flag")
-        .isEqualTo(c.featureEnabled())
-        .isEqualTo(ownerScopeService.isPromotionFeatureEnabledForCurrentScope());
-    assertThat(policy.hasReadAccess())
-        .as("read access")
-        .isEqualTo(c.readAccess())
-        .isEqualTo(ownerScopeService.hasPromotionReadAccess());
+        .isEqualTo(c.featureEnabled());
+    assertThat(policy.hasReadAccess()).as("read access").isEqualTo(c.readAccess());
     if (c.featureEnabled()) {
       assertThatCode(policy::assertFeatureEnabled).doesNotThrowAnyException();
-      assertThatCode(ownerScopeService::assertPromotionFeatureEnabled).doesNotThrowAnyException();
     } else {
       assertThatThrownBy(policy::assertFeatureEnabled).isInstanceOf(AccessDeniedException.class);
-      assertThatThrownBy(ownerScopeService::assertPromotionFeatureEnabled)
-          .isInstanceOf(AccessDeniedException.class);
     }
   }
 

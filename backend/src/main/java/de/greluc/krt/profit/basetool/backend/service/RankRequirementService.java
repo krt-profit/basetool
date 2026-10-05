@@ -68,6 +68,7 @@ public class RankRequirementService {
   private final PromotionCategoryRepository categoryRepository;
   private final RankRequirementMapper mapper;
   private final OwnerScopeService ownerScopeService;
+  private final PromotionAccessPolicy promotionAccessPolicy;
   private final AuditRecorder auditRecorder;
 
   /**
@@ -78,8 +79,8 @@ public class RankRequirementService {
    * @return a page of rank requirements
    */
   public Page<RankRequirementResponse> list(@NotNull Pageable pageable) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
-        || !ownerScopeService.hasPromotionReadAccess()) {
+    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
+        || !promotionAccessPolicy.hasReadAccess()) {
       return Page.empty(pageable);
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
@@ -94,8 +95,8 @@ public class RankRequirementService {
    * @return the rank requirements applicable to that transition
    */
   public List<RankRequirementResponse> listByRanks(int fromRank, int toRank) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
-        || !ownerScopeService.hasPromotionReadAccess()) {
+    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
+        || !promotionAccessPolicy.hasReadAccess()) {
       return List.of();
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
@@ -114,7 +115,7 @@ public class RankRequirementService {
    *     owning squadron
    */
   public RankRequirementResponse get(@NotNull UUID id) {
-    ownerScopeService.assertPromotionFeatureEnabled();
+    promotionAccessPolicy.assertFeatureEnabled();
     RankRequirement entity = load(id);
     assertCallerMaySee(entity);
     return mapper.toResponse(entity);
@@ -133,7 +134,7 @@ public class RankRequirementService {
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public RankRequirementResponse create(@NotNull RankRequirementWriteRequest request) {
-    ownerScopeService.assertPromotionFeatureEnabled();
+    promotionAccessPolicy.assertFeatureEnabled();
     validateSingleRankStep(request.fromRank(), request.toRank());
     if (ownerScopeService.hasAmbiguousStaffelContext()) {
       throw new BadRequestException(
@@ -185,7 +186,7 @@ public class RankRequirementService {
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public RankRequirementResponse update(
       @NotNull UUID id, @NotNull RankRequirementWriteRequest request) {
-    ownerScopeService.assertPromotionFeatureEnabled();
+    promotionAccessPolicy.assertFeatureEnabled();
     validateSingleRankStep(request.fromRank(), request.toRank());
     RankRequirement entity = load(id);
     assertCallerMayEdit(entity);
@@ -217,7 +218,7 @@ public class RankRequirementService {
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public void delete(@NotNull UUID id) {
-    ownerScopeService.assertPromotionFeatureEnabled();
+    promotionAccessPolicy.assertFeatureEnabled();
     RankRequirement entity = load(id);
     assertCallerMayEdit(entity);
     String label = rankRequirementLabel(entity);

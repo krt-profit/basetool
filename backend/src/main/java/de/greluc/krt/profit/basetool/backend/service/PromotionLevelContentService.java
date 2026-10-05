@@ -60,6 +60,7 @@ public class PromotionLevelContentService {
   private final PromotionCategoryRepository categoryRepository;
   private final PromotionLevelContentMapper mapper;
   private final OwnerScopeService ownerScopeService;
+  private final PromotionAccessPolicy promotionAccessPolicy;
   private final AuditRecorder auditRecorder;
 
   /**
@@ -70,8 +71,8 @@ public class PromotionLevelContentService {
    * @return a page of level contents
    */
   public Page<PromotionLevelContentResponse> list(@NotNull Pageable pageable) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
-        || !ownerScopeService.hasPromotionReadAccess()) {
+    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
+        || !promotionAccessPolicy.hasReadAccess()) {
       return Page.empty(pageable);
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
@@ -86,8 +87,8 @@ public class PromotionLevelContentService {
    * @return the category's level contents in display order
    */
   public List<PromotionLevelContentResponse> listByCategory(@NotNull UUID categoryId) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
-        || !ownerScopeService.hasPromotionReadAccess()) {
+    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
+        || !promotionAccessPolicy.hasReadAccess()) {
       return List.of();
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
@@ -106,7 +107,7 @@ public class PromotionLevelContentService {
    *     content's owning squadron
    */
   public PromotionLevelContentResponse get(@NotNull UUID id) {
-    ownerScopeService.assertPromotionFeatureEnabled();
+    promotionAccessPolicy.assertFeatureEnabled();
     PromotionLevelContent entity = load(id);
     assertCallerMaySeeLevelContent(entity);
     return mapper.toResponse(entity);
@@ -123,7 +124,7 @@ public class PromotionLevelContentService {
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public PromotionLevelContentResponse create(@NotNull PromotionLevelContentWriteRequest request) {
-    ownerScopeService.assertPromotionFeatureEnabled();
+    promotionAccessPolicy.assertFeatureEnabled();
     PromotionCategory category =
         Entities.require(
             categoryRepository.findById(request.categoryId()),
@@ -155,7 +156,7 @@ public class PromotionLevelContentService {
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public PromotionLevelContentResponse update(
       @NotNull UUID id, @NotNull PromotionLevelContentWriteRequest request) {
-    ownerScopeService.assertPromotionFeatureEnabled();
+    promotionAccessPolicy.assertFeatureEnabled();
     PromotionLevelContent entity = load(id);
     assertCallerMayEditCategory(entity.getCategory());
     OptimisticLock.check(entity.getVersion(), request.version(), PromotionLevelContent.class, id);
@@ -187,7 +188,7 @@ public class PromotionLevelContentService {
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public void delete(@NotNull UUID id) {
-    ownerScopeService.assertPromotionFeatureEnabled();
+    promotionAccessPolicy.assertFeatureEnabled();
     PromotionLevelContent entity = load(id);
     assertCallerMayEditCategory(entity.getCategory());
     PromotionCategory category = entity.getCategory();

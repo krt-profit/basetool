@@ -688,36 +688,4 @@ public class OwnerScopeService {
   public boolean canEditShip(@NotNull UUID shipId) {
     return accessGateService.canEditShip(shipId);
   }
-
-  /**
-   * Delegates to {@link RequestScopeResolver#isPromotionFeatureEnabledForCurrentScope()}: whether
-   * the per-squadron promotion feature flag is on for the caller's scope.
-   *
-   * @return {@code true} when the promotion menu may be exposed for the caller.
-   */
-  public boolean isPromotionFeatureEnabledForCurrentScope() {
-    return requestScopeResolver.isPromotionFeatureEnabledForCurrentScope();
-  }
-
-  /**
-   * Delegates to {@link RequestScopeResolver#hasPromotionReadAccess()}: whether the caller may read
-   * any promotion data.
-   *
-   * @return {@code true} for admins and non-admins with an effective squadron; {@code false}
-   *     otherwise.
-   */
-  public boolean hasPromotionReadAccess() {
-    return requestScopeResolver.hasPromotionReadAccess();
-  }
-
-  /**
-   * Delegates to {@link RequestScopeResolver#assertPromotionFeatureEnabled()}: throws when the
-   * per-squadron promotion feature flag is off for the caller's scope.
-   *
-   * @throws org.springframework.security.access.AccessDeniedException if a non-admin caller's home
-   *     squadron has the flag disabled.
-   */
-  public void assertPromotionFeatureEnabled() {
-    requestScopeResolver.assertPromotionFeatureEnabled();
-  }
 }

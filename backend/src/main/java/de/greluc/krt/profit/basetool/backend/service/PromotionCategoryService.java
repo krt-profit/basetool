@@ -65,6 +65,7 @@ public class PromotionCategoryService {
   private final PromotionTopicRepository topicRepository;
   private final PromotionCategoryMapper mapper;
   private final OwnerScopeService ownerScopeService;
+  private final PromotionAccessPolicy promotionAccessPolicy;
   private final AuditRecorder auditRecorder;
 
   /**
@@ -76,8 +77,8 @@ public class PromotionCategoryService {
    * @return a page of categories
    */
   public Page<PromotionCategoryResponse> list(@NotNull Pageable pageable) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
-        || !ownerScopeService.hasPromotionReadAccess()) {
+    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
+        || !promotionAccessPolicy.hasReadAccess()) {
       return Page.empty(pageable);
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
@@ -94,8 +95,8 @@ public class PromotionCategoryService {
    */
   public Page<PromotionCategoryResponse> listByTopic(
       @NotNull UUID topicId, @NotNull Pageable pageable) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
-        || !ownerScopeService.hasPromotionReadAccess()) {
+    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
+        || !promotionAccessPolicy.hasReadAccess()) {
       return Page.empty(pageable);
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
@@ -110,8 +111,8 @@ public class PromotionCategoryService {
    * @return the topic's categories in display order
    */
   public List<PromotionCategoryResponse> listAllByTopic(@NotNull UUID topicId) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
-        || !ownerScopeService.hasPromotionReadAccess()) {
+    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
+        || !promotionAccessPolicy.hasReadAccess()) {
       return List.of();
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
@@ -130,7 +131,7 @@ public class PromotionCategoryService {
    *     owning squadron
    */
   public PromotionCategoryResponse get(@NotNull UUID id) {
-    ownerScopeService.assertPromotionFeatureEnabled();
+    promotionAccessPolicy.assertFeatureEnabled();
     PromotionCategory entity = load(id);
     assertCallerMaySeeCategory(entity);
     return mapper.toResponse(entity);
@@ -147,7 +148,7 @@ public class PromotionCategoryService {
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public PromotionCategoryResponse create(@NotNull PromotionCategoryWriteRequest request) {
-    ownerScopeService.assertPromotionFeatureEnabled();
+    promotionAccessPolicy.assertFeatureEnabled();
     PromotionTopic topic =
         Entities.require(
             topicRepository.findById(request.topicId()),
@@ -183,7 +184,7 @@ public class PromotionCategoryService {
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public PromotionCategoryResponse update(
       @NotNull UUID id, @NotNull PromotionCategoryWriteRequest request) {
-    ownerScopeService.assertPromotionFeatureEnabled();
+    promotionAccessPolicy.assertFeatureEnabled();
     PromotionCategory entity = load(id);
     assertCallerMayEditTopic(entity.getTopic());
     OptimisticLock.check(entity.getVersion(), request.version(), PromotionCategory.class, id);
@@ -216,7 +217,7 @@ public class PromotionCategoryService {
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public void delete(@NotNull UUID id) {
-    ownerScopeService.assertPromotionFeatureEnabled();
+    promotionAccessPolicy.assertFeatureEnabled();
     PromotionCategory entity = load(id);
     assertCallerMayEditTopic(entity.getTopic());
     PromotionTopic topic = entity.getTopic();

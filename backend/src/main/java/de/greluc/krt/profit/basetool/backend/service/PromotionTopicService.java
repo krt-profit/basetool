@@ -66,6 +66,7 @@ public class PromotionTopicService {
   private final PromotionTopicRepository repository;
   private final PromotionTopicMapper mapper;
   private final OwnerScopeService ownerScopeService;
+  private final PromotionAccessPolicy promotionAccessPolicy;
   private final AuditRecorder auditRecorder;
 
   /**
@@ -76,8 +77,8 @@ public class PromotionTopicService {
    * @return a page of promotion topics
    */
   public Page<PromotionTopicResponse> list(@NotNull Pageable pageable) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
-        || !ownerScopeService.hasPromotionReadAccess()) {
+    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
+        || !promotionAccessPolicy.hasReadAccess()) {
       return Page.empty(pageable);
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
@@ -92,8 +93,8 @@ public class PromotionTopicService {
    * @return visible topics in display order
    */
   public List<PromotionTopicResponse> listAll() {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
-        || !ownerScopeService.hasPromotionReadAccess()) {
+    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
+        || !promotionAccessPolicy.hasReadAccess()) {
       return List.of();
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
@@ -111,7 +112,7 @@ public class PromotionTopicService {
   public PromotionTopicResponse get(@NotNull UUID id) {
     PromotionTopic entity = load(id);
     assertCallerMayAccess(entity);
-    ownerScopeService.assertPromotionFeatureEnabled();
+    promotionAccessPolicy.assertFeatureEnabled();
     return mapper.toResponse(entity);
   }
 
@@ -126,7 +127,7 @@ public class PromotionTopicService {
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public PromotionTopicResponse create(@NotNull PromotionTopicWriteRequest request) {
-    ownerScopeService.assertPromotionFeatureEnabled();
+    promotionAccessPolicy.assertFeatureEnabled();
     if (ownerScopeService.hasAmbiguousStaffelContext()) {
       throw new BadRequestException(
           "You belong to two Staffeln — pin the Staffel this promotion topic belongs to via the"
@@ -168,7 +169,7 @@ public class PromotionTopicService {
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public PromotionTopicResponse update(
       @NotNull UUID id, @NotNull PromotionTopicWriteRequest request) {
-    ownerScopeService.assertPromotionFeatureEnabled();
+    promotionAccessPolicy.assertFeatureEnabled();
     PromotionTopic entity = load(id);
     assertCallerMayEdit(entity);
     OptimisticLock.check(entity.getVersion(), request.version(), PromotionTopic.class, id);
@@ -190,7 +191,7 @@ public class PromotionTopicService {
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public void delete(@NotNull UUID id) {
-    ownerScopeService.assertPromotionFeatureEnabled();
+    promotionAccessPolicy.assertFeatureEnabled();
     PromotionTopic entity = load(id);
     assertCallerMayEdit(entity);
     String label = entity.getName();

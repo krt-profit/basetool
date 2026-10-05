@@ -61,6 +61,7 @@ class MemberEvaluationServiceTest {
   @Mock private MemberEvaluationMapper mapper;
 
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private PromotionAccessPolicy promotionAccessPolicy;
 
   @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
 
@@ -75,8 +76,8 @@ class MemberEvaluationServiceTest {
    */
   @BeforeEach
   void enablePromotionFeatureFlag() {
-    lenient().when(ownerScopeService.isPromotionFeatureEnabledForCurrentScope()).thenReturn(true);
-    lenient().when(ownerScopeService.hasPromotionReadAccess()).thenReturn(true);
+    lenient().when(promotionAccessPolicy.isFeatureEnabledForCurrentScope()).thenReturn(true);
+    lenient().when(promotionAccessPolicy.hasReadAccess()).thenReturn(true);
   }
 
   @InjectMocks private MemberEvaluationService service;

@@ -55,6 +55,7 @@ class PromotionLevelContentServiceTest {
   @Mock private PromotionLevelContentMapper mapper;
 
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private PromotionAccessPolicy promotionAccessPolicy;
 
   @Mock private AuditService auditService;
 
@@ -65,8 +66,8 @@ class PromotionLevelContentServiceTest {
    */
   @BeforeEach
   void enablePromotionFeatureFlag() {
-    lenient().when(ownerScopeService.isPromotionFeatureEnabledForCurrentScope()).thenReturn(true);
-    lenient().when(ownerScopeService.hasPromotionReadAccess()).thenReturn(true);
+    lenient().when(promotionAccessPolicy.isFeatureEnabledForCurrentScope()).thenReturn(true);
+    lenient().when(promotionAccessPolicy.hasReadAccess()).thenReturn(true);
   }
 
   @InjectMocks private PromotionLevelContentService service;

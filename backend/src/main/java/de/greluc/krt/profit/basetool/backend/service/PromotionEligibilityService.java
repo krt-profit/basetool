@@ -62,6 +62,7 @@ public class PromotionEligibilityService {
   private final RankRequirementRepository rankRequirementRepository;
   private final MemberEvaluationRepository memberEvaluationRepository;
   private final OwnerScopeService ownerScopeService;
+  private final PromotionAccessPolicy promotionAccessPolicy;
 
   /**
    * Evaluates the eligibility of the given user for one rank transition; {@code hasConfiguredRules}
@@ -75,8 +76,8 @@ public class PromotionEligibilityService {
   @NotNull
   public PromotionEligibilityResponse evaluateForRanks(
       @NotNull UUID userId, int fromRank, int toRank) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
-        || !ownerScopeService.hasPromotionReadAccess()) {
+    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
+        || !promotionAccessPolicy.hasReadAccess()) {
       return new PromotionEligibilityResponse(userId, fromRank, toRank, false, false, List.of());
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
@@ -137,8 +138,8 @@ public class PromotionEligibilityService {
    */
   @NotNull
   public List<PromotionEligibilityResponse> evaluateAllForUser(@NotNull UUID userId) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
-        || !ownerScopeService.hasPromotionReadAccess()) {
+    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
+        || !promotionAccessPolicy.hasReadAccess()) {
       return List.of();
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);

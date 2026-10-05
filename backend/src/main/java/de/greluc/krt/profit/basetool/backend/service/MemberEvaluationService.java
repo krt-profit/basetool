@@ -67,6 +67,7 @@ public class MemberEvaluationService {
   private final PromotionCategoryRepository categoryRepository;
   private final MemberEvaluationMapper mapper;
   private final OwnerScopeService ownerScopeService;
+  private final PromotionAccessPolicy promotionAccessPolicy;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   private final AuthHelperService authHelperService;
   private final AuditRecorder auditRecorder;
@@ -77,8 +78,8 @@ public class MemberEvaluationService {
    * the active squadron's grades.
    */
   public List<MemberEvaluationResponse> listForUser(@NotNull UUID userId) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
-        || !ownerScopeService.hasPromotionReadAccess()) {
+    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
+        || !promotionAccessPolicy.hasReadAccess()) {
       return List.of();
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
@@ -90,8 +91,8 @@ public class MemberEvaluationService {
   /** Returns paginated evaluations for the given user, scoped to the active squadron. */
   public Page<MemberEvaluationResponse> listForUserPaged(
       @NotNull UUID userId, @NotNull Pageable pageable) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
-        || !ownerScopeService.hasPromotionReadAccess()) {
+    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
+        || !promotionAccessPolicy.hasReadAccess()) {
       return Page.empty(pageable);
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
@@ -101,8 +102,8 @@ public class MemberEvaluationService {
   /** Returns all evaluations (admin view, all users) scoped to the active squadron. */
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public Page<MemberEvaluationResponse> listAll(@NotNull Pageable pageable) {
-    if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
-        || !ownerScopeService.hasPromotionReadAccess()) {
+    if (!promotionAccessPolicy.isFeatureEnabledForCurrentScope()
+        || !promotionAccessPolicy.hasReadAccess()) {
       return Page.empty(pageable);
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
@@ -119,7 +120,7 @@ public class MemberEvaluationService {
       @NotNull UUID userId,
       @NotNull UUID categoryId,
       @NotNull MemberEvaluationUpdateRequest request) {
-    ownerScopeService.assertPromotionFeatureEnabled();
+    promotionAccessPolicy.assertFeatureEnabled();
     PromotionCategory category =
         Entities.require(
             categoryRepository.findById(categoryId),
@@ -160,7 +161,7 @@ public class MemberEvaluationService {
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public void delete(@NotNull UUID id) {
-    ownerScopeService.assertPromotionFeatureEnabled();
+    promotionAccessPolicy.assertFeatureEnabled();
     MemberEvaluation entity =
         Entities.require(repository.findById(id), () -> "MemberEvaluation not found: " + id);
     assertCallerMayEditCategory(entity.getCategory());

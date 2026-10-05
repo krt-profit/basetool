@@ -39,7 +39,6 @@ import lombok.RequiredArgsConstructor;
 import org.hibernate.Hibernate;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -570,41 +569,6 @@ public class RequestScopeResolver {
   @NotNull
   public Optional<OrgUnit> currentOrgUnit() {
     return currentSquadron().map(s -> (OrgUnit) s);
-  }
-
-  /**
-   * Whether the per-squadron promotion feature flag is on for the caller's scope: the flag of the
-   * effective (pinned or home) squadron, or {@code true} when there is none.
-   *
-   * @return {@code true} when the promotion menu may be exposed for the caller.
-   */
-  public boolean isPromotionFeatureEnabledForCurrentScope() {
-    return currentSquadron().map(Squadron::isPromotionEnabled).orElse(true);
-  }
-
-  /**
-   * Whether the caller may read any promotion data: admins and non-admins with an effective home
-   * squadron. List and eligibility reads return empty otherwise.
-   *
-   * @return {@code true} for admins and for non-admins with an effective squadron.
-   */
-  public boolean hasPromotionReadAccess() {
-    return authHelper.isAdmin() || currentSquadronId().isPresent();
-  }
-
-  /**
-   * Throws {@link AccessDeniedException} when the promotion feature flag is off for the caller's
-   * scope (see {@link #isPromotionFeatureEnabledForCurrentScope()}); called before every promotion
-   * write.
-   *
-   * @throws AccessDeniedException if the flag is disabled for the caller's scope.
-   */
-  public void assertPromotionFeatureEnabled() {
-    if (!isPromotionFeatureEnabledForCurrentScope()) {
-      throw new AccessDeniedException(
-          "Promotion feature is disabled for the caller's squadron; ask an administrator to"
-              + " re-enable it.");
-    }
   }
 
   /**
