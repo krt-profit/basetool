@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialPriceOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MatrixGridDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -514,7 +515,7 @@ public class MaterialsPageController {
   @Nullable
   private UexAge uexAge() {
     try {
-      PageResponse<Map<String, Object>> terminals = catalogueClient.terminalCatalogue();
+      PageResponse<TerminalDto> terminals = catalogueClient.terminalCatalogue();
       return UexAge.of(UexAge.latestSync(terminals), Instant.now());
     } catch (Exception e) {
       log.warn("Terminal catalogue unavailable for the UEX freshness hint", e);

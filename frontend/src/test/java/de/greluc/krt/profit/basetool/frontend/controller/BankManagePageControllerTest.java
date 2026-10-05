@@ -30,6 +30,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
@@ -101,7 +102,8 @@ class BankManagePageControllerTest {
   @Test
   void manage_ShouldDefaultToHolderTabAndFillPagedModel() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankManagePageController controller = new BankManagePageController(backendApiClient);
+    BankManagePageController controller =
+        new BankManagePageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     BankAccountDto acc = account("KB-0001", "Staffel IRIDIUM", "ORG_UNIT", "ACTIVE");
     BankHolderDto holder =
@@ -134,7 +136,8 @@ class BankManagePageControllerTest {
   @Test
   void manage_paginates_clampsUnknownSize_andForwardsPageAndSort() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankManagePageController controller = new BankManagePageController(backendApiClient);
+    BankManagePageController controller =
+        new BankManagePageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     when(backendApiClient.get(eq(ACCOUNTS_PAGE_URI), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 2, 50, 130, 3, Collections.emptyList()));
@@ -149,7 +152,8 @@ class BankManagePageControllerTest {
   @Test
   void manage_rejectsNonWhitelistedSize_fallsBackToDefault() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankManagePageController controller = new BankManagePageController(backendApiClient);
+    BankManagePageController controller =
+        new BankManagePageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     when(backendApiClient.get(eq(ACCOUNTS_PAGE_URI), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 25, 0, 0, Collections.emptyList()));
@@ -164,7 +168,8 @@ class BankManagePageControllerTest {
   @Test
   void manage_explicitKontenTab_selectsAccountsTab() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankManagePageController controller = new BankManagePageController(backendApiClient);
+    BankManagePageController controller =
+        new BankManagePageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     when(backendApiClient.get(any(String.class), anyTypeRef())).thenReturn(null);
 
@@ -177,7 +182,8 @@ class BankManagePageControllerTest {
   @Test
   void manage_ShouldSelectHolderTabAndSurviveNullBackendResponses() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankManagePageController controller = new BankManagePageController(backendApiClient);
+    BankManagePageController controller =
+        new BankManagePageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     when(backendApiClient.get(any(String.class), anyTypeRef())).thenReturn(null);
 
@@ -202,7 +208,8 @@ class BankManagePageControllerTest {
   @Test
   void manage_fragmentManageBody_rendersOnlyBodyFragment_andSkipsModalLookups() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankManagePageController controller = new BankManagePageController(backendApiClient);
+    BankManagePageController controller =
+        new BankManagePageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     when(backendApiClient.get(eq(ACCOUNTS_PAGE_URI), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 25, 0, 0, Collections.emptyList()));
@@ -228,7 +235,8 @@ class BankManagePageControllerTest {
   @Test
   void manage_ShouldExposeOidcSubjectAsSelfUserId_NotPreferredUsername() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    BankManagePageController controller = new BankManagePageController(backendApiClient);
+    BankManagePageController controller =
+        new BankManagePageController(new BankBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     String sub = "33333333-3333-3333-3333-333333333333";
     BankHolderDto ownHolder =

@@ -20,12 +20,12 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDemandGroupDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDemandOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDemandRowDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.QualityTierDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.QualityTierCatalog;
 import java.util.Comparator;
@@ -62,7 +62,7 @@ public class JobOrderMaterialDemandPageController {
       new MaterialDemandOverviewDto(List.of());
 
   /** Loads the aggregated demand from the backend. */
-  private final BackendApiClient backendApiClient;
+  private final JobOrderBackendClient jobOrderClient;
 
   /** Supplies the quality tiers the filter panel offers. */
   private final QualityTierCatalog qualityTierCatalog;
@@ -85,8 +85,7 @@ public class JobOrderMaterialDemandPageController {
       @RequestParam(name = "fragment", required = false) String fragment, Model model) {
     MaterialDemandOverviewDto demand = EMPTY_OVERVIEW;
     try {
-      demand =
-          backendApiClient.get("/api/v1/orders/material-demand", MaterialDemandOverviewDto.class);
+      demand = jobOrderClient.materialDemand();
     } catch (BackendServiceException e) {
       log.warn("Could not load the cross-order material demand: {}", e.getMessage());
     }

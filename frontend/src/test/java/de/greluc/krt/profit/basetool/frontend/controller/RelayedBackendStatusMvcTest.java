@@ -37,12 +37,15 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.frontend.audit.client.AuditBackendClient;
+import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.AppHttpProperties;
 import de.greluc.krt.profit.basetool.frontend.exception.GlobalExceptionHandler;
 import de.greluc.krt.profit.basetool.frontend.hangar.client.HangarBackendClient;
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
+import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
+import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
@@ -148,7 +151,8 @@ class RelayedBackendStatusMvcTest {
             delete("/api/proxy/audit/BANK").param("before", FROM)),
         relay(
             "BankReportProxyController#downloadStatement",
-            wc -> new BankReportProxyController(RealBackendApiClient.over(wc)),
+            wc ->
+                new BankReportProxyController(new BankBackendClient(RealBackendApiClient.over(wc))),
             get("/api/proxy/bank/accounts/" + id + "/statement")
                 .param("from", FROM)
                 .param("to", TO)),
@@ -173,25 +177,35 @@ class RelayedBackendStatusMvcTest {
             multipart("/hangar/import/ships").file(upload())),
         relay(
             "InventoryDeleteAllProxyController#deleteAllGlobalInventory",
-            wc -> new InventoryDeleteAllProxyController(RealBackendApiClient.over(wc)),
+            wc ->
+                new InventoryDeleteAllProxyController(
+                    new InventoryBackendClient(RealBackendApiClient.over(wc))),
             delete("/inventory/all")),
         relay(
             "JobOrderHandoverReportProxyController#downloadHandoverReport",
-            wc -> new JobOrderHandoverReportProxyController(RealBackendApiClient.over(wc)),
+            wc ->
+                new JobOrderHandoverReportProxyController(
+                    new JobOrderBackendClient(RealBackendApiClient.over(wc))),
             get("/api/v1/orders/" + id + "/handovers/" + other + "/report")),
         relay(
             "JobOrderHandoverReportProxyController#downloadItemHandoverReport",
-            wc -> new JobOrderHandoverReportProxyController(RealBackendApiClient.over(wc)),
+            wc ->
+                new JobOrderHandoverReportProxyController(
+                    new JobOrderBackendClient(RealBackendApiClient.over(wc))),
             get("/api/v1/orders/" + id + "/item-handovers/" + other + "/report")),
         relay(
             "JobOrderHandoverReportProxyController#previewHandoverReport",
-            wc -> new JobOrderHandoverReportProxyController(RealBackendApiClient.over(wc)),
+            wc ->
+                new JobOrderHandoverReportProxyController(
+                    new JobOrderBackendClient(RealBackendApiClient.over(wc))),
             post("/api/v1/orders/" + id + "/handovers/report/preview")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}")),
         relay(
             "OrgUnitBankProxyController#downloadStatement",
-            wc -> new OrgUnitBankProxyController(RealBackendApiClient.mockExecutingOver(wc)),
+            wc ->
+                new OrgUnitBankProxyController(
+                    new BankBackendClient(RealBackendApiClient.mockExecutingOver(wc))),
             get("/api/proxy/org-units/bank/accounts/" + id + "/statement")
                 .param("from", FROM)
                 .param("to", TO)),

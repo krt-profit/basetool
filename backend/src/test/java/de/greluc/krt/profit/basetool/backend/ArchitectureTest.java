@@ -49,6 +49,7 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import com.tngtech.archunit.library.dependencies.SliceAssignment;
 import com.tngtech.archunit.library.dependencies.SliceIdentifier;
+import de.greluc.krt.profit.basetool.backend.admin.web.AppVersionPolicyController;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.audit.internal.AuditRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
@@ -62,7 +63,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.CachedEntityGrap
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexValues;
 import de.greluc.krt.profit.basetool.backend.config.ActingMemberFilter;
-import de.greluc.krt.profit.basetool.backend.controller.AppVersionPolicyController;
 import de.greluc.krt.profit.basetool.backend.controller.BankAccountController;
 import de.greluc.krt.profit.basetool.backend.controller.BankAdminController;
 import de.greluc.krt.profit.basetool.backend.controller.BankBookingController;
@@ -1824,7 +1824,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 580);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 576);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 

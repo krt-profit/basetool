@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
+import de.greluc.krt.profit.basetool.backend.admin.api.SystemSettings;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
@@ -34,7 +35,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepos
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.SystemSettingService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -101,7 +101,7 @@ public class OperationPayoutService {
   private final UserService userService;
   private final OperationAccessPolicy operationAccessPolicy;
   private final AuthHelperService authHelperService;
-  private final SystemSettingService systemSettingService;
+  private final SystemSettings systemSettings;
   private final AuditRecorder auditRecorder;
 
   /**
@@ -356,7 +356,7 @@ public class OperationPayoutService {
    */
   @NotNull
   private BigDecimal resolveTransferFeeRate() {
-    Optional<String> raw = systemSettingService.getSettingValue(TRANSFER_FEE_RATE_SETTING_KEY);
+    Optional<String> raw = systemSettings.getSettingValue(TRANSFER_FEE_RATE_SETTING_KEY);
     if (raw.isEmpty() || raw.get().isBlank()) {
       log.warn(
           "System setting '{}' is missing or blank, falling back to default {}",

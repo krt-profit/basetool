@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryMergeCandidatesDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +33,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * AJAX relay of the Einbuchen merge probe (REQ-INV-026), so the form offers the {@code SCU} merge
@@ -46,7 +45,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Slf4j
 public class InventoryMergeProbeProxyController {
 
-  private final BackendApiClient backendApiClient;
+  /** The inventory domain's typed backend client. */
+  private final InventoryBackendClient inventoryClient;
 
   /**
    * Forwards the probe to {@code GET /api/v1/inventory/merge-candidates}.
@@ -70,22 +70,10 @@ public class InventoryMergeProbeProxyController {
       @RequestParam(required = false, defaultValue = "false") boolean personal,
       @RequestParam(required = false, defaultValue = "false") boolean stolen,
       @RequestParam(required = false) UUID owningOrgUnitId) {
-    UriComponentsBuilder uri =
-        UriComponentsBuilder.fromPath("/api/v1/inventory/merge-candidates")
-            .queryParam("materialId", materialId)
-            .queryParam("locationId", locationId)
-            .queryParam("quality", quality)
-            .queryParam("personal", personal)
-            .queryParam("stolen", stolen);
-    if (userId != null) {
-      uri.queryParam("userId", userId);
-    }
-    if (owningOrgUnitId != null) {
-      uri.queryParam("owningOrgUnitId", owningOrgUnitId);
-    }
     try {
       InventoryMergeCandidatesDto answer =
-          backendApiClient.get(uri.toUriString(), InventoryMergeCandidatesDto.class);
+          inventoryClient.mergeCandidates(
+              userId, materialId, locationId, quality, personal, stolen, owningOrgUnitId);
       return ResponseEntity.ok(Map.of("exists", answer != null && answer.exists()));
     } catch (Exception e) {
       log.warn("Failed to probe inventory merge candidates", e);

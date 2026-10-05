@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
@@ -27,7 +28,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.ItemDerivationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderHandoverItemDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialDto;
@@ -41,8 +41,6 @@ import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderHandoverForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemHandoverForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.service.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
@@ -63,7 +61,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.GrantedAuthority;
@@ -94,7 +91,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("isAuthenticated()")
 public class JobOrderPageController {
 
-  private final BackendApiClient backendApiClient;
+  /** Sends every job-order read and the catalogue reads of the order pages to the backend. */
+  private final JobOrderBackendClient jobOrderClient;
+
   private final RoleHierarchy roleHierarchy;
   private final ParallelPageLoader parallelPageLoader;
   private final QualityTierCatalog qualityTierCatalog;
@@ -127,64 +126,6 @@ public class JobOrderPageController {
 
   /** Page size applied when the request carries none (or a non-whitelisted one). */
   private static final int DEFAULT_PAGE_SIZE = 100;
-
-  /** Response type for the paginated order-list pull ({@code GET /api/v1/orders}). */
-  private static final ParameterizedTypeReference<PageResponse<JobOrderDto>> PAGE_OF_JOB_ORDER =
-      new ParameterizedTypeReference<PageResponse<JobOrderDto>>() {};
-
-  /**
-   * Response type for the inventory-item lists — the order's orphaned-inventory warning ({@code GET
-   * /api/v1/orders/{id}/inventory/orphaned}) and the per-material link picker ({@code GET
-   * /api/v1/orders/{id}/materials/{matId}/inventory}).
-   */
-  private static final ParameterizedTypeReference<List<InventoryItemDto>> LIST_OF_INVENTORY_ITEM =
-      new ParameterizedTypeReference<List<InventoryItemDto>>() {};
-
-  /**
-   * Response type for the order-detail Item-Bestand panel ({@code GET
-   * /api/v1/orders/{id}/item-stock}, REQ-ORDERS-028) — the game-item stock earmarked to the order,
-   * grouped per game item.
-   */
-  private static final ParameterizedTypeReference<List<JobOrderItemStockGroupDto>>
-      LIST_OF_ITEM_STOCK_GROUP = new ParameterizedTypeReference<>() {};
-
-  /**
-   * Response type for the item-order blueprint picker ({@code GET
-   * /api/v1/orders/item-catalog/{gameItemId}/blueprints}).
-   */
-  private static final ParameterizedTypeReference<List<BlueprintReferenceDto>>
-      LIST_OF_BLUEPRINT_REFERENCE =
-          new ParameterizedTypeReference<List<BlueprintReferenceDto>>() {};
-
-  /**
-   * Response type for the orderable-item catalog page ({@code GET /api/v1/orders/item-catalog}),
-   * used by both the live item search and the has-orderable-items probe.
-   */
-  private static final ParameterizedTypeReference<PageResponse<GameItemReferenceDto>>
-      PAGE_OF_GAME_ITEM_REFERENCE =
-          new ParameterizedTypeReference<PageResponse<GameItemReferenceDto>>() {};
-
-  /**
-   * Response type for the job-order material catalog ({@code GET /api/v1/materials/job-order})
-   * feeding the create/edit material picker.
-   */
-  private static final ParameterizedTypeReference<List<MaterialDto>> LIST_OF_MATERIAL =
-      new ParameterizedTypeReference<List<MaterialDto>>() {};
-
-  /**
-   * Response type for the squadron-list pull ({@code GET /api/v1/squadrons}) feeding the
-   * logistician squadron picker.
-   */
-  private static final ParameterizedTypeReference<PageResponse<SquadronDto>> PAGE_OF_SQUADRON =
-      new ParameterizedTypeReference<PageResponse<SquadronDto>>() {};
-
-  /**
-   * Response type for the active-org-unit catalogs backing the two owner-pickers ({@code GET
-   * /api/v1/org-units/active} and {@code GET /api/v1/org-units/active-all-kinds}).
-   */
-  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
-      LIST_OF_ORG_UNIT_MEMBERSHIP_OPTION =
-          new ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>() {};
 
   /**
    * Renders the job-order list ({@code /orders}), filtered by scope, status and squadron.
@@ -251,28 +192,9 @@ public class JobOrderPageController {
     int yellowDays = 30;
     int redDays = 90;
     try {
-      StringBuilder uri =
-          new StringBuilder(ownScope ? "/api/v1/orders/requested" : "/api/v1/orders")
-              .append("?page={page}&size={size}&sort=priority,asc&status=");
-      List<Object> uriVariables = new ArrayList<>();
-      uriVariables.add(effectivePage);
-      uriVariables.add(effectiveSize);
-      for (int i = 0; i < status.size(); i++) {
-        if (i > 0) {
-          uri.append(",");
-        }
-        uri.append("{status}");
-        uriVariables.add(status.get(i));
-      }
-      if (toProcessScope) {
-        uri.append("&toProcess=true");
-      } else if (!ownScope) {
-        for (UUID sid : selectedSquadronIds) {
-          uri.append("&squadronId={squadronId}");
-          uriVariables.add(sid);
-        }
-      }
-      p = backendApiClient.get(uri.toString(), PAGE_OF_JOB_ORDER, uriVariables.toArray());
+      p =
+          jobOrderClient.orders(
+              ownScope, toProcessScope, effectivePage, effectiveSize, status, selectedSquadronIds);
       if (p != null && p.content() != null) {
         orders = new ArrayList<>(p.content());
         if (log.isDebugEnabled()) {
@@ -292,17 +214,13 @@ public class JobOrderPageController {
       }
 
       try {
-        SystemSettingDto yellowSetting =
-            backendApiClient.getCached(
-                CachedCatalog.SETTING_JOB_ORDER_AGE_YELLOW, SystemSettingDto.class);
+        SystemSettingDto yellowSetting = jobOrderClient.ageYellowSetting();
         yellowDays = Integer.parseInt(yellowSetting.value());
       } catch (Exception e) {
         log.warn("Could not fetch yellow days setting, using default");
       }
       try {
-        SystemSettingDto redSetting =
-            backendApiClient.getCached(
-                CachedCatalog.SETTING_JOB_ORDER_AGE_RED, SystemSettingDto.class);
+        SystemSettingDto redSetting = jobOrderClient.ageRedSetting();
         redDays = Integer.parseInt(redSetting.value());
       } catch (Exception e) {
         log.warn("Could not fetch red days setting, using default");
@@ -399,7 +317,7 @@ public class JobOrderPageController {
     }
     model.addAttribute("requesterView", requesterView);
     try {
-      JobOrderDto order = backendApiClient.get("/api/v1/orders/{id}", JobOrderDto.class, id);
+      JobOrderDto order = jobOrderClient.order(id);
       requesterView = order.redacted();
       model.addAttribute("requesterView", requesterView);
       model.addAttribute("order", order);
@@ -479,17 +397,13 @@ public class JobOrderPageController {
       int yellowDays = 30;
       int redDays = 90;
       try {
-        SystemSettingDto yellowSetting =
-            backendApiClient.getCached(
-                CachedCatalog.SETTING_JOB_ORDER_AGE_YELLOW, SystemSettingDto.class);
+        SystemSettingDto yellowSetting = jobOrderClient.ageYellowSetting();
         yellowDays = Integer.parseInt(yellowSetting.value());
       } catch (Exception e) {
         log.warn("Could not fetch yellow days setting, using default");
       }
       try {
-        SystemSettingDto redSetting =
-            backendApiClient.getCached(
-                CachedCatalog.SETTING_JOB_ORDER_AGE_RED, SystemSettingDto.class);
+        SystemSettingDto redSetting = jobOrderClient.ageRedSetting();
         redDays = Integer.parseInt(redSetting.value());
       } catch (Exception e) {
         log.warn("Could not fetch red days setting, using default");
@@ -514,12 +428,7 @@ public class JobOrderPageController {
       if ("ITEM".equals(order.type())
           && (fragment == null || "blueprint-owners".equalsIgnoreCase(fragment))) {
         try {
-          model.addAttribute(
-              "itemBlueprintOwners",
-              backendApiClient.get(
-                  "/api/v1/orders/{id}/item-blueprint-owners",
-                  JobOrderItemBlueprintOwnersDto.class,
-                  id));
+          model.addAttribute("itemBlueprintOwners", jobOrderClient.itemBlueprintOwners(id));
         } catch (Exception e) {
           log.debug("Blueprint coverage unavailable for order {}: {}", id, e.getMessage());
         }
@@ -529,8 +438,7 @@ public class JobOrderPageController {
           && !requesterView
           && (fragment == null || "items".equalsIgnoreCase(fragment))) {
         try {
-          List<JobOrderItemStockGroupDto> stock =
-              backendApiClient.get("/api/v1/orders/{id}/item-stock", LIST_OF_ITEM_STOCK_GROUP, id);
+          List<JobOrderItemStockGroupDto> stock = jobOrderClient.itemStock(id);
           Map<UUID, JobOrderItemStockGroupDto> byGameItem = new LinkedHashMap<>();
           if (stock != null) {
             for (JobOrderItemStockGroupDto group : stock) {
@@ -547,10 +455,7 @@ public class JobOrderPageController {
 
       if (fragment == null) {
         try {
-          model.addAttribute(
-              "orphanedInventory",
-              backendApiClient.get(
-                  "/api/v1/orders/{id}/inventory/orphaned", LIST_OF_INVENTORY_ITEM, id));
+          model.addAttribute("orphanedInventory", jobOrderClient.orphanedInventory(id));
         } catch (Exception e) {
           log.debug("Orphaned inventory unavailable for order {}: {}", id, e.getMessage());
         }
@@ -638,7 +543,7 @@ public class JobOrderPageController {
       @PathVariable UUID id, Model model, RedirectAttributes redirectAttributes) {
     JobOrderDto order;
     try {
-      order = backendApiClient.get("/api/v1/orders/{id}", JobOrderDto.class, id);
+      order = jobOrderClient.order(id);
     } catch (Exception e) {
       log.error("Failed to load item order for editing", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.joborder.load.details");
@@ -731,11 +636,7 @@ public class JobOrderPageController {
   @ResponseBody
   public List<BlueprintReferenceDto> itemBlueprints(@PathVariable UUID gameItemId) {
     try {
-      List<BlueprintReferenceDto> result =
-          backendApiClient.get(
-              "/api/v1/orders/item-catalog/{gameItemId}/blueprints",
-              LIST_OF_BLUEPRINT_REFERENCE,
-              gameItemId);
+      List<BlueprintReferenceDto> result = jobOrderClient.itemBlueprints(gameItemId);
       return result != null ? result : List.of();
     } catch (Exception e) {
       log.error("Failed to fetch blueprints for item {}", gameItemId, e);
@@ -758,11 +659,7 @@ public class JobOrderPageController {
       @PathVariable UUID blueprintId,
       @RequestParam(required = false, defaultValue = "1") int amount) {
     try {
-      return backendApiClient.get(
-          "/api/v1/orders/item-catalog/blueprints/{blueprintId}/derivation?amount={amount}",
-          ItemDerivationDto.class,
-          blueprintId,
-          amount);
+      return jobOrderClient.itemDerivation(blueprintId, amount);
     } catch (Exception e) {
       log.error("Failed to derive materials for blueprint {}", blueprintId, e);
       return null;
@@ -781,11 +678,7 @@ public class JobOrderPageController {
   public List<GameItemReferenceDto> itemSearch(@RequestParam(required = false) String q) {
     try {
       PageResponse<GameItemReferenceDto> page =
-          backendApiClient.get(
-              "/api/v1/orders/item-catalog?search={q}&size={size}&sort=name,asc",
-              PAGE_OF_GAME_ITEM_REFERENCE,
-              q == null ? "" : q,
-              PickerSearch.PAGE_SIZE);
+          jobOrderClient.searchOrderableItems(q == null ? "" : q, PickerSearch.PAGE_SIZE);
       return page != null && page.content() != null ? page.content() : List.of();
     } catch (Exception e) {
       log.error("Failed to search orderable items", e);
@@ -823,8 +716,7 @@ public class JobOrderPageController {
   public List<InventoryItemDto> getInventoryItemsForMaterial(
       @PathVariable UUID id, @PathVariable UUID matId) {
     try {
-      return backendApiClient.get(
-          "/api/v1/orders/{id}/materials/{matId}/inventory", LIST_OF_INVENTORY_ITEM, id, matId);
+      return jobOrderClient.inventoryForMaterial(id, matId);
     } catch (Exception e) {
       log.error("Failed to fetch inventory items for job order {} and material {}", id, matId, e);
       throw new org.springframework.web.server.ResponseStatusException(
@@ -836,8 +728,7 @@ public class JobOrderPageController {
   @NotNull
   private List<MaterialDto> fetchMaterials() {
     try {
-      List<MaterialDto> list =
-          backendApiClient.getCached(CachedCatalog.MATERIALS_JOB_ORDER, LIST_OF_MATERIAL);
+      List<MaterialDto> list = jobOrderClient.jobOrderMaterials();
       if (list != null) {
         return new ArrayList<>(list);
       }
@@ -856,7 +747,7 @@ public class JobOrderPageController {
   @Nullable
   private UserDto fetchActingUser() {
     try {
-      return backendApiClient.get("/api/v1/users/me", UserDto.class);
+      return jobOrderClient.currentUser();
     } catch (Exception e) {
       log.warn("Failed to resolve the acting user for the production book-in owner seed", e);
       return null;
@@ -871,8 +762,7 @@ public class JobOrderPageController {
    */
   private boolean hasOrderableItems() {
     try {
-      PageResponse<GameItemReferenceDto> page =
-          backendApiClient.getCached(CachedCatalog.ITEM_CATALOG, PAGE_OF_GAME_ITEM_REFERENCE);
+      PageResponse<GameItemReferenceDto> page = jobOrderClient.orderableItemProbe();
       return page == null || page.content() == null || !page.content().isEmpty();
     } catch (Exception e) {
       log.error("Failed to probe orderable items", e);
@@ -1148,8 +1038,7 @@ public class JobOrderPageController {
   @NotNull
   private List<SquadronDto> fetchSquadrons() {
     try {
-      PageResponse<SquadronDto> p =
-          backendApiClient.getCached(CachedCatalog.SQUADRONS, PAGE_OF_SQUADRON);
+      PageResponse<SquadronDto> p = jobOrderClient.squadrons();
       if (p != null && p.content() != null) {
         return new ArrayList<>(p.content());
       }
@@ -1182,9 +1071,7 @@ public class JobOrderPageController {
    */
   private List<OrgUnitMembershipOptionDto> fetchActiveOrgUnitOptions() {
     try {
-      List<OrgUnitMembershipOptionDto> options =
-          backendApiClient.getCached(
-              CachedCatalog.ORG_UNITS_ACTIVE, LIST_OF_ORG_UNIT_MEMBERSHIP_OPTION);
+      List<OrgUnitMembershipOptionDto> options = jobOrderClient.activeOrgUnits();
       return options != null ? options : List.of();
     } catch (Exception e) {
       log.warn("Failed to fetch active org units for Job Order owner-picker", e);
@@ -1200,9 +1087,7 @@ public class JobOrderPageController {
    */
   private List<OrgUnitMembershipOptionDto> fetchRequestingOrgUnitOptions() {
     try {
-      List<OrgUnitMembershipOptionDto> options =
-          backendApiClient.getCached(
-              CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS, LIST_OF_ORG_UNIT_MEMBERSHIP_OPTION);
+      List<OrgUnitMembershipOptionDto> options = jobOrderClient.activeOrgUnitsAllKinds();
       return options != null ? options : fetchActiveOrgUnitOptions();
     } catch (Exception e) {
       log.warn(
@@ -1251,7 +1136,7 @@ public class JobOrderPageController {
       return fromToken;
     }
     try {
-      UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
+      UserDto me = jobOrderClient.currentUser();
       return me != null ? me.id() : null;
     } catch (Exception ex) {
       log.warn("Failed to get current user ID from backend: {}", ex.getMessage());

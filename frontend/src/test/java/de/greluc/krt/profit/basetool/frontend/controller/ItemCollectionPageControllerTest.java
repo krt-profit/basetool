@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockEntryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockGroupDto;
@@ -48,7 +49,8 @@ class ItemCollectionPageControllerTest {
   @Test
   void viewItemCollection_shouldPopulateModelAndReturnTemplate() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    ItemCollectionPageController controller = new ItemCollectionPageController(backendApiClient);
+    ItemCollectionPageController controller =
+        new ItemCollectionPageController(new JobOrderBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID jobOrderId = UUID.randomUUID();
 
@@ -89,7 +91,8 @@ class ItemCollectionPageControllerTest {
   @Test
   void viewItemCollection_shouldReturnFragment_whenFragmentIsResults() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    ItemCollectionPageController controller = new ItemCollectionPageController(backendApiClient);
+    ItemCollectionPageController controller =
+        new ItemCollectionPageController(new JobOrderBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID jobOrderId = UUID.randomUUID();
 
@@ -107,7 +110,8 @@ class ItemCollectionPageControllerTest {
   @Test
   void viewItemCollection_shouldHandleBackendErrorForItemStock() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    ItemCollectionPageController controller = new ItemCollectionPageController(backendApiClient);
+    ItemCollectionPageController controller =
+        new ItemCollectionPageController(new JobOrderBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID jobOrderId = UUID.randomUUID();
 
@@ -127,7 +131,8 @@ class ItemCollectionPageControllerTest {
   @Test
   void viewItemCollection_shouldHandleBackendErrorForLocations() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    ItemCollectionPageController controller = new ItemCollectionPageController(backendApiClient);
+    ItemCollectionPageController controller =
+        new ItemCollectionPageController(new JobOrderBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID jobOrderId = UUID.randomUUID();
 

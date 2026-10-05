@@ -20,14 +20,13 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.GroupedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
@@ -44,7 +43,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -76,106 +74,6 @@ import tools.jackson.databind.json.JsonMapper;
 public class InventoryPageController {
 
   /**
-   * Response type for the squadron-wide aggregated inventory page ({@code
-   * /api/v1/inventory/aggregated}), decoding the paginated per-material summary rows the {@code
-   * /inventory} index renders.
-   */
-  private static final ParameterizedTypeReference<PageResponse<AggregatedInventoryDto>>
-      AGGREGATED_INVENTORY_PAGE =
-          new ParameterizedTypeReference<PageResponse<AggregatedInventoryDto>>() {};
-
-  /**
-   * Response type for paginated individual inventory rows — shared by the per-material drilldown
-   * ({@code /api/v1/inventory/material/{id}}) and the two stack-entries drill-down endpoints.
-   */
-  private static final ParameterizedTypeReference<PageResponse<InventoryItemDto>>
-      INVENTORY_ITEM_PAGE = new ParameterizedTypeReference<PageResponse<InventoryItemDto>>() {};
-
-  /** Response type for the Materialbörse released-item-ids lookup (the "Auf Börse" flags). */
-  private static final ParameterizedTypeReference<List<UUID>> UUID_LIST =
-      new ParameterizedTypeReference<List<UUID>>() {};
-
-  /**
-   * Response type for the bookable-item catalog search ({@code GET /api/v1/inventory/item-catalog})
-   * backing the {@code remote-game-items} combobox source's {@code /inventory/item-search} proxy.
-   */
-  private static final ParameterizedTypeReference<
-          PageResponse<
-              de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto>>
-      GAME_ITEM_REFERENCE_PAGE =
-          new ParameterizedTypeReference<
-              PageResponse<
-                  de.greluc.krt.profit.basetool.frontend.model.dto
-                      .InventoryGameItemReferenceDto>>() {};
-
-  /**
-   * Response type for the grouped {@code /my} and {@code /all} list views ({@code .../grouped}),
-   * decoding the Material-to-Stack grouping records the personal and admin Lager tables render.
-   */
-  private static final ParameterizedTypeReference<List<GroupedInventoryDto>>
-      GROUPED_INVENTORY_LIST = new ParameterizedTypeReference<List<GroupedInventoryDto>>() {};
-
-  /**
-   * Response type for the owner-picker option lookups ({@code /api/v1/users/{id}/memberships} and
-   * {@code /api/v1/users/me/pickable-org-units}) that populate the inventory-input R5.d owner
-   * picker.
-   */
-  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
-      ORG_UNIT_MEMBERSHIP_OPTION_LIST =
-          new ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>() {};
-
-  /**
-   * Response type for the user lookup ({@code /api/v1/users/lookup}) that fills the admin
-   * target-user dropdown on the create form and the list-view user filter.
-   */
-  private static final ParameterizedTypeReference<
-          List<de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto>>
-      USER_REFERENCE_LIST =
-          new ParameterizedTypeReference<
-              List<de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto>>() {};
-
-  /**
-   * Response type for the cached material catalog lookup ({@code /api/v1/materials/lookup}) that
-   * feeds every inventory view's material filter and the create form's material dropdown.
-   */
-  private static final ParameterizedTypeReference<
-          List<de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto>>
-      MATERIAL_REFERENCE_LIST =
-          new ParameterizedTypeReference<
-              List<de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto>>() {};
-
-  /**
-   * Response type for the cached location catalog lookup ({@code /api/v1/locations/lookup}) that
-   * feeds the create form's location-picker seed (the list views' Umbuchen location picker searches
-   * server-side instead).
-   */
-  private static final ParameterizedTypeReference<
-          List<de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto>>
-      LOCATION_REFERENCE_LIST =
-          new ParameterizedTypeReference<
-              List<de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto>>() {};
-
-  /**
-   * Response type for the active-job-order lookup ({@code /api/v1/orders/lookup}) that populates
-   * the job-order filter and the inline item-to-order re-assignment dropdowns.
-   */
-  private static final ParameterizedTypeReference<
-          List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto>>
-      JOB_ORDER_REFERENCE_LIST =
-          new ParameterizedTypeReference<
-              List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto>>() {};
-
-  /**
-   * Response type for the mission lookup ({@code /api/v1/missions/lookup}) that populates the
-   * mission filter and the per-entry mission-association dropdowns.
-   */
-  private static final ParameterizedTypeReference<
-          List<de.greluc.krt.profit.basetool.frontend.model.dto.MissionReferenceDto>>
-      MISSION_REFERENCE_LIST =
-          new ParameterizedTypeReference<
-              List<de.greluc.krt.profit.basetool.frontend.model.dto.MissionReferenceDto>>() {};
-
-  /**
    * Selectable page sizes for the per-material and per-game-item drilldowns (REQ-INV-033). An
    * out-of-list {@code size} snaps back to {@link #DRILLDOWN_DEFAULT_PAGE_SIZE}, so a crafted URL
    * cannot request an unbounded page from the backend.
@@ -188,7 +86,8 @@ public class InventoryPageController {
    */
   private static final int DRILLDOWN_DEFAULT_PAGE_SIZE = 50;
 
-  private final BackendApiClient backendApiClient;
+  /** The inventory domain's typed backend client. */
+  private final InventoryBackendClient inventoryClient;
 
   /**
    * Writes the check-in picker's per-order need figures into the page's {@code data-order-needs}
@@ -239,24 +138,7 @@ public class InventoryPageController {
     boolean itemsView = isItemsView(view);
     List<AggregatedInventoryDto> aggregated = new ArrayList<>();
     try {
-      StringBuilder uri = new StringBuilder("/api/v1/inventory/aggregated?");
-      List<Object> uriVariables = new ArrayList<>();
-      if (page != null) {
-        uri.append("page={page}&");
-        uriVariables.add(page);
-      }
-      if (size != null) {
-        uri.append("size={size}&");
-        uriVariables.add(size);
-      }
-      if (itemsView) {
-        uri.append("catalog=ITEM");
-      } else {
-        uri.append("sort=material.name,asc;quality,desc;amount,desc");
-      }
-
-      PageResponse<AggregatedInventoryDto> p =
-          backendApiClient.get(uri.toString(), AGGREGATED_INVENTORY_PAGE, uriVariables.toArray());
+      PageResponse<AggregatedInventoryDto> p = inventoryClient.aggregated(page, size, itemsView);
       if (p != null) {
         if (p.content() != null) {
           aggregated = new ArrayList<>(p.content());
@@ -448,18 +330,14 @@ public class InventoryPageController {
    */
   private PageResponse<InventoryItemDto> fetchDrilldownPage(
       boolean gameItem, @NotNull UUID id, int requestedPage, int size) {
-    String uri =
-        gameItem
-            ? "/api/v1/inventory/game-item/{id}?page={page}&size={size}"
-            : "/api/v1/inventory/material/{id}?page={page}&size={size}";
     PageResponse<InventoryItemDto> p =
-        backendApiClient.get(uri, INVENTORY_ITEM_PAGE, id, requestedPage, size);
+        inventoryClient.drilldownPage(gameItem, id, requestedPage, size);
     if (p != null
         && p.totalElements() > 0
         && requestedPage > 0
         && requestedPage >= p.totalPages()) {
       int lastPage = p.totalPages() - 1;
-      p = backendApiClient.get(uri, INVENTORY_ITEM_PAGE, id, lastPage, size);
+      p = inventoryClient.drilldownPage(gameItem, id, lastPage, size);
     }
     return p;
   }
@@ -476,14 +354,9 @@ public class InventoryPageController {
   @org.springframework.web.bind.annotation.ResponseBody
   public List<de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto>
       itemSearch(@RequestParam(required = false) String q) {
-    String uri =
-        org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/inventory/item-catalog")
-            .queryParam("size", PickerSearch.PAGE_SIZE)
-            .queryParam("sort", "name,asc")
-            .toUriString();
     try {
       PageResponse<de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto>
-          page = backendApiClient.get(uri + "&q={q}", GAME_ITEM_REFERENCE_PAGE, q == null ? "" : q);
+          page = inventoryClient.itemCatalog(PickerSearch.PAGE_SIZE, q == null ? "" : q);
       return page != null && page.content() != null ? page.content() : List.of();
     } catch (Exception e) {
       log.error("Failed to search bookable game items", e);
@@ -546,7 +419,7 @@ public class InventoryPageController {
       try {
         List<GroupedInventoryDto> res =
             fetchGroupedItemInventory(
-                "/api/v1/inventory/my-inventory/grouped",
+                InventoryBackendClient.Listing.MY,
                 gameItemIds,
                 locationIds,
                 jobOrderIds,
@@ -565,7 +438,7 @@ public class InventoryPageController {
       model.addAttribute(
           "gameItems",
           resolveGameItemFilterOptions(
-              "/api/v1/inventory/my-inventory/grouped",
+              InventoryBackendClient.Listing.MY,
               groupedItems,
               fragment,
               gameItemIds,
@@ -583,7 +456,7 @@ public class InventoryPageController {
                   personalOnly || nonPersonalOnly || stolen.active()),
               () ->
                   fetchGroupedItemInventory(
-                      "/api/v1/inventory/my-inventory/grouped",
+                      InventoryBackendClient.Listing.MY,
                       null,
                       null,
                       null,
@@ -611,7 +484,7 @@ public class InventoryPageController {
     try {
       List<GroupedInventoryDto> res =
           fetchGroupedMaterialInventory(
-              "/api/v1/inventory/my-inventory/grouped",
+              InventoryBackendClient.Listing.MY,
               materialIds,
               locationIds,
               minQuality,
@@ -645,7 +518,7 @@ public class InventoryPageController {
                 personalOnly || nonPersonalOnly || stolen.active()),
             () ->
                 fetchGroupedMaterialInventory(
-                    "/api/v1/inventory/my-inventory/grouped",
+                    InventoryBackendClient.Listing.MY,
                     null,
                     null,
                     null,
@@ -708,30 +581,28 @@ public class InventoryPageController {
       @RequestParam(required = false, defaultValue = "false") boolean nonPersonalOnly,
       @RequestParam(required = false, defaultValue = "false") boolean stolenOnly,
       @RequestParam(required = false, defaultValue = "false") boolean nonStolenOnly) {
-    org.springframework.web.util.UriComponentsBuilder uriBuilder =
-        org.springframework.web.util.UriComponentsBuilder.fromPath(
-            "/api/v1/inventory/my-inventory/entry-ids");
-    if (isItemsView(view)) {
-      uriBuilder.queryParam("catalog", "ITEM");
-      appendIdParams(uriBuilder, "gameItemIds", gameItemIds);
-      appendIdParams(uriBuilder, "jobOrderIds", jobOrderIds);
-    } else {
-      appendIdParams(uriBuilder, "materialIds", materialIds);
-      if (minQuality != null) {
-        uriBuilder.queryParam("minQuality", minQuality);
-      }
-      appendIdParams(uriBuilder, "jobOrderIds", jobOrderIds);
-      appendIdParams(uriBuilder, "missionIds", missionIds);
-    }
-    appendIdParams(uriBuilder, "locationIds", locationIds);
-    if (personalOnly) {
-      uriBuilder.queryParam("personalOnly", true);
-    }
-    if (nonPersonalOnly) {
-      uriBuilder.queryParam("nonPersonalOnly", true);
-    }
-    new StolenFilter(stolenOnly, nonStolenOnly).appendTo(uriBuilder);
-    List<UUID> ids = backendApiClient.get(uriBuilder.build().toUriString(), UUID_LIST);
+    List<UUID> ids =
+        isItemsView(view)
+            ? inventoryClient.myItemEntryIds(
+                new InventoryBackendClient.ItemFilter(
+                    gameItemIds,
+                    locationIds,
+                    jobOrderIds,
+                    personalOnly,
+                    nonPersonalOnly,
+                    stolenOnly,
+                    nonStolenOnly))
+            : inventoryClient.myMaterialEntryIds(
+                new InventoryBackendClient.MaterialFilter(
+                    materialIds,
+                    locationIds,
+                    minQuality,
+                    jobOrderIds,
+                    missionIds,
+                    personalOnly,
+                    nonPersonalOnly,
+                    stolenOnly,
+                    nonStolenOnly));
     return ids != null ? ids : List.of();
   }
 
@@ -739,8 +610,7 @@ public class InventoryPageController {
    * Fetches one grouped item-inventory result ({@code catalog=ITEM}, REQ-INV-030) with the item
    * view's filters; quality and mission filters are never sent.
    *
-   * @param basePath the backend grouped path ({@code …/my-inventory/grouped} or {@code
-   *     …/all/grouped})
+   * @param listing the grouped listing, {@code /my} or {@code /all}
    * @param gameItemIds optional game-item filter
    * @param locationIds optional storage-location filter (REQ-INV-040)
    * @param jobOrderIds optional job-order filter
@@ -750,54 +620,30 @@ public class InventoryPageController {
    * @return the grouped result as returned by the backend, may be {@code null}
    */
   private List<GroupedInventoryDto> fetchGroupedItemInventory(
-      @NotNull String basePath,
+      @NotNull InventoryBackendClient.Listing listing,
       List<UUID> gameItemIds,
       List<UUID> locationIds,
       List<UUID> jobOrderIds,
       boolean personalOnly,
       boolean nonPersonalOnly,
       @NotNull StolenFilter stolen) {
-    org.springframework.web.util.UriComponentsBuilder uriBuilder =
-        org.springframework.web.util.UriComponentsBuilder.fromPath(basePath)
-            .queryParam("catalog", "ITEM");
-    appendIdParams(uriBuilder, "gameItemIds", gameItemIds);
-    appendIdParams(uriBuilder, "locationIds", locationIds);
-    appendIdParams(uriBuilder, "jobOrderIds", jobOrderIds);
-    if (personalOnly) {
-      uriBuilder.queryParam("personalOnly", true);
-    }
-    if (nonPersonalOnly) {
-      uriBuilder.queryParam("nonPersonalOnly", true);
-    }
-    stolen.appendTo(uriBuilder);
-    return backendApiClient.get(uriBuilder.build().toUriString(), GROUPED_INVENTORY_LIST);
-  }
-
-  /**
-   * Appends one repeated query parameter per id; a {@code null} or empty list appends nothing.
-   *
-   * @param uriBuilder the builder collecting the backend request URI
-   * @param name the query-parameter name to repeat
-   * @param ids the ids to append; {@code null} or empty appends nothing
-   */
-  private static void appendIdParams(
-      @NotNull org.springframework.web.util.UriComponentsBuilder uriBuilder,
-      @NotNull String name,
-      List<UUID> ids) {
-    if (ids == null || ids.isEmpty()) {
-      return;
-    }
-    for (UUID id : ids) {
-      uriBuilder.queryParam(name, id.toString());
-    }
+    return inventoryClient.groupedItems(
+        listing,
+        new InventoryBackendClient.ItemFilter(
+            gameItemIds,
+            locationIds,
+            jobOrderIds,
+            personalOnly,
+            nonPersonalOnly,
+            stolen.stolenOnly(),
+            stolen.nonStolenOnly()));
   }
 
   /**
    * Fetches one grouped material-inventory result with the material view's filters; used for both
    * the table read and the unfiltered read behind {@link #resolveLocationFilterOptions}.
    *
-   * @param basePath the backend grouped path ({@code …/my-inventory/grouped} or {@code
-   *     …/all/grouped})
+   * @param listing the grouped listing, {@code /my} or {@code /all}
    * @param materialIds optional material filter
    * @param locationIds optional storage-location filter (REQ-INV-040)
    * @param minQuality optional quality floor
@@ -809,7 +655,7 @@ public class InventoryPageController {
    * @return the grouped result as returned by the backend, may be {@code null}
    */
   private List<GroupedInventoryDto> fetchGroupedMaterialInventory(
-      @NotNull String basePath,
+      @NotNull InventoryBackendClient.Listing listing,
       List<UUID> materialIds,
       List<UUID> locationIds,
       Integer minQuality,
@@ -818,23 +664,18 @@ public class InventoryPageController {
       boolean personalOnly,
       boolean nonPersonalOnly,
       @NotNull StolenFilter stolen) {
-    org.springframework.web.util.UriComponentsBuilder uriBuilder =
-        org.springframework.web.util.UriComponentsBuilder.fromPath(basePath);
-    appendIdParams(uriBuilder, "materialIds", materialIds);
-    appendIdParams(uriBuilder, "locationIds", locationIds);
-    if (minQuality != null) {
-      uriBuilder.queryParam("minQuality", minQuality);
-    }
-    appendIdParams(uriBuilder, "jobOrderIds", jobOrderIds);
-    appendIdParams(uriBuilder, "missionIds", missionIds);
-    if (personalOnly) {
-      uriBuilder.queryParam("personalOnly", true);
-    }
-    if (nonPersonalOnly) {
-      uriBuilder.queryParam("nonPersonalOnly", true);
-    }
-    stolen.appendTo(uriBuilder);
-    return backendApiClient.get(uriBuilder.build().toUriString(), GROUPED_INVENTORY_LIST);
+    return inventoryClient.groupedMaterials(
+        listing,
+        new InventoryBackendClient.MaterialFilter(
+            materialIds,
+            locationIds,
+            minQuality,
+            jobOrderIds,
+            missionIds,
+            personalOnly,
+            nonPersonalOnly,
+            stolen.stolenOnly(),
+            stolen.nonStolenOnly()));
   }
 
   /**
@@ -939,7 +780,7 @@ public class InventoryPageController {
    * viewer's scope. With an active filter, one extra unfiltered read supplies the full option list;
    * fragment renders need none, and a failed read falls back to the displayed groups.
    *
-   * @param basePath the backend grouped path the page's table was fetched from
+   * @param listing the grouped listing the page's table was fetched from
    * @param groupedItems the (possibly filtered) grouped result already fetched for the table
    * @param fragment whether this render is the table-fragment swap
    * @param gameItemIds the active gameItem filter, if any
@@ -949,7 +790,7 @@ public class InventoryPageController {
    */
   private List<de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto>
       resolveGameItemFilterOptions(
-          @NotNull String basePath,
+          @NotNull InventoryBackendClient.Listing listing,
           @NotNull List<GroupedInventoryDto> groupedItems,
           boolean fragment,
           List<UUID> gameItemIds,
@@ -963,7 +804,7 @@ public class InventoryPageController {
     if (!fragment && anyFilterActive) {
       try {
         List<GroupedInventoryDto> unfiltered =
-            fetchGroupedItemInventory(basePath, null, null, null, false, false, StolenFilter.NONE);
+            fetchGroupedItemInventory(listing, null, null, null, false, false, StolenFilter.NONE);
         if (unfiltered != null) {
           source = unfiltered;
         }
@@ -1026,7 +867,7 @@ public class InventoryPageController {
       try {
         List<GroupedInventoryDto> res =
             fetchGroupedItemInventory(
-                "/api/v1/inventory/all/grouped",
+                InventoryBackendClient.Listing.ALL,
                 gameItemIds,
                 locationIds,
                 jobOrderIds,
@@ -1045,7 +886,7 @@ public class InventoryPageController {
       model.addAttribute(
           "gameItems",
           resolveGameItemFilterOptions(
-              "/api/v1/inventory/all/grouped",
+              InventoryBackendClient.Listing.ALL,
               groupedItems,
               fragment,
               gameItemIds,
@@ -1059,7 +900,7 @@ public class InventoryPageController {
               anyItemFilterActive(gameItemIds, locationIds, jobOrderIds, stolen.active()),
               () ->
                   fetchGroupedItemInventory(
-                      "/api/v1/inventory/all/grouped",
+                      InventoryBackendClient.Listing.ALL,
                       null,
                       null,
                       null,
@@ -1084,7 +925,7 @@ public class InventoryPageController {
     try {
       List<GroupedInventoryDto> res =
           fetchGroupedMaterialInventory(
-              "/api/v1/inventory/all/grouped",
+              InventoryBackendClient.Listing.ALL,
               materialIds,
               locationIds,
               minQuality,
@@ -1113,7 +954,7 @@ public class InventoryPageController {
                 materialIds, locationIds, minQuality, jobOrderIds, missionIds, stolen.active()),
             () ->
                 fetchGroupedMaterialInventory(
-                    "/api/v1/inventory/all/grouped",
+                    InventoryBackendClient.Listing.ALL,
                     null,
                     null,
                     null,
@@ -1168,28 +1009,12 @@ public class InventoryPageController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       Model model) {
-    org.springframework.web.util.UriComponentsBuilder uriBuilder =
-        org.springframework.web.util.UriComponentsBuilder.fromPath(
-                "/api/v1/inventory/my-inventory/stack/entries")
-            .queryParam("materialId", materialId)
-            .queryParam("locationId", locationId)
-            .queryParam("personal", personal);
-    if (stolen) {
-      uriBuilder.queryParam("stolen", true);
-    }
-    if (quality != null) {
-      uriBuilder.queryParam("quality", quality);
-    }
-    if (owningOrgUnitId != null) {
-      uriBuilder.queryParam("owningOrgUnitId", owningOrgUnitId);
-    }
-    if (page != null) {
-      uriBuilder.queryParam("page", page);
-    }
-    if (size != null) {
-      uriBuilder.queryParam("size", size);
-    }
-    fetchStackEntriesIntoModel(uriBuilder.build().toUriString(), model, true);
+    fetchStackEntriesIntoModel(
+        () ->
+            inventoryClient.myStackEntries(
+                materialId, locationId, quality, personal, stolen, owningOrgUnitId, page, size),
+        model,
+        true);
     addReleasedItemIds(model);
     return "fragments/inventory-stack-entries :: stackEntriesMy";
   }
@@ -1219,26 +1044,12 @@ public class InventoryPageController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       Model model) {
-    org.springframework.web.util.UriComponentsBuilder uriBuilder =
-        org.springframework.web.util.UriComponentsBuilder.fromPath(
-                "/api/v1/inventory/my-inventory/stack/entries")
-            .queryParam("catalog", "ITEM")
-            .queryParam("gameItemId", gameItemId)
-            .queryParam("locationId", locationId)
-            .queryParam("personal", personal);
-    if (stolen) {
-      uriBuilder.queryParam("stolen", true);
-    }
-    if (owningOrgUnitId != null) {
-      uriBuilder.queryParam("owningOrgUnitId", owningOrgUnitId);
-    }
-    if (page != null) {
-      uriBuilder.queryParam("page", page);
-    }
-    if (size != null) {
-      uriBuilder.queryParam("size", size);
-    }
-    fetchStackEntriesIntoModel(uriBuilder.build().toUriString(), model, false);
+    fetchStackEntriesIntoModel(
+        () ->
+            inventoryClient.myGameItemStackEntries(
+                gameItemId, locationId, personal, stolen, owningOrgUnitId, page, size),
+        model,
+        false);
     addReleasedItemIds(model);
     return "fragments/inventory-stack-entries :: stackEntriesMy";
   }
@@ -1252,19 +1063,15 @@ public class InventoryPageController {
   private void addReleasedItemIds(Model model) {
     Set<UUID> released = new HashSet<>();
     if (model.getAttribute("entries") instanceof List<?> entries && !entries.isEmpty()) {
-      org.springframework.web.util.UriComponentsBuilder uri =
-          org.springframework.web.util.UriComponentsBuilder.fromPath(
-              "/api/v1/material-exchange/released-item-ids");
-      boolean any = false;
+      List<UUID> ids = new ArrayList<>();
       for (Object entry : entries) {
         if (entry instanceof InventoryItemDto item && item.id() != null) {
-          uri.queryParam("ids", item.id());
-          any = true;
+          ids.add(item.id());
         }
       }
-      if (any) {
+      if (!ids.isEmpty()) {
         try {
-          List<UUID> result = backendApiClient.get(uri.build().toUriString(), UUID_LIST);
+          List<UUID> result = inventoryClient.releasedItemIds(ids);
           if (result != null) {
             released.addAll(result);
           }
@@ -1303,28 +1110,12 @@ public class InventoryPageController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       Model model) {
-    org.springframework.web.util.UriComponentsBuilder uriBuilder =
-        org.springframework.web.util.UriComponentsBuilder.fromPath(
-                "/api/v1/inventory/all/stack/entries")
-            .queryParam("materialId", materialId)
-            .queryParam("userId", userId)
-            .queryParam("locationId", locationId);
-    if (stolen) {
-      uriBuilder.queryParam("stolen", true);
-    }
-    if (quality != null) {
-      uriBuilder.queryParam("quality", quality);
-    }
-    if (owningOrgUnitId != null) {
-      uriBuilder.queryParam("owningOrgUnitId", owningOrgUnitId);
-    }
-    if (page != null) {
-      uriBuilder.queryParam("page", page);
-    }
-    if (size != null) {
-      uriBuilder.queryParam("size", size);
-    }
-    fetchStackEntriesIntoModel(uriBuilder.build().toUriString(), model, true);
+    fetchStackEntriesIntoModel(
+        () ->
+            inventoryClient.allStackEntries(
+                materialId, userId, locationId, quality, stolen, owningOrgUnitId, page, size),
+        model,
+        true);
     return "fragments/inventory-stack-entries :: stackEntriesAdmin";
   }
 
@@ -1353,26 +1144,12 @@ public class InventoryPageController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       Model model) {
-    org.springframework.web.util.UriComponentsBuilder uriBuilder =
-        org.springframework.web.util.UriComponentsBuilder.fromPath(
-                "/api/v1/inventory/all/stack/entries")
-            .queryParam("catalog", "ITEM")
-            .queryParam("gameItemId", gameItemId)
-            .queryParam("userId", userId)
-            .queryParam("locationId", locationId);
-    if (stolen) {
-      uriBuilder.queryParam("stolen", true);
-    }
-    if (owningOrgUnitId != null) {
-      uriBuilder.queryParam("owningOrgUnitId", owningOrgUnitId);
-    }
-    if (page != null) {
-      uriBuilder.queryParam("page", page);
-    }
-    if (size != null) {
-      uriBuilder.queryParam("size", size);
-    }
-    fetchStackEntriesIntoModel(uriBuilder.build().toUriString(), model, false);
+    fetchStackEntriesIntoModel(
+        () ->
+            inventoryClient.allGameItemStackEntries(
+                gameItemId, userId, locationId, stolen, owningOrgUnitId, page, size),
+        model,
+        false);
     return "fragments/inventory-stack-entries :: stackEntriesAdmin";
   }
 
@@ -1380,17 +1157,19 @@ public class InventoryPageController {
    * Fetches a stack-entries page and the job-order / mission catalogs into the model; a backend
    * failure yields an empty list plus an {@code error} flag.
    *
-   * @param uri the fully-built backend stack-entries URI (path + query)
+   * @param read reads the stack-entries page from the backend
    * @param model the model to populate with {@code entries}, {@code entriesPage}, {@code jobOrders}
    *     and {@code missions}
    * @param includeMissions whether to load the mission catalog; {@code false} yields an empty list
    *     (REQ-INV-031)
    */
   private void fetchStackEntriesIntoModel(
-      @NotNull String uri, Model model, boolean includeMissions) {
+      @NotNull java.util.function.Supplier<PageResponse<InventoryItemDto>> read,
+      Model model,
+      boolean includeMissions) {
     PageResponse<InventoryItemDto> p = null;
     try {
-      p = backendApiClient.get(uri, INVENTORY_ITEM_PAGE);
+      p = read.get();
     } catch (Exception e) {
       log.error("Failed to fetch stack entries", e);
       model.addAttribute("error", "inventory.stack.entries.error");
@@ -1594,10 +1373,7 @@ public class InventoryPageController {
       return null;
     }
     try {
-      return backendApiClient.get(
-          "/api/v1/users/{id}",
-          de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class,
-          form.getUserId());
+      return inventoryClient.user(form.getUserId());
     } catch (Exception e) {
       log.warn(
           "Failed to resolve selected user {} for inventory-input picker seed",
@@ -1617,11 +1393,7 @@ public class InventoryPageController {
   private List<OrgUnitMembershipOptionDto> fetchOwnerPickerOptions(InventoryForm form) {
     if (form != null && Boolean.TRUE.equals(form.getIsGlobal()) && form.getUserId() != null) {
       try {
-        List<OrgUnitMembershipOptionDto> options =
-            backendApiClient.get(
-                "/api/v1/users/{id}/memberships?allKinds=true",
-                ORG_UNIT_MEMBERSHIP_OPTION_LIST,
-                form.getUserId());
+        List<OrgUnitMembershipOptionDto> options = inventoryClient.memberships(form.getUserId());
         return options != null ? options : List.of();
       } catch (Exception e) {
         log.warn("Failed to fetch memberships for owner-picker", e);
@@ -1629,9 +1401,7 @@ public class InventoryPageController {
       }
     }
     try {
-      List<OrgUnitMembershipOptionDto> options =
-          backendApiClient.get(
-              "/api/v1/users/me/pickable-org-units", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
+      List<OrgUnitMembershipOptionDto> options = inventoryClient.pickableOrgUnits();
       return options != null ? options : List.of();
     } catch (Exception e) {
       log.warn("Failed to fetch pickable org units for owner-picker", e);
@@ -1642,7 +1412,7 @@ public class InventoryPageController {
   private List<de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto> fetchUsers() {
     try {
       List<de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto> content =
-          backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST);
+          inventoryClient.users();
       if (content != null) {
         return content;
       }
@@ -1659,7 +1429,7 @@ public class InventoryPageController {
         new ArrayList<>();
     try {
       List<de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto> content =
-          backendApiClient.getCached(CachedCatalog.MATERIALS_LOOKUP, MATERIAL_REFERENCE_LIST);
+          inventoryClient.materials();
       if (content != null) {
         materials.addAll(content);
       }
@@ -1676,7 +1446,7 @@ public class InventoryPageController {
         new ArrayList<>();
     try {
       List<de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto> content =
-          backendApiClient.getCached(CachedCatalog.LOCATIONS_LOOKUP, LOCATION_REFERENCE_LIST);
+          inventoryClient.locations();
       if (content != null) {
         locations.addAll(content);
       }
@@ -1706,9 +1476,7 @@ public class InventoryPageController {
         new ArrayList<>();
     try {
       List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto> content =
-          backendApiClient.get(
-              withNeeds ? "/api/v1/orders/lookup?withNeeds=true" : "/api/v1/orders/lookup",
-              JOB_ORDER_REFERENCE_LIST);
+          inventoryClient.activeJobOrders(withNeeds);
       if (content != null) {
         orders.addAll(content);
       }
@@ -1722,7 +1490,7 @@ public class InventoryPageController {
       fetchMissions() {
     try {
       List<de.greluc.krt.profit.basetool.frontend.model.dto.MissionReferenceDto> content =
-          backendApiClient.get("/api/v1/missions/lookup", MISSION_REFERENCE_LIST);
+          inventoryClient.missions();
       if (content != null) {
         return content;
       }
@@ -1758,7 +1526,7 @@ public class InventoryPageController {
   }
 
   /**
-   * The „gestohlen" narrowing of a grouped Lager read or an entry-id read (REQ-INV-053).
+   * The „gestohlen" narrowing of a grouped Lager read (REQ-INV-053).
    *
    * @param stolenOnly relay {@code stolenOnly=true}
    * @param nonStolenOnly relay {@code nonStolenOnly=true}
@@ -1775,20 +1543,6 @@ public class InventoryPageController {
      */
     boolean active() {
       return stolenOnly || nonStolenOnly;
-    }
-
-    /**
-     * Appends the set flags to a backend request URI.
-     *
-     * @param uriBuilder the builder collecting the backend request URI
-     */
-    void appendTo(@NotNull org.springframework.web.util.UriComponentsBuilder uriBuilder) {
-      if (stolenOnly) {
-        uriBuilder.queryParam("stolenOnly", true);
-      }
-      if (nonStolenOnly) {
-        uriBuilder.queryParam("nonStolenOnly", true);
-      }
     }
   }
 }

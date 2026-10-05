@@ -39,11 +39,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PatchMissionScheduleRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.time.Instant;
 import java.util.Collections;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -144,7 +144,7 @@ class MissionCoreEditAjaxControllerTest {
                 .param("plannedStartTime", "2026-06-21T11:59:58.222717")
                 .param("scheduleVersion", "5"))
         .andExpect(status().isOk());
-    ArgumentCaptor<Map<String, Object>> scheduleBody = ArgumentCaptor.captor();
+    ArgumentCaptor<PatchMissionScheduleRequest> scheduleBody = ArgumentCaptor.captor();
     verify(backendApiClient)
         .patch(
             eq("/api/v1/missions/{id}/schedule"),
@@ -153,7 +153,7 @@ class MissionCoreEditAjaxControllerTest {
             eq(MISSION_ID));
     assertEquals(
         Instant.parse("2026-06-21T09:59:58.222717Z"),
-        scheduleBody.getValue().get("plannedStartTime"),
+        scheduleBody.getValue().plannedStartTime(),
         "an unedited microsecond zoneless schedule time must round-trip, not be nulled on save");
   }
 
