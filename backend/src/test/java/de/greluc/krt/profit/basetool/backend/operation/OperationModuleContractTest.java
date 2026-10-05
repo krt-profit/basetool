@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.operation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -27,6 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionCommands;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.Operation;
@@ -59,7 +61,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.IllegalTransactionStateException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
@@ -91,6 +97,10 @@ class OperationModuleContractTest {
   @Autowired private EntityManager entityManager;
 
   @Autowired private JdbcTemplate jdbcTemplate;
+
+  @Autowired private MissionCommands missionCommands;
+
+  @Autowired private PlatformTransactionManager transactionManager;
 
   private MockMvc mockMvc;
 
@@ -217,6 +227,18 @@ class OperationModuleContractTest {
                 String.class,
                 operation.getId()))
         .containsExactly("OPERATION_DELETED");
+  }
+
+  @Test
+  void theDetachCommandRefusesToRunOutsideTheCallersTransaction() {
+    TransactionTemplate withoutTransaction = new TransactionTemplate(transactionManager);
+    withoutTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
+
+    assertThatThrownBy(
+            () ->
+                withoutTransaction.executeWithoutResult(
+                    _ -> missionCommands.detachFromOperation(UUID.randomUUID())))
+        .isInstanceOf(IllegalTransactionStateException.class);
   }
 
   private Map<String, Object> counters(UUID missionId) {

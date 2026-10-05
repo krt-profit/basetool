@@ -87,7 +87,7 @@ class ModularityTest {
    * Modules that publish nothing yet: no {@code api} package and no type in the base package, so no
    * other module may depend on them and no declaration allows them.
    */
-  private static final Set<String> INTERNAL_ONLY_MODULES = Set.of("mission", "orgchart");
+  private static final Set<String> INTERNAL_ONLY_MODULES = Set.of("orgchart");
 
   private static final String API = "api";
 

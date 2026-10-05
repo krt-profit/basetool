@@ -27,7 +27,7 @@ import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionCommands;
 import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -71,6 +71,7 @@ public class OperationService {
 
   private final OperationRepository operationRepository;
   private final MissionRepository missionRepository;
+  private final MissionCommands missionCommands;
   private final UserService userService;
   private final OwnerScopeService ownerScopeService;
   private final AuthHelperService authHelperService;
@@ -267,9 +268,7 @@ public class OperationService {
     log.info("Deleting operation with ID: {}", id);
     Operation operation = Entities.require(operationRepository.findById(id), "Operation not found");
 
-    for (Mission mission : operation.getMissions()) {
-      mission.setOperation(null);
-    }
+    missionCommands.detachFromOperation(id);
     operation.getMissions().clear();
 
     String deletedOperationName = operation.getName();

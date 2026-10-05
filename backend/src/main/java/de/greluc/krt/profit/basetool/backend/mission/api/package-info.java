@@ -18,26 +18,9 @@
  */
 
 /**
- * The bank module: the Kartellbank's accounts, bookings and booking requests, org-unit-blind by
- * design (ADR-0020).
+ * The mission module's published API: the commands other modules may ask of it (plan §5.2, §5.3).
  */
-@ApplicationModule(
-    allowedDependencies = {
-      "audit::api",
-      "catalogue::api",
-      "identity::api",
-      "inventory::api",
-      "joborder::api",
-      "kernel",
-      "livesync::api",
-      "materialexchange::api",
-      "mission::api",
-      "notification::api",
-      "orgunit::api",
-      "platform::api",
-      "refinery::api",
-      "scope::api"
-    })
-package de.greluc.krt.profit.basetool.backend.bank;
+@NamedInterface("api")
+package de.greluc.krt.profit.basetool.backend.mission.api;
 
-import org.springframework.modulith.ApplicationModule;
+import org.springframework.modulith.NamedInterface;

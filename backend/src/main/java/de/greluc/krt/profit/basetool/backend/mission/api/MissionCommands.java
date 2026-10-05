@@ -17,27 +17,22 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/**
- * The bank module: the Kartellbank's accounts, bookings and booking requests, org-unit-blind by
- * design (ADR-0020).
- */
-@ApplicationModule(
-    allowedDependencies = {
-      "audit::api",
-      "catalogue::api",
-      "identity::api",
-      "inventory::api",
-      "joborder::api",
-      "kernel",
-      "livesync::api",
-      "materialexchange::api",
-      "mission::api",
-      "notification::api",
-      "orgunit::api",
-      "platform::api",
-      "refinery::api",
-      "scope::api"
-    })
-package de.greluc.krt.profit.basetool.backend.bank;
+package de.greluc.krt.profit.basetool.backend.mission.api;
 
-import org.springframework.modulith.ApplicationModule;
+import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
+
+/**
+ * The writes another module may ask of the mission module (plan §5.3). Each command joins the
+ * caller's transaction and refuses to run without one.
+ */
+public interface MissionCommands {
+
+  /**
+   * Clears the operation reference of every mission linked to the operation. No mission section
+   * counter and no row version moves, and no audit row is recorded.
+   *
+   * @param operationId the operation whose missions are detached
+   */
+  void detachFromOperation(@NotNull UUID operationId);
+}

@@ -27,6 +27,7 @@
       "joborder::api",
       "kernel",
       "livesync::api",
+      "mission::api",
       "notification::api",
       "orgunit::api",
       "platform::api",
