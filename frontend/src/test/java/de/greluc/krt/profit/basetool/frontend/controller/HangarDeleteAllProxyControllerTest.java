@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import de.greluc.krt.profit.basetool.frontend.hangar.client.HangarBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
@@ -49,7 +50,9 @@ class HangarDeleteAllProxyControllerTest {
     server = new MockWebServer();
     server.start();
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
-    controller = new HangarDeleteAllProxyController(RealBackendApiClient.over(webClient));
+    controller =
+        new HangarDeleteAllProxyController(
+            new HangarBackendClient(RealBackendApiClient.over(webClient)));
   }
 
   @AfterEach

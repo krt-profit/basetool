@@ -147,8 +147,14 @@ class JobOrderListRenderTest {
             false);
 
     when(backendApiClient.get(
-            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
-            anyTypeRef()))
+            eq(
+                "/api/v1/orders?page={page}&size={size}&sort=priority,asc"
+                    + "&status={status},{status}"),
+            anyTypeRef(),
+            eq(0),
+            eq(100),
+            eq("OPEN"),
+            eq("IN_PROGRESS")))
         .thenReturn(new PageResponse<>(List.of(order), 0, 1000, 1L, 1, List.of()));
 
     MvcResult result = mockMvc.perform(get("/orders")).andExpect(status().isOk()).andReturn();
@@ -188,8 +194,14 @@ class JobOrderListRenderTest {
             false);
 
     when(backendApiClient.get(
-            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
-            anyTypeRef()))
+            eq(
+                "/api/v1/orders?page={page}&size={size}&sort=priority,asc"
+                    + "&status={status},{status}"),
+            anyTypeRef(),
+            eq(0),
+            eq(100),
+            eq("OPEN"),
+            eq("IN_PROGRESS")))
         .thenReturn(new PageResponse<>(List.of(order), 0, 1000, 1L, 1, List.of()));
 
     MvcResult result = mockMvc.perform(get("/orders")).andExpect(status().isOk()).andReturn();

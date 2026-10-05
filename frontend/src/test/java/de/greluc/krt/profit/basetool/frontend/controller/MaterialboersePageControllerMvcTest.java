@@ -38,6 +38,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeCountsDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeOfferDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeOfferUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeReleaseRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
@@ -46,7 +48,6 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -108,7 +109,8 @@ class MaterialboersePageControllerMvcTest {
         .thenReturn(new PageResponse<>(List.of(offer), 0, 200, 1, 1, List.of()));
     when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
         .thenReturn(new MaterialExchangeCountsDto(1, 0));
-    when(backendApiClient.get(contains("/material-exchange/offers/"), anyClass()))
+    when(backendApiClient.get(
+            contains("/material-exchange/offers/"), anyClass(), any(Object[].class)))
         .thenReturn(offer);
   }
 
@@ -212,7 +214,9 @@ class MaterialboersePageControllerMvcTest {
         .thenReturn(new PageResponse<>(List.of(item), 0, 200, 1, 1, List.of()));
     when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
         .thenReturn(new MaterialExchangeCountsDto(1, 0));
-    when(backendApiClient.get(contains("/material-exchange/offers/"), anyClass())).thenReturn(item);
+    when(backendApiClient.get(
+            contains("/material-exchange/offers/"), anyClass(), any(Object[].class)))
+        .thenReturn(item);
 
     mockMvc
         .perform(get("/materialboerse").param("lang", "en"))
@@ -256,7 +260,8 @@ class MaterialboersePageControllerMvcTest {
         .thenReturn(new PageResponse<>(List.of(stockBacked), 0, 200, 1, 1, List.of()));
     when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
         .thenReturn(new MaterialExchangeCountsDto(1, 1));
-    when(backendApiClient.get(contains("/material-exchange/offers/"), anyClass()))
+    when(backendApiClient.get(
+            contains("/material-exchange/offers/"), anyClass(), any(Object[].class)))
         .thenReturn(stockBacked);
 
     mockMvc
@@ -313,7 +318,8 @@ class MaterialboersePageControllerMvcTest {
         .thenReturn(new PageResponse<>(List.of(stolen), 0, 200, 1, 1, List.of()));
     when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
         .thenReturn(new MaterialExchangeCountsDto(1, 0));
-    when(backendApiClient.get(contains("/material-exchange/offers/"), anyClass()))
+    when(backendApiClient.get(
+            contains("/material-exchange/offers/"), anyClass(), any(Object[].class)))
         .thenReturn(stolen);
 
     String body =
@@ -392,8 +398,9 @@ class MaterialboersePageControllerMvcTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void deactivateProxy_returns200() throws Exception {
-    when(backendApiClient.post(contains("/deactivate"), any(), eq(Object.class), any()))
-        .thenReturn(Map.of("id", offerId.toString()));
+    when(backendApiClient.post(
+            contains("/deactivate"), any(), eq(MaterialExchangeOfferDto.class), any()))
+        .thenReturn(null);
 
     mockMvc
         .perform(post("/materialboerse/offers/" + offerId + "/deactivate/ajax").with(csrf()))
@@ -474,7 +481,8 @@ class MaterialboersePageControllerMvcTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void remarkProxy_backendConflict_relays409() throws Exception {
-    when(backendApiClient.put(contains("/remark"), any(), eq(Object.class), any()))
+    when(backendApiClient.put(
+            contains("/remark"), any(), eq(MaterialExchangeOfferDto.class), any()))
         .thenThrow(
             new BackendServiceException(
                 "conflict", null, 409, "OPTIMISTIC_LOCK", null, List.of(), "conflict"));
@@ -488,5 +496,59 @@ class MaterialboersePageControllerMvcTest {
                 .content("{\"offeredAmount\":120,\"remark\":\"neu\",\"version\":0}"))
         .andExpect(status().isConflict())
         .andExpect(content().string(containsString("OPTIMISTIC_LOCK")));
+
+    verify(backendApiClient)
+        .put(
+            eq("/api/v1/material-exchange/offers/{id}/remark"),
+            eq(new MaterialExchangeOfferUpdateRequest(120.0, "neu", 0L)),
+            eq(MaterialExchangeOfferDto.class),
+            eq(offerId));
+  }
+
+  /** The release proxy relays the typed release body and answers the created offer's id. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void releaseProxy_relaysTheTypedBodyAndAnswersTheOffer() throws Exception {
+    UUID itemId = UUID.fromString("3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b");
+    MaterialExchangeOfferDto offer =
+        new MaterialExchangeOfferDto(
+            offerId,
+            "MATERIAL",
+            null,
+            null,
+            null,
+            null,
+            List.of(),
+            true,
+            700,
+            5.0,
+            5.0,
+            null,
+            "r",
+            0,
+            null,
+            false,
+            "ACTIVE",
+            0L,
+            false);
+    when(backendApiClient.post(
+            eq("/api/v1/material-exchange/offers"),
+            eq(new MaterialExchangeReleaseRequest(itemId, 5.0, "r")),
+            eq(MaterialExchangeOfferDto.class)))
+        .thenReturn(offer);
+
+    mockMvc
+        .perform(
+            post("/materialboerse/offers/ajax")
+                .with(csrf())
+                .contentType("application/json")
+                .content(
+                    "{\"inventoryItemId\":\""
+                        + itemId
+                        + "\",\"offeredAmount\":5,\"remark\":\"r\"}"))
+        .andExpect(status().isOk())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.id")
+                .value(offerId.toString()));
   }
 }

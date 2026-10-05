@@ -20,13 +20,21 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.PayoutPreference;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AdminDeletionRequestDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MyBlueprintSharingRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MyBlueprintSharingResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MyPayoutPreferenceRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MyPayoutPreferenceResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MyRsiHandleRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MyRsiHandleResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UserDescriptionRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfileBlueprintSharingForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfileDescriptionForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfilePayoutPreferenceForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfileRsiHandleForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.support.MapPayloadValues;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -39,7 +47,6 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -69,11 +76,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("isAuthenticated()")
 public class ProfileController {
 
-  /** Shared response type for the raw {@code Map<String, Object>} backend payloads on this page. */
-  private static final ParameterizedTypeReference<Map<String, Object>> STRING_OBJECT_MAP_TYPE =
-      new ParameterizedTypeReference<>() {};
+  /** Reads and writes the member's profile on the backend. */
+  private final IdentityBackendClient identityClient;
 
-  private final BackendApiClient backendApiClient;
   private final MessageSource messageSource;
 
   @Value("${spring.security.oauth2.client.provider.keycloak.issuer-uri}")
@@ -99,32 +104,23 @@ public class ProfileController {
     model.addAttribute("displayName", getSingleClaim(principal, "displayName"));
 
     try {
-      Map<String, Object> user = backendApiClient.get("/api/v1/users/me", STRING_OBJECT_MAP_TYPE);
+      UserDto user = identityClient.me();
 
       if (user != null) {
-        if (user.get("rank") != null) {
-          model.addAttribute("rank", user.get("rank"));
+        if (user.rank() != null) {
+          model.addAttribute("rank", user.rank());
         }
-        if (user.containsKey("description")) {
-          model.addAttribute("description", user.get("description"));
+        model.addAttribute("description", user.description());
+        model.addAttribute("displayName", user.displayName());
+        model.addAttribute("version", user.version() == null ? 0L : user.version());
+        LocalDate joinDate = user.joinDate();
+        if (joinDate != null) {
+          model.addAttribute("joinDate", joinDate);
+          model.addAttribute(
+              "monthsInSquadron", ChronoUnit.MONTHS.between(joinDate, LocalDate.now()));
         }
-        if (user.containsKey("displayName")) {
-          model.addAttribute("displayName", user.get("displayName"));
-        }
-        if (user.containsKey("version")) {
-          model.addAttribute("version", MapPayloadValues.longOrZero(user.get("version")));
-        }
-        if (user.containsKey("joinDate") && user.get("joinDate") != null) {
-          try {
-            LocalDate joinDate = LocalDate.parse(String.valueOf(user.get("joinDate")));
-            model.addAttribute("joinDate", joinDate);
-            model.addAttribute(
-                "monthsInSquadron", ChronoUnit.MONTHS.between(joinDate, LocalDate.now()));
-          } catch (Exception ignored) {
-          }
-        }
-        if (user.get("squadrons") instanceof java.util.List<?> squadrons) {
-          model.addAttribute("profileSquadrons", squadrons);
+        if (user.squadrons() != null) {
+          model.addAttribute("profileSquadrons", user.squadrons());
         }
       }
     } catch (Exception ignored) {
@@ -132,11 +128,9 @@ public class ProfileController {
 
     PayoutPreference defaultPayoutPreference = PayoutPreference.PAYOUT;
     try {
-      Map<String, Object> pref =
-          backendApiClient.get("/api/v1/users/me/payout-preference", STRING_OBJECT_MAP_TYPE);
-      if (pref != null && pref.get("defaultPayoutPreference") != null) {
-        defaultPayoutPreference =
-            PayoutPreference.valueOf(String.valueOf(pref.get("defaultPayoutPreference")));
+      MyPayoutPreferenceResponse pref = identityClient.myPayoutPreference();
+      if (pref != null && pref.defaultPayoutPreference() != null) {
+        defaultPayoutPreference = PayoutPreference.valueOf(pref.defaultPayoutPreference());
       }
     } catch (Exception e) {
       log.debug(
@@ -146,11 +140,9 @@ public class ProfileController {
 
     boolean shareBlueprintsGlobally = false;
     try {
-      Map<String, Object> sharing =
-          backendApiClient.get("/api/v1/users/me/blueprint-sharing", STRING_OBJECT_MAP_TYPE);
-      if (sharing != null && sharing.get("shareBlueprintsGlobally") != null) {
-        shareBlueprintsGlobally =
-            Boolean.parseBoolean(String.valueOf(sharing.get("shareBlueprintsGlobally")));
+      MyBlueprintSharingResponse sharing = identityClient.myBlueprintSharing();
+      if (sharing != null) {
+        shareBlueprintsGlobally = sharing.shareBlueprintsGlobally();
       }
     } catch (Exception e) {
       log.debug(
@@ -160,10 +152,9 @@ public class ProfileController {
 
     String rsiHandle = null;
     try {
-      Map<String, Object> handle =
-          backendApiClient.get("/api/v1/users/me/rsi-handle", STRING_OBJECT_MAP_TYPE);
-      if (handle != null && handle.get("rsiHandle") != null) {
-        rsiHandle = String.valueOf(handle.get("rsiHandle"));
+      MyRsiHandleResponse handle = identityClient.myRsiHandle();
+      if (handle != null && handle.rsiHandle() != null) {
+        rsiHandle = handle.rsiHandle();
       }
     } catch (Exception e) {
       log.debug("Could not load the RSI handle; the field starts empty", e);
@@ -171,11 +162,10 @@ public class ProfileController {
 
     model.addAttribute("keycloakAccountUrl", issuerUri + "/account");
 
-    Map<String, Object> deletionRequest = null;
+    AdminDeletionRequestDto deletionRequest = null;
     boolean deletionRequestUnavailable = false;
     try {
-      deletionRequest =
-          backendApiClient.get("/api/v1/users/me/deletion-request", STRING_OBJECT_MAP_TYPE);
+      deletionRequest = identityClient.myDeletionRequest();
     } catch (Exception e) {
       log.debug("Could not load the member's deletion request; the card says so", e);
       deletionRequestUnavailable = true;
@@ -248,13 +238,11 @@ public class ProfileController {
       return profile(model, principal);
     }
     try {
-      backendApiClient.put(
-          "/api/v1/users/me/description",
-          Map.of(
-              "description", form.description() == null ? "" : form.description(),
-              "displayName", form.displayName() == null ? "" : form.displayName(),
-              "version", form.version()),
-          Void.class);
+      identityClient.updateMyDescription(
+          new UserDescriptionRequest(
+              form.description() == null ? "" : form.description(),
+              form.displayName() == null ? "" : form.displayName(),
+              form.version()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Update failed", e);
@@ -297,13 +285,11 @@ public class ProfileController {
       return ResponseEntity.badRequest().body(Map.of("detail", firstFieldError(bindingResult)));
     }
     try {
-      backendApiClient.put(
-          "/api/v1/users/me/description",
-          Map.of(
-              "description", form.description() == null ? "" : form.description(),
-              "displayName", form.displayName() == null ? "" : form.displayName(),
-              "version", form.version() == null ? 0L : form.version()),
-          Void.class);
+      identityClient.updateMyDescription(
+          new UserDescriptionRequest(
+              form.description() == null ? "" : form.description(),
+              form.displayName() == null ? "" : form.displayName(),
+              form.version() == null ? 0L : form.version()));
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("AJAX profile description update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
@@ -348,16 +334,12 @@ public class ProfileController {
       return profile(model, principal);
     }
     try {
-      backendApiClient.put(
-          "/api/v1/users/me/payout-preference",
-          Map.of(
-              "preference",
+      identityClient.updateMyPayoutPreference(
+          new MyPayoutPreferenceRequest(
               form.defaultPayoutPreference() == null
                   ? PayoutPreference.PAYOUT.name()
                   : form.defaultPayoutPreference().name(),
-              "version",
-              form.version()),
-          Void.class);
+              form.version()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Update failed", e);
@@ -404,10 +386,8 @@ public class ProfileController {
             ? PayoutPreference.PAYOUT.name()
             : form.defaultPayoutPreference().name();
     try {
-      backendApiClient.put(
-          "/api/v1/users/me/payout-preference",
-          Map.of("preference", preference, "version", form.version() == null ? 0L : form.version()),
-          Void.class);
+      identityClient.updateMyPayoutPreference(
+          new MyPayoutPreferenceRequest(preference, form.version() == null ? 0L : form.version()));
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("AJAX payout-preference update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
@@ -451,14 +431,9 @@ public class ProfileController {
       return profile(model, principal);
     }
     try {
-      backendApiClient.put(
-          "/api/v1/users/me/blueprint-sharing",
-          Map.of(
-              "shareBlueprintsGlobally",
-              form.shareBlueprintsGlobally(),
-              "version",
-              form.version() == null ? 0L : form.version()),
-          Void.class);
+      identityClient.updateMyBlueprintSharing(
+          new MyBlueprintSharingRequest(
+              form.shareBlueprintsGlobally(), form.version() == null ? 0L : form.version()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Update failed", e);
@@ -501,14 +476,9 @@ public class ProfileController {
       return ResponseEntity.badRequest().body(Map.of("detail", firstFieldError(bindingResult)));
     }
     try {
-      backendApiClient.put(
-          "/api/v1/users/me/blueprint-sharing",
-          Map.of(
-              "shareBlueprintsGlobally",
-              form.shareBlueprintsGlobally(),
-              "version",
-              form.version() == null ? 0L : form.version()),
-          Void.class);
+      identityClient.updateMyBlueprintSharing(
+          new MyBlueprintSharingRequest(
+              form.shareBlueprintsGlobally(), form.version() == null ? 0L : form.version()));
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("AJAX blueprint-sharing update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
@@ -552,14 +522,10 @@ public class ProfileController {
       return profile(model, principal);
     }
     try {
-      backendApiClient.put(
-          "/api/v1/users/me/rsi-handle",
-          Map.of(
-              "rsiHandle",
+      identityClient.saveMyRsiHandle(
+          new MyRsiHandleRequest(
               form.rsiHandle() == null ? "" : form.rsiHandle().trim(),
-              "version",
-              form.version() == null ? 0L : form.version()),
-          Void.class);
+              form.version() == null ? 0L : form.version()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("RSI handle update failed", e);
@@ -585,9 +551,9 @@ public class ProfileController {
    */
   private Long refreshedUserVersion(Long priorVersion) {
     try {
-      Map<String, Object> me = backendApiClient.get("/api/v1/users/me", STRING_OBJECT_MAP_TYPE);
-      if (me != null && me.get("version") != null) {
-        return MapPayloadValues.longOrZero(me.get("version"));
+      UserDto me = identityClient.me();
+      if (me != null && me.version() != null) {
+        return me.version();
       }
     } catch (Exception ignored) {
     }

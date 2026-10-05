@@ -22,20 +22,19 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.withBackendStatus;
 
 import de.greluc.krt.profit.basetool.frontend.config.AppHttpProperties;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.UUID;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
-import reactor.netty.http.client.HttpClientRequest;
 
 /**
  * Streams a member's Art. 15 / Art. 20 data export to the browser as a download (REQ-SEC-058).
@@ -47,7 +46,8 @@ import reactor.netty.http.client.HttpClientRequest;
 @RequiredArgsConstructor
 public class DataExportProxyController {
 
-  private final BackendApiClient backendApiClient;
+  /** Downloads the export documents from the backend. */
+  private final IdentityBackendClient identityClient;
 
   private final AppHttpProperties httpProperties;
 
@@ -59,7 +59,10 @@ public class DataExportProxyController {
   @GetMapping("/api/proxy/me/export/json")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<byte[]> json() {
-    return fetch("/api/v1/users/me/export", "datenauskunft.json", MediaType.APPLICATION_JSON);
+    return fetch(
+        () -> identityClient.myExportJson(httpProperties.exportResponseTimeout()),
+        "datenauskunft.json",
+        MediaType.APPLICATION_JSON);
   }
 
   /**
@@ -70,7 +73,10 @@ public class DataExportProxyController {
   @GetMapping("/api/proxy/me/export/pdf")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<byte[]> pdf() {
-    return fetch("/api/v1/users/me/export/pdf", "datenauskunft.pdf", MediaType.APPLICATION_PDF);
+    return fetch(
+        () -> identityClient.myExportPdf(httpProperties.exportResponseTimeout()),
+        "datenauskunft.pdf",
+        MediaType.APPLICATION_PDF);
   }
 
   /**
@@ -84,7 +90,7 @@ public class DataExportProxyController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<byte[]> adminPdf(@PathVariable UUID userId) {
     return fetch(
-        "/api/v1/admin/users/" + userId + "/export/pdf",
+        () -> identityClient.memberExportPdf(userId, httpProperties.exportResponseTimeout()),
         "datenauskunft-" + userId + ".pdf",
         MediaType.APPLICATION_PDF);
   }
@@ -99,39 +105,23 @@ public class DataExportProxyController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<byte[]> adminJson(@PathVariable UUID userId) {
     return fetch(
-        "/api/v1/admin/users/" + userId + "/export",
+        () -> identityClient.memberExportJson(userId, httpProperties.exportResponseTimeout()),
         "datenauskunft-" + userId + ".json",
         MediaType.APPLICATION_JSON);
   }
 
   /**
-   * Fetches one export document with an extended response timeout and no retries, and re-wraps it
-   * with attachment headers. The filename never carries a handle.
+   * Fetches one export document, which the client reads with an extended response timeout and no
+   * retries, and re-wraps it with attachment headers. The filename never carries a handle.
    *
-   * @param uri the backend URI
+   * @param download the client call reading the document
    * @param filename the download filename
    * @param mediaType the response content type
    * @return the proxied attachment response
    */
   private ResponseEntity<byte[]> fetch(
-      @NotNull String uri, @NotNull String filename, @NotNull MediaType mediaType) {
-    byte[] body =
-        withBackendStatus(
-            () ->
-                backendApiClient.execute(
-                    HttpMethod.GET,
-                    uri,
-                    webClient ->
-                        webClient
-                            .get()
-                            .uri(uri)
-                            .httpRequest(
-                                request -> {
-                                  HttpClientRequest nativeRequest = request.getNativeRequest();
-                                  nativeRequest.responseTimeout(
-                                      httpProperties.exportResponseTimeout());
-                                }),
-                    spec -> spec.bodyToMono(byte[].class)));
+      @NotNull Supplier<byte[]> download, @NotNull String filename, @NotNull MediaType mediaType) {
+    byte[] body = withBackendStatus(download);
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(mediaType);
     headers.setContentDispositionFormData("attachment", filename);

@@ -22,17 +22,16 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.model.dto.AdminDeletionRequestDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.DecideDeletionRequestRequest;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -55,10 +54,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @Slf4j
 public class AdminDeletionRequestsPageController {
 
-  private static final ParameterizedTypeReference<List<AdminDeletionRequestDto>> REQUEST_LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Reads and decides the erasure requests on the backend. */
+  private final IdentityBackendClient identityClient;
 
   /**
    * Renders the queue; a backend failure renders an error banner with an empty list.
@@ -71,8 +68,7 @@ public class AdminDeletionRequestsPageController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String page(Model model) {
     try {
-      model.addAttribute(
-          "requests", backendApiClient.get("/api/v1/admin/deletion-requests", REQUEST_LIST_TYPE));
+      model.addAttribute("requests", identityClient.deletionRequests());
     } catch (Exception e) {
       log.error("Loading the deletion-request queue failed", e);
       model.addAttribute("requests", List.of());
@@ -92,8 +88,7 @@ public class AdminDeletionRequestsPageController {
   @GetMapping(params = "fragment=rows")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String rows(@NotNull Model model) {
-    model.addAttribute(
-        "requests", backendApiClient.get("/api/v1/admin/deletion-requests", REQUEST_LIST_TYPE));
+    model.addAttribute("requests", identityClient.deletionRequests());
     return "admin/deletion-requests :: rows";
   }
 
@@ -113,16 +108,13 @@ public class AdminDeletionRequestsPageController {
     if (!(note instanceof String text) || text.isBlank()) {
       return ResponseEntity.badRequest().build();
     }
-    Map<String, Object> body = new LinkedHashMap<>();
-    body.put("grantHistoryErasure", false);
-    body.put("note", text);
-    body.put("version", request.get("version"));
+    DecideDeletionRequestRequest body =
+        new DecideDeletionRequestRequest(false, text, version(request.get("version")));
     return relay(
         log,
         "declining deletion request " + id,
         () -> {
-          backendApiClient.post(
-              "/api/v1/admin/deletion-requests/{id}/decline", body, Object.class, id);
+          identityClient.declineDeletionRequest(id, body);
           return ResponseEntity.ok().build();
         });
   }
@@ -141,16 +133,28 @@ public class AdminDeletionRequestsPageController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> execute(
       @PathVariable UUID id, @RequestBody Map<String, Object> request) {
-    Map<String, Object> body = new LinkedHashMap<>();
-    body.put("grantHistoryErasure", Boolean.TRUE.equals(request.get("grantHistoryErasure")));
-    body.put("version", request.get("version"));
+    DecideDeletionRequestRequest body =
+        new DecideDeletionRequestRequest(
+            Boolean.TRUE.equals(request.get("grantHistoryErasure")),
+            null,
+            version(request.get("version")));
     return relay(
         log,
         "executing deletion request " + id,
         () -> {
-          backendApiClient.post(
-              "/api/v1/admin/deletion-requests/{id}/execute", body, Object.class, id);
+          identityClient.executeDeletionRequest(id, body);
           return ResponseEntity.ok().build();
         });
+  }
+
+  /**
+   * Reads the request row's optimistic-lock version from the browser payload.
+   *
+   * @param value the payload's {@code version}, a JSON number or {@code null}
+   * @return the version, or {@code null} when the payload carried no number
+   */
+  @Nullable
+  private static Long version(@Nullable Object value) {
+    return value instanceof Number number ? number.longValue() : null;
   }
 }

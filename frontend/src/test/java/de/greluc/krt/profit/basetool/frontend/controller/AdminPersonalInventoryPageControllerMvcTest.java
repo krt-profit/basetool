@@ -108,7 +108,8 @@ class AdminPersonalInventoryPageControllerMvcTest {
     String userSub = UUID.randomUUID().toString();
     PageResponse<PersonalInventoryItemDto> items =
         new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
-    when(backendApiClient.get(contains("/api/v1/admin/personal-inventory/"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/admin/personal-inventory/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(items);
 
     mockMvc
@@ -137,7 +138,8 @@ class AdminPersonalInventoryPageControllerMvcTest {
     PersonalInventoryItemDto item =
         new PersonalInventoryItemDto(
             UUID.randomUUID(), "Kiste", "n", 7, null, "Lorville", 3, 0L, null, null);
-    when(backendApiClient.get(contains("/api/v1/admin/personal-inventory/"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/admin/personal-inventory/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(item), 0, 50, 51L, 2, List.of()));
 
     String html =
@@ -181,7 +183,7 @@ class AdminPersonalInventoryPageControllerMvcTest {
     String userSub = UUID.randomUUID().toString();
     PageResponse<PersonalInventoryItemDto> items =
         new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(items);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(items);
 
     mockMvc
         .perform(
@@ -193,7 +195,8 @@ class AdminPersonalInventoryPageControllerMvcTest {
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
     ArgumentCaptor<Object> qCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture());
+    verify(backendApiClient)
+        .get(uriCaptor.capture(), anyTypeRef(), eq(UUID.fromString(userSub)), qCaptor.capture());
     assertTrue(uriCaptor.getValue().contains("q={q}"), uriCaptor.getValue());
     assertEquals("Widget Alpha", qCaptor.getValue());
   }
@@ -204,7 +207,7 @@ class AdminPersonalInventoryPageControllerMvcTest {
     String userSub = UUID.randomUUID().toString();
     PageResponse<PersonalInventoryItemDto> items =
         new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(items);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(items);
 
     String term = "Röhre Größe";
     mockMvc
@@ -217,7 +220,8 @@ class AdminPersonalInventoryPageControllerMvcTest {
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
     ArgumentCaptor<Object> qCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture());
+    verify(backendApiClient)
+        .get(uriCaptor.capture(), anyTypeRef(), eq(UUID.fromString(userSub)), qCaptor.capture());
     assertTrue(uriCaptor.getValue().contains("q={q}"), uriCaptor.getValue());
     assertEquals(term, qCaptor.getValue());
   }
@@ -227,7 +231,8 @@ class AdminPersonalInventoryPageControllerMvcTest {
   void add_withValidationErrors_reRendersInlineWithTheModalOpen_andFlashesNothing()
       throws Exception {
     UUID userSub = UUID.randomUUID();
-    when(backendApiClient.get(contains("/api/v1/admin/personal-inventory/"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/admin/personal-inventory/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     mockMvc
@@ -251,7 +256,8 @@ class AdminPersonalInventoryPageControllerMvcTest {
       throws Exception {
     UUID userSub = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
-    when(backendApiClient.get(contains("/api/v1/admin/personal-inventory/"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/admin/personal-inventory/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     mockMvc

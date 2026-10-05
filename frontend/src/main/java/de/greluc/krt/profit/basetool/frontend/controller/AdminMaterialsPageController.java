@@ -21,16 +21,16 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialCreateAjaxRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialUpdateAjaxRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages.CompleteCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
@@ -43,7 +43,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -70,15 +69,11 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminMaterialsPageController {
 
-  /** Response type for the paginated materials pull ({@code GET /api/v1/materials}). */
-  private static final ParameterizedTypeReference<PageResponse<MaterialDto>> MATERIAL_PAGE_TYPE =
-      new ParameterizedTypeReference<>() {};
+  /** Reads and writes the materials and their categories. */
+  private final CatalogueBackendClient catalogueClient;
 
-  /** Response type for the material-category list ({@code GET /api/v1/material-categories}). */
-  private static final ParameterizedTypeReference<List<MaterialCategoryDto>>
-      MATERIAL_CATEGORY_LIST_TYPE = new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Evicts the material catalogue after a write. */
+  private final CatalogueCacheEviction cacheEviction;
 
   /**
    * Loads the complete materials list and the category dropdown source (REQ-ADMIN-001). The refined
@@ -93,11 +88,7 @@ public class AdminMaterialsPageController {
   public String listMaterials(Model model) {
     try {
       CompleteCatalog<MaterialDto> materialsCatalog =
-          CatalogPages.fetchAll(
-              page ->
-                  backendApiClient.get(
-                      "/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page=" + page,
-                      MATERIAL_PAGE_TYPE));
+          CatalogPages.fetchAll(catalogueClient::materialPage);
       List<MaterialDto> materials = new ArrayList<>(materialsCatalog.items());
       model.addAttribute("catalogTruncated", materialsCatalog.truncated());
 
@@ -117,8 +108,7 @@ public class AdminMaterialsPageController {
               .toList();
       model.addAttribute("materials", sortedMaterials);
 
-      List<MaterialCategoryDto> categories =
-          backendApiClient.get("/api/v1/material-categories", MATERIAL_CATEGORY_LIST_TYPE);
+      List<MaterialCategoryDto> categories = catalogueClient.materialCategories();
       model.addAttribute("categories", categories);
 
     } catch (BackendServiceException e) {
@@ -142,10 +132,7 @@ public class AdminMaterialsPageController {
   @PostMapping("/categories")
   public String createCategory(@RequestParam String name, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.post(
-          "/api/v1/material-categories",
-          new MaterialCategoryDto(null, name, null),
-          MaterialCategoryDto.class);
+      catalogueClient.createMaterialCategory(new MaterialCategoryDto(null, name, null));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "POST /api/v1/material-categories", e);
@@ -168,7 +155,7 @@ public class AdminMaterialsPageController {
   @PostMapping("/categories/{id}/delete")
   public String deleteCategory(@PathVariable UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/material-categories/{id}", Void.class, id);
+      catalogueClient.deleteMaterialCategory(id);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "DELETE /api/v1/material-categories", id, e);
@@ -201,10 +188,7 @@ public class AdminMaterialsPageController {
         "create category (ajax)",
         () -> {
           MaterialCategoryDto created =
-              backendApiClient.post(
-                  "/api/v1/material-categories",
-                  new MaterialCategoryDto(null, name, null),
-                  MaterialCategoryDto.class);
+              catalogueClient.createMaterialCategory(new MaterialCategoryDto(null, name, null));
           return ResponseEntity.ok(created);
         });
   }
@@ -224,7 +208,7 @@ public class AdminMaterialsPageController {
         log,
         "delete category (ajax)",
         () -> {
-          backendApiClient.delete("/api/v1/material-categories/{id}", Void.class, id);
+          catalogueClient.deleteMaterialCategory(id);
           return ResponseEntity.ok().build();
         });
   }
@@ -244,8 +228,7 @@ public class AdminMaterialsPageController {
   public ResponseEntity<MaterialDto> updateMaterialAjax(
       @PathVariable @NotNull UUID id, @Valid @RequestBody MaterialUpdateAjaxRequest request) {
     try {
-      MaterialDto currentMaterial =
-          backendApiClient.get("/api/v1/materials/" + id, MaterialDto.class);
+      MaterialDto currentMaterial = catalogueClient.material(id);
 
       MaterialCategoryDto category = currentMaterial.category();
       MaterialDto refinedMaterial = currentMaterial.refinedMaterial();
@@ -256,17 +239,13 @@ public class AdminMaterialsPageController {
 
       if ("CATEGORY".equals(request.updateType())) {
         if (request.categoryId() != null) {
-          category =
-              backendApiClient.get(
-                  "/api/v1/material-categories/" + request.categoryId(), MaterialCategoryDto.class);
+          category = catalogueClient.materialCategory(request.categoryId());
         } else {
           category = null;
         }
       } else if ("REFINED".equals(request.updateType())) {
         if (request.refinedMaterialId() != null) {
-          refinedMaterial =
-              backendApiClient.get(
-                  "/api/v1/materials/" + request.refinedMaterialId(), MaterialDto.class);
+          refinedMaterial = catalogueClient.material(request.refinedMaterialId());
         } else {
           refinedMaterial = null;
         }
@@ -300,10 +279,9 @@ public class AdminMaterialsPageController {
               isVisible,
               request.version());
 
-      backendApiClient.put("/api/v1/materials/{id}", body, Void.class, id);
-      backendApiClient.evict(CacheDomain.MATERIAL);
-      MaterialDto updatedMaterial =
-          backendApiClient.get("/api/v1/materials/" + id, MaterialDto.class);
+      catalogueClient.updateMaterial(id, body);
+      cacheEviction.evict(CacheDomain.MATERIAL);
+      MaterialDto updatedMaterial = catalogueClient.material(id);
       return ResponseEntity.ok(updatedMaterial);
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "PUT /api/v1/materials", id, e);
@@ -326,8 +304,8 @@ public class AdminMaterialsPageController {
   public ResponseEntity<MaterialDto> createMaterialAjax(
       @Valid @RequestBody MaterialCreateAjaxRequest request) {
     try {
-      MaterialDto created = backendApiClient.post("/api/v1/materials", request, MaterialDto.class);
-      backendApiClient.evict(CacheDomain.MATERIAL);
+      MaterialDto created = catalogueClient.createMaterial(request);
+      cacheEviction.evict(CacheDomain.MATERIAL);
       return ResponseEntity.ok(created);
     } catch (BackendServiceException e) {
       log.warn(

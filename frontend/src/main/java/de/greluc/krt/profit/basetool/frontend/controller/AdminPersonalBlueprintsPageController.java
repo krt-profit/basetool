@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
+import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportApplyRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportPreviewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportResolutionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
@@ -33,7 +33,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintBulkDel
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
@@ -48,13 +47,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -66,7 +61,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -86,11 +80,8 @@ public class AdminPersonalBlueprintsPageController {
   /** Page size for the owned-blueprint list — one row per product. */
   private static final int PAGE_SIZE = 200;
 
-  /** Response type for the paged admin owned-blueprint list read. */
-  private static final ParameterizedTypeReference<PageResponse<PersonalBlueprintDto>>
-      PERSONAL_BLUEPRINT_PAGE_TYPE = new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Sends the member's blueprint requests. */
+  private final BlueprintBackendClient blueprintClient;
 
   /**
    * Renders the admin Blueprints page: a user picker and, once a user is selected, their owned
@@ -148,11 +139,7 @@ public class AdminPersonalBlueprintsPageController {
     }
     try {
       PersonalBlueprintBatchResultDto result =
-          backendApiClient.post(
-              "/api/v1/admin/personal-blueprints/{userSub}/batch",
-              new PersonalBlueprintBatchCreateRequest(keys),
-              PersonalBlueprintBatchResultDto.class,
-              userSub);
+          blueprintClient.addMemberOwned(userSub, new PersonalBlueprintBatchCreateRequest(keys));
       return result == null ? new PersonalBlueprintBatchResultDto(0, 0, 0) : result;
     } catch (Exception e) {
       log.error("Admin batch blueprint add failed for user {}", userSub, e);
@@ -181,12 +168,10 @@ public class AdminPersonalBlueprintsPageController {
       @RequestParam Long version,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.put(
-          "/api/v1/admin/personal-blueprints/items/{id}",
+      blueprintClient.updateMemberOwned(
+          id,
           new PersonalBlueprintUpdateRequest(
-              parseInstantOrNull(acquiredAt), StringNormalization.blankToNull(note), version),
-          PersonalBlueprintDto.class,
-          id);
+              parseInstantOrNull(acquiredAt), StringNormalization.blankToNull(note), version));
       redirectAttributes.addFlashAttribute(
           "successToast", "personalInventory.blueprints.toast.noteUpdated");
     } catch (Exception e) {
@@ -212,7 +197,7 @@ public class AdminPersonalBlueprintsPageController {
       @PathVariable @NotNull UUID id,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/admin/personal-blueprints/items/{id}", Void.class, id);
+      blueprintClient.deleteMemberOwned(id);
       redirectAttributes.addFlashAttribute(
           "successToast", "personalInventory.blueprints.toast.removed");
     } catch (Exception e) {
@@ -246,34 +231,10 @@ public class AdminPersonalBlueprintsPageController {
     }
     String filename =
         file.getOriginalFilename() != null ? file.getOriginalFilename() : "blueprints.json";
-    MultipartBodyBuilder builder = new MultipartBodyBuilder();
-    builder
-        .part(
-            "file",
-            new ByteArrayResource(bytes) {
-              @Override
-              public String getFilename() {
-                return filename;
-              }
-            })
-        .contentType(MediaType.APPLICATION_OCTET_STREAM);
-    String uri = "/api/v1/admin/personal-blueprints/" + userSub + "/import/preview";
-
     return relay(
         log,
         "Admin blueprint import preview for user " + userSub,
-        () ->
-            ResponseEntity.ok(
-                backendApiClient.execute(
-                    HttpMethod.POST,
-                    uri,
-                    webClient ->
-                        webClient
-                            .post()
-                            .uri(uri)
-                            .contentType(MediaType.MULTIPART_FORM_DATA)
-                            .body(BodyInserters.fromMultipartData(builder.build())),
-                    spec -> spec.bodyToMono(BlueprintImportPreviewDto.class))));
+        () -> ResponseEntity.ok(blueprintClient.memberImportPreview(userSub, filename, bytes)));
   }
 
   /**
@@ -294,11 +255,7 @@ public class AdminPersonalBlueprintsPageController {
         "Admin blueprint import apply for user " + userSub,
         () -> {
           BlueprintImportResultDto result =
-              backendApiClient.post(
-                  "/api/v1/admin/personal-blueprints/{userSub}/import/apply",
-                  new BlueprintImportApplyRequest(list),
-                  BlueprintImportResultDto.class,
-                  userSub);
+              blueprintClient.memberImportApply(userSub, new BlueprintImportApplyRequest(list));
           return ResponseEntity.ok(
               result == null ? new BlueprintImportResultDto(0, 0, 0, 0, 0) : result);
         });
@@ -315,8 +272,7 @@ public class AdminPersonalBlueprintsPageController {
   @PostMapping("/delete-all-users")
   public String deleteAllUsers(RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete(
-          "/api/v1/admin/personal-blueprints", PersonalBlueprintBulkDeleteResultDto.class);
+      blueprintClient.deleteAllMembersOwned();
       redirectAttributes.addFlashAttribute(
           "successToast", "admin.personalInventory.blueprints.purge.toast.done");
     } catch (Exception e) {
@@ -340,9 +296,7 @@ public class AdminPersonalBlueprintsPageController {
         log,
         "clear all users' blueprints (ajax)",
         () -> {
-          PersonalBlueprintBulkDeleteResultDto result =
-              backendApiClient.delete(
-                  "/api/v1/admin/personal-blueprints", PersonalBlueprintBulkDeleteResultDto.class);
+          PersonalBlueprintBulkDeleteResultDto result = blueprintClient.deleteAllMembersOwned();
           return ResponseEntity.ok(
               result == null ? new PersonalBlueprintBulkDeleteResultDto(0) : result);
         });
@@ -357,7 +311,7 @@ public class AdminPersonalBlueprintsPageController {
   @Nullable
   private UserDto fetchUser(UUID userSub) {
     try {
-      return backendApiClient.get("/api/v1/users/" + userSub, UserDto.class);
+      return blueprintClient.user(userSub);
     } catch (Exception e) {
       log.warn(
           "Failed to fetch selected member {} for admin personal blueprints picker", userSub, e);
@@ -374,17 +328,7 @@ public class AdminPersonalBlueprintsPageController {
    */
   private PageResponse<PersonalBlueprintDto> fetchOwned(UUID userSub, String q) {
     try {
-      StringBuilder uri =
-          new StringBuilder("/api/v1/admin/personal-blueprints/")
-              .append(userSub)
-              .append("?size=")
-              .append(PAGE_SIZE)
-              .append("&sort=productName,asc");
-      if (q != null && !q.isBlank()) {
-        uri.append("&q={q}");
-        return backendApiClient.get(uri.toString(), PERSONAL_BLUEPRINT_PAGE_TYPE, q);
-      }
-      return backendApiClient.get(uri.toString(), PERSONAL_BLUEPRINT_PAGE_TYPE);
+      return blueprintClient.memberOwnedPage(userSub, PAGE_SIZE, q);
     } catch (Exception e) {
       log.error("Failed to fetch owned blueprints for user {}", userSub, e);
       return new PageResponse<>(new ArrayList<>(), 0, PAGE_SIZE, 0, 0, List.of());

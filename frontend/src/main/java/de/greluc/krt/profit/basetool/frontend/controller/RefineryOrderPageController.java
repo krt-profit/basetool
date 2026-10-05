@@ -217,8 +217,6 @@ public class RefineryOrderPageController {
     final boolean mine = Boolean.TRUE.equals(onlyMine);
     final int effectivePage = page == null || page < 0 ? 0 : page;
     final int effectiveSize = size != null && PAGE_SIZES.contains(size) ? size : DEFAULT_PAGE_SIZE;
-    final String endpoint =
-        mine ? "/api/v1/refinery-orders/my-orders" : "/api/v1/refinery-orders/all";
     final ListQuery listQuery =
         exactStatuses != null
             ? new ListQuery(exactStatuses, false, query, SORT_BY_START)
@@ -226,16 +224,15 @@ public class RefineryOrderPageController {
 
     CompletableFuture<PageResponse<RefineryOrderListDto>> listFuture =
         parallelPageLoader.loadAsync(
-            () -> fetchOrderPage(endpoint, listQuery, effectivePage, effectiveSize));
+            () -> fetchOrderPage(mine, listQuery, effectivePage, effectiveSize));
     CompletableFuture<Long> runningFuture =
-        parallelPageLoader.loadAsync(() -> countOrders(endpoint, segmentQuery(VIEW_RUNNING, null)));
+        parallelPageLoader.loadAsync(() -> countOrders(mine, segmentQuery(VIEW_RUNNING, null)));
     CompletableFuture<Long> readyFuture =
-        parallelPageLoader.loadAsync(() -> countOrders(endpoint, segmentQuery(VIEW_READY, null)));
+        parallelPageLoader.loadAsync(() -> countOrders(mine, segmentQuery(VIEW_READY, null)));
     CompletableFuture<Long> completedFuture =
-        parallelPageLoader.loadAsync(
-            () -> countOrders(endpoint, segmentQuery(VIEW_COMPLETED, null)));
+        parallelPageLoader.loadAsync(() -> countOrders(mine, segmentQuery(VIEW_COMPLETED, null)));
     CompletableFuture<Long> allFuture =
-        parallelPageLoader.loadAsync(() -> countOrders(endpoint, segmentQuery(VIEW_ALL, null)));
+        parallelPageLoader.loadAsync(() -> countOrders(mine, segmentQuery(VIEW_ALL, null)));
     CompletableFuture.allOf(listFuture, runningFuture, readyFuture, completedFuture, allFuture)
         .join();
     model.addAttribute(
@@ -372,35 +369,35 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * The backend URL of one list request; the search, when present, is the {@code {q}} template
-   * variable so the client encodes it.
+   * The backend URL template of one list request, with the {@code {page}} and {@code {size}}
+   * variables and, when a search is present, the {@code {q}} variable so the client encodes them.
    *
-   * @param endpoint the list endpoint, own or scoped
+   * @param mine whether the own-orders endpoint is listed instead of the scoped one
    * @param listQuery the filter
-   * @param page the zero-based page index
-   * @param size the page size
    * @return the URL template
    */
   @NotNull
-  static String orderPageUri(
-      @NotNull String endpoint, @NotNull ListQuery listQuery, int page, int size) {
-    return endpoint
-        + "?page="
-        + page
-        + "&size="
-        + size
-        + "&sort="
-        + listQuery.sort()
-        + "&status="
-        + String.join(",", listQuery.statuses())
-        + (listQuery.ready() ? "&ready=true" : "")
-        + (listQuery.query() != null ? "&q={q}" : "");
+  static String orderPageUri(boolean mine, @NotNull ListQuery listQuery) {
+    UriComponentsBuilder uri =
+        UriComponentsBuilder.fromPath(
+                mine ? "/api/v1/refinery-orders/my-orders" : "/api/v1/refinery-orders/all")
+            .queryParam("page", "{page}")
+            .queryParam("size", "{size}")
+            .queryParam("sort", listQuery.sort())
+            .queryParam("status", String.join(",", listQuery.statuses()));
+    if (listQuery.ready()) {
+      uri.queryParam("ready", true);
+    }
+    if (listQuery.query() != null) {
+      uri.queryParam("q", "{q}");
+    }
+    return uri.encode().build().toUriString();
   }
 
   /**
    * Loads one page of refinery orders; a failure is logged and yields {@code null}.
    *
-   * @param endpoint the list endpoint, own or scoped
+   * @param mine whether the own-orders endpoint is listed instead of the scoped one
    * @param listQuery the filter
    * @param page the zero-based page index
    * @param size the page size
@@ -408,12 +405,12 @@ public class RefineryOrderPageController {
    */
   @Nullable
   private PageResponse<RefineryOrderListDto> fetchOrderPage(
-      @NotNull String endpoint, @NotNull ListQuery listQuery, int page, int size) {
-    String uri = orderPageUri(endpoint, listQuery, page, size);
+      boolean mine, @NotNull ListQuery listQuery, int page, int size) {
+    String uri = orderPageUri(mine, listQuery);
     try {
       return listQuery.query() == null
-          ? backendApiClient.get(uri, REFINERY_ORDER_LIST_PAGE)
-          : backendApiClient.get(uri, REFINERY_ORDER_LIST_PAGE, listQuery.query());
+          ? backendApiClient.get(uri, REFINERY_ORDER_LIST_PAGE, page, size)
+          : backendApiClient.get(uri, REFINERY_ORDER_LIST_PAGE, page, size, listQuery.query());
     } catch (Exception e) {
       log.error("Failed to fetch refinery orders", e);
       return null;
@@ -423,13 +420,13 @@ public class RefineryOrderPageController {
   /**
    * Counts the orders of a filter with a one-row request.
    *
-   * @param endpoint the list endpoint, own or scoped
+   * @param mine whether the own-orders endpoint is counted instead of the scoped one
    * @param listQuery the filter
    * @return the total, or {@code null} on a backend failure
    */
   @Nullable
-  private Long countOrders(@NotNull String endpoint, @NotNull ListQuery listQuery) {
-    PageResponse<RefineryOrderListDto> page = fetchOrderPage(endpoint, listQuery, 0, 1);
+  private Long countOrders(boolean mine, @NotNull ListQuery listQuery) {
+    PageResponse<RefineryOrderListDto> page = fetchOrderPage(mine, listQuery, 0, 1);
     return page == null ? null : page.totalElements();
   }
 
@@ -727,7 +724,7 @@ public class RefineryOrderPageController {
     if (!model.containsAttribute("refineryOrderForm") || !model.containsAttribute("storeForm")) {
       try {
         RefineryOrderDto orderDto =
-            backendApiClient.get("/api/v1/refinery-orders/" + id, RefineryOrderDto.class);
+            backendApiClient.get("/api/v1/refinery-orders/{id}", RefineryOrderDto.class, id);
         UUID currentUserId = getCurrentUserId(principal);
 
         boolean isOwner =
@@ -957,7 +954,7 @@ public class RefineryOrderPageController {
     try {
       Map<String, Integer> yields =
           backendApiClient.get(
-              "/api/v1/refinery-orders/locations/" + locationId + "/yields", STRING_INTEGER_MAP);
+              "/api/v1/refinery-orders/locations/{id}/yields", STRING_INTEGER_MAP, locationId);
       return yields != null ? yields : Map.of();
     } catch (Exception e) {
       log.warn("Failed to fetch refinery yields for location {}: {}", locationId, e.getMessage());
@@ -1161,7 +1158,7 @@ public class RefineryOrderPageController {
     try {
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.get(
-              "/api/v1/users/" + userId + "/memberships", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
+              "/api/v1/users/{id}/memberships", ORG_UNIT_MEMBERSHIP_OPTION_LIST, userId);
       return options != null ? options : List.of();
     } catch (Exception e) {
       log.warn("Failed to fetch memberships for refinery org-unit picker", e);
@@ -1184,7 +1181,7 @@ public class RefineryOrderPageController {
         continue;
       }
       try {
-        UserDto user = backendApiClient.get("/api/v1/users/" + id, UserDto.class);
+        UserDto user = backendApiClient.get("/api/v1/users/{id}", UserDto.class, id);
         if (user != null) {
           names.put(id, user.effectiveName() != null ? user.effectiveName() : user.username());
         }

@@ -92,8 +92,9 @@ public class MaterialCollectionPageController {
     try {
       entries =
           backendApiClient.get(
-              "/api/v1/orders/" + jobOrderId + "/material-collection",
-              MATERIAL_COLLECTION_ENTRY_LIST_TYPE);
+              "/api/v1/orders/{id}/material-collection",
+              MATERIAL_COLLECTION_ENTRY_LIST_TYPE,
+              jobOrderId);
     } catch (BackendServiceException e) {
       log.warn(
           "Could not load material collection for job order {}: {}", jobOrderId, e.getMessage());

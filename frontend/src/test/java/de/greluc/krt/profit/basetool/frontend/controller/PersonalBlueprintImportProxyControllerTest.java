@@ -30,6 +30,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportApplyRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportPreviewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportResolutionDto;
@@ -87,7 +88,7 @@ class PersonalBlueprintImportProxyControllerTest {
         PersonalBlueprintImportProxyController.TOO_LARGE_KEY, Locale.getDefault(), "Zu gross.");
     controller =
         new PersonalBlueprintImportProxyController(
-            backendApiClient, ingestHandoffService, messages);
+            new BlueprintBackendClient(backendApiClient), ingestHandoffService, messages);
   }
 
   /**

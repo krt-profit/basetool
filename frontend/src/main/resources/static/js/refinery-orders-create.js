@@ -121,8 +121,10 @@ function addMaterialRow() {
             removeBtn.setAttribute('data-trigger', 'rfc-remove-material');
             removeBtn.setAttribute('title', MATERIAL_REMOVE_LABEL);
             removeBtn.setAttribute('aria-label', MATERIAL_REMOVE_LABEL);
-            removeBtn.innerHTML =
-                '<svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>';
+            krtHtml.set(
+                removeBtn,
+                krtHtml`<svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>`,
+            );
             actions.appendChild(removeBtn);
         }
     }

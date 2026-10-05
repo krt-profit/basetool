@@ -157,9 +157,13 @@
             endpoints().search || '/personal-inventory/blueprints/search'
         }?q=${encodeURIComponent(q)}&limit=25`;
         resultsEl.hidden = false;
-        resultsEl.innerHTML = `<div class="krt-pi-typeahead-loading">${escapeHtml(
-            window.krtI18nText(i18n().searching, 'krtBlueprintsI18n.searching'),
-        )}</div>`;
+        krtHtml.set(
+            resultsEl,
+            krtHtml`<div class="krt-pi-typeahead-loading">${window.krtI18nText(
+                i18n().searching,
+                'krtBlueprintsI18n.searching',
+            )}</div>`,
+        );
         window.krtFetch
             .getJson(url)
             .then(renderResults)
@@ -171,42 +175,38 @@
     function renderResults(items) {
         if (!resultsEl) return;
         if (!items || items.length === 0) {
-            resultsEl.innerHTML = `<div class="krt-pi-typeahead-empty">${escapeHtml(
-                window.krtI18nText(i18n().noResults, 'krtBlueprintsI18n.noResults'),
-            )}</div>`;
+            krtHtml.set(
+                resultsEl,
+                krtHtml`<div class="krt-pi-typeahead-empty">${window.krtI18nText(
+                    i18n().noResults,
+                    'krtBlueprintsI18n.noResults',
+                )}</div>`,
+            );
             return;
         }
-        let html = '';
-        items.forEach((it) => {
+        const html = items.map((it) => {
             const isStaged = staged.has(it.productKey);
             const blocked = it.ownedByCurrentUser;
             const cls = `krt-pi-typeahead-item krt-bp-result${
                 blocked ? ' krt-bp-result-owned' : ''
             }${isStaged ? ' krt-bp-result-staged' : ''}`;
-            let meta = escapeHtml(it.manufacturerName || '');
+            let meta = it.manufacturerName || '';
             if (blocked) {
-                meta = escapeHtml(window.krtI18nText(i18n().owned, 'krtBlueprintsI18n.owned'));
+                meta = window.krtI18nText(i18n().owned, 'krtBlueprintsI18n.owned');
             } else if (it.variantCount && it.variantCount > 1) {
-                meta = escapeHtml(
-                    `${it.variantCount} ${window.krtI18nText(
-                        i18n().variants,
-                        'krtBlueprintsI18n.variants',
-                    )}`,
-                );
+                meta = `${it.variantCount} ${window.krtI18nText(
+                    i18n().variants,
+                    'krtBlueprintsI18n.variants',
+                )}`;
             }
-            let disabledAttr = '';
-            if (blocked) {
-                disabledAttr = ' disabled';
-            }
-            html +=
-                `<button type="button" class="${escapeAttr(cls)}"` +
-                ` data-key="${escapeAttr(it.productKey)}"` +
-                ` data-name="${escapeAttr(it.name)}"${disabledAttr}>` +
-                `<span class="krt-pi-typeahead-name">${escapeHtml(it.name || '')}</span>` +
-                `<span class="krt-pi-typeahead-meta">${meta}</span>` +
-                `</button>`;
+            const disabledAttr = blocked ? krtHtml` disabled` : '';
+            return krtHtml`<button type="button" class="${cls}" data-key="${it.productKey}" data-name="${
+                it.name
+            }"${disabledAttr}><span class="krt-pi-typeahead-name">${
+                it.name || ''
+            }</span><span class="krt-pi-typeahead-meta">${meta}</span></button>`;
         });
-        resultsEl.innerHTML = html;
+        krtHtml.set(resultsEl, html);
         resultsEl.querySelectorAll('.krt-bp-result').forEach((btn) => {
             if (btn.disabled) return;
             btn.addEventListener('click', () => {
@@ -231,27 +231,30 @@
 
     function renderStaging() {
         if (!stagingListEl) return;
-        let html = '';
         if (staged.size === 0) {
-            stagingListEl.innerHTML = `<span class="krt-bp-staging-empty">${escapeHtml(
-                stagingListEl.getAttribute('data-empty-text') || i18n().emptyStaging || '',
-            )}</span>`;
+            krtHtml.set(
+                stagingListEl,
+                krtHtml`<span class="krt-bp-staging-empty">${
+                    stagingListEl.getAttribute('data-empty-text') || i18n().emptyStaging || ''
+                }</span>`,
+            );
         } else {
             const removeLabel = window.krtI18nText(
                 i18n().chipRemove,
                 'krtBlueprintsI18n.chipRemove',
             );
+            /** @type {KrtHtml[]} */
+            const html = [];
             staged.forEach((name, key) => {
-                html +=
-                    `<span class="chip chip--primary" data-key="${escapeAttr(key)}">` +
-                    `<span class="krt-bp-chip-name">${escapeHtml(name)}</span>` +
-                    `<button type="button" class="krt-bp-chip-remove" data-key="${escapeAttr(
-                        key,
-                    )}"` +
-                    ` aria-label="${escapeAttr(removeLabel)}">&times;</button>` +
-                    `</span>`;
+                html.push(
+                    krtHtml`<span class="chip chip--primary" data-key="${key}"><span class="krt-bp-chip-name">${
+                        name
+                    }</span><button type="button" class="krt-bp-chip-remove" data-key="${
+                        key
+                    }" aria-label="${removeLabel}">&times;</button></span>`,
+                );
             });
-            stagingListEl.innerHTML = html;
+            krtHtml.set(stagingListEl, html);
             stagingListEl.querySelectorAll('.krt-bp-chip-remove').forEach((btn) => {
                 btn.addEventListener('click', () => {
                     toggleStaged(btn.getAttribute('data-key'), null);
@@ -519,7 +522,10 @@
                     marker.className = 'master-row-note';
                     marker.setAttribute('aria-hidden', 'true');
                     marker.title = i18n().noteTitle || '';
-                    marker.innerHTML = '<svg class="krt-icon"><use href="#krt-icon-edit"/></svg>';
+                    krtHtml.set(
+                        marker,
+                        krtHtml`<svg class="krt-icon"><use href="#krt-icon-edit"/></svg>`,
+                    );
                     aside.insertBefore(marker, aside.firstChild);
                 }
             } else if (marker) {

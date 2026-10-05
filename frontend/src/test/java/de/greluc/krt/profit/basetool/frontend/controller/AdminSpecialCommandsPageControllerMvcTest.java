@@ -39,13 +39,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -84,24 +83,26 @@ class AdminSpecialCommandsPageControllerMvcTest {
   /**
    * Stubs the backend SK catalogue with one active special command so the list table renders.
    *
-   * @return a single-row page envelope in the raw {@code Map} wire shape the controller parses
+   * @return a single-row page envelope as the client decodes it
    */
-  private PageResponse<Map<String, Object>> oneSpecialCommand() {
-    Map<String, Object> sc = new HashMap<>();
-    sc.put("id", UUID.randomUUID().toString());
-    sc.put("name", "Fragment SK");
-    sc.put("shorthand", "FSK");
-    sc.put("description", "desc");
-    sc.put("active", true);
-    sc.put("isProfitEligible", false);
-    sc.put("version", 0);
+  private PageResponse<SpecialCommandDto> oneSpecialCommand() {
+    SpecialCommandDto sc =
+        new SpecialCommandDto(
+            UUID.fromString("3f2c8a10-5b7e-4c1d-9a6f-0e4b2d7c9a11"),
+            "Fragment SK",
+            "FSK",
+            "desc",
+            true,
+            false,
+            0L);
     return new PageResponse<>(List.of(sc), 0, 1000, 1L, 1, List.of());
   }
 
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fullPage_rendersSwapWrapper() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/special-commands"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/special-commands"), anyTypeRef(), any(Object[].class)))
         .thenReturn(oneSpecialCommand());
 
     mockMvc
@@ -119,7 +120,8 @@ class AdminSpecialCommandsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_rendersTheListPattern() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/special-commands"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/special-commands"), anyTypeRef(), any(Object[].class)))
         .thenReturn(oneSpecialCommand());
 
     String html =
@@ -147,7 +149,8 @@ class AdminSpecialCommandsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_rendersTheEmptyState() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/special-commands"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/special-commands"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0L, 0, List.of()));
 
     mockMvc
@@ -160,7 +163,8 @@ class AdminSpecialCommandsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/special-commands"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/special-commands"), anyTypeRef(), any(Object[].class)))
         .thenReturn(oneSpecialCommand());
 
     mockMvc
@@ -175,7 +179,8 @@ class AdminSpecialCommandsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fragmentResults_rendersOnlyInnerFragment() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/special-commands"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/special-commands"), anyTypeRef(), any(Object[].class)))
         .thenReturn(oneSpecialCommand());
 
     mockMvc

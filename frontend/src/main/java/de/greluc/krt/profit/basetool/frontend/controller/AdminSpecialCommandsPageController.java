@@ -22,28 +22,25 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.SpecialCommandForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages.CompleteCatalog;
-import de.greluc.krt.profit.basetool.frontend.support.MapPayloadValues;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -73,18 +70,14 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminSpecialCommandsPageController {
 
-  /**
-   * Response type for the paged SK catalog read ({@code /special-commands?...}). A shared static
-   * {@link ParameterizedTypeReference} is behaviourally identical to a fresh anonymous instance per
-   * call (Q10).
-   */
-  private static final ParameterizedTypeReference<PageResponse<Map<String, Object>>> MAP_PAGE_TYPE =
-      new ParameterizedTypeReference<>() {};
-
   /** Base path of the SK member page the lead toggle and the old detail URL redirect to. */
   private static final String MEMBER_PAGE_BASE = "/organisation/special-commands/";
 
-  private final BackendApiClient backendApiClient;
+  /** Reads the Spezialkommandos and sends their lifecycle writes. */
+  private final OrgUnitBackendClient orgUnitClient;
+
+  /** Drops the cached org-unit catalogues after a lifecycle write. */
+  private final CatalogueCacheEviction cacheEviction;
 
   /**
    * Renders the SK list, seeding an empty form unless a validation re-render already supplied one.
@@ -132,31 +125,35 @@ public class AdminSpecialCommandsPageController {
    */
   @NotNull
   private CompleteCatalog<SpecialCommandDto> fetchSpecialCommands(boolean includeInactive) {
-    CompleteCatalog<Map<String, Object>> catalog =
-        CatalogPages.fetchAll(
-            page ->
-                backendApiClient.get(
-                    "/api/v1/special-commands?size=1000&sort=name,asc&includeInactive="
-                        + includeInactive
-                        + "&page="
-                        + page,
-                    MAP_PAGE_TYPE));
+    CompleteCatalog<SpecialCommandDto> catalog =
+        CatalogPages.fetchAll(page -> orgUnitClient.specialCommandPage(includeInactive, page));
     List<SpecialCommandDto> commands =
         catalog.items().stream()
-            .map(
-                m ->
-                    new SpecialCommandDto(
-                        MapPayloadValues.uuidOrNull(m.get("id")),
-                        MapPayloadValues.stringOrNull(m.get("name")),
-                        MapPayloadValues.stringOrNull(m.get("shorthand")),
-                        MapPayloadValues.stringOrNull(m.get("description")),
-                        MapPayloadValues.booleanOrFalse(m.get("active")),
-                        MapPayloadValues.booleanOrFalse(m.get("isProfitEligible")),
-                        MapPayloadValues.longOrZero(m.get("version"))))
+            .map(AdminSpecialCommandsPageController::withDefaults)
             .collect(Collectors.toCollection(ArrayList::new));
     commands.sort(
         Comparator.comparing(s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER));
     return new CompleteCatalog<>(commands, catalog.totalElements(), catalog.truncated());
+  }
+
+  /**
+   * Fills the flags and the version of a decoded Spezialkommando that the backend sent as {@code
+   * null}, so the list renders {@code false} and {@code 0} for them.
+   *
+   * @param sc the decoded Spezialkommando
+   * @return the Spezialkommando with {@code active}, {@code isProfitEligible} and {@code version}
+   *     never {@code null}
+   */
+  @NotNull
+  private static SpecialCommandDto withDefaults(@NotNull SpecialCommandDto sc) {
+    return new SpecialCommandDto(
+        sc.id(),
+        sc.name(),
+        sc.shorthand(),
+        sc.description(),
+        Boolean.TRUE.equals(sc.active()),
+        Boolean.TRUE.equals(sc.isProfitEligible()),
+        sc.version() == null ? 0L : sc.version());
   }
 
   /**
@@ -186,7 +183,7 @@ public class AdminSpecialCommandsPageController {
       SpecialCommandDto body =
           new SpecialCommandDto(
               null, form.name(), form.shorthand(), form.description(), true, false, 0L);
-      backendApiClient.post("/api/v1/special-commands", body, Void.class);
+      orgUnitClient.createSpecialCommand(body);
       evictOrgUnitCatalogueCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
@@ -230,7 +227,7 @@ public class AdminSpecialCommandsPageController {
       SpecialCommandDto body =
           new SpecialCommandDto(
               id, form.name(), form.shorthand(), form.description(), true, false, form.version());
-      backendApiClient.put("/api/v1/special-commands/{id}", body, Void.class, id);
+      orgUnitClient.updateSpecialCommand(id, body);
       evictOrgUnitCatalogueCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
@@ -263,7 +260,7 @@ public class AdminSpecialCommandsPageController {
   public String deleteSpecialCommand(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/special-commands/{id}", Void.class, id);
+      orgUnitClient.deleteSpecialCommand(id);
       evictOrgUnitCatalogueCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
@@ -292,7 +289,7 @@ public class AdminSpecialCommandsPageController {
   public String activateSpecialCommand(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.post("/api/v1/special-commands/{id}/activate", null, Void.class, id);
+      orgUnitClient.activateSpecialCommand(id);
       evictOrgUnitCatalogueCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
@@ -335,11 +332,8 @@ public class AdminSpecialCommandsPageController {
       @RequestParam @NotNull Long version,
       RedirectAttributes redirectAttributes) {
     try {
-      Map<String, Object> body = new HashMap<>();
-      body.put("isLead", isLead);
-      body.put("version", version);
-      backendApiClient.patch(
-          "/api/v1/special-commands/{id}/members/{userId}/lead", body, Void.class, id, userId);
+      orgUnitClient.toggleSpecialCommandLead(
+          id, userId, new MembershipLeadToggleRequest(isLead, version));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Toggle SpecialCommand member lead failed", e);
@@ -373,11 +367,9 @@ public class AdminSpecialCommandsPageController {
     }
     return okOrRelay(
         () -> {
-          backendApiClient.post(
-              "/api/v1/special-commands",
+          orgUnitClient.createSpecialCommand(
               new SpecialCommandDto(
-                  null, form.name(), form.shorthand(), form.description(), true, false, 0L),
-              Void.class);
+                  null, form.name(), form.shorthand(), form.description(), true, false, 0L));
           evictOrgUnitCatalogueCache();
         });
   }
@@ -402,8 +394,8 @@ public class AdminSpecialCommandsPageController {
     }
     return okOrRelay(
         () -> {
-          backendApiClient.put(
-              "/api/v1/special-commands/{id}",
+          orgUnitClient.updateSpecialCommand(
+              id,
               new SpecialCommandDto(
                   id,
                   form.name(),
@@ -411,9 +403,7 @@ public class AdminSpecialCommandsPageController {
                   form.description(),
                   true,
                   false,
-                  form.version()),
-              Void.class,
-              id);
+                  form.version()));
           evictOrgUnitCatalogueCache();
         });
   }
@@ -429,7 +419,7 @@ public class AdminSpecialCommandsPageController {
   public ResponseEntity<Object> deleteSpecialCommandAjax(@PathVariable @NotNull UUID id) {
     return okOrRelay(
         () -> {
-          backendApiClient.delete("/api/v1/special-commands/{id}", Void.class, id);
+          orgUnitClient.deleteSpecialCommand(id);
           evictOrgUnitCatalogueCache();
         });
   }
@@ -445,7 +435,7 @@ public class AdminSpecialCommandsPageController {
   public ResponseEntity<Object> activateSpecialCommandAjax(@PathVariable @NotNull UUID id) {
     return okOrRelay(
         () -> {
-          backendApiClient.post("/api/v1/special-commands/{id}/activate", null, Void.class, id);
+          orgUnitClient.activateSpecialCommand(id);
           evictOrgUnitCatalogueCache();
         });
   }
@@ -468,11 +458,8 @@ public class AdminSpecialCommandsPageController {
       @RequestParam @NotNull Long version) {
     return okOrRelay(
         () -> {
-          Map<String, Object> body = new HashMap<>();
-          body.put("isLead", isLead);
-          body.put("version", version);
-          backendApiClient.patch(
-              "/api/v1/special-commands/{id}/members/{userId}/lead", body, Void.class, id, userId);
+          orgUnitClient.toggleSpecialCommandLead(
+              id, userId, new MembershipLeadToggleRequest(isLead, version));
         });
   }
 
@@ -500,6 +487,6 @@ public class AdminSpecialCommandsPageController {
    * roster changes do not need it.
    */
   private void evictOrgUnitCatalogueCache() {
-    backendApiClient.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
+    cacheEviction.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
   }
 }

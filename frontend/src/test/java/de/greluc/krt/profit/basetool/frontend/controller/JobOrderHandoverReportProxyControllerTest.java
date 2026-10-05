@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
@@ -71,7 +70,12 @@ class JobOrderHandoverReportProxyControllerTest {
     byte[] fakePdf = new byte[] {0x25, 0x50, 0x44, 0x46};
 
     doReturn(requestHeadersUriSpec).when(webClient).get();
-    doReturn(requestHeadersSpec).when(requestHeadersUriSpec).uri(anyString());
+    doReturn(requestHeadersSpec)
+        .when(requestHeadersUriSpec)
+        .uri(
+            eq("/api/v1/orders/{id}/handovers/{handoverId}/report"),
+            eq(jobOrderId),
+            eq(handoverId));
     doReturn(requestHeadersSpec).when(requestHeadersSpec).headers(any(Consumer.class));
     doReturn(responseSpec).when(requestHeadersSpec).retrieve();
     doReturn(Mono.just(fakePdf)).when(responseSpec).bodyToMono(byte[].class);
@@ -96,7 +100,12 @@ class JobOrderHandoverReportProxyControllerTest {
     UUID handoverId = UUID.randomUUID();
 
     doReturn(requestHeadersUriSpec).when(webClient).get();
-    doReturn(requestHeadersSpec).when(requestHeadersUriSpec).uri(anyString());
+    doReturn(requestHeadersSpec)
+        .when(requestHeadersUriSpec)
+        .uri(
+            eq("/api/v1/orders/{id}/handovers/{handoverId}/report"),
+            eq(jobOrderId),
+            eq(handoverId));
     doReturn(requestHeadersSpec).when(requestHeadersSpec).headers(any(Consumer.class));
     doReturn(responseSpec).when(requestHeadersSpec).retrieve();
     doReturn(Mono.error(WebClientResponseException.create(404, "Not Found", null, null, null)))
@@ -118,7 +127,9 @@ class JobOrderHandoverReportProxyControllerTest {
     Map<String, Object> payload = Map.of("jobOrderNumber", "#42", "recipientHandle", "Pilot");
 
     doReturn(requestBodyUriSpec).when(webClient).post();
-    doReturn(requestBodySpec).when(requestBodyUriSpec).uri(anyString());
+    doReturn(requestBodySpec)
+        .when(requestBodyUriSpec)
+        .uri(eq("/api/v1/orders/{id}/handovers/report/preview"), eq(jobOrderId));
     doReturn(requestBodySpec).when(requestBodySpec).contentType(any(MediaType.class));
     doReturn(requestHeadersSpec).when(requestBodySpec).bodyValue(any());
     doReturn(responseSpec).when(requestHeadersSpec).retrieve();
@@ -143,7 +154,9 @@ class JobOrderHandoverReportProxyControllerTest {
     Map<String, Object> payload = Map.of();
 
     doReturn(requestBodyUriSpec).when(webClient).post();
-    doReturn(requestBodySpec).when(requestBodyUriSpec).uri(anyString());
+    doReturn(requestBodySpec)
+        .when(requestBodyUriSpec)
+        .uri(eq("/api/v1/orders/{id}/handovers/report/preview"), eq(jobOrderId));
     doReturn(requestBodySpec).when(requestBodySpec).contentType(any(MediaType.class));
     doReturn(requestHeadersSpec).when(requestBodySpec).bodyValue(any());
     doReturn(responseSpec).when(requestHeadersSpec).retrieve();

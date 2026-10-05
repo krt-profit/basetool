@@ -92,7 +92,7 @@ public class ItemCollectionPageController {
     try {
       itemStock =
           backendApiClient.get(
-              "/api/v1/orders/" + jobOrderId + "/item-stock", ITEM_STOCK_GROUP_LIST_TYPE);
+              "/api/v1/orders/{id}/item-stock", ITEM_STOCK_GROUP_LIST_TYPE, jobOrderId);
     } catch (BackendServiceException e) {
       log.warn("Could not load item collection for job order {}: {}", jobOrderId, e.getMessage());
     }

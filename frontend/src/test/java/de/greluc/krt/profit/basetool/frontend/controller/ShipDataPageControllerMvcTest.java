@@ -97,12 +97,14 @@ class ShipDataPageControllerMvcTest {
         new PageResponse<>(shipTypes, 0, 1000, shipTypes.size(), 1, Collections.emptyList());
 
     when(backendApiClient.get(
-            eq("/api/v1/manufacturers?size=1000&sort=name,asc&includeHidden=true&page=0"),
-            anyTypeRef()))
+            eq("/api/v1/manufacturers?size=1000&sort=name,asc&includeHidden=true&page={page}"),
+            anyTypeRef(),
+            eq(0)))
         .thenReturn(manufacturersPage);
     when(backendApiClient.get(
-            eq("/api/v1/ship-types?size=1000&sort=name,asc&includeHidden=true&page=0"),
-            anyTypeRef()))
+            eq("/api/v1/ship-types?size=1000&sort=name,asc&includeHidden=true&page={page}"),
+            anyTypeRef(),
+            eq(0)))
         .thenReturn(shipTypesPage);
   }
 

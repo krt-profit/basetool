@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
@@ -75,7 +75,9 @@ class MembersListPatternRenderTest {
   private @NotNull String render(@NotNull PageResponse<UserDto> page) throws Exception {
     when(backendApiClient.get(eq("/api/v1/users?sort=username,asc"), anyTypeRef()))
         .thenReturn(page);
-    when(backendApiClient.get(contains("/memberships"), anyTypeRef())).thenReturn(List.of());
+    when(backendApiClient.get(
+            eq("/api/v1/users/{id}/memberships"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(List.of());
     MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     return mockMvc
         .perform(

@@ -21,12 +21,12 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages.CompleteCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
@@ -37,7 +37,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -65,11 +64,11 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminLocationsPageController {
 
-  /** Captured generic type for decoding the paged locations catalog. */
-  private static final ParameterizedTypeReference<PageResponse<LocationDto>> LOCATION_PAGE =
-      new ParameterizedTypeReference<>() {};
+  /** Reads and writes the locations. */
+  private final CatalogueBackendClient catalogueClient;
 
-  private final BackendApiClient backendApiClient;
+  /** Evicts the location catalogue after a write. */
+  private final CatalogueCacheEviction cacheEviction;
 
   /**
    * Fetches all locations, including hidden ones, sorts them by name and renders the table
@@ -84,11 +83,7 @@ public class AdminLocationsPageController {
   public String listData(Model model) {
     try {
       CompleteCatalog<LocationDto> locationsCatalog =
-          CatalogPages.fetchAll(
-              page ->
-                  backendApiClient.get(
-                      "/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page=" + page,
-                      LOCATION_PAGE));
+          CatalogPages.fetchAll(catalogueClient::locationPage);
 
       List<LocationDto> locations = new ArrayList<>(locationsCatalog.items());
       locations.sort(
@@ -124,8 +119,7 @@ public class AdminLocationsPageController {
       @RequestParam boolean hidden,
       RedirectAttributes redirectAttributes) {
     try {
-      LocationDto currentLocation =
-          backendApiClient.get("/api/v1/locations/" + id, LocationDto.class);
+      LocationDto currentLocation = catalogueClient.location(id);
       LocationDto body =
           new LocationDto(
               id,
@@ -134,8 +128,8 @@ public class AdminLocationsPageController {
               hidden,
               currentLocation.homeLocation(),
               currentLocation.version());
-      backendApiClient.put("/api/v1/locations/{id}", body, Void.class, id);
-      backendApiClient.evict(CacheDomain.LOCATION);
+      catalogueClient.updateLocation(id, body);
+      cacheEviction.evict(CacheDomain.LOCATION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Toggle location visibility failed", e);
@@ -170,8 +164,7 @@ public class AdminLocationsPageController {
       @RequestParam boolean homeLocation,
       RedirectAttributes redirectAttributes) {
     try {
-      LocationDto currentLocation =
-          backendApiClient.get("/api/v1/locations/" + id, LocationDto.class);
+      LocationDto currentLocation = catalogueClient.location(id);
       LocationDto body =
           new LocationDto(
               id,
@@ -180,8 +173,8 @@ public class AdminLocationsPageController {
               currentLocation.hidden(),
               homeLocation,
               currentLocation.version());
-      backendApiClient.put("/api/v1/locations/{id}", body, Void.class, id);
-      backendApiClient.evict(CacheDomain.LOCATION);
+      catalogueClient.updateLocation(id, body);
+      cacheEviction.evict(CacheDomain.LOCATION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Toggle home-location failed", e);
@@ -215,7 +208,7 @@ public class AdminLocationsPageController {
         log,
         "toggle location visibility (ajax)",
         () -> {
-          LocationDto current = backendApiClient.get("/api/v1/locations/" + id, LocationDto.class);
+          LocationDto current = catalogueClient.location(id);
           LocationDto body =
               new LocationDto(
                   id,
@@ -224,10 +217,9 @@ public class AdminLocationsPageController {
                   !current.hidden(),
                   current.homeLocation(),
                   current.version());
-          backendApiClient.put("/api/v1/locations/{id}", body, Void.class, id);
-          backendApiClient.evict(CacheDomain.LOCATION);
-          return ResponseEntity.ok(
-              backendApiClient.get("/api/v1/locations/" + id, LocationDto.class));
+          catalogueClient.updateLocation(id, body);
+          cacheEviction.evict(CacheDomain.LOCATION);
+          return ResponseEntity.ok(catalogueClient.location(id));
         });
   }
 
@@ -248,7 +240,7 @@ public class AdminLocationsPageController {
         log,
         "toggle home-location (ajax)",
         () -> {
-          LocationDto current = backendApiClient.get("/api/v1/locations/" + id, LocationDto.class);
+          LocationDto current = catalogueClient.location(id);
           LocationDto body =
               new LocationDto(
                   id,
@@ -257,10 +249,9 @@ public class AdminLocationsPageController {
                   current.hidden(),
                   !current.homeLocation(),
                   current.version());
-          backendApiClient.put("/api/v1/locations/{id}", body, Void.class, id);
-          backendApiClient.evict(CacheDomain.LOCATION);
-          return ResponseEntity.ok(
-              backendApiClient.get("/api/v1/locations/" + id, LocationDto.class));
+          catalogueClient.updateLocation(id, body);
+          cacheEviction.evict(CacheDomain.LOCATION);
+          return ResponseEntity.ok(catalogueClient.location(id));
         });
   }
 }
