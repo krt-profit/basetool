@@ -31,6 +31,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.FinanceType;
 import de.greluc.krt.profit.basetool.frontend.model.form.MissionFinanceEntryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -73,7 +74,9 @@ class MissionFinancePageControllerTest {
     backendApiClient = mock(BackendApiClient.class);
     missionPageController = mock(MissionPageController.class);
     authHelper = mock(FrontendAuthHelperService.class);
-    controller = new MissionFinancePageController(backendApiClient, missionPageController);
+    controller =
+        new MissionFinancePageController(
+            new MissionBackendClient(backendApiClient), missionPageController);
     redirectAttributes = new RedirectAttributesModelMap();
     principal = mock(OidcUser.class);
   }

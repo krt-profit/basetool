@@ -23,8 +23,8 @@ import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorRespons
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
+import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.form.MissionFinanceEntryForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import jakarta.validation.Valid;
 import java.util.HashMap;
@@ -66,7 +66,10 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("isAuthenticated()")
 public class MissionFinancePageController {
 
-  private final BackendApiClient backendApiClient;
+  /** The mission domain's typed backend client. */
+  private final MissionBackendClient missionClient;
+
+  /** Re-renders the mission detail inline on a validation failure. */
   private final MissionPageController missionPageController;
 
   /**
@@ -100,7 +103,7 @@ public class MissionFinancePageController {
       body.put("type", form.getType());
       body.put("amount", form.getAmount());
 
-      backendApiClient.post("/api/v1/finance-entries", body, Void.class);
+      missionClient.addFinanceEntry(body);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "addFinanceEntry", id, e);
@@ -146,7 +149,7 @@ public class MissionFinancePageController {
       body.put("amount", form.getAmount());
       body.put("version", form.getVersion());
 
-      backendApiClient.put("/api/v1/finance-entries/{entryId}", body, Void.class, entryId);
+      missionClient.updateFinanceEntry(entryId, body);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "updateFinanceEntry", entryId, e);
@@ -175,7 +178,7 @@ public class MissionFinancePageController {
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/finance-entries/{entryId}", Void.class, entryId);
+      missionClient.deleteFinanceEntry(entryId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "deleteFinanceEntry", entryId, e);
@@ -208,7 +211,7 @@ public class MissionFinancePageController {
         "add finance entry (ajax) for mission " + id,
         () -> {
           body.put("missionId", id);
-          Object result = backendApiClient.post("/api/v1/finance-entries", body, Object.class);
+          Object result = missionClient.addFinanceEntryJson(body);
           return ResponseEntity.ok(result);
         });
   }
@@ -232,9 +235,7 @@ public class MissionFinancePageController {
         log,
         "update finance entry (ajax) for mission " + id + " entry " + entryId,
         () -> {
-          Object result =
-              backendApiClient.put(
-                  "/api/v1/finance-entries/{entryId}", body, Object.class, entryId);
+          Object result = missionClient.updateFinanceEntryJson(entryId, body);
           return ResponseEntity.ok(result);
         });
   }
@@ -255,7 +256,7 @@ public class MissionFinancePageController {
         log,
         "delete finance entry (ajax) for mission " + id + " entry " + entryId,
         () -> {
-          backendApiClient.delete("/api/v1/finance-entries/{entryId}", Void.class, entryId);
+          missionClient.deleteFinanceEntry(entryId);
           return ResponseEntity.noContent().build();
         });
   }

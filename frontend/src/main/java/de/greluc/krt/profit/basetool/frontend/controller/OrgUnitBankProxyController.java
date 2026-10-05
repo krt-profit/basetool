@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.withBackendStatus;
 
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
 import java.time.Instant;
 import java.util.Map;
@@ -31,7 +31,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -48,7 +47,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * AJAX proxy for the org-unit bank actions ({@code /api/proxy/org-units/bank/**}), forwarding to
@@ -60,7 +58,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RequiredArgsConstructor
 public class OrgUnitBankProxyController {
 
-  private final BackendApiClient backendApiClient;
+  /** The bank domain's backend calls. */
+  private final BankBackendClient bankClient;
 
   /**
    * Forwards a new booking request raised by an officer/lead against their overseen org unit's
@@ -73,7 +72,7 @@ public class OrgUnitBankProxyController {
   @PreAuthorize("isAuthenticated()")
   @ResponseStatus(HttpStatus.CREATED)
   public Map<String, Object> createRequest(@RequestBody @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/org-units/bank/requests", body);
+    return orEmpty(bankClient.createOrgUnitRequest(body));
   }
 
   /**
@@ -87,7 +86,7 @@ public class OrgUnitBankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> cancelRequest(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/org-units/bank/requests/{id}/cancel", body, id);
+    return orEmpty(bankClient.cancelOrgUnitRequest(id, body));
   }
 
   /**
@@ -104,7 +103,7 @@ public class OrgUnitBankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> updateRequest(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return putMap("/api/v1/org-units/bank/requests/{id}", body, id);
+    return orEmpty(bankClient.updateOrgUnitRequest(id, body));
   }
 
   /**
@@ -119,7 +118,7 @@ public class OrgUnitBankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> setBalanceTarget(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return putMap("/api/v1/org-units/bank/accounts/{id}/balance-target", body, id);
+    return orEmpty(bankClient.setOrgUnitBalanceTarget(id, body));
   }
 
   /**
@@ -136,11 +135,7 @@ public class OrgUnitBankProxyController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull String roleCode,
       @RequestBody(required = false) @Nullable Map<String, Object> body) {
-    return postMap(
-        "/api/v1/org-units/bank/accounts/{id}/visibility/role/{roleCode}",
-        emptyIfNull(body),
-        id,
-        requireRoleCode(roleCode));
+    return orEmpty(bankClient.addRoleVisibility(id, requireRoleCode(roleCode), emptyIfNull(body)));
   }
 
   /**
@@ -154,10 +149,7 @@ public class OrgUnitBankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> removeRoleVisibility(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull String roleCode) {
-    return deleteMap(
-        "/api/v1/org-units/bank/accounts/{id}/visibility/role/{roleCode}",
-        id,
-        requireRoleCode(roleCode));
+    return orEmpty(bankClient.removeRoleVisibility(id, requireRoleCode(roleCode)));
   }
 
   /**
@@ -174,11 +166,7 @@ public class OrgUnitBankProxyController {
       @PathVariable @NotNull UUID id,
       @PathVariable boolean enabled,
       @RequestBody(required = false) @Nullable Map<String, Object> body) {
-    return putMap(
-        "/api/v1/org-units/bank/accounts/{id}/visibility/all-members/{enabled}",
-        emptyIfNull(body),
-        id,
-        enabled);
+    return orEmpty(bankClient.setAllMembersVisibility(id, enabled, emptyIfNull(body)));
   }
 
   /**
@@ -196,11 +184,7 @@ public class OrgUnitBankProxyController {
       @PathVariable @NotNull UUID id,
       @PathVariable boolean enabled,
       @RequestBody(required = false) @Nullable Map<String, Object> body) {
-    return putMap(
-        "/api/v1/org-units/bank/accounts/{id}/visibility/area-members/{enabled}",
-        emptyIfNull(body),
-        id,
-        enabled);
+    return orEmpty(bankClient.setAreaMembersVisibility(id, enabled, emptyIfNull(body)));
   }
 
   /**
@@ -217,11 +201,7 @@ public class OrgUnitBankProxyController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID userId,
       @RequestBody(required = false) @Nullable Map<String, Object> body) {
-    return postMap(
-        "/api/v1/org-units/bank/accounts/{id}/visibility/user/{userId}",
-        emptyIfNull(body),
-        id,
-        userId);
+    return orEmpty(bankClient.addUserVisibility(id, userId, emptyIfNull(body)));
   }
 
   /**
@@ -235,7 +215,7 @@ public class OrgUnitBankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> removeUserVisibility(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
-    return deleteMap("/api/v1/org-units/bank/accounts/{id}/visibility/user/{userId}", id, userId);
+    return orEmpty(bankClient.removeUserVisibility(id, userId));
   }
 
   /**
@@ -252,11 +232,7 @@ public class OrgUnitBankProxyController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull String roleCode,
       @RequestBody @NotNull Map<String, Object> body) {
-    return putMap(
-        "/api/v1/org-units/bank/accounts/{id}/approval-limit/role/{roleCode}",
-        body,
-        id,
-        requireRoleCode(roleCode));
+    return orEmpty(bankClient.setRoleApprovalLimit(id, requireRoleCode(roleCode), body));
   }
 
   /**
@@ -270,10 +246,7 @@ public class OrgUnitBankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> clearRoleApprovalLimit(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull String roleCode) {
-    return deleteMap(
-        "/api/v1/org-units/bank/accounts/{id}/approval-limit/role/{roleCode}",
-        id,
-        requireRoleCode(roleCode));
+    return orEmpty(bankClient.clearRoleApprovalLimit(id, requireRoleCode(roleCode)));
   }
 
   /**
@@ -287,7 +260,7 @@ public class OrgUnitBankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> setAllMembersApprovalLimit(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return putMap("/api/v1/org-units/bank/accounts/{id}/approval-limit/all-members", body, id);
+    return orEmpty(bankClient.setAllMembersApprovalLimit(id, body));
   }
 
   /**
@@ -299,7 +272,7 @@ public class OrgUnitBankProxyController {
   @DeleteMapping("/accounts/{id}/approval-limit/all-members")
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> clearAllMembersApprovalLimit(@PathVariable @NotNull UUID id) {
-    return deleteMap("/api/v1/org-units/bank/accounts/{id}/approval-limit/all-members", id);
+    return orEmpty(bankClient.clearAllMembersApprovalLimit(id));
   }
 
   /**
@@ -314,7 +287,7 @@ public class OrgUnitBankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> setAreaMembersApprovalLimit(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return putMap("/api/v1/org-units/bank/accounts/{id}/approval-limit/area-members", body, id);
+    return orEmpty(bankClient.setAreaMembersApprovalLimit(id, body));
   }
 
   /**
@@ -327,7 +300,7 @@ public class OrgUnitBankProxyController {
   @DeleteMapping("/accounts/{id}/approval-limit/area-members")
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> clearAreaMembersApprovalLimit(@PathVariable @NotNull UUID id) {
-    return deleteMap("/api/v1/org-units/bank/accounts/{id}/approval-limit/area-members", id);
+    return orEmpty(bankClient.clearAreaMembersApprovalLimit(id));
   }
 
   /**
@@ -344,8 +317,7 @@ public class OrgUnitBankProxyController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID userId,
       @RequestBody @NotNull Map<String, Object> body) {
-    return putMap(
-        "/api/v1/org-units/bank/accounts/{id}/approval-limit/user/{userId}", body, id, userId);
+    return orEmpty(bankClient.setUserApprovalLimit(id, userId, body));
   }
 
   /**
@@ -359,8 +331,7 @@ public class OrgUnitBankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> clearUserApprovalLimit(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
-    return deleteMap(
-        "/api/v1/org-units/bank/accounts/{id}/approval-limit/user/{userId}", id, userId);
+    return orEmpty(bankClient.clearUserApprovalLimit(id, userId));
   }
 
   /**
@@ -376,7 +347,7 @@ public class OrgUnitBankProxyController {
   public Map<String, Object> grantOwnerApproval(
       @PathVariable @NotNull UUID id,
       @RequestBody(required = false) @Nullable Map<String, Object> body) {
-    return postMap("/api/v1/org-units/bank/requests/{id}/owner-approval", emptyIfNull(body), id);
+    return orEmpty(bankClient.grantOwnerApproval(id, emptyIfNull(body)));
   }
 
   /**
@@ -388,7 +359,7 @@ public class OrgUnitBankProxyController {
   @DeleteMapping("/requests/{id}/owner-approval")
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> revokeOwnerApproval(@PathVariable @NotNull UUID id) {
-    return deleteMap("/api/v1/org-units/bank/requests/{id}/owner-approval", id);
+    return orEmpty(bankClient.revokeOwnerApproval(id));
   }
 
   /**
@@ -407,30 +378,8 @@ public class OrgUnitBankProxyController {
       @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
       @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
       @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
-    String uri =
-        UriComponentsBuilder.fromPath("/api/v1/org-units/bank/accounts/{id}/statement")
-            .queryParam("from", from)
-            .queryParam("to", to)
-            .encode()
-            .build()
-            .toUriString();
     byte[] pdf =
-        withBackendStatus(
-            () ->
-                backendApiClient.execute(
-                    HttpMethod.GET,
-                    uri,
-                    webClient ->
-                        webClient
-                            .get()
-                            .uri(uri, id)
-                            .headers(
-                                h -> {
-                                  if (userTimeZone != null && !userTimeZone.isBlank()) {
-                                    h.set("X-User-Time-Zone", userTimeZone);
-                                  }
-                                }),
-                    spec -> spec.bodyToMono(byte[].class)));
+        withBackendStatus(() -> bankClient.orgUnitAccountStatement(id, from, to, userTimeZone));
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_PDF);
     headers.setContentDispositionFormData("attachment", "kontoauszug-" + id + ".pdf");
@@ -438,51 +387,13 @@ public class OrgUnitBankProxyController {
   }
 
   /**
-   * POST helper returning the backend's JSON body as a raw map (empty map for a bodyless 2xx).
+   * Returns the backend's answer, or an empty map for a bodyless 2xx.
    *
-   * @param uriTemplate the backend endpoint as a URI template
-   * @param body the forwarded payload
-   * @param uriVariables the values expanded into the template, in order
-   * @return the backend response body
+   * @param response the backend's answer, or {@code null}
+   * @return the answer, or an empty map
    */
-  @SuppressWarnings("unchecked")
-  private Map<String, Object> postMap(
-      @NotNull String uriTemplate,
-      @NotNull Map<String, Object> body,
-      @NotNull Object... uriVariables) {
-    Map<String, Object> response =
-        backendApiClient.post(uriTemplate, body, Map.class, uriVariables);
-    return response == null ? Map.of() : response;
-  }
-
-  /**
-   * PUT helper returning the backend's JSON body as a raw map (empty map for a bodyless 2xx).
-   *
-   * @param uriTemplate the backend endpoint as a URI template
-   * @param body the forwarded payload
-   * @param uriVariables the values expanded into the template, in order
-   * @return the backend response body
-   */
-  @SuppressWarnings("unchecked")
-  private Map<String, Object> putMap(
-      @NotNull String uriTemplate,
-      @NotNull Map<String, Object> body,
-      @NotNull Object... uriVariables) {
-    Map<String, Object> response = backendApiClient.put(uriTemplate, body, Map.class, uriVariables);
-    return response == null ? Map.of() : response;
-  }
-
-  /**
-   * DELETE helper returning the backend's JSON body as a raw map (empty map for a bodyless 2xx).
-   *
-   * @param uriTemplate the backend endpoint as a URI template
-   * @param uriVariables the values expanded into the template, in order
-   * @return the backend response body
-   */
-  @SuppressWarnings("unchecked")
-  private Map<String, Object> deleteMap(
-      @NotNull String uriTemplate, @NotNull Object... uriVariables) {
-    Map<String, Object> response = backendApiClient.delete(uriTemplate, Map.class, uriVariables);
+  @NotNull
+  private static Map<String, Object> orEmpty(@Nullable Map<String, Object> response) {
     return response == null ? Map.of() : response;
   }
 

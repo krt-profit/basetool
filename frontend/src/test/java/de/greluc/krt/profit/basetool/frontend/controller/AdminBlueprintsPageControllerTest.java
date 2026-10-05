@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -42,7 +43,8 @@ class AdminBlueprintsPageControllerTest {
   @Test
   void listBlueprints_populatesModelAndReturnsView() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    AdminBlueprintsPageController controller = new AdminBlueprintsPageController(backendApiClient);
+    AdminBlueprintsPageController controller =
+        new AdminBlueprintsPageController(new BlueprintBackendClient(backendApiClient));
     PageResponse<BlueprintDto> page =
         new PageResponse<>(List.of(minimalDto()), 0, 25, 1, 1, List.of());
     when(backendApiClient.get(anyString(), anyTypeRef(), eq(25), eq(0), eq("omni")))
@@ -60,7 +62,8 @@ class AdminBlueprintsPageControllerTest {
   @Test
   void listBlueprints_fragmentResults_returnsResultsFragmentView() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    AdminBlueprintsPageController controller = new AdminBlueprintsPageController(backendApiClient);
+    AdminBlueprintsPageController controller =
+        new AdminBlueprintsPageController(new BlueprintBackendClient(backendApiClient));
     PageResponse<BlueprintDto> page =
         new PageResponse<>(List.of(minimalDto()), 0, 25, 1, 1, List.of());
     when(backendApiClient.get(anyString(), anyTypeRef(), eq(25), eq(0), eq("omni")))
@@ -79,7 +82,8 @@ class AdminBlueprintsPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
         .thenThrow(new RuntimeException("backend down"));
-    AdminBlueprintsPageController controller = new AdminBlueprintsPageController(backendApiClient);
+    AdminBlueprintsPageController controller =
+        new AdminBlueprintsPageController(new BlueprintBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
 
     String view = controller.listBlueprints(null, 0, null, model);

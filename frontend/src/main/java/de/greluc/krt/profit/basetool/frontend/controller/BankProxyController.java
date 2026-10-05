@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +28,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -41,7 +41,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * AJAX proxy for every bank mutation ({@code /api/proxy/bank/**}), forwarding the JSON body to the
@@ -55,19 +54,13 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class BankProxyController {
 
   /**
-   * Response type for the paged account search ({@code /api/v1/bank/accounts}), whose raw JSON rows
-   * are decoded as maps so this proxy stays decoupled from the account DTO shape.
-   */
-  private static final ParameterizedTypeReference<PageResponse<Map<String, Object>>>
-      ACCOUNT_SEARCH_PAGE = new ParameterizedTypeReference<>() {};
-
-  /**
    * Number of matches one account-picker fetch returns: one more than the combobox renders ({@link
    * PickerSearch#PAGE_SIZE}), so the component can show its "keep typing" hint.
    */
   private static final int ACCOUNT_SEARCH_PAGE_SIZE = PickerSearch.PAGE_SIZE;
 
-  private final BackendApiClient backendApiClient;
+  /** The bank domain's backend calls. */
+  private final BankBackendClient bankClient;
 
   /**
    * Server-side account search for the {@code remote-bank-accounts} combobox (REQ-BANK-053,
@@ -80,15 +73,8 @@ public class BankProxyController {
   @GetMapping("/accounts/search")
   @PreAuthorize("isAuthenticated()")
   public List<Map<String, Object>> searchAccounts(@RequestParam(required = false) String query) {
-    String uri =
-        UriComponentsBuilder.fromPath("/api/v1/bank/accounts")
-            .queryParam("status", "ACTIVE")
-            .queryParam("size", ACCOUNT_SEARCH_PAGE_SIZE)
-            .queryParam("sort", "name,asc")
-            .toUriString();
     PageResponse<Map<String, Object>> response =
-        backendApiClient.get(
-            uri + "&query={query}", ACCOUNT_SEARCH_PAGE, query == null ? "" : query);
+        bankClient.searchActiveAccounts(query == null ? "" : query, ACCOUNT_SEARCH_PAGE_SIZE);
     return response != null && response.content() != null ? response.content() : List.of();
   }
 
@@ -102,7 +88,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   @ResponseStatus(HttpStatus.CREATED)
   public Map<String, Object> bookDeposit(@RequestBody @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/deposits", body);
+    return orEmpty(bankClient.deposit(body));
   }
 
   /**
@@ -115,7 +101,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   @ResponseStatus(HttpStatus.CREATED)
   public Map<String, Object> bookWithdrawal(@RequestBody @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/withdrawals", body);
+    return orEmpty(bankClient.withdrawal(body));
   }
 
   /**
@@ -128,7 +114,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   @ResponseStatus(HttpStatus.CREATED)
   public Map<String, Object> bookTransfer(@RequestBody @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/transfers", body);
+    return orEmpty(bankClient.transfer(body));
   }
 
   /**
@@ -142,7 +128,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   @ResponseStatus(HttpStatus.CREATED)
   public Map<String, Object> bookHolderTransfer(@RequestBody @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/holders/transfer", body);
+    return orEmpty(bankClient.holderTransfer(body));
   }
 
   /**
@@ -157,7 +143,7 @@ public class BankProxyController {
   @ResponseStatus(HttpStatus.CREATED)
   public Map<String, Object> reverseTransaction(
       @PathVariable @NotNull UUID id, @RequestBody(required = false) Map<String, Object> body) {
-    return postMap("/api/v1/bank/transactions/{id}/reversal", body == null ? Map.of() : body, id);
+    return orEmpty(bankClient.reverseTransaction(id, body == null ? Map.of() : body));
   }
 
   /**
@@ -172,7 +158,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> confirmBookingRequest(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/requests/{id}/confirm", body, id);
+    return orEmpty(bankClient.confirmRequest(id, body));
   }
 
   /**
@@ -186,7 +172,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> rejectBookingRequest(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/requests/{id}/reject", body, id);
+    return orEmpty(bankClient.rejectRequest(id, body));
   }
 
   /**
@@ -200,7 +186,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   @ResponseStatus(HttpStatus.CREATED)
   public Map<String, Object> createAccount(@RequestBody @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/accounts", body);
+    return orEmpty(bankClient.createAccount(body));
   }
 
   /**
@@ -214,7 +200,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> renameAccount(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return patchMap("/api/v1/bank/accounts/{id}", body, id);
+    return orEmpty(bankClient.renameAccount(id, body));
   }
 
   /**
@@ -229,7 +215,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> setBalanceTarget(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return patchMap("/api/v1/bank/accounts/{id}/balance-target", body, id);
+    return orEmpty(bankClient.setBalanceTarget(id, body));
   }
 
   /**
@@ -245,7 +231,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> setCartelApprovalTiers(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return patchMap("/api/v1/bank/accounts/{id}/approval-tiers", body, id);
+    return orEmpty(bankClient.setApprovalTiers(id, body));
   }
 
   /**
@@ -259,7 +245,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> closeAccount(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/accounts/{id}/close", body, id);
+    return orEmpty(bankClient.closeAccount(id, body));
   }
 
   /**
@@ -273,7 +259,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> reopenAccount(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/accounts/{id}/reopen", body, id);
+    return orEmpty(bankClient.reopenAccount(id, body));
   }
 
   /**
@@ -286,7 +272,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   @ResponseStatus(HttpStatus.CREATED)
   public Map<String, Object> registerHolder(@RequestBody @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/holders", body);
+    return orEmpty(bankClient.registerHolder(body));
   }
 
   /**
@@ -300,7 +286,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> updateHolder(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
-    return patchMap("/api/v1/bank/holders/{id}", body, id);
+    return orEmpty(bankClient.updateHolder(id, body));
   }
 
   /**
@@ -313,7 +299,7 @@ public class BankProxyController {
   @PreAuthorize("isAuthenticated()")
   @ResponseStatus(HttpStatus.CREATED)
   public Map<String, Object> createGrant(@RequestBody @NotNull Map<String, Object> body) {
-    return postMap("/api/v1/bank/grants", body);
+    return orEmpty(bankClient.createGrant(body));
   }
 
   /**
@@ -330,7 +316,7 @@ public class BankProxyController {
       @PathVariable @NotNull UUID userId,
       @PathVariable @NotNull UUID accountId,
       @RequestBody @NotNull Map<String, Object> body) {
-    return patchMap("/api/v1/bank/grants/{userId}/{accountId}", body, userId, accountId);
+    return orEmpty(bankClient.updateGrant(userId, accountId, body));
   }
 
   /**
@@ -344,44 +330,18 @@ public class BankProxyController {
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void deleteGrant(
       @PathVariable @NotNull UUID userId, @PathVariable @NotNull UUID accountId) {
-    backendApiClient.delete(
-        "/api/v1/bank/grants/{userId}/{accountId}", Void.class, userId, accountId);
+    bankClient.deleteGrant(userId, accountId);
   }
 
   /**
-   * POST helper returning the backend's JSON body as a raw map (or an empty map for bodyless 2xx
-   * responses, keeping the browser contract uniform).
+   * Returns the backend's answer, or an empty map for a bodyless 2xx, keeping the browser contract
+   * uniform.
    *
-   * @param uriTemplate the backend endpoint as a URI template
-   * @param body the forwarded payload
-   * @param uriVariables the values expanded into the template, in order
-   * @return the backend response body
+   * @param response the backend's answer, or {@code null}
+   * @return the answer, or an empty map
    */
-  @SuppressWarnings("unchecked")
-  private Map<String, Object> postMap(
-      @NotNull String uriTemplate,
-      @NotNull Map<String, Object> body,
-      @NotNull Object... uriVariables) {
-    Map<String, Object> response =
-        backendApiClient.post(uriTemplate, body, Map.class, uriVariables);
-    return response == null ? Map.of() : response;
-  }
-
-  /**
-   * PATCH helper returning the backend's JSON body as a raw map.
-   *
-   * @param uriTemplate the backend endpoint as a URI template
-   * @param body the forwarded payload
-   * @param uriVariables the values expanded into the template, in order
-   * @return the backend response body
-   */
-  @SuppressWarnings("unchecked")
-  private Map<String, Object> patchMap(
-      @NotNull String uriTemplate,
-      @NotNull Map<String, Object> body,
-      @NotNull Object... uriVariables) {
-    Map<String, Object> response =
-        backendApiClient.patch(uriTemplate, body, Map.class, uriVariables);
+  @NotNull
+  private static Map<String, Object> orEmpty(@Nullable Map<String, Object> response) {
     return response == null ? Map.of() : response;
   }
 }

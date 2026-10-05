@@ -26,7 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemDto
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.PersonalInventoryForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.personalinventory.client.PersonalInventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
@@ -39,7 +39,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -51,7 +50,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Admin counterpart of {@link PersonalInventoryPageController}: manages a selected user's personal
@@ -65,11 +63,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Slf4j
 public class AdminPersonalInventoryPageController {
 
-  private final BackendApiClient backendApiClient;
-
-  /** Response type for one paginated page of a target user's personal-inventory items. */
-  private static final ParameterizedTypeReference<PageResponse<PersonalInventoryItemDto>>
-      PERSONAL_INVENTORY_PAGE_TYPE = new ParameterizedTypeReference<>() {};
+  /** Sends the member's item and lookup requests. */
+  private final PersonalInventoryBackendClient personalInventoryClient;
 
   /**
    * Renders the admin personal-inventory page: the user picker and, with {@code userSub}, that
@@ -152,11 +147,7 @@ public class AdminPersonalInventoryPageController {
               form.getLocationUexId(),
               form.getLocationType(),
               form.getQuantity());
-      backendApiClient.post(
-          "/api/v1/admin/personal-inventory/{userSub}",
-          request,
-          PersonalInventoryItemDto.class,
-          userSub);
+      personalInventoryClient.createForMember(userSub, request);
       redirectAttributes.addFlashAttribute("successToast", "personalInventory.toast.created");
     } catch (Exception e) {
       log.error("Admin failed to create personal inventory item for {}", userSub, e);
@@ -202,11 +193,7 @@ public class AdminPersonalInventoryPageController {
               form.getLocationType(),
               form.getQuantity(),
               form.getVersion());
-      backendApiClient.put(
-          "/api/v1/admin/personal-inventory/items/{id}",
-          request,
-          PersonalInventoryItemDto.class,
-          id);
+      personalInventoryClient.updateForMember(id, request);
       redirectAttributes.addFlashAttribute("successToast", "personalInventory.toast.updated");
     } catch (Exception e) {
       log.error("Admin failed to update personal inventory item {}", id, e);
@@ -231,7 +218,7 @@ public class AdminPersonalInventoryPageController {
       @PathVariable @NotNull UUID id,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/admin/personal-inventory/items/{id}", Void.class, id);
+      personalInventoryClient.deleteForMember(id);
       redirectAttributes.addFlashAttribute("successToast", "personalInventory.toast.deleted");
     } catch (Exception e) {
       log.error("Admin failed to delete personal inventory item {}", id, e);
@@ -272,7 +259,7 @@ public class AdminPersonalInventoryPageController {
   @Nullable
   private UserDto fetchUser(UUID userSub) {
     try {
-      return backendApiClient.get("/api/v1/users/{userSub}", UserDto.class, userSub);
+      return personalInventoryClient.user(userSub);
     } catch (Exception e) {
       log.warn(
           "Failed to fetch selected member {} for admin personal inventory picker", userSub, e);
@@ -283,23 +270,10 @@ public class AdminPersonalInventoryPageController {
   private PageResponse<PersonalInventoryItemDto> fetchItems(
       UUID userSub, String q, Integer page, Integer size, String sort) {
     try {
-      UriComponentsBuilder builder =
-          UriComponentsBuilder.fromPath("/api/v1/admin/personal-inventory/{userSub}");
-      if (page != null) {
-        builder.queryParam("page", page);
-      }
-      builder.queryParam("size", size == null ? 50 : size);
-      String safeSort = RelayParams.sortSpecOrNull(sort);
-      if (safeSort != null) {
-        builder.queryParam("sort", safeSort);
-      }
-      if (q != null && !q.isBlank()) {
-        builder.queryParam("q", "{q}");
-        String uri = builder.encode().build().toUriString();
-        return backendApiClient.get(uri, PERSONAL_INVENTORY_PAGE_TYPE, userSub, q);
-      }
-      String uri = builder.encode().build().toUriString();
-      return backendApiClient.get(uri, PERSONAL_INVENTORY_PAGE_TYPE, userSub);
+      return personalInventoryClient.memberItemPage(
+          userSub,
+          new PersonalInventoryBackendClient.ItemQuery(
+              page, size == null ? 50 : size, RelayParams.sortSpecOrNull(sort), q));
     } catch (Exception e) {
       log.error("Failed to fetch personal inventory items for {}", userSub, e);
       return new PageResponse<>(new ArrayList<>(), 0, size == null ? 50 : size, 0, 0, List.of());

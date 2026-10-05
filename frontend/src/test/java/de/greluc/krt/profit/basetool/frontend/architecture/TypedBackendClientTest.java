@@ -74,74 +74,7 @@ class TypedBackendClientTest {
       Set.of(BASE + ".service", BASE + ".config", BASE + ".websocket");
 
   /** The typed clients when the rule was introduced; fewer means the selection broke. */
-  private static final int CLIENT_FLOOR = 6;
-
-  /**
-   * The controllers and controller helpers that still call {@link BackendApiClient} until their
-   * domain's typed client lands (plan F3). The list only shrinks and must match exactly.
-   */
-  private static final Set<String> NOT_YET_ON_A_TYPED_CLIENT =
-      Set.of(
-          "AdminBankPageController",
-          "AdminBlueprintsPageController",
-          "AdminDefaultBlueprintsPageController",
-          "AdminDeletionRequestsPageController",
-          "AdminDiscordRegistrationsPageController",
-          "AdminLocationsPageController",
-          "AdminMaterialAliasesPageController",
-          "AdminMaterialsPageController",
-          "AdminMissionDataPageController",
-          "AdminOrgStructurePageController",
-          "AdminP4kImportPageController",
-          "AdminPersonSearchPageController",
-          "AdminPersonalBlueprintsPageController",
-          "AdminPersonalInventoryPageController",
-          "AdminQualityTiersPageController",
-          "AdminQualityTiersRelayController",
-          "AdminSpecialCommandsPageController",
-          "AdminSyncReportsPageController",
-          "AdminTermsPageController",
-          "AdminUexPageController",
-          "BankGrantsPageController",
-          "BankManagePageController",
-          "BankPageController",
-          "BankProxyController",
-          "BankReportProxyController",
-          "BankRequestQueuePageController",
-          "BlueprintOverviewPageController",
-          "CatalogSearchController",
-          "DataExportProxyController",
-          "DeletionRequestProxyController",
-          "HangarDeleteAllProxyController",
-          "HangarImportProxyController",
-          "HangarPageController",
-          "LeitungPageController",
-          "MaterialProxyController",
-          "MaterialboersePageController",
-          "MaterialsPageController",
-          "MemberManagementController",
-          "MissionFinancePageController",
-          "MissionPageController",
-          "MissionWriteController",
-          "OperationPageController",
-          "OrgUnitBankPageController",
-          "OrgUnitBankProxyController",
-          "PendingApprovalPageController",
-          "PersonalBlueprintImportProxyController",
-          "PersonalInventoryBlueprintsPageController",
-          "PersonalInventoryPageController",
-          "ProfileController",
-          "ProfileRsiHandleProxyController",
-          "ProfitCalculationPageController",
-          "PromotionPageController",
-          "PromotionProxyController",
-          "ShipDataPageController",
-          "SpecialCommandAdminProxyController",
-          "SpecialCommandMembersPageController",
-          "SquadronAdminProxyController",
-          "TermsAcceptancePageController",
-          "TermsController",
-          "UserProxyController");
+  private static final int CLIENT_FLOOR = 21;
 
   @Test
   void onlyTheKernelAndTypedClientsCallTheKernelClient() {
@@ -149,7 +82,7 @@ class TypedBackendClientTest {
         .as(
             "classes that call BackendApiClient but are neither kernel nor a typed client in a"
                 + " <domain>.client package; call the domain's typed client instead")
-        .containsExactlyInAnyOrderElementsOf(NOT_YET_ON_A_TYPED_CLIENT);
+        .isEmpty();
   }
 
   @Test

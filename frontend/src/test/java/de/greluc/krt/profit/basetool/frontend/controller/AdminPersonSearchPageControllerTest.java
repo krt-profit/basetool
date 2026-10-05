@@ -28,6 +28,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonSearchHitDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonSearchResultDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -57,7 +58,8 @@ class AdminPersonSearchPageControllerTest {
   @Test
   void aTermUnderThreeCharactersNeverReachesTheBackend() {
     BackendApiClient client = mock(BackendApiClient.class);
-    AdminPersonSearchPageController controller = new AdminPersonSearchPageController(client);
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
     Model model = new ConcurrentModel();
 
     String view = controller.page("Zz", null, model);
@@ -71,7 +73,8 @@ class AdminPersonSearchPageControllerTest {
   @Test
   void anEmptyTermIsTheInitialStateAndNotAnError() {
     BackendApiClient client = mock(BackendApiClient.class);
-    AdminPersonSearchPageController controller = new AdminPersonSearchPageController(client);
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
     Model model = new ConcurrentModel();
 
     controller.page(null, null, model);
@@ -85,7 +88,8 @@ class AdminPersonSearchPageControllerTest {
   @Test
   void whitespaceIsTrimmedBeforeTheLengthIsJudged() {
     BackendApiClient client = mock(BackendApiClient.class);
-    AdminPersonSearchPageController controller = new AdminPersonSearchPageController(client);
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
     Model model = new ConcurrentModel();
 
     controller.page("  Zz  ", null, model);
@@ -98,7 +102,8 @@ class AdminPersonSearchPageControllerTest {
   void theTermIsBoundAsAUriVariableAndNeverEncodedByHand() {
     BackendApiClient client = mock(BackendApiClient.class);
     stubOneHit(client);
-    AdminPersonSearchPageController controller = new AdminPersonSearchPageController(client);
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
 
     controller.page("Müller & Söhne", null, new ConcurrentModel());
 
@@ -109,7 +114,8 @@ class AdminPersonSearchPageControllerTest {
   void theTypedCasingIsRelayedUntouched() {
     BackendApiClient client = mock(BackendApiClient.class);
     stubOneHit(client);
-    AdminPersonSearchPageController controller = new AdminPersonSearchPageController(client);
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
 
     controller.page("MixedCase", null, new ConcurrentModel());
 
@@ -127,7 +133,8 @@ class AdminPersonSearchPageControllerTest {
                         "MEMBER", "app_user", "username", "id", "Snippet", "MEMBER")),
                 true,
                 List.of("mission_participant.comment")));
-    AdminPersonSearchPageController controller = new AdminPersonSearchPageController(client);
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
     Model model = new ConcurrentModel();
 
     controller.page("SomeHandle", null, model);
@@ -143,7 +150,8 @@ class AdminPersonSearchPageControllerTest {
   void anEmptyBodyFromTheBackendIsNoHitsRatherThanAFailure() {
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.get(any(String.class), resultType(), any(Object[].class))).thenReturn(null);
-    AdminPersonSearchPageController controller = new AdminPersonSearchPageController(client);
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
     Model model = new ConcurrentModel();
 
     controller.page("SomeHandle", null, model);
@@ -159,7 +167,8 @@ class AdminPersonSearchPageControllerTest {
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.get(any(String.class), resultType(), any(Object[].class)))
         .thenThrow(new BackendServiceException("boom", new RuntimeException(), 503));
-    AdminPersonSearchPageController controller = new AdminPersonSearchPageController(client);
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
     Model model = new ConcurrentModel();
 
     controller.page("SomeHandle", null, model);
@@ -173,7 +182,8 @@ class AdminPersonSearchPageControllerTest {
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.get(any(String.class), resultType(), any(Object[].class)))
         .thenThrow(new IllegalStateException("boom"));
-    AdminPersonSearchPageController controller = new AdminPersonSearchPageController(client);
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
     Model model = new ConcurrentModel();
 
     controller.page("SomeHandle", null, model);
@@ -186,7 +196,8 @@ class AdminPersonSearchPageControllerTest {
   void theFragmentParameterSelectsTheResultsBlockForTheInPlaceSwap() {
     BackendApiClient client = mock(BackendApiClient.class);
     stubOneHit(client);
-    AdminPersonSearchPageController controller = new AdminPersonSearchPageController(client);
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
 
     String view = controller.page("SomeHandle", "results", new ConcurrentModel());
 
@@ -197,7 +208,8 @@ class AdminPersonSearchPageControllerTest {
   void anUnknownFragmentValueRendersTheWholePage() {
     BackendApiClient client = mock(BackendApiClient.class);
     stubOneHit(client);
-    AdminPersonSearchPageController controller = new AdminPersonSearchPageController(client);
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
 
     String view = controller.page("SomeHandle", "nonsense", new ConcurrentModel());
 

@@ -35,18 +35,7 @@ import org.junit.jupiter.api.Test;
 class WriteUriTemplateTest {
 
   /** The write-verb call sites when the guard was introduced; fewer means the scan broke. */
-  private static final int MIN_WRITE_SITES = 318;
-
-  /**
-   * The methods that still concatenate a runtime value into a write URI, each with the reason it is
-   * safe. The set must match the scan exactly.
-   */
-  private static final Map<String, String> REVIEWED =
-      Map.of(
-          "AdminUexPageController#dispatchOverride",
-          "the entity kind is narrowed to ALLOWED_LOADING_DOCK_KINDS before it is concatenated",
-          "AdminUexPageController#dispatchOverrideAjax",
-          "the entity kind is narrowed to ALLOWED_LOADING_DOCK_KINDS before it is concatenated");
+  private static final int MIN_WRITE_SITES = 257;
 
   /** A source with one templated and one concatenating write per verb shape. */
   private static final String FIXTURE_SOURCE =
@@ -87,8 +76,8 @@ class WriteUriTemplateTest {
     assertThat(scan.concatenatedWrites())
         .as(
             "write calls that concatenate a runtime value into the backend URI; pass it as a URI"
-                + " template variable instead, or review it here with the reason it is safe")
-        .containsExactlyInAnyOrderElementsOf(REVIEWED.keySet());
+                + " template variable instead")
+        .isEmpty();
   }
 
   @Test
