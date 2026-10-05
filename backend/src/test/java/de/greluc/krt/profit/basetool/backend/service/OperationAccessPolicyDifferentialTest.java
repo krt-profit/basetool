@@ -56,7 +56,10 @@ import org.springframework.mock.web.MockHttpServletRequest;
 /**
  * The differential verdict test of the operation access policy (plan §5.4, ADR-0236): over one
  * fixture matrix of callers and operations, {@link OperationAccessPolicy} returns exactly the
- * verdict of the scope hub's {@link AccessGateService} for the read, ledger and edit gates.
+ * verdict of the scope hub's former operation gates for the read, ledger and edit gates.
+ *
+ * <p>{@link ScopeHubOperationGates} holds those gates as {@link AccessGateService} decided them
+ * before they moved, on the same scope kernel, so the comparison outlives their deletion.
  *
  * <p>The matrix covers an admin unpinned and pinned to either unit, a pinned and an unpinned
  * member, members of zero, one and two units, a Bereich lead reaching a child Staffel through the
@@ -114,7 +117,7 @@ class OperationAccessPolicyDifferentialTest {
    */
   private record Gate(
       String name,
-      BiPredicate<AccessGateService, UUID> scopeHub,
+      BiPredicate<ScopeHubOperationGates, UUID> scopeHub,
       BiPredicate<OperationAccessPolicy, UUID> policy) {}
 
   @Test
@@ -151,7 +154,7 @@ class OperationAccessPolicyDifferentialTest {
       Fixture fixture = new Fixture(caller);
       for (UUID operation : OPERATIONS) {
         for (Gate gate : gates()) {
-          boolean old = gate.scopeHub().test(fixture.accessGateService, operation);
+          boolean old = gate.scopeHub().test(fixture.scopeHub, operation);
           boolean now = gate.policy().test(fixture.policy, operation);
           assertThat(now)
               .as("%s on %s for %s", gate.name(), label(operation), caller.name())
@@ -170,15 +173,15 @@ class OperationAccessPolicyDifferentialTest {
     return List.of(
         new Gate(
             "canSeeOperation",
-            AccessGateService::canSeeOperation,
+            ScopeHubOperationGates::canSeeOperation,
             OperationAccessPolicy::canSeeOperation),
         new Gate(
             "canSeeOperationLedger",
-            AccessGateService::canSeeOperationLedger,
+            ScopeHubOperationGates::canSeeOperationLedger,
             OperationAccessPolicy::canSeeOperationLedger),
         new Gate(
             "canEditOperation",
-            AccessGateService::canEditOperation,
+            ScopeHubOperationGates::canEditOperation,
             OperationAccessPolicy::canEditOperation));
   }
 
@@ -198,7 +201,7 @@ class OperationAccessPolicyDifferentialTest {
   /** One caller's freshly wired scope hub and policy over shared scenario mocks. */
   private static final class Fixture {
 
-    private final AccessGateService accessGateService;
+    private final ScopeHubOperationGates scopeHub;
 
     private final OperationAccessPolicy policy;
 
@@ -260,7 +263,7 @@ class OperationAccessPolicyDifferentialTest {
               cascade,
               new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
               request);
-      accessGateService =
+      AccessGateService accessGateService =
           new AccessGateService(
               resolver,
               authHelper,
@@ -270,7 +273,6 @@ class OperationAccessPolicyDifferentialTest {
               mock(JobOrderItemHandoverRepository.class),
               mock(InventoryItemRepository.class),
               mock(RefineryOrderRepository.class),
-              operations,
               mock(ShipRepository.class),
               memberships);
       OwnerScopeService ownerScopeService =
@@ -280,6 +282,7 @@ class OperationAccessPolicyDifferentialTest {
               new OrgUnitStampingService(
                   resolver, accessGateService, authHelper, memberships, orgUnits));
       policy = new OperationAccessPolicy(ownerScopeService, authHelper, operations);
+      scopeHub = new ScopeHubOperationGates(accessGateService, authHelper, operations);
     }
 
     private static Operation operation(UUID id, UUID owner) {
@@ -291,6 +294,61 @@ class OperationAccessPolicyDifferentialTest {
         operation.setOwningOrgUnit(unit);
       }
       return operation;
+    }
+  }
+
+  /**
+   * The operation gates as the scope hub decided them, kept for the comparison.
+   *
+   * @param accessGateService the scope hub, for its org-unit gates
+   * @param authHelper the caller's identity and roles
+   * @param operationRepository the operations
+   */
+  private record ScopeHubOperationGates(
+      AccessGateService accessGateService,
+      AuthHelperService authHelper,
+      OperationRepository operationRepository) {
+
+    boolean canSeeOperation(UUID operationId) {
+      return operationRepository
+          .findById(operationId)
+          .map(
+              o -> {
+                boolean scopeVisible =
+                    o.getOwningOrgUnit() == null
+                        ? authHelper.isMemberOrAbove()
+                        : accessGateService.canSeeSquadron(o.getOwningOrgUnit().getId());
+                return scopeVisible || participatedInOperation(operationId);
+              })
+          .orElse(false);
+    }
+
+    boolean canSeeOperationLedger(UUID operationId) {
+      return operationRepository
+          .findById(operationId)
+          .map(
+              o ->
+                  o.getOwningOrgUnit() == null
+                      ? authHelper.isMemberOrAbove()
+                      : accessGateService.canSeeSquadron(o.getOwningOrgUnit().getId()))
+          .orElse(false);
+    }
+
+    boolean canEditOperation(UUID operationId) {
+      return operationRepository
+          .findById(operationId)
+          .map(
+              o ->
+                  o.getOwningOrgUnit() == null
+                      || accessGateService.canEditSquadron(o.getOwningOrgUnit().getId()))
+          .orElse(false);
+    }
+
+    private boolean participatedInOperation(UUID operationId) {
+      return authHelper
+          .currentUserId()
+          .map(uid -> operationRepository.existsParticipantUserInOperation(operationId, uid))
+          .orElse(false);
     }
   }
 }

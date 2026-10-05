@@ -101,7 +101,7 @@ public class OperationPayoutService {
   private final RefineryOrderRepository refineryOrderRepository;
   private final OperationPayoutStatusRepository payoutStatusRepository;
   private final UserService userService;
-  private final OwnerScopeService ownerScopeService;
+  private final OperationAccessPolicy operationAccessPolicy;
   private final AuthHelperService authHelperService;
   private final SystemSettingService systemSettingService;
   private final AuditRecorder auditRecorder;
@@ -243,7 +243,7 @@ public class OperationPayoutService {
    */
   private List<OperationPayoutDto> restrictToOwnRowIfEscapeOnly(
       @NotNull UUID operationId, @NotNull List<OperationPayoutDto> payouts) {
-    if (ownerScopeService.canSeeOperationLedger(operationId)) {
+    if (operationAccessPolicy.canSeeOperationLedger(operationId)) {
       return payouts;
     }
     String ownKey = authHelperService.currentUserId().map(UUID::toString).orElse(null);

@@ -81,7 +81,7 @@ class OperationPayoutServiceTest {
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private OperationPayoutStatusRepository payoutStatusRepository;
   @Mock private UserService userService;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private OperationAccessPolicy operationAccessPolicy;
   @Mock private AuthHelperService authHelperService;
   @Mock private SystemSettingService systemSettingService;
 
@@ -944,7 +944,7 @@ class OperationPayoutServiceTest {
       stubOperation(Set.of(m));
       stubFinances(
           List.of(newEntry(m, bobP, FinanceType.INCOME, new BigDecimal("900.00"))), List.of());
-      when(ownerScopeService.canSeeOperationLedger(OPERATION_ID)).thenReturn(true);
+      when(operationAccessPolicy.canSeeOperationLedger(OPERATION_ID)).thenReturn(true);
 
       OperationPayoutSummaryDto summary =
           operationPayoutService.getOperationPayoutSummary(OPERATION_ID);
@@ -970,7 +970,7 @@ class OperationPayoutServiceTest {
       stubOperation(Set.of(m));
       stubFinances(
           List.of(newEntry(m, aliceP, FinanceType.INCOME, new BigDecimal("500.00"))), List.of());
-      when(ownerScopeService.canSeeOperationLedger(OPERATION_ID)).thenReturn(true);
+      when(operationAccessPolicy.canSeeOperationLedger(OPERATION_ID)).thenReturn(true);
 
       OperationPayoutSummaryDto summary =
           operationPayoutService.getOperationPayoutSummary(OPERATION_ID);
@@ -993,7 +993,7 @@ class OperationPayoutServiceTest {
       stubOperation(Set.of(m));
       stubFinances(
           List.of(newEntry(m, bobP, FinanceType.INCOME, new BigDecimal("900.00"))), List.of());
-      when(ownerScopeService.canSeeOperationLedger(OPERATION_ID)).thenReturn(false);
+      when(operationAccessPolicy.canSeeOperationLedger(OPERATION_ID)).thenReturn(false);
       when(authHelperService.currentUserId()).thenReturn(java.util.Optional.of(bob.getId()));
 
       OperationPayoutSummaryDto summary =

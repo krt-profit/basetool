@@ -65,6 +65,7 @@ import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartPosition;
 import de.greluc.krt.profit.basetool.backend.service.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.service.MissionSecurityService;
+import de.greluc.krt.profit.basetool.backend.service.OperationAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.SpecialCommandSecurityService;
@@ -98,6 +99,7 @@ class TenancyGuardTest {
       Set.of(
           OwnerScopeService.class,
           AccessGateService.class,
+          OperationAccessPolicy.class,
           MissionSecurityService.class,
           SpecialCommandSecurityService.class,
           OrgRoleManagementSecurityService.class);
