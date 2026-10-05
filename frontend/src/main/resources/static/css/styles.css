@@ -2384,7 +2384,6 @@
     .notification-toast.visible {
         opacity: 1;
         transform: translateX(0);
-        pointer-events: auto;
     }
 
     .notification-toast::before {
