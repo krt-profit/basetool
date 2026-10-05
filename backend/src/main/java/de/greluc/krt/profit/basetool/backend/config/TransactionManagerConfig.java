@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
-import de.greluc.krt.profit.basetool.backend.support.ChangeSource;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ChangeSource;
 import jakarta.persistence.EntityManagerFactory;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.context.annotation.Bean;

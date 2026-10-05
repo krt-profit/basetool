@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.Set;

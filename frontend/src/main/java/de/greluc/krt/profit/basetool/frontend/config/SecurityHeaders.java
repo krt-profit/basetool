@@ -31,7 +31,8 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
  * The frontend's security response headers: the per-request nonce-gated {@code
  * Content-Security-Policy} with a Keycloak-aware {@code form-action}, {@code X-Frame-Options:
  * DENY}, {@code Referrer-Policy}, cross-origin policies, HSTS, {@code Permissions-Policy} and
- * {@code X-Content-Type-Options}.
+ * {@code X-Content-Type-Options}, plus the Trusted Types directives in the mode {@link
+ * TrustedTypesMode} selects.
  *
  * <p>Stateless; pinned by {@code SecurityHeadersTest}.
  */
@@ -48,16 +49,29 @@ public final class SecurityHeaders {
           + "style-src-attr 'none'; "
           + "script-src 'nonce-%1$s' 'strict-dynamic'";
 
+  /** The report-only policy header that carries the Trusted Types directives in report mode. */
+  static final String REPORT_ONLY_HEADER = "Content-Security-Policy-Report-Only";
+
+  /**
+   * The Trusted Types directives (ADR-0239): every DOM script sink takes a policy value, and only
+   * the two named policies of {@code krt-html.js} and {@code krt-fetch.js} may be created, so a
+   * {@code default} policy is a violation too.
+   */
+  static final String TRUSTED_TYPES_DIRECTIVES =
+      "require-trusted-types-for 'script'; trusted-types krt-html krt-fragment";
+
   /**
    * Builds the frontend response-header {@link Customizer} for {@link HttpSecurity#headers}.
    *
    * @param issuerUri the configured Keycloak issuer URI, from which the CSP {@code form-action}
    *     logout-redirect origin is derived
+   * @param trustedTypes whether the Trusted Types directives are reported or enforced
    * @return the headers customizer to hand to {@code http.headers(...)}
    */
-  public static Customizer<HeadersConfigurer<HttpSecurity>> frontend(String issuerUri) {
+  public static Customizer<HeadersConfigurer<HttpSecurity>> frontend(
+      String issuerUri, @NotNull TrustedTypesMode trustedTypes) {
     return headers -> {
-      headers.addHeaderWriter(cspNonceHeaderWriter(issuerUri));
+      headers.addHeaderWriter(cspNonceHeaderWriter(issuerUri, trustedTypes));
       headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::deny);
       headers.referrerPolicy(ref -> ref.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN));
       headers.crossOriginOpenerPolicy(
@@ -87,18 +101,30 @@ public final class SecurityHeaders {
   /**
    * Builds the per-request CSP header writer. The nonce is substituted per request; {@code
    * form-action} is {@code 'self'} plus the Keycloak origin, so the POST-logout redirect to the
-   * end-session endpoint is allowed.
+   * end-session endpoint is allowed. The Trusted Types directives join the enforced policy in
+   * {@link TrustedTypesMode#ENFORCE} and form a report-only policy of their own in {@link
+   * TrustedTypesMode#REPORT}.
    *
    * @param issuerUri the configured Keycloak issuer URI
-   * @return a header writer that emits the {@code Content-Security-Policy} response header
+   * @param trustedTypes whether the Trusted Types directives are reported or enforced
+   * @return a header writer that emits the {@code Content-Security-Policy} response header and, in
+   *     report mode, the {@code Content-Security-Policy-Report-Only} header
    */
-  private static HeaderWriter cspNonceHeaderWriter(String issuerUri) {
+  static HeaderWriter cspNonceHeaderWriter(
+      String issuerUri, @NotNull TrustedTypesMode trustedTypes) {
     String keycloakOrigin = keycloakOriginOf(issuerUri);
     String formAction = keycloakOrigin.isEmpty() ? "'self'" : "'self' " + keycloakOrigin;
+    boolean enforce = trustedTypes == TrustedTypesMode.ENFORCE;
     return (request, response) -> {
       Object nonceAttr = request.getAttribute(CspNonceFilter.REQUEST_ATTRIBUTE);
       String nonce = nonceAttr != null ? nonceAttr.toString() : "";
-      response.setHeader("Content-Security-Policy", String.format(CSP_TEMPLATE, nonce, formAction));
+      String policy = String.format(CSP_TEMPLATE, nonce, formAction);
+      if (enforce) {
+        response.setHeader("Content-Security-Policy", policy + "; " + TRUSTED_TYPES_DIRECTIVES);
+      } else {
+        response.setHeader("Content-Security-Policy", policy);
+        response.setHeader(REPORT_ONLY_HEADER, TRUSTED_TYPES_DIRECTIVES);
+      }
     };
   }
 

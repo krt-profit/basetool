@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service.exchange;
 
-import de.greluc.krt.profit.basetool.backend.support.ExchangeMirrorProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeMirrorProperties;
 import java.time.Clock;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;

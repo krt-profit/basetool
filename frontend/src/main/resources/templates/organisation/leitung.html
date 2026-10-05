@@ -424,7 +424,13 @@
         confirmPromote: /*[[#{leitung.confirm.skLeadPromote}]]*/ 'Ernennen?',
         confirmDemote: /*[[#{leitung.confirm.skLeadDemote}]]*/ 'Entfernen?'
     };
-    window.MEMBER_CONFLICT = window.leitungI18n.conflict;
+    window.MEMBER_CONFLICT = {
+        title: /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
+        reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Neu laden.',
+        reloadLabel: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Neu laden',
+        dismissLabel: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
+        reloadQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Neu laden?'
+    };
 </script>
 <script th:src="@{/js/leitung.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/special-command-detail.js}" defer th:attr="nonce=${cspNonce}"></script>

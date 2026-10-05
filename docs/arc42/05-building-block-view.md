@@ -66,7 +66,6 @@ Layered, with the direction enforced by ArchUnit rather than by convention:
 | `repository` | Spring Data JPA; fetch strategies that keep the no-N+1 rule |
 | `model` | JPA entities, `@Version`, the OrgUnit hierarchy |
 | `dto` / `mapper` | Records on the boundary, MapStruct between them and entities |
-| `support` | Cross-cutting helpers, including the `OptimisticLock` family |
 | `task` | Scheduled jobs |
 | `integration` | Outbound third parties — `UexClient`, `scwiki` — on the blocking `RestClient` from `config.RestClientConfig` (JDK HTTP client, no WebFlux; ADR-0204), which `KeycloakService` shares |
 | `metrics` / `health` / `logging` | `basetool_*` business metrics, health indicators, MDC enrichment |
@@ -114,6 +113,29 @@ repositories that produce them, the catalogue's `ShipTypeMapper` maps ship types
 `AuthHelperService` no longer delegates to `OwnerScopeService`: callers ask the scope API
 directly.
 
+The former `support` package is gone (plan §7.3, P1-9). Its domain-free helpers are kernel
+types (`OptimisticLock`, `StringNormalization`, `LikePatterns`, `Quality`, `RequestMemo`, `Roles`,
+`Permissions`, `ProblemResponseFactory` and its `AppProblemProperties`); the access core and the
+request settings form the `platform` module (`platform.api`: `AuthenticatedSubject`,
+`SubjectAuthentication`, `OrgUnitContextualAuthority`, `ClientAttribution`, the refused-subject
+window, the resilient Redis listener container and the shared rate-limit, role-scope and
+authorities-cache settings; `platform.internal`: the metric client list and the body limit);
+every other helper sits in `<module>.internal`, or in `<module>.api` when another module uses it
+(for example `inventory.api.InventoryAllocations`, `livesync.api.LiveSyncTopic`,
+`catalogue.api.QuantityTypeRounding`, `orgunit.api.StaffelMembershipResolver`). `mission` is the
+first module that publishes nothing yet: its section-version counters, peer redaction and
+viewer-access SPI are internal, and no other module may depend on it. The helpers stay
+dependency leaves — they may use only each other, the entity model and the repositories
+(`ArchitectureTest.LEAF_HELPER_CLASSES`).
+
+Phase 2 (plan §7.4) moves whole domains out of the layer packages, each into
+`<module>.api` (what other modules use), `<module>.internal` (entities, repositories, services,
+mappers no other module needs) and `<module>.web` (controllers and their REST DTOs):
+
+| Module | `api` | `internal` | `web` |
+| --- | --- | --- | --- |
+| `dashboard` | — (publishes nothing) | `Announcement`, `AnnouncementRepository`, `AnnouncementService` | `AnnouncementController`, `AnnouncementDto`, `AnnouncementMapper` |
+
 The platform modules reach the domains only through SPIs they own and the domains implement
 (plan §5.3); Spring injects the implementations, so the platform names no domain class:
 
@@ -126,6 +148,7 @@ The platform modules reach the domains only through SPIs they own and the domain
 | `notification.api.AccountRecipientDirectory` | grant holders and responsible holders of a bank account | bank, org-unit side (`OrgUnitBankRecipientDirectory`) |
 | `livesync.api.LiveSyncTopicAuthorizer` | whether the caller may join a room, through the owning module's read gate; one implementation per kind, checked at startup | mission, operation, joborder, refinery, bank (`OrgUnitBankLiveSyncTopicAuthorizer`); the member and self rooms stay with livesync |
 | `service.ActiveOrgUnitProvider` (platform) | the org unit for the `orgUnitId` MDC field | scope (`ScopeActiveOrgUnitProvider`) |
+| `platform.api.ClientDirectory` | whether a client id is a configured ingest gateway or a registered exchange client, for the bounded client label | exchange (`ExchangeClientDirectory`) |
 
 ## 5.3 Level 2 — inside `frontend`
 
@@ -139,7 +162,7 @@ The platform modules reach the domains only through SPIs they own and the domain
 | `websocket` | `/ws/sync`, the handler and the Redis fanout |
 | `config` | WebClient, Resilience4j, Redis session, Reactor context propagation, security, the layout model |
 | `oss` | The open-source licence report |
-| `support` / `validation` / `exception` / `health` / `logging` / `metrics` | As on the backend |
+| `support` / `validation` / `exception` / `health` / `logging` / `metrics` | Shared helpers (`Roles` among them) and the usual Spring surface |
 
 *Corrected 2026-09-29:* this table called `BackendApiClient` "the single seam" (see §4.1), placed
 view-shaping services in `service` and view models in `view`; the view shaping lives in

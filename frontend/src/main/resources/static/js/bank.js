@@ -379,7 +379,7 @@
      */
     async function fillCounterpartyOrgUnits(userSelect, orgSelect) {
         const placeholder = orgSelect.querySelector('option[value=""]');
-        orgSelect.innerHTML = '';
+        orgSelect.replaceChildren();
         if (placeholder) {
             orgSelect.appendChild(placeholder);
         }
@@ -430,7 +430,7 @@
      */
     function resetCounterpartyOrgUnitOptions(select) {
         const placeholder = select.querySelector('option[value=""]');
-        select.innerHTML = '';
+        select.replaceChildren();
         if (placeholder) {
             select.appendChild(placeholder);
         }

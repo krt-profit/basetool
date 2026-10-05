@@ -22,10 +22,10 @@ package de.greluc.krt.profit.basetool.backend.controller;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderInventoryOwnerRedactor;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.support.JobOrderInventoryOwnerRedactor;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

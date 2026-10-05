@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.dto.SystemSettingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SystemSettingUpdateDto;
 import de.greluc.krt.profit.basetool.backend.service.SystemSettingService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

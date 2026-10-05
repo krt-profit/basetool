@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.config;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.greluc.krt.profit.basetool.backend.support.Roles;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;

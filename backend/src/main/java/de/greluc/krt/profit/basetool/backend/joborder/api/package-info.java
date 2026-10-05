@@ -18,8 +18,8 @@
  */
 
 /**
- * The job-order module's published API: its problem codes and exception and, in {@code events}, the
- * order events (plan §5.2).
+ * The job-order module's published API: its problem codes and exception, the order audit label and,
+ * in {@code events}, the order events (plan §5.2).
  */
 @NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.joborder.api;

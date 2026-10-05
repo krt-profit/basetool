@@ -129,7 +129,7 @@ answered as a decision rather than as a per-endpoint accident.
 ### 1.3 Data redaction among members (one level)
 
 Mission responses are cleaned up server-side in [`MissionController`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/MissionController.java),
-through [`MissionPeerRedactor`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/support/MissionPeerRedactor.java):
+through [`MissionPeerRedactor`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/mission/internal/MissionPeerRedactor.java):
 
 - **Peer** (`cleanupMissionForPeer` / `cleanupParticipantForPeer` / `cleanupUnitForPeer` /
   `cleanupShipForPeer`, all funnelling into `cleanupUserForPeer`) — for a caller **below
@@ -231,7 +231,7 @@ syncs the token's realm roles by name onto the `app_user` row; the authority is 
 upper-cased with spaces turned into underscores (`KRT Member` → `ROLE_KRT_MEMBER`), plus the role's
 seeded permissions from
 [`DataInitializer`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/DataInitializer.java).
-The constants live in `support.Roles` (backend and frontend). In addition, a **role hierarchy**
+The constants live in `kernel.Roles` (backend) and `support.Roles` (frontend). In addition, a **role hierarchy**
 applies.
 
 ### Role hierarchy (backend + frontend identical)

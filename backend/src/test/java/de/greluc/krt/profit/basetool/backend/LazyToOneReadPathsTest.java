@@ -24,6 +24,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
 import de.greluc.krt.profit.basetool.backend.model.City;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobType;
@@ -64,7 +65,6 @@ import de.greluc.krt.profit.basetool.backend.service.JobTypeService;
 import de.greluc.krt.profit.basetool.backend.service.LocationService;
 import de.greluc.krt.profit.basetool.backend.service.MaterialService;
 import de.greluc.krt.profit.basetool.backend.service.ShipTypeService;
-import de.greluc.krt.profit.basetool.backend.support.Permissions;
 import jakarta.persistence.EntityManagerFactory;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;

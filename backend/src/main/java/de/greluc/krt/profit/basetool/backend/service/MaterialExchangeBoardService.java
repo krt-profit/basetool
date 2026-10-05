@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
+import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeQueryParams;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer;
@@ -43,7 +44,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeInterest
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.support.MaterialExchangeQueryParams;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;

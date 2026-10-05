@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionViewerAccess;
 import de.greluc.krt.profit.basetool.backend.model.FrequencyType;
 import de.greluc.krt.profit.basetool.backend.model.JobType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
@@ -45,7 +46,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionStepDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionUnitDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitReferenceDto;
-import de.greluc.krt.profit.basetool.backend.support.MissionViewerAccess;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
