@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import okhttp3.mockwebserver.RecordedRequest;
@@ -76,7 +77,13 @@ class CatalogueBackendClientTest {
     backend.answerJson("{}");
     backend.answerJson(EMPTY_PAGE);
     backend.answerJson(
-        "{\"content\":[{\"starSystemName\":\"Stanton\"}],\"page\":0,\"size\":1,"
+        "{\"content\":[{\"id\":\""
+            + OTHER
+            + "\",\"name\":\"Area18 TDD\",\"nickname\":\"TDD\",\"starSystemName\":\"Stanton\","
+            + "\"planetName\":\"ArcCorp\",\"cityName\":\"Area18\",\"spaceStationName\":null,"
+            + "\"hasLoadingDock\":true,\"isAutoLoad\":false,\"hasLoadingDockOverridden\":false,"
+            + "\"isAutoLoadOverridden\":false,\"uexHasLoadingDock\":true,\"uexIsAutoLoad\":false,"
+            + "\"uexSyncedAt\":\"2026-10-03T11:30:00Z\",\"hidden\":false}],\"page\":0,\"size\":1,"
             + "\"totalElements\":1,\"totalPages\":1}");
     backend.answerJson(EMPTY_PAGE);
 
@@ -89,7 +96,12 @@ class CatalogueBackendClientTest {
     client.materialPricePage(ID, 1);
     assertThat(client.terminalCatalogue().content())
         .singleElement()
-        .satisfies(row -> assertThat(row).containsEntry("starSystemName", "Stanton"));
+        .satisfies(
+            row -> {
+              assertThat(row.id()).isEqualTo(OTHER);
+              assertThat(row.starSystemName()).isEqualTo("Stanton");
+              assertThat(row.uexSyncedAt()).isEqualTo(Instant.parse("2026-10-03T11:30:00Z"));
+            });
     client.shipTypesSorted();
 
     backend.expect("GET", "/api/v1/materials/prices-overview?size=10000&sort=name,asc");

@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -66,7 +67,7 @@ class MaterialCollectionPageControllerTest {
   void viewMaterialCollection_shouldPopulateModelAndReturnTemplate() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialCollectionPageController controller =
-        new MaterialCollectionPageController(backendApiClient);
+        new MaterialCollectionPageController(new JobOrderBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID jobOrderId = UUID.randomUUID();
 
@@ -105,7 +106,7 @@ class MaterialCollectionPageControllerTest {
   void viewMaterialCollection_shouldReturnFragment_whenFragmentIsResults() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialCollectionPageController controller =
-        new MaterialCollectionPageController(backendApiClient);
+        new MaterialCollectionPageController(new JobOrderBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID jobOrderId = UUID.randomUUID();
 
@@ -125,7 +126,7 @@ class MaterialCollectionPageControllerTest {
   void viewMaterialCollection_shouldHandleBackendErrorForEntries() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialCollectionPageController controller =
-        new MaterialCollectionPageController(backendApiClient);
+        new MaterialCollectionPageController(new JobOrderBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID jobOrderId = UUID.randomUUID();
 
@@ -147,7 +148,7 @@ class MaterialCollectionPageControllerTest {
   void viewMaterialCollection_shouldHandleBackendErrorForLocations() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialCollectionPageController controller =
-        new MaterialCollectionPageController(backendApiClient);
+        new MaterialCollectionPageController(new JobOrderBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID jobOrderId = UUID.randomUUID();
 

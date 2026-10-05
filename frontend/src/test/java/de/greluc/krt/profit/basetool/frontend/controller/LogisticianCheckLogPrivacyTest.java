@@ -60,9 +60,29 @@ class LogisticianCheckLogPrivacyTest {
         Arguments.of(RefineryOrderPageController.class));
   }
 
+  /**
+   * Sets the controller's typed backend client to a real client over the mocked kernel client.
+   *
+   * @param controller the controller under test
+   * @param type its class
+   * @param api the mocked kernel client
+   * @throws ReflectiveOperationException when the client cannot be built
+   */
+  private static void injectTypedClient(Object controller, Class<?> type, BackendApiClient api)
+      throws ReflectiveOperationException {
+    for (java.lang.reflect.Field field : type.getDeclaredFields()) {
+      if (field.getType().getSimpleName().endsWith("BackendClient")) {
+        Object client = field.getType().getConstructor(BackendApiClient.class).newInstance(api);
+        ReflectionTestUtils.setField(controller, field.getName(), client);
+        return;
+      }
+    }
+    throw new IllegalStateException(type.getSimpleName() + " has no typed backend client");
+  }
+
   @ParameterizedTest
   @MethodSource("controllers")
-  void isLogistician_neverLogsPrincipalNameOrItsHash(Class<?> type) {
+  void isLogistician_neverLogsPrincipalNameOrItsHash(Class<?> type) throws Exception {
     Logger logger = (Logger) LoggerFactory.getLogger(type);
     Level original = logger.getLevel();
     logger.setLevel(Level.DEBUG);
@@ -78,7 +98,7 @@ class LogisticianCheckLogPrivacyTest {
       RoleHierarchy hierarchy = mock(RoleHierarchy.class);
       when(hierarchy.getReachableGrantedAuthorities(any()))
           .thenAnswer(inv -> List.<GrantedAuthority>of(new SimpleGrantedAuthority("ROLE_X")));
-      ReflectionTestUtils.setField(controller, "backendApiClient", api);
+      injectTypedClient(controller, type, api);
       ReflectionTestUtils.setField(controller, "roleHierarchy", hierarchy);
       OidcUser principal = mock(OidcUser.class);
       when(principal.getName()).thenReturn(PRINCIPAL_NAME);

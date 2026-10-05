@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialMatrixItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialPriceOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
@@ -43,7 +44,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -337,8 +337,22 @@ class MaterialsPageControllerMvcTest {
         .thenReturn(
             new PageResponse<>(
                 List.of(
-                    Map.<String, Object>of(
-                        "uexSyncedAt", Instant.now().minus(Duration.ofMinutes(14)).toString())),
+                    new TerminalDto(
+                        UUID.fromString("0d6b3e1a-7c42-4f58-9a1e-3b5c7d9e2f40"),
+                        "Area18 TDD",
+                        null,
+                        "Stanton",
+                        "ArcCorp",
+                        "Area18",
+                        null,
+                        true,
+                        false,
+                        false,
+                        false,
+                        true,
+                        false,
+                        Instant.now().minus(Duration.ofMinutes(14)),
+                        false)),
                 0,
                 10000,
                 1,

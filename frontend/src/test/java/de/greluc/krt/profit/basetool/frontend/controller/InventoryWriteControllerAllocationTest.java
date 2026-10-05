@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryAllocationDimension;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryAllocationWriteDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
@@ -50,7 +51,8 @@ class InventoryWriteControllerAllocationTest {
   @Mock private InventoryPageController inventoryPageController;
 
   private InventoryWriteController controller() {
-    return new InventoryWriteController(backendApiClient, inventoryPageController);
+    return new InventoryWriteController(
+        new InventoryBackendClient(backendApiClient), inventoryPageController);
   }
 
   private static InventoryItemDto sentinel() {

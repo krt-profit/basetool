@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderForm;
+import de.greluc.krt.profit.basetool.frontend.refinery.client.RefineryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.nio.charset.StandardCharsets;
@@ -71,7 +72,7 @@ class RefineryImportProxyControllerTest {
   @BeforeEach
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
-    controller = new RefineryImportProxyController(backendApiClient);
+    controller = new RefineryImportProxyController(new RefineryBackendClient(backendApiClient));
     redirectAttributes = new RedirectAttributesModelMap();
   }
 

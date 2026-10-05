@@ -39,9 +39,11 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialPriceOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MatrixGridDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -193,7 +195,23 @@ class MaterialsPageControllerTest {
     when(backendApiClient.getCached(eq(CachedCatalog.TERMINALS), anyTypeRef()))
         .thenReturn(
             new PageResponse<>(
-                List.of(Map.of("uexSyncedAt", "2020-01-01T00:00:00Z")),
+                List.of(
+                    new TerminalDto(
+                        UUID.fromString("0d6b3e1a-7c42-4f58-9a1e-3b5c7d9e2f40"),
+                        "Area 18 TDD",
+                        null,
+                        "Stanton",
+                        "ArcCorp",
+                        "Area18",
+                        null,
+                        true,
+                        false,
+                        false,
+                        false,
+                        true,
+                        false,
+                        Instant.parse("2020-01-01T00:00:00Z"),
+                        false)),
                 0,
                 10000,
                 1,

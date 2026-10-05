@@ -74,30 +74,7 @@ class TypedBackendClientTest {
       Set.of(BASE + ".service", BASE + ".config", BASE + ".websocket");
 
   /** The typed clients when the rule was introduced; fewer means the selection broke. */
-  private static final int CLIENT_FLOOR = 6;
-
-  /**
-   * The controllers and controller helpers that still call {@link BackendApiClient} until their
-   * domain's typed client lands (plan F3). The list only shrinks and must match exactly.
-   */
-  private static final Set<String> NOT_YET_ON_A_TYPED_CLIENT =
-      Set.of(
-          "InventoryDeleteAllProxyController",
-          "InventoryMergeProbeProxyController",
-          "InventoryOrgUnitChangeProxyController",
-          "InventoryPageController",
-          "InventoryStolenMarkProxyController",
-          "InventoryWriteController",
-          "ItemCollectionPageController",
-          "JobOrderHandoverReportProxyController",
-          "JobOrderMaterialDemandPageController",
-          "JobOrderPageController",
-          "JobOrderStockAttributionProxyController",
-          "JobOrderWriteController",
-          "MaterialCollectionPageController",
-          "RefineryImportProxyController",
-          "RefineryOrderPageController",
-          "RefineryOrderWriteController");
+  private static final int CLIENT_FLOOR = 21;
 
   @Test
   void onlyTheKernelAndTypedClientsCallTheKernelClient() {
@@ -105,7 +82,7 @@ class TypedBackendClientTest {
         .as(
             "classes that call BackendApiClient but are neither kernel nor a typed client in a"
                 + " <domain>.client package; call the domain's typed client instead")
-        .containsExactlyInAnyOrderElementsOf(NOT_YET_ON_A_TYPED_CLIENT);
+        .isEmpty();
   }
 
   @Test
