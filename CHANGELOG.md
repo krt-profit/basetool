@@ -323,6 +323,11 @@
 
 ### Fixed
 
+- **Benachrichtigungs-Stream: kein ERROR mehr, wenn der Browser geht.** Schloss ein Browser den
+  Live-Stream genau während eines Ereignisses, schrieb das Frontend einen `IllegalStateException`
+  als ERROR ins Log. Ein abgebrochener Schreibvorgang beendet jetzt nur noch die Verbindung zum
+  Backend (Frontend, REQ-NOTIF-010).
+
 - **Lager: `canEdit` sagt die ganze Wahrheit.** Das Feld war für ein einfaches Mitglied auch auf den
   Zeilen anderer Mitglieder seiner Einheit `true`, obwohl jede Zeilenaktion dort mit 403 abgelehnt
   wird; die App bot deshalb Aktionen an, die scheiterten. Jetzt gilt: Besitzer oder Logistiker und

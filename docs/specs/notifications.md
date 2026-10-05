@@ -395,6 +395,16 @@ because the async dispatch then ran without the request's MDC, not because the c
 2026-09-25 the async dispatch carries the request's `correlationId`, `userId` and `orgUnitId`
 ([`observability.md`](observability.md) REQ-OBS-001).
 
+**The relay never completes an emitter the container has already ended (2026-10-05).** The relay
+writes from a Reactor-Netty thread, so a browser that disconnects can race it: Tomcat runs its
+async error handling, and a `complete()` from the Netty thread afterwards throws
+`IllegalStateException` ("A non-container (application) thread attempted to use the AsyncContext
+after an error"). Thrown inside the subscriber, it went to Reactor's `onErrorDropped` and logged
+`ERROR`. Now a write that fails with an `IOException` only cancels the backend subscription and
+leaves the emitter to the container's error dispatch, as Spring's `ResponseBodyEmitter` contract
+asks; every other completion from the Netty thread (upstream end, upstream error, a non-I/O write
+failure) tolerates an already-ended request at `DEBUG`.
+
 **A stream refused for a missing session stops reconnecting.** An anonymous `GET
 /notifications/stream` meets the entry point like every background call: `401` + `X-Reauthenticate`,
 never a login redirect (REQ-SEC-012; `Accept: text/event-stream` and `Sec-Fetch-Mode: cors` are both
