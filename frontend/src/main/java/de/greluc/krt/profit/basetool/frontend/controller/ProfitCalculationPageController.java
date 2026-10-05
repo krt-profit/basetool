@@ -23,9 +23,9 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendC
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import lombok.RequiredArgsConstructor;
@@ -82,14 +82,14 @@ public class ProfitCalculationPageController {
           .findFirst()
           .ifPresent(c2 -> model.addAttribute("defaultShipId", c2.id()));
 
-      PageResponse<Map<String, Object>> terminalsPage = catalogueClient.terminalCatalogue();
+      PageResponse<TerminalDto> terminalsPage = catalogueClient.terminalCatalogue();
 
       Set<String> starSystems = new TreeSet<>();
       if (terminalsPage != null && terminalsPage.content() != null) {
-        for (Map<String, Object> terminal : terminalsPage.content()) {
-          Object system = terminal.get("starSystemName");
-          if (system != null && !system.toString().isBlank()) {
-            starSystems.add(system.toString());
+        for (TerminalDto terminal : terminalsPage.content()) {
+          String system = terminal.starSystemName();
+          if (system != null && !system.isBlank()) {
+            starSystems.add(system);
           }
         }
       }

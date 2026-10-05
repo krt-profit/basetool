@@ -22,11 +22,12 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.TerminalDto;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.HashMap;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /** Unit tests of {@link UexAge}: the unit chosen for an age and the newest sweep of a catalogue. */
@@ -62,18 +63,16 @@ class UexAgeTest {
     assertThat(UexAge.of(NOW.plusSeconds(600), NOW)).extracting(UexAge::unit).isEqualTo("now");
   }
 
-  /** The newest readable sweep wins; unreadable and missing values are skipped. */
+  /** The newest sweep wins; terminals without a sweep and missing rows are skipped. */
   @Test
-  void latestSync_returnsTheNewestReadableSweep() {
-    Map<String, Object> missing = new HashMap<>();
-    missing.put("uexSyncedAt", null);
-    PageResponse<Map<String, Object>> terminals =
+  void latestSync_returnsTheNewestSweep() {
+    PageResponse<TerminalDto> terminals =
         new PageResponse<>(
-            List.of(
-                Map.of("uexSyncedAt", "2026-10-03T10:00:00Z"),
-                Map.of("uexSyncedAt", "2026-10-03T11:30:00Z"),
-                Map.of("uexSyncedAt", "not a date"),
-                missing),
+            Arrays.asList(
+                terminal(Instant.parse("2026-10-03T10:00:00Z")),
+                terminal(Instant.parse("2026-10-03T11:30:00Z")),
+                terminal(null),
+                null),
             0,
             10,
             4,
@@ -83,5 +82,30 @@ class UexAgeTest {
     assertThat(UexAge.latestSync(terminals)).isEqualTo(Instant.parse("2026-10-03T11:30:00Z"));
     assertThat(UexAge.latestSync(null)).isNull();
     assertThat(UexAge.latestSync(new PageResponse<>(List.of(), 0, 10, 0, 0, List.of()))).isNull();
+  }
+
+  /**
+   * Builds a terminal row carrying only a sweep instant.
+   *
+   * @param uexSyncedAt the sweep instant, or {@code null}
+   * @return the terminal
+   */
+  private static TerminalDto terminal(Instant uexSyncedAt) {
+    return new TerminalDto(
+        UUID.fromString("5b0f6c2e-8f1a-4d3b-9c7e-2a4d6f8b1c3e"),
+        "Area 18 TDD",
+        null,
+        "Stanton",
+        null,
+        null,
+        null,
+        null,
+        null,
+        false,
+        false,
+        null,
+        null,
+        uexSyncedAt,
+        false);
   }
 }

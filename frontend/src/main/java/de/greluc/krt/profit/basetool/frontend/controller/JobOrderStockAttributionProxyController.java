@@ -19,14 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LinkedStockAttributionDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -46,11 +45,8 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class JobOrderStockAttributionProxyController {
 
-  /** Decodes the backend's attribution list. */
-  private static final ParameterizedTypeReference<List<LinkedStockAttributionDto>>
-      LIST_OF_STOCK_ATTRIBUTION = new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Reads the attribution from the backend. */
+  private final JobOrderBackendClient jobOrderClient;
 
   /**
    * Forwards to {@code GET /api/v1/orders/{id}/materials/{matId}/attribution}.
@@ -67,12 +63,7 @@ public class JobOrderStockAttributionProxyController {
   public ResponseEntity<List<LinkedStockAttributionDto>> stockAttribution(
       @PathVariable UUID id, @PathVariable UUID matId) {
     try {
-      return ResponseEntity.ok(
-          backendApiClient.get(
-              "/api/v1/orders/{id}/materials/{matId}/attribution",
-              LIST_OF_STOCK_ATTRIBUTION,
-              id,
-              matId));
+      return ResponseEntity.ok(jobOrderClient.stockAttribution(id, matId));
     } catch (Exception e) {
       log.warn("Failed to load stock attribution for job order {} and material {}", id, matId, e);
       return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
