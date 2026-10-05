@@ -161,8 +161,10 @@ public class OperationPageController {
       uri.append("end={end}&");
       uriVariables.add(end);
     }
-    uri.append("page=").append(page).append("&");
-    uri.append("size=").append(size).append("&");
+    uri.append("page={page}&");
+    uriVariables.add(page);
+    uri.append("size={size}&");
+    uriVariables.add(size);
     uri.append("sort=createdAt,desc&");
 
     String knownPeriod = RelayParams.oneOfOrNull(period, OPERATION_PERIODS);
@@ -177,9 +179,7 @@ public class OperationPageController {
 
     try {
       PageResponse<OperationDto> operationsPage =
-          uriVariables.isEmpty()
-              ? backendApiClient.get(uri.toString(), OPERATION_PAGE_TYPE)
-              : backendApiClient.get(uri.toString(), OPERATION_PAGE_TYPE, uriVariables.toArray());
+          backendApiClient.get(uri.toString(), OPERATION_PAGE_TYPE, uriVariables.toArray());
       model.addAttribute("operations", operationsPage.content());
       model.addAttribute("operationsPage", operationsPage);
       model.addAttribute("search", search);
@@ -316,20 +316,21 @@ public class OperationPageController {
       UUID id, Integer page, Integer size, Authentication authentication, Model model) {
     CompletableFuture<OperationDto> operationF =
         parallelPageLoader.loadAsync(
-            () -> backendApiClient.get("/api/v1/operations/" + id, OperationDto.class));
+            () -> backendApiClient.get("/api/v1/operations/{id}", OperationDto.class, id));
     CompletableFuture<PageResponse<MissionListDto>> missionsF =
         parallelPageLoader.loadAsync(() -> fetchMissionsPage(id, page, size));
     CompletableFuture<OperationFinanceSummaryDto> financeF =
         parallelPageLoader.loadAsync(
             () ->
                 backendApiClient.get(
-                    "/api/v1/operations/" + id + "/finance-summary",
-                    OperationFinanceSummaryDto.class));
+                    "/api/v1/operations/{id}/finance-summary",
+                    OperationFinanceSummaryDto.class,
+                    id));
     CompletableFuture<OperationPayoutSummaryDto> payoutsF =
         parallelPageLoader.loadAsync(
             () ->
                 backendApiClient.get(
-                    "/api/v1/operations/" + id + "/payouts", OperationPayoutSummaryDto.class));
+                    "/api/v1/operations/{id}/payouts", OperationPayoutSummaryDto.class, id));
     CompletableFuture.allOf(operationF, missionsF, financeF, payoutsF).join();
 
     model.addAttribute("operation", operationF.join());
@@ -372,10 +373,10 @@ public class OperationPageController {
    */
   private void loadPayoutModel(UUID id, Authentication authentication, @NotNull Model model) {
     model.addAttribute(
-        "operation", backendApiClient.get("/api/v1/operations/" + id, OperationDto.class));
+        "operation", backendApiClient.get("/api/v1/operations/{id}", OperationDto.class, id));
     OperationPayoutSummaryDto payoutSummary =
         backendApiClient.get(
-            "/api/v1/operations/" + id + "/payouts", OperationPayoutSummaryDto.class);
+            "/api/v1/operations/{id}/payouts", OperationPayoutSummaryDto.class, id);
     model.addAttribute("operationPayouts", payoutSummary.payouts());
     model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
     model.addAttribute("payoutProgress", OperationPayoutProgress.of(payoutSummary.payouts()));
@@ -395,7 +396,7 @@ public class OperationPageController {
     model.addAttribute(
         "operationFinance",
         backendApiClient.get(
-            "/api/v1/operations/" + id + "/finance-summary", OperationFinanceSummaryDto.class));
+            "/api/v1/operations/{id}/finance-summary", OperationFinanceSummaryDto.class, id));
   }
 
   /**
@@ -414,7 +415,7 @@ public class OperationPageController {
   private String missionsFragment(UUID id, Integer page, Integer size, Model model) {
     try {
       model.addAttribute(
-          "operation", backendApiClient.get("/api/v1/operations/" + id, OperationDto.class));
+          "operation", backendApiClient.get("/api/v1/operations/{id}", OperationDto.class, id));
       PageResponse<MissionListDto> missionsPage = fetchMissionsPage(id, page, size);
       model.addAttribute("missions", missionsPage.content());
       model.addAttribute("missionsPage", missionsPage);
@@ -437,14 +438,12 @@ public class OperationPageController {
    */
   private PageResponse<MissionListDto> fetchMissionsPage(UUID id, Integer page, Integer size) {
     return backendApiClient.get(
-        "/api/v1/missions/search?operationId="
-            + id
-            + "&page="
-            + page
-            + "&size="
-            + size
+        "/api/v1/missions/search?operationId={id}&page={page}&size={size}"
             + "&sort=plannedStartTime,asc",
-        MISSION_PAGE_TYPE);
+        MISSION_PAGE_TYPE,
+        id,
+        page,
+        size);
   }
 
   /**
@@ -465,8 +464,10 @@ public class OperationPageController {
     try {
       MissionFinanceSummaryDto detail =
           backendApiClient.get(
-              "/api/v1/operations/" + id + "/finances/" + missionId,
-              MissionFinanceSummaryDto.class);
+              "/api/v1/operations/{id}/finances/{missionId}",
+              MissionFinanceSummaryDto.class,
+              id,
+              missionId);
       model.addAttribute("financeDetail", detail);
     } catch (Exception e) {
       log.error("Error loading finance detail for operation {} mission {}", id, missionId, e);

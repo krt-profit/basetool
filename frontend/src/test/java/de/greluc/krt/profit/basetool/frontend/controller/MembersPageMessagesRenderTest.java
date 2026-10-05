@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
@@ -94,7 +93,9 @@ class MembersPageMessagesRenderTest {
     PageResponse<UserDto> page = new PageResponse<>(List.of(), 0, 20, 0, 0, List.of());
     when(backendApiClient.get(eq("/api/v1/users?sort=username,asc"), anyTypeRef()))
         .thenReturn(page);
-    when(backendApiClient.get(contains("/memberships"), anyTypeRef())).thenReturn(List.of());
+    when(backendApiClient.get(
+            eq("/api/v1/users/{id}/memberships"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(List.of());
   }
 
   /** The German page carries every dialog message, resolved and JavaScript-escaped. */

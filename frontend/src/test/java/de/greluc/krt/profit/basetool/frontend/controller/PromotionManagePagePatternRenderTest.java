@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -83,13 +84,16 @@ class PromotionManagePagePatternRenderTest {
             UUID.randomUUID(), 0L, topicId, "Profit", "Trading", "desc", 0, null, null);
     when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(topic));
-    when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef()))
+    when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of(cat));
-    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/all"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 1, List.of()));
-    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/members"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/members"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(members, 0, 1000, members.size(), 1, List.of()));
-    when(backendApiClient.get(contains("/api/v1/promotion/eligibility/user/"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/eligibility/user/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of());
     MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     MockHttpServletRequestBuilder request = get("/promotion/manage").locale(Locale.GERMAN);

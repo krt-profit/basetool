@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -89,7 +90,7 @@ class JobOrderPaginationMvcTest {
   @Test
   @WithMockUser
   void viewOrders_multiPageResult_rendersPaginationAndSizePicker() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef()))
+    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(page(1, 100, 300));
 
     mockMvc
@@ -109,7 +110,7 @@ class JobOrderPaginationMvcTest {
   @Test
   @WithMockUser
   void viewOrders_withStatusFilter_keepsFilterInPaginationLinks() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef()))
+    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(page(1, 100, 300));
 
     mockMvc
@@ -157,7 +158,7 @@ class JobOrderPaginationMvcTest {
   @Test
   @WithMockUser
   void viewOrders_fragmentResults_rendersOnlyTableFragment() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef()))
+    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(pageWithOneOrder(300));
 
     mockMvc
@@ -172,7 +173,7 @@ class JobOrderPaginationMvcTest {
   @Test
   @WithMockUser
   void viewOrders_singleShortPage_rendersNeitherPageNavNorSizePicker() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef()))
+    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(page(0, 100, 5));
 
     mockMvc

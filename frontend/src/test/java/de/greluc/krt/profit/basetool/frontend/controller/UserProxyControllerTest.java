@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -42,6 +43,10 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 class UserProxyControllerTest {
+
+  /** The URI template of the per-user membership lookup. */
+  private static final String MEMBERSHIPS_URI =
+      "/api/v1/users/{userId}/memberships?allKinds={allKinds}";
 
   @Test
   void searchUsers_ShouldCallWebClient() {
@@ -158,14 +163,13 @@ class UserProxyControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     UserProxyController controller = new UserProxyController(backendApiClient);
     UUID id = UUID.fromString("00000000-0000-0000-0000-000000000044");
-    when(backendApiClient.get(anyString(), anyTypeRef()))
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of(Map.of("orgUnitId", "u1", "orgUnitName", "IRIDIUM")));
 
     List<Map<String, Object>> result = controller.userMemberships(id, true);
 
     assertNotNull(result);
-    verify(backendApiClient)
-        .get(eq("/api/v1/users/" + id + "/memberships?allKinds=true"), anyTypeRef());
+    verify(backendApiClient).get(eq(MEMBERSHIPS_URI), anyTypeRef(), eq(id), eq(true));
   }
 
   @Test
@@ -173,13 +177,13 @@ class UserProxyControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     UserProxyController controller = new UserProxyController(backendApiClient);
     UUID id = UUID.fromString("00000000-0000-0000-0000-000000000045");
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(List.of());
 
     List<Map<String, Object>> result = controller.userMemberships(id, false);
 
     assertNotNull(result);
-    verify(backendApiClient)
-        .get(eq("/api/v1/users/" + id + "/memberships?allKinds=false"), anyTypeRef());
+    verify(backendApiClient).get(eq(MEMBERSHIPS_URI), anyTypeRef(), eq(id), eq(false));
   }
 
   @Test
@@ -187,7 +191,7 @@ class UserProxyControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     UserProxyController controller = new UserProxyController(backendApiClient);
     UUID id = UUID.fromString("00000000-0000-0000-0000-000000000046");
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(null);
 
     List<Map<String, Object>> result = controller.userMemberships(id, true);
 
@@ -201,12 +205,12 @@ class UserProxyControllerTest {
     UserProxyController controller = new UserProxyController(backendApiClient);
     UUID id = UUID.fromString("00000000-0000-0000-0000-000000000042");
     Map<String, Object> user = Map.of("id", id.toString(), "effectiveName", "Alice");
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(user);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(user);
 
     Map<String, Object> result = controller.getUser(id);
 
     assertNotNull(result);
-    verify(backendApiClient).get(eq("/api/v1/users/" + id), anyTypeRef());
+    verify(backendApiClient).get(eq("/api/v1/users/{userId}"), anyTypeRef(), eq(id));
   }
 
   @Test
@@ -214,7 +218,8 @@ class UserProxyControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     UserProxyController controller = new UserProxyController(backendApiClient);
     UUID id = UUID.fromString("00000000-0000-0000-0000-000000000043");
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenThrow(new RuntimeException("boom"));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenThrow(new RuntimeException("boom"));
 
     assertNull(controller.getUser(id));
   }

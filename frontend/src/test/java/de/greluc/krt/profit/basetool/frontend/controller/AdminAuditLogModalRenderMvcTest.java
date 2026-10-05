@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -74,6 +75,8 @@ class AdminAuditLogModalRenderMvcTest {
   void exportModal_rendersViaFragmentShell_andProjectsFormExactlyOnce() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     String html =
         mockMvc
@@ -118,6 +121,8 @@ class AdminAuditLogModalRenderMvcTest {
             "basetool-android");
     when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(row), 0, 50, 1, 1, List.of()));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(new PageResponse<>(List.of(row), 0, 50, 1, 1, List.of()));
 
     String html =
         mockMvc
@@ -138,6 +143,8 @@ class AdminAuditLogModalRenderMvcTest {
   @WithMockUser(roles = "ADMIN")
   void bankTab_rendersTheClientFilterAndColumnToo() {
     when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     String html =
@@ -178,6 +185,8 @@ class AdminAuditLogModalRenderMvcTest {
             "basetool-android");
     when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(row), 0, 50, 1, 1, List.of()));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(new PageResponse<>(List.of(row), 0, 50, 1, 1, List.of()));
 
     String html = render("INVENTORY");
 
@@ -216,6 +225,8 @@ class AdminAuditLogModalRenderMvcTest {
   @WithMockUser(roles = "ADMIN")
   void rendersTheEmptyState() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     String html = render("INVENTORY");

@@ -61,9 +61,9 @@ class SpecialCommandMembersPageControllerTest {
 
   /** Stubs a minimal SK read plus a two-member roster delivered out of name order. */
   private void stubSkWithTwoMembers() {
-    when(client.get(eq("/api/v1/special-commands/" + skId), anyTypeRef()))
+    when(client.get(eq("/api/v1/special-commands/{id}"), anyTypeRef(), eq(skId)))
         .thenReturn(Map.of("id", skId.toString(), "name", "Alpha SK", "shorthand", "ASK"));
-    when(client.get(eq("/api/v1/special-commands/" + skId + "/members"), anyTypeRef()))
+    when(client.get(eq("/api/v1/special-commands/{id}/members"), anyTypeRef(), eq(skId)))
         .thenReturn(List.of(Map.of("userDisplayName", "zulu"), Map.of("userDisplayName", "Alpha")));
   }
 
@@ -102,7 +102,7 @@ class SpecialCommandMembersPageControllerTest {
   @Test
   void detail_backendForbidden_throwsAccessDenied() {
     when(authHelper.isAdmin()).thenReturn(false);
-    when(client.get(eq("/api/v1/special-commands/" + skId), anyTypeRef()))
+    when(client.get(eq("/api/v1/special-commands/{id}"), anyTypeRef(), eq(skId)))
         .thenThrow(new BackendServiceException("forbidden", null, 403));
 
     assertThrows(
@@ -112,7 +112,7 @@ class SpecialCommandMembersPageControllerTest {
   @Test
   void detail_emptySkRead_redirectsToBackUrl() {
     when(authHelper.isAdmin()).thenReturn(true);
-    when(client.get(eq("/api/v1/special-commands/" + skId), anyTypeRef())).thenReturn(null);
+    when(client.get(eq("/api/v1/special-commands/{id}"), anyTypeRef(), eq(skId))).thenReturn(null);
 
     String view = controller.detail(skId, null, new ConcurrentModel());
 

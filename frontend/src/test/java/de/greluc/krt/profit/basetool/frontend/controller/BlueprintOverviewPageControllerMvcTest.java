@@ -91,7 +91,8 @@ class BlueprintOverviewPageControllerMvcTest {
   @Test
   @WithMockUser
   void view_multiPageResult_rendersPaginationAndSizePicker() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page(1, 50, 120));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(page(1, 50, 120));
 
     mockMvc
         .perform(get("/blueprint-overview").param("page", "1"))
@@ -106,7 +107,8 @@ class BlueprintOverviewPageControllerMvcTest {
   @Test
   @WithMockUser
   void view_withSearch_keepsSearchInPaginationLinks() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(page(0, 10, 25));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(page(0, 10, 25));
 
     mockMvc
         .perform(get("/blueprint-overview").param("search", "Aurora").param("size", "10"))
@@ -123,7 +125,8 @@ class BlueprintOverviewPageControllerMvcTest {
   @Test
   @WithMockUser
   void view_fragmentResults_rendersOnlyTableFragment() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page(0, 50, 120));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(page(0, 50, 120));
 
     mockMvc
         .perform(get("/blueprint-overview").param("fragment", "results"))
@@ -143,7 +146,8 @@ class BlueprintOverviewPageControllerMvcTest {
   @Test
   @WithMockUser
   void view_rendersTheListPattern() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page(0, 50, 3));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(page(0, 50, 3));
 
     mockMvc
         .perform(get("/blueprint-overview").locale(Locale.GERMAN))
@@ -167,7 +171,8 @@ class BlueprintOverviewPageControllerMvcTest {
   @Test
   @WithMockUser
   void view_emptyList_rendersTheEmptyState() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page(0, 50, 0));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(page(0, 50, 0));
 
     mockMvc
         .perform(get("/blueprint-overview"))
@@ -180,7 +185,8 @@ class BlueprintOverviewPageControllerMvcTest {
   @Test
   @WithMockUser
   void view_singleShortPage_rendersNeitherPageNavNorSizePicker() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page(0, 50, 5));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(page(0, 50, 5));
 
     mockMvc
         .perform(get("/blueprint-overview"))

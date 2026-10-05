@@ -17,15 +17,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend;
+package de.greluc.krt.profit.basetool.backend.dashboard.web;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import de.greluc.krt.profit.basetool.backend.controller.AnnouncementController;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
-class AnnouncementControllerTest {
+class AnnouncementRequestJsonTest {
 
   @Test
   void testJsonParsing_ContentOnly() throws Exception {

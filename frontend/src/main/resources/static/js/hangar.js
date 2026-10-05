@@ -578,7 +578,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const defaultOption = shipTypeAllOptions[0];
 
-        shipTypeSelect.innerHTML = '';
+        shipTypeSelect.replaceChildren();
         shipTypeSelect.appendChild(defaultOption);
 
         shipTypeAllOptions.slice(1).forEach((option) => {

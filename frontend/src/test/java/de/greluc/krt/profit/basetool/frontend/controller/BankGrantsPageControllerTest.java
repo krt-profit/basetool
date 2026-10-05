@@ -90,7 +90,7 @@ class BankGrantsPageControllerTest {
     when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenReturn(List.of(grant(user, "alpha", accountId)));
     when(backendApiClient.get(
-            eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
+            eq("/api/v1/bank/accounts/{id}"), eq(BankAccountDetailDto.class), eq(accountId)))
         .thenReturn(detail(accountId));
 
     String view = controller.grants(null, accountId, null, null, model);
@@ -149,7 +149,7 @@ class BankGrantsPageControllerTest {
     assertNotNull(grants);
     assertEquals(1, grants.size());
     verify(backendApiClient, never())
-        .get(eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class));
+        .get(eq("/api/v1/bank/accounts/{id}"), eq(BankAccountDetailDto.class), eq(accountId));
     verify(backendApiClient, never()).get(eq("/api/v1/bank/grants"), anyTypeRef());
   }
 }

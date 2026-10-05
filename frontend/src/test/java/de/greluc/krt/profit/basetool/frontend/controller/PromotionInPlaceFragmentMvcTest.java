@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -89,9 +90,10 @@ class PromotionInPlaceFragmentMvcTest {
 
     when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(topic));
-    when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef()))
+    when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of(cat));
-    when(backendApiClient.get(contains("/level-contents/by-category/"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/level-contents/by-category/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of(lc));
 
     mockMvc
@@ -169,14 +171,16 @@ class PromotionInPlaceFragmentMvcTest {
 
     when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(topic));
-    when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef()))
+    when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of(cat));
-    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/all"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 10000, 0, 0, List.of()));
-    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/members"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/members"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(member), 0, 1000, 1, 1, List.of()));
     when(backendApiClient.get(
-            contains("/api/v1/promotion/eligibility/user/" + memberId), anyTypeRef()))
+            eq("/api/v1/promotion/eligibility/user/{userId}"), anyTypeRef(), eq(memberId)))
         .thenReturn(List.of(elig));
 
     mockMvc
@@ -203,7 +207,7 @@ class PromotionInPlaceFragmentMvcTest {
         new PromotionEligibilityDto(memberId.toString(), 20, 19, true, true, List.of());
 
     when(backendApiClient.get(
-            contains("/api/v1/promotion/eligibility/user/" + memberId), anyTypeRef()))
+            eq("/api/v1/promotion/eligibility/user/{userId}"), anyTypeRef(), eq(memberId)))
         .thenReturn(List.of(elig));
 
     mockMvc

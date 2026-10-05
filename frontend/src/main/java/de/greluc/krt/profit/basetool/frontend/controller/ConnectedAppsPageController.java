@@ -20,16 +20,15 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.exchange.client.ExchangeBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ConnectedAppDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ConnectedInstallationDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -50,14 +49,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 @Slf4j
 public class ConnectedAppsPageController {
 
-  private static final ParameterizedTypeReference<List<ConnectedAppDto>> LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
-
   /** The {@code fragment} value that renders only the list, for the in-place swap. */
   static final String APPS_FRAGMENT = "apps";
 
   /** Talks to the backend. */
-  private final BackendApiClient backendApiClient;
+  private final ExchangeBackendClient exchangeClient;
 
   /**
    * Renders the page, or with {@code fragment=apps} only the list. A failed load renders an empty
@@ -72,8 +68,7 @@ public class ConnectedAppsPageController {
   public String page(@Nullable @RequestParam(required = false) String fragment, Model model) {
     List<ConnectedAppDto> apps = List.of();
     try {
-      List<ConnectedAppDto> loaded =
-          backendApiClient.get(ConnectedAppsRelayController.BACKEND, LIST_TYPE);
+      List<ConnectedAppDto> loaded = exchangeClient.connectedApps();
       apps = loaded == null ? List.of() : loaded;
     } catch (Exception e) {
       log.debug("Failed to load the connected apps", e);

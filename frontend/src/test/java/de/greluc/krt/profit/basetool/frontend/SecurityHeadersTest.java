@@ -121,4 +121,17 @@ class SecurityHeadersTest {
                 + " Keycloak's end_session_endpoint is not blocked by the browser")
         .contains("form-action 'self' http://keycloak.example.com");
   }
+
+  /**
+   * Verifies the default Trusted Types mode (ADR-0239): the directives travel in a report-only
+   * policy, so a violation is reported but nothing is blocked.
+   */
+  @Test
+  void trustedTypesAreReportedByDefault() throws Exception {
+    var response = mockMvc.perform(get("/")).andExpect(status().isOk()).andReturn().getResponse();
+
+    assertThat(response.getHeader("Content-Security-Policy-Report-Only"))
+        .isEqualTo("require-trusted-types-for 'script'; trusted-types krt-html krt-fragment");
+    assertThat(response.getHeader("Content-Security-Policy")).doesNotContain("trusted-types");
+  }
 }

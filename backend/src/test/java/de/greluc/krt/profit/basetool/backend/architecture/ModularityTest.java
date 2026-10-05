@@ -59,6 +59,7 @@ class ModularityTest {
           "audit",
           "bank",
           "catalogue",
+          "dashboard",
           "exchange",
           "identity",
           "inventory",
@@ -75,7 +76,7 @@ class ModularityTest {
           "refinery",
           "scope");
 
-  private static final int DECLARED_MODULE_FLOOR = 18;
+  private static final int DECLARED_MODULE_FLOOR = 19;
 
   /**
    * Modules without an {@code api} package: their types lie in the base package, which is their
@@ -87,7 +88,8 @@ class ModularityTest {
    * Modules that publish nothing yet: no {@code api} package and no type in the base package, so no
    * other module may depend on them and no declaration allows them.
    */
-  private static final Set<String> INTERNAL_ONLY_MODULES = Set.of("mission", "orgchart");
+  private static final Set<String> INTERNAL_ONLY_MODULES =
+      Set.of("dashboard", "mission", "orgchart");
 
   private static final String API = "api";
 

@@ -257,7 +257,7 @@ public class AdminPersonalBlueprintsPageController {
               }
             })
         .contentType(MediaType.APPLICATION_OCTET_STREAM);
-    String uri = "/api/v1/admin/personal-blueprints/" + userSub + "/import/preview";
+    String uri = "/api/v1/admin/personal-blueprints/{userSub}/import/preview";
 
     return relay(
         log,
@@ -270,7 +270,7 @@ public class AdminPersonalBlueprintsPageController {
                     webClient ->
                         webClient
                             .post()
-                            .uri(uri)
+                            .uri(uri, userSub)
                             .contentType(MediaType.MULTIPART_FORM_DATA)
                             .body(BodyInserters.fromMultipartData(builder.build())),
                     spec -> spec.bodyToMono(BlueprintImportPreviewDto.class))));
@@ -357,7 +357,7 @@ public class AdminPersonalBlueprintsPageController {
   @Nullable
   private UserDto fetchUser(UUID userSub) {
     try {
-      return backendApiClient.get("/api/v1/users/" + userSub, UserDto.class);
+      return backendApiClient.get("/api/v1/users/{userSub}", UserDto.class, userSub);
     } catch (Exception e) {
       log.warn(
           "Failed to fetch selected member {} for admin personal blueprints picker", userSub, e);
@@ -374,17 +374,19 @@ public class AdminPersonalBlueprintsPageController {
    */
   private PageResponse<PersonalBlueprintDto> fetchOwned(UUID userSub, String q) {
     try {
-      StringBuilder uri =
-          new StringBuilder("/api/v1/admin/personal-blueprints/")
-              .append(userSub)
-              .append("?size=")
-              .append(PAGE_SIZE)
-              .append("&sort=productName,asc");
       if (q != null && !q.isBlank()) {
-        uri.append("&q={q}");
-        return backendApiClient.get(uri.toString(), PERSONAL_BLUEPRINT_PAGE_TYPE, q);
+        return backendApiClient.get(
+            "/api/v1/admin/personal-blueprints/{userSub}?size={size}&sort=productName,asc&q={q}",
+            PERSONAL_BLUEPRINT_PAGE_TYPE,
+            userSub,
+            PAGE_SIZE,
+            q);
       }
-      return backendApiClient.get(uri.toString(), PERSONAL_BLUEPRINT_PAGE_TYPE);
+      return backendApiClient.get(
+          "/api/v1/admin/personal-blueprints/{userSub}?size={size}&sort=productName,asc",
+          PERSONAL_BLUEPRINT_PAGE_TYPE,
+          userSub,
+          PAGE_SIZE);
     } catch (Exception e) {
       log.error("Failed to fetch owned blueprints for user {}", userSub, e);
       return new PageResponse<>(new ArrayList<>(), 0, PAGE_SIZE, 0, 0, List.of());

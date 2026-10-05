@@ -1,7 +1,8 @@
 # ADR-0239 — The browser baseline is "Baseline 2025", and Trusted Types follow
 
 - **Status:** Accepted — the baseline and the language level are implemented (2026-10-04);
-  Trusted Types are pending and start in report-only mode
+  Trusted Types are implemented in report-only mode (2026-10-04), and the only step left is the
+  owner-approved switch of production to `enforce`
 - **Date:** 2026-10-01
 - **Deciders:** @greluc (owner decision D-16)
 - **Related:** [domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) §8.2 · spec
@@ -47,6 +48,40 @@ the frontend already collects CSP violations through its client-error beacon (`c
   `Promise.try`, `RegExp.escape` and `Float16Array`, which the floor does not ship, so ESLint rejects
   them (`no-restricted-properties`, `no-restricted-globals`; proven by `:frontend:testEslintBans`).
   The floor is written into REQ-FE-018 and `ui-design-system.md`.
+- **2026-10-04 — Trusted Types, report-only.**
+  - **The two policies.** `krt-html` belongs to the tagged-template builder `krtHtml`
+    (`krt-html.js`): every interpolated value is escaped unless it is itself `krtHtml` markup,
+    arrays render element by element, `krtHtml.set(el, value)` writes markup as HTML and anything
+    else as text, and a call with a forged strings array throws. `krt-fragment` lives inside
+    `krt-fetch.js` and wraps only the text of same-origin fragment responses
+    (`setTrustedHtml`, `replaceWithTrustedHtml`, the new `parseTrustedDocument`). Neither policy
+    object leaves its closure, no `default` policy exists, and where the browser has no Trusted
+    Types both fall back to plain strings.
+  - **The sinks.** The 42 builder sites in 15 scripts moved from `escapeHtml` / `escapeAttr` to
+    `krtHtml`, the 26 `innerHTML = ''` clears to `replaceChildren()`, the one `DOMParser` read to
+    `parseTrustedDocument`, and two client-built tables that misused `setTrustedHtml` (the materials
+    matrix and the profit calculation) to `krtHtml`. `escape-html.js` is gone; nothing used it
+    any more. ESLint (`no-restricted-syntax`, `no-eval`, `no-implied-eval`, `no-new-func`) rejects
+    every HTML or script sink and every `createPolicy` outside the two helpers, and
+    `:frontend:testEslintBans` proves each ban fires; `:frontend:testTrustedTypesJs` pins the
+    builder and both policies.
+  - **The header.** `SecurityHeaders` sends `require-trusted-types-for 'script'; trusted-types
+    krt-html krt-fragment`. `app.security.trusted-types` (`APP_SECURITY_TRUSTED_TYPES`) is `report`
+    by default — the directives form a `Content-Security-Policy-Report-Only` header of their own —
+    or `enforce`, which appends them to the enforced policy; a blank or unknown value is `report`.
+    The gauge `basetool_trusted_types_mode{mode}` shows the effective mode. Chromium dispatches
+    `securitypolicyviolation` for a report-only policy without a `report-uri` (checked by hand
+    against a scratch page before the change), so the beacon's existing listener reports a
+    violation as `csp_violation`, now with the sink name (`require-trusted-types-for Element
+    innerHTML`) and never the markup.
+  - **The collector.** `DialogA11yE2eTest` registers a `securitypolicyviolation` listener before
+    every page script and fails the page walk on any Trusted Types violation; it first plants an
+    `innerHTML` write on the home page and fails if the collector does not hear it.
+  - **What is left.** Switching production to `enforce` is a production configuration change that
+    the owner approves after a quiet period with no `csp_violation` report and a green dialog walk
+    ([`deployment.md` → *Trusted Types: report, then
+    enforce*](../deployment.md#trusted-types-report-then-enforce)). Nothing else of this decision
+    is open.
 
 ## Consequences
 

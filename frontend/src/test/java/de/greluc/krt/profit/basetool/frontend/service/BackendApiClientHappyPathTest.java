@@ -110,6 +110,33 @@ class BackendApiClientHappyPathTest {
   }
 
   @Test
+  void get_withARepeatedPlaceholder_fillsEachOccurrenceWithTheNextValue() throws Exception {
+    server.enqueue(jsonOk("{}"));
+    server.enqueue(jsonOk("{}"));
+
+    client.get(
+        "/api/v1/materials/{id}/terminals?starSystemNames={s}&starSystemNames={s}",
+        String.class,
+        "0b5e0b5e-0000-4000-8000-000000000001",
+        "Stanton",
+        "Pyro & Nyx");
+    client.get(
+        "/api/v1/missions/search?status={status}&status={status}&size={size}",
+        new ParameterizedTypeReference<String>() {},
+        "PLANNED",
+        "ACTIVE",
+        20);
+
+    assertEquals(
+        "/api/v1/materials/0b5e0b5e-0000-4000-8000-000000000001/terminals"
+            + "?starSystemNames=Stanton&starSystemNames=Pyro%20%26%20Nyx",
+        server.takeRequest(1, TimeUnit.SECONDS).getPath());
+    assertEquals(
+        "/api/v1/missions/search?status=PLANNED&status=ACTIVE&size=20",
+        server.takeRequest(1, TimeUnit.SECONDS).getPath());
+  }
+
+  @Test
   void get_withUriVariables_percentEncodesSpacesAndQuotes_notFormEncoding() throws Exception {
     server.enqueue(jsonOk("[]"));
 

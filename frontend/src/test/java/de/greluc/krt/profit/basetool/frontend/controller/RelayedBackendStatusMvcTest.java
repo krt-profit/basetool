@@ -36,6 +36,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.frontend.audit.client.AuditBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.AppHttpProperties;
 import de.greluc.krt.profit.basetool.frontend.exception.GlobalExceptionHandler;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -126,11 +127,15 @@ class RelayedBackendStatusMvcTest {
             multipart("/admin/personal-blueprints/" + id + "/import/preview").file(upload())),
         relay(
             "AuditReportProxyController#downloadAuditLog",
-            wc -> new AuditReportProxyController(RealBackendApiClient.over(wc)),
+            wc ->
+                new AuditReportProxyController(
+                    new AuditBackendClient(RealBackendApiClient.over(wc))),
             get("/api/proxy/audit/BANK/export").param("from", FROM).param("to", TO)),
         relay(
             "AuditReportProxyController#purgeAuditLog",
-            wc -> new AuditReportProxyController(RealBackendApiClient.over(wc)),
+            wc ->
+                new AuditReportProxyController(
+                    new AuditBackendClient(RealBackendApiClient.over(wc))),
             delete("/api/proxy/audit/BANK").param("before", FROM)),
         relay(
             "BankReportProxyController#downloadStatement",

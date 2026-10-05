@@ -216,7 +216,7 @@ class JobOrderItemDetailRenderTest {
             null,
             false);
 
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(order);
 
     MvcResult result =
@@ -331,7 +331,7 @@ class JobOrderItemDetailRenderTest {
             1L,
             null,
             false);
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(order);
 
     String html =
@@ -410,7 +410,7 @@ class JobOrderItemDetailRenderTest {
             1L,
             null,
             false);
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(order);
 
     String html =
@@ -493,7 +493,7 @@ class JobOrderItemDetailRenderTest {
             1L,
             null,
             false);
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(order);
 
     String html =
@@ -595,7 +595,7 @@ class JobOrderItemDetailRenderTest {
             null,
             false);
 
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(order);
 
     MvcResult result =
@@ -666,7 +666,7 @@ class JobOrderItemDetailRenderTest {
             1L,
             null,
             false);
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(order);
 
     String html =
@@ -723,7 +723,7 @@ class JobOrderItemDetailRenderTest {
             1L,
             null,
             false);
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(order);
 
     String html =
@@ -789,7 +789,7 @@ class JobOrderItemDetailRenderTest {
             1L,
             null,
             false);
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(order);
 
     String html =
@@ -870,7 +870,7 @@ class JobOrderItemDetailRenderTest {
   void itemOrder_memberSeesBlueprintCoverageSection() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(oneLineItemOrder(orderId));
     JobOrderItemBlueprintOwnersDto coverage =
         new JobOrderItemBlueprintOwnersDto(
@@ -881,8 +881,9 @@ class JobOrderItemDetailRenderTest {
                 new JobOrderBlueprintOwnerDto("Alice", List.of("A03 Sniper Rifle"), true),
                 new JobOrderBlueprintOwnerDto("Carla", List.of("A03 Sniper Rifle"), false)));
     when(backendApiClient.get(
-            eq("/api/v1/orders/" + orderId + "/item-blueprint-owners"),
-            eq(JobOrderItemBlueprintOwnersDto.class)))
+            eq("/api/v1/orders/{id}/item-blueprint-owners"),
+            eq(JobOrderItemBlueprintOwnersDto.class),
+            eq(orderId)))
         .thenReturn(coverage);
 
     String html =
@@ -926,7 +927,7 @@ class JobOrderItemDetailRenderTest {
   void itemOrder_blueprintOwnersFragment_rendersOnlyThePanel() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(oneLineItemOrder(orderId));
     JobOrderItemBlueprintOwnersDto coverage =
         new JobOrderItemBlueprintOwnersDto(
@@ -934,8 +935,9 @@ class JobOrderItemDetailRenderTest {
                 new JobOrderRequiredBlueprintDto("a03 sniper rifle", "A03 Sniper Rifle", 1, true)),
             List.of(new JobOrderBlueprintOwnerDto("Alice", List.of("A03 Sniper Rifle"), true)));
     when(backendApiClient.get(
-            eq("/api/v1/orders/" + orderId + "/item-blueprint-owners"),
-            eq(JobOrderItemBlueprintOwnersDto.class)))
+            eq("/api/v1/orders/{id}/item-blueprint-owners"),
+            eq(JobOrderItemBlueprintOwnersDto.class),
+            eq(orderId)))
         .thenReturn(coverage);
 
     String html =
@@ -963,7 +965,7 @@ class JobOrderItemDetailRenderTest {
   void itemOrder_nonBlueprintFragmentSwap_doesNotFetchBlueprintCoverage() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(oneLineItemOrder(orderId));
 
     mockMvc
@@ -975,19 +977,21 @@ class JobOrderItemDetailRenderTest {
 
     verify(backendApiClient, never())
         .get(
-            eq("/api/v1/orders/" + orderId + "/item-blueprint-owners"),
-            eq(JobOrderItemBlueprintOwnersDto.class));
+            eq("/api/v1/orders/{id}/item-blueprint-owners"),
+            eq(JobOrderItemBlueprintOwnersDto.class),
+            eq(orderId));
   }
 
   @Test
   void itemOrder_nonMember_blueprintCoverageSectionOmitted() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(oneLineItemOrder(orderId));
     when(backendApiClient.get(
-            eq("/api/v1/orders/" + orderId + "/item-blueprint-owners"),
-            eq(JobOrderItemBlueprintOwnersDto.class)))
+            eq("/api/v1/orders/{id}/item-blueprint-owners"),
+            eq(JobOrderItemBlueprintOwnersDto.class),
+            eq(orderId)))
         .thenThrow(new RuntimeException("forbidden"));
 
     String html =
@@ -1007,7 +1011,7 @@ class JobOrderItemDetailRenderTest {
   void itemOrder_productionModal_rendersBookInSection() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(oneLineItemOrder(orderId));
     when(backendApiClient.get(
             eq("/api/v1/users/me"),
@@ -1069,7 +1073,7 @@ class JobOrderItemDetailRenderTest {
   void detailRender_logistician_fetchesEachFanOutLookupExactlyOnce() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(oneLineItemOrder(orderId));
     when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef()))
         .thenReturn(
@@ -1120,9 +1124,9 @@ class JobOrderItemDetailRenderTest {
     UUID userId = UUID.randomUUID();
     UUID entryId = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(oneLineItemOrder(orderId, gameItemId));
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId + "/item-stock"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}/item-stock"), anyTypeRef(), eq(orderId)))
         .thenReturn(List.of(itemStockGroup(entryId, gameItemId)));
 
     String html =
@@ -1167,9 +1171,9 @@ class JobOrderItemDetailRenderTest {
             List.of(
                 new de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockEntryDto(
                     entryId, 7L, null, null, null, null, 4L, 3L, false)));
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(oneLineItemOrder(orderId, gameItemId));
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId + "/item-stock"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}/item-stock"), anyTypeRef(), eq(orderId)))
         .thenReturn(List.of(redacted));
 
     String html =
@@ -1194,9 +1198,9 @@ class JobOrderItemDetailRenderTest {
   void itemOrder_noEarmarkedStock_rendersNoInlineStock() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(oneLineItemOrder(orderId));
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId + "/item-stock"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}/item-stock"), anyTypeRef(), eq(orderId)))
         .thenReturn(List.of());
 
     String html =
@@ -1222,9 +1226,9 @@ class JobOrderItemDetailRenderTest {
     UUID userId = UUID.randomUUID();
     UUID entryId = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(oneLineItemOrder(orderId, gameItemId));
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId + "/item-stock"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}/item-stock"), anyTypeRef(), eq(orderId)))
         .thenReturn(List.of(itemStockGroup(entryId, gameItemId)));
 
     String html =
@@ -1285,7 +1289,7 @@ class JobOrderItemDetailRenderTest {
             1L,
             null,
             false);
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(order);
 
     String html =
@@ -1300,7 +1304,7 @@ class JobOrderItemDetailRenderTest {
         .as("no inline item stock on a material order")
         .doesNotContain("class=\"od-item-stock-inline\"");
     verify(backendApiClient, never())
-        .get(eq("/api/v1/orders/" + orderId + "/item-stock"), anyTypeRef());
+        .get(eq("/api/v1/orders/{id}/item-stock"), anyTypeRef(), eq(orderId));
   }
 
   @Test
@@ -1357,7 +1361,7 @@ class JobOrderItemDetailRenderTest {
             1L,
             null,
             false);
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(order);
 
     String html =

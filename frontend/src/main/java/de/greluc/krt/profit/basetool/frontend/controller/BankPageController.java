@@ -197,7 +197,7 @@ public class BankPageController {
       return balanceChartFragment(id, chartRange, model);
     }
     BankAccountDetailDto detail =
-        backendApiClient.get("/api/v1/bank/accounts/" + id, BankAccountDetailDto.class);
+        backendApiClient.get("/api/v1/bank/accounts/{id}", BankAccountDetailDto.class, id);
     addBookingsModel(id, page, size, from, to, model);
     addChartModel(id, chartRange, detail, model);
     List<BankHolderDto> holders = backendApiClient.get("/api/v1/bank/holders", BANK_HOLDER_LIST);
@@ -252,7 +252,7 @@ public class BankPageController {
   private String balanceChartFragment(UUID id, String chartRange, Model model) {
     BankAccountDetailDto detail = null;
     try {
-      detail = backendApiClient.get("/api/v1/bank/accounts/" + id, BankAccountDetailDto.class);
+      detail = backendApiClient.get("/api/v1/bank/accounts/{id}", BankAccountDetailDto.class, id);
     } catch (RuntimeException e) {
       log.warn("Error loading account {} for balance-chart fragment", id, e);
     }
@@ -369,14 +369,16 @@ public class BankPageController {
    */
   private PageResponse<BankBookingDto> fetchBookings(
       UUID id, int page, Integer size, Instant from, Instant to) {
-    return backendApiClient.get(
-        UriComponentsBuilder.fromPath("/api/v1/bank/accounts/" + id + "/transactions")
+    String uri =
+        UriComponentsBuilder.fromPath("/api/v1/bank/accounts/{id}/transactions")
             .queryParam("page", page)
             .queryParam("size", size == null ? BankAccountDetailSupport.DEFAULT_PAGE_SIZE : size)
             .queryParam("from", from)
             .queryParam("to", to)
-            .toUriString(),
-        BANK_BOOKING_PAGE);
+            .encode()
+            .build()
+            .toUriString();
+    return backendApiClient.get(uri, BANK_BOOKING_PAGE, id);
   }
 
   /**
@@ -388,12 +390,14 @@ public class BankPageController {
    * @return the balance series envelope
    */
   private BankBalanceSeriesDto fetchBalanceSeries(UUID id, Instant from, Instant to) {
-    return backendApiClient.get(
-        UriComponentsBuilder.fromPath("/api/v1/bank/accounts/" + id + "/balance-series")
+    String uri =
+        UriComponentsBuilder.fromPath("/api/v1/bank/accounts/{id}/balance-series")
             .queryParam("from", from)
             .queryParam("to", to)
-            .toUriString(),
-        BankBalanceSeriesDto.class);
+            .encode()
+            .build()
+            .toUriString();
+    return backendApiClient.get(uri, BankBalanceSeriesDto.class, id);
   }
 
   /**
@@ -418,7 +422,8 @@ public class BankPageController {
       return holderBookingsFragment(id, page, model);
     }
     int effectivePage = page == null || page < 0 ? 0 : page;
-    BankHolderDto holder = backendApiClient.get("/api/v1/bank/holders/" + id, BankHolderDto.class);
+    BankHolderDto holder =
+        backendApiClient.get("/api/v1/bank/holders/{id}", BankHolderDto.class, id);
     PageResponse<BankHolderBookingDto> bookings = fetchHolderBookings(id, effectivePage);
     model.addAttribute("holder", holder);
     model.addAttribute("bookings", bookings);
@@ -462,11 +467,10 @@ public class BankPageController {
    */
   private PageResponse<BankHolderBookingDto> fetchHolderBookings(UUID id, int page) {
     return backendApiClient.get(
-        UriComponentsBuilder.fromPath("/api/v1/bank/holders/" + id + "/transactions")
-            .queryParam("page", page)
-            .queryParam("size", 20)
-            .toUriString(),
-        BANK_HOLDER_BOOKING_PAGE);
+        "/api/v1/bank/holders/{id}/transactions?page={page}&size=20",
+        BANK_HOLDER_BOOKING_PAGE,
+        id,
+        page);
   }
 
   /**
