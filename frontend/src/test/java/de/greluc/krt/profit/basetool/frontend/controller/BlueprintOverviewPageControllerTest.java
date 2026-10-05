@@ -28,14 +28,15 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintOverviewEntryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintOverviewOwnerDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ui.ExtendedModelMap;
@@ -50,7 +51,12 @@ class BlueprintOverviewPageControllerTest {
       "/api/v1/personal-blueprints/overview?page={page}&size={size}";
 
   @Mock private BackendApiClient backendApiClient;
-  @InjectMocks private BlueprintOverviewPageController controller;
+  private BlueprintOverviewPageController controller;
+
+  @BeforeEach
+  void setUp() {
+    controller = new BlueprintOverviewPageController(new BlueprintBackendClient(backendApiClient));
+  }
 
   @Test
   void view_populatesOverviewAndPageEnvelope_withDefaults() {

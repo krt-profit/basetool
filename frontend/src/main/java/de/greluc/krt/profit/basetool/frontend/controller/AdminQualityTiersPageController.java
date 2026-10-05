@@ -19,16 +19,15 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.QualityTierDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -49,13 +48,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminQualityTiersPageController {
 
-  private static final String BACKEND_BASE = "/api/v1/admin/quality-tiers";
-
-  /** Response type of the backend's tier list. */
-  private static final ParameterizedTypeReference<List<QualityTierDto>> TIER_LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Reads the quality tiers. */
+  private final CatalogueBackendClient catalogueClient;
 
   /**
    * Renders the tier table, inactive tiers included; a backend failure shows an error banner over
@@ -69,7 +63,7 @@ public class AdminQualityTiersPageController {
   @GetMapping
   public String list(@RequestParam(required = false) @Nullable String fragment, Model model) {
     try {
-      List<QualityTierDto> tiers = backendApiClient.get(BACKEND_BASE, TIER_LIST_TYPE);
+      List<QualityTierDto> tiers = catalogueClient.qualityTiers();
       model.addAttribute("tiers", tiers == null ? List.of() : tiers);
     } catch (Exception e) {
       log.error("Failed to load quality-tier admin page", e);
