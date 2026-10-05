@@ -823,8 +823,8 @@ their "must stay green" period here (D-01).
   `LeitungController` into `orgchart.web`, the rest (entity `OrgChartPosition`, its repository, the
   enums, `OrgChartService`, `OrgChartReadService`, `LeitungViewService`, `OrgChartPositionMapper`
   and the 14 DTOs, `AreaLeadershipDto` with them as §7.3 P1-1 deferred) into `orgchart.internal`.
-  The module is declared (floor 19, after `dashboard`) and publishes nothing: no other module uses it, and orgunit
-  reaches it only through `MembershipChangeObserver`. The domain map trades its two `name` rules
+  The module is declared (floor 19, after `dashboard`) and publishes nothing: no other module uses
+  it, and orgunit reaches it only through `MembershipChangeObserver`. The domain map trades its two `name` rules
   and the `AreaLeadershipDto` class rule for one `package` rule. No access policy left the scope
   hub — the org chart has none: its reads are `isAuthenticated()`, its writes `hasRole('ADMIN')`,
   and neither touches `OwnerScopeService` or `AccessGateService`. The module baseline is unchanged
