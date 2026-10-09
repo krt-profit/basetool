@@ -17,12 +17,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+/**
+ * The mission module's published API: the commands other modules may ask of it (plan §5.2, §5.3).
+ */
+@NamedInterface("api")
+package de.greluc.krt.profit.basetool.backend.mission.api;
 
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.UUID;
-
-/** Data transfer record carrying Operation Finance payload. */
-public record OperationFinanceDto(
-    UUID operationId, BigDecimal totalSum, List<MissionFinanceSummaryDto> missions) {}
+import org.springframework.modulith.NamedInterface;

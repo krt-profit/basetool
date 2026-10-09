@@ -33,7 +33,6 @@ import de.greluc.krt.profit.basetool.backend.controller.InventoryItemController;
 import de.greluc.krt.profit.basetool.backend.controller.MemberEvaluationController;
 import de.greluc.krt.profit.basetool.backend.controller.MissionController;
 import de.greluc.krt.profit.basetool.backend.controller.MissionFinanceEntryController;
-import de.greluc.krt.profit.basetool.backend.controller.OperationController;
 import de.greluc.krt.profit.basetool.backend.controller.PromotionCategoryController;
 import de.greluc.krt.profit.basetool.backend.controller.PromotionLevelContentController;
 import de.greluc.krt.profit.basetool.backend.controller.PromotionTopicController;
@@ -62,6 +61,8 @@ import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.model.RankRequirement;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.operation.web.OperationController;
 import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartPosition;
 import de.greluc.krt.profit.basetool.backend.service.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.service.MissionSecurityService;
@@ -98,6 +99,7 @@ class TenancyGuardTest {
       Set.of(
           OwnerScopeService.class,
           AccessGateService.class,
+          OperationAccessPolicy.class,
           MissionSecurityService.class,
           SpecialCommandSecurityService.class,
           OrgRoleManagementSecurityService.class);

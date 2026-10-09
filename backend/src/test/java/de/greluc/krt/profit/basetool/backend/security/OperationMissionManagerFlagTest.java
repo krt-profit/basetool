@@ -56,7 +56,7 @@ import org.springframework.web.context.WebApplicationContext;
 /**
  * Verifies that the DB mission-manager flag, resolved by {@link
  * CustomJwtGrantedAuthoritiesConverter}, passes the {@code hasRole('MISSION_MANAGER')} gates of
- * {@link de.greluc.krt.profit.basetool.backend.controller.OperationController}.
+ * {@link de.greluc.krt.profit.basetool.backend.operation.web.OperationController}.
  */
 @SpringBootTest
 @Transactional

@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
@@ -105,6 +106,8 @@ class OwnerScopeServiceTest {
   @Mock private HttpServletRequest request;
 
   private OwnerScopeService service;
+
+  private OperationAccessPolicy operationPolicy;
 
   private static final UUID MEMBER_USER_ID = UUID.randomUUID();
   private static final UUID SQUADRON_A_ID = UUID.randomUUID();
@@ -178,7 +181,6 @@ class OwnerScopeServiceTest {
             jobOrderItemHandoverRepository,
             inventoryItemRepository,
             refineryOrderRepository,
-            operationRepository,
             shipRepository,
             orgUnitMembershipRepository);
     OrgUnitStampingService orgUnitStampingService =
@@ -190,6 +192,7 @@ class OwnerScopeServiceTest {
             orgUnitRepository);
     service =
         new OwnerScopeService(requestScopeResolver, accessGateService, orgUnitStampingService);
+    operationPolicy = new OperationAccessPolicy(service, authHelper, operationRepository);
   }
 
   /** Returns a Staffel membership row pointing the given user at the given Squadron. */
@@ -1190,8 +1193,8 @@ class OwnerScopeServiceTest {
       when(operationRepository.findById(opId)).thenReturn(Optional.of(op));
       stubMemberInSquadronA();
 
-      assertFalse(service.canSeeOperation(opId));
-      assertFalse(service.canEditOperation(opId));
+      assertFalse(operationPolicy.canSeeOperation(opId));
+      assertFalse(operationPolicy.canEditOperation(opId));
     }
 
     @Test
@@ -1203,7 +1206,7 @@ class OwnerScopeServiceTest {
       when(operationRepository.findById(opId)).thenReturn(Optional.of(op));
       when(authHelper.isMemberOrAbove()).thenReturn(true);
 
-      assertTrue(service.canSeeOperation(opId));
+      assertTrue(operationPolicy.canSeeOperation(opId));
     }
 
     @Test
@@ -1215,7 +1218,7 @@ class OwnerScopeServiceTest {
       when(operationRepository.findById(opId)).thenReturn(Optional.of(op));
       when(authHelper.isMemberOrAbove()).thenReturn(false);
 
-      assertFalse(service.canSeeOperation(opId));
+      assertFalse(operationPolicy.canSeeOperation(opId));
     }
 
     @Test
@@ -1226,7 +1229,7 @@ class OwnerScopeServiceTest {
       op.setOwningOrgUnit(null);
       when(operationRepository.findById(opId)).thenReturn(Optional.of(op));
 
-      assertTrue(service.canEditOperation(opId));
+      assertTrue(operationPolicy.canEditOperation(opId));
     }
 
     @Test
@@ -1240,8 +1243,11 @@ class OwnerScopeServiceTest {
       when(operationRepository.existsParticipantUserInOperation(opId, MEMBER_USER_ID))
           .thenReturn(true);
 
-      assertTrue(service.canSeeOperation(opId), "participant may view a foreign-Staffel operation");
-      assertFalse(service.canEditOperation(opId), "participation grants view only, not edit");
+      assertTrue(
+          operationPolicy.canSeeOperation(opId),
+          "participant may view a foreign-Staffel operation");
+      assertFalse(
+          operationPolicy.canEditOperation(opId), "participation grants view only, not edit");
     }
 
     @Test

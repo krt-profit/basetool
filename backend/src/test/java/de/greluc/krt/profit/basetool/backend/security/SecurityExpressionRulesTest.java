@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.security.SecurityExpressionAnalyzer.Analysis;
 import de.greluc.krt.profit.basetool.backend.security.SecurityExpressionAnalyzer.BeanCall;
 import de.greluc.krt.profit.basetool.backend.security.SecurityExpressionSources.Declared;
@@ -54,12 +55,13 @@ class SecurityExpressionRulesTest {
   private static final int EXPRESSION_FLOOR = 441;
 
   /**
-   * Bean references per security bean on 2026-10-02. A count below its floor means a gate lost a
-   * bean check; a count above it is new coverage, and the floor is raised with it.
+   * Bean references per security bean. A count below its floor means a gate lost a bean check; a
+   * count above it is new coverage, and the floor is raised with it.
    */
   private static final Map<String, Integer> REFERENCE_FLOORS =
       Map.of(
-          "ownerScopeService", 66,
+          "ownerScopeService", 59,
+          "operationAccessPolicy", 8,
           "missionSecurityService", 40,
           "authHelperService", 17,
           "exchangeGate", 14,
@@ -75,6 +77,7 @@ class SecurityExpressionRulesTest {
   private static final Map<String, Class<?>> NAMED_SECURITY_BEANS =
       Map.of(
           "ownerScopeService", OwnerScopeService.class,
+          "operationAccessPolicy", OperationAccessPolicy.class,
           "missionSecurityService", MissionSecurityService.class,
           "authHelperService", AuthHelperService.class,
           "exchangeGate", ExchangeGate.class,

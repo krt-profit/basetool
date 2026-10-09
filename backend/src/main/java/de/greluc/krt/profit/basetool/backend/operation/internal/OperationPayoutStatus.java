@@ -17,8 +17,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model;
+package de.greluc.krt.profit.basetool.backend.operation.internal;
 
+import de.greluc.krt.profit.basetool.backend.model.AbstractEntity;
+import de.greluc.krt.profit.basetool.backend.model.Operation;
+import de.greluc.krt.profit.basetool.backend.model.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -90,8 +93,7 @@ public class OperationPayoutStatus extends AbstractEntity<UUID> {
 
   /**
    * Whether the participant has been paid out. Defaults to {@code false}; toggled by the {@link
-   * de.greluc.krt.profit.basetool.backend.service.OperationPayoutService#setPayoutStatus} entry
-   * point.
+   * OperationPayoutService#setPayoutStatus} entry point.
    */
   @Column(name = "paid_out", nullable = false)
   private boolean paidOut;

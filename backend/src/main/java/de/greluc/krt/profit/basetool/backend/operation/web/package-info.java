@@ -17,18 +17,5 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
-
-import java.math.BigDecimal;
-import java.util.List;
-
-/**
- * Payout view of an operation: the per-participant breakdown plus the operation-wide donation
- * total, which always equals the sum of the rows' {@link OperationPayoutDto#donatedAmount()}.
- *
- * @param totalDonations sum of donated shares, two-decimal scale; {@link BigDecimal#ZERO} when no
- *     participant donated
- * @param payouts the per-participant rows, sorted by participant name
- */
-public record OperationPayoutSummaryDto(
-    BigDecimal totalDonations, List<OperationPayoutDto> payouts) {}
+/** The operation module's REST controller for /api/v1/operations (plan §5.2). */
+package de.greluc.krt.profit.basetool.backend.operation.web;

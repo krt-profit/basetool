@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.operation.internal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -29,19 +29,25 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionCommands;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
+import de.greluc.krt.profit.basetool.backend.service.AuditService;
+import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
+import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -52,6 +58,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -65,6 +72,7 @@ class OperationServiceTest {
 
   @Mock private OperationRepository operationRepository;
   @Mock private MissionRepository missionRepository;
+  @Mock private MissionCommands missionCommands;
   @Mock private UserService userService;
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private AuthHelperService authHelperService;
@@ -339,7 +347,7 @@ class OperationServiceTest {
   }
 
   @Test
-  void deleteOperation_unlinksMissions_butDoesNotDeleteThem() {
+  void deleteOperation_detachesMissionsThroughTheMissionModule_beforeDeleting() {
     UUID id = UUID.randomUUID();
     Operation operation = new Operation();
     operation.setId(id);
@@ -347,24 +355,20 @@ class OperationServiceTest {
     Mission m1 = new Mission();
     m1.setId(UUID.randomUUID());
     m1.setOperation(operation);
-    Mission m2 = new Mission();
-    m2.setId(UUID.randomUUID());
-    m2.setOperation(operation);
     Set<Mission> missions = new HashSet<>();
     missions.add(m1);
-    missions.add(m2);
     operation.setMissions(missions);
 
     when(operationRepository.findById(id)).thenReturn(Optional.of(operation));
 
     operationService.deleteOperation(id);
 
-    assertNull(m1.getOperation(), "mission #1 back-reference to the operation must be cleared");
-    assertNull(m2.getOperation(), "mission #2 back-reference to the operation must be cleared");
+    InOrder order = inOrder(missionCommands, operationRepository);
+    order.verify(missionCommands).detachFromOperation(id);
+    order.verify(operationRepository).delete(operation);
     assertTrue(
         operation.getMissions().isEmpty(),
         "in-memory missions collection must be cleared to keep state consistent");
-    verify(operationRepository, times(1)).delete(operation);
   }
 
   @Test

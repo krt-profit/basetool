@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.operation.internal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -42,17 +42,15 @@ import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.Operation;
-import de.greluc.krt.profit.basetool.backend.model.OperationPayoutStatus;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutStatusDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutSummaryDto;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
-import de.greluc.krt.profit.basetool.backend.repository.OperationPayoutStatusRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
+import de.greluc.krt.profit.basetool.backend.service.AuditService;
+import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
@@ -82,7 +80,7 @@ class OperationPayoutServiceTest {
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private OperationPayoutStatusRepository payoutStatusRepository;
   @Mock private UserService userService;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private OperationAccessPolicy operationAccessPolicy;
   @Mock private AuthHelperService authHelperService;
   @Mock private SystemSettings systemSettings;
 
@@ -945,7 +943,7 @@ class OperationPayoutServiceTest {
       stubOperation(Set.of(m));
       stubFinances(
           List.of(newEntry(m, bobP, FinanceType.INCOME, new BigDecimal("900.00"))), List.of());
-      when(ownerScopeService.canSeeOperationLedger(OPERATION_ID)).thenReturn(true);
+      when(operationAccessPolicy.canSeeOperationLedger(OPERATION_ID)).thenReturn(true);
 
       OperationPayoutSummaryDto summary =
           operationPayoutService.getOperationPayoutSummary(OPERATION_ID);
@@ -971,7 +969,7 @@ class OperationPayoutServiceTest {
       stubOperation(Set.of(m));
       stubFinances(
           List.of(newEntry(m, aliceP, FinanceType.INCOME, new BigDecimal("500.00"))), List.of());
-      when(ownerScopeService.canSeeOperationLedger(OPERATION_ID)).thenReturn(true);
+      when(operationAccessPolicy.canSeeOperationLedger(OPERATION_ID)).thenReturn(true);
 
       OperationPayoutSummaryDto summary =
           operationPayoutService.getOperationPayoutSummary(OPERATION_ID);
@@ -994,7 +992,7 @@ class OperationPayoutServiceTest {
       stubOperation(Set.of(m));
       stubFinances(
           List.of(newEntry(m, bobP, FinanceType.INCOME, new BigDecimal("900.00"))), List.of());
-      when(ownerScopeService.canSeeOperationLedger(OPERATION_ID)).thenReturn(false);
+      when(operationAccessPolicy.canSeeOperationLedger(OPERATION_ID)).thenReturn(false);
       when(authHelperService.currentUserId()).thenReturn(java.util.Optional.of(bob.getId()));
 
       OperationPayoutSummaryDto summary =

@@ -17,15 +17,22 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.mission.api;
 
-import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 
-/** Data transfer record carrying Operation Update payload. */
-public record OperationUpdateDto(
-    @NotBlank String name,
-    String description,
-    @NotNull OperationStatus status,
-    @NotNull Long version) {}
+/**
+ * The writes another module may ask of the mission module (plan §5.3). Each command joins the
+ * caller's transaction and refuses to run without one.
+ */
+public interface MissionCommands {
+
+  /**
+   * Clears the operation reference of every mission linked to the operation. No mission section
+   * counter and no row version moves, and no audit row is recorded.
+   *
+   * @param operationId the operation whose missions are detached
+   */
+  void detachFromOperation(@NotNull UUID operationId);
+}

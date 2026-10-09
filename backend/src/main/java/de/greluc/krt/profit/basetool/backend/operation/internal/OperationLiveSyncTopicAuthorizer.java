@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.operation.internal;
 
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncAuthorization;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
@@ -35,7 +35,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class OperationLiveSyncTopicAuthorizer implements LiveSyncTopicAuthorizer {
 
-  private final OwnerScopeService ownerScopeService;
+  private final OperationAccessPolicy operationAccessPolicy;
 
   /**
    * Decides the operation rooms.
@@ -49,13 +49,13 @@ public class OperationLiveSyncTopicAuthorizer implements LiveSyncTopicAuthorizer
   }
 
   /**
-   * Asks {@code ownerScopeService.canSeeOperation(id)}.
+   * Asks {@code operationAccessPolicy.canSeeOperation(id)}.
    *
    * @param topic a parsed operation topic
    * @return {@code true} if the room may be opened for the caller
    */
   @Override
   public boolean mayJoin(@NotNull LiveSyncTopic topic) {
-    return ownerScopeService.canSeeOperation(topic.requiredResourceId());
+    return operationAccessPolicy.canSeeOperation(topic.requiredResourceId());
   }
 }
