@@ -1,7 +1,7 @@
 # ADR-0241 — Quality tiers are a catalogue table, and linked stock counts toward one bucket
 
 - **Status:** Accepted — owner decision 2026-10-03. Built by #2359 (catalogue and allocation),
-  #2361 (the member's choice at handover and production, `REQ-ORDERS-038/039`) and V266 (the
+  #2361 (the member's choice at handover and production, `REQ-ORDERS-038/039`) and V268 (the
   superseded columns dropped).
 - **Date:** 2026-10-03
 - **Deciders:** @greluc

@@ -175,8 +175,8 @@ written.
 
 `job_order_material.min_quality`, `job_order_item_material.quality_requirement` and
 `material_claim.quality_requirement` held the requirement before the catalogue. V262–V264 stopped
-writing them and V266 drops them with the floor's range check, one release later (two-phase drop,
+writing them and V268 drops them with the floor's range check, one release later (two-phase drop,
 `db/migration/README.md`). The tier a row names is `quality_tier_id` alone; the wire fields
 `qualityRequirement`, `quality` and `minQuality` are derived from the tier and keep their names.
 
-**Enforced by:** `V266MigrationTest`, `V261QualityTierMigrationTest`
+**Enforced by:** `V268MigrationTest`, `V261QualityTierMigrationTest`
