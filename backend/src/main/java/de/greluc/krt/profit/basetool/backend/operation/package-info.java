@@ -18,8 +18,9 @@
  */
 
 /**
- * The bank module: the Kartellbank's accounts, bookings and booking requests, org-unit-blind by
- * design (ADR-0020).
+ * The operation module: Operationen, their finance view and payouts (plan §5.1 rank 11). The
+ * Operation entity, its repository, mapper and the DTOs the mission module embeds stay in the layer
+ * packages until Mission references an operation by id (plan §7.5).
  */
 @ApplicationModule(
     allowedDependencies = {
@@ -39,6 +40,6 @@
       "refinery::api",
       "scope::api"
     })
-package de.greluc.krt.profit.basetool.backend.bank;
+package de.greluc.krt.profit.basetool.backend.operation;
 
 import org.springframework.modulith.ApplicationModule;

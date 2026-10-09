@@ -103,8 +103,6 @@ scope -> joborder: AccessGateService -> JobOrderRepository
 scope -> joborder: OwnerScopeService -> JobOrder
 scope -> mission: AccessGateService -> Mission
 scope -> mission: AccessGateService -> MissionRepository
-scope -> operation: AccessGateService -> Operation
-scope -> operation: AccessGateService -> OperationRepository
 scope -> refinery: AccessGateService -> RefineryOrder
 scope -> refinery: AccessGateService -> RefineryOrderRepository
 scope -> refinery: OwnerScopeService -> RefineryOrder

@@ -18,27 +18,7 @@
  */
 
 /**
- * The bank module: the Kartellbank's accounts, bookings and booking requests, org-unit-blind by
- * design (ADR-0020).
+ * The operation module's internals: the services, the access policy, the payout-status entity and
+ * repository, and the finance and payout DTOs (plan §5.2).
  */
-@ApplicationModule(
-    allowedDependencies = {
-      "admin::api",
-      "audit::api",
-      "catalogue::api",
-      "identity::api",
-      "inventory::api",
-      "joborder::api",
-      "kernel",
-      "livesync::api",
-      "materialexchange::api",
-      "mission::api",
-      "notification::api",
-      "orgunit::api",
-      "platform::api",
-      "refinery::api",
-      "scope::api"
-    })
-package de.greluc.krt.profit.basetool.backend.bank;
-
-import org.springframework.modulith.ApplicationModule;
+package de.greluc.krt.profit.basetool.backend.operation.internal;

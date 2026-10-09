@@ -17,28 +17,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/**
- * The bank module: the Kartellbank's accounts, bookings and booking requests, org-unit-blind by
- * design (ADR-0020).
- */
-@ApplicationModule(
-    allowedDependencies = {
-      "admin::api",
-      "audit::api",
-      "catalogue::api",
-      "identity::api",
-      "inventory::api",
-      "joborder::api",
-      "kernel",
-      "livesync::api",
-      "materialexchange::api",
-      "mission::api",
-      "notification::api",
-      "orgunit::api",
-      "platform::api",
-      "refinery::api",
-      "scope::api"
-    })
-package de.greluc.krt.profit.basetool.backend.bank;
+package de.greluc.krt.profit.basetool.backend.operation.internal;
 
-import org.springframework.modulith.ApplicationModule;
+import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+/** Data transfer record carrying Operation Update payload. */
+public record OperationUpdateDto(
+    @NotBlank String name,
+    String description,
+    @NotNull OperationStatus status,
+    @NotNull Long version) {}

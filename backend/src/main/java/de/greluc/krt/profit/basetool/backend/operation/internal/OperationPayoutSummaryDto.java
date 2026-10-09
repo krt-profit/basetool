@@ -17,17 +17,18 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.operation.internal;
 
 import java.math.BigDecimal;
-import java.util.UUID;
+import java.util.List;
 
 /**
- * One mission's line in the operation finance summary: its id, name and signed bottom line, without
- * per-entry lists (those load via {@code GET /api/v1/operations/{id}/finances/{missionId}}).
+ * Payout view of an operation: the per-participant breakdown plus the operation-wide donation
+ * total, which always equals the sum of the rows' {@link OperationPayoutDto#donatedAmount()}.
  *
- * @param missionId the mission's id
- * @param missionName the mission's display name
- * @param totalSum the mission's signed bottom line in aUEC (income − expense + refinery profit)
+ * @param totalDonations sum of donated shares, two-decimal scale; {@link BigDecimal#ZERO} when no
+ *     participant donated
+ * @param payouts the per-participant rows, sorted by participant name
  */
-public record OperationMissionFinanceDto(UUID missionId, String missionName, BigDecimal totalSum) {}
+public record OperationPayoutSummaryDto(
+    BigDecimal totalDonations, List<OperationPayoutDto> payouts) {}

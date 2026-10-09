@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.operation.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -27,16 +27,17 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.controller.RoleGateFixture;
 import de.greluc.krt.profit.basetool.backend.mapper.OperationMapper;
 import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.service.OperationFinanceService;
-import de.greluc.krt.profit.basetool.backend.service.OperationPayoutService;
-import de.greluc.krt.profit.basetool.backend.service.OperationService;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationFinanceService;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationPayoutService;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationService;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationUpdateDto;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

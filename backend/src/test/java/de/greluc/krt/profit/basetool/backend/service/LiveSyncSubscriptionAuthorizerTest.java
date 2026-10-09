@@ -30,6 +30,8 @@ import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncAuthorization;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationLiveSyncTopicAuthorizer;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.ArrayList;
@@ -50,6 +52,8 @@ class LiveSyncSubscriptionAuthorizerTest {
   private static final UUID RESOURCE = UUID.fromString("8f14e45f-ceea-467a-9c5b-5f1f52a3a1c2");
 
   @Mock private OwnerScopeService ownerScopeService;
+
+  @Mock private OperationAccessPolicy operationAccessPolicy;
   @Mock private AuthHelperService authHelperService;
   @Mock private OrgUnitBankAccessService orgUnitBankAccessService;
 
@@ -67,7 +71,7 @@ class LiveSyncSubscriptionAuthorizerTest {
   private List<LiveSyncTopicAuthorizer> moduleAuthorizers() {
     return List.of(
         new MissionLiveSyncTopicAuthorizer(ownerScopeService),
-        new OperationLiveSyncTopicAuthorizer(ownerScopeService),
+        new OperationLiveSyncTopicAuthorizer(operationAccessPolicy),
         new JobOrderLiveSyncTopicAuthorizer(ownerScopeService),
         new RefineryLiveSyncTopicAuthorizer(ownerScopeService),
         new OrgUnitBankLiveSyncTopicAuthorizer(orgUnitBankAccessService));
@@ -141,7 +145,7 @@ class LiveSyncSubscriptionAuthorizerTest {
   @Test
   @DisplayName("the Operation, Auftrag and Raffinerie-Order rooms each use their own scope")
   void perResourceRoomsUseTheirOwnScope() {
-    when(ownerScopeService.canSeeOperation(RESOURCE)).thenReturn(true);
+    when(operationAccessPolicy.canSeeOperation(RESOURCE)).thenReturn(true);
     when(ownerScopeService.canSeeJobOrder(RESOURCE)).thenReturn(false);
     when(ownerScopeService.canSeeRefineryOrder(RESOURCE)).thenReturn(true);
 

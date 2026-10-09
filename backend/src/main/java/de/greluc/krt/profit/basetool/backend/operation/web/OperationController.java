@@ -17,25 +17,25 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.operation.web;
 
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.OperationMapper;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceSummaryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationFinanceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationFinanceSummaryDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutStatusDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutStatusUpdateDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutSummaryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationFinanceDto;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationFinanceService;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationFinanceSummaryDto;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationPayoutService;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationPayoutStatusDto;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationPayoutStatusUpdateDto;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationPayoutSummaryDto;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationService;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.OperationFinanceService;
-import de.greluc.krt.profit.basetool.backend.service.OperationPayoutService;
-import de.greluc.krt.profit.basetool.backend.service.OperationService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -201,7 +201,7 @@ public class OperationController {
    * @return the operation DTO
    */
   @GetMapping("/{id}")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeOperation(#id)")
+  @PreAuthorize("isAuthenticated() and @operationAccessPolicy.canSeeOperation(#id)")
   @Operation(
       summary = "Get operation by ID",
       description =
@@ -230,7 +230,7 @@ public class OperationController {
    * @return finance summary DTO with the full per-mission breakdown
    */
   @GetMapping("/{id}/finances")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeOperationLedger(#id)")
+  @PreAuthorize("isAuthenticated() and @operationAccessPolicy.canSeeOperationLedger(#id)")
   @Operation(
       summary = "Get aggregated finances for an operation (full breakdown)",
       description =
@@ -259,7 +259,7 @@ public class OperationController {
    * @return the operation-wide total plus the capped per-mission roll-up lines
    */
   @GetMapping("/{id}/finance-summary")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeOperationLedger(#id)")
+  @PreAuthorize("isAuthenticated() and @operationAccessPolicy.canSeeOperationLedger(#id)")
   @Operation(
       summary = "Get the finance roll-up for an operation (totals only)",
       description =
@@ -287,7 +287,7 @@ public class OperationController {
    * @return the mission's finance detail (entries + refinery orders + recomputed total)
    */
   @GetMapping("/{id}/finances/{missionId}")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeOperationLedger(#id)")
+  @PreAuthorize("isAuthenticated() and @operationAccessPolicy.canSeeOperationLedger(#id)")
   @Operation(
       summary = "Get one mission's finance detail within an operation",
       description =
@@ -316,7 +316,7 @@ public class OperationController {
    * @return payout rows sorted by participant name
    */
   @GetMapping("/{id}/payouts")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeOperation(#id)")
+  @PreAuthorize("isAuthenticated() and @operationAccessPolicy.canSeeOperation(#id)")
   @Operation(
       summary = "Get participation payout breakdown with amounts and paid-out status",
       description =
@@ -359,7 +359,8 @@ public class OperationController {
   @PreAuthorize(
       "hasRole('"
           + Roles.MISSION_MANAGER
-          + "') and @ownerScopeService.canEditOperation(#id) and (#dto.paidOut() or hasAnyRole('"
+          + "') and @operationAccessPolicy.canEditOperation(#id) and (#dto.paidOut() or"
+          + " hasAnyRole('"
           + Roles.ADMIN
           + "', '"
           + Roles.OFFICER
@@ -431,7 +432,7 @@ public class OperationController {
    */
   @PutMapping("/{id}")
   @PreAuthorize(
-      "hasRole('" + Roles.MISSION_MANAGER + "') and @ownerScopeService.canEditOperation(#id)")
+      "hasRole('" + Roles.MISSION_MANAGER + "') and @operationAccessPolicy.canEditOperation(#id)")
   @Operation(
       summary = "Update an existing operation",
       description =
@@ -464,7 +465,7 @@ public class OperationController {
    * @return 204 No Content
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "') and @ownerScopeService.canEditOperation(#id)")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "') and @operationAccessPolicy.canEditOperation(#id)")
   @Operation(
       summary = "Delete an operation",
       description =

@@ -36,13 +36,13 @@ import org.springframework.security.core.context.SecurityContextHolder;
  * AuthHelperService} against the raw authority check it replaces, for every caller in {@link
  * #callers()}.
  */
-final class RoleGateFixture {
+public final class RoleGateFixture {
 
   /** Marker in {@link #callers()} for a request that carries no authentication at all. */
-  static final String NONE = "none";
+  public static final String NONE = "none";
 
   /** Marker in {@link #callers()} for Spring Security's anonymous principal. */
-  static final String ANONYMOUS = "anonymous";
+  public static final String ANONYMOUS = "anonymous";
 
   private RoleGateFixture() {}
 
@@ -53,7 +53,7 @@ final class RoleGateFixture {
    * @return a real {@link AuthHelperService} over the production role hierarchy
    */
   @NotNull
-  static AuthHelperService realAuthHelper() {
+  public static AuthHelperService realAuthHelper() {
     return new AuthHelperService(SecurityConfig.roleHierarchy());
   }
 
@@ -64,7 +64,7 @@ final class RoleGateFixture {
    * @return the authority (or {@link #NONE} / {@link #ANONYMOUS}) of each caller shape
    */
   @NotNull
-  static Stream<String> callers() {
+  public static Stream<String> callers() {
     return Stream.of(
         "ROLE_ADMIN",
         "ROLE_OFFICER",
@@ -84,7 +84,7 @@ final class RoleGateFixture {
    *
    * @param caller an authority from {@link #callers()}, {@link #ANONYMOUS} or {@link #NONE}
    */
-  static void authenticateAs(@NotNull String caller) {
+  public static void authenticateAs(@NotNull String caller) {
     SecurityContextHolder.clearContext();
     Authentication authentication = toAuthentication(caller);
     if (authentication != null) {
@@ -93,7 +93,7 @@ final class RoleGateFixture {
   }
 
   /** Removes whatever {@link #authenticateAs(String)} installed. */
-  static void clear() {
+  public static void clear() {
     SecurityContextHolder.clearContext();
   }
 
@@ -105,7 +105,7 @@ final class RoleGateFixture {
    * @param authorities the authorities the raw check accepted
    * @return {@code true} iff the caller's single authority is one of {@code authorities}
    */
-  static boolean rawCheckAccepted(@NotNull String caller, @NotNull String... authorities) {
+  public static boolean rawCheckAccepted(@NotNull String caller, @NotNull String... authorities) {
     return List.of(authorities).contains(caller);
   }
 

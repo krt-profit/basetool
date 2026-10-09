@@ -851,6 +851,43 @@ their "must stay green" period here (D-01).
   the selection floor of `ArchitectureTest`'s `squadron_id` join-column rule counts the legacy
   `model` package tree as well as every entity by role, so each move of `model.dto` records lowers
   it (by 4 here) without the rule checking any entity less.
+- `operation` — **done 2026-10-05.** Three steps, each green on its own:
+  1. *Access policy out of the scope hub* (§5.4, ADR-0236): `OperationAccessPolicy`, bean
+     `operationAccessPolicy`, holds `canSeeOperation`, `canSeeOperationLedger` and
+     `canEditOperation` verbatim, on the scope kernel's `canSeeSquadron`/`canEditSquadron`. The
+     eight operation endpoints, the operation live-sync room and the payout ledger check ask it;
+     `OwnerScopeService` and `AccessGateService` lost the three methods and `AccessGateService` its
+     `OperationRepository`. The authorization matrix changed on exactly those eight lines, in
+     expression text only. `OperationAccessPolicyDifferentialTest` compared the old and the new
+     gate over 22 callers (admin unpinned and pinned to either unit; members of zero, one and two
+     units; a member pinned to an own and to a foreign unit; a Bereich lead reaching a child Staffel
+     by cascade; guests below member — each with and without the participant escape), five
+     operations (either unit, a child unit, ownerless, unknown) and the three gates, 330 verdicts,
+     before the old methods went; it keeps comparing against a verbatim copy of them. Proven able
+     to fail by dropping the participant escape. `TenancyGuardTest` counts the policy as a scope
+     gate type.
+  2. *The mission detach command* (§5.3, write family 10): `mission.api.MissionCommands#
+     detachFromOperation`, implemented by `MissionService` with `MANDATORY`; the operation delete
+     calls it instead of writing `Mission` rows. Same transaction, same order, no counter moves,
+     `OPERATION_DELETED` still recorded after the delete. `mission` now publishes an `api` package,
+     so every declared module above rank 9 allows `mission::api`.
+  3. *Move*: `OperationController` into `operation.web`; the five services, the policy,
+     `OperationPayoutStatus` with its repository and eight DTOs into `operation.internal`. The
+     module is declared (floor 21) and publishes nothing.
+  The module baseline shrank by the two `scope -> operation` edges, **110 → 108**.
+  `OperationModuleContractTest` pins the endpoints per caller, the delete, the command's
+  transaction rule and that the scoped list and the per-row gate admit the same operations.
+  **Corrections:** (1) the `Operation` entity, `OperationStatus`, `OperationRepository`,
+  `OperationMapper` and `OperationDto`, `OperationCreateDto`, `OperationReferenceDto` cannot leave
+  the layer packages yet: `Mission`, `MissionDto`/`MissionListDto`, `MissionMapper`,
+  `MissionService` and `BusinessMetricsCollector` use them, so a move closes a package cycle with
+  `model`, `mapper`, `repository`, `service` or `task`. They stay assigned to `operation` by the
+  `^Operation` name rule and move with P3-8, when `Mission.operation` becomes an id. (2) So the
+  policy does not yet own the operation's JPQL scope fragment (§5.4): `OPERATION_SCOPE_PREDICATE`
+  stays in `ScopeSpecifications`, used by `OperationRepository`; that the list query and the gate
+  still widen together is now tested end to end instead. (3) The detach command removes the
+  foreign write, not the `mission -> operation` edges: those are the association and the DTO
+  embedding of (1), and leave with P3-8 and the `OperationSummaryProvider` SPI.
 
 ### 7.5 Phase 3 — the business core
 
