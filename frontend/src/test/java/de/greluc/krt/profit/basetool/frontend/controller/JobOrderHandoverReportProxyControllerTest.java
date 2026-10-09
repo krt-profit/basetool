@@ -23,8 +23,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.HandoverReportPreviewRequestDto;
 import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
-import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,7 +60,9 @@ class JobOrderHandoverReportProxyControllerTest {
 
   @BeforeEach
   void setUp() {
-    controller = new JobOrderHandoverReportProxyController(RealBackendApiClient.over(webClient));
+    controller =
+        new JobOrderHandoverReportProxyController(
+            new JobOrderBackendClient(RealBackendApiClient.over(webClient)));
   }
 
   @Test
@@ -124,7 +127,8 @@ class JobOrderHandoverReportProxyControllerTest {
   void previewHandoverReport_shouldReturnPdfBytes_whenBackendRespondsOk() {
     UUID jobOrderId = UUID.randomUUID();
     byte[] fakePdf = new byte[] {0x25, 0x50, 0x44, 0x46};
-    Map<String, Object> payload = Map.of("jobOrderNumber", "#42", "recipientHandle", "Pilot");
+    HandoverReportPreviewRequestDto payload =
+        new HandoverReportPreviewRequestDto("#42", null, "Pilot", null);
 
     doReturn(requestBodyUriSpec).when(webClient).post();
     doReturn(requestBodySpec)
@@ -151,7 +155,8 @@ class JobOrderHandoverReportProxyControllerTest {
   @SuppressWarnings({"unchecked", "rawtypes"})
   void previewHandoverReport_shouldThrowResponseStatusException_whenBackendReturns400() {
     UUID jobOrderId = UUID.randomUUID();
-    Map<String, Object> payload = Map.of();
+    HandoverReportPreviewRequestDto payload =
+        new HandoverReportPreviewRequestDto(null, null, null, null);
 
     doReturn(requestBodyUriSpec).when(webClient).post();
     doReturn(requestBodySpec)

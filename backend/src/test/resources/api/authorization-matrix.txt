@@ -316,14 +316,14 @@ GET /api/v1/operations | OperationController#getAllOperations | pre=isAuthentica
 POST /api/v1/operations | OperationController#createOperation | pre=hasRole('MISSION_MANAGER') | url=anyRequest -> authenticated
 GET /api/v1/operations/lookup | OperationController#lookupOperations | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/operations/search | OperationController#searchOperations | pre=isAuthenticated() | url=anyRequest -> authenticated
-DELETE /api/v1/operations/{id} | OperationController#deleteOperation | pre=hasRole('ADMIN') and @ownerScopeService.canEditOperation(#id) | url=anyRequest -> authenticated
-GET /api/v1/operations/{id} | OperationController#getOperationById | pre=isAuthenticated() and @ownerScopeService.canSeeOperation(#id) | url=anyRequest -> authenticated
-PUT /api/v1/operations/{id} | OperationController#updateOperation | pre=hasRole('MISSION_MANAGER') and @ownerScopeService.canEditOperation(#id) | url=anyRequest -> authenticated
-GET /api/v1/operations/{id}/finance-summary | OperationController#getOperationFinanceSummary | pre=isAuthenticated() and @ownerScopeService.canSeeOperationLedger(#id) | url=anyRequest -> authenticated
-GET /api/v1/operations/{id}/finances | OperationController#getOperationFinances | pre=isAuthenticated() and @ownerScopeService.canSeeOperationLedger(#id) | url=anyRequest -> authenticated
-GET /api/v1/operations/{id}/finances/{missionId} | OperationController#getMissionFinanceDetail | pre=isAuthenticated() and @ownerScopeService.canSeeOperationLedger(#id) | url=anyRequest -> authenticated
-GET /api/v1/operations/{id}/payouts | OperationController#getOperationPayouts | pre=isAuthenticated() and @ownerScopeService.canSeeOperation(#id) | url=anyRequest -> authenticated
-PUT /api/v1/operations/{id}/payouts/paid-out | OperationController#setPayoutStatus | pre=hasRole('MISSION_MANAGER') and @ownerScopeService.canEditOperation(#id) and (#dto.paidOut() or hasAnyRole('ADMIN', 'OFFICER')) | url=anyRequest -> authenticated
+DELETE /api/v1/operations/{id} | OperationController#deleteOperation | pre=hasRole('ADMIN') and @operationAccessPolicy.canEditOperation(#id) | url=anyRequest -> authenticated
+GET /api/v1/operations/{id} | OperationController#getOperationById | pre=isAuthenticated() and @operationAccessPolicy.canSeeOperation(#id) | url=anyRequest -> authenticated
+PUT /api/v1/operations/{id} | OperationController#updateOperation | pre=hasRole('MISSION_MANAGER') and @operationAccessPolicy.canEditOperation(#id) | url=anyRequest -> authenticated
+GET /api/v1/operations/{id}/finance-summary | OperationController#getOperationFinanceSummary | pre=isAuthenticated() and @operationAccessPolicy.canSeeOperationLedger(#id) | url=anyRequest -> authenticated
+GET /api/v1/operations/{id}/finances | OperationController#getOperationFinances | pre=isAuthenticated() and @operationAccessPolicy.canSeeOperationLedger(#id) | url=anyRequest -> authenticated
+GET /api/v1/operations/{id}/finances/{missionId} | OperationController#getMissionFinanceDetail | pre=isAuthenticated() and @operationAccessPolicy.canSeeOperationLedger(#id) | url=anyRequest -> authenticated
+GET /api/v1/operations/{id}/payouts | OperationController#getOperationPayouts | pre=isAuthenticated() and @operationAccessPolicy.canSeeOperation(#id) | url=anyRequest -> authenticated
+PUT /api/v1/operations/{id}/payouts/paid-out | OperationController#setPayoutStatus | pre=hasRole('MISSION_MANAGER') and @operationAccessPolicy.canEditOperation(#id) and (#dto.paidOut() or hasAnyRole('ADMIN', 'OFFICER')) | url=anyRequest -> authenticated
 GET /api/v1/orders | JobOrderController#getAllJobOrders | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/orders | JobOrderController#createJobOrder | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/orders/item-catalog | JobOrderController#getOrderableItems | pre=isAuthenticated() | url=anyRequest -> authenticated

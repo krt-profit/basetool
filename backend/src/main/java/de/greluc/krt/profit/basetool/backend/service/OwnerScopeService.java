@@ -635,39 +635,6 @@ public class OwnerScopeService {
   }
 
   /**
-   * Delegates to {@link AccessGateService#canSeeOperationLedger(UUID)}: operation visibility
-   * <em>without</em> the self-issuable participant escape, for the finance and payout endpoints.
-   *
-   * @param operationId operation to inspect; never {@code null}.
-   * @return {@code true} iff the caller reaches the operation through scope alone.
-   */
-  public boolean canSeeOperationLedger(@NotNull UUID operationId) {
-    return accessGateService.canSeeOperationLedger(operationId);
-  }
-
-  /**
-   * Delegates to {@link AccessGateService#canSeeOperation(UUID)}: whether the caller may read
-   * operation {@code operationId} (scope / ownerless-leadership / participant escape).
-   *
-   * @param operationId operation to inspect; never {@code null}.
-   * @return {@code true} iff the caller may read the operation.
-   */
-  public boolean canSeeOperation(@NotNull UUID operationId) {
-    return accessGateService.canSeeOperation(operationId);
-  }
-
-  /**
-   * Delegates to {@link AccessGateService#canEditOperation(UUID)}: whether the caller may edit
-   * operation {@code operationId} (strict owning-squadron / ownerless-leadership no-op).
-   *
-   * @param operationId operation to inspect; never {@code null}.
-   * @return {@code true} iff the caller may edit the operation.
-   */
-  public boolean canEditOperation(@NotNull UUID operationId) {
-    return accessGateService.canEditOperation(operationId);
-  }
-
-  /**
    * Delegates to {@link AccessGateService#canSeeShip(UUID)}: whether the caller may read ship
    * {@code shipId} (owner escape → ownerless → strict scope).
    *

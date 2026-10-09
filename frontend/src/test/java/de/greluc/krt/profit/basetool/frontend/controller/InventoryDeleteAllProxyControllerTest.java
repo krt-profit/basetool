@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
@@ -51,7 +52,9 @@ class InventoryDeleteAllProxyControllerTest {
     server = new MockWebServer();
     server.start();
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
-    controller = new InventoryDeleteAllProxyController(RealBackendApiClient.over(webClient));
+    controller =
+        new InventoryDeleteAllProxyController(
+            new InventoryBackendClient(RealBackendApiClient.over(webClient)));
   }
 
   @AfterEach

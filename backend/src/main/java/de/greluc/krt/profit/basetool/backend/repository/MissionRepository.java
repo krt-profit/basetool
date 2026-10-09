@@ -212,6 +212,15 @@ public interface MissionRepository
   void removeManager(@Param("userId") UUID userId);
 
   /**
+   * Returns every mission linked to the operation, for the detach before the operation is deleted.
+   *
+   * @param operationId the operation whose missions are returned
+   * @return the linked missions, empty when none is linked
+   */
+  @Query("SELECT m FROM Mission m WHERE m.operation.id = :operationId")
+  List<Mission> findAllLinkedToOperation(@Param("operationId") UUID operationId);
+
+  /**
    * Returns whether any mission of the operation lacks {@code actualStartTime} or {@code
    * actualEndTime}, i.e. whether the operation's payout figures are still preliminary.
    *

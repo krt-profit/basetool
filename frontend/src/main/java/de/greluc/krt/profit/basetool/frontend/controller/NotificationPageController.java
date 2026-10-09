@@ -77,6 +77,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.Disposable;
+import reactor.core.Disposables;
 
 /**
  * Frontend page + AJAX relay for the per-user notification inbox. The browser never talks to the
@@ -240,7 +241,7 @@ public class NotificationPageController {
       emitter.complete();
       return emitter;
     }
-    String bearerToken = authorizedClient.getAccessToken().getTokenValue();
+    final String bearerToken = authorizedClient.getAccessToken().getTokenValue();
     try {
       emitter.send(SseEmitter.event().comment("ready"));
     } catch (IOException | RuntimeException e) {
@@ -250,26 +251,24 @@ public class NotificationPageController {
       emitter.complete();
       return emitter;
     }
-    relayConnections.incrementAndGet();
-    Disposable subscription =
-        backendSideChannels
-            .notificationStream(bearerToken)
-            .doFinally(signal -> relayConnections.decrementAndGet())
-            .subscribe(
-                event -> forward(emitter, event),
-                error ->
-                    handleStreamError(
-                        emitter,
-                        error,
-                        request.getContextPath() + TermsAcceptanceGateFilter.CONSENT_PATH),
-                emitter::complete);
+    Disposable.Swap subscription = Disposables.swap();
     emitter.onCompletion(subscription::dispose);
     emitter.onTimeout(
         () -> {
           subscription.dispose();
-          emitter.complete();
+          completeQuietly(emitter);
         });
-    emitter.onError(error -> subscription.dispose());
+    emitter.onError(_ -> subscription.dispose());
+    String consentUrl = request.getContextPath() + TermsAcceptanceGateFilter.CONSENT_PATH;
+    relayConnections.incrementAndGet();
+    subscription.update(
+        backendSideChannels
+            .notificationStream(bearerToken)
+            .doFinally(_ -> relayConnections.decrementAndGet())
+            .subscribe(
+                event -> forward(emitter, event, subscription),
+                error -> handleStreamError(emitter, error, consentUrl),
+                () -> completeQuietly(emitter)));
     return emitter;
   }
 
@@ -491,9 +490,9 @@ public class NotificationPageController {
       try {
         emitter.send(
             SseEmitter.event().name("reauth").data(ReauthenticationRequiredException.REAUTH_PATH));
-        emitter.complete();
+        completeQuietly(emitter);
       } catch (IOException | RuntimeException sendFailure) {
-        emitter.complete();
+        completeQuietly(emitter);
       }
       return;
     }
@@ -502,16 +501,16 @@ public class NotificationPageController {
       try {
         emitter.send(
             SseEmitter.event().name(TermsAcceptanceGateFilter.SSE_GATE_EVENT).data(consentUrl));
-        emitter.complete();
+        completeQuietly(emitter);
       } catch (IOException | RuntimeException sendFailure) {
-        emitter.complete();
+        completeQuietly(emitter);
       }
       return;
     }
     log.debug(
         "Notification stream dropped ({}); completing cleanly, poll fallback keeps the badge fresh",
         error.getClass().getSimpleName());
-    emitter.complete();
+    completeQuietly(emitter);
   }
 
   /**
@@ -536,7 +535,18 @@ public class NotificationPageController {
     return false;
   }
 
-  private static void forward(SseEmitter emitter, ServerSentEvent<String> event) {
+  /**
+   * Writes one backend event to the browser; a failed write stops the upstream subscription.
+   *
+   * <p>An {@link IOException} means the browser is gone and the container already runs its error
+   * dispatch, so the emitter is left to it; any other failure completes the emitter quietly.
+   *
+   * @param emitter the browser-facing emitter
+   * @param event the backend event to relay
+   * @param subscription the upstream subscription to cancel when the write fails
+   */
+  private static void forward(
+      SseEmitter emitter, ServerSentEvent<String> event, Disposable subscription) {
     try {
       SseEmitter.SseEventBuilder builder = SseEmitter.event();
       if (event.event() != null) {
@@ -549,10 +559,32 @@ public class NotificationPageController {
         builder.data(event.data());
       }
       emitter.send(builder);
-    } catch (IOException | RuntimeException e) {
+    } catch (IOException e) {
+      log.debug(
+          "Notification stream send failed ({}); the browser is gone",
+          e.getClass().getSimpleName());
+      subscription.dispose();
+    } catch (RuntimeException e) {
       log.debug(
           "Notification stream send failed ({}); completing cleanly", e.getClass().getSimpleName());
+      subscription.dispose();
+      completeQuietly(emitter);
+    }
+  }
+
+  /**
+   * Completes the emitter from a non-container thread, tolerating a request the container has
+   * already ended.
+   *
+   * @param emitter the browser-facing emitter to complete
+   */
+  private static void completeQuietly(SseEmitter emitter) {
+    try {
       emitter.complete();
+    } catch (IllegalStateException e) {
+      log.debug(
+          "Notification stream already ended by the container ({}); nothing to complete",
+          e.getClass().getSimpleName());
     }
   }
 }

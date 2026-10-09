@@ -237,69 +237,39 @@ templates by a Java test.
 `types/globals.d.ts` (`KrtReadOpts`, `KrtReadError`), `eslint.config.mjs` · **ADR:** ADR-0012,
 ADR-0239 · **Plan:** domain modularisation §8.2 ("One read path")
 
-### REQ-FE-022 — Every HTML sink takes a Trusted Types policy value: built by `krtHtml`, or a server fragment
+### REQ-FE-022 — Every HTML sink is escaped or a trusted server fragment
 
-A value reaches `innerHTML` / `outerHTML` / `insertAdjacentHTML` / `DOMParser.parseFromString` /
-`document.write` only in one of two shapes, and both are values of a named Trusted Types policy
-(ADR-0239):
+A value reaches `innerHTML` / `outerHTML` / `insertAdjacentHTML` / `document.write` only in one of
+two shapes: markup built in script with **every** interpolated value passed through the shared
+`escapeHtml` / `escapeAttr` (`escape-html.js`), or the text of a same-origin Thymeleaf fragment
+response — escaped server-side by the template engine — inserted through
+`krtFetch.setTrustedHtml(el, html)` or its `outerHTML` twin `krtFetch.replaceWithTrustedHtml(el,
+html)`. Everything else is built with DOM APIs and `textContent`. There is one escaper pair: seven
+pages carried a private copy, some of which did not escape `'`, and all seven now use the shared one
+(`escapeAttr` wherever the value sits in an attribute).
 
-- **Markup built in script** goes through the tagged-template builder `krtHtml` (`krt-html.js`,
-  policy `krt-html`) and is written with ``krtHtml.set(el, krtHtml`<li>${value}</li>`)``. Every
-  interpolated value is escaped (`&`, `<`, `>`, `"`, `'`, `/`) unless it is itself `krtHtml` markup;
-  an array is rendered element by element, `null` / `undefined` as nothing, and `krtHtml.join`
-  joins with an escaped separator. `krtHtml.set` writes anything that is not `krtHtml` markup (or an
-  array of pieces) as **text**, so a raw string never reaches the parser, and `krtHtml` refuses to
-  be called as a plain function.
-- **The text of a same-origin Thymeleaf fragment response** — escaped server-side by the template
-  engine — goes through `krtFetch.setTrustedHtml(el, html)`, its `outerHTML` twin
-  `krtFetch.replaceWithTrustedHtml(el, html)`, or `krtFetch.parseTrustedDocument(html)` (policy
-  `krt-fragment`, created inside `krt-fetch.js` and never exposed). Never a string assembled in
-  script.
-
-Clearing an element is `el.replaceChildren()`, never `innerHTML = ''`, which a Trusted Types policy
-counts as a sink write like any other. Everything else is built with DOM APIs and `textContent`. No
-`default` policy exists, and no other script creates a policy.
-
-ESLint makes the shapes the only ones that pass `:frontend:lintJs`: `no-restricted-syntax` rejects
-any assignment to `innerHTML` / `outerHTML` / `srcdoc`, any `insertAdjacentHTML` /
-`createContextualFragment` / `setHTMLUnsafe` / `parseHTMLUnsafe` / `parseFromString` call and any
-`createPolicy` call outside `krt-html.js` and `krt-fetch.js`, and everywhere `document.write`, a
-created `<script>` element and `krtHtml` called as a function; `no-eval`, `no-implied-eval` and
-`no-new-func` close the script sinks. `eslint-plugin-no-unsanitized` stays on for the two helper
-files, with `krtHtml` as its only accepted escaper. `:frontend:testEslintBans` proves every ban
-fires on a planted source, and `:frontend:testTrustedTypesJs` pins the builder's escaping, the two
-policy names and the fragment policy in a vm context with a scripted `trustedTypes` factory.
-
-> [!note] Amended 2026-10-04 — the builder replaces the escaper pair (ADR-0239)
-> Until 2026-10-04 markup built in script passed every value through `escapeHtml` / `escapeAttr`
-> (`escape-html.js`) and `no-unsanitized` proved the escaping. A Trusted Types policy cannot accept
-> such a string without trusting every caller, so the 42 builder sites and the 26 `innerHTML = ''`
-> clears in 23 scripts moved to `krtHtml` and `replaceChildren()`, two client-built tables that
-> went through `setTrustedHtml` (the materials matrix and the profit calculation) moved to
-> `krtHtml`, and `escape-html.js` was removed. Until 2026-09-22 (FE-SEC-05) the rule held by review
-> alone across 96 sinks.
+Until 2026-09-22 (FE-SEC-05) this held by review alone across 96 sinks.
+`eslint-plugin-no-unsanitized` (`method` + `property`, with `escapeHtml` / `escapeAttr` as the
+accepted escapers) now fails `:frontend:lintJs` on any sink it cannot prove escaped; the trusted
+helper holds the codebase's single justified `eslint-disable-next-line`. The plugin trusts a markup
+variable only when it is declared in the function that assigns it, which is why a few render helpers
+are nested inside their render function.
 
 **Acceptance**
 
-- [x] `:frontend:lintJs` reports no `no-restricted-syntax` sink finding and no `no-unsanitized/*`
-  finding; `:frontend:testEslintBans` proves each ban fires.
-- [x] No page defines its own HTML escaper, and none uses `escapeHtml` — it no longer exists.
-- [ ] `setTrustedHtml` / `replaceWithTrustedHtml` / `parseTrustedDocument` are called only with the
-  body of a same-origin fragment response, never with a string assembled in script.
+- [ ] `:frontend:lintJs` reports no `no-unsanitized/*` finding.
+- [ ] No page defines its own HTML escaper.
+- [ ] `setTrustedHtml` / `replaceWithTrustedHtml` are called only with the body of a same-origin
+  fragment response, never with a string assembled in script.
 - [x] A translated message an inline script needs is emitted by `th:inline="javascript"` as a
   JavaScript string literal (`/*[[#{key}]]*/ ""`), never as `"[[#{key}]]"` in a plain script, where
-  Thymeleaf HTML-escapes it (`'` arrives as `&#39;`), nor as `'[[#{key}]]'` in an inlined one, where
-  the inliner adds its own quotes (`'"Gespeichert."'`). `MembersPageMessagesRenderTest` renders
-  `/members` in DE and EN with a quote- and ampersand-laden translation; `InlineScriptDataOnlyTest`
-  rejects both forms.
-- [x] The dialog page walk collects no Trusted Types violation (`DialogA11yE2eTest`).
+  Thymeleaf HTML-escapes it (`'` arrives as `&#39;`). `MembersPageMessagesRenderTest` renders
+  `/members` in DE and EN with a quote- and ampersand-laden translation.
 
-**Enforced by:** `:frontend:lintJs` (`no-restricted-syntax`, `no-eval`, `no-implied-eval`,
-`no-new-func`, `no-unsanitized/*`), `:frontend:testEslintBans`, `:frontend:testTrustedTypesJs`,
-`MembersPageMessagesRenderTest`, `InlineScriptDataOnlyTest`, the Trusted Types collector of
-`DialogA11yE2eTest`, review of the fragment-helper call sites · **Code:** `krt-html.js`,
-`krt-fetch.js` (`setTrustedHtml`, `replaceWithTrustedHtml`, `parseTrustedDocument`, `swap`),
-`eslint.config.mjs` · **ADR:** ADR-0239
+**Enforced by:** `:frontend:lintJs` (`no-unsanitized/method`, `no-unsanitized/property`),
+`MembersPageMessagesRenderTest` + review of
+the trusted-helper call sites · **Code:** `escape-html.js`, `krt-fetch.js` (`setTrustedHtml`,
+`replaceWithTrustedHtml`, `swap`), `eslint.config.mjs`
 
 ### REQ-FE-003 — `syncVersion` propagates the optimistic-lock version
 
@@ -1865,13 +1835,8 @@ helpers — and nothing newer. The type check's `lib` / `target` (`tsconfig.json
 `ecmaVersion` (`eslint.config.mjs`, browser and Node scripts) are **ES2025**. TypeScript's `ES2025`
 lib also declares `Promise.try`, `RegExp.escape` and `Float16Array`, which the floor does not ship,
 so ESLint rejects those three (`no-restricted-properties`, `no-restricted-globals`) until the floor
-moves past them. Trusted Types follow the same decision: every HTML sink takes a policy value
-(REQ-FE-022), the CSP sends `require-trusted-types-for 'script'; trusted-types krt-html
-krt-fragment` in a report-only policy whose violations reach the client-error beacon as
-`csp_violation`, and `app.security.trusted-types` (`APP_SECURITY_TRUSTED_TYPES`, default `report`)
-moves the directives into the enforced policy (REQ-SEC-064). Switching production to `enforce` is
-the one remaining step and a production configuration change the owner approves after a quiet
-period ([`deployment.md` → *Trusted Types: report, then enforce*](../deployment.md#trusted-types-report-then-enforce)).
+moves past them. Trusted Types follow the same decision: report-only through the `csp_violation`
+beacon first, then enforced.
 
 **Modern syntax is lint-enforced.** `prefer-template`, `prefer-arrow-callback`,
 `prefer-object-has-own`, `radix` and `logical-assignment-operators` are errors for the browser and
@@ -1888,10 +1853,6 @@ values, so they are introduced by hand in files that opt into `// @ts-check`.
 > (TS2550, TS2339). `tsconfig.json` and `eslint.config.mjs` moved to 2025 together, and the five
 > modern-syntax rules above were enabled with their autofix applied. No Trusted Types directive is
 > sent yet.
-
-> [!note] Amended 2026-10-04 — Trusted Types are reported
-> The HTML sinks moved onto the two policies (REQ-FE-022) and the frontend sends the Trusted Types
-> directives in a report-only policy; enforcing them is a configuration switch (REQ-SEC-064).
 
 **JSDoc must be JSDoc.** In a checked file, `{@code …}` / `{@link …}` / `@param name {shape}` —
 Javadoc spellings this repo uses elsewhere — are parsed as type syntax and are hard errors.
@@ -2033,7 +1994,7 @@ registry: the admin area is web-only permanently, so a room there would have no 
 > `LiveSyncRelayService`, `LiveSyncSubscriptionAuthorizer`, `backend/…/livesync/api/LiveSyncTopicAuthorizer`
 > and its `*LiveSyncTopicAuthorizer` implementations, `RedisLiveSyncFanout`,
 > `LocalLiveSyncFanout`, `LiveSyncRedisConfig`, `NotificationRedisConfig`,
-> `backend/…/platform/api/ResilientRedisMessageListenerContainer`, `backend/…/livesync/api/LiveSyncTopic`,
+> `backend/…/support/ResilientRedisMessageListenerContainer`, `backend/…/support/LiveSyncTopic`,
 > `LiveSyncTopicClass`, `LiveSyncAuthorization` · **ADR:** ADR-0143 (ADR-0094 unchanged) ·
 > **App side:** `basetool-android` `REQ-APP-SYNC-*`
 
@@ -2188,20 +2149,16 @@ script, which runs where it stands, during parsing, before any deferred file:
 
 - **`krt-client-error.js` stays synchronous and first.** It installs the `error` /
   `unhandledrejection` handlers that observe every other script, so it must run before them.
-- **An inline script is a data bootstrap and nothing else (ADR-0069).** It is a
-  `th:inline="javascript"` block of `const` / `let` / `var NAME = literal` and `window.NAME =
-  literal` statements, where a literal is a string, number, boolean, `null`, or an array or object
-  of literals filled from Thymeleaf's `/*[[…]]*/` natural-template values. Every function, call,
-  listener, merge or reference to another global lives in a deferred page module under
-  `static/js`, where it is linted and type-checked. The only inline block that runs code is the
-  head's `krtEvents` stub with its watchdog, listed with its reason in
-  `InlineScriptDataOnlyTest.EXCEPTIONS`: it detects a deferred script that never ran, so it must
-  not be one. Before 2026-10-04 an inline page script could also define functions and register
-  listeners at its top level and had to defer what it ran to `DOMContentLoaded`; the last such
-  blocks (the bank holder and manage pagers, the org-unit bank tabs, the member list and edit
-  form, the mission finance dialog and presence start, the materials exchange dictionary merges)
-  moved into their modules, the five empty error-page blocks were deleted and the head's SCU
-  parser fallback, which `scu-decimal-input.js` replaces, was removed.
+- **An inline page script declares and registers, it does not run.** At its top level it may define
+  constants, functions and `window.*` dictionaries, look up elements already parsed above it,
+  register listeners and `window.krtEvents.on(...)` handlers (the head stub queues those). Anything
+  it has to *run* goes into a `DOMContentLoaded` listener, which fires after every deferred script.
+  A top-level call that touches `window.krtFetch` would otherwise meet an undefined global, and the
+  `if (window.krtFetch)` guard such scripts carry turns that into a silent no-op — the shape this
+  load order regressed in three times. The inline scripts that ran code at parse time moved onto
+  `DOMContentLoaded` (the bank detail / holder / manage pagers, the org-unit bank tabs and account
+  detail, the member edit form). `fragments/head.html`'s own inline scripts are exempt: they are the
+  bootstrap stubs and dictionaries that must exist first.
 
 A second `krtEvents` watchdog sits in the head, beside the stub: if `event-delegation.js` has not
 replaced the stub five seconds after `load` it **throws**, so the client-error beacon reports a
@@ -2220,14 +2177,11 @@ compression instead (`gzip_types` for JavaScript, CSS and JSON, PR #2021).
   head's first script and synchronous.
 - [x] No inline page script makes a top-level call other than element look-ups, listener and
   `krtEvents` registrations, and no inline page script is an immediately invoked function.
-- [x] Every inline script is a `th:inline="javascript"` data bootstrap of literals, or an entry of
-  the reviewed exception list with its reason; a planted template with logic fails the check.
 - [x] On every core page, after load, the shared globals exist, the `krtEvents` stub is replaced, no
   script threw and no client-error beacon was sent.
 
-**Enforced by:** `InlineScriptLoadOrderTest` (the first two), `InlineScriptDataOnlyTest` (the
-third, with its planted fixture `fixtures/inline-script/planted-logic.html`),
-`ScriptLoadOrderE2eTest` (the fourth, over `FrontendPageRoutes.CORE_SMOKE`) · **Code:** `fragments/head.html`, `event-delegation.js`,
+**Enforced by:** `InlineScriptLoadOrderTest` (the first two), `ScriptLoadOrderE2eTest` (the third,
+over `FrontendPageRoutes.CORE_SMOKE`) · **Code:** `fragments/head.html`, `event-delegation.js`,
 `krt-client-error.js` · **Related:** REQ-FE-001, REQ-OBS-* (`basetool_client_error_total`), ADR-0069
 (page JavaScript in static modules), ADR-0125
 
@@ -2437,8 +2391,13 @@ the breaker, the error mapping.
   owns the domain's backend paths, passes runtime values as URI-template variables and returns
   typed records; only the kernel packages (`service`, `config`, `websocket`) and these clients
   call `BackendApiClient`. A typed client takes no `java.net.URI` or `UriBuilderFactory` and
-  carries no cache annotation. The controllers not yet moved are listed in
-  `TypedBackendClientTest`, a list that only shrinks.
+  carries no cache annotation. A client sends and returns records, never an untyped `Map`, with
+  two exceptions by design: the org-unit bank path-only writes, whose backend endpoint binds no
+  request body, and the refinery import's extract, a `JsonNode` relayed unchanged because the
+  extractor's file is its own JSON contract (ADR-0008). Twenty-one clients cover every
+  controller, and no class outside
+  the kernel and the client packages calls `BackendApiClient` (`TypedBackendClientTest`, no
+  allow-list).
 - **HTTP-interface clients** (Spring `@HttpExchange`, none yet) are created only by the kernel,
   over the `webClient` bean (`HttpServiceProxyFactory`/`WebClientAdapter` used nowhere else), and
   never take a `java.net.URI` or `UriBuilderFactory` parameter (it replaces the whole request URL),
@@ -2468,7 +2427,7 @@ the breaker, the error mapping.
 - [x] No class outside the kernel holds a `WebClient`, and no controller does.
 - [x] Each `Outcome` maps to the status, problem code, log level and metric label it had before
   the mapper was extracted (`BackendErrorMapperTest`, and the unchanged `BackendApiClient*Test`).
-- [ ] Every controller reaches the backend only through its domain's typed client; a planted
+- [x] Every controller reaches the backend only through its domain's typed client; a planted
   controller calling `BackendApiClient` and a planted client outside a `<domain>.client` package
   that takes a `URI` and caches are reported (`TypedBackendClientTest`). Each typed client's
   requests are pinned against a MockWebServer (`*BackendClientTest`).
