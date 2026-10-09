@@ -63,6 +63,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -91,6 +92,7 @@ class InventoryItemServiceTest {
   @Mock private JobOrderItemService jobOrderItemService;
 
   @Mock private AuditService auditService;
+  @Mock private ApplicationEventPublisher eventPublisher;
   private InventoryItemService inventoryItemService;
 
   private InventoryAggregationService realAggregationService;
@@ -119,7 +121,8 @@ class InventoryItemServiceTest {
             offerRatchet,
             inventoryItemMapper,
             ownerScopeService,
-            auditService);
+            auditService,
+            eventPublisher);
     inventoryItemService =
         new InventoryItemService(
             inventoryItemRepository,

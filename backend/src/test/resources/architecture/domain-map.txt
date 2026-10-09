@@ -171,6 +171,7 @@ class BlueprintPackTags blueprint log-name clean-up used only by BlueprintImport
 class BasetoolErrorController platform container error dispatch as RFC 7807
 class ConnectedInstallationDto exchange connected-apps installation row
 class CounterpartySnapshot bank bank counterparty snapshot (REQ-BANK-044)
+class MemberEvaluationErasure promotion GDPR erasure command; in service until 7.6, a promotion package would close a service-promotion package cycle
 
 package dto catalogue external feed DTO packages of the UEX, SC Wiki and P4K imports
 package integration catalogue outbound catalogue clients
@@ -195,6 +196,7 @@ package dashboard dashboard the dashboard module's package tree (plan 5.2)
 package orgchart orgchart the org chart module's package tree (plan 5.2)
 package admin admin the admin module's package tree (plan 5.2)
 package operation operation the operation module's package tree (plan 5.2)
+package promotion promotion the promotion module's package tree (plan 5.2)
 package personalinventory personalinventory the personal-inventory module's package tree (plan 5.2)
 
 name ^OrgUnitBank bank
@@ -213,7 +215,6 @@ name ^Refining catalogue
 name ^(Hangar|Ship(?!Type)|Fleet|Starjump|Shiplist|SquadronShip|SetHomeLocation) hangar
 name ^(Notification|LocalNotification|RedisNotification|RuleEvaluation|RecipientResolution|SelectorKind|OrgRelativeRole|Mail|SmtpMail) notification
 name ^Audit audit
-name ^(Promotion|RankRequirement|MemberEvaluation) promotion
 name ^(OrgRoleManagement|AddOlMember|SquadronRole|AssignSquadronRank) orgunit leadership writes merged into orgunit (plan 7.3)
 name ^(OrgUnit|Squadron|SpecialCommand|Bereich|Organisationsleitung|KommandoGroup|CreateKommandoGroup|UpdateKommandoGroup|OrgHierarchy|Membership) orgunit
 name ^(User|Role|Registration|PendingRegistration|ApproveRegistration|RejectRegistration|ReopenRegistration|LinkRegistration|MyRegistration|Discord|Keycloak|Terms|DeletionRequest|CreateDeletionRequest|DecideDeletionRequest|DataExport|AdminDataExport|AccountDeletion|AccountConsolidation|ConsolidateAccount|MergeAccount|Handle|PersonSearch|AdminPersonSearch|AdminTerms|AdminDeletion|RejectedRegistration|ApprovalDecision|ApprovalStatus|AdminController$) identity

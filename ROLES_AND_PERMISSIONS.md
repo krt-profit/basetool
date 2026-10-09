@@ -664,7 +664,7 @@ service layer via the active Staffel context
   the pages show a „Staffel wählen" (select Staffel) hint instead of mixing all Staffeln.
 - A **user without Staffel affiliation who is not an admin** has no promotion
   system of their own: the menu item is hidden, every list/eligibility read
-  returns empty, and a direct page call is blocked with 403 (`hasPromotionReadAccess()`).
+  returns empty, and a direct page call is blocked with 403 (`PromotionAccessPolicy.hasReadAccess()`).
 - The **evaluation matrix** (the member list of the evaluation management) lists exclusively the
   **plain members** of a Staffel: whoever holds the `ADMIN` or `OFFICER` role **never** appears
   there as a row to be evaluated — admins are Staffel-less, and officers carry out the evaluation
@@ -679,7 +679,7 @@ service layer via the active Staffel context
 | View **others'** evaluations/eligibility, member list (`hasAnyRole('ADMIN','OFFICER')`, officer Staffel-scoped) |   ❌    |  ❌   | ❌  |   ✅⁴    |  ✅⁴   |
 | Enable/disable promotion subsystem per Staffel (`PATCH /squadrons/{id}/promotion-enabled`, `hasRole('ADMIN')`)  |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
-¹ Only the **own home Staffel**; a user with no Staffel at all (and without admin rights) sees nothing — `hasPromotionReadAccess()` returns empty, the menu is hidden, direct call 403.
+¹ Only the **own home Staffel**; a user with no Staffel at all (and without admin rights) sees nothing — `PromotionAccessPolicy.hasReadAccess()` is false, the menu is hidden, direct call 403.
 ² Admin: the actively pinned Staffel; in all-Staffeln mode a „Staffel wählen" (select Staffel) hint instead of mixing.
 ³ Only for one's own Staffel. **SKs are permanently excluded from the promotion system via DB CHECK/trigger + ArchUnit rule.**
 ⁴ The **member list** to be evaluated (`GET /api/v1/promotion/evaluations/members`) contains only the **plain members** of the Staffel — holders of the `ADMIN` and `OFFICER` roles are filtered out (#817), since they carry out the evaluation instead of being evaluated themselves. Officer/Admin therefore **read** the matrix but do **not appear** as a row in it.

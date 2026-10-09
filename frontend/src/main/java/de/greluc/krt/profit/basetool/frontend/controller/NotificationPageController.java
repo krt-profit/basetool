@@ -107,6 +107,8 @@ public class NotificationPageController {
           "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "/materialboerse",
           "EXCHANGE_INSTALLATION_CONNECTED", "/connected-apps",
           "EXCHANGE_BULK_UNDO_APPLIED", "/connected-apps",
+          "INVENTORY_TRANSFERRED_TO_USER", "/inventory/my",
+          "INVENTORY_TRANSFERRED_FROM_USER", "/inventory/my",
           "ACCOUNT_DELETION_REQUEST_DECLINED", "/profile",
           "ACCOUNT_DELETION_REQUESTED", "/admin/deletion-requests",
           "DISCORD_REGISTRATION_PENDING", "/admin/discord-registrations");

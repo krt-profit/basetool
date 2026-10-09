@@ -140,7 +140,6 @@ import de.greluc.krt.profit.basetool.backend.model.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.model.BankTransaction;
 import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountDetailDto;
@@ -222,6 +221,7 @@ import de.greluc.krt.profit.basetool.backend.privacy.internal.DataExportSections
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleErasureCoverage;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleSpellings;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.PersonSearchTargets;
+import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountApprovalLimitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountGrantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
@@ -1824,7 +1824,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 571);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 557);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 

@@ -88,7 +88,7 @@ in the layer packages.
 The domain events live in their publisher's `<module>.api.events` package (plan §5.2, §5.3); there
 is no central `event` package. Every listener runs after commit (`@TransactionalEventListener`),
 so the reaction may happen later or fail on its own, and none records an audit row for the mutation
-that published the event (REQ-AUDIT-007). Seven modules publish today:
+that published the event (REQ-AUDIT-007). Eight modules publish today:
 
 | Package | Events |
 | --- | --- |
@@ -99,6 +99,7 @@ that published the event (REQ-AUDIT-007). Seven modules publish today:
 | `joborder.api.events` | `JobOrderCreatedEvent`, `JobOrderUpdatedByRequesterEvent` |
 | `materialexchange.api.events` | `MaterialExchangeInterestRegisteredEvent`, `MaterialRequestFulfillmentSignalledEvent` |
 | `exchange.api.events` | `ExchangeInstallationConnectedEvent`, `ExchangeBulkUndoAppliedEvent` |
+| `inventory.api.events` | `InventoryTransferredToUserEvent`, `InventoryTransferredFromUserEvent` and the `TransferredLot` they list (REQ-INV-055) |
 
 The publishing services and the listeners still sit in `service`. `OrgUnitRef` stays with the
 notification contract rather than the kernel, because it carries the org-unit module's
@@ -138,6 +139,7 @@ mappers no other module needs) and `<module>.web` (controllers and their REST DT
 | `admin` | `SystemSettings` (setting read, system flag write) | `SystemSetting`, its repository, `SystemSettingService`, `SystemSettingMapper`, the setting records, `AndroidClientProperties`, `AndroidVersionPolicyReport` | `SystemSettingController`, `AppVersionPolicyController`, `SystemController`, `AppVersionPolicyDto`, `PingResponse` |
 | `personalinventory` | `PersonalInventoryErasure` (the GDPR deletion's bulk delete) | `PersonalInventoryItem`, `PersonalInventoryLocationType`, the repository, `PersonalInventoryItemService`, the mapper and records, `UexLocationDto` | `PersonalInventoryController`, `AdminPersonalInventoryController`, `UexLocationController` |
 | `orgchart` | — (publishes nothing; orgunit reaches it through `orgunit.api.MembershipChangeObserver`) | `OrgChartPosition` and its repository and enums, `OrgChartService`, `OrgChartReadService`, `LeitungViewService`, `OrgChartPositionMapper`, the chart and Leitung DTOs | `OrgChartController`, `LeitungController` |
+| `promotion` | — (publishes nothing; the GDPR deletion calls `service.MemberEvaluationErasure`, which the module implements) | the entities, repositories, services, mappers and records, `PromotionAccessPolicy` | the six promotion controllers |
 
 `OrgChartService` mirrors the leadership ranks inside the transaction of the rank change. The org
 chart's DTOs stay in `internal`, because its services return them: a moved domain's `web` depends on

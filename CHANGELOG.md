@@ -4,6 +4,11 @@
 
 ### Added
 
+- **Benachrichtigung bei Lager-Umbuchungen auf ein anderes Mitglied.** Wer Bestand auf dich umbucht,
+  löst eine Benachrichtigung mit Material, Qualität, Menge und Ort aus; bucht jemand anderes deinen
+  Bestand weg (z. B. ein Logistiker), erfährt auch der bisherige Besitzer davon. Eine
+  Sammel-Umbuchung erzeugt eine Nachricht pro Empfänger (REQ-INV-055, Migration V267).
+
 - **Layout-Prüfung um die Seitenmuster erweitert (Phase 5).** Die Geräteklassen-Prüfung meldet jetzt
   auch seitlich scrollende Karten am Smartphone, eine Hauptaktion außerhalb des ersten Bildschirms,
   mehr als eine Hauptaktion im Seitenkopf, verschachtelte `.hud-box`en und Text im alten Grau.
