@@ -888,6 +888,40 @@ their "must stay green" period here (D-01).
   still widen together is now tested end to end instead. (3) The detach command removes the
   foreign write, not the `mission -> operation` edges: those are the association and the DTO
   embedding of (1), and leave with P3-8 and the `OperationSummaryProvider` SPI.
+- `exchange` (as a package) — **done 2026-10-10.** Its "must stay green" period starts here
+  (D-01); Phase 5 extracts it next (D-23).
+  1. *Characterise*: the relay contract was already pinned (G-18 wire contract and golden answers,
+     `ExchangeRelaySeamParityTest`, the relay OpenAPI document, the authorization matrix);
+     `BlueprintUploadPreviewServiceTest` was added for the one exchange path a lower module used.
+  2. *Inversions* (5 baseline edges, **108 → 103**; the `blueprint -> exchange` and
+     `scope -> exchange` pairs are gone): the blueprint upload preview hands the envelope to the
+     blueprint-owned SPI `service.BlueprintEnvelopeReader` (implemented by
+     `ExchangeBlueprintEnvelopeReader`, same binding, validation and draft resolution in the
+     caller's transaction); `PersonalBlueprintService`, `CustomJwtGrantedAuthoritiesConverter` and
+     `UserDeletionService` ask `platform.api.ClientDirectory` (`displayNames`, `isGatewayClient`,
+     `isGatewayServiceAccount`); the display-name projection is nested in
+     `ExchangeClientRepository` (the P1-4 pattern).
+  3. *Move*: 152 classes. `exchange.web` holds the eleven controllers, `exchange.internal.dto` the
+     34 relay wire records, `exchange.internal` everything else — including `ActingMemberFilter`,
+     `SandboxProfileGuard` (its `spring.factories` entry follows), the change-source transaction
+     manager and its configuration from `config`, and `DatabaseActingMemberAuthorities`.
+  No access policy left the scope hub: the exchange has none there. Its gates are its own
+  (`exchangeGate`, `connectedAppsGate`); the one scope-hub call, `canViewJobOrders` in
+  `ExchangeDemandService`, is the job-order gate the exchange asks as a caller.
+  **Corrections:** (1) the move needed two more inversions than the eleven inbound edges show,
+  because once the exchange depends on the service layer any `config -> exchange` edge closes a
+  `config -> exchange -> service -> config` package cycle: `SecurityConfig` takes the filter from
+  the new SPI `platform.api.ActingMemberFilterProvider` (same constructor arguments, same place
+  in the chain, the approval filter anchored on the filter's runtime class), `ActingMemberHeader`
+  moved to `platform.api` (the metrics filter reads the client header) and `KeycloakSyncProperties`
+  to `identity.api` (`FirstPartyClientIds` reads it). (2) The exchange's ArchUnit rules were keyed
+  on the package segment `exchange` and on the service package tree; both would have changed
+  meaning. The relay-controller rules now select controllers mapped under `/api/v1/exchange/`
+  (still 8 classes, 14 methods), the reduced-authority rule every non-web exchange class
+  (52 → 160), and the service-layer `SecurityContextHolder` and read-only-transaction rules also
+  select the exchange's non-web classes, so the 28 helpers that left the service package tree stay
+  checked. (3) §5.2's `web` cannot hold the relay DTOs, as with the org chart; they sit in
+  `internal.dto`, which keeps the `exchangeDtosStayInTheExchangeLayer` selection (34) unchanged.
 
 ### 7.5 Phase 3 — the business core
 
