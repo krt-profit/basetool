@@ -888,6 +888,24 @@ their "must stay green" period here (D-01).
   still widen together is now tested end to end instead. (3) The detach command removes the
   foreign write, not the `mission -> operation` edges: those are the association and the DTO
   embedding of (1), and leave with P3-8 and the `OperationSummaryProvider` SPI.
+- `promotion` — **done 2026-10-05** (P2-3), the second module, after `operation`, to take its access
+  policy out of the scope hub. `PromotionAccessPolicy` (bean `promotionAccessPolicy`, `promotion.internal`) owns
+  the per-Staffel feature flag, the read gate and the feature assertion; the three methods left
+  `OwnerScopeService` and `RequestScopeResolver`. The generic Staffel gates the promotion services
+  also use (`currentSquadronId`, `canSeeSquadron`, `canEditSquadron`, `hasAmbiguousStaffelContext`)
+  stay in the scope kernel, because other modules use them. No SpEL referenced the moved methods,
+  so the authorization matrix did not change. The differential verdict test
+  (`PromotionAccessPolicyVerdictTest`, 17 cases) ran the policy and the hub side by side over the
+  rows of §5.4 that apply to this gate and now keeps the recorded verdicts; the per-row escapes of
+  §5.4 do not apply, because the per-row checks are the unchanged kernel `canSeeSquadron` /
+  `canEditSquadron`. Controllers moved to `promotion.web`, everything else to `promotion.internal`.
+  The GDPR deletion reaches the module through `MemberEvaluationErasure` (`MANDATORY`), which sits
+  in the `service` package beside `UserDeletionService`, assigned to `promotion` by a `class` rule.
+  **Correction to §5.2:** a module cannot publish a type in `<module>.api` while the caller sits in
+  a layer package the module itself depends on — `service → promotion.api` plus `promotion →
+  service` closes a top-level package cycle; the type is carried into Phase 4 and replaced by the GDPR
+  participant SPIs of §7.6.
+  With that, `promotion` publishes nothing. The move removes no baseline edge (108).
 
 ### 7.5 Phase 3 — the business core
 
@@ -912,6 +930,10 @@ as each pair is decoupled.
 run `MANDATORY` inside the orchestrator's one transaction, and the deletion and anonymisation audit
 rows stay in the orchestrator — and `catalogue`, whose caches switch to read models. Identity's REST
 surface sheds the six domains it hosts today.
+Carried into this phase from Phase 2: `service.MemberEvaluationErasure` (promotion) and
+`personalinventory.api.PersonalInventoryErasure` are the interim erasure commands `UserDeletionService`
+calls; both are replaced by `UserErasureParticipant` implementations here, and
+`MemberEvaluationErasure` leaves the `service` package with that step (P2-3).
 
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 

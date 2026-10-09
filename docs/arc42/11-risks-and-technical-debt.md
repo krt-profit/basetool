@@ -369,4 +369,4 @@ Phase 1 has begun: `audit.api`, `kernel`, `orgunit.api`/`orgunit.web` and the pu
 shrunk from 138 to 110 class edges. Phase 2 has begun (2026-10-05): `dashboard`, `orgchart`
 and `admin` are the first domains moved whole into their module packages. `operation` followed
 with the first access policy out of the scope hub and the first mission command; the baseline is
-at 108 class edges.
+at 108 class edges. `promotion` moved with its own access policy (`promotionAccessPolicy`).
