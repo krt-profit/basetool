@@ -55,6 +55,9 @@ class MissionOwnerChangeE2eTest {
   private static final String OFFICER = "test-officer";
   private static final String OFFICER_PASSWORD = "test-officer-pw";
 
+  /** Attribute set on the owner row before a write; the re-rendered row no longer carries it. */
+  private static final String PRE_WRITE_MARKER = "data-e2e-pre-write";
+
   private static Playwright playwright;
   private static Browser browser;
   private static String missionId;
@@ -95,6 +98,9 @@ class MissionOwnerChangeE2eTest {
   /**
    * Hands the mission to the member (in place, counter moves to 1), then replays a change with the
    * pre-change counter 0 — the second manager who opened the page earlier — and expects the 409.
+   *
+   * <p>The counter is rewound only once the {@code mgmt} section has re-rendered the owner row,
+   * since that refresh replaces the row with the current counter.
    */
   @Test
   void ownerChangeMovesTheCounterAndAStaleCounterIsRefused() {
@@ -116,9 +122,11 @@ class MissionOwnerChangeE2eTest {
         assertEquals(200, first.status(), "the owner change must succeed");
         assertEquals(memberId, ownerId(), "the new owner must be persisted");
         page.waitForFunction(
-            "() => document.getElementById('owner-row')"
-                + " && document.getElementById('owner-row').getAttribute('data-ownership-version')"
-                + " === '1'");
+            "() => { const row = document.getElementById('owner-row');"
+                + " return row && !row.hasAttribute('"
+                + PRE_WRITE_MARKER
+                + "')"
+                + " && row.getAttribute('data-ownership-version') === '1'; }");
         assertEquals(
             Boolean.TRUE,
             page.evaluate("window.__krtNoReload === true"),
@@ -140,6 +148,10 @@ class MissionOwnerChangeE2eTest {
    * Picks a candidate in the owner combobox, saves, confirms the dialog and returns the answer of
    * the owner-change write.
    *
+   * <p>Marks the current owner row with {@link #PRE_WRITE_MARKER} first, so a caller can tell the
+   * row the {@code mgmt} section refresh re-renders after a successful write from the one it
+   * replaces.
+   *
    * @param page the mission detail page on the Verwaltung tab
    * @param userId the candidate's app-user id (the option value)
    * @param searchText what to type so the server-side search renders the candidate
@@ -148,6 +160,8 @@ class MissionOwnerChangeE2eTest {
   private static Response changeOwner(Page page, String userId, String searchText) {
     E2eSupport.selectComboboxByValue(
         page.locator("[data-testid='mission-owner-picker']"), userId, searchText);
+    page.evaluate(
+        "document.getElementById('owner-row').setAttribute('" + PRE_WRITE_MARKER + "', '')");
     page.locator("[data-trigger='mission-change-owner']").click();
     Locator ok = page.locator(".krt-confirm-ok");
     return page.waitForResponse(
