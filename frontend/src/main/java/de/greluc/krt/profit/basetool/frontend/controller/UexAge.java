@@ -20,10 +20,9 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.TerminalDto;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.format.DateTimeParseException;
-import java.util.Map;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -83,38 +82,17 @@ public record UexAge(@NotNull Instant syncedAt, @NotNull String unit, long amoun
    * @return the newest sweep instant, or {@code null} when no terminal carries one
    */
   @Nullable
-  public static Instant latestSync(@Nullable PageResponse<Map<String, Object>> terminals) {
+  public static Instant latestSync(@Nullable PageResponse<TerminalDto> terminals) {
     if (terminals == null || terminals.content() == null) {
       return null;
     }
     Instant latest = null;
-    for (Map<String, Object> terminal : terminals.content()) {
-      Instant synced = terminal == null ? null : parse(terminal.get("uexSyncedAt"));
+    for (TerminalDto terminal : terminals.content()) {
+      Instant synced = terminal == null ? null : terminal.uexSyncedAt();
       if (synced != null && (latest == null || synced.isAfter(latest))) {
         latest = synced;
       }
     }
     return latest;
-  }
-
-  /**
-   * Reads an instant from a decoded JSON value.
-   *
-   * @param value an {@link Instant} or an ISO-8601 string; anything else yields {@code null}
-   * @return the instant, or {@code null} when the value is absent or unreadable
-   */
-  @Nullable
-  private static Instant parse(@Nullable Object value) {
-    if (value instanceof Instant instant) {
-      return instant;
-    }
-    if (!(value instanceof String text) || text.isBlank()) {
-      return null;
-    }
-    try {
-      return Instant.parse(text.trim());
-    } catch (DateTimeParseException _) {
-      return null;
-    }
   }
 }

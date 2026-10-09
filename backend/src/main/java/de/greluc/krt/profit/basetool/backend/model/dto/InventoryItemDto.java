@@ -30,7 +30,8 @@ import org.jetbrains.annotations.NotNull;
  * <p>Exactly one of {@code material} (with {@code quality}) and {@code gameItem} is set
  * (REQ-INV-029). The allocation lists and rest figures carry the job-order and mission splits
  * (REQ-INV-027); {@code stolen} is the „gestohlen" marker (REQ-INV-053); {@code canEdit} is the
- * server's answer whether the caller may write this row (REQ-SEC-030).
+ * server's answer whether the caller may write this row, scope and then owner or
+ * Logistician-or-above (REQ-SEC-047).
  */
 public record InventoryItemDto(
     UUID id,

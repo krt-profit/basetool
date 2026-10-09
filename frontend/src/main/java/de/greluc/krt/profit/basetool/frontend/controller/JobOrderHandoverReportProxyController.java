@@ -21,13 +21,12 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.withBackendStatus;
 
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import java.util.Map;
+import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.HandoverReportPreviewRequestDto;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -43,7 +42,7 @@ import org.springframework.web.bind.annotation.RestController;
  * Frontend proxy for the job order handover report endpoints.
  *
  * <p>Forwards PDF download and preview requests to the backend through {@link
- * BackendApiClient#execute} (authenticated client, shared error mapping), and streams the PDF bytes
+ * JobOrderBackendClient} (authenticated client, shared error mapping), and streams the PDF bytes
  * back to the browser.
  */
 @RestController
@@ -51,7 +50,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class JobOrderHandoverReportProxyController {
 
-  private final BackendApiClient backendApiClient;
+  /** Fetches the report PDFs from the backend. */
+  private final JobOrderBackendClient jobOrderClient;
 
   /**
    * Proxies the download of a persisted handover report PDF to the backend.
@@ -98,21 +98,9 @@ public class JobOrderHandoverReportProxyController {
   @PostMapping("/{jobOrderId}/handovers/report/preview")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<byte[]> previewHandoverReport(
-      @PathVariable @NotNull UUID jobOrderId, @RequestBody @NotNull Map<String, Object> body) {
-    String uri = "/api/v1/orders/{id}/handovers/report/preview";
-    byte[] pdf =
-        withBackendStatus(
-            () ->
-                backendApiClient.execute(
-                    HttpMethod.POST,
-                    uri,
-                    webClient ->
-                        webClient
-                            .post()
-                            .uri(uri, jobOrderId)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(body),
-                    spec -> spec.bodyToMono(byte[].class)));
+      @PathVariable @NotNull UUID jobOrderId,
+      @RequestBody @NotNull HandoverReportPreviewRequestDto body) {
+    byte[] pdf = withBackendStatus(() -> jobOrderClient.handoverReportPreview(jobOrderId, body));
 
     return attachment(pdf, "uebergabeprotokoll-vorschau.pdf");
   }
@@ -134,27 +122,12 @@ public class JobOrderHandoverReportProxyController {
       @NotNull UUID handoverId,
       String userTimeZone,
       @NotNull String filename) {
-    String uri =
-        itemHandover
-            ? "/api/v1/orders/{id}/item-handovers/{handoverId}/report"
-            : "/api/v1/orders/{id}/handovers/{handoverId}/report";
     byte[] pdf =
         withBackendStatus(
             () ->
-                backendApiClient.execute(
-                    HttpMethod.GET,
-                    uri,
-                    webClient ->
-                        webClient
-                            .get()
-                            .uri(uri, jobOrderId, handoverId)
-                            .headers(
-                                h -> {
-                                  if (userTimeZone != null && !userTimeZone.isBlank()) {
-                                    h.set("X-User-Time-Zone", userTimeZone);
-                                  }
-                                }),
-                    spec -> spec.bodyToMono(byte[].class)));
+                itemHandover
+                    ? jobOrderClient.itemHandoverReport(jobOrderId, handoverId, userTimeZone)
+                    : jobOrderClient.handoverReport(jobOrderId, handoverId, userTimeZone));
     return attachment(pdf, filename);
   }
 

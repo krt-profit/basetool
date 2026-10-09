@@ -33,7 +33,6 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverReposito
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
@@ -69,7 +68,6 @@ public class AccessGateService {
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   private final InventoryItemRepository inventoryItemRepository;
   private final RefineryOrderRepository refineryOrderRepository;
-  private final OperationRepository operationRepository;
   private final ShipRepository shipRepository;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
 
@@ -580,74 +578,6 @@ public class AccessGateService {
     return orgUnitMembershipRepository.findAllByIdUserId(targetUserId).stream()
         .map(m -> m.getId().getOrgUnitId())
         .anyMatch(unitScope);
-  }
-
-  /**
-   * Checks whether the caller may read operation {@code operationId}: when the owning-org-unit
-   * check passes, when it is ownerless and the caller is member-or-above (REQ-ORG-009), or when the
-   * caller participated in one of its linked missions. Unknown ids return {@code false}.
-   *
-   * @param operationId operation to inspect; never {@code null}
-   * @return {@code true} iff the caller may read the operation
-   */
-  public boolean canSeeOperation(@NotNull UUID operationId) {
-    return operationRepository
-        .findById(operationId)
-        .map(
-            o -> {
-              boolean scopeVisible =
-                  o.getOwningOrgUnit() == null
-                      ? authHelper.isMemberOrAbove()
-                      : canSeeSquadron(o.getOwningOrgUnit().getId());
-              return scopeVisible || participatedInOperation(operationId);
-            })
-        .orElse(false);
-  }
-
-  /**
-   * {@link #canSeeOperation(UUID)} without the participant escape, for the finance endpoints:
-   * mission participation is self-issuable and so does not unlock a foreign ledger.
-   *
-   * @param operationId operation to inspect; never {@code null}
-   * @return {@code true} iff the caller reaches the operation without the participant escape
-   */
-  public boolean canSeeOperationLedger(@NotNull UUID operationId) {
-    return operationRepository
-        .findById(operationId)
-        .map(
-            o ->
-                o.getOwningOrgUnit() == null
-                    ? authHelper.isMemberOrAbove()
-                    : canSeeSquadron(o.getOwningOrgUnit().getId()))
-        .orElse(false);
-  }
-
-  /**
-   * Checks whether the caller participated in one of the operation's linked missions.
-   *
-   * @param operationId the operation to test; never {@code null}
-   * @return {@code true} iff the caller is a participant of one of its missions
-   */
-  private boolean participatedInOperation(@NotNull UUID operationId) {
-    return authHelper
-        .currentUserId()
-        .map(uid -> operationRepository.existsParticipantUserInOperation(operationId, uid))
-        .orElse(false);
-  }
-
-  /**
-   * Checks whether the caller may edit operation {@code operationId}: strict owning-org-unit check;
-   * an ownerless operation passes and is restricted by the controller's role gate (REQ-ORG-009).
-   * Unknown ids return {@code false}.
-   *
-   * @param operationId operation to inspect; never {@code null}
-   * @return {@code true} iff the caller may edit the operation
-   */
-  public boolean canEditOperation(@NotNull UUID operationId) {
-    return operationRepository
-        .findById(operationId)
-        .map(o -> o.getOwningOrgUnit() == null || canEditSquadron(o.getOwningOrgUnit().getId()))
-        .orElse(false);
   }
 
   /**

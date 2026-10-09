@@ -1,0 +1,178 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.operation.web;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationPayoutService;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationPayoutStatusDto;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+/**
+ * Security tests for {@link OperationController#setPayoutStatus}: any mission manager may set
+ * {@code paidOut=true}, only ADMIN or OFFICER may clear it.
+ */
+@SpringBootTest
+class OperationPayoutPaidOutSecurityTest {
+
+  @Autowired private WebApplicationContext context;
+
+  private MockMvc mockMvc;
+
+  @MockitoBean private OperationPayoutService operationPayoutService;
+  @MockitoBean private OperationAccessPolicy operationAccessPolicy;
+
+  @BeforeEach
+  void setUp() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+  }
+
+  private static SimpleGrantedAuthority admin() {
+    return new SimpleGrantedAuthority("ROLE_ADMIN");
+  }
+
+  private static SimpleGrantedAuthority officer() {
+    return new SimpleGrantedAuthority("ROLE_OFFICER");
+  }
+
+  private static SimpleGrantedAuthority missionManager() {
+    return new SimpleGrantedAuthority("ROLE_MISSION_MANAGER");
+  }
+
+  private static OperationPayoutStatusDto refreshedRow(String key) {
+    return new OperationPayoutStatusDto(key, true, null, null);
+  }
+
+  private static String body(String key, boolean paidOut) {
+    return "{\"participantKey\":\"" + key + "\",\"paidOut\":" + paidOut + "}";
+  }
+
+  @Test
+  void missionManager_canSet_paidOutTrue() throws Exception {
+    UUID opId = UUID.randomUUID();
+    String key = UUID.randomUUID().toString();
+    when(operationAccessPolicy.canEditOperation(opId)).thenReturn(true);
+    when(operationPayoutService.setPayoutStatus(eq(opId), eq(key), eq(true)))
+        .thenReturn(refreshedRow(key));
+
+    mockMvc
+        .perform(
+            put("/api/v1/operations/" + opId + "/payouts/paid-out")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body(key, true))
+                .with(jwt().authorities(missionManager())))
+        .andExpect(status().isOk());
+
+    verify(operationPayoutService).setPayoutStatus(opId, key, true);
+  }
+
+  @Test
+  void missionManager_isForbiddenFromSetting_paidOutFalse() throws Exception {
+    UUID opId = UUID.randomUUID();
+    String key = UUID.randomUUID().toString();
+    when(operationAccessPolicy.canEditOperation(opId)).thenReturn(true);
+
+    mockMvc
+        .perform(
+            put("/api/v1/operations/" + opId + "/payouts/paid-out")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body(key, false))
+                .with(jwt().authorities(missionManager())))
+        .andExpect(status().isForbidden());
+
+    verify(operationPayoutService, never()).setPayoutStatus(any(), any(), any(Boolean.class));
+  }
+
+  @Test
+  void officer_canSet_paidOutFalse() throws Exception {
+    UUID opId = UUID.randomUUID();
+    String key = UUID.randomUUID().toString();
+    when(operationAccessPolicy.canEditOperation(opId)).thenReturn(true);
+    when(operationPayoutService.setPayoutStatus(eq(opId), eq(key), eq(false)))
+        .thenReturn(refreshedRow(key));
+
+    mockMvc
+        .perform(
+            put("/api/v1/operations/" + opId + "/payouts/paid-out")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body(key, false))
+                .with(jwt().authorities(officer())))
+        .andExpect(status().isOk());
+
+    verify(operationPayoutService).setPayoutStatus(opId, key, false);
+  }
+
+  @Test
+  void admin_canSet_paidOutFalse() throws Exception {
+    UUID opId = UUID.randomUUID();
+    String key = UUID.randomUUID().toString();
+    when(operationAccessPolicy.canEditOperation(opId)).thenReturn(true);
+    when(operationPayoutService.setPayoutStatus(eq(opId), eq(key), eq(false)))
+        .thenReturn(refreshedRow(key));
+
+    mockMvc
+        .perform(
+            put("/api/v1/operations/" + opId + "/payouts/paid-out")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body(key, false))
+                .with(jwt().authorities(admin())))
+        .andExpect(status().isOk());
+
+    verify(operationPayoutService).setPayoutStatus(opId, key, false);
+  }
+
+  @Test
+  void officer_canStillSet_paidOutTrue() throws Exception {
+    UUID opId = UUID.randomUUID();
+    String key = UUID.randomUUID().toString();
+    when(operationAccessPolicy.canEditOperation(opId)).thenReturn(true);
+    when(operationPayoutService.setPayoutStatus(eq(opId), eq(key), eq(true)))
+        .thenReturn(refreshedRow(key));
+
+    mockMvc
+        .perform(
+            put("/api/v1/operations/" + opId + "/payouts/paid-out")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body(key, true))
+                .with(jwt().authorities(officer())))
+        .andExpect(status().isOk());
+
+    verify(operationPayoutService).setPayoutStatus(opId, key, true);
+  }
+}

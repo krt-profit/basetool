@@ -20,11 +20,10 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.view.ItemCollectionGroup;
 import java.util.Collections;
 import java.util.List;
@@ -32,7 +31,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -52,18 +50,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 @Slf4j
 public class ItemCollectionPageController {
 
-  /**
-   * Response type for the per-order earmarked item stock, grouped per game item ({@code GET
-   * /api/v1/orders/{id}/item-stock}).
-   */
-  private static final ParameterizedTypeReference<List<JobOrderItemStockGroupDto>>
-      ITEM_STOCK_GROUP_LIST_TYPE = new ParameterizedTypeReference<>() {};
-
-  /** Response type for the location-reference lookup ({@code GET /api/v1/locations/lookup}). */
-  private static final ParameterizedTypeReference<List<LocationReferenceDto>>
-      LOCATION_REFERENCE_LIST_TYPE = new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Loads the earmarked item stock and the location lookup from the backend. */
+  private final JobOrderBackendClient jobOrderClient;
 
   /**
    * Renders the item-collection page of an ITEM job order ({@code
@@ -90,16 +78,13 @@ public class ItemCollectionPageController {
     List<LocationReferenceDto> locations = Collections.emptyList();
 
     try {
-      itemStock =
-          backendApiClient.get(
-              "/api/v1/orders/{id}/item-stock", ITEM_STOCK_GROUP_LIST_TYPE, jobOrderId);
+      itemStock = jobOrderClient.itemStock(jobOrderId);
     } catch (BackendServiceException e) {
       log.warn("Could not load item collection for job order {}: {}", jobOrderId, e.getMessage());
     }
 
     try {
-      locations =
-          backendApiClient.getCached(CachedCatalog.LOCATIONS_LOOKUP, LOCATION_REFERENCE_LIST_TYPE);
+      locations = jobOrderClient.locations();
     } catch (BackendServiceException e) {
       log.warn("Could not load locations: {}", e.getMessage());
     }

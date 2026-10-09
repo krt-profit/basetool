@@ -59,7 +59,7 @@ class DecideDeletionRequestRequest privacy GDPR orchestration, transitional modu
 class ConsolidateAccountRequest privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class MergeAccountRequest privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class PayoutPreference identity member preference on User (plan 7.3)
-class AccessGateService scope per-aggregate can* gate slab for mission/joborder/inventory/refinery/operation/ship (ADR-0065)
+class AccessGateService scope per-aggregate can* gate slab for mission/joborder/inventory/refinery/ship (ADR-0065)
 class OwnerScopeService scope scope facade referenced by 64+ SpEL strings (ADR-0065)
 class ScopeActiveOrgUnitProvider scope the active org unit for the logging MDC (plan 5.3)
 class RequestScopeResolver scope request-scoped pin and ScopePredicate resolution (ADR-0065)
@@ -194,6 +194,7 @@ package mission mission the mission module's package tree (plan 5.2)
 package dashboard dashboard the dashboard module's package tree (plan 5.2)
 package orgchart orgchart the org chart module's package tree (plan 5.2)
 package admin admin the admin module's package tree (plan 5.2)
+package operation operation the operation module's package tree (plan 5.2)
 package personalinventory personalinventory the personal-inventory module's package tree (plan 5.2)
 
 name ^OrgUnitBank bank

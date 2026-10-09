@@ -46,7 +46,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest.SpecialCommandChange;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationCreateDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitParentUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrganisationsleitungDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
@@ -67,6 +66,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.request.PatchMissionCoreR
 import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionOwningOrgUnitRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionRequest;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartPositionCreateRequest;
 import de.greluc.krt.profit.basetool.guardfixture.massassignment.FixtureMassAssignmentController;
 import de.greluc.krt.profit.basetool.guardfixture.massassignment.FixtureNestedRequest;

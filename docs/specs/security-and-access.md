@@ -323,6 +323,7 @@ class rename, a moved bean or a changed signature therefore has to fail the buil
 
 **Enforced by:** `SecurityExpressionBeanResolutionTest`, `SecurityExpressionRulesTest`,
 `SecurityExpressionAnalyzerTest` · **Code:** the explicit names on `OwnerScopeService`,
+`OperationAccessPolicy`,
 `MissionSecurityService`, `AuthHelperService`, `OrgRoleManagementSecurityService`,
 `BankSecurityService`, `SpecialCommandSecurityService`, `ExchangeGate`, `ConnectedAppsGate` ·
 **Related:** REQ-SEC-002, REQ-OBS-020, plan guard G-04
@@ -3345,8 +3346,19 @@ on `hasRole('LOGISTICIAN') and canEditJobOrder(#id)`; a flag built on the scope 
 offer editing to a plain member whose own Staffel owns the order, which the endpoint refuses.
 `StockViewerAccess#mayEditJobOrder` therefore answers with both halves.
 
-**The mapper reaches the gate through a leaf interface** (`StockViewerAccess` in `support`,
-implemented in `service`), for the ADR-0047 reason `MissionViewerAccess` already exists: a
+> [!note] Amended 2026-10-04 — the Lager row flag answers both gates too
+> `InventoryItemDto.canEdit` was built on `canEditInventoryItem` alone, the scope half: a plain
+> member read `true` on every other member's shared row of their unit, while the per-row Lager
+> writes then refuse a non-owner below Logistician — book-out, Umbuchen, the note and the delivered
+> flag, and the „gestohlen" marker and the allocations with #2417 (REQ-INV-053, REQ-INV-027). The
+> Android app gated
+> its row actions on the flag and offered writes that answered `403`.
+> `StockViewerAccess#mayEditInventoryItem` now answers with both halves: the scope gate, then the
+> row's owner or `isLogisticianOrAbove()`. The web read the flag only where both already held, so it
+> renders unchanged.
+
+**The mapper reaches the gate through a leaf interface** (`StockViewerAccess` in `inventory.api`,
+implemented in `service`; in `support` until P1-9 split that package on 2026-10-04), for the ADR-0047 reason `MissionViewerAccess` already exists: a
 `mapper → service` edge would close a package cycle, and mappers may touch neither
 `SecurityContextHolder` (ArchUnit `mapperLayerShouldNotReachIntoSecurityContext`) nor the service
 layer directly.
@@ -3357,10 +3369,14 @@ layer directly.
   three and an officer for the first two (`MeControllerTest`).
 - [x] The job-order row flag is false for a caller who passes the scope check but holds no
   Logistician-or-above role.
+- [x] The Lager row flag is false for a caller who passes the scope check on another member's row
+  but holds no Logistician-or-above role, and true for that row's owner and for a Logistician in
+  scope.
 - [ ] Walked on a device with an admin account: outstanding.
 
-**Enforced by:** `MeControllerTest` · **Code:** `MeController`, `StockViewerAccess`,
-`StockViewerAccessService`, `AccessGateService#mayEditJobOrder`, `InventoryItemMapper`,
+**Enforced by:** `MeControllerTest`, `StockViewerAccessServiceTest`, `InventoryItemMapperTest` ·
+**Code:** `MeController`, `StockViewerAccess`, `StockViewerAccessService`,
+`AccessGateService#mayEditJobOrder`, `AccessGateService#canEditInventoryItem`, `InventoryItemMapper`,
 `JobOrderMapper` · **Related:** REQ-SEC-046, ADR-0047, and the Android counterpart REQ-APP-AUTH-014
 (`basetool-android` `docs/specs/auth.md`)
 

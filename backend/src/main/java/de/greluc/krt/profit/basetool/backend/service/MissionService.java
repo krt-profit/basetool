@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionCommands;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions.MissionSection;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFrequency;
@@ -70,6 +71,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -84,7 +86,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class MissionService {
+public class MissionService implements MissionCommands {
 
   /** Hard cap on participants per mission — see {@link #addParticipant} for the rationale. */
   public static final int MAX_PARTICIPANTS_PER_MISSION = 500;
@@ -1327,5 +1329,20 @@ public class MissionService {
   @Transactional
   public Mission removeManager(@NotNull UUID missionId, @NotNull UUID userId) {
     return missionParticipantService.removeManager(missionId, userId);
+  }
+
+  /**
+   * Clears the operation reference of every mission linked to the operation, inside the caller's
+   * transaction. The operation column is excluded from the row version and belongs to no section,
+   * so no counter moves.
+   *
+   * @param operationId the operation whose missions are detached
+   */
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void detachFromOperation(@NotNull UUID operationId) {
+    for (Mission mission : missionRepository.findAllLinkedToOperation(operationId)) {
+      mission.setOperation(null);
+    }
   }
 }

@@ -33,7 +33,7 @@ public enum LiveSyncAuthorization {
   /** {@code ownerScopeService.canSeeMission(id)} — the gate of the Einsatz detail read. */
   MISSION,
 
-  /** {@code ownerScopeService.canSeeOperation(id)} — the gate of the Operation detail read. */
+  /** {@code operationAccessPolicy.canSeeOperation(id)} — the gate of the Operation detail read. */
   OPERATION,
 
   /** {@code ownerScopeService.canSeeJobOrder(id)} — the gate of the Auftrag detail read. */

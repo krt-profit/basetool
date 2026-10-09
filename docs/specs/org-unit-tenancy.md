@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-05.
 > **Owner area:** ORG · **Related:** [`security-and-access.md`](security-and-access.md) · issues #214, #340–#344, #500
 
 # Multi-org-unit tenancy & scope (CRITICAL)
@@ -724,7 +724,9 @@ referenced from the code and `INDEX.md` but had no entry in any spec.)*
 
 > **Renumbered 2026-09-22:** this requirement was `REQ-ORG-021` until 2026-09-22; that id also named the single Grand Admiral at the top of the Organisationsleitung in [`org-chart.md`](org-chart.md), which keeps it.
 
-`OwnerScopeService.canSeeOperation` admits a caller either through org-unit scope (or the
+`OperationAccessPolicy.canSeeOperation` (bean `operationAccessPolicy`, the operation module's
+access policy since 2026-10-05; the scope hub's `OwnerScopeService.canSeeOperation` before) admits
+a caller either through org-unit scope (or the
 ownerless-leadership case of REQ-ORG-009) **or** through the participant escape of ADR-0006. The
 second key is **self-issuable**: `POST /api/v1/missions/{id}/join` is gated only on
 `isAuthenticated() and canSeeMission(#id)`, and `canSeeMission` is `true` for every non-internal
@@ -758,7 +760,8 @@ key* — reasoning that assumes participation is granted rather than claimed.
 - [x] A caller inside the operation's scope is unaffected on all five endpoints.
 
 **Decided by:** ADR-0150. **Enforced by:** `OperationPayoutServiceTest`
-(`summary_escapeOnlyCaller_seesOnlyTheirOwnRow`), `AccessGateService#canSeeOperationLedger`.
+(`summary_escapeOnlyCaller_seesOnlyTheirOwnRow`), `OperationAccessPolicy#canSeeOperationLedger`,
+`OperationModuleContractTest`.
 
 ### REQ-ORG-023 — The owner-picker rejection is a stable code, never English prose
 

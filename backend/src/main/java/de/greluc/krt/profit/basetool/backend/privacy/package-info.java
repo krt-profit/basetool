@@ -34,6 +34,7 @@
       "kernel",
       "livesync::api",
       "materialexchange::api",
+      "mission::api",
       "notification::api",
       "orgunit::api",
       "personalinventory::api",

@@ -29,11 +29,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -70,8 +70,8 @@ class ProfitCalculationPageControllerMvcTest {
     ShipTypeDto c2 = new ShipTypeDto(c2Id, "C2 Hercules Starlifter", null, "C2", 696, false);
     PageResponse<ShipTypeDto> shipTypes = new PageResponse<>(List.of(c2), 0, 10, 1, 1, List.of());
 
-    PageResponse<Map<String, Object>> terminals =
-        new PageResponse<>(List.of(Map.of("starSystemName", "Stanton")), 0, 10, 1, 1, List.of());
+    PageResponse<TerminalDto> terminals =
+        new PageResponse<>(List.of(stantonTerminal()), 0, 10, 1, 1, List.of());
 
     when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES_SORTED), anyTypeRef()))
         .thenReturn(shipTypes);
@@ -95,8 +95,7 @@ class ProfitCalculationPageControllerMvcTest {
     PageResponse<ShipTypeDto> shipTypes =
         new PageResponse<>(List.of(titan), 0, 10, 1, 1, List.of());
 
-    PageResponse<Map<String, Object>> terminals =
-        new PageResponse<>(List.of(), 0, 10, 0, 1, List.of());
+    PageResponse<TerminalDto> terminals = new PageResponse<>(List.of(), 0, 10, 0, 1, List.of());
 
     when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES_SORTED), anyTypeRef()))
         .thenReturn(shipTypes);
@@ -125,14 +124,7 @@ class ProfitCalculationPageControllerMvcTest {
     when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES_SORTED), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(hullC, titan), 0, 10, 2, 1, List.of()));
     when(backendApiClient.getCached(eq(CachedCatalog.TERMINALS), anyTypeRef()))
-        .thenReturn(
-            new PageResponse<>(
-                List.of(Map.<String, Object>of("starSystemName", "Stanton")),
-                0,
-                10,
-                1,
-                1,
-                List.of()));
+        .thenReturn(new PageResponse<>(List.of(stantonTerminal()), 0, 10, 1, 1, List.of()));
 
     String html =
         mockMvc
@@ -175,8 +167,7 @@ class ProfitCalculationPageControllerMvcTest {
     PageResponse<ShipTypeDto> shipTypes =
         new PageResponse<>(List.of(gladius, titan, noScu), 0, 10, 3, 1, List.of());
 
-    PageResponse<Map<String, Object>> terminals =
-        new PageResponse<>(List.of(), 0, 10, 0, 1, List.of());
+    PageResponse<TerminalDto> terminals = new PageResponse<>(List.of(), 0, 10, 0, 1, List.of());
 
     when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES_SORTED), anyTypeRef()))
         .thenReturn(shipTypes);
@@ -187,5 +178,29 @@ class ProfitCalculationPageControllerMvcTest {
         .perform(get("/materials/profit-calculation"))
         .andExpect(status().isOk())
         .andExpect(model().attribute("shipTypes", List.of(titan)));
+  }
+
+  /**
+   * Builds a Stanton terminal row of the cached terminal catalogue.
+   *
+   * @return the terminal
+   */
+  private static TerminalDto stantonTerminal() {
+    return new TerminalDto(
+        UUID.fromString("0d6b3e1a-7c42-4f58-9a1e-3b5c7d9e2f40"),
+        "Area18 TDD",
+        null,
+        "Stanton",
+        "ArcCorp",
+        "Area18",
+        null,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        null,
+        false);
   }
 }

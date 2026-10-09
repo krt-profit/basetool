@@ -26,6 +26,8 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncAuthorization;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationLiveSyncTopicAuthorizer;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,6 +42,8 @@ class LiveSyncTopicAuthorizersTest {
   private static final UUID RESOURCE = UUID.fromString("0b6c1f4e-2a7d-4c51-9e0a-6f3d2b8c9a11");
 
   @Mock private OwnerScopeService ownerScopeService;
+
+  @Mock private OperationAccessPolicy operationAccessPolicy;
   @Mock private OrgUnitBankAccessService orgUnitBankAccessService;
 
   @Test
@@ -58,8 +62,8 @@ class LiveSyncTopicAuthorizersTest {
   @DisplayName("the operation authorizer decides the Operation room by canSeeOperation")
   void operationAuthorizerAsksTheOperationGate() {
     OperationLiveSyncTopicAuthorizer authorizer =
-        new OperationLiveSyncTopicAuthorizer(ownerScopeService);
-    when(ownerScopeService.canSeeOperation(RESOURCE)).thenReturn(true, false);
+        new OperationLiveSyncTopicAuthorizer(operationAccessPolicy);
+    when(operationAccessPolicy.canSeeOperation(RESOURCE)).thenReturn(true, false);
 
     assertThat(authorizer.authorizations()).containsExactly(LiveSyncAuthorization.OPERATION);
     assertThat(authorizer.mayJoin(LiveSyncTopic.parse("operation:" + RESOURCE))).isTrue();
