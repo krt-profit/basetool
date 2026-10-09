@@ -55,6 +55,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * Audit tests (REQ-AUDIT-001) for the delivered-flag toggle ({@link
@@ -75,6 +76,7 @@ class InventoryCheckoutServiceAuditTest {
   @Mock private MaterialExchangeOfferRatchet offerRatchet;
   @Mock private AuditService auditService;
 
+  @Mock private ApplicationEventPublisher eventPublisher;
   @InjectMocks private InventoryCheckoutService service;
 
   @Test

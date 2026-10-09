@@ -67,6 +67,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
@@ -97,6 +98,7 @@ class InventoryItemServicePersonalRebookTest {
   @Mock private OwnerScopeService ownerScopeService;
 
   @Mock private AuditService auditService;
+  @Mock private ApplicationEventPublisher eventPublisher;
   @InjectMocks private InventoryCheckoutService service;
 
   private static final UUID ITEM_ID = UUID.randomUUID();

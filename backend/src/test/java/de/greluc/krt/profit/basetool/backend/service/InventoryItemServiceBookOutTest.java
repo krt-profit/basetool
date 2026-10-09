@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -26,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -36,6 +38,9 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredFromUserEvent;
+import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredToUserEvent;
+import de.greluc.krt.profit.basetool.backend.inventory.api.events.TransferredLot;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
@@ -74,6 +79,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
@@ -101,6 +107,7 @@ class InventoryItemServiceBookOutTest {
   @Mock private OwnerScopeService ownerScopeService;
 
   @Mock private AuditService auditService;
+  @Mock private ApplicationEventPublisher eventPublisher;
   @InjectMocks private InventoryCheckoutService service;
 
   private static final UUID ITEM_ID = UUID.randomUUID();
@@ -1014,6 +1021,138 @@ class InventoryItemServiceBookOutTest {
               any(),
               eq(targetUserId),
               any());
+    }
+  }
+
+  @Nested
+  class TransferNotificationTests {
+
+    private User member(UUID id, String name) {
+      User user = new User();
+      user.setId(id);
+      user.setUsername(name);
+      return user;
+    }
+
+    private List<Object> publishedEvents() {
+      ArgumentCaptor<Object> events = ArgumentCaptor.forClass(Object.class);
+      verify(eventPublisher, atLeast(0)).publishEvent(events.capture());
+      return events.getAllValues();
+    }
+
+    private void stubTransfer(InventoryItem item, User target) {
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+      when(userRepository.findById(target.getId())).thenReturn(Optional.of(target));
+      when(inventoryItemRepository.save(any(InventoryItem.class)))
+          .thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    @Test
+    void ownersTransferToAnotherMember_announcesTheNewOwnerOnly() {
+      User bob = member(UUID.randomUUID(), "bob");
+      stubTransfer(newItem(10.0, 1L), bob);
+
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newDto(3.0, bob.getId(), null, CheckoutType.TRANSFER, null, null, 1L),
+          OWNER_ID,
+          false);
+
+      assertThat(publishedEvents())
+          .singleElement()
+          .isEqualTo(
+              new InventoryTransferredToUserEvent(
+                  bob.getId(),
+                  OWNER_ID,
+                  "alice",
+                  ITEM_ID,
+                  List.of(new TransferredLot("Quantanium", 3.0, false, 500, "ARC-L1"))));
+    }
+
+    @Test
+    void logisticiansTransferOfAnotherMembersRow_announcesBothOwners() {
+      User bob = member(UUID.randomUUID(), "bob");
+      User carol = member(ADMIN_ID, "carol");
+      Location hangar = new Location();
+      hangar.setId(UUID.randomUUID());
+      hangar.setName("Lorville");
+      stubTransfer(newItem(10.0, 1L), bob);
+      when(locationRepository.findById(hangar.getId())).thenReturn(Optional.of(hangar));
+      when(userRepository.findById(ADMIN_ID)).thenReturn(Optional.of(carol));
+
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newDto(10.0, bob.getId(), hangar.getId(), CheckoutType.TRANSFER, null, null, 1L),
+          ADMIN_ID,
+          true);
+
+      assertThat(publishedEvents())
+          .containsExactly(
+              new InventoryTransferredToUserEvent(
+                  bob.getId(),
+                  ADMIN_ID,
+                  "carol",
+                  ITEM_ID,
+                  List.of(new TransferredLot("Quantanium", 10.0, false, 500, "Lorville"))),
+              new InventoryTransferredFromUserEvent(
+                  OWNER_ID,
+                  ADMIN_ID,
+                  "carol",
+                  "bob",
+                  ITEM_ID,
+                  List.of(new TransferredLot("Quantanium", 10.0, false, 500, "ARC-L1"))));
+    }
+
+    @Test
+    void logisticianTransfersAnotherMembersRowToThemselves_announcesThePreviousOwnerOnly() {
+      User carol = member(ADMIN_ID, "carol");
+      stubTransfer(newItem(10.0, 1L), carol);
+
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newDto(2.0, ADMIN_ID, null, CheckoutType.TRANSFER, null, null, 1L),
+          ADMIN_ID,
+          true);
+
+      assertThat(publishedEvents())
+          .singleElement()
+          .isEqualTo(
+              new InventoryTransferredFromUserEvent(
+                  OWNER_ID,
+                  ADMIN_ID,
+                  "carol",
+                  "carol",
+                  ITEM_ID,
+                  List.of(new TransferredLot("Quantanium", 2.0, false, 500, "ARC-L1"))));
+    }
+
+    @Test
+    void locationOnlyTransfer_announcesNothing() {
+      Location hangar = new Location();
+      hangar.setId(UUID.randomUUID());
+      hangar.setName("Lorville");
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(newItem(10.0, 1L)));
+      when(locationRepository.findById(hangar.getId())).thenReturn(Optional.of(hangar));
+      when(inventoryItemRepository.save(any(InventoryItem.class)))
+          .thenAnswer(inv -> inv.getArgument(0));
+
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newDto(4.0, null, hangar.getId(), CheckoutType.TRANSFER, null, null, 1L),
+          OWNER_ID,
+          false);
+
+      verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void discard_announcesNothing() {
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(newItem(10.0, 1L)));
+
+      service.bookOutInventoryItem(
+          ITEM_ID, newDto(4.0, null, null, CheckoutType.DISCARD, null, null, 1L), ADMIN_ID, true);
+
+      verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
   }
 

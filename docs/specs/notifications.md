@@ -54,6 +54,8 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `ACCOUNT_DELETION_REQUEST_RESOLVED` | none (no rule) | — | supersedes `ACCOUNT_DELETION_REQUESTED` only | REQ-SEC-061, REQ-NOTIF-018 |
 | `EXCHANGE_INSTALLATION_CONNECTED` | `EXCHANGE_INSTALLATION_CONNECTED` | V251 | `EVENT_RECIPIENT` (the connected member); rendered with the registry's `client` name only, never the client-supplied label; read by opening „Verbundene Anwendungen" | [REQ-XCH-032](external-exchange.md) |
 | `EXCHANGE_BULK_UNDO_APPLIED` | `EXCHANGE_BULK_UNDO_APPLIED` | V257 | `EVENT_RECIPIENT` (the member whose entries an admin's bulk undo restored; one per member and run); rendered with the registry's `client` name and the restored `count` only | [REQ-XCH-034](external-exchange.md) |
+| `INVENTORY_TRANSFERRED_TO_USER` | `INVENTORY_TRANSFERRED_TO_USER` | V267 | `EVENT_RECIPIENT` (the member a Lager transfer booked stock onto; one per action and new owner); rendered with `actor`, `count` and `lots` | [REQ-INV-055](inventory-lager.md) |
+| `INVENTORY_TRANSFERRED_FROM_USER` | `INVENTORY_TRANSFERRED_FROM_USER` | V267 | `EVENT_RECIPIENT` (the member someone else moved stock away from; one per action, previous and new owner); rendered with `actor`, `newOwner`, `count` and `lots` | [REQ-INV-055](inventory-lager.md) |
 
 Every notification type renders through `notifications.type.<TYPE>` in all three frontend bundles.
 The e-mail consumers of REQ-NOTIF-013 (`UserApprovalMailService`, `PendingRegistrationMailService`)
@@ -739,6 +741,7 @@ Every row whose subject has a page is a link to it. `NotificationViewDto` carrie
 | `JOB_ORDER_CREATED`, `JOB_ORDER_UPDATED_BY_REQUESTER` | `/orders/{id}` |
 | `MATERIAL_EXCHANGE_INTEREST_REGISTERED`, `MATERIAL_REQUEST_FULFILLMENT_SIGNALLED` | `/materialboerse` |
 | `EXCHANGE_INSTALLATION_CONNECTED`, `EXCHANGE_BULK_UNDO_APPLIED` | `/connected-apps` |
+| `INVENTORY_TRANSFERRED_TO_USER`, `INVENTORY_TRANSFERRED_FROM_USER` | `/inventory/my` |
 | `ACCOUNT_DELETION_REQUEST_DECLINED` | `/profile` |
 | `ACCOUNT_DELETION_REQUESTED` | `/admin/deletion-requests` |
 | `DISCORD_REGISTRATION_PENDING` | `/admin/discord-registrations` |
