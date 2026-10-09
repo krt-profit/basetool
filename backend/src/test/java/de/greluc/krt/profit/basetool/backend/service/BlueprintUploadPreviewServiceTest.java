@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportPreviewDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeBlueprintDraftDto;
+import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeBlueprintEnvelopeReader;
 import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeDraftService;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -72,7 +73,10 @@ class BlueprintUploadPreviewServiceTest {
     when(importService.previewImport(eq(OWNER), any())).thenReturn(parsed);
     when(draftService.blueprints(eq(OWNER), any())).thenReturn(drafted);
     service =
-        new BlueprintUploadPreviewService(objectMapper, validator, importService, draftService);
+        new BlueprintUploadPreviewService(
+            objectMapper,
+            importService,
+            new ExchangeBlueprintEnvelopeReader(objectMapper, validator, draftService));
   }
 
   @Test

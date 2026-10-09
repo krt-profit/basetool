@@ -55,4 +55,16 @@ public record IngestGatewayProperties(@DefaultValue List<String> clientIds) {
   public boolean isGatewayClient(String azp) {
     return azp != null && !azp.isBlank() && clientIds.contains(azp);
   }
+
+  /**
+   * Checks whether a Keycloak username is the service-account name of a configured gateway client.
+   *
+   * @param username the username Keycloak reports, may be {@code null}
+   * @return {@code true} when the name equals {@value #SERVICE_ACCOUNT_PREFIX} plus a gateway id
+   */
+  public boolean isServiceAccountOfAGateway(String username) {
+    return username != null
+        && clientIds.stream()
+            .anyMatch(clientId -> username.equals(SERVICE_ACCOUNT_PREFIX + clientId));
+  }
 }

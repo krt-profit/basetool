@@ -21,7 +21,10 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
+import java.util.Collection;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
@@ -47,5 +50,16 @@ public class ExchangeClientDirectory implements ClientDirectory {
   @Override
   public boolean isRegisteredClient(@Nullable String clientId) {
     return knownExchangeClients.isRegistered(clientId);
+  }
+
+  @Override
+  public boolean isGatewayServiceAccount(@Nullable String username) {
+    return gatewayProperties.isServiceAccountOfAGateway(username);
+  }
+
+  @Override
+  @NotNull
+  public Map<String, String> displayNames(@NotNull Collection<String> clientIds) {
+    return knownExchangeClients.displayNames(clientIds);
   }
 }

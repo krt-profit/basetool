@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.ExchangeClient;
-import de.greluc.krt.profit.basetool.backend.model.projection.ExchangeClientDisplayName;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -32,6 +31,15 @@ import org.springframework.data.repository.query.Param;
 
 /** Access to the exchange client registry (REQ-XCH-003). */
 public interface ExchangeClientRepository extends JpaRepository<ExchangeClient, UUID> {
+
+  /**
+   * JPQL constructor projection pairing a registered exchange client's id with its display name
+   * (REQ-INV-054).
+   *
+   * @param clientId the Keycloak client id the registry row carries
+   * @param displayName the product name the registry shows for it
+   */
+  record ExchangeClientDisplayName(String clientId, String displayName) {}
 
   /**
    * Loads every registry client with its capabilities in one query, ordered by client id.
@@ -86,8 +94,8 @@ public interface ExchangeClientRepository extends JpaRepository<ExchangeClient, 
    * @return one pair per registered id
    */
   @Query(
-      "SELECT new de.greluc.krt.profit.basetool.backend.model.projection"
-          + ".ExchangeClientDisplayName(c.clientId, c.displayName)"
+      "SELECT new de.greluc.krt.profit.basetool.backend.repository.ExchangeClientRepository"
+          + "$ExchangeClientDisplayName(c.clientId, c.displayName)"
           + " FROM ExchangeClient c WHERE c.clientId IN :clientIds")
   List<ExchangeClientDisplayName> findDisplayNamesByClientIdIn(
       @Param("clientIds") Collection<String> clientIds);
