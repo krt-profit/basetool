@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.api;
 
+import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
@@ -62,7 +63,7 @@ public record IngestGatewayProperties(@DefaultValue List<String> clientIds) {
    * @param username the username Keycloak reports, may be {@code null}
    * @return {@code true} when the name equals {@value #SERVICE_ACCOUNT_PREFIX} plus a gateway id
    */
-  public boolean isServiceAccountOfAGateway(String username) {
+  public boolean isGatewayServiceAccount(String username) {
     return username != null
         && clientIds.stream()
             .anyMatch(clientId -> username.equals(SERVICE_ACCOUNT_PREFIX + clientId));

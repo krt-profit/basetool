@@ -54,7 +54,7 @@ public class ExchangeClientDirectory implements ClientDirectory {
 
   @Override
   public boolean isGatewayServiceAccount(@Nullable String username) {
-    return gatewayProperties.isServiceAccountOfAGateway(username);
+    return gatewayProperties.isGatewayServiceAccount(username);
   }
 
   @Override

@@ -26,9 +26,9 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
-import de.greluc.krt.profit.basetool.backend.model.ExchangeClientStatus;
-import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeRegistrySnapshot;
-import de.greluc.krt.profit.basetool.backend.service.exchange.RedisExchangeRegistryMirror;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientStatus;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeRegistrySnapshot;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.RedisExchangeRegistryMirror;
 import de.greluc.krt.profit.basetool.testsupport.containers.TestImages;
 import de.greluc.krt.profit.basetool.testsupport.redis.RedisAclTemplate;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;

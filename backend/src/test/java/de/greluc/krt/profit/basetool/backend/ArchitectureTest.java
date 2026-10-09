@@ -62,7 +62,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.CachedEntityGraphs;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexValues;
-import de.greluc.krt.profit.basetool.backend.config.ActingMemberFilter;
 import de.greluc.krt.profit.basetool.backend.controller.BankAccountController;
 import de.greluc.krt.profit.basetool.backend.controller.BankAdminController;
 import de.greluc.krt.profit.basetool.backend.controller.BankBookingController;
@@ -76,14 +75,15 @@ import de.greluc.krt.profit.basetool.backend.controller.DiscordAccountExistenceC
 import de.greluc.krt.profit.basetool.backend.controller.OrgUnitBankController;
 import de.greluc.krt.profit.basetool.backend.controller.TermsDocumentController;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ActingMemberAuthorities;
-import de.greluc.krt.profit.basetool.backend.exchange.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ActingMemberFilter;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ChangeSource;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ChangeSourceProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ConnectedAppsProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientDirectory;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeConnectionRetentionProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeGate;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeMirrorProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
 import de.greluc.krt.profit.basetool.backend.identity.api.TermsConsentCheck;
@@ -206,6 +206,7 @@ import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationR
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.orgunit.internal.OrgUnitLabels;
+import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthoritiesCacheProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientAttribution;
@@ -275,7 +276,6 @@ import de.greluc.krt.profit.basetool.backend.service.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.PersonalBlueprintOverviewService;
 import de.greluc.krt.profit.basetool.backend.service.RefineryOrderService;
-import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeGate;
 import de.greluc.krt.profit.basetool.backend.service.pdf.BankBalanceChart;
 import de.greluc.krt.profit.basetool.backend.service.pdf.BankPdfFormat;
 import de.greluc.krt.profit.basetool.backend.task.BankLedgerIntegrityTask;
@@ -521,6 +521,35 @@ class ArchitectureTest {
 
   /** Classes of the exchange domain: a package segment named {@code exchange}. */
   static final DescribedPredicate<JavaClass> EXCHANGE_DOMAIN = inDomain("exchange");
+
+  /** The class-level path prefix of the frozen exchange relay surface (REQ-XCH-036). */
+  static final String EXCHANGE_RELAY_PREFIX = "/api/v1/exchange/";
+
+  /**
+   * The exchange relay controllers: web controllers whose class-level mapping lies under {@link
+   * #EXCHANGE_RELAY_PREFIX}, whichever package holds them.
+   */
+  static final DescribedPredicate<JavaClass> EXCHANGE_RELAY_CONTROLLERS =
+      DescribedPredicate.describe(
+          "exchange relay controllers (class mapping under " + EXCHANGE_RELAY_PREFIX + ")",
+          c ->
+              WEB_CONTROLLERS.test(c)
+                  && c.tryGetAnnotationOfType(RequestMapping.class)
+                      .map(
+                          mapping ->
+                              Stream.concat(
+                                      Arrays.stream(mapping.value()), Arrays.stream(mapping.path()))
+                                  .anyMatch(path -> path.startsWith(EXCHANGE_RELAY_PREFIX)))
+                      .orElse(false));
+
+  /**
+   * The exchange's non-web code: every class of the exchange domain except its controllers, so a
+   * helper that leaves the service package tree stays selected.
+   */
+  static final DescribedPredicate<JavaClass> EXCHANGE_NON_WEB =
+      EXCHANGE_DOMAIN
+          .and(DescribedPredicate.not(CONTROLLER_CODE))
+          .as("exchange-domain classes other than its controllers");
 
   /**
    * The bank's own classes (REQ-BANK-008, REQ-BANK-019), named by class literal until the bank has
@@ -857,13 +886,18 @@ class ArchitectureTest {
 
   @Test
   void serviceLayerShouldNotReachIntoSecurityContext() {
-    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 272);
+    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 390);
     serviceLayerShouldNotReachIntoSecurityContextRule(serviceSelection()).check(CLASSES);
   }
 
   static DescribedPredicate<JavaClass> serviceSelection() {
-    return SERVICE_CODE.and(
-        DescribedPredicate.not(JavaClass.Predicates.equivalentTo(AuthHelperService.class)));
+    return SERVICE_CODE
+        .or(
+            EXCHANGE_NON_WEB.and(
+                DescribedPredicate.not(
+                    JavaClass.Predicates.belongToAnyOf(
+                        ActingMemberFilter.class, ChangeSource.class))))
+        .and(DescribedPredicate.not(JavaClass.Predicates.equivalentTo(AuthHelperService.class)));
   }
 
   static ArchRule serviceLayerShouldNotReachIntoSecurityContextRule(
@@ -1166,8 +1200,7 @@ class ArchitectureTest {
 
   @Test
   void everyExchangeControllerMethodCarriesTheExchangeGate() {
-    DescribedPredicate<JavaMethod> selection =
-        publicMethodsOf(CONTROLLER_CODE.and(EXCHANGE_DOMAIN));
+    DescribedPredicate<JavaMethod> selection = publicMethodsOf(EXCHANGE_RELAY_CONTROLLERS);
     assertMethodFloor("everyExchangeControllerMethodCarriesTheExchangeGate", selection, 14);
     everyExchangeControllerMethodCarriesTheExchangeGateRule(selection).check(CLASSES);
   }
@@ -1193,7 +1226,7 @@ class ArchitectureTest {
 
   @Test
   void exchangeControllersCallExchangeServicesOnly() {
-    DescribedPredicate<JavaClass> selection = CONTROLLER_CODE.and(EXCHANGE_DOMAIN);
+    DescribedPredicate<JavaClass> selection = EXCHANGE_RELAY_CONTROLLERS;
     assertClassFloor("exchangeControllersCallExchangeServicesOnly", selection, 8);
     exchangeControllersCallExchangeServicesOnlyRule(selection).check(CLASSES);
   }
@@ -1235,8 +1268,8 @@ class ArchitectureTest {
 
   @Test
   void exchangeServicesNeverUseAdminGatesOrTheAdminScope() {
-    DescribedPredicate<JavaClass> selection = SERVICE_CODE.and(EXCHANGE_DOMAIN);
-    assertClassFloor("exchangeServicesNeverUseAdminGatesOrTheAdminScope", selection, 52);
+    DescribedPredicate<JavaClass> selection = EXCHANGE_NON_WEB;
+    assertClassFloor("exchangeServicesNeverUseAdminGatesOrTheAdminScope", selection, 160);
     exchangeServicesNeverUseAdminGatesRule(selection, OwnerScopeService.class).check(CLASSES);
   }
 
@@ -1477,13 +1510,15 @@ class ArchitectureTest {
   @Test
   void mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional() {
     assertClassFloor(
-        "mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional", SERVICE_CODE, 273);
+        "mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional",
+        SERVICE_CODE.or(EXCHANGE_NON_WEB),
+        393);
     mutatingServiceMethodsInReadOnlyClassesRule().check(CLASSES);
   }
 
   static ArchRule mutatingServiceMethodsInReadOnlyClassesRule() {
     return classes()
-        .that(SERVICE_CODE)
+        .that(SERVICE_CODE.or(EXCHANGE_NON_WEB))
         .should(declareTransactionalForMutatingMethodsWhenClassIsReadOnly())
         .because(
             "A class-level @Transactional(readOnly = true) silently propagates to every "
@@ -1824,7 +1859,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 575);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 516);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakSyncProperties;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import java.util.Map;
 import org.junit.jupiter.api.Test;

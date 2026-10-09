@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
-import de.greluc.krt.profit.basetool.backend.repository.ExchangeClientRepository;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.HashMap;
@@ -73,12 +72,6 @@ public class KnownExchangeClients {
   }
 
   /**
-   * Returns the cached ids, reloading them when they are older than {@link #TTL} or dropped; a
-   * failed reload keeps the previous ids.
-   *
-   * @return the registered client ids
-   */
-  /**
    * Reads the display names of the registered clients among the given ids, uncached, in one query.
    *
    * @param clientIds the client ids to look up
@@ -94,6 +87,12 @@ public class KnownExchangeClients {
     return names;
   }
 
+  /**
+   * Returns the cached ids, reloading them when they are older than {@link #TTL} or dropped; a
+   * failed reload keeps the previous ids.
+   *
+   * @return the registered client ids
+   */
   private Set<String> current() {
     if (!loaded || System.nanoTime() - loadedAt > TTL.toNanos()) {
       try {

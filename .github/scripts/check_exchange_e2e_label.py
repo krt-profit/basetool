@@ -25,12 +25,9 @@ LABEL = "e2e"
 BACKEND = "backend/src/main/java/de/greluc/krt/profit/basetool/backend/"
 
 EXCHANGE_PATHS = (
-    BACKEND + "controller/exchange/",
-    BACKEND + "service/exchange/",
-    BACKEND + "model/dto/exchange/",
-    BACKEND + "config/ActingMemberFilter.java",
     BACKEND + "exchange/",
-    BACKEND + "model/ExchangeCapability.java",
+    BACKEND + "platform/api/ActingMemberHeader.java",
+    BACKEND + "platform/api/ActingMemberFilterProvider.java",
     "ingest/src/main/",
     "docs/exchange/examples/",
     "test-support/src/main/java/de/greluc/krt/profit/basetool/testsupport/exchange/",
@@ -51,14 +48,16 @@ def check(changed: list[str], labels: list[str]) -> list[str]:
 
 def selftest() -> int:
     """Check the decision against each case that must pass or fail; return the exit code."""
-    controller = BACKEND + "controller/exchange/ExchangeStockController.java"
+    controller = BACKEND + "exchange/web/ExchangeStockController.java"
     cases: list[tuple[str, list[str], list[str], bool]] = [
         ("unrelated change without the label", ["frontend/src/main/x.java"], [], False),
         ("exchange controller without the label", [controller], ["enhancement"], True),
         ("exchange controller with the label", [controller], ["e2e", "BE"], False),
         ("ingest code without the label", ["ingest/src/main/java/a/B.java"], [], True),
         ("contract fixture without the label", ["docs/exchange/examples/v1/x/valid/a.json"], [], True),
-        ("acting-member filter without the label", [BACKEND + "config/ActingMemberFilter.java"], [], True),
+        ("acting-member filter without the label", [BACKEND + "exchange/internal/ActingMemberFilter.java"], [], True),
+        ("relay header contract without the label", [BACKEND + "platform/api/ActingMemberHeader.java"], [], True),
+        ("another platform type without the label", [BACKEND + "platform/api/ClientAttribution.java"], [], False),
         ("exchange docs prose without the label", ["docs/exchange/quickstart.md"], [], False),
         ("ingest test without the label", ["ingest/src/test/java/a/BTest.java"], [], False),
         ("a label that only contains e2e", [controller], ["e2e-smoke"], True),

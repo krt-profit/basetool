@@ -69,10 +69,6 @@ class ScopeSpecifications scope compile-time JPQL scope fragments per aggregate 
 class AuthHelperService platform the single SecurityContextHolder reader (ArchUnit rule)
 class ActiveOrgUnitProvider platform SPI for the orgUnitId MDC field, implemented by scope (plan 5.3)
 class CustomJwtGrantedAuthoritiesConverter scope JWT -> authorities, incl. contextual org-unit authorities
-class DatabaseActingMemberAuthorities exchange acting member's reduced exchange authorities (ADR-0129)
-class ChangeSourceTransactionManager exchange attributes writes for the change-feed triggers (ADR-0224)
-class TransactionManagerConfig exchange installs the change-source transaction manager (ADR-0224)
-class SandboxProfileGuard exchange sandbox image guard (REQ-XCH-029)
 class MissionAllocationDto inventory mission slice of an inventory entry (REQ-INV-027), mapped by InventoryItemMapper
 class MaterialCollectionEntryDto inventory produced by InventoryAggregationService
 class UpdateDeliveredRequest inventory delivered toggle of an inventory entry's job-order slice (REQ-INV-027)
@@ -104,7 +100,6 @@ class PendingRegistrationMailService identity identity mail composition
 class PendingApprovalAccessFilter identity enforces the approval gate (REQ-SEC-017)
 class TermsAcceptanceAccessFilter identity enforces the terms gate (REQ-SEC-028)
 class DiscordSpiPrecheckProperties identity Discord SPI precheck secret (REQ-SEC-022)
-class KeycloakSyncProperties identity Keycloak user-sync configuration
 class KeycloakTrustSupport identity Keycloak admin-client truststore
 class KeycloakHealthIndicator platform health probe
 class UserSyncTask identity Keycloak user-sync trigger
@@ -172,7 +167,6 @@ class JobOrderAllocationDto inventory job-order slice of an inventory entry (REQ
 class BlueprintEnvelopeReader blueprint upload-preview envelope SPI, implemented by the exchange (plan 5.3)
 class BlueprintPackTags blueprint log-name clean-up used only by BlueprintImportService
 class BasetoolErrorController platform container error dispatch as RFC 7807
-class ConnectedInstallationDto exchange connected-apps installation row
 class CounterpartySnapshot bank bank counterparty snapshot (REQ-BANK-044)
 
 package dto catalogue external feed DTO packages of the UEX, SC Wiki and P4K imports
@@ -201,7 +195,6 @@ package operation operation the operation module's package tree (plan 5.2)
 
 name ^OrgUnitBank bank
 name ^(Bank|CreateBank|CancelBank|ConfirmBank|RegisterBank|RejectBank|RenameBank|ReverseBank|SetBank|UpdateBank|SetCartel|OrgUnitBalanceTarget) bank
-name ^(Exchange|ConnectedApp|FirstPartyClientIds|RedisExchange|DisabledExchange|ActingMember) exchange
 name ^(MaterialExchange|MaterialRequest|MaterialItemRequest) materialexchange
 name ^(MaterialClaim|ClaimBucket|ClaimDto|CreateClaim|MaterialDemand) joborder
 name ^(JobOrder|CreateJobOrder|UpdateJobOrder|HandoverReport) joborder
@@ -222,7 +215,6 @@ name ^(OrgUnit|Squadron|SpecialCommand|Bereich|Organisationsleitung|KommandoGrou
 name ^(User|Role|Registration|PendingRegistration|ApproveRegistration|RejectRegistration|ReopenRegistration|LinkRegistration|MyRegistration|Discord|Keycloak|Terms|DeletionRequest|CreateDeletionRequest|DecideDeletionRequest|DataExport|AdminDataExport|AccountDeletion|AccountConsolidation|ConsolidateAccount|MergeAccount|Handle|PersonSearch|AdminPersonSearch|AdminTerms|AdminDeletion|RejectedRegistration|ApprovalDecision|ApprovalStatus|AdminController$) identity
 name ^AdminPersonalInventory personalinventory
 name ^(AdminPersonalBlueprint|AdminDefaultBlueprint) blueprint
-name ^(AdminExchange) exchange
 name ^(AdminP4k) catalogue
 name ^(QualityTier|AdminQualityTier) catalogue
 name ^(LiveSync|LocalLiveSync|RedisLiveSync) livesync

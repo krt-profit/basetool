@@ -29,10 +29,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeBlueprintEnvelopeReader;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeDraftService;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintDraftDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportPreviewDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeBlueprintDraftDto;
-import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeBlueprintEnvelopeReader;
-import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeDraftService;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import java.nio.charset.StandardCharsets;
