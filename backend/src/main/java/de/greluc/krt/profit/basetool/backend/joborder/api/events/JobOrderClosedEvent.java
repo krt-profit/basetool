@@ -17,11 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.bank.api.events;
+package de.greluc.krt.profit.basetool.backend.joborder.api.events;
 
 import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import java.util.Map;
 import java.util.Set;
@@ -31,23 +32,21 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published when a requester cancels their own pending bank booking request
- * (REQ-BANK-022, REQ-NOTIF-018).
+ * Published when a job order is completed, rejected or deleted (REQ-NOTIF-008, REQ-NOTIF-018).
  *
- * <p>Directed at nobody: it only {@linkplain #resolvesNotificationTypes() clears} the stale {@code
- * BANK_BOOKING_REQUEST_CREATED} items shown to the bank staff. Carries only scalars.
+ * <p>Directed at nobody: its only effect is to clear the open "new order" and "order changed by the
+ * requester" items, so an inbox does not keep pointing at an order that is settled or gone.
  *
- * @param requestId the cancelled request's id (also the notification's loose entity id)
- * @param accountId the target bank account id
- * @param actorSub the withdrawing requester's sub
+ * @param jobOrderId the closed order; the loose entity id of the cleared items
+ * @param actorSub the member who closed it, or {@code null} when none is known
  */
-public record BankBookingRequestCancelledEvent(
-    UUID requestId, UUID accountId, @Nullable UUID actorSub) implements BankBookingRequestEvent {
+public record JobOrderClosedEvent(@NotNull UUID jobOrderId, @Nullable UUID actorSub)
+    implements NotificationEvent {
 
   @NotNull
   @Override
   public NotificationEventType eventType() {
-    return NotificationEventType.BANK_BOOKING_REQUEST_CANCELLED;
+    return NotificationEventType.JOB_ORDER_CLOSED;
   }
 
   @NotNull
@@ -57,14 +56,16 @@ public record BankBookingRequestCancelledEvent(
     return Map.of();
   }
 
+  @NotNull
   @Override
-  public UUID contextAccountId() {
-    return accountId;
+  public String entityType() {
+    return JobOrderCreatedEvent.ENTITY_TYPE;
   }
 
+  @NotNull
   @Override
   public UUID entityId() {
-    return requestId;
+    return jobOrderId;
   }
 
   @NotNull
@@ -75,15 +76,16 @@ public record BankBookingRequestCancelledEvent(
   }
 
   /**
-   * Withdrawing the request settles its lifecycle, so the "new booking request" items the bank
-   * staff were shown are now stale and get cleared (REQ-NOTIF-018).
+   * The order needs no more action, so its open order notices are stale.
    *
-   * @return {@link #OPEN_REQUEST_NOTICES}
+   * @return {@link NotificationType#JOB_ORDER_CREATED} and {@link
+   *     NotificationType#JOB_ORDER_UPDATED_BY_REQUESTER}
    */
   @NotNull
   @Unmodifiable
   @Override
   public Set<NotificationType> resolvesNotificationTypes() {
-    return OPEN_REQUEST_NOTICES;
+    return Set.of(
+        NotificationType.JOB_ORDER_CREATED, NotificationType.JOB_ORDER_UPDATED_BY_REQUESTER);
   }
 }

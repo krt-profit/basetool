@@ -122,4 +122,21 @@ public interface NotificationEvent {
   default Set<NotificationType> resolvesNotificationTypes() {
     return Set.of();
   }
+
+  /**
+   * The members whose notice about this event's entity is decided afresh, for an event that
+   * reconciles an existing notice instead of raising a new one (REQ-NOTIF-023).
+   *
+   * <p>When non-empty, the event touches only these members: each one the rules resolve now and who
+   * holds no notification of {@link #resolvesNotificationTypes()} for the entity gets one; each one
+   * the rules no longer resolve loses theirs. Nobody else is notified or cleared. Default: none,
+   * which processes the event normally.
+   *
+   * @return the members to reconcile; never {@code null}, empty for an ordinary event
+   */
+  @NotNull
+  @Unmodifiable
+  default Set<UUID> reconcileRecipients() {
+    return Set.of();
+  }
 }

@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestC
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestConfirmedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestRejectedEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestUpdatedEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
@@ -328,7 +329,8 @@ public class BankBookingRequestService {
 
   /**
    * Applies a requester's correction to their own pending, not yet owner-approved booking request
-   * (REQ-BANK-056), stamping the approval snapshot the caller re-derived from the new amount.
+   * (REQ-BANK-056), stamping the approval snapshot the caller re-derived from the new amount, and
+   * replacing the open notices about it with ones that show the new values.
    *
    * <p>All guards run under the row lock; a foreign request is reported as not found.
    *
@@ -393,6 +395,18 @@ public class BankBookingRequestService {
             + plain(update.amount())
             + " aUEC"
             + (requiresOwnerApproval ? " (needs approval)" : ""));
+    BankAccount account = request.getAccount();
+    OrgUnit orgUnit = account.getOrgUnit();
+    eventPublisher.publishEvent(
+        new BankBookingRequestUpdatedEvent(
+            request.getId(),
+            account.getId(),
+            type,
+            update.amount(),
+            account.getAccountNo(),
+            request.getRequesterHandle(),
+            orgUnit == null ? null : orgUnit.getShorthand(),
+            caller));
     return toDto(request);
   }
 

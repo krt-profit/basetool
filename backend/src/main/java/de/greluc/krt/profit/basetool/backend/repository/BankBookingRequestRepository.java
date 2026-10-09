@@ -205,6 +205,18 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
   boolean existsByAccountIdAndStatus(UUID accountId, BankBookingRequestStatus status);
 
   /**
+   * Lists the requests on one source account in one lifecycle state, oldest first — the open
+   * requests whose notices follow a change of the account's responsible holders (REQ-BANK-034).
+   *
+   * @param accountId the source account
+   * @param status the lifecycle state (the holder change passes {@code PENDING})
+   * @return the matching requests with their account and org unit loaded; empty when none
+   */
+  @EntityGraph(attributePaths = {"account", "account.orgUnit"})
+  List<BankBookingRequest> findByAccountIdAndStatusOrderByCreatedAtAsc(
+      UUID accountId, BankBookingRequestStatus status);
+
+  /**
    * Replaces this member's handle snapshots in all four handle columns of the booking requests
    * (requester, deciding employee, counterparty, approving holder) with the erasure sentinel, for a
    * granted Art. 17 request (REQ-SEC-062).

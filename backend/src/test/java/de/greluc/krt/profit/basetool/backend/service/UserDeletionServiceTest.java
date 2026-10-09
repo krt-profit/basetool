@@ -25,6 +25,8 @@ import static org.mockito.Mockito.*;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
+import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationDecidedEvent;
+import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.*;
@@ -47,6 +49,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.client.ResourceAccessException;
 
 /**
@@ -82,6 +85,8 @@ class UserDeletionServiceTest {
   private ObjectProvider<OrgUnitBankResponsibilityService> orgUnitBankResponsibilityServiceProvider;
 
   @Mock private OrgUnitBankResponsibilityService orgUnitBankResponsibilityService;
+
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   /** The gateway allowlist a test may extend; the properties record reads it by reference. */
   private final List<String> gatewayClientIds = new ArrayList<>();
@@ -320,6 +325,41 @@ class UserDeletionServiceTest {
             eq(AuditEventType.PERSONAL_DATA_PURGED_ON_USER_DELETION), any(), any(), any(), any());
     verify(auditService, never())
         .record(eq(AuditEventType.REFINERY_ORDERS_REASSIGNED), any(), any(), any(), any());
+  }
+
+  @Test
+  void deleteUser_ofAPendingRegistration_clearsTheAdminsPendingNotices() {
+    user.setApprovalStatus(ApprovalStatus.PENDING);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
+
+    userDeletionService.deleteUser(
+        userId, UserDeletionService.KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
+
+    verify(eventPublisher).publishEvent(new DiscordRegistrationDecidedEvent(userId, null));
+    verify(userRepository).delete(user);
+  }
+
+  @Test
+  void deleteUser_ofAnActiveMember_publishesNoRegistrationEvent() {
+    user.setApprovalStatus(ApprovalStatus.ACTIVE);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
+
+    userDeletionService.deleteUser(userId);
+
+    verify(eventPublisher, never()).publishEvent(any(Object.class));
+  }
+
+  @Test
+  void deleteUser_refusedWhileInKeycloak_publishesNothing() {
+    user.setApprovalStatus(ApprovalStatus.PENDING);
+    user.setInKeycloak(true);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+    assertThrows(BadRequestException.class, () -> userDeletionService.deleteUser(userId));
+
+    verify(eventPublisher, never()).publishEvent(any(Object.class));
   }
 
   @Test

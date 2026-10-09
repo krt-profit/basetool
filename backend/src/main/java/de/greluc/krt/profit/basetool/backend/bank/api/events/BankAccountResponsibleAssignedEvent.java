@@ -21,45 +21,40 @@ package de.greluc.krt.profit.basetool.backend.bank.api.events;
 
 import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
-import de.greluc.krt.profit.basetool.backend.model.NotificationType;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
-import de.greluc.krt.profit.basetool.backend.util.BankAmounts;
-import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published when a bank employee confirms a booking request (REQ-BANK-026).
+ * Domain event published once per member who became a responsible holder of a bank account
+ * (REQ-BANK-034); the default rule notifies that member.
  *
- * <p>Directed at the requester via {@link #contextRecipientUserId()}; {@link #contextAccountId()}
- * lets the {@code ACCOUNT_RESPONSIBLE} selector notify the account's responsible holder
- * (REQ-BANK-034). Carries only scalars.
- *
- * @param requestId the confirmed request's id (also the notification's loose entity id)
- * @param accountId the target bank account id ({@code ACCOUNT_RESPONSIBLE} selector input)
- * @param accountNo the target account's human-readable number, for rendering
- * @param amount the requested whole-aUEC amount, for rendering
- * @param requesterSub the requesting officer/lead's sub; the directed recipient
- * @param actorSub the confirming employee's sub
+ * @param accountId the account (also the notification's loose entity id)
+ * @param holderId the new responsible holder, the single recipient
+ * @param accountNo the account's human-readable number, for rendering
+ * @param pending how many open requests on the account await a responsible holder's approval
+ * @param actorSub the member whose change made them responsible, or {@code null}
  */
-public record BankBookingRequestConfirmedEvent(
-    UUID requestId,
-    UUID accountId,
-    String accountNo,
-    BigDecimal amount,
-    @Nullable UUID requesterSub,
+public record BankAccountResponsibleAssignedEvent(
+    @NotNull UUID accountId,
+    @NotNull UUID holderId,
+    @NotNull String accountNo,
+    int pending,
     @Nullable UUID actorSub)
-    implements BankBookingRequestEvent {
+    implements NotificationEvent {
+
+  /** Loose entity-type tag stored on the produced notification. */
+  public static final String ENTITY_TYPE = "BANK_ACCOUNT";
 
   @NotNull
   @Override
   public NotificationEventType eventType() {
-    return NotificationEventType.BANK_BOOKING_REQUEST_CONFIRMED;
+    return NotificationEventType.BANK_ACCOUNT_RESPONSIBLE_ASSIGNED;
   }
 
   @NotNull
@@ -69,19 +64,33 @@ public record BankBookingRequestConfirmedEvent(
     return Map.of();
   }
 
-  @Override
-  public UUID contextRecipientUserId() {
-    return requesterSub;
-  }
-
+  @NotNull
   @Override
   public UUID contextAccountId() {
     return accountId;
   }
 
+  /**
+   * The single recipient the {@code EVENT_RECIPIENT} selector resolves to — the new holder.
+   *
+   * @return the new holder's id
+   */
+  @NotNull
+  @Override
+  public UUID contextRecipientUserId() {
+    return holderId;
+  }
+
+  @NotNull
+  @Override
+  public String entityType() {
+    return ENTITY_TYPE;
+  }
+
+  @NotNull
   @Override
   public UUID entityId() {
-    return requestId;
+    return accountId;
   }
 
   @NotNull
@@ -89,20 +98,7 @@ public record BankBookingRequestConfirmedEvent(
   public Map<String, String> renderParams() {
     Map<String, String> params = new LinkedHashMap<>();
     params.put("accountNo", accountNo);
-    params.put("amount", BankAmounts.plain(amount));
+    params.put("pending", Integer.toString(pending));
     return params;
-  }
-
-  /**
-   * Confirming the request settles its lifecycle, so the "new booking request" items the bank staff
-   * were shown are now stale and get cleared (REQ-NOTIF-018).
-   *
-   * @return {@link #OPEN_REQUEST_NOTICES}
-   */
-  @NotNull
-  @Unmodifiable
-  @Override
-  public Set<NotificationType> resolvesNotificationTypes() {
-    return OPEN_REQUEST_NOTICES;
   }
 }

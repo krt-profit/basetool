@@ -93,15 +93,15 @@ that published the event (REQ-AUDIT-007). Eight modules publish today:
 | Package | Events |
 | --- | --- |
 | `notification.api.events` | `NotificationEvent`, the contract every notification-producing event implements, and the `OrgUnitRef` it carries |
-| `identity.api.events` | `DiscordRegistrationPendingEvent`, `UserApprovalDecidedEvent`, `MemberDepartedEvent` (consumed by the exchange departure) |
+| `identity.api.events` | `DiscordRegistrationPendingEvent`, `DiscordRegistrationDecidedEvent`, `UserApprovalDecidedEvent`, `MemberDepartedEvent` (consumed by the exchange departure) |
 | `privacy.api.events` | the three `AccountDeletionRequest…Event`s (transitional module, plan §7.6) |
-| `bank.api.events` | `BankBookingRequestEvent` and its created, confirmed, rejected and cancelled records |
-| `joborder.api.events` | `JobOrderCreatedEvent`, `JobOrderUpdatedByRequesterEvent` |
+| `bank.api.events` | `BankBookingRequestEvent` and its created, updated, confirmed, rejected, cancelled and notices-reconciled records; `BankAccountResponsibleAssignedEvent` |
+| `joborder.api.events` | `JobOrderCreatedEvent`, `JobOrderUpdatedByRequesterEvent`, `JobOrderClosedEvent` |
 | `materialexchange.api.events` | `MaterialExchangeInterestRegisteredEvent`, `MaterialRequestFulfillmentSignalledEvent` |
 | `exchange.api.events` | `ExchangeInstallationConnectedEvent`, `ExchangeBulkUndoAppliedEvent` |
 | `inventory.api.events` | `InventoryTransferredToUserEvent`, `InventoryTransferredFromUserEvent` and the `TransferredLot` they list (REQ-INV-055) |
 
-The publishing services and the listeners still sit in `service`. `OrgUnitRef` stays with the
+An event either notifies, supersedes the notices of its entity (REQ-NOTIF-018), or reconciles one notice for named members (REQ-NOTIF-023, ADR-0244). The publishing services and the listeners still sit in `service`. `OrgUnitRef` stays with the
 notification contract rather than the kernel, because it carries the org-unit module's
 `OrgUnitKind`.
 
