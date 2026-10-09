@@ -96,7 +96,8 @@ requires it and duplicating it into further files spreads personal data for no g
 
 - **Purpose:** tell a member about events relevant to them.
 - **Data:** recipient, type, read status, and the parameters needed to render the message, which can
-  include the handle of the member who triggered it.
+  include the handle of the member who triggered it and, for a Lager transfer taken from the
+  recipient's stock, the name of the member it went to (REQ-INV-055).
 - **Legal basis:** Art. 6(1)(b) / Art. 6(1)(f).
 - **Where:** `notification`, `notification_rule_selector`.
 - **Retention:** two windows, both finite (REQ-NOTIF-009).

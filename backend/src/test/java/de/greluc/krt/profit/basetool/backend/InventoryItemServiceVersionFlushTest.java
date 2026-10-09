@@ -51,6 +51,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * Verifies that in-place inventory edits ({@code updateNote}, reducing {@code
@@ -75,6 +76,7 @@ class InventoryItemServiceVersionFlushTest {
 
   @Mock private AuditService auditService;
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private ApplicationEventPublisher eventPublisher;
   private InventoryItemService inventoryItemService;
 
   private InventoryCheckoutService realCheckoutService;
@@ -92,7 +94,8 @@ class InventoryItemServiceVersionFlushTest {
             offerRatchet,
             inventoryItemMapper,
             ownerScopeService,
-            auditService);
+            auditService,
+            eventPublisher);
     inventoryItemService =
         new InventoryItemService(
             inventoryItemRepository,

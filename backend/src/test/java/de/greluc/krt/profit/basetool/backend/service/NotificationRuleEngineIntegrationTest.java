@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.repository.NotificationRuleReposito
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -86,6 +87,35 @@ class NotificationRuleEngineIntegrationTest {
     assertThat(seeded.getNotificationType()).isEqualTo(NotificationType.JOB_ORDER_CREATED);
     assertThat(seeded.isExcludeActor()).isTrue();
     assertThat(seeded.getSelectors()).hasSize(4);
+  }
+
+  @Test
+  void seededInventoryTransferRulesNotifyTheEventRecipientButNeverTheActor() {
+    NotificationRule toUser =
+        notificationRuleRepository
+            .findByIdWithSelectors(UUID.fromString("62200000-0000-0000-0000-00000000000f"))
+            .orElseThrow();
+    NotificationRule fromUser =
+        notificationRuleRepository
+            .findByIdWithSelectors(UUID.fromString("62200000-0000-0000-0000-000000000010"))
+            .orElseThrow();
+
+    assertThat(toUser.getEventType())
+        .isEqualTo(NotificationEventType.INVENTORY_TRANSFERRED_TO_USER);
+    assertThat(toUser.getNotificationType())
+        .isEqualTo(NotificationType.INVENTORY_TRANSFERRED_TO_USER);
+    assertThat(fromUser.getEventType())
+        .isEqualTo(NotificationEventType.INVENTORY_TRANSFERRED_FROM_USER);
+    assertThat(fromUser.getNotificationType())
+        .isEqualTo(NotificationType.INVENTORY_TRANSFERRED_FROM_USER);
+    for (NotificationRule rule : List.of(toUser, fromUser)) {
+      assertThat(rule.isEnabled()).isTrue();
+      assertThat(rule.isExcludeActor()).isTrue();
+      assertThat(rule.getSelectors())
+          .singleElement()
+          .extracting(NotificationRuleSelector::getKind)
+          .isEqualTo(SelectorKind.EVENT_RECIPIENT);
+    }
   }
 
   @Test

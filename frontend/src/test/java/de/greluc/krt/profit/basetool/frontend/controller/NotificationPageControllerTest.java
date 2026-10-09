@@ -229,6 +229,21 @@ class NotificationPageControllerTest {
     assertNull(NotificationPageController.targetOf(null, null, null));
   }
 
+  /** Both Lager transfer notifications link the recipient's own Lager (REQ-INV-055). */
+  @Test
+  void targetOf_inventoryTransfersLinkMeinLager() {
+    UUID rowId = UUID.randomUUID();
+
+    assertEquals(
+        "/inventory/my",
+        NotificationPageController.targetOf(
+            "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_ITEM", rowId));
+    assertEquals(
+        "/inventory/my",
+        NotificationPageController.targetOf(
+            "INVENTORY_TRANSFERRED_FROM_USER", "INVENTORY_ITEM", rowId));
+  }
+
   /** The page slice carries each row's link target for the load-more rows. */
   @Test
   void pageItems_carriesTheLinkTarget() {

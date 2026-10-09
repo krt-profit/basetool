@@ -1443,6 +1443,47 @@ Lager row — shared or personal, material or game item — carries a **„gesto
 **Issues:** #2096
 (epic #2078).
 
+### REQ-INV-055 — A transfer that changes a row's owner tells the new and the previous owner
+
+A transfer that books stock onto **another member** reaches that member through the normal
+notification system (REQ-NOTIF-001), so they know about the booking and can trace the change in
+their stock. When someone other than the stock's previous owner made the transfer — a Logistician
+moving a member's row — the **previous owner** is told as well.
+
+- **Trigger:** a transfer whose new row's member differs from the source row's — the single-row
+  book-out `TRANSFER` (REQ-INV-025, `POST /api/v1/inventory/{id}/book-out`) and the bulk rebooking
+  in mode `LOCATION` with a target member (REQ-INV-036, `POST /api/v1/inventory/bulk-rebook`). Web
+  and app use the same endpoints. A move of location or org-unit pool alone, a personal ↔ shared
+  rebooking and a transaction that rolls back notify nobody (published after commit, REQ-NOTIF-002).
+- **Recipients:** the new owner gets `INVENTORY_TRANSFERRED_TO_USER`, the previous owner
+  `INVENTORY_TRANSFERRED_FROM_USER`, each only when they are not the acting member. Both go through
+  seeded, admin-editable rules (`V267`, `EVENT_RECIPIENT`, `exclude_actor`).
+- **One notification per recipient per action.** A bulk transfer lists every lot moved onto the
+  recipient in that action; the previous-owner notice groups by previous and new owner.
+- **Content:** the acting member's name and the lots — per lot amount (SCU, or pieces as `n×`),
+  material or item, quality (`Q800`) and location: the target location for the new owner, the
+  source location for the previous owner, who is also told the new owner's name. At most 20 lots
+  are listed, then `…`; the count names them all. No free text (notes) rides the event.
+- **Link:** both notifications open „Mein Lager" (`/inventory/my`).
+
+**Acceptance**
+
+- [x] A member's transfer onto another member notifies the new owner only.
+- [x] A Logistician's transfer of a member's row onto another member notifies both; onto
+  themselves, the previous owner only.
+- [x] A bulk transfer onto another member produces exactly one notification listing every moved
+  lot.
+- [x] A location-only move, a discard and a rolled-back transfer notify nobody.
+
+**Enforced by:** `InventoryItemServiceBookOutTest.TransferNotificationTests`,
+`InventoryCheckoutServiceBulkRebookTest`, `InventoryTransferEventsTest`,
+`InventoryTransferNotificationIntegrationTest`, `NotificationRuleEngineIntegrationTest`,
+`NotificationPageControllerTest`, `NotificationTypeMessageCoverageTest`,
+`AdminNotificationRuleOptionListsTest` · **Code:** `InventoryCheckoutService`,
+`InventoryTransferredToUserEvent`, `InventoryTransferredFromUserEvent`, `TransferredLot`,
+`V267__seed_inventory_transfer_notification_rules.sql`, `NotificationPageController` ·
+**Issues:** #2409.
+
 ## Out of scope
 
 - Tenancy / visibility scope of inventory (strict-staffel Lager-View) is governed by

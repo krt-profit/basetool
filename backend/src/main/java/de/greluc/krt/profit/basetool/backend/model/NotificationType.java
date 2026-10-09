@@ -115,5 +115,18 @@ public enum NotificationType {
    * An admin undid an exchange client's changes to the member's data (REQ-XCH-034), rendered with
    * the registry's {@code client} name and the restored {@code count} only.
    */
-  EXCHANGE_BULK_UNDO_APPLIED
+  EXCHANGE_BULK_UNDO_APPLIED,
+
+  /**
+   * Stock was transferred onto the member (REQ-INV-055), rendered with the {@code actor}, the lot
+   * {@code count} and the {@code lots} list (amount, material, quality, target location).
+   */
+  INVENTORY_TRANSFERRED_TO_USER,
+
+  /**
+   * Someone else transferred stock away from the member (REQ-INV-055), rendered with the {@code
+   * actor}, the {@code newOwner}, the lot {@code count} and the {@code lots} list (amount,
+   * material, quality, source location).
+   */
+  INVENTORY_TRANSFERRED_FROM_USER
 }

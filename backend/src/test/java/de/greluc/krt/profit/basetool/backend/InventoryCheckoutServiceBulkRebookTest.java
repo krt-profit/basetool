@@ -35,6 +35,8 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredToUserEvent;
+import de.greluc.krt.profit.basetool.backend.inventory.api.events.TransferredLot;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.BulkRebookMode;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -67,6 +69,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
@@ -88,6 +91,7 @@ class InventoryCheckoutServiceBulkRebookTest {
   @Mock private MaterialExchangeOfferRatchet offerRatchet;
   @Mock private AuditService auditService;
 
+  @Mock private ApplicationEventPublisher eventPublisher;
   @InjectMocks private InventoryCheckoutService checkoutService;
 
   private static final UUID OWNER_ID = UUID.fromString("00000000-0000-0000-0000-0000000000aa");
@@ -172,6 +176,63 @@ class InventoryCheckoutServiceBulkRebookTest {
         .beforeDelete(List.of(already.getId()), MaterialExchangeOfferRatchet.Reason.REBOOK);
     verify(inventoryItemRepository).delete(moving);
     verify(inventoryItemRepository, never()).delete(already);
+  }
+
+  @Test
+  void bulkRebook_toAnotherMember_announcesTheNewOwnerOnceWithEveryMovedLot() {
+    Location here = location(UUID.randomUUID(), "Area18");
+    Location there = location(UUID.randomUUID(), "Lorville");
+    InventoryItem first = row(UUID.fromString("00000000-0000-0000-0000-000000000001"), here, 12.5);
+    first.setQuality(640);
+    first.getUser().setUsername("alice");
+    InventoryItem second = row(UUID.fromString("00000000-0000-0000-0000-000000000002"), there, 5.0);
+    given(first);
+    given(second);
+    User bob = user(UUID.randomUUID());
+    when(userRepository.findById(bob.getId())).thenReturn(Optional.of(bob));
+
+    BulkRebookResultDto result =
+        checkoutService.bulkRebook(
+            new BulkRebookRequest(
+                List.of(second.getId(), first.getId()),
+                BulkRebookMode.LOCATION,
+                bob.getId(),
+                null,
+                null,
+                null),
+            OWNER_ID);
+
+    assertEquals(2, result.rebooked());
+    ArgumentCaptor<Object> events = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher).publishEvent(events.capture());
+    assertEquals(
+        new InventoryTransferredToUserEvent(
+            bob.getId(),
+            OWNER_ID,
+            "alice",
+            first.getId(),
+            List.of(
+                new TransferredLot("Titanium", 12.5, false, 640, "Area18"),
+                new TransferredLot("Titanium", 5.0, false, null, "Lorville"))),
+        events.getValue());
+  }
+
+  @Test
+  void bulkRebook_keepingTheOwner_announcesNothing() {
+    Location here = location(UUID.randomUUID(), "Area18");
+    Location there = location(UUID.randomUUID(), "Lorville");
+    InventoryItem item = row(UUID.randomUUID(), here, 4.0);
+    given(item);
+    when(locationRepository.findById(there.getId())).thenReturn(Optional.of(there));
+    when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(user(OWNER_ID)));
+
+    checkoutService.bulkRebook(toLocation(List.of(item.getId()), there.getId()), OWNER_ID);
+    checkoutService.bulkRebook(
+        new BulkRebookRequest(
+            List.of(item.getId()), BulkRebookMode.LOCATION, OWNER_ID, there.getId(), null, null),
+        OWNER_ID);
+
+    verify(eventPublisher, never()).publishEvent(any(Object.class));
   }
 
   @Test
