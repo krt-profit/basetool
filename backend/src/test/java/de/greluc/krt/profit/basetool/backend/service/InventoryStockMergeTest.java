@@ -55,6 +55,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * Unit tests for the write-time stock merge {@link InventoryCheckoutService#mergeStockIfRequested}
@@ -78,6 +79,7 @@ class InventoryStockMergeTest {
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private MaterialExchangeOfferRatchet offerRatchet;
   @Mock private AuditService auditService;
+  @Mock private ApplicationEventPublisher eventPublisher;
   @InjectMocks private InventoryCheckoutService service;
 
   private static final UUID USER_ID = UUID.randomUUID();

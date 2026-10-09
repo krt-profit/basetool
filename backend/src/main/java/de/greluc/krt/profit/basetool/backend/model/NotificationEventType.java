@@ -112,5 +112,18 @@ public enum NotificationEventType {
    * An admin's bulk undo restored entries of a member that an exchange client had written
    * (REQ-XCH-034). The default rule notifies that member via the {@code EVENT_RECIPIENT} selector.
    */
-  EXCHANGE_BULK_UNDO_APPLIED
+  EXCHANGE_BULK_UNDO_APPLIED,
+
+  /**
+   * A Lager transfer booked stock onto another member (REQ-INV-055). Published once per action and
+   * new owner; the default rule notifies that member via the {@code EVENT_RECIPIENT} selector.
+   */
+  INVENTORY_TRANSFERRED_TO_USER,
+
+  /**
+   * A Lager transfer made by someone else moved stock away from its member (REQ-INV-055). Published
+   * once per action and previous owner; the default rule notifies that member via the {@code
+   * EVENT_RECIPIENT} selector.
+   */
+  INVENTORY_TRANSFERRED_FROM_USER
 }

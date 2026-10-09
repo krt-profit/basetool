@@ -57,6 +57,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 
 /** Unit tests for the bulk checkout functionality in {@link InventoryCheckoutService}. */
@@ -76,6 +77,7 @@ class InventoryItemServiceBulkCheckoutTest {
 
   @Mock private MaterialExchangeOfferRatchet offerRatchet;
   @Mock private AuditService auditService;
+  @Mock private ApplicationEventPublisher eventPublisher;
   @InjectMocks private InventoryCheckoutService inventoryItemService;
 
   private User userWithId(UUID id) {
