@@ -29,7 +29,6 @@ import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MemberEvaluationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
@@ -120,7 +119,7 @@ public class UserDeletionService {
   private final PersonalBlueprintRepository personalBlueprintRepository;
   private final NotificationRepository notificationRepository;
   private final NotificationRuleRepository notificationRuleRepository;
-  private final MemberEvaluationRepository memberEvaluationRepository;
+  private final MemberEvaluationErasure memberEvaluationErasure;
 
   /**
    * The authoritative answer to "is this account really gone from Keycloak?". Consulted by {@link
@@ -231,7 +230,7 @@ public class UserDeletionService {
     int blueprintsDeleted = personalBlueprintRepository.deleteAllByOwnerUserId(userId);
     int notificationsDeleted = notificationRepository.deleteAllForRecipient(userId);
     int ruleSelectorsDeleted = notificationRuleRepository.deleteSelectorsByUserId(userId);
-    int evaluationsDeleted = memberEvaluationRepository.deleteAllByUserId(userId);
+    int evaluationsDeleted = memberEvaluationErasure.deleteAllEvaluationsOf(userId);
 
     missionRepository.updateOwner(user, admin);
 
