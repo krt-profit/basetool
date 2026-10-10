@@ -29,11 +29,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Migration test for {@code V268__drop_superseded_quality_columns.sql}: the quality columns the
+ * Migration test for {@code V270__drop_superseded_quality_columns.sql}: the quality columns the
  * tier catalogue superseded are gone, together with their range check (REQ-ORDERS-036).
  */
 @SpringBootTest
-class V268MigrationTest {
+class V270MigrationTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;
 
