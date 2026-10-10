@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.integration.scwiki;
 
 import de.greluc.krt.profit.basetool.backend.config.ResponseSizeLimitInterceptor;
+import de.greluc.krt.profit.basetool.backend.config.RestClientConfig;
 import de.greluc.krt.profit.basetool.backend.config.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiMetaDto;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiResponseDto;
@@ -39,8 +40,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
+import org.springframework.resilience.annotation.ConcurrencyLimit;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
@@ -58,7 +61,14 @@ import tools.jackson.databind.json.JsonMapper;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConcurrencyLimit(ScWikiClient.MAX_CONCURRENT_CALLS)
 public class ScWikiClient {
+
+  /**
+   * Most calls in flight at once through this client; further callers wait. Equal to the SC Wiki
+   * executor's maximum pool size.
+   */
+  static final int MAX_CONCURRENT_CALLS = 2;
 
   /**
    * Largest response body one Wiki call may deliver (16 MiB), the ceiling the reactive codec used
@@ -67,11 +77,12 @@ public class ScWikiClient {
   static final long MAX_RESPONSE_BYTES = 16L * 1024 * 1024;
 
   /**
-   * A fresh, observed builder from {@code RestClientConfig} (prototype-scoped), so the base URL set
-   * here does not leak into any other client. Its request factory bounds each call by the same 30 s
-   * read timeout as the UEX client, so a single hung Wiki page cannot delay the whole {@code
-   * ScWikiScheduler} tick beyond the scheduler's own grace window.
+   * A fresh, observed builder for external hosts from {@code RestClientConfig} (prototype-scoped),
+   * so the base URL set here does not leak into any other client. Its request factory bounds each
+   * call by the same 30 s read timeout as the UEX client, so a single hung Wiki page cannot delay
+   * the whole {@code ScWikiScheduler} tick beyond the scheduler's own grace window.
    */
+  @Qualifier(RestClientConfig.EXTERNAL_REST_CLIENT_BUILDER)
   private final RestClient.Builder restClientBuilder;
 
   /** The {@code app.scwiki.*} configuration: base URL, page sizes, pacing and game version. */
