@@ -31,6 +31,7 @@ configurations { compileOnly { extendsFrom(configurations.annotationProcessor.ge
 
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-web")
+  implementation("org.springframework.boot:spring-boot-http-client")
   implementation("tools.jackson.dataformat:jackson-dataformat-cbor")
   implementation("org.springframework.boot:spring-boot-starter-data-jpa") {
     exclude(group = "org.springframework", module = "spring-aspects")

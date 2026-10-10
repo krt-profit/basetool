@@ -1229,23 +1229,28 @@ JSpecify stays out for now (ADR-0192).
 ### 8.3 SQL, persistence, platform
 
 - **PostgreSQL 18**: `RETURNING OLD/NEW` where a native bulk update needs the old value for its audit
-  row; review multicolumn indexes against skip scan with `EXPLAIN`; temporal `WITHOUT OVERLAPS` only
+  row (**checked 2026-10-10, nothing to adopt**: the backend has no native bulk `UPDATE`; its bulk
+  updates are JPQL and its native statements are retention `DELETE`s that write no audit row); review multicolumn indexes against skip scan with `EXPLAIN`; temporal `WITHOUT OVERLAPS` only
   with the leadership redesign (needs `btree_gist`). **No `uuidv7` ids** for anything whose id
   appears in a URL or an export without a privacy decision — they reveal creation times.
 - **Hibernate 7.4**: do not adopt `@Audited` (it would keep full row history, personal data included,
   outside the GDPR deletion flow) or Jakarta Data stateless repositories (they do not fit the
   `@Version` concurrency rules); write a characterisation test before touching
-  `fail_on_pagination_over_collection_fetch`.
+  `fail_on_pagination_over_collection_fetch` (**done 2026-10-10**: `PagedFindersNoCollectionFetchTest`
+  pins both halves, the shape the gate refuses and the shape it lets through).
 - **Spring Framework 7**: `@ConcurrencyLimit` for the backend's outbound fan-out to UEX and SC Wiki,
-  which virtual threads no longer bound; keep the find-or-create retry explicit. Spring's built-in API
+  which virtual threads no longer bound; keep the find-or-create retry explicit (**done 2026-10-10**,
+  REQ-SEC-081: 4 for UEX, 2 for SC Wiki, enabled by `AsyncConfig`; nothing else changed). Spring's built-in API
   versioning adds nothing under a hard cut; its standard deprecation headers only if
   `@ApiDeprecation` is ever used again.
 - **Spring Boot 4.1**: an `InetAddressFilter` restricting the external-integration HTTP clients (UEX,
   SC Wiki, Discord) to external addresses — a defence against redirects into internal networks; never
-  on the internal clients.
+  on the internal clients (**done 2026-10-10**, REQ-SEC-081, ADR-0204 amendment 3: UEX and SC Wiki use
+  the external builder; the backend has no Discord client, that federation lives in `keycloak-spi`).
 - **Jackson 3** reads unknown JSON properties tolerantly by default. That stays: the frontend and
   backend deploy together and are checked by the contract tests, and the exchange's tolerant reading
-  is part of its frozen behaviour. The policy is written into the API conventions.
+  is part of its frozen behaviour. The policy is written into the API conventions (**done 2026-10-10**, REQ-API-022,
+  `JacksonTolerantReadingTest`).
 
 ### 8.4 Gradle and CI
 

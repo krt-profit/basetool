@@ -1658,3 +1658,23 @@ and 4–5 ms without either, within the noise of `docker exec`.
 REQ-OPS-042, REQ-SEC-037, ADR-0135, ADR-0136
 
 ---
+
+### REQ-API-022 — A request body is read tolerantly: an unknown property is ignored
+
+The application's Jackson 3 mapper keeps `FAIL_ON_UNKNOWN_PROPERTIES` off, which is Jackson 3's
+default and the behaviour of every body the frozen contract has ever accepted. A client that sends a
+property the server does not declare gets the request handled without it; a property the server
+adds later is invisible to an older client. The frontend and the backend deploy together and the
+contract tests (REQ-API-016, REQ-API-017) check both sides, and the exchange's tolerant reading is
+part of its frozen behaviour (REQ-XCH-009), so the policy is not tightened. Mass assignment is not
+this requirement's concern: REQ-SEC-077 refuses a body that carries a server-managed field.
+
+**Acceptance**
+
+- [x] The primary mapper reads a body with an undeclared property and drops it, and the feature that
+  would refuse it is off (`JacksonTolerantReadingTest`).
+
+**Enforced by:** `JacksonTolerantReadingTest` · **Code:** `JacksonConfig` · **Related:** REQ-API-009,
+REQ-API-011, REQ-SEC-077
+
+---
