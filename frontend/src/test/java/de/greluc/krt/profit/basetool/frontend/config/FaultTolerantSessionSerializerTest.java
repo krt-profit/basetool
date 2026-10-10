@@ -24,19 +24,24 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipForm;
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.serializer.SerializationException;
+import org.springframework.web.servlet.FlashMap;
 
 /**
  * Verifies that an unreadable session value signs the member out instead of failing the request,
@@ -172,6 +177,41 @@ class FaultTolerantSessionSerializerTest {
     UnreadableSessionValue marker = drop(raw, stale);
 
     assertEquals("de.greluc.krt.Vanished", marker.typeId());
+  }
+
+  /**
+   * A flash map stored by a release before the package-by-domain move (plan F4) names its form by
+   * the old class name: the read drops that one value and names the old class, the allow-list's
+   * refusal listener is never reached because the name resolves to no class, and the same value
+   * under the current name reads back.
+   */
+  @Test
+  void aFlashedFormUnderItsPreMoveClassNameIsDroppedNotRefused() {
+    List<String> refused = new ArrayList<>();
+    RedisSerializer<Object> raw =
+        new GenericJacksonJsonRedisSerializer(
+            RedisSessionConfig.buildSessionJsonMapper(
+                getClass().getClassLoader(),
+                SessionTypeAllowList.validatorBuilder(
+                    SessionTypeAllowList.Mode.ENFORCE, (name, mode) -> refused.add(name))));
+    ShipForm form = new ShipForm();
+    form.setName("Carrack");
+    FlashMap flash = new FlashMap();
+    flash.put("shipForm", form);
+    byte[] current = raw.serialize(new CopyOnWriteArrayList<>(List.of(flash)));
+    String json = new String(current, StandardCharsets.UTF_8);
+    String preMoveName = "de.greluc.krt.profit.basetool.frontend.model.form.ShipForm";
+
+    assertTrue(json.contains(ShipForm.class.getName()));
+    assertInstanceOf(CopyOnWriteArrayList.class, wrap(raw).deserialize(current));
+
+    UnreadableSessionValue marker =
+        drop(
+            raw,
+            json.replace(ShipForm.class.getName(), preMoveName).getBytes(StandardCharsets.UTF_8));
+
+    assertEquals(preMoveName, marker.typeId());
+    assertEquals(List.of(), refused);
   }
 
   @Test

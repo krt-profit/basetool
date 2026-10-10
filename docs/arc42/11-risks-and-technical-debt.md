@@ -23,7 +23,8 @@ twice, and the second one can be forgotten.
 **Mitigated, not solved.** `FrontendDtoContractTest` diffs the mirrors against `openapi.json`, and
 `GeneratedDtoAgreementTest` compares them field by field against the models generated from the same
 document, and `DtoMirrorConsistencyTest` pairs every mirror with its backend record wherever it
-lives in the backend source tree (REQ-OPS-038). Nothing in `main` imports a generated type yet — replacing the mirrors is a separate epic,
+lives in the backend source tree (REQ-OPS-038); all of them select the mirrors by their
+`@DtoMirror` marker, not by a package (REQ-FE-032). Nothing in `main` imports a generated type yet — replacing the mirrors is a separate epic,
 and until it happens the duplication is real.
 
 ## 11.3 The knowledge base cannot be gated by this repository's CI
@@ -370,3 +371,8 @@ shrunk from 138 to 110 class edges. Phase 2 has begun (2026-10-05): `dashboard`,
 and `admin` are the first domains moved whole into their module packages. `operation` followed
 with the first access policy out of the scope hub and the first mission command; the baseline is
 at 108 class edges. `promotion` moved with its own access policy (`promotionAccessPolicy`). `personalinventory` moved without one; it had no scope gate.
+The frontend is packaged by domain since 2026-10-10 (plan F4, REQ-FE-032): its controllers, mirrors
+and forms live in `<domain>.web` and `<domain>.model` beside the typed clients, the shared reference
+DTOs in the kernel model. The cross-domain references that remain are page composition, twelve of
+them from the kernel into `orgunit`, `identity` and `catalogue` (§5.3), and no frontend rule bounds
+them yet.

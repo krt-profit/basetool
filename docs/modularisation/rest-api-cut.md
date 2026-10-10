@@ -300,7 +300,7 @@ seam rule passing vacuously → G-01. **Effort** M.
 | `POST /finance-entries`, `PUT`, `DELETE /finance-entries/{entryId}` | `/missions/{missionId}/finance-entries`, `…/{entryId}` | 3 | 3 |
 | 28 operations ending in `/slim`, all in `MissionController` | the same paths without `/slim` | 28 | 24 |
 | `GET /missions/search` | `GET /missions` with typed filters and `q` | 1 | 1 |
-| `POST /missions/{id}/participants/add` | deleted: the twin of `POST /missions/{id}/participants/slim`; its web caller (`frontend/src/main/…/controller/MissionWriteController.java:199`) and the E2E seeder move to the survivor | 1 | 0 |
+| `POST /missions/{id}/participants/add` | deleted: the twin of `POST /missions/{id}/participants/slim`; its web caller (`frontend/src/main/…/mission/web/MissionWriteController.java:199`) and the E2E seeder move to the survivor | 1 | 0 |
 | `GET /inventory/mission/{missionId}`, `GET /refinery-orders/mission/{missionId}` | `GET /inventory/allocations?missionId=`, `GET /refinery-orders?missionId=` — filters on the owners' collections | 2 | 0 |
 | `PUT /missions/{id}`, the legacy full replace (`backend/src/main/…/controller/MissionController.java:314`) | deleted: no caller in the frontend, E2E or the app, and the one mission write that force-increments the row `@Version` (not measured) | 1 | 0 |
 | `GET /missions/{id}/unit-ship-options` | stays, a mission use case served through the hangar module API | — | — |

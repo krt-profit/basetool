@@ -212,7 +212,7 @@ re-swaps the rule table in place (REQ-FE-001) instead of reloading the page.
 **Code:** `model/NotificationRule`, `model/NotificationRuleSelector`,
 `service/RuleEvaluationService`, `service/NotificationRuleService`,
 `controller/NotificationRuleController`, `db/migration/V156__create_notification_rule.sql`,
-frontend `controller/AdminNotificationRulePageController`,
+frontend `notification/web/AdminNotificationRulePageController`,
 `templates/admin/notification-rules.html`, `static/js/notification-rules.js`
 
 ### REQ-NOTIF-008 — UC1: notify on job-order creation
@@ -478,7 +478,7 @@ events + clean timeout completion), `DisconnectedClientHandlingTest`,
 `service/NotificationStreamService`, `service/NotificationFanout` / `RedisNotificationFanout` /
 `LocalNotificationFanout`, `notification/internal/NotificationFanoutProperties`,
 `controller/NotificationController#stream`, frontend
-`controller/NotificationPageController#stream`, `service/BackendSideChannels#notificationStream`,
+`notification/web/NotificationPageController#stream`, `service/BackendSideChannels#notificationStream`,
 `config/WebClientConfig#sseWebClient`,
 `exception/GlobalExceptionHandler#handleDisconnectedClient`, `static/js/notifications.js`
 
@@ -718,8 +718,8 @@ truncation, not that inherent-to-offset edge.
 slice), `NotificationServiceTest` (sort whitelist yields the stable `id` tiebreaker),
 `NotificationPageRenderMvcTest` (hint + load-more render only past one page),
 `MessageBundleConsistencyTest` (`notifications.loadMore` / `notifications.showingLatest` in every
-bundle) · **Code:** `frontend controller/NotificationPageController#page` / `#pageItems` /
-`#loadPage`, `model/dto/NotificationPageSliceDto`, `backend service/NotificationService`
+bundle) · **Code:** `frontend notification/web/NotificationPageController#page` / `#pageItems` /
+`#loadPage`, `notification/model/NotificationPageSliceDto`, `backend service/NotificationService`
 (`SORTABLE_FIELDS` with `id`), `templates/notifications.html`, `static/js/notifications.js`
 (`loadMorePage` / `updatePageHint`) · **Issues:** — (ADR-0100 silent-truncation audit follow-up)
 

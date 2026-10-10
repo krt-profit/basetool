@@ -2721,8 +2721,8 @@ replaces rather than appends breaks every installed copy for the length of the r
 > is the half of this requirement that can regress in production without any test noticing. The
 > fallback is not vestigial: it was used from the wild on 2026-09-16, the day after it shipped.
 
-**Code:** `frontend/…/controller/AssetLinksController.java`,
-`frontend/…/controller/AppLinkController.java`,
+**Code:** `frontend/…/shell/web/AssetLinksController.java`,
+`frontend/…/shell/web/AppLinkController.java`,
 `frontend/…/config/AndroidAppLinkProperties.java`, `SecurityConfig` (anonymous matchers),
 `frontend/…/templates/app-link-help.html`.
 **Test:** `AssetLinksControllerTest` — asserts the three response conditions through the real
@@ -3757,7 +3757,8 @@ touches no stored session and needs no migration.
   instantiated, dropped as an unreadable attribute and counted on both counters.
 - [ ] Under `report` that same value is read and reported; under `off` it is read and not reported.
 - [ ] A subpackage of an allowed JDK or Spring package is not allowed by the parent entry.
-- [x] A class of `frontend.model` that is not on `SESSION_BOUND_TYPES` (`InventoryBookOutForm`) is
+- [x] A class of a model package that is not on `SESSION_BOUND_TYPES` (`InventoryBookOutForm`, in
+  `frontend.model.form` until 2026-10-10 and `frontend.inventory.model` since, REQ-FE-032) is
   refused under `enforce`, dropped and counted exactly like any other outsider, while a listed form
   reads back (`SessionTypeAllowListTest#aModelPackageClassOffTheExactList_isRefusedDroppedAndCountedLikeAnyOutsider`,
   2026-10-04).
@@ -4044,7 +4045,7 @@ REQ-FE-025) ·
 `SecurityConfigStaticAssetPermitAllTest` · `ManagementPortIsolationTest` ·
 `ApiVhostAnonymousSurfaceTest` and the nightly `edge-deny-probe.yml` (the same statuses from outside
 the host) · **Code:** `backend/…/config/SecurityConfig`, `frontend/…/config/SecurityConfig`,
-`frontend/…/controller/HomeController`, `frontend/…/config/SafeCsrfAdvice`,
+`frontend/…/dashboard/web/HomeController`, `frontend/…/config/SafeCsrfAdvice`,
 `templates/landing.html` · **ADR:**
 [ADR-0159](../adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md)
 
@@ -4651,7 +4652,7 @@ data is no more disclosable to an admin serving somebody's Art. 15 request than 
 `DataExportControllerSecurityTest` · **Code:** `privacy/internal/DataExportSections`,
 `kernel/HandleScrubber`, `service/DataExportService`, `service/DataExportReportService`,
 `service/pdf/DataExportPdfFormat`, `controller/DataExportController`,
-`controller/AdminDataExportController`, frontend `controller/DataExportProxyController`,
+`controller/AdminDataExportController`, frontend `identity/web/DataExportProxyController`,
 `templates/profile.html` (`#profile-export-card` — the member's export buttons are plain `GET`
 links, beside the separate deletion card) · **Decision:**
 [ADR-0185](../adr/0185-the-data-export-excludes-third-parties-by-projection.md) ·
@@ -4865,7 +4866,7 @@ aggregates.
 **Enforced by:** `PersonSearchCoverageTest`, `AdminPersonSearchControllerSecurityTest` · **Code:**
 `privacy/internal/PersonSearchTargets`, `service/PersonSearchService`,
 `controller/AdminPersonSearchController`, `model/dto/PersonSearchHitDto`,
-`frontend/controller/AdminPersonSearchPageController`, `templates/admin/person-search.html`,
+`frontend/identity/web/AdminPersonSearchPageController`, `templates/admin/person-search.html`,
 `static/js/admin-person-search.js` · **Decision:**
 [ADR-0184](../adr/0184-the-person-search-is-a-checked-registry-not-a-schema-sweep.md) ·
 **Record:** [`docs/privacy/data-subject-requests.md`](../privacy/data-subject-requests.md)
@@ -4970,8 +4971,8 @@ from a statute rather than from operational taste.
 `service/DeletionRequestService`, `controller/DeletionRequestController`,
 `controller/AdminDeletionRequestController`, `privacy/api/events/AccountDeletionRequestedEvent`,
 `privacy/api/events/AccountDeletionRequestDeclinedEvent`, `db/migration/V242`, `db/migration/V243`,
-`frontend/controller/DeletionRequestProxyController`,
-`frontend/controller/AdminDeletionRequestsPageController`,
+`frontend/identity/web/DeletionRequestProxyController`,
+`frontend/identity/web/AdminDeletionRequestsPageController`,
 `templates/fragments/profile-deletion-card.html`, `templates/admin/deletion-requests.html`,
 `static/js/profile.js`, `static/js/admin-deletion-requests.js` · **Decision:**
 [ADR-0181](../adr/0181-self-service-deletion-is-a-request-an-admin-executes.md) ·

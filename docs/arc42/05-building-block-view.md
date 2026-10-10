@@ -173,23 +173,32 @@ The platform modules reach the domains only through SPIs they own and the domain
 
 ## 5.3 Level 2 — inside `frontend`
 
+The frontend is packaged by domain (plan §5.9, F4, REQ-FE-032): each of the 21 domains of the
+evidence table plus `shell` (landing, legal pages, manifest, client-error beacon, licence report)
+has up to three packages, and the kernel keeps its own.
+
 | Package | What lives there |
 | --- | --- |
-| `controller` | Thymeleaf page and fragment endpoints; AJAX mutation endpoints that return fragments; the domain-specific view shaping (`MissionDetailModelBuilder`, `BankDashboardViewAssembler`, …) |
+| `<domain>.web` | The domain's Thymeleaf page and fragment endpoints, AJAX mutation endpoints that return fragments, and its view shaping (`MissionDetailModelBuilder`, `BankDashboardViewAssembler`, view rows such as `RefineryListRow`); `DomainPackageLayoutTest` keeps every controller here |
+| `<domain>.model` | The domain's hand-mirrored DTO records, marked `@DtoMirror` so the DTO contract tests find them wherever they live, its form objects and view models |
 | `<domain>.client` | One typed backend client per domain (`AuditBackendClient`, `NotificationBackendClient`, …): a thin `@Service` over `BackendApiClient` that owns its domain's backend paths, passes every runtime value as a URI-template variable and returns typed records; a controller reaches the backend only through its domain's client (plan F3, `TypedBackendClientTest`) |
+| `model` | The kernel model: `PageResponse`, `PayoutPreference`, the ingest handoff types, `BackendEnumAsString`, `DtoMirror` and the reference DTOs several domains share (`UserReferenceDto`, `SquadronReferenceDto`, `MaterialReferenceDto`, …) |
 | `service` | The backend kernel — `BackendApiClient` with its catalogue cache and URI-template verbs for every verb, `BackendErrorMapper` (the one mapping of a failed call, a sealed `Outcome`), `BackendSideChannels` (the SSE relay and the live-sync probe), `CatalogueCacheEviction` (the evictions a controller triggers after an admin write) — plus `ParallelPageLoader`, the ingest handoff, live-sync presence, Markdown rendering |
-| `model` | The hand-mirrored DTO records (`model.dto`) and the form objects (`model.form`) |
-| `view` | `MoneyFormat` |
+| `view` | The template beans `moneyFormat` and `relativeDays` |
 | `websocket` | `/ws/sync`, the handler and the Redis fanout |
 | `config` | WebClient, Resilience4j, Redis session, Reactor context propagation, security, the layout model |
-| `oss` | The open-source licence report |
 | `support` / `validation` / `exception` / `health` / `logging` / `metrics` | Shared helpers (`Roles` among them) and the usual Spring surface |
 
+The kernel still reaches into three domains in twelve places: the layout advices and loader read
+`orgunit.model` (`SquadronDto`, `OrgUnitMembershipOptionDto`) and the active-org-unit session key
+of `orgunit.web.MeFrontendController`, the access gates read `identity.model` (`UserDto`,
+`RegistrationStatusDto`, `TermsStatusDto`), `BackendApiClient` reads `TermsDocumentDto` and
+`QualityTierCatalog` reads `catalogue.model.QualityTierDto`.
+
 *Corrected 2026-09-29:* this table called `BackendApiClient` "the single seam" (see §4.1), placed
-view-shaping services in `service` and view models in `view`; the view shaping lives in
-`controller`, and `view` holds one class. The
-[domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) (§5.9) proposes the per-domain
-package tree that replaces this layout.
+view-shaping services in `service` and view models in `view`; the view shaping lived in
+`controller`, and `view` held one class. *Updated 2026-10-10:* the layer packages `controller`,
+`model.dto`, `model.form` and `oss` are gone (plan F4).
 
 **One trap lives here and is worth naming in an architecture document**, because it is invisible
 from the code that suffers from it: `WebClient.exchange()` runs on a Reactor-Netty worker thread,

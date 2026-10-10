@@ -264,6 +264,26 @@ debt rather than anything TS 7 introduced.
   repo — `{@code …}`, `{@link …}`, `@param name {shape}` — are parsed as type syntax and are hard
   errors. Convert them when you opt a file in.
 
+## Package layout (REQ-FE-032, plan §5.9)
+
+The Java code is packaged by domain: a new controller, view row or view helper goes into
+`frontend.<domain>.web`, a DTO mirror, form or view model into `frontend.<domain>.model`, the
+domain's backend calls into `frontend.<domain>.client`. A reference DTO several domains share, and
+the other kernel types, go into `frontend.model`; the kernel packages (`service`, `config`,
+`websocket`, `support`, …) take nothing domain-specific. There is no `controller`, `model.dto` or
+`model.form` package any more, and `DomainPackageLayoutTest` fails on a class that puts one back.
+
+- **Every DTO of the backend seam carries `@DtoMirror`** (`frontend.model.DtoMirror`): the DTO
+  contract tests find mirrors by it, not by package. A `*Dto`, `*Request` or `*Response` type in a
+  model package without it fails the build; anything else without it is invisible to those tests.
+- **A flashed form or DTO keeps its exact name in `SessionTypeAllowList.SESSION_BOUND_TYPES`**:
+  moving or renaming one changes the name its session values carry, so the entry moves in the same
+  change (`SessionBoundTypeClosureTest`), and sessions written before the release drop that one
+  flash attribute once (`docs/deployment.md` → *The per-domain package move*).
+- Bean names are the simple class names or explicit (`moneyFormat`, `relativeDays`, `handles`,
+  `markdown`); templates reference no domain class by its package (`T(…)` names only
+  `support.Roles`), so a move inside the frontend touches no template.
+
 ## Backend calls: resilience & context propagation
 
 - **WebClient** is centrally configured (base URL, default headers, connect/read/write timeouts) in `WebClientConfig`, and **nowhere else** (REQ-FE-029, `WebClientConfinementTest`): only `WebClientConfig` builds a client, and only the backend kernel holds one: `BackendApiClient`, and `BackendSideChannels` for the notification SSE relay and the live-sync probe, the two calls that deliberately skip the resilience pass. A controller calls the backend only through its domain's typed client — `<Domain>BackendClient` in `frontend.<domain>.client`, a thin `@Service` over `BackendApiClient` that owns the domain's paths and returns typed records, never a `Map` (plan F3, `TypedBackendClientTest`); a new backend call is a method there (`execute(…)` for an unusual shape), and a catalogue eviction goes through `CatalogueCacheEviction`. Every failure is mapped once, by `BackendErrorMapper`'s exhaustive switch over its sealed `Outcome`. A runtime value goes into a backend URI as a template variable of the verb's template overload (`post("/api/v1/x/{id}", body, T.class, id)`), never by concatenation, for every verb (REQ-SEC-051, `WriteUriTemplateTest`, `ReadUriTemplateTest`); a value with reserved characters (an `Instant`) stays a `UriComponentsBuilder.queryParam` and only the path variable is left in the template (`fromPath("/api/v1/x/{id}").queryParam(…).encode().build().toUriString()`), so the bytes sent do not change. Each typed client's requests are pinned in a `*BackendClientTest` over `BackendClientHarness` (MockWebServer). Paths are relative `/api/…`: every backend client refuses any origin but `app.backend-url`'s in its first filter, before the OAuth2 filter attaches the bearer — a test that wants a client to reach a local server sets the backend URL to that server instead of passing an absolute URI. A future HTTP-interface client is created over the `webClient` bean and takes no `URI`, `UriBuilderFactory` or `@CookieValue` parameter, names no absolute URL and carries no `@Cacheable`.
