@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
-> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0213](../adr/0213-a-release-that-moves-the-provider-jar-costs-one-outage.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md)
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-10.
+> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0213](../adr/0213-a-release-that-moves-the-provider-jar-costs-one-outage.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md), [ADR-0246](../adr/0246-pull-requests-merge-through-a-merge-queue-not-the-strict-up-to-date-policy.md)
 
 # Deployment delivery & promotion
 
@@ -1933,6 +1933,8 @@ to the shared group and restores the defect exactly.
   checker self-tests against a known-drifted workflow first, so it cannot pass vacuously.
 - [ ] The `build-stack` job, which builds the E2E images once per run for all matrix cells (since
   2026-09-22), carries the same gate expression, so a run whose gate is false builds nothing.
+- [ ] `e2e.yml` carries no `merge_group` trigger: its gate admits any event that is not a pull
+  request, so a merge group would start the whole suite (REQ-OPS-044).
 
 **Enforced by:** `.github/workflows/e2e.yml` (`concurrency.group`, `jobs.e2e.if`,
 `jobs.build-stack.if`) · `.github/scripts/check_e2e_gate_mirror.py` ·
@@ -2774,6 +2776,48 @@ features only. No tracked file outside Markdown and the audit archive names `--e
 
 **Enforced by:** `scripts/check-final-java-only.py` (`repo-lint.yml`, `final-java-only`) ·
 **Related:** ADR-0223, REQ-OPS-038
+
+### REQ-OPS-044 — Pull requests merge through a merge queue, and every required check reports in it
+
+`main` is advanced only through a GitHub merge queue (a `merge_queue` rule in the `main` ruleset:
+squash, one pull request per group). The strict up-to-date policy is off; the queue builds `main`
+plus the pull request before the merge instead.
+
+- **Every required status check reports on the merge group.** A required check either runs on the
+  `merge_group` event (checks whose verdict depends on the combined tree) or is answered by a job of
+  the same name in `merge-group-shims.yml` (checks decided on the pull request head: DCO,
+  gitleaks). A required context nothing reports on a merge group wedges the queue and is a defect.
+- **CodeQL runs for real in every merge group, and uploads nothing.** `codeql.yml` triggers on
+  `merge_group`, analyses `java-kotlin` and `javascript-typescript` and calls `analyze` with
+  `upload: never` and `upload-database: false`, so no SARIF upload races the queue's deletion of the
+  temporary branch. The group's verdict is that the analysis completes on the combined tree;
+  findings are judged on the pull request head and on `main`.
+- **A merge group reads its base from `github.event.merge_group`**, never from `github.base_ref` or
+  `github.event.pull_request`, which are empty there.
+- **No merge group starts the E2E suite.** `e2e.yml` has no `merge_group` trigger.
+- **One pull request per group**, so the push to `main` carries the single commit the release and
+  image workflows inspect.
+- **The repository stays public**; the queue exists only for public repositories of an
+  organization. The emergency path when `gh pr merge --admin` does not merge past the queue is the
+  owner editing the ruleset, never an agent.
+
+**Acceptance**
+
+- [ ] Every context in the `main` ruleset's `required_status_checks` is the `name:` of a job in a
+  workflow that triggers on `merge_group`.
+- [ ] A queued docs-only pull request reaches `main` with all 11 contexts reported on its
+  `gh-readonly-queue/main/...` ref and a GitHub-verified squash commit.
+- [ ] A merge group's `Analyze (java-kotlin)` and `Analyze (javascript-typescript)` pass without
+  creating a code scanning analysis on the `gh-readonly-queue/...` ref.
+- [ ] After a queued merge, `gh pr view <n> --json mergeCommit` equals the new `main` tip.
+- [ ] Two queued pull requests that each add the same Flyway version fail the second group, not
+  `main`.
+
+**Enforced by:** the ruleset `main`, `.github/workflows/merge-group-shims.yml`,
+`.github/workflows/codeql.yml` (matrix and `upload`), the `merge_group` triggers of `ci.yml`,
+`repo-lint.yml`, `wrapper-validation.yml` and `flyway-migrations.yml` · **Decision:**
+[ADR-0246](../adr/0246-pull-requests-merge-through-a-merge-queue-not-the-strict-up-to-date-policy.md) ·
+**Related:** REQ-OPS-027
 
 ## Open questions
 

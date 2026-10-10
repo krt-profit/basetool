@@ -264,7 +264,7 @@ and "works in the IDE" is not a passing state.
 ### CI
 
 The [CI workflow](.github/workflows/ci.yml) runs `./gradlew build --continue
---configuration-cache` on every PR and push to `main`. That includes Spotless, Checkstyle,
+--configuration-cache` on every PR, merge group and push to `main`. That includes Spotless, Checkstyle,
 SpotBugs, the frontend asset linters and JS type check, the full JUnit
 suite, and the JaCoCo coverage report. Reports are uploaded as workflow
 artefacts so reviewers can download them when investigating a failure.
@@ -492,6 +492,8 @@ CPE), `notes` saying why it is a false positive, and an `until` no more than six
 - Reviewer comments are not blockers by default — please respond to them, even if your response is "I disagree, here is why".
 - Maintainers normally merge via **squash merge** so the final commit on `main` matches the PR title. Write the PR title accordingly: it is what ends up in `git log`.
 - Do not force-push to a PR branch once review has started unless a reviewer asks you to; prefer additional commits and let the squash collapse them at merge time.
+- **`main` is advanced only through the GitHub merge queue** ([ADR-0246](docs/adr/0246-pull-requests-merge-through-a-merge-queue-not-the-strict-up-to-date-policy.md), `REQ-OPS-044`). Once the required checks pass on the PR head, `gh pr merge <number> --squash` (or the *Merge when ready* button) enqueues it. The queue builds `main` plus your PR and merges only if that combination is green, one PR per group, so there is no *Update branch* round and a PR is never `BEHIND`. Do not push to a queued PR: a push removes it from the queue. If a group fails, the PR leaves the queue; fix it and enqueue it again.
+- A workflow that must report in the queue triggers on `merge_group` and reads its base from `github.event.merge_group`, never from `github.base_ref` or `github.event.pull_request`. A new required check is added to `merge-group-shims.yml` under the same name unless it runs on `merge_group` itself; `e2e.yml` never gets a `merge_group` trigger.
 
 ---
 

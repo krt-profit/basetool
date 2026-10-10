@@ -3,8 +3,8 @@
 ## 9.1 How decisions are recorded
 
 Every architecturally significant decision is an **ADR** in [`docs/adr/`](../adr/README.md), written
-before or with the change that implements it. There are **239** of them (ADR-0001 to ADR-0239,
-as of 2026-10-02). They are numbered
+before or with the change that implements it. There are **246** of them (ADR-0001 to ADR-0246,
+as of 2026-10-10). They are numbered
 sequentially, carry a status, and are amended in place with a dated `## Amendment N` section rather
 than silently rewritten — a vault or a decision log that edits its own history teaches its readers
 not to trust it.
@@ -44,6 +44,7 @@ other decision in context.
 | **0192 / 0193** | Lombok and the JetBrains annotations everywhere; one logging facade, enforced | Style rules turned into compile errors and CI gates, so they stop depending on review attention. |
 | **0231 / 0232 / 0233** | The backend becomes a modular monolith; modules interact through commands, observers and after-commit events; ArchUnit and Spring Modulith enforce the boundaries | The target every backend change now moves towards (§8.14, §11.9): a package per domain with a published API, audit always in the business transaction, and a frozen module baseline that may only shrink. Decided 2026-09-29; being built. |
 | **0234** | The API is re-cut by hard cut, with a forced app update and a release-bound floor | No `/api/v2` beside `/api/v1`: contract tiers decide what may break, a declared-break ledger and the app's call list say what does, and the minimum app version rides the release. |
+| **0246** | Pull requests merge through a merge queue, not the strict up-to-date policy | `main` plus the PR is built before the merge, one PR per group, with real CodeQL in the group but no SARIF upload, shims for DCO and gitleaks, and the standing condition that the repository stays public. |
 
 ## 9.3 Where a decision is *not* an ADR
 
