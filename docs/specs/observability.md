@@ -3593,3 +3593,39 @@ requests.
 `monitoring/prometheus/tests/security_expression_failures_test.yml`,
 `monitoring/grafana/dashboards/07-basetool-operations.json` · **Related:** REQ-SEC-075,
 REQ-API-004, REQ-OBS-011
+
+### REQ-OBS-021 — The hand-mirrored platform classes keep one security floor in all three applications
+
+The backend, frontend and ingest each keep a copy of `CorrelationIdFilter`, `ManagementPortSecurityConfig`
+and (backend, ingest) `KeycloakTrustSupport`. The copies differ where their application differs,
+so byte equality is not the rule; what cannot drift is the security floor each one gives:
+
+- **Correlation id.** An inbound id that could break a log line or a response header (control
+  characters, spaces, quotes, `%`, `$`, non-ASCII) is never echoed or bound to the MDC; no id is
+  longer than 128 characters; an id that is already safe comes back unchanged; an absent or blank one
+  becomes a fresh UUID. The three filters treat an over-long inbound id differently on purpose (backend
+  and frontend truncate it, the ingest mints a new one), so the contract states only the common part.
+- **Management port.** Each `ManagementPortSecurityConfig` is active only with `management.server.port`,
+  permits only through its own security matcher, is stateless, keeps no request cache and does not touch
+  CSRF protection; the three applications expose the same web Actuator endpoints. The backend
+  enumerates the read endpoints it opens, the frontend and ingest open `/actuator/**`, which is safe
+  only because CSRF stays armed there: the chains leave Spring Security's default alone, which the
+  parity test pins by refusing any mention of CSRF in them (the backend's own armed check is
+  `ActuatorLoggersCsrfArmedTest`).
+- **Keycloak trust.** The backend and ingest `KeycloakTrustSupport` are the same code apart from
+  comments, imports and the name of the read-timeout constant: the bundle's own trust managers,
+  HTTP/1.1, hostname verification on.
+
+**Acceptance**
+
+- [x] The same list of injection attempts and length edges runs through all three filters and every
+  outcome holds the contract (`CorrelationIdFilterTest` in each module over `CorrelationIdParity`); the
+  contract is proven able to fail (`CorrelationIdParityTest`).
+- [x] The management chains and the exposure lists are pinned as above, and the two trust-support
+  copies are equal after comments are removed (`PlatformMirrorParityTest`); a planted change to the
+  ingest copy fails it. The sources it reads are declared inputs of the backend `test` task, so a
+  change in the ingest or frontend module cannot leave the result cached.
+
+**Enforced by:** `CorrelationIdParity`, `CorrelationIdFilterTest`, `PlatformMirrorParityTest`,
+`ObservationPrivacyFilterMirrorParityTest` · **Related:** REQ-OBS-002, REQ-OBS-005, REQ-OBS-016,
+REQ-SEC-014, REQ-SEC-024

@@ -810,7 +810,7 @@ public class RefineryOrderService implements CraftabilityYieldSource {
       } else {
         rawNew = Math.round(amount);
       }
-      int clamped = (int) Math.max(1L, Math.min(rawNew, Integer.MAX_VALUE));
+      int clamped = Math.clamp(rawNew, 1, Integer.MAX_VALUE);
       good.setOutputQuantity(clamped);
     }
   }
@@ -824,7 +824,7 @@ public class RefineryOrderService implements CraftabilityYieldSource {
    * @return the good, or {@code null} when none matches
    */
   @Nullable
-  private RefineryGood findGood(RefineryOrder order, UUID materialId, Integer quality) {
+  private RefineryGood findGood(RefineryOrder order, UUID materialId, @Nullable Integer quality) {
     for (RefineryGood good : order.getGoods()) {
       if (good.getOutputMaterial() == null || good.getOutputMaterial().getId() == null) {
         continue;

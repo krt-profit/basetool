@@ -1,0 +1,47 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.joborder.internal;
+
+import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
+import java.util.List;
+import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
+
+/**
+ * Create payload for an {@code ITEM} job order: finished-item lines whose required materials the
+ * server derives from each line's blueprint.
+ *
+ * @param responsibleOrgUnitId the profit-eligible org unit that processes the order; required
+ * @param requestingOrgUnitId the customer org unit of any kind; mandatory
+ * @param handle optional contact handle (≤ 200 chars)
+ * @param comment optional free-text note (≤ 1000 chars), HTML-escaped on display
+ * @param items the ordered finished-item lines (1..50)
+ * @param version optimistic-lock version (unused on create)
+ */
+public record CreateJobOrderItemRequestDto(
+    @Nullable UUID responsibleOrgUnitId,
+    @Nullable UUID requestingOrgUnitId,
+    @Size(max = 200) String handle,
+    @Size(max = 1000) String comment,
+    @NotEmpty @Size(max = 50) List<@Valid CreateJobOrderItemLineDto> items,
+    Long version) {}

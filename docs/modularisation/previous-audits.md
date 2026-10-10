@@ -650,7 +650,7 @@ open.
 | J-QW3 | Leaf de-duplications: `InventoryAuditLabels`, `OrgUnitLabels`, `UexValues`, `QuantityTypeRounding`, `MapPayloadValues`, material alias guards, `@EvictAllMaterialCaches` | #1256 | DONE | all in use (`UexValues` 149 times); they sit in `support`, where 43 of 63 classes carry a domain name | ADJUSTED | Re-home per domain or kernel; the `InventoryAuditLabels` output stays byte-identical (audit viewer, exports). |
 | J-QW4 | `ObservationPrivacyFilter` parity guard across the three apps | #1256 (`1e4b3720`) | DONE | three 106-line copies plus `ObservationPrivacyFilterMirrorParityTest` | CONFIRMED | `logging-support` holds no beans (ADR-0205), so the parity test stays the guard. |
 | J-S10 | `ProblemResponseFactory` (item #10) | #1256 (`d4c3860e`) | DONE | `backend/src/main/java/…/support/ProblemResponseFactory.java:40,60,86`; 9 users | CONFIRMED | One sanitised assembly point for problem bodies; kernel. |
-| J-S10b | Split `GlobalExceptionHandler` per exception family (prerequisite laid in July) | — | OPEN | 1,005 lines, 20 `@ExceptionHandler` methods | REPRIORITISED | By family yes, never per domain: one advice keeps one handler order and one disclosure path (§5.5). |
+| J-S10b | Split `GlobalExceptionHandler` per exception family (prerequisite laid in July) | — | DONE 2026-10-10 | 1,181 lines, 23 `@ExceptionHandler` methods, now five family classes and the advice | REPRIORITISED | By family yes, never per domain: one advice keeps one handler order and one disclosure path (§5.5). |
 | J-RELAY | `BackendErrorResponses.relay` wrapper (July: adopted in one controller only) | #1256 (`210b6569`) | DONE | adopted widely by #2010 and #2014 | DROPPED | Finished by FE-SIMP-01. |
 | J-REDACT | Peer-redactor extraction, explicit full-field reconstruction kept | #1256 (`ee34c23c`) | DONE | now `MissionPeerRedactor` (`backend/src/main/java/…/support/MissionPeerRedactor.java:56-213`); rule in `backend/src/test/java/…/ArchitectureTest.java:1129-1162` | ADJUSTED | Moves into the mission module; completeness for nested records is untested (PRV-10). |
 | J-ROLES | `Roles.HAS_ROLE_*` constants for `@PreAuthorize` | #1256 (`425c08e7`) | DONE | `backend/src/main/java/…/support/Roles.java:83-110`; 126 uses in 51 files | CONFIRMED | Part of the platform's access core. |
@@ -997,7 +997,7 @@ is listed with where the plan adopts it.
   in `MissionDto` with sentinel values and asserts that peer redaction removes them; a user summary
   without an `email` component. *Partly adopted*: the kernel's `UserRef` (§5.1) carries cross-domain
   member references and the wave checklist keeps the redaction selection floors (§6.2); the
-  reflective test is not yet a named guard and belongs to the mission step (§7.5).
+  reflective test is now a named guard, `MissionPeerRedactionSentinelTest` (done 2026-10-10, REQ-SEC-040); it walks the types reachable from `MissionDto`, so it follows the DTOs through the mission move.
 - **PRV-11 — An audit-completeness guard per audited module** (in place of the rejected base
   template). Every mutating public service method of an audited module reaches an audit call or sits
   on a reviewed exemption list. *Adopted in changed form*: an audit contract per command (§6.2,

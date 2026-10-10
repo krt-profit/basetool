@@ -18,6 +18,7 @@
  */
 
 /**
- * The job-order module's internal helpers: the owner redaction of order-linked stock (plan §5.2).
+ * The job-order module's implementation: the order, item, production, handover, claim and demand
+ * services, its access policy, its own repositories and request DTOs (plan §5.2).
  */
 package de.greluc.krt.profit.basetool.backend.joborder.internal;

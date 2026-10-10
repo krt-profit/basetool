@@ -217,6 +217,11 @@
 
 ### Changed
 
+- **UEX und SC Wiki werden nur über externe Adressen angesprochen.** Der Abruf lehnt Namen ab, die auf
+  interne, Loopback- oder Link-Local-Adressen auflösen, folgt keiner Weiterleitung und läuft höchstens
+  vier (UEX) bzw. zwei (SC Wiki) Aufrufe gleichzeitig. Eine auf einen internen Host zeigende
+  `app.uex`- oder `app.scwiki`-URL funktioniert damit nicht mehr (REQ-SEC-081).
+
 - **Auswahlfelder nach abgelaufener Sitzung führen zur Anmeldung.** Ist die Sitzung abgelaufen, zeigt
   eine Mitglieder-, Material- oder Kontosuche nicht mehr stumm „keine Treffer", sondern leitet zur
   Anmeldung weiter; dasselbe gilt für alle anderen nachgeladenen Listen und Downloads. Alle Lesezugriffe

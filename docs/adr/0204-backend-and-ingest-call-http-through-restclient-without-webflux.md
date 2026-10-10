@@ -151,3 +151,15 @@ Rejected: raising the shared timeout (a slow exchange would then hold the extrac
 window longer, and nothing would bound the backend's load); a bulkhead that waits for a slot (it
 holds the client's connection for an unknown time, where `Retry-After` states it); weighting every
 set by its op count (small sets, 65 ms at p50, would queue behind large ones).
+
+## Amendment 3 (2026-10-10) — the external clients are filtered and bounded
+
+The backend builds two `RestClient.Builder` beans from `RestClientConfig`. The primary one is the
+builder this ADR describes and stays unfiltered, because the Keycloak admin client reaches an
+internal host through it. The second, `externalRestClientBuilder`, serves UEX and SC Wiki and its JDK
+client carries Spring Boot's `InetAddressFilter.externalAddresses()` and follows no redirect, so a
+configured name that resolves to a private address, or a hostile redirect, cannot turn the backend
+into a probe of the internal networks (REQ-SEC-081). `UexClient` and `ScWikiClient` also carry
+`@ConcurrencyLimit` (4 and 2), enabled by `AsyncConfig`. The dependency is
+`spring-boot-http-client`, which the backend did not carry before. The ingest builds no client for
+a third party and is unchanged.
