@@ -258,8 +258,8 @@ class FeatureExpansionTest {
     participant.setUser(normalUser);
     participant = missionParticipantRepository.save(participant);
 
-    de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryCreateDto req =
-        new de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryCreateDto(
+    de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryCreateDto req =
+        new de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryCreateDto(
             mission.getId(),
             participant.getId(),
             "Fuel",
@@ -314,16 +314,16 @@ class FeatureExpansionTest {
     otherParticipant.setUser(otherUser);
     otherParticipant = missionParticipantRepository.save(otherParticipant);
 
-    de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryCreateDto req =
-        new de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryCreateDto(
+    de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryCreateDto req =
+        new de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryCreateDto(
             mission.getId(),
             participant.getId(),
             "Fuel",
             FinanceType.EXPENSE,
             new BigDecimal("50.00"));
 
-    de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryCreateDto reqOther =
-        new de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryCreateDto(
+    de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryCreateDto reqOther =
+        new de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryCreateDto(
             mission.getId(),
             otherParticipant.getId(),
             "Snacks",

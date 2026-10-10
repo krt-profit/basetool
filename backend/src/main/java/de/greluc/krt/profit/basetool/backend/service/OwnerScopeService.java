@@ -400,28 +400,6 @@ public class OwnerScopeService {
   }
 
   /**
-   * Delegates to {@link AccessGateService#canSeeMission(UUID)}: whether the caller may read mission
-   * {@code missionId} (cross-staffel public escape + M-2/M-3 hardenings).
-   *
-   * @param missionId mission to inspect; never {@code null}.
-   * @return {@code true} iff the caller may read the mission.
-   */
-  public boolean canSeeMission(@NotNull UUID missionId) {
-    return accessGateService.canSeeMission(missionId);
-  }
-
-  /**
-   * Delegates to {@link AccessGateService#canEditMission(UUID)}: whether the caller may edit
-   * mission {@code missionId} (strict owning-squadron check, no public escape).
-   *
-   * @param missionId mission to inspect; never {@code null}.
-   * @return {@code true} iff the caller may edit the mission.
-   */
-  public boolean canEditMission(@NotNull UUID missionId) {
-    return accessGateService.canEditMission(missionId);
-  }
-
-  /**
    * Delegates to {@link AccessGateService#canSeeInventoryItem(UUID)}: whether the caller may read
    * inventory item {@code itemId} (owner escape → ownerless → strict scope).
    *

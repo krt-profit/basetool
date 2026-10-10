@@ -36,7 +36,6 @@ import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
@@ -304,7 +303,6 @@ class JobOrderAccessPolicyDifferentialTest {
           new AccessGateService(
               resolver,
               authHelper,
-              mock(MissionRepository.class),
               mock(InventoryItemRepository.class),
               mock(ShipRepository.class),
               memberships);
