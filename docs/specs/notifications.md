@@ -967,7 +967,7 @@ stays. With either set empty nothing is deleted. An event may combine this with 
 Some notices have no user action behind them: a reminder before a mission, a refinery order that is
 ready, a mission that was never ended. They come from **one scheduled producer**.
 
-- Every module that owns such a time implements `TimedNoticeProducer` (`kind()`, `produce(now)`).
+- Every module that owns such a time implements `TimedNoticeProducer` (`kind()`, `produce(now, limit)`).
   `NotificationTimedTask` runs them every `app.notifications.timed.interval` (default one minute,
   `app.notifications.timed.enabled`), through `NotificationTimedRunner`.
 - **At most once.** A producer sets the entity's „already notified" marker and publishes the event in
@@ -977,6 +977,12 @@ ready, a mission that was never ended. They come from **one scheduled producer**
   `pg_try_advisory_xact_lock`; an instance that does not get it skips the run. Each producer runs in
   its own transaction, so one failing producer neither blocks the others nor rolls back what they
   marked; the first failure is rethrown after all have run, so the job is recorded as failed.
+- **Budgeted.** All producers share `app.notifications.timed.max-events-per-tick` events per run
+  (default 100, at most 150, below the executor's 200-slot queue), spent in `@Order` (reminders, then
+  never-ended, then refinery-ready). A producer marks only the entities it handles, so a backlog drains
+  over successive runs and each entity is announced exactly once; a run that spends the budget logs it.
+- **No history.** A producer whose condition can hold for old rows bounds it by a window
+  (REQ-MISSION-025, REQ-REFINERY-023); a row older than the window is never announced and carries no marker.
 - **Observable.** The run is the `notification_timed` scheduled job (executions, duration,
   last-success, enabled, items = notices raised) and each producer counts its notices in
   `basetool_notification_timed_produced_total{kind}`. `NotificationTimedStale` fires when the job has
@@ -991,8 +997,12 @@ ready, a mission that was never ended. They come from **one scheduled producer**
 - [x] The task records the notices raised as the job's item count, survives a failure and publishes
   its enabled gauge.
 
+- [x] The budget is shared across producers, a later producer gets what is left, and a backlog of 1,000
+  entities is announced over successive runs and never twice.
+
 **Enforced by:** `NotificationTimedRunnerTest`, `NotificationTimedRunnerIntegrationTest`,
-`NotificationTimedTaskTest`, `notification_timed_stale_test.yml` · **Code:**
+`NotificationTimedTaskTest`, `MissionNoticeIntegrationTest`, `RefineryNoticeIntegrationTest`,
+`notification_timed_stale_test.yml` · **Code:**
 `notification/api/TimedNoticeProducer`, `service/NotificationTimedRunner`,
 `task/NotificationTimedTask`, `notification/internal/NotificationTimedProperties`,
 `repository/NotificationRepository#tryTimedProducerLock` · **Decision:**
@@ -1070,6 +1080,33 @@ parameter. Every client applies the rule when it fills a template: the web inbox
 
 **Enforced by:** `NotificationRenderCodesTest` · **Code:**
 `NotificationPageController#render` · **Issues:** #2414
+
+### REQ-NOTIF-029 — No notice is lost to a full executor
+
+Notices are created after the originating transaction commits, on the bounded `notificationExecutor`
+(two to four threads, a 200-slot queue). A burst of more events than the queue holds — an admin bulk
+action over hundreds of members (`HangarService`, `PersonalBlueprintService`), or a timed backlog — must
+not drop any: the executor's `BackpressureRejectedExecutionHandler` makes the **publishing thread wait up
+to 30 s for room** instead of rejecting at once. The submitter never runs the task itself, because it
+sits in an after-commit callback whose finished transaction a nested write would not join. Only a wait
+that outlasts the limit (a stalled database) rejects the task; that is a lost notice, so it increments
+`basetool_notification_executor_rejected_total`, logs an ERROR and raises `NotificationExecutorRejected`.
+
+- `basetool_notification_created_total{notification_type}` counts the inbox rows written; the alert
+  `NotificationCreationFlood` fires above 2000 rows in 15 minutes (a bulk action over the whole
+  organisation stays below it, a runaway producer does not).
+- Delivery stays at-most-once across a restart: a callback queued in memory is lost with the process.
+
+**Acceptance**
+
+- [x] 1,200 events published in one transaction create 1,200 notices and reject none.
+- [x] A full queue holds the submitter until room appears, and a wait past the limit is rejected and counted.
+- [x] The two alerts are covered by promtool tests.
+
+**Enforced by:** `NotificationBurstIntegrationTest`, `BackpressureRejectedExecutionHandlerTest`,
+`NotificationCreationServiceTest`, `notification_delivery_alerts_test.yml` · **Code:**
+`config/AsyncConfig#notificationExecutor`, `config/BackpressureRejectedExecutionHandler`,
+`service/NotificationCreationService#recordCreated`
 
 ## Out of scope (v1)
 

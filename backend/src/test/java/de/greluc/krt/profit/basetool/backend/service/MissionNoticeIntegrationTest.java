@@ -28,10 +28,12 @@ import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.Notification;
+import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
@@ -39,6 +41,8 @@ import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -47,6 +51,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -56,6 +62,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @SpringBootTest
 @Transactional
+@RecordApplicationEvents
 class MissionNoticeIntegrationTest {
 
   private static final UUID OWNER = UUID.fromString("44444444-4444-4444-4444-4444444460c1");
@@ -71,6 +78,7 @@ class MissionNoticeIntegrationTest {
   @Autowired private MissionParticipantRepository participantRepository;
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private ApplicationEvents events;
 
   private Mission mission;
 
@@ -191,8 +199,8 @@ class MissionNoticeIntegrationTest {
 
   @Test
   void aReminderIsRaisedOncePerMissionAndAsksEachRegisteredParticipant() {
-    int first = reminderProducer.produce(Instant.now());
-    int second = reminderProducer.produce(Instant.now());
+    int first = reminderProducer.produce(Instant.now(), 100);
+    int second = reminderProducer.produce(Instant.now(), 100);
 
     assertThat(first).isEqualTo(2);
     assertThat(second).isZero();
@@ -204,16 +212,16 @@ class MissionNoticeIntegrationTest {
   void aMissionBeyondTheWindowOrAlreadyStartedGetsNoReminder() {
     mission.setMeetingTime(Instant.now().plus(3, ChronoUnit.DAYS));
     missionRepository.saveAndFlush(mission);
-    assertThat(reminderProducer.produce(Instant.now())).isZero();
+    assertThat(reminderProducer.produce(Instant.now(), 100)).isZero();
 
     mission.setMeetingTime(Instant.now().minus(1, ChronoUnit.HOURS));
     missionRepository.saveAndFlush(mission);
-    assertThat(reminderProducer.produce(Instant.now())).isZero();
+    assertThat(reminderProducer.produce(Instant.now(), 100)).isZero();
 
     mission.setMeetingTime(Instant.now().plus(40, ChronoUnit.MINUTES));
     mission.setStatus("CANCELLED");
     missionRepository.saveAndFlush(mission);
-    assertThat(reminderProducer.produce(Instant.now())).isZero();
+    assertThat(reminderProducer.produce(Instant.now(), 100)).isZero();
   }
 
   @Test
@@ -221,8 +229,8 @@ class MissionNoticeIntegrationTest {
     mission.setMeetingTime(Instant.now().plus(40, ChronoUnit.MINUTES));
     missionRepository.saveAndFlush(mission);
 
-    assertThat(reminderProducer.produce(Instant.now())).isEqualTo(2);
-    assertThat(reminderProducer.produce(Instant.now())).isZero();
+    assertThat(reminderProducer.produce(Instant.now(), 100)).isEqualTo(2);
+    assertThat(reminderProducer.produce(Instant.now(), 100)).isZero();
     assertThat(missionRepository.findById(mission.getId()).orElseThrow().getReminder1hSentAt())
         .isNotNull();
   }
@@ -233,8 +241,58 @@ class MissionNoticeIntegrationTest {
     mission.setPlannedEndTime(Instant.now().minus(7, ChronoUnit.HOURS));
     missionRepository.saveAndFlush(mission);
 
-    assertThat(neverEndedProducer.produce(Instant.now())).isEqualTo(1);
-    assertThat(neverEndedProducer.produce(Instant.now())).isZero();
+    assertThat(neverEndedProducer.produce(Instant.now(), 100)).isEqualTo(1);
+    assertThat(neverEndedProducer.produce(Instant.now(), 100)).isZero();
+  }
+
+  @Test
+  void aMissionWhosePlannedEndLiesBeyondTheWindowIsHistoryAndNeverReported() {
+    mission.setStatus("COMPLETED");
+    mission.setPlannedEndTime(Instant.now().minus(20, ChronoUnit.DAYS));
+    missionRepository.saveAndFlush(mission);
+    assertThat(neverEndedProducer.produce(Instant.now(), 100)).isZero();
+
+    mission.setPlannedEndTime(Instant.now().minus(10, ChronoUnit.DAYS));
+    missionRepository.saveAndFlush(mission);
+    assertThat(neverEndedProducer.produce(Instant.now(), 100)).isEqualTo(1);
+  }
+
+  @Test
+  void aBacklogOfAThousandMissionsIsReportedOverSuccessiveTicksAndNeverTwice() {
+    Squadron iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
+    List<Mission> backlog = new ArrayList<>();
+    for (int i = 0; i < 1_000; i++) {
+      Mission overdue = new Mission();
+      overdue.setOwningOrgUnit(iridium);
+      overdue.setName("Backlog " + i);
+      overdue.setStatus("ACTIVE");
+      overdue.setOwner(mission.getOwner());
+      overdue.setPlannedEndTime(Instant.now().minus(7, ChronoUnit.HOURS).minusSeconds(i));
+      backlog.add(overdue);
+    }
+    missionRepository.saveAllAndFlush(backlog);
+
+    int ticks = 0;
+    int raised;
+    do {
+      raised = neverEndedProducer.produce(Instant.now(), 100);
+      assertThat(raised).isLessThanOrEqualTo(100);
+      ticks += raised > 0 ? 1 : 0;
+    } while (raised > 0);
+
+    Set<UUID> reported = new HashSet<>();
+    long reports = 0;
+    for (NoticeEvent event :
+        events.stream(NoticeEvent.class)
+            .filter(e -> e.eventType() == NotificationEventType.MISSION_NEVER_ENDED)
+            .toList()) {
+      reported.add(event.entityId());
+      reports++;
+    }
+    assertThat(ticks).isEqualTo(10);
+    assertThat(reports).isEqualTo(1_000);
+    assertThat(reported).hasSize(1_000);
+    assertThat(neverEndedProducer.produce(Instant.now(), 100)).isZero();
   }
 
   @Test
@@ -242,12 +300,12 @@ class MissionNoticeIntegrationTest {
     mission.setStatus("ACTIVE");
     mission.setPlannedEndTime(Instant.now().minus(1, ChronoUnit.HOURS));
     missionRepository.saveAndFlush(mission);
-    assertThat(neverEndedProducer.produce(Instant.now())).isZero();
+    assertThat(neverEndedProducer.produce(Instant.now(), 100)).isZero();
 
     mission.setPlannedEndTime(Instant.now().minus(9, ChronoUnit.HOURS));
     mission.setActualEndTime(Instant.now().minus(8, ChronoUnit.HOURS));
     missionRepository.saveAndFlush(mission);
-    assertThat(neverEndedProducer.produce(Instant.now())).isZero();
+    assertThat(neverEndedProducer.produce(Instant.now(), 100)).isZero();
   }
 
   @Test
