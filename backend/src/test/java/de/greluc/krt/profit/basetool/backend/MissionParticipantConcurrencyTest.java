@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -31,7 +32,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantReposi
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.service.MissionService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;

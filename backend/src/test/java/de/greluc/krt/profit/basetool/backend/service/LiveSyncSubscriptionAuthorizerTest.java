@@ -34,6 +34,8 @@ import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncAuthorization;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionLiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationLiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;

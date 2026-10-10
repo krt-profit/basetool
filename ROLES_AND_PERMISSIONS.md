@@ -128,7 +128,7 @@ answered as a decision rather than as a per-endpoint accident.
 
 ### 1.3 Data redaction among members (one level)
 
-Mission responses are cleaned up server-side in [`MissionController`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/MissionController.java),
+Mission responses are cleaned up server-side in [`MissionController`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/mission/web/MissionController.java),
 through [`MissionPeerRedactor`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/mission/internal/MissionPeerRedactor.java):
 
 - **Peer** (`cleanupMissionForPeer` / `cleanupParticipantForPeer` / `cleanupUnitForPeer` /

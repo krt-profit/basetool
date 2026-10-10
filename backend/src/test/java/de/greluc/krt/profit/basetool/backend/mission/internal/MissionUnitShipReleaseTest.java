@@ -32,7 +32,6 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
-import de.greluc.krt.profit.basetool.backend.repository.MissionUnitRepository;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
