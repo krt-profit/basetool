@@ -783,7 +783,7 @@ public class InventoryItemController {
    * @return the persisted DTO or 204
    */
   @PostMapping("/{id}/book-out")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  @PreAuthorize("isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)")
   public ResponseEntity<InventoryItemDto> bookOutInventoryItem(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -820,7 +820,7 @@ public class InventoryItemController {
     @ApiResponse(responseCode = "409", description = "Optimistic locking conflict")
   })
   @PostMapping("/{id}/personal-rebook")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  @PreAuthorize("isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)")
   public InventoryItemDto rebookPersonal(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -836,7 +836,7 @@ public class InventoryItemController {
    * locking is enforced via the {@code version} field in the request.
    */
   @PutMapping("/{id}/note")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  @PreAuthorize("isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)")
   public InventoryItemDto updateInventoryItemNote(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -898,7 +898,7 @@ public class InventoryItemController {
     @ApiResponse(responseCode = "409", description = "Optimistic locking conflict")
   })
   @PostMapping("/{id}/org-unit")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  @PreAuthorize("isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)")
   public InventoryItemDto changeOrgUnit(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -967,7 +967,7 @@ public class InventoryItemController {
     @ApiResponse(responseCode = "422", description = "The rest could not carry its earmarks")
   })
   @PostMapping("/{id}/stolen")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  @PreAuthorize("isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)")
   public InventoryItemDto markStolen(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -1052,7 +1052,7 @@ public class InventoryItemController {
     @ApiResponse(responseCode = "409", description = "Optimistic locking conflict")
   })
   @PatchMapping("/{id}/delivered")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  @PreAuthorize("isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)")
   public InventoryItemDto updateDelivered(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -1094,7 +1094,7 @@ public class InventoryItemController {
     @ApiResponse(responseCode = "422", description = "Over-allocation (dimension Σ exceeds amount)")
   })
   @PostMapping("/{id}/allocation")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  @PreAuthorize("isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)")
   public InventoryItemDto addAllocation(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -1130,7 +1130,7 @@ public class InventoryItemController {
     @ApiResponse(responseCode = "422", description = "Over-allocation (dimension Σ exceeds amount)")
   })
   @PatchMapping("/{id}/allocation")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  @PreAuthorize("isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)")
   public InventoryItemDto changeAllocation(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -1163,7 +1163,7 @@ public class InventoryItemController {
     @ApiResponse(responseCode = "409", description = "Optimistic locking conflict")
   })
   @DeleteMapping("/{id}/allocation")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  @PreAuthorize("isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)")
   public InventoryItemDto removeAllocation(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,

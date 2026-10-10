@@ -77,5 +77,3 @@ notification -> orgunit: OrgUnitRef -> OrgUnitKind
 orgunit -> inventory: OrgUnitMembershipService -> InventoryOrgUnitReconciler
 scope -> hangar: AccessGateService -> Ship
 scope -> hangar: AccessGateService -> ShipRepository
-scope -> inventory: AccessGateService -> InventoryItem
-scope -> inventory: AccessGateService -> InventoryItemRepository

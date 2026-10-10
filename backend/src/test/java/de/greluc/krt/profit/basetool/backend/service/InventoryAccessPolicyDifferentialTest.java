@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.refinery.internal;
+package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -25,24 +25,18 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
+import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.service.AccessGateService;
-import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitCascadeService;
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitStampingService;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.service.RequestScopeResolver;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -57,21 +51,21 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 /**
- * The differential verdict test of the refinery access policy (plan §5.4, ADR-0236): over one
- * fixture matrix of callers, orders and target members, {@link RefineryAccessPolicy} returns
- * exactly the verdict of the scope hub's former refinery gates for the read and edit gates of an
- * order and the two on-behalf pre-checks.
+ * The differential verdict test of the inventory access policy (plan §5.4, ADR-0236): over one
+ * fixture matrix of callers, Lager rows and target members, {@link InventoryAccessPolicy} returns
+ * exactly the verdict of the scope hub's inventory gates for the read and edit gates of a Lager row
+ * and the on-behalf book-in pre-check.
  *
- * <p>{@link ScopeHubRefineryGates} restates those gates as {@link AccessGateService} decided them
+ * <p>{@link ScopeHubInventoryGates} restates those gates as {@link AccessGateService} decided them
  * before they moved, on the scope kernel's primitives, so the comparison outlives their deletion.
  *
  * <p>The matrix covers an admin unpinned and pinned to either unit, a pinned and an unpinned
  * member, members of zero, one and two units and a Bereich lead reaching a child Staffel through
- * the cascade; orders of either unit, of the child unit, of a foreign unit owned by the caller (the
- * owner escape), ownerless orders of the caller and of another member, and an unknown order; and
- * target members of either unit, of the child unit, of none, and the caller.
+ * the cascade; rows of either unit, of the child unit, of a foreign unit owned by the caller (the
+ * owner escape), ownerless rows of the caller and of another member, and an unknown row; and target
+ * members of either unit, of the child unit, of none, and the caller.
  */
-class RefineryAccessPolicyDifferentialTest {
+class InventoryAccessPolicyDifferentialTest {
 
   private static final UUID UNIT_A = UUID.randomUUID();
 
@@ -91,7 +85,7 @@ class RefineryAccessPolicyDifferentialTest {
 
   private static final UUID TARGET_NONE = UUID.randomUUID();
 
-  private static final int ORDER_CASES = 7;
+  private static final int ROW_CASES = 7;
 
   private static final int TARGET_CASES = 5;
 
@@ -106,7 +100,7 @@ class RefineryAccessPolicyDifferentialTest {
   private record Caller(String name, boolean admin, List<UUID> memberships, UUID pin) {}
 
   @Test
-  void thePolicyReturnsTheScopeHubsVerdictForEveryCallerOrderTargetAndGate() {
+  void thePolicyReturnsTheScopeHubsVerdictForEveryCallerRowTargetAndGate() {
     List<Caller> callers =
         List.of(
             new Caller("admin unpinned", true, List.of(), null),
@@ -123,17 +117,13 @@ class RefineryAccessPolicyDifferentialTest {
     int granted = 0;
     for (Caller caller : callers) {
       Fixture fixture = new Fixture(caller);
-      for (Map.Entry<String, UUID> order : fixture.orders.entrySet()) {
-        for (String gate : List.of("canSeeRefineryOrder", "canEditRefineryOrder")) {
-          boolean old =
-              gate.equals("canSeeRefineryOrder")
-                  ? fixture.scopeHub.canSeeRefineryOrder(order.getValue())
-                  : fixture.scopeHub.canEditRefineryOrder(order.getValue());
-          boolean now =
-              gate.equals("canSeeRefineryOrder")
-                  ? fixture.policy.canSeeRefineryOrder(order.getValue())
-                  : fixture.policy.canEditRefineryOrder(order.getValue());
-          assertThat(now).as("%s on %s for %s", gate, order.getKey(), caller.name()).isEqualTo(old);
+      for (Map.Entry<String, UUID> row : fixture.rows.entrySet()) {
+        for (Gate gate : rowGates()) {
+          boolean old = gate.scopeHub().test(fixture.scopeHub, row.getValue());
+          boolean now = gate.policy().test(fixture.policy, row.getValue());
+          assertThat(now)
+              .as("%s on %s for %s", gate.name(), row.getKey(), caller.name())
+              .isEqualTo(old);
           compared++;
           granted += now ? 1 : 0;
         }
@@ -151,42 +141,50 @@ class RefineryAccessPolicyDifferentialTest {
       }
     }
 
-    assertThat(compared).isEqualTo(callers.size() * (ORDER_CASES * 2 + TARGET_CASES * 2));
+    assertThat(compared).isEqualTo(callers.size() * (ROW_CASES * 2 + TARGET_CASES));
     assertThat(granted).isBetween(1, compared - 1);
   }
 
   /**
-   * One on-behalf gate, as the scope hub and as the policy decide it.
+   * One inventory gate, as the restated scope hub and the policy decide it.
    *
    * @param name the gate's method name
-   * @param scopeHub the scope hub's verdict
+   * @param scopeHub the restated scope hub's verdict
    * @param policy the policy's verdict
    */
   private record Gate(
       String name,
-      BiPredicate<ScopeHubRefineryGates, UUID> scopeHub,
-      BiPredicate<RefineryAccessPolicy, UUID> policy) {}
+      BiPredicate<ScopeHubInventoryGates, UUID> scopeHub,
+      BiPredicate<InventoryAccessPolicy, UUID> policy) {}
+
+  private static List<Gate> rowGates() {
+    return List.of(
+        new Gate(
+            "canSeeInventoryItem",
+            ScopeHubInventoryGates::canSeeInventoryItem,
+            InventoryAccessPolicy::canSeeInventoryItem),
+        new Gate(
+            "canEditInventoryItem",
+            ScopeHubInventoryGates::canEditInventoryItem,
+            InventoryAccessPolicy::canEditInventoryItem));
+  }
 
   private static List<Gate> userGates() {
     return List.of(
         new Gate(
-            "canViewUserRefineryOrders",
-            ScopeHubRefineryGates::canViewUserRefineryOrders,
-            RefineryAccessPolicy::canViewUserRefineryOrders),
-        new Gate(
-            "canManageUserRefineryOrders",
-            ScopeHubRefineryGates::canManageUserRefineryOrders,
-            RefineryAccessPolicy::canManageUserRefineryOrders));
+            "canManageUserInventory",
+            ScopeHubInventoryGates::canManageUserInventory,
+            InventoryAccessPolicy::canManageUserInventory));
   }
 
   /** One caller's freshly wired scope hub and policy over the scenario mocks. */
   private static final class Fixture {
 
-    private final ScopeHubRefineryGates scopeHub;
+    private final ScopeHubInventoryGates scopeHub;
 
-    private final RefineryAccessPolicy policy;
+    private final InventoryAccessPolicy policy;
 
-    private final Map<String, UUID> orders = new LinkedHashMap<>();
+    private final Map<String, UUID> rows = new LinkedHashMap<>();
 
     private final Map<String, UUID> targets = new LinkedHashMap<>();
 
@@ -224,15 +222,15 @@ class RefineryAccessPolicyDifferentialTest {
                 return ids;
               });
 
-      RefineryOrderRepository repository = mock(RefineryOrderRepository.class);
+      InventoryItemRepository repository = mock(InventoryItemRepository.class);
       when(repository.findById(any())).thenReturn(Optional.empty());
-      order(repository, "order of A", UNIT_A, OTHER_OWNER);
-      order(repository, "order of B", UNIT_B, OTHER_OWNER);
-      order(repository, "order of child C", CHILD_C, OTHER_OWNER);
-      order(repository, "own order of foreign B", UNIT_B, callerId);
-      order(repository, "own ownerless order", null, callerId);
-      order(repository, "foreign ownerless order", null, OTHER_OWNER);
-      orders.put("unknown order", UUID.randomUUID());
+      row(repository, "row of A", UNIT_A, OTHER_OWNER);
+      row(repository, "row of B", UNIT_B, OTHER_OWNER);
+      row(repository, "row of child C", CHILD_C, OTHER_OWNER);
+      row(repository, "own row of foreign B", UNIT_B, callerId);
+      row(repository, "own ownerless row", null, callerId);
+      row(repository, "foreign ownerless row", null, OTHER_OWNER);
+      rows.put("unknown row", UUID.randomUUID());
 
       targets.put("member of A", TARGET_A);
       targets.put("member of B", TARGET_B);
@@ -262,25 +260,25 @@ class RefineryAccessPolicyDifferentialTest {
               new OrgUnitStampingService(
                   resolver, accessGateService, authHelper, memberships, orgUnits));
       scopeHub =
-          new ScopeHubRefineryGates(
+          new ScopeHubInventoryGates(
               accessGateService, authHelper, resolver, repository, memberships);
-      policy = new RefineryAccessPolicy(ownerScopeService, repository);
+      policy = new InventoryAccessPolicy(ownerScopeService, repository);
     }
 
-    private void order(RefineryOrderRepository repository, String label, UUID unit, UUID owner) {
+    private void row(InventoryItemRepository repository, String label, UUID unit, UUID owner) {
       UUID id = UUID.randomUUID();
-      RefineryOrder order = new RefineryOrder();
-      order.setId(id);
+      InventoryItem item = new InventoryItem();
+      item.setId(id);
       User user = new User();
       user.setId(owner);
-      order.setOwner(user);
+      item.setUser(user);
       if (unit != null) {
         Squadron squadron = new Squadron();
         squadron.setId(unit);
-        order.setOwningOrgUnit(squadron);
+        item.setOwningOrgUnit(squadron);
       }
-      when(repository.findById(id)).thenReturn(Optional.of(order));
-      orders.put(label, id);
+      when(repository.findById(id)).thenReturn(Optional.of(item));
+      rows.put(label, id);
     }
 
     private static List<OrgUnitMembership> rows(UUID userId, List<UUID> units) {
@@ -296,47 +294,43 @@ class RefineryAccessPolicyDifferentialTest {
   }
 
   /**
-   * The refinery gates as the scope hub decided them, restated on the kernel's primitives.
+   * The inventory gates as the scope hub decided them, restated on the kernel's primitives.
    *
    * @param accessGateService the scope hub, for its org-unit gates
    * @param authHelper the caller's identity and roles
    * @param resolver the request scope, for the admin pin
-   * @param orders the refinery orders
+   * @param items the Lager rows
    * @param memberships the members' org-unit memberships
    */
-  private record ScopeHubRefineryGates(
+  private record ScopeHubInventoryGates(
       AccessGateService accessGateService,
       AuthHelperService authHelper,
       RequestScopeResolver resolver,
-      RefineryOrderRepository orders,
+      InventoryItemRepository items,
       OrgUnitMembershipRepository memberships) {
 
-    boolean canSeeRefineryOrder(UUID orderId) {
-      return orders.findById(orderId).map(o -> permits(o, false)).orElse(false);
+    boolean canSeeInventoryItem(UUID itemId) {
+      return items.findById(itemId).map(i -> permits(i, false)).orElse(false);
     }
 
-    boolean canEditRefineryOrder(UUID orderId) {
-      return orders.findById(orderId).map(o -> permits(o, true)).orElse(false);
+    boolean canEditInventoryItem(UUID itemId) {
+      return items.findById(itemId).map(i -> permits(i, true)).orElse(false);
     }
 
-    boolean canViewUserRefineryOrders(UUID targetUserId) {
-      return actsOn(targetUserId, false);
-    }
-
-    boolean canManageUserRefineryOrders(UUID targetUserId) {
+    boolean canManageUserInventory(UUID targetUserId) {
       return actsOn(targetUserId, true);
     }
 
-    private boolean permits(RefineryOrder order, boolean edit) {
-      User owner = order.getOwner();
+    private boolean permits(InventoryItem item, boolean edit) {
+      User owner = item.getUser();
       if (isOwner(owner)) {
         return true;
       }
-      if (order.getOwningOrgUnit() == null) {
+      if (item.getOwningOrgUnit() == null) {
         return (authHelper.isAdmin() && resolver.readActiveSquadronFromHeader().isEmpty())
             || isOwner(owner);
       }
-      UUID unit = order.getOwningOrgUnit().getId();
+      UUID unit = item.getOwningOrgUnit().getId();
       return edit
           ? accessGateService.canEditSquadron(unit)
           : accessGateService.canSeeSquadron(unit);

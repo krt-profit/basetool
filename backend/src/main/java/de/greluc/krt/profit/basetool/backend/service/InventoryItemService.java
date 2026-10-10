@@ -105,6 +105,7 @@ public class InventoryItemService {
   private final MissionRepository missionRepository;
   private final InventoryItemMapper inventoryItemMapper;
   private final OwnerScopeService ownerScopeService;
+  private final InventoryAccessPolicy inventoryAccessPolicy;
   private final JobOrderItemService jobOrderItemService;
   private final AuditRecorder auditRecorder;
   private final InventoryAggregationService inventoryAggregationService;
@@ -446,7 +447,7 @@ public class InventoryItemService {
       @NotNull InventoryItemCreateDto dto, UUID currentUserId) {
     UUID targetUserId = dto.userId() != null ? dto.userId() : currentUserId;
     final boolean onBehalfOfSomeoneElse = !targetUserId.equals(currentUserId);
-    if (onBehalfOfSomeoneElse && !ownerScopeService.canManageUserInventory(targetUserId)) {
+    if (onBehalfOfSomeoneElse && !inventoryAccessPolicy.canManageUserInventory(targetUserId)) {
       throw new AccessDeniedException(
           "You are not allowed to create inventory items for other users");
     }
@@ -592,7 +593,7 @@ public class InventoryItemService {
       UUID owningOrgUnitId) {
     UUID targetUserId = userId != null ? userId : currentUserId;
     boolean onBehalfOfSomeoneElse = !targetUserId.equals(currentUserId);
-    if (onBehalfOfSomeoneElse && !ownerScopeService.canManageUserInventory(targetUserId)) {
+    if (onBehalfOfSomeoneElse && !inventoryAccessPolicy.canManageUserInventory(targetUserId)) {
       throw new AccessDeniedException(
           "You are not allowed to inspect inventory items of other users");
     }

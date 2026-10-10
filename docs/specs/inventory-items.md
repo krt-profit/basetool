@@ -120,7 +120,7 @@ book-in section shipped.
 (`canEditJobOrder`) answers for the *order*, not for the member whose ledger receives
 the stock. An explicit `bookIn.ownerUserId` other than the caller therefore needs the
 same user-level gate as Einbuchen (REQ-SEC-005 / REQ-ORG-016,
-`OwnerScopeService.canManageUserInventory`), evaluated on the requested id **before**
+`BookInPolicy.mayBookInFor`, the inventory access policy's `canManageUserInventory`), evaluated on the requested id **before**
 the owner lookup and before anything is loaded or consumed — so the refusal is no
 existence oracle — and a `personal = true` book-in on behalf of someone else is
 refused outright. Before this, a logistician could book produced stock into any

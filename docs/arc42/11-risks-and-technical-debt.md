@@ -378,4 +378,5 @@ scope gate), then `exchange` and the bank as packages (2026-10-10), which enter 
 boundary before their Gradle extraction. Phase 3 began with `materialexchange` (2026-10-10), the
 Lager reaching it only through its own `StockChangeObserver` and `StockOfferLookup`, then `refinery`
 with the second module access policy, `joborder` with the third and `mission` with the fourth;
-the baseline is at 81 class edges.
+the inventory follows in five parts, the first taking its access policy out of the scope hub. The
+baseline is at 79 class edges.
