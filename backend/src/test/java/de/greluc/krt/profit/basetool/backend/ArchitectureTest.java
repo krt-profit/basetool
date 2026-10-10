@@ -98,6 +98,9 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderInventoryOwnerRedactor;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryService;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimService;
 import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
@@ -160,9 +163,6 @@ import de.greluc.krt.profit.basetool.backend.service.HangarService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryAggregationService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderQueryService;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderService;
-import de.greluc.krt.profit.basetool.backend.service.MaterialClaimService;
 import de.greluc.krt.profit.basetool.backend.service.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.service.MissionService;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
@@ -1639,7 +1639,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 409);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 386);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 

@@ -42,6 +42,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A wanted-listing (Gesuch) on the Materialbörse (REQ-MARKET-015): what a member is looking for, in
@@ -141,6 +142,7 @@ public class MaterialExchangeRequest extends AbstractEntity<UUID> {
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_org_unit_id")
+  @Nullable
   private OrgUnit owningOrgUnit;
 
   /**

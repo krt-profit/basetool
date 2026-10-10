@@ -67,7 +67,7 @@ Layered, with the direction enforced by ArchUnit rather than by convention:
 | `model` | JPA entities, `@Version`, the OrgUnit hierarchy |
 | `dto` / `mapper` | Records on the boundary, MapStruct between them and entities |
 | `task` | Scheduled jobs |
-| `integration` | Outbound third parties — `UexClient`, `scwiki` — on the blocking `RestClient` from `config.RestClientConfig` (JDK HTTP client, no WebFlux; ADR-0204), which `KeycloakService` shares |
+| `integration` | Outbound third parties — `UexClient`, `scwiki` — on the blocking `RestClient` from `config.RestClientConfig` (JDK HTTP client, no WebFlux; ADR-0204), through its external builder that refuses non-external addresses (REQ-SEC-081); the primary builder is `KeycloakService`'s |
 | `metrics` / `health` / `logging` | `basetool_*` business metrics, health indicators, MDC enrichment |
 | `filter` / `interceptor` / `annotation` / `validation` / `util` / `web` / `exception` / `config` | The usual Spring surface |
 
@@ -146,6 +146,7 @@ mappers no other module needs) and `<module>.web` (controllers and their REST DT
 | `bank` | `BankConflictException`, `BankProblemCode`, `BankAmounts`, `BankBookingRequestType`, the booking-request events | the Kartellbank (entities, ledger, booking requests, audit trail, PDF formats, ledger task) and the org-unit side behind `OrgUnitBankAccessService` | the eight Kartellbank controllers, `OrgUnitBankController` |
 | `materialexchange` | the two after-commit events | the offer and request entities, repositories and DTOs, the board services, `MaterialExchangeOfferRatchet` (the Lager's `StockChangeObserver`) and `MaterialExchangeStockOfferLookup` (its `StockOfferLookup`) | `MaterialExchangeController`, `MaterialRequestController` |
 | `refinery` | `RefineryDraftBuilder` (the exchange's refinery draft), the screenshot-extract and draft records, the problem codes | `RefineryOrderService` (also the blueprint craftability's `CraftabilityYieldSource`), `RefineryImportService`, `RefineryAccessPolicy`, the live-sync authorizer, the import settings and the store requests | `RefineryOrderController`, `RefineryImportController` |
+| `joborder` | the problem codes, `ProductionAllocationException`, `JobOrderAuditLabel`, the order events | the order, item, production, handover, claim (also the stock projection's `ClaimBucketSource`) and demand services, `JobOrderAccessPolicy` (also the Lager's `EarmarkTargetPolicy`), the live-sync authorizer, the integrity task, its own repositories and the request DTOs | `JobOrderController`, `MaterialClaimController`, `MaterialCollectionController`, `JobOrderItemStockController` |
 | `orgchart` | — (publishes nothing; orgunit reaches it through `orgunit.api.MembershipChangeObserver`) | `OrgChartPosition` and its repository and enums, `OrgChartService`, `OrgChartReadService`, `LeitungViewService`, `OrgChartPositionMapper`, the chart and Leitung DTOs | `OrgChartController`, `LeitungController` |
 | `promotion` | — (publishes nothing; the GDPR deletion calls `service.MemberEvaluationErasure`, which the module implements) | the entities, repositories, services, mappers and records, `PromotionAccessPolicy` | the six promotion controllers |
 

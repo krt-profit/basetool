@@ -48,7 +48,7 @@ A user may create, edit, or delete the note **only on their own assignee entry**
 **Logistician-or-above** (the role hierarchy promotes Officer and Admin into Logistician) may
 change the note on **any** entry of an order they can see; an Admin can see every order. This
 is the same self-or-logistician rule that already gates adding and removing assignees
-(`verifyAssigneeAccess` + `@ownerScopeService.canSeeJobOrder`), applied unchanged — no new
+(`verifyAssigneeAccess` + `@jobOrderAccessPolicy.canSeeJobOrder`), applied unchanged — no new
 permission concept. The 403 decision lives in the controller, not the service, so business
 logic stays free of `SecurityContextHolder` reads (ArchUnit invariant).
 
