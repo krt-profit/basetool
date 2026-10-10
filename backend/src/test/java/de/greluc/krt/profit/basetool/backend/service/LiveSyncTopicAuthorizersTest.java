@@ -44,6 +44,8 @@ class LiveSyncTopicAuthorizersTest {
   @Mock private OwnerScopeService ownerScopeService;
 
   @Mock private OperationAccessPolicy operationAccessPolicy;
+
+  @Mock private RefineryAccessPolicy refineryAccessPolicy;
   @Mock private OrgUnitBankAccessService orgUnitBankAccessService;
 
   @Test
@@ -91,8 +93,8 @@ class LiveSyncTopicAuthorizersTest {
   @DisplayName("the refinery authorizer decides the Raffinerie-Order room by canSeeRefineryOrder")
   void refineryAuthorizerAsksTheRefineryGate() {
     RefineryLiveSyncTopicAuthorizer authorizer =
-        new RefineryLiveSyncTopicAuthorizer(ownerScopeService);
-    when(ownerScopeService.canSeeRefineryOrder(RESOURCE)).thenReturn(true, false);
+        new RefineryLiveSyncTopicAuthorizer(refineryAccessPolicy);
+    when(refineryAccessPolicy.canSeeRefineryOrder(RESOURCE)).thenReturn(true, false);
 
     assertThat(authorizer.authorizations()).containsExactly(LiveSyncAuthorization.REFINERY_ORDER);
     assertThat(authorizer.mayJoin(LiveSyncTopic.parse("refinery-order:" + RESOURCE))).isTrue();

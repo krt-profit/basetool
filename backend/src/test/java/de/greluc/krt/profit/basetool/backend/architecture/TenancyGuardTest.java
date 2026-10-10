@@ -68,6 +68,7 @@ import de.greluc.krt.profit.basetool.backend.service.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.service.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.service.RefineryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.service.SpecialCommandSecurityService;
 import de.greluc.krt.profit.basetool.guardfixture.tenancy.FixtureAggregate;
 import de.greluc.krt.profit.basetool.guardfixture.tenancy.FixtureAggregateController;
@@ -100,6 +101,7 @@ class TenancyGuardTest {
           OwnerScopeService.class,
           AccessGateService.class,
           OperationAccessPolicy.class,
+          RefineryAccessPolicy.class,
           MissionSecurityService.class,
           SpecialCommandSecurityService.class,
           OrgRoleManagementSecurityService.class);

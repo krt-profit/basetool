@@ -185,7 +185,7 @@ class MassAssignmentGuardTest {
                   Map.of(
                       "owner",
                       "create on behalf, honoured only when"
-                          + " OwnerScopeService.canManageUserRefineryOrders admits the caller"
+                          + " RefineryAccessPolicy.canManageUserRefineryOrders admits the caller"
                           + " (REQ-SEC-005); the proof forges an owner outside the caller's units",
                       "status",
                       "forced to OPEN on create; client-settable on the edit form by owner"

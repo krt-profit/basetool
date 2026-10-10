@@ -109,6 +109,8 @@ class OwnerScopeServiceTest {
 
   private OperationAccessPolicy operationPolicy;
 
+  private RefineryAccessPolicy refineryPolicy;
+
   private static final UUID MEMBER_USER_ID = UUID.randomUUID();
   private static final UUID SQUADRON_A_ID = UUID.randomUUID();
   private static final UUID SQUADRON_B_ID = UUID.randomUUID();
@@ -180,7 +182,6 @@ class OwnerScopeServiceTest {
             jobOrderHandoverRepository,
             jobOrderItemHandoverRepository,
             inventoryItemRepository,
-            refineryOrderRepository,
             shipRepository,
             orgUnitMembershipRepository);
     OrgUnitStampingService orgUnitStampingService =
@@ -193,6 +194,7 @@ class OwnerScopeServiceTest {
     service =
         new OwnerScopeService(requestScopeResolver, accessGateService, orgUnitStampingService);
     operationPolicy = new OperationAccessPolicy(service, authHelper, operationRepository);
+    refineryPolicy = new RefineryAccessPolicy(service, refineryOrderRepository);
   }
 
   /** Returns a Staffel membership row pointing the given user at the given Squadron. */
@@ -1134,9 +1136,11 @@ class OwnerScopeServiceTest {
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
 
       assertTrue(
-          service.canSeeRefineryOrder(order.getId()), "owner sees their own foreign-org order");
+          refineryPolicy.canSeeRefineryOrder(order.getId()),
+          "owner sees their own foreign-org order");
       assertTrue(
-          service.canEditRefineryOrder(order.getId()), "owner edits their own foreign-org order");
+          refineryPolicy.canEditRefineryOrder(order.getId()),
+          "owner edits their own foreign-org order");
     }
 
     @Test
@@ -1148,9 +1152,10 @@ class OwnerScopeServiceTest {
       stubMemberInSquadronA();
 
       assertFalse(
-          service.canSeeRefineryOrder(order.getId()), "a non-owner outside scope must not see it");
+          refineryPolicy.canSeeRefineryOrder(order.getId()),
+          "a non-owner outside scope must not see it");
       assertFalse(
-          service.canEditRefineryOrder(order.getId()),
+          refineryPolicy.canEditRefineryOrder(order.getId()),
           "a non-owner outside scope must not edit it");
     }
   }
@@ -1167,8 +1172,8 @@ class OwnerScopeServiceTest {
       when(refineryOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       stubMemberInSquadronA();
 
-      assertFalse(service.canSeeRefineryOrder(orderId));
-      assertFalse(service.canEditRefineryOrder(orderId));
+      assertFalse(refineryPolicy.canSeeRefineryOrder(orderId));
+      assertFalse(refineryPolicy.canEditRefineryOrder(orderId));
     }
 
     @Test
@@ -1180,8 +1185,8 @@ class OwnerScopeServiceTest {
       when(refineryOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       stubMemberInSquadronA();
 
-      assertTrue(service.canSeeRefineryOrder(orderId));
-      assertTrue(service.canEditRefineryOrder(orderId));
+      assertTrue(refineryPolicy.canSeeRefineryOrder(orderId));
+      assertTrue(refineryPolicy.canEditRefineryOrder(orderId));
     }
 
     @Test
@@ -1260,8 +1265,8 @@ class OwnerScopeServiceTest {
       when(authHelper.isAdmin()).thenReturn(true);
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
-      assertTrue(service.canSeeRefineryOrder(orderId));
-      assertTrue(service.canEditRefineryOrder(orderId));
+      assertTrue(refineryPolicy.canSeeRefineryOrder(orderId));
+      assertTrue(refineryPolicy.canEditRefineryOrder(orderId));
     }
   }
 
@@ -1273,8 +1278,8 @@ class OwnerScopeServiceTest {
       UUID targetUserId = UUID.randomUUID();
       when(authHelper.isAdmin()).thenReturn(true);
 
-      assertTrue(service.canViewUserRefineryOrders(targetUserId));
-      assertTrue(service.canManageUserRefineryOrders(targetUserId));
+      assertTrue(refineryPolicy.canViewUserRefineryOrders(targetUserId));
+      assertTrue(refineryPolicy.canManageUserRefineryOrders(targetUserId));
     }
 
     @Test
@@ -1282,8 +1287,8 @@ class OwnerScopeServiceTest {
       lenient().when(authHelper.isAdmin()).thenReturn(false);
       lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
 
-      assertTrue(service.canViewUserRefineryOrders(MEMBER_USER_ID));
-      assertTrue(service.canManageUserRefineryOrders(MEMBER_USER_ID));
+      assertTrue(refineryPolicy.canViewUserRefineryOrders(MEMBER_USER_ID));
+      assertTrue(refineryPolicy.canManageUserRefineryOrders(MEMBER_USER_ID));
     }
 
     @Test
@@ -1298,8 +1303,8 @@ class OwnerScopeServiceTest {
           .when(orgUnitMembershipRepository.findAllByIdUserId(targetUserId))
           .thenReturn(List.of(staffelMembership(targetUserId, SQUADRON_A_ID)));
 
-      assertTrue(service.canViewUserRefineryOrders(targetUserId));
-      assertTrue(service.canManageUserRefineryOrders(targetUserId));
+      assertTrue(refineryPolicy.canViewUserRefineryOrders(targetUserId));
+      assertTrue(refineryPolicy.canManageUserRefineryOrders(targetUserId));
     }
 
     @Test
@@ -1314,8 +1319,8 @@ class OwnerScopeServiceTest {
           .when(orgUnitMembershipRepository.findAllByIdUserId(targetUserId))
           .thenReturn(List.of(staffelMembership(targetUserId, SQUADRON_B_ID)));
 
-      assertFalse(service.canViewUserRefineryOrders(targetUserId));
-      assertFalse(service.canManageUserRefineryOrders(targetUserId));
+      assertFalse(refineryPolicy.canViewUserRefineryOrders(targetUserId));
+      assertFalse(refineryPolicy.canManageUserRefineryOrders(targetUserId));
     }
   }
 
@@ -1392,8 +1397,8 @@ class OwnerScopeServiceTest {
       when(refineryOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
 
-      assertTrue(service.canSeeRefineryOrder(order.getId()));
-      assertTrue(service.canEditRefineryOrder(order.getId()));
+      assertTrue(refineryPolicy.canSeeRefineryOrder(order.getId()));
+      assertTrue(refineryPolicy.canEditRefineryOrder(order.getId()));
     }
 
     @Test
@@ -1403,8 +1408,8 @@ class OwnerScopeServiceTest {
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
 
-      assertFalse(service.canSeeRefineryOrder(order.getId()));
-      assertFalse(service.canEditRefineryOrder(order.getId()));
+      assertFalse(refineryPolicy.canSeeRefineryOrder(order.getId()));
+      assertFalse(refineryPolicy.canEditRefineryOrder(order.getId()));
     }
 
     @Test

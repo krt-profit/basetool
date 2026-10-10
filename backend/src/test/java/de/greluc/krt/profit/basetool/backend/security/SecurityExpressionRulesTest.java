@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.service.BankSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.service.RefineryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.service.SpecialCommandSecurityService;
 import java.util.ArrayList;
 import java.util.List;
@@ -60,8 +61,9 @@ class SecurityExpressionRulesTest {
    */
   private static final Map<String, Integer> REFERENCE_FLOORS =
       Map.of(
-          "ownerScopeService", 59,
+          "ownerScopeService", 51,
           "operationAccessPolicy", 8,
+          "refineryAccessPolicy", 8,
           "missionSecurityService", 40,
           "authHelperService", 17,
           "exchangeGate", 14,
@@ -78,6 +80,7 @@ class SecurityExpressionRulesTest {
       Map.of(
           "ownerScopeService", OwnerScopeService.class,
           "operationAccessPolicy", OperationAccessPolicy.class,
+          "refineryAccessPolicy", RefineryAccessPolicy.class,
           "missionSecurityService", MissionSecurityService.class,
           "authHelperService", AuthHelperService.class,
           "exchangeGate", ExchangeGate.class,

@@ -24,7 +24,6 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
@@ -34,7 +33,6 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepo
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import java.util.Optional;
 import java.util.UUID;
@@ -67,7 +65,6 @@ public class AccessGateService {
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   private final InventoryItemRepository inventoryItemRepository;
-  private final RefineryOrderRepository refineryOrderRepository;
   private final ShipRepository shipRepository;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
 
@@ -503,74 +500,9 @@ public class AccessGateService {
   }
 
   /**
-   * Checks whether the caller may read refinery order {@code orderId}, applying the owner escape
-   * (REQ-ORG-011), then the ownerless rule, then {@link #canSeeSquadron(UUID)}. Unknown ids return
-   * {@code false}.
-   *
-   * @param orderId refinery order to inspect; never {@code null}
-   * @return {@code true} iff the caller may read the order
-   */
-  public boolean canSeeRefineryOrder(@NotNull UUID orderId) {
-    return refineryOrderRepository.findById(orderId).map(this::canSeeRefineryOrder).orElse(false);
-  }
-
-  /**
-   * Entity overload of {@link #canSeeRefineryOrder(UUID)} for callers that already hold the {@link
-   * RefineryOrder}.
-   *
-   * @param order the refinery order to inspect; never {@code null}
-   * @return {@code true} iff the caller may read the order
-   */
-  public boolean canSeeRefineryOrder(@NotNull RefineryOrder order) {
-    return permitsRow(
-        Optional.of(order), RefineryOrder::getOwner, RefineryOrder::getOwningOrgUnit, false);
-  }
-
-  /**
-   * Checks whether the caller may edit refinery order {@code orderId}, applying the owner escape
-   * (REQ-ORG-011), then the ownerless rule, then {@link #canEditSquadron(UUID)}. Unknown ids return
-   * {@code false}.
-   *
-   * @param orderId refinery order to inspect; never {@code null}
-   * @return {@code true} iff the caller may edit the order
-   */
-  public boolean canEditRefineryOrder(@NotNull UUID orderId) {
-    return permitsRow(
-        refineryOrderRepository.findById(orderId),
-        RefineryOrder::getOwner,
-        RefineryOrder::getOwningOrgUnit,
-        true);
-  }
-
-  /**
-   * Coarse pre-check for reading a user's refinery orders: admin, the user themselves, or a caller
-   * whose {@link #canSeeSquadron(UUID)} covers any of the user's memberships. Per-row scoping is
-   * left to the scoped list query.
-   *
-   * @param targetUserId the user whose refinery orders the caller wants to read; never {@code null}
-   * @return {@code true} iff the caller may read the user's in-scope refinery orders
-   */
-  public boolean canViewUserRefineryOrders(@NotNull UUID targetUserId) {
-    return canActOnTargetUserScoped(targetUserId, this::canSeeSquadron);
-  }
-
-  /**
-   * Coarse pre-check for creating a refinery order on a user's behalf, like {@link
-   * #canViewUserRefineryOrders(UUID)} but with {@link #canEditSquadron(UUID)}. The per-row bound is
-   * {@link OrgUnitStampingService#resolveStampedOrgUnit(java.util.Set, UUID)}.
-   *
-   * @param targetUserId the user the caller wants to create a refinery order for; never {@code
-   *     null}
-   * @return {@code true} iff the caller may create a refinery order on that user's behalf
-   */
-  public boolean canManageUserRefineryOrders(@NotNull UUID targetUserId) {
-    return canActOnTargetUserScoped(targetUserId, this::canEditSquadron);
-  }
-
-  /**
    * Coarse pre-check for creating inventory in another member's name: admin, self, or a shared
-   * editable org unit, like {@link #canManageUserRefineryOrders(UUID)} (REQ-SEC-005). The per-row
-   * bound is the stamp validation.
+   * editable org unit, like the refinery's on-behalf pre-check (REQ-SEC-005). The per-row bound is
+   * the stamp validation.
    *
    * @param targetUserId the member whose inventory would receive the row; never {@code null}
    * @return {@code true} iff the caller may create inventory rows in that member's name

@@ -58,14 +58,17 @@ import org.springframework.mock.web.MockHttpServletRequest;
 /**
  * The differential verdict test of the refinery access policy (plan §5.4, ADR-0236): over one
  * fixture matrix of callers, orders and target members, {@link RefineryAccessPolicy} returns
- * exactly the verdict of the scope hub's {@link AccessGateService} for the read and edit gates of
- * an order and the two on-behalf pre-checks.
+ * exactly the verdict of the scope hub's former refinery gates for the read and edit gates of an
+ * order and the two on-behalf pre-checks.
+ *
+ * <p>{@link ScopeHubRefineryGates} restates those gates as {@link AccessGateService} decided them
+ * before they moved, on the scope kernel's primitives, so the comparison outlives their deletion.
  *
  * <p>The matrix covers an admin unpinned and pinned to either unit, a pinned and an unpinned
- * member, members of zero, one and two units, a Bereich lead reaching a child Staffel through the
- * cascade and a guest; orders of either unit, of the child unit, of a foreign unit owned by the
- * caller (the owner escape), ownerless orders of the caller and of another member, and an unknown
- * order; and target members of either unit, of the child unit, of none, and the caller.
+ * member, members of zero, one and two units and a Bereich lead reaching a child Staffel through
+ * the cascade; orders of either unit, of the child unit, of a foreign unit owned by the caller (the
+ * owner escape), ownerless orders of the caller and of another member, and an unknown order; and
+ * target members of either unit, of the child unit, of none, and the caller.
  */
 class RefineryAccessPolicyDifferentialTest {
 
@@ -160,25 +163,25 @@ class RefineryAccessPolicyDifferentialTest {
    */
   private record Gate(
       String name,
-      BiPredicate<AccessGateService, UUID> scopeHub,
+      BiPredicate<ScopeHubRefineryGates, UUID> scopeHub,
       BiPredicate<RefineryAccessPolicy, UUID> policy) {}
 
   private static List<Gate> userGates() {
     return List.of(
         new Gate(
             "canViewUserRefineryOrders",
-            AccessGateService::canViewUserRefineryOrders,
+            ScopeHubRefineryGates::canViewUserRefineryOrders,
             RefineryAccessPolicy::canViewUserRefineryOrders),
         new Gate(
             "canManageUserRefineryOrders",
-            AccessGateService::canManageUserRefineryOrders,
+            ScopeHubRefineryGates::canManageUserRefineryOrders,
             RefineryAccessPolicy::canManageUserRefineryOrders));
   }
 
   /** One caller's freshly wired scope hub and policy over the scenario mocks. */
   private static final class Fixture {
 
-    private final AccessGateService scopeHub;
+    private final ScopeHubRefineryGates scopeHub;
 
     private final RefineryAccessPolicy policy;
 
@@ -249,7 +252,7 @@ class RefineryAccessPolicyDifferentialTest {
               cascade,
               new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
               request);
-      scopeHub =
+      AccessGateService accessGateService =
           new AccessGateService(
               resolver,
               authHelper,
@@ -258,14 +261,17 @@ class RefineryAccessPolicyDifferentialTest {
               mock(JobOrderHandoverRepository.class),
               mock(JobOrderItemHandoverRepository.class),
               mock(InventoryItemRepository.class),
-              repository,
               mock(ShipRepository.class),
               memberships);
       OwnerScopeService ownerScopeService =
           new OwnerScopeService(
               resolver,
-              scopeHub,
-              new OrgUnitStampingService(resolver, scopeHub, authHelper, memberships, orgUnits));
+              accessGateService,
+              new OrgUnitStampingService(
+                  resolver, accessGateService, authHelper, memberships, orgUnits));
+      scopeHub =
+          new ScopeHubRefineryGates(
+              accessGateService, authHelper, resolver, repository, memberships);
       policy = new RefineryAccessPolicy(ownerScopeService, repository);
     }
 
@@ -294,6 +300,76 @@ class RefineryAccessPolicyDifferentialTest {
         rows.add(row);
       }
       return rows;
+    }
+  }
+
+  /**
+   * The refinery gates as the scope hub decided them, restated on the kernel's primitives.
+   *
+   * @param accessGateService the scope hub, for its org-unit gates
+   * @param authHelper the caller's identity and roles
+   * @param resolver the request scope, for the admin pin
+   * @param orders the refinery orders
+   * @param memberships the members' org-unit memberships
+   */
+  private record ScopeHubRefineryGates(
+      AccessGateService accessGateService,
+      AuthHelperService authHelper,
+      RequestScopeResolver resolver,
+      RefineryOrderRepository orders,
+      OrgUnitMembershipRepository memberships) {
+
+    boolean canSeeRefineryOrder(UUID orderId) {
+      return orders.findById(orderId).map(o -> permits(o, false)).orElse(false);
+    }
+
+    boolean canEditRefineryOrder(UUID orderId) {
+      return orders.findById(orderId).map(o -> permits(o, true)).orElse(false);
+    }
+
+    boolean canViewUserRefineryOrders(UUID targetUserId) {
+      return actsOn(targetUserId, false);
+    }
+
+    boolean canManageUserRefineryOrders(UUID targetUserId) {
+      return actsOn(targetUserId, true);
+    }
+
+    private boolean permits(RefineryOrder order, boolean edit) {
+      User owner = order.getOwner();
+      if (isOwner(owner)) {
+        return true;
+      }
+      if (order.getOwningOrgUnit() == null) {
+        return (authHelper.isAdmin() && resolver.readActiveSquadronFromHeader().isEmpty())
+            || isOwner(owner);
+      }
+      UUID unit = order.getOwningOrgUnit().getId();
+      return edit
+          ? accessGateService.canEditSquadron(unit)
+          : accessGateService.canSeeSquadron(unit);
+    }
+
+    private boolean isOwner(User owner) {
+      return owner != null
+          && owner.getId() != null
+          && authHelper.currentUserId().map(owner.getId()::equals).orElse(false);
+    }
+
+    private boolean actsOn(UUID targetUserId, boolean edit) {
+      if (authHelper.isAdmin()) {
+        return true;
+      }
+      if (authHelper.currentUserId().map(targetUserId::equals).orElse(false)) {
+        return true;
+      }
+      return memberships.findAllByIdUserId(targetUserId).stream()
+          .map(m -> m.getId().getOrgUnitId())
+          .anyMatch(
+              unit ->
+                  edit
+                      ? accessGateService.canEditSquadron(unit)
+                      : accessGateService.canSeeSquadron(unit));
     }
   }
 }
