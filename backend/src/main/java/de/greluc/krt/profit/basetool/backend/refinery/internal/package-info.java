@@ -17,24 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
-
 /**
- * Severity grading of an {@link ImportIssueDto}, driving its styling in the review UI.
- *
- * <p>Never blocks the response: even a {@link #BLOCKING} issue returns 200 with the draft.
+ * The refinery module's internals: the order and import services, the access policy, the live-sync
+ * authorizer, the import settings and the store requests (plan §5.2).
  */
-public enum ImportIssueSeverity {
-
-  /**
-   * A required pre-fill is impossible (e.g. every row un-quoted). The draft is returned but the
-   * user cannot meaningfully save without resolving the underlying capture problem.
-   */
-  BLOCKING,
-
-  /** Something needs user review before saving (unmatched name, checksum mismatch, skip). */
-  WARNING,
-
-  /** Heads-up with no required action (e.g. a missing admin-curated refined-material link). */
-  INFO
-}
+package de.greluc.krt.profit.basetool.backend.refinery.internal;
