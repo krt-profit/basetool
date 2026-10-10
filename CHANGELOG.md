@@ -4,6 +4,12 @@
 
 ### Added
 
+- **Keycloak-Härtung als Skript.** `scripts/harden-keycloak-realm.py` setzt die Runbook-Schritte 2 (Passwort
+  vergessen), 11 (OTP für Admins, auch über Discord) und 12 (Sitzungsfenster) trocken vorab prüfbar und mit
+  Rücknahme um; die Sitzungsfenster stehen jetzt in `scripts/keycloak/session-windows.json`, die der Provisioner
+  mitliest und neben `external-clients.json` auf den Host gehört. Alle offenen Schritte nur für den Betreiber:
+  `docs/OWNER_STEPS_2026-10.md` (REQ-SEC-082).
+
 - **Benachrichtigungen räumen auf und folgen Änderungen.** Entschiedene Registrierungen und
   abgeschlossene, abgelehnte oder gelöschte Aufträge verschwinden aus allen Posteingängen. Ein
   geänderter Buchungsantrag ersetzt die alte Nachricht durch eine mit dem neuen Betrag. Neue
