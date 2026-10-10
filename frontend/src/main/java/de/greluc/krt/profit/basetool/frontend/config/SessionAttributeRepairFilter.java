@@ -107,7 +107,7 @@ public class SessionAttributeRepairFilter extends OncePerRequestFilter implement
       try {
         session.removeAttribute(attribute);
         log.debug("Repaired an unreadable session value: attribute='{}'.", attribute);
-      } catch (IllegalStateException ex) {
+      } catch (IllegalStateException _) {
         log.debug(
             "Session invalidated before attribute '{}' could be repaired; nothing to do.",
             attribute);

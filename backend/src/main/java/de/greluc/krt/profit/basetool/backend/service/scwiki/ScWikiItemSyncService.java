@@ -150,7 +150,7 @@ public class ScWikiItemSyncService {
         } else {
           missing++;
         }
-      } catch (OptimisticLockingFailureException e) {
+      } catch (OptimisticLockingFailureException _) {
         deferred++;
         log.warn("Optimistic lock collision filling SC Wiki item {}; deferring to next run", uuid);
       } catch (Exception e) {
@@ -452,7 +452,7 @@ public class ScWikiItemSyncService {
         } else if (outcome == BackfillOutcome.SKIPPED) {
           ctx.skipped++;
         }
-      } catch (OptimisticLockingFailureException e) {
+      } catch (OptimisticLockingFailureException _) {
         ctx.deferred++;
         log.warn(
             "Optimistic lock collision upserting SC Wiki item {} ({}); deferring to next run",
@@ -679,7 +679,7 @@ public class ScWikiItemSyncService {
     }
     try {
       return Integer.valueOf(size.trim());
-    } catch (NumberFormatException e) {
+    } catch (NumberFormatException _) {
       log.debug("Non-numeric Wiki item size '{}' — leaving size_class null", size);
       return null;
     }

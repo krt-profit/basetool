@@ -102,7 +102,7 @@ public class PersonalBlueprintOverviewService {
       byKey
           .computeIfAbsent(
               familyKey,
-              key -> new ProductAggregate(familyResolver.displayBaseName(bp.productName())))
+              _ -> new ProductAggregate(familyResolver.displayBaseName(bp.productName())))
           .owners
           .add(bp.ownerUserId());
     }

@@ -182,7 +182,7 @@ public class AdminP4kImportController {
   private byte @NotNull [] readBytes(@NotNull MultipartFile file) {
     try {
       return file.getBytes();
-    } catch (IOException e) {
+    } catch (IOException _) {
       throw new BadRequestException("The uploaded file could not be read.");
     }
   }

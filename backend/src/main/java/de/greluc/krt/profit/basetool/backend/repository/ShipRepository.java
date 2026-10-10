@@ -187,8 +187,10 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * @return one row per ship type the owner holds, with its ship count
    */
   @Query(
-      "SELECT s.shipType.id AS shipTypeId, COUNT(s) AS shipCount FROM Ship s"
-          + " WHERE s.owner.id = :ownerId GROUP BY s.shipType.id")
+      """
+      SELECT s.shipType.id AS shipTypeId, COUNT(s) AS shipCount FROM Ship s
+      WHERE s.owner.id = :ownerId GROUP BY s.shipType.id
+      """)
   List<ShipTypeCount> countShipsPerTypeByOwnerId(@Param("ownerId") UUID ownerId);
 
   /**

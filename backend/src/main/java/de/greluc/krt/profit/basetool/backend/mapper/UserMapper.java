@@ -282,7 +282,7 @@ public abstract class UserMapper {
     if (cache == null) {
       return queryStaffelMemberships(user);
     }
-    return cache.computeIfAbsent(user.getId(), id -> queryStaffelMemberships(user));
+    return cache.computeIfAbsent(user.getId(), _ -> queryStaffelMemberships(user));
   }
 
   /**

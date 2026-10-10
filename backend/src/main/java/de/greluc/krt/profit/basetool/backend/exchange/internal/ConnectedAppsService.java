@@ -109,7 +109,7 @@ public class ConnectedAppsService {
         continue;
       }
       byClient
-          .computeIfAbsent(installation.getClient().getClientId(), k -> new ArrayList<>())
+          .computeIfAbsent(installation.getClient().getClientId(), _ -> new ArrayList<>())
           .add(installation);
     }
     Set<UUID> unseen =

@@ -63,7 +63,7 @@ public enum TrustedTypesMode {
     }
     try {
       return valueOf(raw.strip().toUpperCase(Locale.ROOT));
-    } catch (IllegalArgumentException ex) {
+    } catch (IllegalArgumentException _) {
       log.warn(
           "Unrecognised {} '{}'; falling back to REPORT. Valid values: REPORT, ENFORCE.",
           PROPERTY,

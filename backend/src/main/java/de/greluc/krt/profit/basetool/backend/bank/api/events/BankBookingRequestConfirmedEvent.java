@@ -69,6 +69,7 @@ public record BankBookingRequestConfirmedEvent(
     return Map.of();
   }
 
+  @Nullable
   @Override
   public UUID contextRecipientUserId() {
     return requesterSub;

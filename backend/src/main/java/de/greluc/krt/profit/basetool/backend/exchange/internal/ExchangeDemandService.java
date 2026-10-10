@@ -158,7 +158,7 @@ public class ExchangeDemandService {
         double[] totals =
             buckets.computeIfAbsent(
                 new UnitBucket(unit, new MaterialLine(material.id(), floor, source)),
-                key -> new double[2]);
+                _ -> new double[2]);
         totals[0] += requirement.requiredAmount();
         totals[1] += booked[i];
       }
@@ -216,7 +216,7 @@ public class ExchangeDemandService {
     rawMaterials.sort(Comparator.comparing(Material::getName, String.CASE_INSENSITIVE_ORDER));
     for (Material raw : rawMaterials) {
       List<ExchangeItemRefDto> list =
-          raws.computeIfAbsent(raw.getRefinedMaterial().getId(), id -> new ArrayList<>());
+          raws.computeIfAbsent(raw.getRefinedMaterial().getId(), _ -> new ArrayList<>());
       if (list.size() < MAX_RAW_REFS) {
         list.add(new ExchangeItemRefDto(raw.getId().toString(), cut(raw.getName())));
       }
@@ -244,7 +244,7 @@ public class ExchangeDemandService {
             itemOrders.stream().map(JobOrder::getId).toList())) {
       if (row.jobOrderId() != null && row.gameItemId() != null) {
         earmarked
-            .computeIfAbsent(row.jobOrderId(), id -> new HashMap<>())
+            .computeIfAbsent(row.jobOrderId(), _ -> new HashMap<>())
             .merge(row.gameItemId(), row.amount() == null ? 0.0 : row.amount(), Double::sum);
       }
     }
@@ -267,7 +267,7 @@ public class ExchangeDemandService {
         orderOpen.merge(line.getGameItem().getId(), ordered - delivered, Integer::sum);
         ItemLine item =
             lines.computeIfAbsent(
-                line.getGameItem().getId(), id -> new ItemLine(line.getGameItem().getName()));
+                line.getGameItem().getId(), _ -> new ItemLine(line.getGameItem().getName()));
         String output = line.getBlueprint() == null ? null : line.getBlueprint().getOutputName();
         boolean variants =
             order.isCountBlueprintsWithVariants() && !familyResolver.isMagazine(output);
