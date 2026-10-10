@@ -67,10 +67,10 @@ public class BlueprintBackendClient {
 
   /** Backend path of an admin import preview for a member. */
   private static final String ADMIN_PREVIEW_URI =
-      "/api/v1/admin/personal-blueprints/{userSub}/import/preview";
+      "/api/v1/personal-blueprints/admin/{userSub}/import/preview";
 
   /** Backend admin API of the default-blueprint set. */
-  private static final String DEFAULTS = "/api/v1/admin/default-blueprints";
+  private static final String DEFAULTS = "/api/v1/blueprints/admin/defaults";
 
   private static final ParameterizedTypeReference<List<BlueprintProductDto>> PRODUCT_LIST =
       new ParameterizedTypeReference<>() {};
@@ -356,14 +356,14 @@ public class BlueprintBackendClient {
       @NotNull UUID userSub, int size, @Nullable String q) {
     if (q != null && !q.isBlank()) {
       return backendApiClient.get(
-          "/api/v1/admin/personal-blueprints/{userSub}?size={size}&sort=productName,asc&q={q}",
+          "/api/v1/personal-blueprints/admin/{userSub}?size={size}&sort=productName,asc&q={q}",
           PERSONAL_BLUEPRINT_PAGE,
           userSub,
           size,
           q);
     }
     return backendApiClient.get(
-        "/api/v1/admin/personal-blueprints/{userSub}?size={size}&sort=productName,asc",
+        "/api/v1/personal-blueprints/admin/{userSub}?size={size}&sort=productName,asc",
         PERSONAL_BLUEPRINT_PAGE,
         userSub,
         size);
@@ -380,7 +380,7 @@ public class BlueprintBackendClient {
   public PersonalBlueprintBatchResultDto addMemberOwned(
       @NotNull UUID userSub, @NotNull PersonalBlueprintBatchCreateRequest request) {
     return backendApiClient.post(
-        "/api/v1/admin/personal-blueprints/{userSub}/batch",
+        "/api/v1/personal-blueprints/admin/{userSub}/batch",
         request,
         PersonalBlueprintBatchResultDto.class,
         userSub);
@@ -397,7 +397,7 @@ public class BlueprintBackendClient {
   public PersonalBlueprintDto updateMemberOwned(
       @NotNull UUID id, @NotNull PersonalBlueprintUpdateRequest request) {
     return backendApiClient.put(
-        "/api/v1/admin/personal-blueprints/items/{id}", request, PersonalBlueprintDto.class, id);
+        "/api/v1/personal-blueprints/admin/items/{id}", request, PersonalBlueprintDto.class, id);
   }
 
   /**
@@ -406,7 +406,7 @@ public class BlueprintBackendClient {
    * @param id the owned-blueprint entry
    */
   public void deleteMemberOwned(@NotNull UUID id) {
-    backendApiClient.delete("/api/v1/admin/personal-blueprints/items/{id}", Void.class, id);
+    backendApiClient.delete("/api/v1/personal-blueprints/admin/items/{id}", Void.class, id);
   }
 
   /**
@@ -444,7 +444,7 @@ public class BlueprintBackendClient {
   public BlueprintImportResultDto memberImportApply(
       @NotNull UUID userSub, @NotNull BlueprintImportApplyRequest request) {
     return backendApiClient.post(
-        "/api/v1/admin/personal-blueprints/{userSub}/import/apply",
+        "/api/v1/personal-blueprints/admin/{userSub}/import/apply",
         request,
         BlueprintImportResultDto.class,
         userSub);
@@ -458,7 +458,7 @@ public class BlueprintBackendClient {
   @Nullable
   public PersonalBlueprintBulkDeleteResultDto deleteAllMembersOwned() {
     return backendApiClient.delete(
-        "/api/v1/admin/personal-blueprints", PersonalBlueprintBulkDeleteResultDto.class);
+        "/api/v1/personal-blueprints/admin", PersonalBlueprintBulkDeleteResultDto.class);
   }
 
   /**

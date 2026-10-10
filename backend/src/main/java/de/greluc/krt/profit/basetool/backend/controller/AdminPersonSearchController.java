@@ -38,7 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
  * Art. 16 or Art. 17 request needs, and exactly why nobody else may run it.
  */
 @RestController
-@RequestMapping("/api/v1/admin/person-search")
+@RequestMapping("/api/v1/users/admin/person-search")
 @RequiredArgsConstructor
 public class AdminPersonSearchController {
 

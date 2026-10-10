@@ -243,7 +243,7 @@ saved from the editor — not even to disable it.)
 **Acceptance**
 
 - [x] `notification_rule` + `notification_rule_selector` exist (V156) with `ON DELETE CASCADE`.
-- [x] Admin CRUD at `/api/v1/notification-rules` is gated on `hasRole('ADMIN')`.
+- [x] Admin CRUD at `/api/v1/notifications/admin/rules` is gated on `hasRole('ADMIN')`.
 - [x] The engine unions a rule's selectors, applies `exclude_actor`, and de-duplicates
   recipients.
 - [x] Every selector kind is admin-manageable; a seeded rule round-trips through the editor

@@ -77,7 +77,7 @@ import reactor.netty.http.client.HttpClientRequest;
 public class IdentityBackendClient {
 
   /** The admin Discord registration queue. */
-  private static final String REGISTRATIONS = "/api/v1/admin/registrations";
+  private static final String REGISTRATIONS = "/api/v1/users/admin/registrations";
 
   private static final ParameterizedTypeReference<PageResponse<UserDto>> USER_PAGE =
       new ParameterizedTypeReference<>() {};
@@ -250,7 +250,7 @@ public class IdentityBackendClient {
   public byte @Nullable [] memberExportPdf(
       @NotNull UUID userId, @NotNull Duration responseTimeout) {
     return export(
-        "/api/v1/admin/users/{userId}/export/pdf", new Object[] {userId}, responseTimeout);
+        "/api/v1/users/admin/{userId}/export/pdf", new Object[] {userId}, responseTimeout);
   }
 
   /**
@@ -262,7 +262,7 @@ public class IdentityBackendClient {
    */
   public byte @Nullable [] memberExportJson(
       @NotNull UUID userId, @NotNull Duration responseTimeout) {
-    return export("/api/v1/admin/users/{userId}/export", new Object[] {userId}, responseTimeout);
+    return export("/api/v1/users/admin/{userId}/export", new Object[] {userId}, responseTimeout);
   }
 
   /**
@@ -548,7 +548,7 @@ public class IdentityBackendClient {
    */
   @Nullable
   public List<AdminDeletionRequestDto> deletionRequests() {
-    return backendApiClient.get("/api/v1/admin/deletion-requests", DELETION_REQUEST_LIST);
+    return backendApiClient.get("/api/v1/users/admin/deletion-requests", DELETION_REQUEST_LIST);
   }
 
   /**
@@ -562,7 +562,7 @@ public class IdentityBackendClient {
   public AdminDeletionRequestDto declineDeletionRequest(
       @NotNull UUID id, @NotNull DecideDeletionRequestRequest decision) {
     return backendApiClient.post(
-        "/api/v1/admin/deletion-requests/{id}/decline",
+        "/api/v1/users/admin/deletion-requests/{id}/decline",
         decision,
         AdminDeletionRequestDto.class,
         id);
@@ -576,7 +576,8 @@ public class IdentityBackendClient {
    */
   public void executeDeletionRequest(
       @NotNull UUID id, @NotNull DecideDeletionRequestRequest decision) {
-    backendApiClient.post("/api/v1/admin/deletion-requests/{id}/execute", decision, Void.class, id);
+    backendApiClient.post(
+        "/api/v1/users/admin/deletion-requests/{id}/execute", decision, Void.class, id);
   }
 
   /**
@@ -587,7 +588,8 @@ public class IdentityBackendClient {
    */
   @Nullable
   public PersonSearchResultDto personSearch(@NotNull String term) {
-    return backendApiClient.get("/api/v1/admin/person-search?q={q}", PERSON_SEARCH_RESULT, term);
+    return backendApiClient.get(
+        "/api/v1/users/admin/person-search?q={q}", PERSON_SEARCH_RESULT, term);
   }
 
   /**
@@ -649,7 +651,7 @@ public class IdentityBackendClient {
   public PageResponse<TermsAcceptanceStatusDto> termsAcceptances(
       @NotNull String filter, int page, int size) {
     return backendApiClient.get(
-        UriComponentsBuilder.fromPath("/api/v1/admin/terms")
+        UriComponentsBuilder.fromPath("/api/v1/terms/admin")
             .queryParam("filter", filter)
             .queryParam("page", page)
             .queryParam("size", size)
@@ -666,7 +668,7 @@ public class IdentityBackendClient {
    */
   @Nullable
   public PendingCountDto termsPendingCount() {
-    return backendApiClient.get("/api/v1/admin/terms/pending-count", PendingCountDto.class);
+    return backendApiClient.get("/api/v1/terms/admin/pending-count", PendingCountDto.class);
   }
 
   /**

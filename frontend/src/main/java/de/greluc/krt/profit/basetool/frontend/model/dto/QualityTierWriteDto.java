@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
- * Create or update payload of a quality tier, relayed to {@code /api/v1/admin/quality-tiers}
- * (REQ-ORDERS-036). The backend validates every component.
+ * Create or update payload of a quality tier, relayed to {@code
+ * /api/v1/catalog/admin/quality-tiers} (REQ-ORDERS-036). The backend validates every component.
  *
  * @param code the upper-case code: a letter, then letters, digits or underscores, at most 32
  * @param minQuality the floor, 0 to 1000, unique across the catalogue

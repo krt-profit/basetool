@@ -49,7 +49,7 @@ import org.springframework.web.bind.annotation.RestController;
  * decide who is notified for what, so editing them is an administrative capability.
  */
 @RestController
-@RequestMapping("/api/v1/notification-rules")
+@RequestMapping("/api/v1/notifications/admin/rules")
 @RequiredArgsConstructor
 @PreAuthorize(Roles.HAS_ROLE_ADMIN)
 @Tag(name = "Notification Rules", description = "Admin-managed notification recipient rules.")

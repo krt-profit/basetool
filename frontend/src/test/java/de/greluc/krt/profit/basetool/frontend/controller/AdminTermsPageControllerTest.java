@@ -173,7 +173,7 @@ class AdminTermsPageControllerTest {
     verify(backendApiClient, atLeastOnce())
         .get(captor.capture(), ArgumentMatchers.<ParameterizedTypeReference<Object>>any());
     return captor.getAllValues().stream()
-        .filter(uri -> uri.startsWith("/api/v1/admin/terms"))
+        .filter(uri -> uri.startsWith("/api/v1/terms/admin"))
         .findFirst()
         .orElseThrow(() -> new AssertionError("no overview request was made"));
   }

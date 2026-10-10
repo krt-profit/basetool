@@ -223,7 +223,9 @@ final class ExchangeE2eSupport {
         seeder.postBody(
             ADMIN,
             ADMIN_PASSWORD,
-            "/api/v1/admin/exchange-clients/" + existing.get("id").getAsString() + "/activate",
+            "/api/v1/connected-apps/admin/clients/"
+                + existing.get("id").getAsString()
+                + "/activate",
             "{\"version\":" + existing.get("version").getAsLong() + "}");
       }
       return;
@@ -234,7 +236,8 @@ final class ExchangeE2eSupport {
     JsonArray capabilities = new JsonArray();
     CAPABILITIES.forEach(capabilities::add);
     request.add("capabilities", capabilities);
-    seeder.postBody(ADMIN, ADMIN_PASSWORD, "/api/v1/admin/exchange-clients", request.toString());
+    seeder.postBody(
+        ADMIN, ADMIN_PASSWORD, "/api/v1/connected-apps/admin/clients", request.toString());
   }
 
   /**
@@ -247,7 +250,7 @@ final class ExchangeE2eSupport {
   static JsonObject registryEntry(BackendSeeder seeder) {
     JsonArray clients =
         JsonParser.parseString(
-                seeder.getBody(ADMIN, ADMIN_PASSWORD, "/api/v1/admin/exchange-clients"))
+                seeder.getBody(ADMIN, ADMIN_PASSWORD, "/api/v1/connected-apps/admin/clients"))
             .getAsJsonArray();
     for (JsonElement element : clients) {
       JsonObject entry = element.getAsJsonObject();
@@ -266,7 +269,7 @@ final class ExchangeE2eSupport {
   static void switchExchangeOn(BackendSeeder seeder) {
     JsonObject settings =
         JsonParser.parseString(
-                seeder.getBody(ADMIN, ADMIN_PASSWORD, "/api/v1/admin/exchange-settings"))
+                seeder.getBody(ADMIN, ADMIN_PASSWORD, "/api/v1/connected-apps/admin/settings"))
             .getAsJsonObject();
     if (settings.get("enabled").getAsBoolean()) {
       return;
@@ -275,7 +278,7 @@ final class ExchangeE2eSupport {
         seeder.putForStatus(
             ADMIN,
             ADMIN_PASSWORD,
-            "/api/v1/admin/exchange-settings",
+            "/api/v1/connected-apps/admin/settings",
             "{\"enabled\":true,\"version\":" + settings.get("version").getAsLong() + "}");
     assertEquals(200, status, "the exchange switch turns on");
   }

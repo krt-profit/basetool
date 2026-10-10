@@ -761,7 +761,7 @@ class ArchitectureTest {
   @Test
   void controllerMethodsShouldNotReturnJpaEntities() {
     DescribedPredicate<JavaMethod> selection = publicMethodsOf(CONTROLLER_CODE);
-    assertMethodFloor("controllerMethodsShouldNotReturnJpaEntities", selection, 721);
+    assertMethodFloor("controllerMethodsShouldNotReturnJpaEntities", selection, 712);
     controllerMethodsShouldNotReturnJpaEntitiesRule(selection).check(CLASSES);
   }
 
@@ -1273,7 +1273,7 @@ class ArchitectureTest {
   void controllerMethodsShouldNotExposeJpaEntitiesInGenericWrappers() {
     DescribedPredicate<JavaMethod> selection = publicMethodsOf(CONTROLLER_CODE);
     assertMethodFloor(
-        "controllerMethodsShouldNotExposeJpaEntitiesInGenericWrappers", selection, 721);
+        "controllerMethodsShouldNotExposeJpaEntitiesInGenericWrappers", selection, 712);
     controllerMethodsShouldNotExposeJpaEntitiesInGenericWrappersRule(selection).check(CLASSES);
   }
 

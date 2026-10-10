@@ -117,7 +117,7 @@ class UserPlainLookupIntegrationTest {
 
     mockMvc
         .perform(
-            post("/api/v1/hangar/users/" + userId + "/ships")
+            post("/api/v1/hangar/admin/users/" + userId + "/ships")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(userId.toString()))

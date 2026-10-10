@@ -883,7 +883,7 @@ the app's spec instead.
 writing one cannot save without it, and adding a field to a frozen set is the direction that is
 always safe.
 
-The Hangar's write path is `/hangar/ships`, **not** `/hangar/users/{id}/ships`. The second one names
+The Hangar's write path is `/hangar/ships`, **not** `/hangar/admin/users/{id}/ships`. The second one names
 a member and is the admin surface; this contract set has no reason to carry it, and the vhost never
 admits it.
 
@@ -1689,5 +1689,30 @@ this requirement's concern: REQ-SEC-077 refuses a body that carries a server-man
 
 **Enforced by:** `JacksonTolerantReadingTest` · **Code:** `JacksonConfig` · **Related:** REQ-API-009,
 REQ-API-011, REQ-SEC-077
+
+---
+
+### REQ-API-023 — A domain's administration sits under its own `/api/v1/<root>/admin/**`, behind one ADMIN rule
+
+The operations only an administrator may call live in a sub-tree of the resource root that owns the
+data (`/api/v1/users/admin/**`, `/api/v1/terms/admin/**`, `/api/v1/catalog/admin/**`,
+`/api/v1/blueprints/admin/**`, `/api/v1/personal-blueprints/admin/**`,
+`/api/v1/personal-inventory/admin/**`, `/api/v1/hangar/admin/**`, `/api/v1/notifications/admin/**`,
+`/api/v1/connected-apps/admin/**`, `/api/v1/bank/admin/**`), and a domain that is administration
+throughout is one root of its own (`/api/v1/roles/**`). No `/api/v1/admin/**` tree exists. One URL
+rule, `/api/v1/*/admin/**` and `/api/v1/roles/**`, requires `ADMIN` ahead of every domain rule, so a
+domain's own rule (for example the hangar's or the personal inventory's) can never decide an admin
+path; every handler keeps its own `hasRole('ADMIN')`. Every admin sub-tree is `no-store`
+(REQ-SEC-031) and is web-only (tier T2), so the API vhost never admits it (REQ-API-021).
+
+**Acceptance**
+
+- [x] The authorization matrix names `/api/v1/*/admin/**` or `/api/v1/roles/**` as the matching rule
+  of every operation under those paths and no other (`AuthorizationMatrixTest`).
+- [x] No operation is documented under `/api/v1/admin/` (`ApiCutMapTest`).
+- [x] Every admin sub-tree is classified `no-store` (`NoStoreApiScopesTest`).
+
+**Enforced by:** `AuthorizationMatrixTest`, `ApiCutMapTest`, `NoStoreApiScopesTest` · **Code:**
+`SecurityConfig`, `NoStoreApiScopes` · **Related:** REQ-API-009, REQ-API-021, REQ-SEC-031, ADR-0234
 
 ---

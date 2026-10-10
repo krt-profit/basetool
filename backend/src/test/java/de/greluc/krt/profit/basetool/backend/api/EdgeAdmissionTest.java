@@ -62,7 +62,7 @@ class EdgeAdmissionTest {
           "/api/v1/connected-apps/",
           "/api/v1/connected-apps/versekit/undo",
           "/api/v1/connected-apps/a-control-not-built-yet",
-          "/api/v1/admin/exchange-a-page-not-built-yet");
+          "/api/v1/connected-apps/admin/a-page-not-built-yet");
 
   /**
    * Verifies that the committed admission map is exactly what the generator renders.
@@ -409,15 +409,13 @@ class EdgeAdmissionTest {
    * admin registry of connected applications.
    *
    * @param path a documented path
-   * @return {@code true} for {@code /api/v1/exchange/**}, {@code /api/v1/connected-apps/**} and
-   *     {@code /api/v1/admin/exchange-*}
+   * @return {@code true} for {@code /api/v1/exchange/**} and {@code /api/v1/connected-apps/**}
    */
   private static boolean isExchangeOrConnectionPath(String path) {
     return path.equals("/api/v1/exchange")
         || path.startsWith("/api/v1/exchange/")
         || path.equals("/api/v1/connected-apps")
-        || path.startsWith("/api/v1/connected-apps/")
-        || path.startsWith("/api/v1/admin/exchange-");
+        || path.startsWith("/api/v1/connected-apps/");
   }
 
   /**

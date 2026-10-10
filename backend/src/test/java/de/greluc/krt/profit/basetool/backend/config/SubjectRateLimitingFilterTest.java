@@ -311,7 +311,7 @@ class SubjectRateLimitingFilterTest {
     config.put("subject.export.refill-period", "10m");
     String[] exports = {
       "/api/v1/users/me/export",
-      "/api/v1/admin/users/u/export/pdf",
+      "/api/v1/users/admin/u/export/pdf",
       "/api/v1/audit/BANK/export.json",
       "/api/v1/bank/admin/audit/export",
       "/api/v1/org-units/bank/accounts/a/statement",
@@ -357,7 +357,7 @@ class SubjectRateLimitingFilterTest {
 
     for (int i = 0; i < 5; i++) {
       assertEquals(200, send("GET", "/api/v1/bank/accounts").getStatus());
-      assertEquals(200, send("GET", "/api/v1/sync-reports").getStatus());
+      assertEquals(200, send("GET", "/api/v1/catalog/admin/sync-reports").getStatus());
     }
   }
 

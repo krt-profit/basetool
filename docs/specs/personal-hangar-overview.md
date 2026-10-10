@@ -132,7 +132,7 @@ names, never values. Deleting a ship first detaches it from mission units and re
 ## Out of scope
 
 - The **squadron** hangar overview (`/hangar/squadron`) — REQ-HANGAR-001 — and the **admin per-user**
-  hangar (`/api/v1/hangar/users/{userId}/ships`), which keeps its existing `{name, insurance, fitted,
+  hangar (`/api/v1/hangar/admin/users/{userId}/ships`), which keeps its existing `{name, insurance, fitted,
   id}` sort whitelist.
 - New user-facing sortable columns. The personal hangar keeps its fixed rich order; the `/my-ships`
   endpoint no longer accepts a `sort` parameter (the order is server-fixed).

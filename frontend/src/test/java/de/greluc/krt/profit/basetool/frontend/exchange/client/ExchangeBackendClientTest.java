@@ -68,10 +68,10 @@ class ExchangeBackendClientTest {
     assertThat(client.usage()).isEmpty();
     assertThat(client.settings()).isNotNull();
 
-    backend.expect("GET", "/api/v1/admin/exchange-clients");
-    backend.expect("GET", "/api/v1/admin/exchange-clients/" + ID);
-    backend.expect("GET", "/api/v1/admin/exchange-clients/usage");
-    backend.expect("GET", "/api/v1/admin/exchange-settings");
+    backend.expect("GET", "/api/v1/connected-apps/admin/clients");
+    backend.expect("GET", "/api/v1/connected-apps/admin/clients/" + ID);
+    backend.expect("GET", "/api/v1/connected-apps/admin/clients/usage");
+    backend.expect("GET", "/api/v1/connected-apps/admin/settings");
   }
 
   @Test
@@ -93,19 +93,22 @@ class ExchangeBackendClientTest {
 
     backend.expect(
         "POST",
-        "/api/v1/admin/exchange-clients",
+        "/api/v1/connected-apps/admin/clients",
         "{\"clientId\":\"fleet-tool\",\"displayName\":\"Fleet Tool\",\"capabilities\":"
             + "[\"exchange.connect\"],\"minClientVersion\":\"1.0\",\"contactUrl\":null,"
             + "\"requestsPerMinute\":60,\"writesPerDay\":100}");
     backend.expect(
         "PUT",
-        "/api/v1/admin/exchange-clients/" + ID,
+        "/api/v1/connected-apps/admin/clients/" + ID,
         "{\"displayName\":\"Fleet Tool\",\"capabilities\":[\"exchange.connect\"],"
             + "\"minClientVersion\":null,\"contactUrl\":null,\"requestsPerMinute\":null,"
             + "\"writesPerDay\":null,\"version\":3}");
-    backend.expect("POST", "/api/v1/admin/exchange-clients/" + ID + "/suspend", "{\"version\":4}");
-    backend.expect("POST", "/api/v1/admin/exchange-clients/" + ID + "/activate", "{\"version\":5}");
-    backend.expect("PUT", "/api/v1/admin/exchange-settings", "{\"enabled\":false,\"version\":6}");
+    backend.expect(
+        "POST", "/api/v1/connected-apps/admin/clients/" + ID + "/suspend", "{\"version\":4}");
+    backend.expect(
+        "POST", "/api/v1/connected-apps/admin/clients/" + ID + "/activate", "{\"version\":5}");
+    backend.expect(
+        "PUT", "/api/v1/connected-apps/admin/settings", "{\"enabled\":false,\"version\":6}");
   }
 
   @Test
@@ -123,15 +126,15 @@ class ExchangeBackendClientTest {
 
     String body =
         "{\"since\":\"2026-09-01T10:15:30Z\",\"installationId\":null,\"resource\":\"stock\"}";
-    backend.expect("POST", "/api/v1/admin/exchange-clients/" + ID + "/undo/preview", body);
-    backend.expect("POST", "/api/v1/admin/exchange-clients/" + ID + "/undo", body);
+    backend.expect("POST", "/api/v1/connected-apps/admin/clients/" + ID + "/undo/preview", body);
+    backend.expect("POST", "/api/v1/connected-apps/admin/clients/" + ID + "/undo", body);
     backend.expect(
         "GET",
-        "/api/v1/admin/exchange-clients/"
+        "/api/v1/connected-apps/admin/clients/"
             + ID
             + "/undo/installations?since=2026-09-01T10%3A15%3A30Z");
-    backend.expect("GET", "/api/v1/admin/exchange-undo-runs");
-    backend.expect("GET", "/api/v1/admin/exchange-undo-runs/" + ID);
+    backend.expect("GET", "/api/v1/connected-apps/admin/undo-runs");
+    backend.expect("GET", "/api/v1/connected-apps/admin/undo-runs/" + ID);
   }
 
   @Test

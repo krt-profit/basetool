@@ -42,7 +42,7 @@ class UriTagCapacityTest {
   private static final int HEADROOM = 50;
 
   /** Selection floor: the distinct route templates when the guard was introduced. */
-  private static final int MIN_ROUTE_TEMPLATES = 449;
+  private static final int MIN_ROUTE_TEMPLATES = 448;
 
   @Autowired private ApplicationContext applicationContext;
   @Autowired private MetricsProperties metricsProperties;

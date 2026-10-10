@@ -51,7 +51,7 @@ import org.springframework.web.server.ResponseStatusException;
  * from the Star Citizen game files as an asynchronous backend import job, polls its preview and
  * applies it.
  *
- * <p>Every action proxies to {@code /api/v1/admin/import/p4k/jobs} through {@link
+ * <p>Every action proxies to {@code /api/v1/catalog/admin/import/p4k/jobs} through {@link
  * CatalogueBackendClient}, so a backend refusal is mapped like any other backend call.
  */
 @Controller

@@ -232,6 +232,8 @@
 
 ### Changed
 
+- **REST-API, Welle 1 (nur Web, keine App-Änderung).** Die Administrations-Endpunkte liegen jetzt je Fachbereich unter `/api/v1/<bereich>/admin/**` (z. B. `/users/admin`, `/catalog/admin`, `/connected-apps/admin`), die Rollen unter `/api/v1/roles`, die Benachrichtigungsregeln unter `/api/v1/notifications/admin/rules`; ein einziges ADMIN-Gate steht vor allen Fachregeln. Das Duplikat `PUT /admin/users/{id}/attributes` und die beiden Ping-Endpunkte entfallen. Teil des gemeinsamen API-Schnitts (REQ-API-023).
+
 - **UEX und SC Wiki werden nur über externe Adressen angesprochen.** Der Abruf lehnt Namen ab, die auf
   interne, Loopback- oder Link-Local-Adressen auflösen, folgt keiner Weiterleitung und läuft höchstens
   vier (UEX) bzw. zwei (SC Wiki) Aufrufe gleichzeitig. Eine auf einen internen Host zeigende

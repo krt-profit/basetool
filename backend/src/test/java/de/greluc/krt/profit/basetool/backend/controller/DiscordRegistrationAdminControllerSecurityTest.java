@@ -53,7 +53,7 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 class DiscordRegistrationAdminControllerSecurityTest {
 
-  private static final String BASE = "/api/v1/admin/registrations";
+  private static final String BASE = "/api/v1/users/admin/registrations";
 
   @Autowired private WebApplicationContext context;
   private MockMvc mockMvc;
