@@ -116,7 +116,7 @@ class ListenerAndObserverRulesTest {
    */
   static final Map<String, String> AUDITING_LISTENERS =
       Map.of(
-          "de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeDepartureService"
+          "de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeDepartureService"
               + ".onDeparture",
           "Audits the departure work it performs itself (Keycloak consent and session removal,"
               + " revocations) in its own REQUIRES_NEW transaction after the roster sync"

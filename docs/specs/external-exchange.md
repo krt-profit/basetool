@@ -1,6 +1,6 @@
 > **Doc type:** Living spec — requirements accepted by the owner, built except where a status line
 > says otherwise (epic [#2078](https://github.com/krt-profit/basetool/issues/2078)). Last reviewed:
-> 2026-10-03.
+> 2026-10-10.
 > **Owner area:** XCH · **Related ADRs:** [ADR-0216](../adr/0216-the-exchange-api-is-a-separate-contract-on-the-ingest-gateway.md),
 > [ADR-0217](../adr/0217-third-party-clients-are-public-device-grant-clients-in-a-db-registry.md),
 > [ADR-0218](../adr/0218-exchange-sync-semantics.md),
@@ -2103,9 +2103,11 @@ contract allows.
   `ExchangeTokenGateFilter`, `ExchangeGateFilter`, `ExchangeLimitFilter` and
   `ExchangeIdempotencyFilter` after authentication — in the test profile and with the management
   port and the scrape credentials set.
-- **The `e2e` label.** A pull request that changes the exchange path — the backend's exchange
-  controllers, services and DTOs, `ActingMemberFilter`, `ActingMemberHeader`,
-  `ExchangeProblemException`, `ExchangeCapability`, the ingest's `src/main`, the published
+- **The `e2e` label.** A pull request that changes the exchange path — anything in the backend's
+  `exchange` module package (its controllers, services, DTOs, `ActingMemberFilter`,
+  `ExchangeProblemException`, `ExchangeCapability`), the relay header vocabulary
+  `platform.api.ActingMemberHeader` and `platform.api.ActingMemberFilterProvider`, the ingest's
+  `src/main`, the published
   fixtures or the shared seam definition — fails the `Exchange changes carry the e2e label` job of
   `e2e.yml` until it carries the `e2e` label, so the full E2E suite runs on it
   (`.github/scripts/check_exchange_e2e_label.py`, self-tested in `repo-lint.yml`).

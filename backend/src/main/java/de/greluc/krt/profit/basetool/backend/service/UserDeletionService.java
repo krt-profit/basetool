@@ -23,11 +23,11 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ResponsibleHolderTracker;
 import de.greluc.krt.profit.basetool.backend.personalinventory.api.PersonalInventoryErasure;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
@@ -69,13 +69,6 @@ import org.springframework.web.client.RestClientException;
 public class UserDeletionService {
 
   /**
-   * Keycloak's generated username for a client's service account: {@code service-account-<id>}.
-   * Shared with the gauge that has to exclude such a row, so the two cannot spell it differently.
-   */
-  private static final String SERVICE_ACCOUNT_PREFIX =
-      IngestGatewayProperties.SERVICE_ACCOUNT_PREFIX;
-
-  /**
    * I18n key of the 400 detail for deleting an account that still exists in Keycloak — by the
    * stored flag or by the live probe; the caller is told the same either way.
    */
@@ -103,7 +96,7 @@ public class UserDeletionService {
     WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER
   }
 
-  private final IngestGatewayProperties ingestGatewayProperties;
+  private final ClientDirectory clientDirectory;
   private final UserRepository userRepository;
   private final InventoryItemRepository inventoryItemRepository;
   private final MaterialExchangeOfferRatchet offerRatchet;
@@ -347,13 +340,7 @@ public class UserDeletionService {
       log.warn("Could not determine whether the row is a gateway service account; refusing");
       return false;
     }
-    boolean isMachine =
-        username
-            .filter(
-                name ->
-                    ingestGatewayProperties.clientIds().stream()
-                        .anyMatch(clientId -> name.equals(SERVICE_ACCOUNT_PREFIX + clientId)))
-            .isPresent();
+    boolean isMachine = username.filter(clientDirectory::isGatewayServiceAccount).isPresent();
     if (isMachine) {
       log.warn(
           "Deleting the stray app_user row of a configured ingest gateway's service account; "

@@ -1,7 +1,3 @@
-blueprint -> exchange: BlueprintUploadPreviewService -> ExchangeBlueprintDraftDto
-blueprint -> exchange: BlueprintUploadPreviewService -> ExchangeDraftService
-blueprint -> exchange: PersonalBlueprintService -> ExchangeClientDisplayName
-blueprint -> exchange: PersonalBlueprintService -> ExchangeClientRepository
 blueprint -> inventory: BlueprintCraftabilityService -> InventoryItemService
 blueprint -> inventory: BlueprintCraftabilityService -> OwnedStockSlice
 blueprint -> refinery: BlueprintCraftabilityService -> RefineryOrderService
@@ -89,7 +85,6 @@ mission -> refinery: MissionFinanceSummaryDto -> RefineryOrderDto
 mission -> refinery: MissionService -> RefineryOrder
 notification -> orgunit: OrgUnitRef -> OrgUnitKind
 orgunit -> inventory: OrgUnitMembershipService -> InventoryOrgUnitReconciler
-scope -> exchange: CustomJwtGrantedAuthoritiesConverter -> IngestGatewayProperties
 scope -> hangar: AccessGateService -> Ship
 scope -> hangar: AccessGateService -> ShipRepository
 scope -> inventory: AccessGateService -> InventoryItem

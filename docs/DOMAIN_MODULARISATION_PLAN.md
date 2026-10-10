@@ -916,6 +916,40 @@ their "must stay green" period here (D-01).
   nothing in `service`, so no package cycle forces the type out of its module. It is carried into
   Phase 4 like `MemberEvaluationErasure` (§7.6). Every declared module of a higher rank allows
   `personalinventory::api`. The move removes no baseline edge (108).
+- `exchange` (as a package) — **done 2026-10-10.** Its "must stay green" period starts here
+  (D-01); Phase 5 extracts it next (D-23).
+  1. *Characterise*: the relay contract was already pinned (G-18 wire contract and golden answers,
+     `ExchangeRelaySeamParityTest`, the relay OpenAPI document, the authorization matrix);
+     `BlueprintUploadPreviewServiceTest` was added for the one exchange path a lower module used.
+  2. *Inversions* (5 baseline edges, **108 → 103**; the `blueprint -> exchange` and
+     `scope -> exchange` pairs are gone): the blueprint upload preview hands the envelope to the
+     blueprint-owned SPI `service.BlueprintEnvelopeReader` (implemented by
+     `ExchangeBlueprintEnvelopeReader`, same binding, validation and draft resolution in the
+     caller's transaction); `PersonalBlueprintService`, `CustomJwtGrantedAuthoritiesConverter` and
+     `UserDeletionService` ask `platform.api.ClientDirectory` (`displayNames`, `isGatewayClient`,
+     `isGatewayServiceAccount`); the display-name projection is nested in
+     `ExchangeClientRepository` (the P1-4 pattern).
+  3. *Move*: 152 classes. `exchange.web` holds the eleven controllers, `exchange.internal.dto` the
+     34 relay wire records, `exchange.internal` everything else — including `ActingMemberFilter`,
+     `SandboxProfileGuard` (its `spring.factories` entry follows), the change-source transaction
+     manager and its configuration from `config`, and `DatabaseActingMemberAuthorities`.
+  No access policy left the scope hub: the exchange has none there. Its gates are its own
+  (`exchangeGate`, `connectedAppsGate`); the one scope-hub call, `canViewJobOrders` in
+  `ExchangeDemandService`, is the job-order gate the exchange asks as a caller.
+  **Corrections:** (1) the move needed two more inversions than the eleven inbound edges show,
+  because once the exchange depends on the service layer any `config -> exchange` edge closes a
+  `config -> exchange -> service -> config` package cycle: `SecurityConfig` takes the filter from
+  the new SPI `platform.api.ActingMemberFilterProvider` (same constructor arguments, same place
+  in the chain, the approval filter anchored on the filter's runtime class), `ActingMemberHeader`
+  moved to `platform.api` (the metrics filter reads the client header) and `KeycloakSyncProperties`
+  to `identity.api` (`FirstPartyClientIds` reads it). (2) The exchange's ArchUnit rules were keyed
+  on the package segment `exchange` and on the service package tree; both would have changed
+  meaning. The relay-controller rules now select controllers mapped under `/api/v1/exchange/`
+  (still 8 classes, 14 methods), the reduced-authority rule every non-web exchange class
+  (52 → 160), and the service-layer `SecurityContextHolder` and read-only-transaction rules also
+  select the exchange's non-web classes, so the 28 helpers that left the service package tree stay
+  checked. (3) §5.2's `web` cannot hold the relay DTOs, as with the org chart; they sit in
+  `internal.dto`, which keeps the `exchangeDtosStayInTheExchangeLayer` selection (34) unchanged.
 - `bank` as a package — **done 2026-10-10** (P2-5). All 126 bank classes of the layer packages moved:
   the nine controllers (eight Kartellbank, `OrgUnitBankController`) into `bank.web`, everything else
   — entities, repositories, services, mappers, records, the PDF formats, the ledger-integrity task
@@ -936,12 +970,14 @@ their "must stay green" period here (D-01).
      the responsible holders through `orgunit.api.ResponsibleHolderTracker`; `UserSyncService` runs
      the holder reconciliation through `identity.api.UserSyncFollowUp`; the GDPR handle anonymisation
      reaches the bank tables and the bank audit marker through `BankHandleSnapshots` (`MANDATORY`).
-     The module baseline shrank by `identity -> bank` and `orgunit -> bank`, **108 → 106**.
+     The module baseline shrank by `identity -> bank` and `orgunit -> bank`, **103 → 101** (re-derived after the exchange move).
   3. *Move*, with the seam rules re-keyed to the module (§5.4): `BANK_DOMAIN` is the `bank`
      package tree minus `ORG_UNIT_BANK_SIDE` (class literals), plus `BANK_CLASSES`, which now names
      only the bank types outside the package; the bridge set is still exactly
-     `OrgUnitBankAccessService`. `BankAuditService`, `bank_audit_event`, the lock order and the
-     money arithmetic are untouched.
+     `OrgUnitBankAccessService`. Like `EXCHANGE_NON_WEB`, `BANK_NON_WEB` keeps the bank's
+     non-controller classes in the security-context and read-only-transaction rules after they left
+     the `service` tree (floors 495 and 498). `BankAuditService`, `bank_audit_event`, the lock order
+     and the money arithmetic are untouched.
   **Corrections:** (1) §5.4 expected bank gates in `OwnerScopeService`/`AccessGateService`; there was
   one membership query and two dead methods. (2) Like `MemberEvaluationErasure`,
   `BankHandleSnapshots` cannot sit in `bank.api` while its caller lives in the `service` package the

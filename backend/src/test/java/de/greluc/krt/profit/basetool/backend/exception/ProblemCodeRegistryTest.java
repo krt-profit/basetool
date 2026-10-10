@@ -188,7 +188,7 @@ class ProblemCodeRegistryTest {
             "de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException",
             "de.greluc.krt.profit.basetool.backend.config.TermsAcceptanceAccessFilter",
             "de.greluc.krt.profit.basetool.backend.config.PendingApprovalAccessFilter",
-            "de.greluc.krt.profit.basetool.backend.config.ActingMemberFilter",
+            "de.greluc.krt.profit.basetool.backend.exchange.internal.ActingMemberFilter",
             "de.greluc.krt.profit.basetool.backend.config.IdentityProviderUnavailableFilter",
             "de.greluc.krt.profit.basetool.backend.config.SubjectRateLimitingFilter",
             "de.greluc.krt.profit.basetool.backend.filter.RateLimitingFilter")) {

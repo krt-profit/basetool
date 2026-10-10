@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.audit.internal.AuditRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeConnectionRetentionProperties;
+import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakSyncProperties;
 import de.greluc.krt.profit.basetool.backend.identity.internal.RejectedRegistrationRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthoritiesCacheProperties;

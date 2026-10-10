@@ -368,6 +368,7 @@ Phase 1 has begun: `audit.api`, `kernel`, `orgunit.api`/`orgunit.web` and the pu
 `platform` module and the modules' `api`/`internal` packages, and the frozen module baseline has
 shrunk from 138 to 110 class edges. Phase 2 has begun (2026-10-05): `dashboard`, `orgchart`
 and `admin` are the first domains moved whole into their module packages. `operation` followed
-with the first access policy out of the scope hub and the first mission command; the baseline is
-at 108 class edges. `promotion` moved with its own access policy (`promotionAccessPolicy`). `personalinventory` moved without one; it had no scope gate. The bank followed as a package
-(2026-10-10), the baseline is at 106 class edges.
+with the first access policy out of the scope hub and the first mission command. `promotion` moved
+with its own access policy (`promotionAccessPolicy`), `personalinventory` without one (it had no
+scope gate), then `exchange` and the bank as packages (2026-10-10), which enter their "must stay green"
+boundary before their Gradle extraction; the baseline is at 101 class edges.
