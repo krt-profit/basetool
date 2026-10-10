@@ -51,7 +51,7 @@ import org.springframework.stereotype.Service;
 public class LeadershipBackendClient {
 
   /** The backend's Organisationsleitung resource. */
-  private static final String OL = "/api/v1/org-hierarchy/organisationsleitung/{olId}";
+  private static final String OL = "/api/v1/org-units/organisationsleitung/{olId}";
 
   private static final ParameterizedTypeReference<List<OrgUnitMembershipDto>> MEMBER_LIST =
       new ParameterizedTypeReference<>() {};
@@ -66,7 +66,7 @@ public class LeadershipBackendClient {
    */
   @Nullable
   public LeitungViewDto leitungView() {
-    return backendApiClient.get("/api/v1/leitung/view", LeitungViewDto.class);
+    return backendApiClient.get("/api/v1/org-chart/leadership", LeitungViewDto.class);
   }
 
   /**
@@ -148,24 +148,36 @@ public class LeadershipBackendClient {
   /**
    * Renames or reorders a Kommandogruppe.
    *
+   * @param squadronId the Staffel the group belongs to
    * @param groupId the group
    * @param request the name, position and version
    * @return the updated group, or {@code null} when the backend sent no body
    */
   @Nullable
   public KommandoGroupDto updateKommandoGroup(
-      @NotNull UUID groupId, @Nullable UpdateKommandoGroupRequest request) {
+      @NotNull UUID squadronId,
+      @NotNull UUID groupId,
+      @Nullable UpdateKommandoGroupRequest request) {
     return backendApiClient.put(
-        "/api/v1/kommando-groups/{groupId}", request, KommandoGroupDto.class, groupId);
+        "/api/v1/squadrons/{squadronId}/kommando-groups/{groupId}",
+        request,
+        KommandoGroupDto.class,
+        squadronId,
+        groupId);
   }
 
   /**
    * Deletes a Kommandogruppe.
    *
+   * @param squadronId the Staffel the group belongs to
    * @param groupId the group
    */
-  public void deleteKommandoGroup(@NotNull UUID groupId) {
-    backendApiClient.delete("/api/v1/kommando-groups/{groupId}", Void.class, groupId);
+  public void deleteKommandoGroup(@NotNull UUID squadronId, @NotNull UUID groupId) {
+    backendApiClient.delete(
+        "/api/v1/squadrons/{squadronId}/kommando-groups/{groupId}",
+        Void.class,
+        squadronId,
+        groupId);
   }
 
   /**
@@ -179,7 +191,7 @@ public class LeadershipBackendClient {
   public BereichMemberResponse addBereichLeader(
       @NotNull UUID bereichId, @Nullable AddBereichLeaderRequest request) {
     return backendApiClient.post(
-        "/api/v1/org-hierarchy/bereiche/{bereichId}/members",
+        "/api/v1/org-units/bereiche/{bereichId}/members",
         request,
         BereichMemberResponse.class,
         bereichId);
@@ -193,10 +205,7 @@ public class LeadershipBackendClient {
    */
   public void removeBereichLeader(@NotNull UUID bereichId, @NotNull UUID userId) {
     backendApiClient.delete(
-        "/api/v1/org-hierarchy/bereiche/{bereichId}/members/{userId}",
-        Void.class,
-        bereichId,
-        userId);
+        "/api/v1/org-units/bereiche/{bereichId}/members/{userId}", Void.class, bereichId, userId);
   }
 
   /**

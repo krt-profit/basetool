@@ -22,9 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.UUID;
 
 /**
- * Set-parent payload relayed to the backend {@code PATCH
- * /api/v1/org-hierarchy/org-units/{id}/parent} (REQ-ORG-014); the backend validates the kind
- * pairing and the version.
+ * Set-parent payload relayed to the backend {@code PATCH /api/v1/org-units/{id}/parent}
+ * (REQ-ORG-014); the backend validates the kind pairing and the version.
  *
  * @param parentOrgUnitId the new parent's id, or {@code null} to detach the unit.
  * @param version the child unit's current optimistic-lock version.

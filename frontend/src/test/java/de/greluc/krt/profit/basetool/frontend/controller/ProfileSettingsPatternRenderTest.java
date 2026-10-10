@@ -93,10 +93,9 @@ class ProfileSettingsPatternRenderTest {
                 null,
                 null));
     when(backendApiClient.get(
-            "/api/v1/users/me/payout-preference", MyPayoutPreferenceResponse.class))
+            "/api/v1/missions/me/payout-preference", MyPayoutPreferenceResponse.class))
         .thenReturn(new MyPayoutPreferenceResponse("DONATE", 7L));
-    when(backendApiClient.get(
-            "/api/v1/users/me/blueprint-sharing", MyBlueprintSharingResponse.class))
+    when(backendApiClient.get("/api/v1/blueprints/me/sharing", MyBlueprintSharingResponse.class))
         .thenReturn(new MyBlueprintSharingResponse(true, 7L));
     when(backendApiClient.get("/api/v1/users/me/rsi-handle", MyRsiHandleResponse.class))
         .thenReturn(new MyRsiHandleResponse("Valk_RSI", 7L));

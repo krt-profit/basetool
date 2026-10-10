@@ -121,7 +121,7 @@ public class IdentityBackendClient {
   @Nullable
   public MyPayoutPreferenceResponse myPayoutPreference() {
     return backendApiClient.get(
-        "/api/v1/users/me/payout-preference", MyPayoutPreferenceResponse.class);
+        "/api/v1/missions/me/payout-preference", MyPayoutPreferenceResponse.class);
   }
 
   /**
@@ -131,8 +131,7 @@ public class IdentityBackendClient {
    */
   @Nullable
   public MyBlueprintSharingResponse myBlueprintSharing() {
-    return backendApiClient.get(
-        "/api/v1/users/me/blueprint-sharing", MyBlueprintSharingResponse.class);
+    return backendApiClient.get("/api/v1/blueprints/me/sharing", MyBlueprintSharingResponse.class);
   }
 
   /**
@@ -170,7 +169,7 @@ public class IdentityBackendClient {
    * @param update the preference and the user-row version
    */
   public void updateMyPayoutPreference(@NotNull MyPayoutPreferenceRequest update) {
-    backendApiClient.put("/api/v1/users/me/payout-preference", update, Void.class);
+    backendApiClient.put("/api/v1/missions/me/payout-preference", update, Void.class);
   }
 
   /**
@@ -179,7 +178,7 @@ public class IdentityBackendClient {
    * @param update the flag and the user-row version
    */
   public void updateMyBlueprintSharing(@NotNull MyBlueprintSharingRequest update) {
-    backendApiClient.put("/api/v1/users/me/blueprint-sharing", update, Void.class);
+    backendApiClient.put("/api/v1/blueprints/me/sharing", update, Void.class);
   }
 
   /**
@@ -338,7 +337,8 @@ public class IdentityBackendClient {
    */
   @Nullable
   public List<OrgUnitMembershipOptionDto> memberships(@NotNull UUID id) {
-    return backendApiClient.get("/api/v1/users/{id}/memberships", MEMBERSHIP_OPTION_LIST, id);
+    return backendApiClient.get(
+        "/api/v1/org-units/members/{id}/memberships", MEMBERSHIP_OPTION_LIST, id);
   }
 
   /**
@@ -352,7 +352,7 @@ public class IdentityBackendClient {
   public List<OrgUnitMembershipOptionDto> membershipOptions(
       @NotNull UUID userId, boolean allKinds) {
     return backendApiClient.get(
-        "/api/v1/users/{userId}/memberships?allKinds={allKinds}",
+        "/api/v1/org-units/members/{userId}/memberships?allKinds={allKinds}",
         MEMBERSHIP_OPTION_LIST,
         userId,
         allKinds);
@@ -367,7 +367,7 @@ public class IdentityBackendClient {
   @Nullable
   public MembershipDeltaResponse membershipDetail(@NotNull UUID id) {
     return backendApiClient.get(
-        "/api/v1/users/{id}/memberships/detail", MembershipDeltaResponse.class, id);
+        "/api/v1/org-units/members/{id}/memberships/detail", MembershipDeltaResponse.class, id);
   }
 
   /**
@@ -391,7 +391,7 @@ public class IdentityBackendClient {
   public MembershipDeltaResponse updateMemberships(
       @NotNull UUID id, @NotNull MembershipDeltaRequest delta) {
     return backendApiClient.patch(
-        "/api/v1/users/{id}/memberships", delta, MembershipDeltaResponse.class, id);
+        "/api/v1/org-units/members/{id}/memberships", delta, MembershipDeltaResponse.class, id);
   }
 
   /**
@@ -445,7 +445,7 @@ public class IdentityBackendClient {
    */
   @Nullable
   public PageResponse<UserReferenceDto> bankUserReferences(@NotNull String query) {
-    return references("/api/v1/users/search-bank/references", query);
+    return references("/api/v1/bank/members/search/references", query);
   }
 
   /**

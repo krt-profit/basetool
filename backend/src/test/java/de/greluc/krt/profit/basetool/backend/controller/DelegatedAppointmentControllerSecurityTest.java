@@ -155,7 +155,7 @@ class DelegatedAppointmentControllerSecurityTest {
   void addBereichRole_nonLeader_isForbidden() throws Exception {
     mockMvc
         .perform(
-            post("/api/v1/org-hierarchy/bereiche/{id}/members", bereichId)
+            post("/api/v1/org-units/bereiche/{id}/members", bereichId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"userId\":\"" + targetUser + "\",\"role\":\"KOORDINATOR\"}")
                 .with(member("ROLE_OFFICER")))
@@ -174,7 +174,7 @@ class DelegatedAppointmentControllerSecurityTest {
     when(orgUnitMembershipService.addBereichLeader(any(), any(), any())).thenReturn(m);
     mockMvc
         .perform(
-            post("/api/v1/org-hierarchy/bereiche/{id}/members", bereichId)
+            post("/api/v1/org-units/bereiche/{id}/members", bereichId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"userId\":\"" + targetUser + "\",\"role\":\"LEITER\"}")
                 .with(member("ROLE_OFFICER")))
@@ -214,7 +214,7 @@ class DelegatedAppointmentControllerSecurityTest {
     when(orgRoleManagementSecurityService.targetsAnotherUser(any(), any())).thenReturn(false);
     mockMvc
         .perform(
-            post("/api/v1/org-hierarchy/bereiche/{id}/members", bereichId)
+            post("/api/v1/org-units/bereiche/{id}/members", bereichId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"userId\":\"" + targetUser + "\",\"role\":\"LEITER\"}")
                 .with(member("ROLE_OFFICER")))

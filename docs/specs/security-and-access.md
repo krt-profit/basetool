@@ -3385,7 +3385,7 @@ layer directly.
 
 ### REQ-SEC-048 — One endpoint answers which org units a caller may pin
 
-`GET /api/v1/me/org-units` returns every active org unit an **admin** may pin, and for **everyone
+`GET /api/v1/org-units/me/switchable` returns every active org unit an **admin** may pin, and for **everyone
 else** the units they belong to plus the ones a Bereich or OL seat reaches (`OrgUnitCascadeService`,
 REQ-ORG-015 — a materialised id set, never an admin-all marker). All four kinds in both branches,
 ordered top-down: OL → Bereich → Staffel → SK, then by name.

@@ -155,7 +155,7 @@ class OrgHierarchyVisibilityMatrixE2eTest {
   void bereichsleiterIsDeniedAdminEndpoints() {
     assertEquals(
         403,
-        seeder.attemptGetStatus(BEREICH_USER, BEREICH_PASSWORD, "/api/v1/org-hierarchy/bereiche"),
+        seeder.attemptGetStatus(BEREICH_USER, BEREICH_PASSWORD, "/api/v1/org-units/bereiche"),
         "a Bereichsleiter must not reach the ADMIN-gated org-hierarchy admin list");
   }
 

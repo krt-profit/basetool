@@ -173,8 +173,8 @@ class RoleAppointmentMatrixE2eTest {
   }
 
   /**
-   * Issues {@code POST /api/v1/org-hierarchy/bereiche/{id}/members} as the given principal and
-   * returns the HTTP status, so a test can assert the delegated-appointment verdict.
+   * Issues {@code POST /api/v1/org-units/bereiche/{id}/members} as the given principal and returns
+   * the HTTP status, so a test can assert the delegated-appointment verdict.
    *
    * @param username the appointing principal's Keycloak username
    * @param password the appointing principal's Keycloak password
@@ -189,7 +189,7 @@ class RoleAppointmentMatrixE2eTest {
     return seeder.postForStatus(
         username,
         password,
-        "/api/v1/org-hierarchy/bereiche/" + bereichId + "/members",
+        "/api/v1/org-units/bereiche/" + bereichId + "/members",
         "{\"userId\":\"" + userId + "\",\"role\":\"" + role + "\"}");
   }
 }

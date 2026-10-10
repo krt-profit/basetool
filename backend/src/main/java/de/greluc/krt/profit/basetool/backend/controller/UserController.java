@@ -77,7 +77,7 @@ import org.springframework.web.bind.annotation.RestController;
  * class-level {@link Transactional} keeps the session open for the {@link UserMapper} projection.
  */
 @RestController
-@RequestMapping("/api/v1/users")
+@RequestMapping("/api/v1")
 @RequiredArgsConstructor
 @Transactional
 public class UserController {
@@ -113,7 +113,7 @@ public class UserController {
    * @return the number of users reconciled this run
    */
   @NotNull
-  @PostMapping("/sync")
+  @PostMapping("/users/sync")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public UserSyncResultDto syncUsersNow() {
@@ -129,7 +129,7 @@ public class UserController {
    *
    * @return paged user DTOs
    */
-  @GetMapping
+  @GetMapping("/users")
   @PreAuthorize(
       "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.OFFICER + "', '" + Roles.KRT_MEMBER + "')")
   @Transactional(readOnly = true)
@@ -151,7 +151,7 @@ public class UserController {
    *
    * @return all users as reference DTOs
    */
-  @GetMapping("/lookup")
+  @GetMapping("/users/lookup")
   @PreAuthorize(
       "hasAnyRole('"
           + Roles.ADMIN
@@ -172,7 +172,7 @@ public class UserController {
    *
    * @return paged user DTOs
    */
-  @GetMapping("/search")
+  @GetMapping("/users/search")
   @PreAuthorize(
       "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.OFFICER + "', '" + Roles.KRT_MEMBER + "')")
   @Transactional(readOnly = true)
@@ -191,7 +191,7 @@ public class UserController {
    *
    * @return paged user DTOs, peer-redacted for non-elevated callers
    */
-  @GetMapping("/search-bank")
+  @GetMapping("/bank/members/search")
   @PreAuthorize(
       "hasAnyRole('"
           + Roles.ADMIN
@@ -226,7 +226,7 @@ public class UserController {
    *     null} for the username default
    * @return one page of matching user references
    */
-  @GetMapping("/search/references")
+  @GetMapping("/users/search/references")
   @PreAuthorize(
       "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.OFFICER + "', '" + Roles.KRT_MEMBER + "')")
   @Transactional(readOnly = true)
@@ -249,7 +249,7 @@ public class UserController {
    *     null} for the username default
    * @return one page of matching user references
    */
-  @GetMapping("/search-bank/references")
+  @GetMapping("/bank/members/search/references")
   @PreAuthorize(
       "hasAnyRole('"
           + Roles.ADMIN
@@ -315,7 +315,7 @@ public class UserController {
    * @param id user id
    * @return the user DTO, peer-redacted for cross-squadron non-admin callers
    */
-  @GetMapping("/{id}")
+  @GetMapping("/users/{id}")
   @PreAuthorize(
       "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.OFFICER + "', '" + Roles.KRT_MEMBER + "')")
   @Transactional(readOnly = true)
@@ -341,7 +341,7 @@ public class UserController {
    * @return option DTOs sorted Staffel-first then SK alphabetical, or top-down by kind when {@code
    *     allKinds=true}; never {@code null}, possibly empty.
    */
-  @GetMapping("/{id}/memberships")
+  @GetMapping("/org-units/members/{id}/memberships")
   @PreAuthorize(
       "hasAnyRole('"
           + Roles.ADMIN
@@ -368,7 +368,7 @@ public class UserController {
    * @return the user DTO
    */
   @NotNull
-  @GetMapping("/me")
+  @GetMapping("/users/me")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public UserDto getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
@@ -385,7 +385,7 @@ public class UserController {
    * @param jwt caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
    * @return the caller's pickable org-unit options across all reachable kinds; never {@code null}.
    */
-  @GetMapping("/me/pickable-org-units")
+  @GetMapping("/org-units/me/pickable")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public List<OrgUnitMembershipOptionDto> getMyPickableOrgUnits(@AuthenticationPrincipal Jwt jwt) {
@@ -405,7 +405,7 @@ public class UserController {
    * @return option DTOs, sorted as the sibling endpoint sorts them; never {@code null}, possibly
    *     empty.
    */
-  @GetMapping("/me/memberships")
+  @GetMapping("/org-units/me/memberships")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public List<OrgUnitMembershipOptionDto> getMyMemberships(
@@ -426,7 +426,7 @@ public class UserController {
    * @param jwt caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
    * @return the caller's direct org-unit ids; never {@code null}, possibly empty.
    */
-  @GetMapping("/me/org-unit-ids")
+  @GetMapping("/org-units/me/ids")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public Set<UUID> getMyOrgUnitIds(@AuthenticationPrincipal Jwt jwt) {
@@ -442,7 +442,7 @@ public class UserController {
    * @return the persisted DTO
    */
   @NotNull
-  @PutMapping("/me/description")
+  @PutMapping("/users/me/description")
   @PreAuthorize("isAuthenticated()")
   public UserDto updateMyDescription(
       @AuthenticationPrincipal Jwt jwt,
@@ -468,7 +468,7 @@ public class UserController {
    *     version.
    */
   @NotNull
-  @GetMapping("/me/payout-preference")
+  @GetMapping("/missions/me/payout-preference")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public MyPayoutPreferenceResponse getMyPayoutPreference(@AuthenticationPrincipal Jwt jwt) {
@@ -487,7 +487,7 @@ public class UserController {
    * @return the persisted preference and the new version.
    */
   @NotNull
-  @PutMapping("/me/payout-preference")
+  @PutMapping("/missions/me/payout-preference")
   @PreAuthorize("isAuthenticated()")
   public MyPayoutPreferenceResponse updateMyPayoutPreference(
       @AuthenticationPrincipal Jwt jwt,
@@ -507,7 +507,7 @@ public class UserController {
    * @return the current opt-in flag plus the user-row version.
    */
   @NotNull
-  @GetMapping("/me/blueprint-sharing")
+  @GetMapping("/blueprints/me/sharing")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public MyBlueprintSharingResponse getMyBlueprintSharing(@AuthenticationPrincipal Jwt jwt) {
@@ -527,7 +527,7 @@ public class UserController {
    * @return the persisted flag and the new version.
    */
   @NotNull
-  @PutMapping("/me/blueprint-sharing")
+  @PutMapping("/blueprints/me/sharing")
   @PreAuthorize("isAuthenticated()")
   public MyBlueprintSharingResponse updateMyBlueprintSharing(
       @AuthenticationPrincipal Jwt jwt,
@@ -548,7 +548,7 @@ public class UserController {
    * @return the stored handle, {@code null} when none is stored, plus the user-row version.
    */
   @NotNull
-  @GetMapping("/me/rsi-handle")
+  @GetMapping("/users/me/rsi-handle")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public MyRsiHandleResponse getMyRsiHandle(@AuthenticationPrincipal Jwt jwt) {
@@ -565,7 +565,7 @@ public class UserController {
    * @return the persisted handle and the new version.
    */
   @NotNull
-  @PutMapping("/me/rsi-handle")
+  @PutMapping("/users/me/rsi-handle")
   @PreAuthorize("isAuthenticated()")
   public MyRsiHandleResponse updateMyRsiHandle(
       @AuthenticationPrincipal Jwt jwt, @NotNull @RequestBody @Valid MyRsiHandleRequest request) {
@@ -584,7 +584,7 @@ public class UserController {
    *     unknown
    */
   @NotNull
-  @GetMapping("/{id}/rsi-handle")
+  @GetMapping("/users/{id}/rsi-handle")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Transactional(readOnly = true)
   public UserRsiHandleResponse getUserRsiHandle(@PathVariable @NotNull UUID id) {
@@ -594,15 +594,15 @@ public class UserController {
   /**
    * Records that the calling user has read the given announcement (clears the unread badge).
    *
-   * @param announcementId announcement just read
+   * @param id announcement just read
    * @return the persisted DTO
    */
   @NotNull
-  @PutMapping("/me/read-announcement/{announcementId}")
+  @PutMapping("/announcements/{id}/read")
   @PreAuthorize("isAuthenticated()")
   public UserDto updateReadAnnouncement(
-      @AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID announcementId) {
-    User me = userService.updateReadAnnouncement(userService.getUserIdFromJwt(jwt), announcementId);
+      @AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
+    User me = userService.updateReadAnnouncement(userService.getUserIdFromJwt(jwt), id);
     return withSelfEmail(userMapper.toDto(me), me);
   }
 
@@ -615,7 +615,7 @@ public class UserController {
    * @param request typed body (NOT query params — keeps user values out of access logs)
    * @return the persisted DTO
    */
-  @PutMapping("/{id}/attributes")
+  @PutMapping("/users/{id}/attributes")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public UserDto updateUserAttributes(
       @PathVariable @NotNull UUID id, @NotNull @RequestBody @Valid UserAttributesRequest request) {
@@ -642,7 +642,7 @@ public class UserController {
    * @return the user's complete post-write membership list.
    */
   @NotNull
-  @PatchMapping("/{id}/memberships")
+  @PatchMapping("/org-units/members/{id}/memberships")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public MembershipDeltaResponse patchMemberships(
       @PathVariable @NotNull UUID id, @RequestBody @Valid MembershipDeltaRequest request) {
@@ -660,7 +660,7 @@ public class UserController {
    *     wrapped in the same response shape the membership-delta PATCH returns.
    */
   @NotNull
-  @GetMapping("/{id}/memberships/detail")
+  @GetMapping("/org-units/members/{id}/memberships/detail")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public MembershipDeltaResponse getMembershipsDetail(@PathVariable @NotNull UUID id) {
     return new MembershipDeltaResponse(
@@ -673,7 +673,7 @@ public class UserController {
    *
    * @param id user id
    */
-  @DeleteMapping("/{id}")
+  @DeleteMapping("/users/{id}")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteUser(@PathVariable @NotNull UUID id) {
     userDeletionService.deleteUser(id);
@@ -691,7 +691,7 @@ public class UserController {
    * @param body the surviving account's id and the duplicate's optimistic-lock version
    * @return the surviving account, carrying the moved Discord link
    */
-  @PostMapping("/{id}/consolidate")
+  @PostMapping("/users/{id}/consolidate")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public UserDto consolidateAccount(
       @PathVariable @NotNull UUID id,

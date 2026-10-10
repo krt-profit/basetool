@@ -468,7 +468,7 @@ class DualUseRequestBodyProofTest {
     UUID createdId =
         id(
             adminPost(
-                "/api/v1/org-hierarchy/bereiche",
+                "/api/v1/org-units/bereiche",
                 body(
                     "id",
                     Squadron.IRIDIUM_ID,
@@ -493,7 +493,7 @@ class DualUseRequestBodyProofTest {
     UUID createdId =
         id(
             adminPost(
-                "/api/v1/org-hierarchy/organisationsleitung",
+                "/api/v1/org-units/organisationsleitung",
                 body(
                     "id",
                     Squadron.IRIDIUM_ID,

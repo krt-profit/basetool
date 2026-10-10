@@ -1209,7 +1209,7 @@ class InventoryPageControllerMvcTest {
         .thenAnswer(
             inv -> {
               String url = inv.getArgument(0);
-              return url.contains("pickable-org-units") ? ownerOptions : Collections.emptyList();
+              return url.contains("org-units/me/pickable") ? ownerOptions : Collections.emptyList();
             });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());

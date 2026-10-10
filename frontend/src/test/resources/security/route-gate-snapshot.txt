@@ -451,14 +451,14 @@
 /organisation/leitung GET -> LeitungPageController#leitung gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
 /organisation/leitung/bereiche/{bereichId}/members/ajax POST -> LeitungPageController#addBereichLeader gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
 /organisation/leitung/bereiche/{bereichId}/members/{userId}/ajax DELETE -> LeitungPageController#removeBereichLeader gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
-/organisation/leitung/kommando-groups/{groupId}/ajax DELETE -> LeitungPageController#deleteKommandoGroup gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
-/organisation/leitung/kommando-groups/{groupId}/ajax PUT -> LeitungPageController#updateKommandoGroup gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
 /organisation/leitung/organisationsleitung/{olId}/grand-admiral/ajax DELETE -> LeitungPageController#removeGrandAdmiral gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
 /organisation/leitung/organisationsleitung/{olId}/grand-admiral/ajax PUT -> LeitungPageController#setGrandAdmiral gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
 /organisation/leitung/organisationsleitung/{olId}/members/ajax POST -> LeitungPageController#addOlMember gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
 /organisation/leitung/organisationsleitung/{olId}/members/{userId}/ajax DELETE -> LeitungPageController#removeOlMember gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
 /organisation/leitung/special-commands/{skId}/members/{userId}/lead/ajax PATCH -> LeitungPageController#toggleSkLead gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
 /organisation/leitung/squadrons/{squadronId}/kommando-groups/ajax POST -> LeitungPageController#createKommandoGroup gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
+/organisation/leitung/squadrons/{squadronId}/kommando-groups/{groupId}/ajax DELETE -> LeitungPageController#deleteKommandoGroup gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
+/organisation/leitung/squadrons/{squadronId}/kommando-groups/{groupId}/ajax PUT -> LeitungPageController#updateKommandoGroup gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
 /organisation/leitung/squadrons/{squadronId}/ranks/{userId}/ajax DELETE -> LeitungPageController#removeSquadronRank gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
 /organisation/leitung/squadrons/{squadronId}/ranks/{userId}/ajax PUT -> LeitungPageController#assignSquadronRank gate=method:hasAnyRole('ADMIN','OFFICER') layout=yes
 /organisation/special-commands/{id} GET -> SpecialCommandMembersPageController#detail gate=class:hasAnyRole('ADMIN','OFFICER') layout=yes

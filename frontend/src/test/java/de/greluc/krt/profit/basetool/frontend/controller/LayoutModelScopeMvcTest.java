@@ -60,8 +60,8 @@ class LayoutModelScopeMvcTest {
           "/api/v1/me/layout",
           "/api/v1/me/capabilities",
           "/api/v1/notifications/unread-count",
-          "/api/v1/me/active-org-unit",
-          "/api/v1/me/org-units",
+          "/api/v1/org-units/me/active",
+          "/api/v1/org-units/me/switchable",
           "SQUADRONS");
 
   @Autowired private WebApplicationContext context;
@@ -141,8 +141,8 @@ class LayoutModelScopeMvcTest {
         .doesNotContain(
             "/api/v1/me/capabilities",
             "/api/v1/notifications/unread-count",
-            "/api/v1/me/active-org-unit",
-            "/api/v1/me/org-units");
+            "/api/v1/org-units/me/active",
+            "/api/v1/org-units/me/switchable");
   }
 
   /**

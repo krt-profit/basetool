@@ -34,8 +34,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Verifies over the full MockMvc stack that {@code PUT /api/v1/users/me/payout-preference} answers
- * 400 when {@code preference} or {@code version} is missing.
+ * Verifies over the full MockMvc stack that {@code PUT /api/v1/missions/me/payout-preference}
+ * answers 400 when {@code preference} or {@code version} is missing.
  */
 @SpringBootTest
 class UserPayoutPreferenceValidationTest {
@@ -60,7 +60,7 @@ class UserPayoutPreferenceValidationTest {
   void updateMyPayoutPreference_missingPreference_isBadRequest() throws Exception {
     mockMvc
         .perform(
-            put("/api/v1/users/me/payout-preference")
+            put("/api/v1/missions/me/payout-preference")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"version\":1}")
                 .with(jwt()))
@@ -78,7 +78,7 @@ class UserPayoutPreferenceValidationTest {
   void updateMyPayoutPreference_missingVersion_isBadRequest() throws Exception {
     mockMvc
         .perform(
-            put("/api/v1/users/me/payout-preference")
+            put("/api/v1/missions/me/payout-preference")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"preference\":\"DONATE\"}")
                 .with(jwt()))

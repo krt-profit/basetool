@@ -64,7 +64,7 @@ class HomeControllerTest {
 
     assertEquals(200, response.getStatusCode().value());
     verify(backendApiClient)
-        .put("/api/v1/users/me/read-announcement/{id}", null, Void.class, ANNOUNCEMENT_ID);
+        .put("/api/v1/announcements/{id}/read", null, Void.class, ANNOUNCEMENT_ID);
   }
 
   @Test

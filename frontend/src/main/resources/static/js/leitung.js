@@ -422,7 +422,9 @@
             return;
         }
         write({
-            url: `/organisation/leitung/kommando-groups/${row.getAttribute('data-group-id')}/ajax`,
+            url: `/organisation/leitung/squadrons/${row.getAttribute(
+                'data-unit-id',
+            )}/kommando-groups/${row.getAttribute('data-group-id')}/ajax`,
             method: 'PUT',
             payload: {
                 name,
@@ -445,9 +447,9 @@
         }
         confirmThen(btn.getAttribute('data-group-name'), i18n.confirmDeleteGroup, () => {
             write({
-                url: `/organisation/leitung/kommando-groups/${row.getAttribute(
-                    'data-group-id',
-                )}/ajax`,
+                url: `/organisation/leitung/squadrons/${row.getAttribute(
+                    'data-unit-id',
+                )}/kommando-groups/${row.getAttribute('data-group-id')}/ajax`,
                 method: 'DELETE',
                 success: i18n.deleted,
             });

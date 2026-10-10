@@ -330,7 +330,7 @@ one" guarantee. In the read model the holder is surfaced as `OlChartDto.grandAdm
 it is the matching OL member split out of the member list (so it never also appears in `members`); a
 free-text holder is a synthesized node (no account, rendered with the "no account" marker).
 
-Appointment is **ADMIN-only** via `PUT /api/v1/org-hierarchy/organisationsleitung/{id}/grand-admiral`,
+Appointment is **ADMIN-only** via `PUT /api/v1/org-units/organisationsleitung/{id}/grand-admiral`,
 which takes **either** a `userId` (account) **or** a `displayName` (free-text). The account path is
 **direct**: a user who is not yet an OL member is **auto-added** as one (`OL_MEMBER` rank) first, and
 setting it clears any free-text holder. The free-text path — used by the chart editor, like every

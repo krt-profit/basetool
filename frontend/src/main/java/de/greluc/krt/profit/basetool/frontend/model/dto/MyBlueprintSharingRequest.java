@@ -20,8 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
- * The member's global blueprint-sharing flag as {@code PUT /api/v1/users/me/blueprint-sharing}
- * takes it.
+ * The member's global blueprint-sharing flag as {@code PUT /api/v1/blueprints/me/sharing} takes it.
  *
  * @param shareBlueprintsGlobally whether the member's blueprints are shared with every member
  * @param version the user row's optimistic-lock version

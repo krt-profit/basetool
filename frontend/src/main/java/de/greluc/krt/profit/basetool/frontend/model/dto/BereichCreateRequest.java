@@ -22,8 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.UUID;
 
 /**
- * Create payload for a Bereich, relayed to {@code POST /api/v1/org-hierarchy/bereiche}
- * (REQ-ORG-014).
+ * Create payload for a Bereich, relayed to {@code POST /api/v1/org-units/bereiche} (REQ-ORG-014).
  *
  * @param name the Bereich's display name; required, unique across all org units.
  * @param shorthand the Bereich's short tag; required.

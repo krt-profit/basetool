@@ -87,8 +87,8 @@ class IdentityBackendClientTest {
     assertThat(client.registrationStatus().approvalStatus()).isEqualTo("PENDING");
 
     backend.expect("GET", "/api/v1/users/me");
-    backend.expect("GET", "/api/v1/users/me/payout-preference");
-    backend.expect("GET", "/api/v1/users/me/blueprint-sharing");
+    backend.expect("GET", "/api/v1/missions/me/payout-preference");
+    backend.expect("GET", "/api/v1/blueprints/me/sharing");
     backend.expect("GET", "/api/v1/users/me/rsi-handle");
     backend.expect("GET", "/api/v1/users/me/deletion-request");
     backend.expect("GET", "/api/v1/users/me/registration-status");
@@ -114,11 +114,11 @@ class IdentityBackendClientTest {
         "/api/v1/users/me/description",
         "{\"description\":\"Hallo\",\"displayName\":\"Valk\",\"version\":7}");
     backend.expect(
-        "PUT", "/api/v1/users/me/payout-preference", "{\"preference\":\"DONATE\",\"version\":7}");
-    backend.expect(
         "PUT",
-        "/api/v1/users/me/blueprint-sharing",
-        "{\"shareBlueprintsGlobally\":true,\"version\":7}");
+        "/api/v1/missions/me/payout-preference",
+        "{\"preference\":\"DONATE\",\"version\":7}");
+    backend.expect(
+        "PUT", "/api/v1/blueprints/me/sharing", "{\"shareBlueprintsGlobally\":true,\"version\":7}");
     backend.expect(
         "PUT", "/api/v1/users/me/rsi-handle", "{\"rsiHandle\":\"Valk_RSI\",\"version\":7}");
     backend.expect(
@@ -177,7 +177,7 @@ class IdentityBackendClientTest {
     backend.expect("GET", "/api/v1/users/search?size=1000&sort=username,asc&query=ali");
     backend.expect("GET", "/api/v1/users/search/references?size=51&sort=username,asc&query=");
     backend.expect(
-        "GET", "/api/v1/users/search-bank/references?size=51&sort=username,asc&query=ali");
+        "GET", "/api/v1/bank/members/search/references?size=51&sort=username,asc&query=ali");
   }
 
   @Test
@@ -196,9 +196,9 @@ class IdentityBackendClientTest {
 
     backend.expect("GET", "/api/v1/users/" + USER);
     backend.expect("GET", "/api/v1/users/" + USER + "/rsi-handle");
-    backend.expect("GET", "/api/v1/users/" + USER + "/memberships");
-    backend.expect("GET", "/api/v1/users/" + USER + "/memberships?allKinds=true");
-    backend.expect("GET", "/api/v1/users/" + USER + "/memberships/detail");
+    backend.expect("GET", "/api/v1/org-units/members/" + USER + "/memberships");
+    backend.expect("GET", "/api/v1/org-units/members/" + USER + "/memberships?allKinds=true");
+    backend.expect("GET", "/api/v1/org-units/members/" + USER + "/memberships/detail");
   }
 
   @Test
@@ -226,7 +226,7 @@ class IdentityBackendClientTest {
             + "\"joinDate\":null}");
     backend.expect(
         "PATCH",
-        "/api/v1/users/" + USER + "/memberships",
+        "/api/v1/org-units/members/" + USER + "/memberships",
         "{\"staffeln\":[{\"squadronId\":\""
             + SQUADRON
             + "\",\"isLogistician\":true,\"isMissionManager\":null}],\"specialCommands\":null}");

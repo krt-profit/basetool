@@ -142,7 +142,7 @@ public class OrgUnitMembershipQueryService {
   /**
    * Lists every active org unit an admin may pin in the active-context switcher, in the top-down
    * order of {@link #listPickerOptionsWithDescendants(UUID)} (OL &rarr; Bereich &rarr; Staffel
-   * &rarr; SK). Backs the admin branch of {@code GET /api/v1/me/org-units}.
+   * &rarr; SK). Backs the admin branch of {@code GET /api/v1/org-units/me/switchable}.
    *
    * @return every active org unit as a pinnable option; never {@code null}, possibly empty.
    */
@@ -346,7 +346,7 @@ public class OrgUnitMembershipQueryService {
 
   /**
    * Lists the user's complete membership set as response DTOs, mapped inside the read transaction;
-   * backs {@code GET /api/v1/users/{id}/memberships/detail}.
+   * backs {@code GET /api/v1/org-units/members/{id}/memberships/detail}.
    *
    * @param userId the user whose memberships to project; never {@code null}.
    * @return the user's memberships as DTOs; never {@code null}, possibly empty.

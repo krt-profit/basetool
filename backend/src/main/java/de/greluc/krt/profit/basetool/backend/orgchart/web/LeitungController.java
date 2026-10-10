@@ -39,7 +39,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/leitung")
+@RequestMapping("/api/v1/org-chart")
 public class LeitungController {
 
   private final LeitungViewService leitungViewService;
@@ -51,7 +51,7 @@ public class LeitungController {
    *     authenticated-only).
    * @return the manageable units grouped by tier, with rosters and capability flags.
    */
-  @GetMapping("/view")
+  @GetMapping("/leadership")
   @PreAuthorize("isAuthenticated()")
   @Operation(summary = "The org units the caller may appoint leadership ranks into, by tier")
   public LeitungViewDto view(@NotNull Authentication authentication) {
