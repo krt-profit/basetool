@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.JobType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.MissionUnit;
+import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import java.time.Duration;
@@ -247,6 +248,42 @@ public class MissionNotificationPublisher {
     eventPublisher.publishEvent(
         MissionNotices.responsibilityAssigned(
             mission.getId(), mission.getName(), recipientId, roleCode, actor));
+  }
+
+  /**
+   * Tells the owner of a ship that it was assigned to a mission unit (REQ-HANGAR-005); nothing
+   * happens when the owner assigned it.
+   *
+   * @param mission the managed mission
+   * @param unit the managed unit
+   * @param ship the assigned ship
+   */
+  public void shipAssigned(
+      @NotNull Mission mission, @NotNull MissionUnit unit, @NotNull Ship ship) {
+    ActorRef actor = userService.currentActor();
+    UUID ownerId = ship.getOwner().getId();
+    if (ownerId.equals(actor.id())) {
+      return;
+    }
+    eventPublisher.publishEvent(
+        MissionNotices.shipAssigned(
+            unit.getId(),
+            ownerId,
+            ship.getShipType() == null ? null : ship.getShipType().getName(),
+            mission.getName(),
+            unit.getName(),
+            mission.getPlannedStartTime(),
+            actor));
+  }
+
+  /**
+   * Clears the owner's assignment notice when their ship was taken off a unit (REQ-HANGAR-005).
+   *
+   * @param unitId the unit
+   * @param ship the ship that was taken off
+   */
+  public void shipUnassigned(@NotNull UUID unitId, @NotNull Ship ship) {
+    eventPublisher.publishEvent(MissionNotices.shipUnassigned(unitId, ship.getOwner().getId()));
   }
 
   /**

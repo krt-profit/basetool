@@ -287,7 +287,7 @@ class HangarControllerTest {
         new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true, 0L, null);
     Ship created = new Ship();
     ShipDto dto = shipDto("Cutlass");
-    when(hangarService.addShip(targetUser, request)).thenReturn(created);
+    when(hangarService.addShipByAdmin(targetUser, request)).thenReturn(created);
     when(shipMapper.toDto(created)).thenReturn(dto);
 
     ShipDto result = controller.addUserShip(targetUser, request);
@@ -304,7 +304,7 @@ class HangarControllerTest {
         new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true, 1L, null);
     Ship updated = new Ship();
     ShipDto dto = shipDto("Cutlass");
-    when(hangarService.updateShip(targetUser, shipId, request)).thenReturn(updated);
+    when(hangarService.updateShipByAdmin(targetUser, shipId, request)).thenReturn(updated);
     when(shipMapper.toDto(updated)).thenReturn(dto);
 
     ShipDto result = controller.updateUserShip(targetUser, shipId, request);
@@ -320,7 +320,7 @@ class HangarControllerTest {
 
     controller.deleteUserShip(targetUser, shipId);
 
-    verify(hangarService).deleteShip(targetUser, shipId);
+    verify(hangarService).deleteShipByAdmin(targetUser, shipId);
   }
 
   @Test

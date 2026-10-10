@@ -280,6 +280,22 @@ class NotificationPageControllerTest {
   }
 
   @Test
+  void targetOf_hangarAndBlueprintNoticesLinkTheirPage() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/hangar", NotificationPageController.targetOf("HANGAR_SHIP_ASSIGNED", "MISSION_UNIT", id));
+    assertEquals(
+        "/hangar", NotificationPageController.targetOf("HANGAR_CHANGED_BY_ADMIN", "HANGAR", id));
+    assertEquals(
+        "/personal-inventory/blueprints",
+        NotificationPageController.targetOf(
+            "BLUEPRINT_PURGED_BY_ADMIN", "PERSONAL_BLUEPRINTS", id));
+    assertEquals(
+        "/missions/" + id,
+        NotificationPageController.targetOf("HANGAR_SHIP_REMOVED_FROM_UNIT", "MISSION", id));
+  }
+
+  @Test
   void targetOf_jobOrderLinksTheOrder() {
     UUID orderId = UUID.fromString("00000000-0000-0000-0000-000000000099");
 

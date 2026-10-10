@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.admin.api.events.HangarNotices;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
@@ -30,11 +31,13 @@ import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.mapper.PersonalBlueprintMapper;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintSource;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
+import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintBatchResult;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintRecipeResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
@@ -54,6 +57,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -87,6 +91,8 @@ public class PersonalBlueprintService {
   private final DefaultBlueprintKeyService defaultBlueprintKeyService;
   private final AuditRecorder auditRecorder;
   private final ClientDirectory clientDirectory;
+  private final ApplicationEventPublisher eventPublisher;
+  private final UserService userService;
 
   /**
    * Owner-scoped paged list of owned blueprints, optionally filtered by a case-insensitive product
@@ -327,6 +333,7 @@ public class PersonalBlueprintService {
   public PersonalBlueprintResponse addForUser(
       @NotNull UUID targetSub, @NotNull PersonalBlueprintCreateRequest request) {
     PersonalBlueprintResponse response = add(targetSub, request);
+    announceByAdmin(targetSub, "ADDED", response.productName());
     log.info(
         "Admin added blueprint productKey='{}' ownerUserId={}",
         LogSafe.text(request.productKey(), 255),
@@ -346,6 +353,9 @@ public class PersonalBlueprintService {
   public PersonalBlueprintBatchResult addBatchForUser(
       @NotNull UUID targetSub, @NotNull List<String> productKeys) {
     PersonalBlueprintBatchResult result = addBatch(targetSub, productKeys);
+    if (result.added() > 0) {
+      announceByAdmin(targetSub, "ADDED", result.added() + "×");
+    }
     log.info("Admin batch add for ownerUserId={}: {}", targetSub, result);
     return result;
   }
@@ -365,6 +375,7 @@ public class PersonalBlueprintService {
     PersonalBlueprint entity =
         Entities.require(repository.findById(id), () -> "PersonalBlueprint not found: " + id);
     PersonalBlueprintResponse response = applyUpdate(entity, request);
+    announceByAdmin(entity.getOwnerUserId(), "UPDATED", response.productName());
     log.info("Admin updated blueprint id={} ownerUserId={}", id, entity.getOwnerUserId());
     return response;
   }
@@ -383,7 +394,32 @@ public class PersonalBlueprintService {
     requireRemovable(entity);
     repository.delete(entity);
     recordRemoved(entity);
+    announceByAdmin(entity.getOwnerUserId(), "DELETED", entity.getProductName());
     log.info("Admin deleted blueprint id={} ownerUserId={}", id, entity.getOwnerUserId());
+  }
+
+  /**
+   * Tells a member that an admin applied a blueprint import for them (REQ-HANGAR-008).
+   *
+   * @param memberId the member
+   * @param result the import's counts
+   */
+  @Transactional
+  public void announceImportByAdmin(
+      @NotNull UUID memberId, @NotNull BlueprintImportResultDto result) {
+    int added = result.added() + result.acquiredAtUpdated();
+    if (added > 0) {
+      announceByAdmin(memberId, "IMPORTED", added + "×");
+    }
+  }
+
+  private void announceByAdmin(UUID memberId, String changeCode, String subject) {
+    ActorRef actor = userService.currentActor();
+    if (memberId.equals(actor.id())) {
+      return;
+    }
+    eventPublisher.publishEvent(
+        HangarNotices.blueprintsChanged(memberId, changeCode, subject, actor));
   }
 
   /**
@@ -394,8 +430,17 @@ public class PersonalBlueprintService {
    */
   @Transactional
   public int deleteAllForAllUsers() {
+    List<PersonalBlueprintRepository.OwnerBlueprintCount> perOwner =
+        repository.countRemovableByOwner();
     int removed = repository.deleteAllRemovable();
     if (removed > 0) {
+      ActorRef actor = userService.currentActor();
+      for (PersonalBlueprintRepository.OwnerBlueprintCount owner : perOwner) {
+        if (!owner.getOwnerId().equals(actor.id())) {
+          eventPublisher.publishEvent(
+              HangarNotices.blueprintsPurged(owner.getOwnerId(), owner.getBlueprintCount(), actor));
+        }
+      }
       auditRecorder.record(
           AuditEventType.BLUEPRINT_PURGED_ALL_USERS,
           null,

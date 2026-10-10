@@ -124,7 +124,14 @@ public class AdminNotificationRulePageController {
           "BANK_HOLDER_NOTICE_CLEARED",
           "ORG_LEADERSHIP_ROLE_MISMATCH",
           "ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED",
-          "ORG_MEMBER_DEPARTED");
+          "ORG_MEMBER_DEPARTED",
+          "HANGAR_SHIP_ASSIGNED_TO_UNIT",
+          "HANGAR_SHIP_UNASSIGNED_FROM_UNIT",
+          "HANGAR_SHIP_DELETED_FROM_MISSION",
+          "HANGAR_FITTED_RESET_FOR_OWNER",
+          "HANGAR_CHANGED_BY_ADMIN",
+          "BLUEPRINT_CHANGED_BY_ADMIN",
+          "BLUEPRINT_PURGED_BY_ADMIN");
 
   /**
    * {@code NotificationType} codes, labelled via {@code admin.notificationRules.notificationType}.
@@ -178,7 +185,13 @@ public class AdminNotificationRulePageController {
           "BANK_ACCOUNT_DEBITED",
           "BANK_HOLDER_DEACTIVATED_WITH_BALANCE",
           "ORG_LEADERSHIP_ROLE_MISMATCH",
-          "ORG_MEMBER_DEPARTED");
+          "ORG_MEMBER_DEPARTED",
+          "HANGAR_SHIP_ASSIGNED",
+          "HANGAR_SHIP_REMOVED_FROM_UNIT",
+          "HANGAR_FITTED_RESET",
+          "HANGAR_CHANGED_BY_ADMIN",
+          "BLUEPRINT_CHANGED_BY_ADMIN",
+          "BLUEPRINT_PURGED_BY_ADMIN");
 
   /**
    * {@code SelectorKind} codes, labelled via {@code admin.notificationRules.selector.kind}. All but

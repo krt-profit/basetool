@@ -128,6 +128,11 @@ public class NotificationPageController {
           Map.entry("INVENTORY_TRANSFERRED_FROM_USER", "/inventory/my"),
           Map.entry("INVENTORY_BOOKED_OUT_BY_OTHER", "/inventory/my"),
           Map.entry("BANK_BOOKING_REQUEST_APPROVED", "/bank/requests"),
+          Map.entry("HANGAR_SHIP_ASSIGNED", "/hangar"),
+          Map.entry("HANGAR_FITTED_RESET", "/hangar"),
+          Map.entry("HANGAR_CHANGED_BY_ADMIN", "/hangar"),
+          Map.entry("BLUEPRINT_CHANGED_BY_ADMIN", "/personal-inventory/blueprints"),
+          Map.entry("BLUEPRINT_PURGED_BY_ADMIN", "/personal-inventory/blueprints"),
           Map.entry("ACCOUNT_DELETION_REQUEST_DECLINED", "/profile"),
           Map.entry("ACCOUNT_DELETION_REQUESTED", "/admin/deletion-requests"),
           Map.entry("DISCORD_REGISTRATION_PENDING", "/admin/discord-registrations"));
