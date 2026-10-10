@@ -24,45 +24,26 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Resolves the per-membership appointments of an org unit as notification recipients.
+ * Resolves the holders of external-client installations as notification recipients.
  *
- * <p>Owned by the notification module and implemented by the orgunit module.
+ * <p>Owned by the notification module and implemented by the exchange module.
  */
-public interface OrgUnitRecipientDirectory {
+public interface ExchangeRecipientDirectory {
 
   /**
-   * The members flagged as Lead of an org unit.
+   * The members with a connected, non-revoked installation of one registry client.
    *
-   * @param orgUnitId the org unit
+   * @param clientId the registry client's id
    * @return their user subs; never {@code null}, possibly empty
    */
   @NotNull
-  Set<UUID> leadsOf(@NotNull UUID orgUnitId);
+  Set<UUID> holdersOfClient(@NotNull UUID clientId);
 
   /**
-   * The members flagged as Logistician of an org unit.
+   * The members with a connected, non-revoked installation of any registry client.
    *
-   * @param orgUnitId the org unit
    * @return their user subs; never {@code null}, possibly empty
    */
   @NotNull
-  Set<UUID> logisticiansOf(@NotNull UUID orgUnitId);
-
-  /**
-   * The members flagged as Mission Manager of an org unit.
-   *
-   * @param orgUnitId the org unit
-   * @return their user subs; never {@code null}, possibly empty
-   */
-  @NotNull
-  Set<UUID> missionManagersOf(@NotNull UUID orgUnitId);
-
-  /**
-   * The members who hold a leadership seat in an org unit, whatever their global roles.
-   *
-   * @param orgUnitId the org unit
-   * @return their user subs; never {@code null}, possibly empty
-   */
-  @NotNull
-  Set<UUID> leadershipOf(@NotNull UUID orgUnitId);
+  Set<UUID> holdersOfAnyClient();
 }

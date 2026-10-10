@@ -77949,11 +77949,11 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE" ]
+            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE", "MISSION_PARTICIPANTS", "MISSION_LEADERSHIP", "EXCHANGE_CLIENT_HOLDERS", "EVENT_RECIPIENTS" ]
           },
           "orgRelativeRole" : {
             "type" : "string",
-            "enum" : [ "OFFICER", "LEAD", "LOGISTICIAN", "MISSION_MANAGER" ]
+            "enum" : [ "OFFICER", "LEAD", "LOGISTICIAN", "MISSION_MANAGER", "UNIT_LEADERSHIP" ]
           },
           "roleCode" : {
             "type" : "string"
@@ -77973,11 +77973,11 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE" ]
+            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE", "MISSION_PARTICIPANTS", "MISSION_LEADERSHIP", "EXCHANGE_CLIENT_HOLDERS", "EVENT_RECIPIENTS" ]
           },
           "orgRelativeRole" : {
             "type" : "string",
-            "enum" : [ "OFFICER", "LEAD", "LOGISTICIAN", "MISSION_MANAGER" ]
+            "enum" : [ "OFFICER", "LEAD", "LOGISTICIAN", "MISSION_MANAGER", "UNIT_LEADERSHIP" ]
           },
           "roleCode" : {
             "type" : "string"

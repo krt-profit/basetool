@@ -209,7 +209,15 @@ class NotificationRuleServiceTest {
   @ParameterizedTest(name = "{0}")
   @EnumSource(
       value = SelectorKind.class,
-      names = {"ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE"})
+      names = {
+        "ACCOUNT_GRANT",
+        "EVENT_RECIPIENT",
+        "ACCOUNT_RESPONSIBLE",
+        "MISSION_PARTICIPANTS",
+        "MISSION_LEADERSHIP",
+        "EXCHANGE_CLIENT_HOLDERS",
+        "EVENT_RECIPIENTS"
+      })
   void createAcceptsEventDerivedKindAndStoresNoColumns(SelectorKind kind) {
     NotificationRule saved = ruleWithVersion(UUID.randomUUID(), 0L);
     when(notificationRuleRepository.saveAndFlush(any(NotificationRule.class))).thenReturn(saved);
@@ -231,7 +239,15 @@ class NotificationRuleServiceTest {
   @ParameterizedTest(name = "{0}")
   @EnumSource(
       value = SelectorKind.class,
-      names = {"ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE"})
+      names = {
+        "ACCOUNT_GRANT",
+        "EVENT_RECIPIENT",
+        "ACCOUNT_RESPONSIBLE",
+        "MISSION_PARTICIPANTS",
+        "MISSION_LEADERSHIP",
+        "EXCHANGE_CLIENT_HOLDERS",
+        "EVENT_RECIPIENTS"
+      })
   void updateAcceptsEventDerivedKindAndStoresNoColumns(SelectorKind kind) {
     UUID id = UUID.randomUUID();
     NotificationRule persisted = ruleWithVersion(id, 3L);
