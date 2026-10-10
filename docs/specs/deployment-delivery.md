@@ -2780,7 +2780,7 @@ features only. No tracked file outside Markdown and the audit archive names `--e
 ### REQ-OPS-044 — Pull requests merge through a merge queue, and every required check reports in it
 
 `main` is advanced only through a GitHub merge queue (a `merge_queue` rule in the `main` ruleset:
-squash, one pull request per group). The strict up-to-date policy is off; the queue builds `main`
+merge commit, one pull request per group). The strict up-to-date policy is off; the queue builds `main`
 plus the pull request before the merge instead.
 
 - **Every required status check reports on the merge group.** A required check either runs on the
@@ -2795,7 +2795,7 @@ plus the pull request before the merge instead.
 - **A merge group reads its base from `github.event.merge_group`**, never from `github.base_ref` or
   `github.event.pull_request`, which are empty there.
 - **No merge group starts the E2E suite.** `e2e.yml` has no `merge_group` trigger.
-- **One pull request per group**, so the push to `main` carries the single commit the release and
+- **One pull request per group**, so the push to `main` carries the single merge commit the release and
   image workflows inspect.
 - **The repository stays public**; the queue exists only for public repositories of an
   organization. The emergency path when `gh pr merge --admin` does not merge past the queue is the
@@ -2806,7 +2806,7 @@ plus the pull request before the merge instead.
 - [ ] Every context in the `main` ruleset's `required_status_checks` is the `name:` of a job in a
   workflow that triggers on `merge_group`.
 - [ ] A queued docs-only pull request reaches `main` with all 11 contexts reported on its
-  `gh-readonly-queue/main/...` ref and a GitHub-verified squash commit.
+  `gh-readonly-queue/main/...` ref and a GitHub-verified merge commit.
 - [ ] A merge group's `Analyze (java-kotlin)` and `Analyze (javascript-typescript)` pass without
   creating a code scanning analysis on the `gh-readonly-queue/...` ref.
 - [ ] After a queued merge, `gh pr view <n> --json mergeCommit` equals the new `main` tip.

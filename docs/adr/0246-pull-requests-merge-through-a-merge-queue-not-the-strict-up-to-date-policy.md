@@ -26,7 +26,7 @@ Enterprise Cloud. This repository is public and its organization is on the Free 
 
 ## Decision
 
-We will replace the strict policy by a ruleset `merge_queue` rule on `main`: `SQUASH`, `ALLGREEN`,
+We will replace the strict policy by a ruleset `merge_queue` rule on `main`: `MERGE`, `ALLGREEN`,
 one pull request per group, up to three groups building, a 90 minute check timeout, and
 `strict_required_status_checks_policy` off.
 
@@ -56,6 +56,12 @@ one pull request per group, up to three groups building, a 90 minute check timeo
 - The checks whose verdict is about the PR's own commits (DCO, gitleaks) are answered in a merge
   group by `merge-group-shims.yml`, whose job names equal the required contexts.
 - `e2e.yml` never triggers on `merge_group`.
+- **The merge method is `MERGE`** (owner decision of 2026-10-11, replacing the first draft's `SQUASH`). The
+  commits of a branch reach `main` with their own signatures and sign-offs under one GitHub-signed
+  merge commit per pull request; `REBASE` stays excluded because it rewrites the commits and drops
+  their signatures. The cost is a `git log` that shows the branch commits and a `Merge pull request`
+  subject; the release-notes tooling already reads `--no-merges`, and the queue removes the need for
+  *Merge origin/main* commits on a branch.
 - One PR per group keeps one push per merge, which `release-publish.yml` (the release PR is found
   by the pushed head SHA) and `release-images.yml` rely on.
 - **The repository stays public.** Public visibility is a standing condition of this decision: the
