@@ -996,6 +996,25 @@ member's own decision; it changes nothing for anybody else and nothing about wha
 [ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md) ·
 **Issues:** #2414
 
+### REQ-NOTIF-028 — Coded render parameters
+
+A notification stores no rendered text, so a word that differs by language — „verschoben" or
+„abgesagt", „Auszahlung" or „Spende" — cannot be a parameter value. A render parameter whose name
+ends in `Code` therefore gives the placeholder of the same name without the suffix its localized
+word: with `changeCode = cancelled`, `{change}` renders as `notifications.value.change.cancelled`
+in the member's language; a code without a word renders as itself. The type's own template names
+the placeholder (`{mission}: {change} durch {actor}`). A parameter named just `Code` is an ordinary
+parameter. Every client applies the rule when it fills a template: the web inbox and bell
+(`NotificationPageController#render`) and the Android app (`NotificationText`).
+
+**Acceptance**
+
+- [x] A `…Code` parameter renders as the word of the member's language and as itself without one.
+- [x] A parameter named `code` is not special.
+
+**Enforced by:** `NotificationRenderCodesTest` · **Code:**
+`NotificationPageController#render` · **Issues:** #2414
+
 ## Out of scope (v1)
 
 - Per-notification e-mail routing (generic fan-out of in-app notification types to e-mail), per-channel

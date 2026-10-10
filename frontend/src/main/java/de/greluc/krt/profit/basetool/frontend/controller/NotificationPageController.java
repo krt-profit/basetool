@@ -113,6 +113,9 @@ public class NotificationPageController {
           "ACCOUNT_DELETION_REQUESTED", "/admin/deletion-requests",
           "DISCORD_REGISTRATION_PENDING", "/admin/discord-registrations");
 
+  /** The suffix that marks a render parameter as a code with a localized word (REQ-NOTIF-028). */
+  private static final String CODE_SUFFIX = "Code";
+
   private static final DateTimeFormatter DISPLAY_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'UTC'").withZone(ZoneOffset.UTC);
   private static final long STREAM_TIMEOUT_MS = Duration.ofMinutes(30).toMillis();
@@ -448,7 +451,17 @@ public class NotificationPageController {
     return PAGE_TARGETS.get(type);
   }
 
-  private String render(String type, Map<String, String> params, Locale locale) {
+  /**
+   * Renders a notification into the member's language: the type's template with every parameter
+   * filled in, a parameter named {@code <name>Code} also giving {@code {<name>}} its localized word
+   * (REQ-NOTIF-028).
+   *
+   * @param type the notification type
+   * @param params the stored render parameters, or {@code null}
+   * @param locale the member's locale
+   * @return the rendered text
+   */
+  String render(String type, Map<String, String> params, Locale locale) {
     String key = "notifications.type." + type;
     String template = messageSource.getMessage(key, null, key, locale);
     if (template == null || template.equals(key)) {
@@ -460,9 +473,25 @@ public class NotificationPageController {
         template =
             template.replace(
                 "{" + entry.getKey() + "}", entry.getValue() == null ? "" : entry.getValue());
+        if (isCodeParameter(entry.getKey()) && entry.getValue() != null) {
+          String name = entry.getKey().substring(0, entry.getKey().length() - CODE_SUFFIX.length());
+          String valueKey = "notifications.value." + name + "." + entry.getValue();
+          String word = messageSource.getMessage(valueKey, null, entry.getValue(), locale);
+          template = template.replace("{" + name + "}", word == null ? entry.getValue() : word);
+        }
       }
     }
     return template;
+  }
+
+  /**
+   * Whether a parameter carries a code that has a localized word, by its {@code Code} suffix.
+   *
+   * @param name the parameter name
+   * @return {@code true} for a name such as {@code changeCode}
+   */
+  private static boolean isCodeParameter(String name) {
+    return name.length() > CODE_SUFFIX.length() && name.endsWith(CODE_SUFFIX);
   }
 
   private long currentUnreadCount() {
