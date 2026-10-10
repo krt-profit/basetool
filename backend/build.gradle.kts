@@ -163,6 +163,7 @@ val contractBaselineRequired =
     .orElse(false)
 
 tasks.named<Test>("test") {
+  maxParallelForks = 2
   inputs
     .files(contractBaseline)
     .withPropertyName("contractBaseline")
