@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.personalinventory.api.PersonalInventoryErasure;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
@@ -35,7 +36,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRuleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.repository.PersonalInventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
@@ -121,7 +121,7 @@ public class UserDeletionService {
    * delete (REQ-DATA-008), but {@link #deleteUser(UUID)} deletes them explicitly to count the rows
    * for the audit event.
    */
-  private final PersonalInventoryItemRepository personalInventoryItemRepository;
+  private final PersonalInventoryErasure personalInventoryErasure;
 
   private final PersonalBlueprintRepository personalBlueprintRepository;
   private final NotificationRepository notificationRepository;
@@ -233,7 +233,7 @@ public class UserDeletionService {
     int inventoryDeleted = inventoryItemRepository.deleteByUserId(userId);
     int shipsDeleted = shipRepository.deleteByOwnerId(userId);
 
-    int personalInventoryDeleted = personalInventoryItemRepository.deleteByOwnerUserId(userId);
+    int personalInventoryDeleted = personalInventoryErasure.deleteAllItemsOf(userId);
     int blueprintsDeleted = personalBlueprintRepository.deleteAllByOwnerUserId(userId);
     int notificationsDeleted = notificationRepository.deleteAllForRecipient(userId);
     int ruleSelectorsDeleted = notificationRuleRepository.deleteSelectorsByUserId(userId);

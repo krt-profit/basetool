@@ -30,6 +30,7 @@
       "mission::api",
       "notification::api",
       "orgunit::api",
+      "personalinventory::api",
       "platform::api",
       "scope::api"
     })

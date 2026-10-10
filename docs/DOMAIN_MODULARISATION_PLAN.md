@@ -906,6 +906,16 @@ their "must stay green" period here (D-01).
   service` closes a top-level package cycle; the type is carried into Phase 4 and replaced by the GDPR
   participant SPIs of §7.6.
   With that, `promotion` publishes nothing. The move removes no baseline edge (108).
+- `personalinventory` — **done 2026-10-05** (P2-4). Mein Inventar moved out of the layer
+  packages: the member, admin and UEX location-picker controllers into `personalinventory.web`, the
+  item entity, the location-type enum, the repository, the service, the mapper and the records into
+  `personalinventory.internal`. The module never consulted the scope hub — its gate is the owner
+  (`@CurrentUserId`) and the role annotations — so no access policy moved. Its one inbound edge,
+  the GDPR deletion's bulk delete, goes through `personalinventory.api.PersonalInventoryErasure`
+  (`MANDATORY`), which the module publishes as its `api`; unlike promotion the module depends on
+  nothing in `service`, so no package cycle forces the type out of its module. It is carried into
+  Phase 4 like `MemberEvaluationErasure` (§7.6). Every declared module of a higher rank allows
+  `personalinventory::api`. The move removes no baseline edge (108).
 
 ### 7.5 Phase 3 — the business core
 

@@ -18,30 +18,22 @@
  */
 
 /**
- * The GDPR module, transitional until its participants become identity-owned SPIs (plan §5.1 rank
- * 13, §7.6).
+ * The personal-inventory module: Mein Inventar, its admin view and the UEX location picker (plan
+ * §5.1 rank 7).
  */
 @ApplicationModule(
     allowedDependencies = {
       "admin::api",
       "audit::api",
-      "bank::api",
       "catalogue::api",
-      "exchange::api",
       "identity::api",
-      "inventory::api",
-      "joborder::api",
       "kernel",
       "livesync::api",
-      "materialexchange::api",
-      "mission::api",
       "notification::api",
       "orgunit::api",
-      "personalinventory::api",
       "platform::api",
-      "refinery::api",
       "scope::api"
     })
-package de.greluc.krt.profit.basetool.backend.privacy;
+package de.greluc.krt.profit.basetool.backend.personalinventory;
 
 import org.springframework.modulith.ApplicationModule;

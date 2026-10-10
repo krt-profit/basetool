@@ -17,14 +17,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.personalinventory.web;
 
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemCreateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemUpdateRequest;
-import de.greluc.krt.profit.basetool.backend.service.PersonalInventoryItemService;
+import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemCreateRequest;
+import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemResponse;
+import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemService;
+import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -51,41 +51,40 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Admin-only counterpart of {@link PersonalInventoryController}: lets administrators manage the
- * personal inventory of any user. The owner identifier is taken from the URL path ({@code
- * /{userId}}) instead of from the JWT.
+ * REST endpoints for the user-facing personal inventory. Every method enforces data isolation by
+ * deriving the owner identifier from the JWT {@code sub} claim and never accepting it from the
+ * request body.
  */
 @RestController
-@RequestMapping("/api/v1/admin/personal-inventory")
+@RequestMapping("/api/v1/personal-inventory")
 @RequiredArgsConstructor
-@PreAuthorize(Roles.HAS_ROLE_ADMIN)
-@Tag(
-    name = "Admin – Personal Inventory",
-    description = "Administrator endpoints for managing any user's personal inventory.")
+@PreAuthorize("isAuthenticated()")
+@Tag(name = "Personal Inventory", description = "Per-user personal inventory entries.")
 @SecurityRequirement(name = "bearer-jwt")
 @Slf4j
-public class AdminPersonalInventoryController {
+public class PersonalInventoryController {
 
   private final PersonalInventoryItemService service;
 
   /**
-   * Lists a target user's personal-inventory items.
+   * Lists the caller's own personal-inventory items. Owner is taken from the JWT {@code sub} —
+   * never from the request body — so a caller cannot view another user's items.
    *
-   * @param userId target user's {@code app_user.id}
    * @return paged response DTOs
    */
-  @GetMapping("/{userId}")
-  @Operation(summary = "List a specific user's personal inventory entries.")
+  @GetMapping
+  @Operation(
+      summary = "List own personal inventory entries (paginated, sortable, optional name filter).")
   @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "Paginated list."),
-    @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
+    @ApiResponse(responseCode = "200", description = "Paginated list of the caller's items."),
+    @ApiResponse(responseCode = "401", description = "Authentication required.")
   })
-  public PageResponse<PersonalInventoryItemResponse> listForUser(
-      @PathVariable UUID userId,
+  public PageResponse<PersonalInventoryItemResponse> list(
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
-      @RequestParam(required = false) String q) {
+      @RequestParam(required = false) String q,
+      @CurrentUserId UUID ownerUserId) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -93,66 +92,84 @@ public class AdminPersonalInventoryController {
             sort,
             PersonalInventoryItemService.SORTABLE_FIELDS,
             PersonalInventoryItemService.DEFAULT_SORT_FIELD);
-    Page<PersonalInventoryItemResponse> result = service.listForUser(userId, q, pageable);
+    Page<PersonalInventoryItemResponse> result = service.listOwn(ownerUserId, q, pageable);
     return PageResponse.of(result);
   }
 
   /**
-   * Creates an item on behalf of the target user.
+   * Fetches one of the caller's own items. 404 for unknown id OR cross-owner attempt (the two cases
+   * are intentionally indistinguishable on the wire).
    *
-   * @param userId target user's {@code app_user.id}
-   * @param request create payload
-   * @return the persisted DTO
+   * @param id item id
+   * @return the item DTO
    */
-  @PostMapping("/{userId}")
-  @ResponseStatus(HttpStatus.CREATED)
-  @Operation(summary = "Create a personal inventory entry on behalf of the given user.")
+  @GetMapping("/{id}")
+  @Operation(summary = "Fetch a single personal inventory entry owned by the caller.")
   @ApiResponses({
-    @ApiResponse(responseCode = "201", description = "Item created."),
-    @ApiResponse(responseCode = "400", description = "Validation failed."),
-    @ApiResponse(responseCode = "403", description = "Caller is not an administrator."),
-    @ApiResponse(responseCode = "404", description = "Referenced UEX location does not exist.")
+    @ApiResponse(responseCode = "200", description = "Item found."),
+    @ApiResponse(responseCode = "404", description = "Not found or not owned by caller.")
   })
-  public PersonalInventoryItemResponse createForUser(
-      @PathVariable UUID userId, @Valid @RequestBody PersonalInventoryItemCreateRequest request) {
-    return service.createForUser(userId, request);
+  public PersonalInventoryItemResponse get(@PathVariable UUID id, @CurrentUserId UUID ownerUserId) {
+    return service.getOwn(ownerUserId, id);
   }
 
   /**
-   * Updates any personal-inventory item by id (admins are trusted to know the id).
+   * Creates a new personal-inventory item owned by the caller.
+   *
+   * @param request create payload
+   * @return the persisted DTO
+   */
+  @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
+  @Operation(summary = "Create a new personal inventory entry for the caller.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "201", description = "Item created."),
+    @ApiResponse(responseCode = "400", description = "Validation failed."),
+    @ApiResponse(responseCode = "404", description = "Referenced UEX location does not exist.")
+  })
+  public PersonalInventoryItemResponse create(
+      @Valid @RequestBody PersonalInventoryItemCreateRequest request,
+      @CurrentUserId UUID ownerUserId) {
+    return service.createOwn(ownerUserId, request);
+  }
+
+  /**
+   * Updates one of the caller's own items.
    *
    * @param id item id
    * @param request update payload (carries the expected version)
    * @return the persisted DTO
    */
-  @PutMapping("/items/{id}")
-  @Operation(summary = "Update any personal inventory entry by id.")
+  @PutMapping("/{id}")
+  @Operation(summary = "Update an existing personal inventory entry owned by the caller.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Item updated."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
-    @ApiResponse(responseCode = "403", description = "Caller is not an administrator."),
-    @ApiResponse(responseCode = "404", description = "Item not found or location unknown."),
+    @ApiResponse(
+        responseCode = "404",
+        description = "Item not found, not owned, or location unknown."),
     @ApiResponse(responseCode = "409", description = "Optimistic lock conflict.")
   })
-  public PersonalInventoryItemResponse updateForUser(
-      @PathVariable UUID id, @Valid @RequestBody PersonalInventoryItemUpdateRequest request) {
-    return service.updateForUser(id, request);
+  public PersonalInventoryItemResponse update(
+      @PathVariable UUID id,
+      @Valid @RequestBody PersonalInventoryItemUpdateRequest request,
+      @CurrentUserId UUID ownerUserId) {
+    return service.updateOwn(ownerUserId, id, request);
   }
 
   /**
-   * Deletes any personal-inventory item by id. Owner sub is logged at INFO for the audit trail.
+   * Deletes one of the caller's own items.
    *
    * @param id item id
    */
-  @DeleteMapping("/items/{id}")
+  @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @Operation(summary = "Delete any personal inventory entry by id.")
+  @Operation(summary = "Delete one of the caller's personal inventory entries.")
   @ApiResponses({
     @ApiResponse(responseCode = "204", description = "Item deleted."),
-    @ApiResponse(responseCode = "403", description = "Caller is not an administrator."),
-    @ApiResponse(responseCode = "404", description = "Item not found.")
+    @ApiResponse(responseCode = "404", description = "Not found or not owned by caller.")
   })
-  public void deleteForUser(@PathVariable UUID id) {
-    service.deleteForUser(id);
+  public void delete(@PathVariable UUID id, @CurrentUserId UUID ownerUserId) {
+    service.deleteOwn(ownerUserId, id);
   }
 }

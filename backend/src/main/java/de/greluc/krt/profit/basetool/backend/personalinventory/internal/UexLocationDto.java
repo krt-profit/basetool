@@ -17,9 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
-
-import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryLocationType;
+package de.greluc.krt.profit.basetool.backend.personalinventory.internal;
 
 /**
  * Combined search result entry exposing UEX cities and space stations to the frontend for the
