@@ -95,7 +95,7 @@ that published the event (REQ-AUDIT-007). Eleven modules publish today:
 | `notification.api.events` | `NotificationEvent`, the contract every notification-producing event implements, the `OrgUnitRef` it carries, `NoticeEvent`, the plain event the newer producers build from their parts, and the `ActorRef` that names who acted |
 | `identity.api.events` | `DiscordRegistrationPendingEvent`, `DiscordRegistrationDecidedEvent`, `UserApprovalDecidedEvent`, `MemberDepartedEvent` (consumed by the exchange departure) |
 | `privacy.api.events` | the three `AccountDeletionRequest…Event`s (transitional module, plan §7.6) |
-| `bank.api.events` | `BankBookingRequestEvent` and its created, updated, confirmed, rejected, cancelled and notices-reconciled records; `BankAccountResponsibleAssignedEvent` |
+| `bank.api.events` | `BankBookingRequestEvent` and its created, updated, confirmed, rejected, cancelled and notices-reconciled records; `BankAccountResponsibleAssignedEvent`; and `BankNotices`, the factory of the approval, grant, direct-booking and holder notices (REQ-BANK-057…060) |
 | `joborder.api.events` | `JobOrderCreatedEvent`, `JobOrderUpdatedByRequesterEvent`, `JobOrderClosedEvent`, and `JobOrderNotices`, the factory of the reassigned, finished, assignee and withdrawn-claim notices (REQ-ORDERS-041…044) |
 | `materialexchange.api.events` | `MaterialExchangeInterestRegisteredEvent`, `MaterialRequestFulfillmentSignalledEvent`, and `MarketNotices`, the factory of the offer-gone and request-withdrawn notices (REQ-MARKET-021, -022) |
 | `exchange.api.events` | `ExchangeInstallationConnectedEvent`, `ExchangeBulkUndoAppliedEvent` |

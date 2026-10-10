@@ -255,6 +255,23 @@ class NotificationPageControllerTest {
   }
 
   @Test
+  void targetOf_bankNoticesLinkWhatTheirRecipientCanOpen() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/bank/requests",
+        NotificationPageController.targetOf(
+            "BANK_BOOKING_REQUEST_APPROVED", "BANK_BOOKING_REQUEST", id));
+    assertEquals(
+        "/bank/accounts/" + id,
+        NotificationPageController.targetOf("BANK_GRANT_CHANGED", "BANK_ACCOUNT_GRANT", id));
+    assertNull(NotificationPageController.targetOf("BANK_GRANT_REVOKED", "BANK_ACCOUNT_GRANT", id));
+    assertEquals(
+        "/bank/holders/" + id,
+        NotificationPageController.targetOf(
+            "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "BANK_HOLDER", id));
+  }
+
+  @Test
   void targetOf_jobOrderLinksTheOrder() {
     UUID orderId = UUID.fromString("00000000-0000-0000-0000-000000000099");
 

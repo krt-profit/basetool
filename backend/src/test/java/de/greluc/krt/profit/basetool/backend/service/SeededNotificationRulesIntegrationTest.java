@@ -166,6 +166,43 @@ class SeededNotificationRulesIntegrationTest {
             true,
             SelectorKind.EVENT_RECIPIENT),
         rule(
+            NotificationEventType.BANK_BOOKING_REQUEST_APPROVED,
+            NotificationType.BANK_BOOKING_REQUEST_APPROVED,
+            true,
+            SelectorKind.ROLE,
+            SelectorKind.ACCOUNT_GRANT,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
+            NotificationEventType.BANK_GRANT_CHANGED,
+            NotificationType.BANK_GRANT_CHANGED,
+            true,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
+            NotificationEventType.BANK_GRANT_REVOKED,
+            NotificationType.BANK_GRANT_REVOKED,
+            true,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
+            NotificationEventType.BANK_PAYOUT_BOOKED,
+            NotificationType.BANK_PAYOUT_RECEIVED,
+            true,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
+            NotificationEventType.BANK_HOLDER_TRANSFER_BOOKED,
+            NotificationType.BANK_HOLDER_TRANSFER_RECEIVED,
+            true,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
+            NotificationEventType.BANK_ACCOUNT_DEBITED,
+            NotificationType.BANK_ACCOUNT_DEBITED,
+            true,
+            SelectorKind.ACCOUNT_RESPONSIBLE),
+        rule(
+            NotificationEventType.BANK_HOLDER_DEACTIVATED_WITH_BALANCE,
+            NotificationType.BANK_HOLDER_DEACTIVATED_WITH_BALANCE,
+            true,
+            SelectorKind.ROLE),
+        rule(
             NotificationEventType.OPERATION_COMPLETED_UNOWNED,
             NotificationType.OPERATION_COMPLETED,
             true,

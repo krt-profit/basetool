@@ -88,6 +88,15 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `MATERIAL_EXCHANGE_OFFER_UNAVAILABLE` | `MATERIAL_EXCHANGE_OFFER_UNAVAILABLE` | V277 | `EVENT_RECIPIENTS` (the members who registered interest); coded `reasonCode`; supersedes `MATERIAL_EXCHANGE_INTEREST_REGISTERED` | REQ-MARKET-021 |
 | `MATERIAL_REQUEST_UNAVAILABLE` | `MATERIAL_REQUEST_UNAVAILABLE` | V277 | `EVENT_RECIPIENTS` (the members who signalled they can supply); supersedes `MATERIAL_REQUEST_FULFILLMENT_SIGNALLED` | REQ-MARKET-022 |
 | `INVENTORY_BOOKED_OUT_BY_OTHER` | `INVENTORY_BOOKED_OUT_BY_OTHER` | V277 | `EVENT_RECIPIENT` (the row's owner); coded `actionCode`, one notice per action | REQ-INV-056 |
+| `BANK_BOOKING_REQUEST_APPROVED` | `BANK_BOOKING_REQUEST_APPROVED` | V278 | `ROLE` `BANK_MANAGEMENT`, `ACCOUNT_GRANT`, `EVENT_RECIPIENT` (the requester); cleared by the revocation and by confirm / reject / cancel | REQ-BANK-057 |
+| `BANK_BOOKING_REQUEST_APPROVAL_REVOKED` | none (no rule) | — | supersedes the request's `BANK_BOOKING_REQUEST_APPROVED` | REQ-BANK-057 |
+| `BANK_GRANT_CHANGED` | `BANK_GRANT_CHANGED` | V278 | `EVENT_RECIPIENT` (the grantee); supersedes the grantee's earlier grant notices for the account | REQ-BANK-058 |
+| `BANK_GRANT_REVOKED` | `BANK_GRANT_REVOKED` | V278 | `EVENT_RECIPIENT` (the former grantee); supersedes the same | REQ-BANK-058 |
+| `BANK_PAYOUT_BOOKED` | `BANK_PAYOUT_RECEIVED` | V278 | `EVENT_RECIPIENT` (the member paid out to) | REQ-BANK-059 |
+| `BANK_HOLDER_TRANSFER_BOOKED` | `BANK_HOLDER_TRANSFER_RECEIVED` | V278 | `EVENT_RECIPIENT` (the receiving holder's member) | REQ-BANK-059 |
+| `BANK_ACCOUNT_DEBITED` | `BANK_ACCOUNT_DEBITED` | V278 | `ACCOUNT_RESPONSIBLE`; coded `debitCode` | REQ-BANK-059 |
+| `BANK_HOLDER_DEACTIVATED_WITH_BALANCE` | `BANK_HOLDER_DEACTIVATED_WITH_BALANCE` | V278 | `ROLE` `BANK_MANAGEMENT`; replaces itself | REQ-BANK-060 |
+| `BANK_HOLDER_NOTICE_CLEARED` | none (no rule) | — | supersedes the holder's deactivated-with-balance notice | REQ-BANK-060 |
 
 Every notification type renders through `notifications.type.<TYPE>` in all three frontend bundles.
 The e-mail consumers of REQ-NOTIF-013 (`UserApprovalMailService`, `PendingRegistrationMailService`)

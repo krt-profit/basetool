@@ -258,7 +258,49 @@ public enum NotificationType {
    * Somebody else discarded or sold part of the recipient's Lager stock (REQ-INV-056), rendered
    * with {@code actor}, the {@code action} word, {@code count} and the {@code lots}.
    */
-  INVENTORY_BOOKED_OUT_BY_OTHER;
+  INVENTORY_BOOKED_OUT_BY_OTHER,
+
+  /**
+   * A booking request is approved and ready to confirm (REQ-BANK-057), rendered with {@code type},
+   * {@code amount}, {@code accountNo} and {@code approver}.
+   */
+  BANK_BOOKING_REQUEST_APPROVED,
+
+  /**
+   * The recipient's bank access to an account was granted or changed (REQ-BANK-058), rendered with
+   * {@code accountNo}, the {@code grantChange} word and the three rights words.
+   */
+  BANK_GRANT_CHANGED,
+
+  /**
+   * The recipient's bank access to an account was withdrawn (REQ-BANK-058), rendered with {@code
+   * accountNo} and {@code actor}.
+   */
+  BANK_GRANT_REVOKED,
+
+  /**
+   * Bank staff paid an amount out to the recipient (REQ-BANK-059), rendered with {@code amount},
+   * {@code fee}, {@code accountNo} and {@code actor}.
+   */
+  BANK_PAYOUT_RECEIVED,
+
+  /**
+   * Bank staff moved an amount to the recipient's holder, who must take the aUEC over
+   * (REQ-BANK-059), rendered with {@code amount} and {@code actor}.
+   */
+  BANK_HOLDER_TRANSFER_RECEIVED,
+
+  /**
+   * Bank staff debited the recipient's account or reversed a booking on it (REQ-BANK-059), rendered
+   * with {@code accountNo}, {@code amount}, {@code fee}, the {@code debit} word and {@code actor}.
+   */
+  BANK_ACCOUNT_DEBITED,
+
+  /**
+   * A bank holder was deactivated but still holds aUEC (REQ-BANK-060), rendered with {@code holder}
+   * and {@code balance}.
+   */
+  BANK_HOLDER_DEACTIVATED_WITH_BALANCE;
 
   /**
    * Whether a member may mute this type (REQ-NOTIF-027). The account-deletion types serve a legal
@@ -308,7 +350,14 @@ public enum NotificationType {
           REFINERY_ORDER_CHANGED_BY_OTHER,
           MATERIAL_EXCHANGE_OFFER_UNAVAILABLE,
           MATERIAL_REQUEST_UNAVAILABLE,
-          INVENTORY_BOOKED_OUT_BY_OTHER ->
+          INVENTORY_BOOKED_OUT_BY_OTHER,
+          BANK_BOOKING_REQUEST_APPROVED,
+          BANK_GRANT_CHANGED,
+          BANK_GRANT_REVOKED,
+          BANK_PAYOUT_RECEIVED,
+          BANK_HOLDER_TRANSFER_RECEIVED,
+          BANK_ACCOUNT_DEBITED,
+          BANK_HOLDER_DEACTIVATED_WITH_BALANCE ->
           true;
     };
   }

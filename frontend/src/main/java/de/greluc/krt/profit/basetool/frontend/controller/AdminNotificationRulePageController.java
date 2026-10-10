@@ -112,7 +112,16 @@ public class AdminNotificationRulePageController {
           "REFINERY_ORDER_READY_CLEARED",
           "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE",
           "MATERIAL_REQUEST_UNAVAILABLE",
-          "INVENTORY_BOOKED_OUT_BY_OTHER");
+          "INVENTORY_BOOKED_OUT_BY_OTHER",
+          "BANK_BOOKING_REQUEST_APPROVED",
+          "BANK_BOOKING_REQUEST_APPROVAL_REVOKED",
+          "BANK_GRANT_CHANGED",
+          "BANK_GRANT_REVOKED",
+          "BANK_PAYOUT_BOOKED",
+          "BANK_HOLDER_TRANSFER_BOOKED",
+          "BANK_ACCOUNT_DEBITED",
+          "BANK_HOLDER_DEACTIVATED_WITH_BALANCE",
+          "BANK_HOLDER_NOTICE_CLEARED");
 
   /**
    * {@code NotificationType} codes, labelled via {@code admin.notificationRules.notificationType}.
@@ -157,7 +166,14 @@ public class AdminNotificationRulePageController {
           "REFINERY_ORDER_CHANGED_BY_OTHER",
           "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE",
           "MATERIAL_REQUEST_UNAVAILABLE",
-          "INVENTORY_BOOKED_OUT_BY_OTHER");
+          "INVENTORY_BOOKED_OUT_BY_OTHER",
+          "BANK_BOOKING_REQUEST_APPROVED",
+          "BANK_GRANT_CHANGED",
+          "BANK_GRANT_REVOKED",
+          "BANK_PAYOUT_RECEIVED",
+          "BANK_HOLDER_TRANSFER_RECEIVED",
+          "BANK_ACCOUNT_DEBITED",
+          "BANK_HOLDER_DEACTIVATED_WITH_BALANCE");
 
   /**
    * {@code SelectorKind} codes, labelled via {@code admin.notificationRules.selector.kind}. All but
