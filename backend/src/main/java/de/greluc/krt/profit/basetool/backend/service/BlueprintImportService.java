@@ -154,7 +154,7 @@ public class BlueprintImportService {
         case SUGGESTED -> suggested++;
         case UNMATCHED -> unmatched++;
         case ALREADY_OWNED -> alreadyOwned++;
-        default -> {}
+        case null -> throw new NullPointerException("import status");
       }
       entries.add(
           new BlueprintImportEntryDto(

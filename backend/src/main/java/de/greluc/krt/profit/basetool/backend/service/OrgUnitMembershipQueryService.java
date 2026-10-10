@@ -174,10 +174,7 @@ public class OrgUnitMembershipQueryService {
     List<OrgUnitMembershipOptionDto> options = new ArrayList<>(rows.size());
     for (OrgUnitMembership row : rows) {
       OrgUnit unit = units.get(row.getId().getOrgUnitId());
-      if (unit == null
-          || unit.getKind() != row.getKind()
-          || (row.getKind() != OrgUnitKind.SQUADRON
-              && row.getKind() != OrgUnitKind.SPECIAL_COMMAND)) {
+      if (unit == null || unit.getKind() != row.getKind() || !row.getKind().isTenantUnit()) {
         continue;
       }
       options.add(

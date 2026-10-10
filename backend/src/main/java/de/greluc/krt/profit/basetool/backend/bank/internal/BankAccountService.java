@@ -231,8 +231,7 @@ public class BankAccountService {
         }
         OrgUnit orgUnit =
             Entities.require(orgUnitRepository.findById(request.orgUnitId()), "Org unit not found");
-        if (orgUnit.getKind() != OrgUnitKind.SQUADRON
-            && orgUnit.getKind() != OrgUnitKind.SPECIAL_COMMAND) {
+        if (!orgUnit.getKind().isTenantUnit()) {
           throw new BadRequestException(
               "An ORG_UNIT account must reference a Staffel or Spezialkommando");
         }
@@ -289,7 +288,7 @@ public class BankAccountService {
         requireNoOrgUnit(request);
         requireNoAreaName(request);
       }
-      default -> throw new BadRequestException("Unsupported bank account type: " + request.type());
+      case null -> throw new NullPointerException("account type");
     }
     account.setAccountNo(String.format("KB-%04d", accountRepository.nextAccountNoValue()));
     BankAccount saved = accountRepository.save(account);

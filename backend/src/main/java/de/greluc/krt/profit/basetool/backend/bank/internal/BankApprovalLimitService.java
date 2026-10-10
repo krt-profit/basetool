@@ -168,7 +168,7 @@ public class BankApprovalLimitService {
                     limit.getGranteeUserId(),
                     names.getOrDefault(limit.getGranteeUserId(), ""),
                     limit.getLimitAmount()));
-        default -> {}
+        case null -> throw new NullPointerException("grantee kind");
       }
     }
     return new BankApprovalLimitsDto(

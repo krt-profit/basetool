@@ -59,10 +59,8 @@ public final class OperationPayoutCalculator {
       @NotNull List<MissionFinanceEntry> entries, @NotNull List<RefineryOrder> orders) {
     BigDecimal total = BigDecimal.ZERO;
     for (MissionFinanceEntry entry : entries) {
-      if (entry.getType() == FinanceType.INCOME) {
-        total = total.add(entry.getAmount());
-      } else if (entry.getType() == FinanceType.EXPENSE) {
-        total = total.subtract(entry.getAmount());
+      if (entry.getType() != null) {
+        total = total.add(entry.getType().signed(entry.getAmount()));
       }
     }
     for (RefineryOrder order : orders) {

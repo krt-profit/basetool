@@ -203,8 +203,7 @@ public class NotificationRuleService {
         }
       }
       case ACCOUNT_GRANT, EVENT_RECIPIENT, ACCOUNT_RESPONSIBLE -> {}
-      default ->
-          throw new IllegalArgumentException("Unsupported selector kind: " + selector.kind());
+      case null -> throw new NullPointerException("selector kind");
     }
     return null;
   }
