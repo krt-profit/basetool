@@ -33,9 +33,6 @@ import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
@@ -263,9 +260,6 @@ class RefineryAccessPolicyDifferentialTest {
               resolver,
               authHelper,
               mock(MissionRepository.class),
-              mock(JobOrderRepository.class),
-              mock(JobOrderHandoverRepository.class),
-              mock(JobOrderItemHandoverRepository.class),
               mock(InventoryItemRepository.class),
               mock(ShipRepository.class),
               memberships);

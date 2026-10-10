@@ -29,6 +29,8 @@ import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.http.client.FilteredHostException;
+import org.springframework.boot.http.client.InetAddressFilter;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
@@ -111,6 +113,65 @@ class RestClientConfigTest {
 
       assertThat(second.get().uri("/ping").retrieve().body(String.class)).isEqualTo("ok");
       assertThat(first).isNotSameAs(config.restClientBuilder(ObservationRegistry.NOOP));
+    }
+  }
+
+  /**
+   * The external builder refuses a connection to a loopback address, the case a hostile redirect or
+   * a rebinding hostname would aim for; the internal builder still reaches it.
+   *
+   * @throws Exception if the mock server cannot be started
+   */
+  @Test
+  void theExternalBuilderRefusesLoopbackWhileTheInternalOneReachesIt() throws Exception {
+    try (MockWebServer server = new MockWebServer()) {
+      server.enqueue(new MockResponse().setBody("ok"));
+      server.start();
+      RestClientConfig config = new RestClientConfig();
+      String base = server.url("/").toString();
+
+      RestClient external =
+          config.externalRestClientBuilder(ObservationRegistry.NOOP).baseUrl(base).build();
+      RestClient internal =
+          config.restClientBuilder(ObservationRegistry.NOOP).baseUrl(base).build();
+
+      assertThatThrownBy(() -> external.get().uri("/ping").retrieve().body(String.class))
+          .isInstanceOf(FilteredHostException.class);
+      assertThat(server.getRequestCount()).isZero();
+      assertThat(internal.get().uri("/ping").retrieve().body(String.class)).isEqualTo("ok");
+    }
+  }
+
+  /**
+   * The external request factory answers a redirect with the redirect itself and never opens the
+   * second connection.
+   *
+   * @throws Exception if the mock server cannot be started
+   */
+  @Test
+  void theExternalFactoryFollowsNoRedirect() throws Exception {
+    try (MockWebServer target = new MockWebServer();
+        MockWebServer origin = new MockWebServer()) {
+      target.enqueue(new MockResponse().setBody("reached"));
+      target.start();
+      origin.enqueue(
+          new MockResponse()
+              .setResponseCode(302)
+              .setHeader("Location", target.url("/secret").toString()));
+      origin.start();
+      RestClient client =
+          RestClient.builder()
+              .requestFactory(
+                  RestClientConfig.externalJdkRequestFactory(
+                      Duration.ofSeconds(5), Duration.ofSeconds(5), InetAddressFilter.all()))
+              .baseUrl(origin.url("/").toString())
+              .build();
+
+      int status =
+          client.get().uri("/start").exchange((_, response) -> response.getStatusCode().value());
+
+      assertThat(status).isEqualTo(302);
+      assertThat(target.getRequestCount()).isZero();
     }
   }
 }

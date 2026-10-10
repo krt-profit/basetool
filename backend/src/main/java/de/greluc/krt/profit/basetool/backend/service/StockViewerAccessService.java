@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargetPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ public class StockViewerAccessService implements StockViewerAccess {
 
   private final AccessGateService accessGateService;
   private final AuthHelperService authHelperService;
+  private final EarmarkTargetPolicy earmarkTargetPolicy;
 
   /** {@inheritDoc} */
   @Override
@@ -46,7 +48,7 @@ public class StockViewerAccessService implements StockViewerAccess {
   /** {@inheritDoc} */
   @Override
   public boolean mayEditJobOrder(UUID jobOrderId) {
-    return jobOrderId != null && accessGateService.mayEditJobOrder(jobOrderId);
+    return jobOrderId != null && earmarkTargetPolicy.mayEditJobOrderEarmarks(jobOrderId);
   }
 
   /**
