@@ -5,6 +5,7 @@ spring-dependency-management = { id = "io.spring.dependency-management", version
 cyclonedx-bom = { id = "org.cyclonedx.bom", version.ref = "cyclonedx" }
 spotbugs-base = { id = "com.github.spotbugs-base", version.ref = "spotbugs" }
 pitest = { id = "info.solidsoft.pitest", version.ref = "pitest" }
+errorprone = { id = "net.ltgt.errorprone", version.ref = "errorpronePlugin" }
 node-gradle = { id = "com.github.node-gradle.node", version.ref = "nodeGradle" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 owasp-dependencycheck = { id = "org.owasp.dependencycheck", version.ref = "owaspDependencycheck" }
@@ -43,6 +44,9 @@ nodeGradle = "7.1.0"
 spotless = "8.10.3"
 owaspDependencycheck = "13.0.0"
 findsecbugs = "1.14.0"
+errorprone = "2.50.0"
+errorpronePlugin = "5.1.1"
+nullaway = "0.14.2"
 checkstyle = "14.3.0"
 googleJavaFormat = "1.36.1"
 node = "24.21.0"
@@ -87,6 +91,8 @@ lombok-mapstruct-binding = { module = "org.projectlombok:lombok-mapstruct-bindin
 openpdf-core = { module = "com.github.librepdf:openpdf", version.ref = "openpdf" }
 commonmark-core = { module = "org.commonmark:commonmark", version.ref = "commonmark" }
 findsecbugs-plugin = { module = "com.h3xstream.findsecbugs:findsecbugs-plugin", version.ref = "findsecbugs" }
+errorprone-core = { module = "com.google.errorprone:error_prone_core", version.ref = "errorprone" }
+nullaway = { module = "com.uber.nullaway:nullaway", version.ref = "nullaway" }
 checkstyle = { module = "com.puppycrawl.tools:checkstyle", version.ref = "checkstyle" }
 google-java-format = { module = "com.google.googlejavaformat:google-java-format", version.ref = "googleJavaFormat" }
 pitest-junit5-plugin = { module = "org.pitest:pitest-junit5-plugin", version.ref = "pitestJunit5" }

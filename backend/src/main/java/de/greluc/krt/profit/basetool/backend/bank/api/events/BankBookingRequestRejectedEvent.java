@@ -71,6 +71,7 @@ public record BankBookingRequestRejectedEvent(
     return Map.of();
   }
 
+  @Nullable
   @Override
   public UUID contextRecipientUserId() {
     return requesterSub;

@@ -66,6 +66,7 @@ public record MaterialExchangeInterestRegisteredEvent(
     return Map.of();
   }
 
+  @Nullable
   @Override
   public UUID contextRecipientUserId() {
     return ownerUserId;
