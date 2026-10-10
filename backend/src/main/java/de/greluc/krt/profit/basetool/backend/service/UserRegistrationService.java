@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.UserApprovalDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
@@ -252,8 +253,8 @@ public class UserRegistrationService {
 
   /**
    * Shared approve/reject body: loads the user, checks the optimistic-lock version, stamps the new
-   * status + deciding admin + time, and persists (saveAndFlush so the bumped {@code @Version}
-   * reaches the response for the no-reload admin queue).
+   * status + deciding admin + time, persists (saveAndFlush so the bumped {@code @Version} reaches
+   * the response for the no-reload admin queue) and clears the admins' pending notices.
    *
    * @param userId the registration to decide
    * @param version the optimistic-lock version; {@code null} bypasses the check
@@ -273,7 +274,9 @@ public class UserRegistrationService {
     user.setApprovalStatus(newStatus);
     user.setApprovedAt(Instant.now());
     user.setApprovedById(adminId);
-    return userRepository.saveAndFlush(user);
+    User saved = userRepository.saveAndFlush(user);
+    eventPublisher.publishEvent(new DiscordRegistrationDecidedEvent(userId, adminId));
+    return saved;
   }
 
   /**

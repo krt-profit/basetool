@@ -115,7 +115,7 @@ public class UserProxyController {
   public UserDto getUser(@PathVariable UUID userId) {
     try {
       return identityClient.user(userId);
-    } catch (Exception e) {
+    } catch (Exception _) {
       return null;
     }
   }

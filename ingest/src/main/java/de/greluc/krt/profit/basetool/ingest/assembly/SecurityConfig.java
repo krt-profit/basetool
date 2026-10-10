@@ -272,7 +272,7 @@ public class SecurityConfig {
                                 .authenticationFailureHandler(
                                     new org.springframework.security.web.authentication
                                         .AuthenticationEntryPointFailureHandler(securityProblems)))
-                    .jwt(jwt -> {})
+                    .jwt(_ -> {})
                     .authenticationEntryPoint(securityProblems)
                     .accessDeniedHandler(securityProblems))
         .addFilterBefore(

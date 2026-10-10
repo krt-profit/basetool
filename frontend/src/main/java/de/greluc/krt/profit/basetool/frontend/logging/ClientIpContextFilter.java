@@ -166,7 +166,7 @@ public class ClientIpContextFilter extends OncePerRequestFilter implements Order
         if (matcher.matches(ip)) {
           return true;
         }
-      } catch (IllegalArgumentException ignored) {
+      } catch (IllegalArgumentException _) {
       }
     }
     return false;

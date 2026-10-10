@@ -462,7 +462,7 @@ public class RefineryImportService implements RefineryDraftBuilder {
     for (Material candidate : candidates) {
       String canonical = MaterialNameCanonicalizer.canonicalCore(candidate.getName());
       if (canonical != null && !canonical.isEmpty()) {
-        canonicalIndex.computeIfAbsent(canonical, k -> new ArrayList<>()).add(candidate);
+        canonicalIndex.computeIfAbsent(canonical, _ -> new ArrayList<>()).add(candidate);
       }
     }
     Set<UUID> candidateIds = new HashSet<>();
@@ -484,7 +484,7 @@ public class RefineryImportService implements RefineryDraftBuilder {
           || !candidateIds.contains(target.getId())) {
         continue;
       }
-      aliasCanonicalIndex.computeIfAbsent(aliasCanonical, k -> new ArrayList<>()).add(target);
+      aliasCanonicalIndex.computeIfAbsent(aliasCanonical, _ -> new ArrayList<>()).add(target);
     }
     return new MatchContext(candidates, canonicalIndex, candidateIds, aliasCanonicalIndex);
   }

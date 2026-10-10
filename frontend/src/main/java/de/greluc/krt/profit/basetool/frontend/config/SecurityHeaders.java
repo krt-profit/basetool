@@ -150,7 +150,7 @@ public final class SecurityHeaders {
       return uri.getPort() == -1
           ? scheme + "://" + host
           : scheme + "://" + host + ":" + uri.getPort();
-    } catch (IllegalArgumentException ex) {
+    } catch (IllegalArgumentException _) {
       log.warn(
           "Could not derive the Keycloak origin from issuer-uri '{}' for the CSP form-action"
               + " directive; the POST /logout redirect to Keycloak may be blocked by the browser.",

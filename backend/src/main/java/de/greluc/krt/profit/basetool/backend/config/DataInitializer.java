@@ -52,7 +52,7 @@ public class DataInitializer {
    */
   @Bean
   public CommandLineRunner initRoles() {
-    return args -> {
+    return _ -> {
       createRoleIfNotFound(
           Roles.KRT_MEMBER,
           "KRT Member",

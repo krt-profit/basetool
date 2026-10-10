@@ -290,4 +290,55 @@ class NotificationRepositoryIntegrationTest {
     assertThat(repository.findByIdAndRecipientUserId(decision.getId(), staffA)).isPresent();
     assertThat(repository.findByIdAndRecipientUserId(otherRequest.getId(), staffA)).isPresent();
   }
+
+  @Test
+  void supersedeForRecipientsLeavesEveryOtherRecipientsNotice() {
+    UUID formerHolder = UUID.randomUUID();
+    UUID staff = UUID.randomUUID();
+    UUID requestId = UUID.randomUUID();
+    Set<NotificationType> notices =
+        Set.of(
+            NotificationType.BANK_BOOKING_REQUEST_CREATED,
+            NotificationType.BANK_BOOKING_REQUEST_UPDATED);
+
+    Notification formerCreated =
+        save(
+            formerHolder,
+            NotificationType.BANK_BOOKING_REQUEST_CREATED,
+            "BANK_BOOKING_REQUEST",
+            requestId);
+    Notification formerUpdated =
+        save(
+            formerHolder,
+            NotificationType.BANK_BOOKING_REQUEST_UPDATED,
+            "BANK_BOOKING_REQUEST",
+            requestId);
+    Notification staffNotice =
+        save(
+            staff,
+            NotificationType.BANK_BOOKING_REQUEST_CREATED,
+            "BANK_BOOKING_REQUEST",
+            requestId);
+    Notification formerOtherRequest =
+        save(
+            formerHolder,
+            NotificationType.BANK_BOOKING_REQUEST_CREATED,
+            "BANK_BOOKING_REQUEST",
+            UUID.randomUUID());
+
+    int deleted =
+        transactionTemplate.execute(
+            status ->
+                repository.deleteByTypeInAndEntityForRecipients(
+                    notices, "BANK_BOOKING_REQUEST", requestId, Set.of(formerHolder)));
+
+    assertThat(deleted).isEqualTo(2);
+    assertThat(repository.findByIdAndRecipientUserId(formerCreated.getId(), formerHolder))
+        .isEmpty();
+    assertThat(repository.findByIdAndRecipientUserId(formerUpdated.getId(), formerHolder))
+        .isEmpty();
+    assertThat(repository.findByIdAndRecipientUserId(staffNotice.getId(), staff)).isPresent();
+    assertThat(repository.findByIdAndRecipientUserId(formerOtherRequest.getId(), formerHolder))
+        .isPresent();
+  }
 }

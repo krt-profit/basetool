@@ -122,9 +122,9 @@ public class JobOrderItemBlueprintOwnersService {
         }
         UUID ownerId = bp.ownerUserId();
         ownedNamesByOwnerId
-            .computeIfAbsent(ownerId, id -> new LinkedHashSet<>())
+            .computeIfAbsent(ownerId, _ -> new LinkedHashSet<>())
             .add(bp.productName());
-        ownersByFamily.computeIfAbsent(matchKey, k -> new LinkedHashSet<>()).add(ownerId);
+        ownersByFamily.computeIfAbsent(matchKey, _ -> new LinkedHashSet<>()).add(ownerId);
       }
     }
 
