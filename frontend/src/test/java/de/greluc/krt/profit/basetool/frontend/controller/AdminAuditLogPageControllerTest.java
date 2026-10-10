@@ -389,7 +389,7 @@ class AdminAuditLogPageControllerTest {
   @Test
   void aRegistryClientIsOfferedByNameAndRelayedAsAFilter() {
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(contains("/api/v1/admin/exchange-clients"), anyTypeRef()))
+    when(backendApiClient.get(contains("/api/v1/connected-apps/admin/clients"), anyTypeRef()))
         .thenReturn(
             List.of(
                 new ExchangeClientDto(
@@ -559,7 +559,7 @@ class AdminAuditLogPageControllerTest {
         .filter(i -> "get".equals(i.getMethod().getName()))
         .forEach(i -> uris.add(i.getArgument(0)));
     return uris.stream()
-        .filter(u -> !u.startsWith("/api/v1/admin/exchange-clients"))
+        .filter(u -> !u.startsWith("/api/v1/connected-apps/admin/clients"))
         .findFirst()
         .orElseThrow();
   }

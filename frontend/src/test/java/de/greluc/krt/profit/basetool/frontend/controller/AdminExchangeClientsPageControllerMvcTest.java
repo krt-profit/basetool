@@ -108,9 +108,9 @@ class AdminExchangeClientsPageControllerMvcTest {
             Instant.parse("2026-09-27T08:00:00Z"),
             null,
             3L);
-    when(backendApiClient.get(eq("/api/v1/admin/exchange-clients"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/connected-apps/admin/clients"), anyTypeRef()))
         .thenReturn(List.of(client));
-    when(backendApiClient.get("/api/v1/admin/exchange-settings", ExchangeSettingsDto.class))
+    when(backendApiClient.get("/api/v1/connected-apps/admin/settings", ExchangeSettingsDto.class))
         .thenReturn(new ExchangeSettingsDto(true, null, 5L));
   }
 
@@ -145,7 +145,7 @@ class AdminExchangeClientsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void eachClientShowsItsConnectedMembersLastActivityAndTheGrafanaLink() throws Exception {
     stubRegistry();
-    when(backendApiClient.get(eq("/api/v1/admin/exchange-clients/usage"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/connected-apps/admin/clients/usage"), anyTypeRef()))
         .thenReturn(
             List.of(new ExchangeClientUsageDto(ID, 7L, Instant.parse("2026-09-27T09:30:00Z"))));
 
@@ -165,7 +165,7 @@ class AdminExchangeClientsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void anUnreadableUsageLeavesThePageStanding() throws Exception {
     stubRegistry();
-    when(backendApiClient.get(eq("/api/v1/admin/exchange-clients/usage"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/connected-apps/admin/clients/usage"), anyTypeRef()))
         .thenThrow(new BackendServiceException("usage down", null, 503));
 
     mockMvc
@@ -194,7 +194,7 @@ class AdminExchangeClientsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void aBackendOutageRendersTheFailureInsideTheFragmentWithoutASwitch() throws Exception {
-    when(backendApiClient.get(eq("/api/v1/admin/exchange-clients"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/connected-apps/admin/clients"), anyTypeRef()))
         .thenThrow(new BackendServiceException("backend down", null, 503));
 
     mockMvc
@@ -251,7 +251,7 @@ class AdminExchangeClientsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void aRegistrationIsRelayedToTheBackend() throws Exception {
     when(backendApiClient.post(
-            eq("/api/v1/admin/exchange-clients"), any(), eq(ExchangeClientDto.class)))
+            eq("/api/v1/connected-apps/admin/clients"), any(), eq(ExchangeClientDto.class)))
         .thenReturn(null);
 
     mockMvc
@@ -267,7 +267,10 @@ class AdminExchangeClientsPageControllerMvcTest {
 
     ArgumentCaptor<Object> body = ArgumentCaptor.forClass(Object.class);
     verify(backendApiClient)
-        .post(eq("/api/v1/admin/exchange-clients"), body.capture(), eq(ExchangeClientDto.class));
+        .post(
+            eq("/api/v1/connected-apps/admin/clients"),
+            body.capture(),
+            eq(ExchangeClientDto.class));
     assertThat(body.getValue())
         .isEqualTo(
             new ExchangeClientCreateRequest(
@@ -288,7 +291,7 @@ class AdminExchangeClientsPageControllerMvcTest {
 
     verify(backendApiClient)
         .post(
-            "/api/v1/admin/exchange-clients/{id}/suspend",
+            "/api/v1/connected-apps/admin/clients/{id}/suspend",
             new ExchangeClientStatusRequest(3L),
             ExchangeClientDto.class,
             ID);
@@ -298,7 +301,7 @@ class AdminExchangeClientsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void theSwitchIsRelayedAndAConflictComesBackAsAConflict() throws Exception {
     when(backendApiClient.put(
-            eq("/api/v1/admin/exchange-settings"),
+            eq("/api/v1/connected-apps/admin/settings"),
             eq(new ExchangeSettingsUpdateRequest(false, 5L)),
             eq(ExchangeSettingsDto.class)))
         .thenThrow(new BackendServiceException("stale", null, 409));
@@ -317,7 +320,8 @@ class AdminExchangeClientsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void oneClientIsReturnedForTheEditForm() throws Exception {
     stubRegistry();
-    when(backendApiClient.get("/api/v1/admin/exchange-clients/{id}", ExchangeClientDto.class, ID))
+    when(backendApiClient.get(
+            "/api/v1/connected-apps/admin/clients/{id}", ExchangeClientDto.class, ID))
         .thenReturn(
             new ExchangeClientDto(
                 ID,
@@ -370,7 +374,7 @@ class AdminExchangeClientsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void theUndoRunsFragmentShowsARunningRunAndAsksToBePolled() throws Exception {
     stubRegistry();
-    when(backendApiClient.get(eq("/api/v1/admin/exchange-undo-runs"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/connected-apps/admin/undo-runs"), anyTypeRef()))
         .thenReturn(List.of(run("RUNNING")));
 
     mockMvc
@@ -389,7 +393,7 @@ class AdminExchangeClientsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void thePageOffersTheUndoPerClientAndStopsPollingWhenNothingRuns() throws Exception {
     stubRegistry();
-    when(backendApiClient.get(eq("/api/v1/admin/exchange-undo-runs"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/connected-apps/admin/undo-runs"), anyTypeRef()))
         .thenReturn(List.of(run("COMPLETED")));
 
     mockMvc
@@ -409,13 +413,16 @@ class AdminExchangeClientsPageControllerMvcTest {
     ExchangeBulkUndoRequest scope =
         new ExchangeBulkUndoRequest(Instant.parse("2026-09-27T12:00:00Z"), null, "SHIP");
     when(backendApiClient.post(
-            "/api/v1/admin/exchange-clients/{id}/undo/preview",
+            "/api/v1/connected-apps/admin/clients/{id}/undo/preview",
             scope,
             ExchangeBulkUndoPreviewDto.class,
             ID))
         .thenReturn(new ExchangeBulkUndoPreviewDto(scope.since(), 3, 12L, true));
     when(backendApiClient.post(
-            "/api/v1/admin/exchange-clients/{id}/undo", scope, ExchangeBulkUndoRunDto.class, ID))
+            "/api/v1/connected-apps/admin/clients/{id}/undo",
+            scope,
+            ExchangeBulkUndoRunDto.class,
+            ID))
         .thenReturn(run("RUNNING"));
     String body = "{\"since\":\"2026-09-27T12:00:00Z\",\"resource\":\"SHIP\"}";
 
@@ -444,7 +451,7 @@ class AdminExchangeClientsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void aSecondRunIsRelayedAsAConflict() throws Exception {
     when(backendApiClient.post(
-            eq("/api/v1/admin/exchange-clients/{id}/undo"),
+            eq("/api/v1/connected-apps/admin/clients/{id}/undo"),
             any(),
             eq(ExchangeBulkUndoRunDto.class),
             eq(ID)))
@@ -464,13 +471,15 @@ class AdminExchangeClientsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void theInstallationsAndARunsSkippedEntriesAreRelayed() throws Exception {
     when(backendApiClient.get(
-            eq("/api/v1/admin/exchange-clients/{id}/undo/installations?since={since}"),
+            eq("/api/v1/connected-apps/admin/clients/{id}/undo/installations?since={since}"),
             anyTypeRef(),
             eq(ID),
             eq("2026-09-27T12:00:00Z")))
         .thenReturn(List.of());
     when(backendApiClient.get(
-            "/api/v1/admin/exchange-undo-runs/{runId}", ExchangeBulkUndoRunDetailDto.class, RUN))
+            "/api/v1/connected-apps/admin/undo-runs/{runId}",
+            ExchangeBulkUndoRunDetailDto.class,
+            RUN))
         .thenReturn(
             new ExchangeBulkUndoRunDetailDto(
                 run("COMPLETED"),

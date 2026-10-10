@@ -1274,6 +1274,9 @@ is replaced by a single cut. Each wave is one domain's cut ([appendix](modularis
 backend and frontend change of that domain in one release (frontend and backend deploy in one
 restart window), with a new app release published first and the minimum version raised once the
 re-cut release is verified healthy — or, once the floor is release-bound (D-11), by the release itself.
+The executable wave plan (counts re-measured on 2026-10-10, the machine-readable map, the
+integration branch `claude/api-cut`, the shape changes, the forced-update mechanics, the owner
+questions and the app work split) is [`modularisation/api-cut-waves.md`](modularisation/api-cut-waves.md).
 Suggested order by risk and app impact: web-only moves first (admin sub-trees, notification rules,
 the demonstration ping), then identity and org units, mission, bank, job orders and the game-item
 catalogue, and the small rest (Materialbörse, hangar, refinery, typed settings). The T0 tier never

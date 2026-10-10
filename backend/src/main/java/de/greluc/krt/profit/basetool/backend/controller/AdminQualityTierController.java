@@ -47,7 +47,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** Administrator maintenance of the quality-tier catalogue (REQ-ORDERS-036). */
 @RestController
-@RequestMapping("/api/v1/admin/quality-tiers")
+@RequestMapping("/api/v1/catalog/admin/quality-tiers")
 @RequiredArgsConstructor
 @PreAuthorize(Roles.HAS_ROLE_ADMIN)
 @Tag(name = "Admin – Quality tiers", description = "Administrator endpoints for the quality tiers.")

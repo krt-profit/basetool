@@ -52,9 +52,10 @@ public final class NoStoreApiScopes {
   /** The families whose GET bodies must not be stored anywhere. */
   private static final List<String> NO_STORE_FAMILIES =
       List.of(
-          "/api/v1/admin/**",
           "/api/v1/audit/**",
           "/api/v1/bank/**",
+          "/api/v1/blueprints/admin/**",
+          "/api/v1/catalog/admin/**",
           "/api/v1/connected-apps/**",
           "/api/v1/exchange/**",
           "/api/v1/finance-entries/**",
@@ -66,7 +67,6 @@ public final class NoStoreApiScopes {
           "/api/v1/material-requests/**",
           "/api/v1/me/**",
           "/api/v1/missions/*/finance-entries/**",
-          "/api/v1/notification-rules/**",
           "/api/v1/notifications/**",
           "/api/v1/operations/**",
           "/api/v1/orders/**",
@@ -76,6 +76,7 @@ public final class NoStoreApiScopes {
           "/api/v1/personal-inventory/**",
           "/api/v1/promotion/**",
           "/api/v1/refinery-orders/**",
+          "/api/v1/roles/**",
           "/api/v1/special-commands/*/members/**",
           "/api/v1/squadrons/*/members/**",
           "/api/v1/terms/**",
@@ -111,12 +112,9 @@ public final class NoStoreApiScopes {
           "/api/v1/special-commands/**",
           "/api/v1/squadrons/**",
           "/api/v1/star-systems/**",
-          "/api/v1/sync-reports/**",
-          "/api/v1/system/**",
           "/api/v1/terminals/**",
           "/api/v1/terms/document",
-          "/api/v1/uex/**",
-          "/api/v2/system/**");
+          "/api/v1/uex/**");
 
   /** The surface the classification is about. */
   private static final PathPattern API_SCOPE = PathPatternParser.defaultInstance.parse("/api/**");

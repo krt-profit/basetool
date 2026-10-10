@@ -52,7 +52,7 @@ import org.springframework.web.bind.annotation.RestController;
  * The exchange client registry and the global exchange switch, {@code ADMIN} only (REQ-XCH-003).
  */
 @RestController
-@RequestMapping("/api/v1/admin")
+@RequestMapping("/api/v1/connected-apps/admin")
 @RequiredArgsConstructor
 @PreAuthorize(Roles.HAS_ROLE_ADMIN)
 @Tag(name = "Admin — Exchange registry", description = "Approved third-party exchange clients")
@@ -67,7 +67,7 @@ public class AdminExchangeRegistryController {
    * @return all clients, ordered by client id
    */
   @NotNull
-  @GetMapping("/exchange-clients")
+  @GetMapping("/clients")
   @Operation(summary = "List exchange clients")
   @ApiResponse(responseCode = "200", description = "Every registry client")
   public ResponseEntity<List<ExchangeClientDto>> listClients() {
@@ -80,7 +80,7 @@ public class AdminExchangeRegistryController {
    * @return connected members and last activity per client in use; unused clients have no row
    */
   @NotNull
-  @GetMapping("/exchange-clients/usage")
+  @GetMapping("/clients/usage")
   @Operation(
       summary = "Exchange client usage",
       description = "Connected members and last activity per client, over live installations.")
@@ -96,7 +96,7 @@ public class AdminExchangeRegistryController {
    * @return the client
    */
   @NotNull
-  @GetMapping("/exchange-clients/{id}")
+  @GetMapping("/clients/{id}")
   @Operation(summary = "Get an exchange client")
   @ApiResponse(responseCode = "200", description = "The client")
   @ApiResponse(responseCode = "404", description = "No such client")
@@ -111,7 +111,7 @@ public class AdminExchangeRegistryController {
    * @return the saved client
    */
   @NotNull
-  @PostMapping("/exchange-clients")
+  @PostMapping("/clients")
   @Operation(
       summary = "Register an exchange client",
       description = "Registers an approved client as ACTIVE; exchange.connect is required.")
@@ -131,7 +131,7 @@ public class AdminExchangeRegistryController {
    * @return the saved client
    */
   @NotNull
-  @PutMapping("/exchange-clients/{id}")
+  @PutMapping("/clients/{id}")
   @Operation(
       summary = "Update an exchange client",
       description =
@@ -154,7 +154,7 @@ public class AdminExchangeRegistryController {
    * @return the saved client
    */
   @NotNull
-  @PostMapping("/exchange-clients/{id}/suspend")
+  @PostMapping("/clients/{id}/suspend")
   @Operation(
       summary = "Suspend an exchange client",
       description = "The suspension reaches the gateway's mirror before the commit or not at all.")
@@ -175,7 +175,7 @@ public class AdminExchangeRegistryController {
    * @return the saved client
    */
   @NotNull
-  @PostMapping("/exchange-clients/{id}/activate")
+  @PostMapping("/clients/{id}/activate")
   @Operation(summary = "Activate an exchange client")
   @ApiResponse(responseCode = "200", description = "The active client")
   @ApiResponse(responseCode = "409", description = "Stale version")
@@ -191,7 +191,7 @@ public class AdminExchangeRegistryController {
    * @return the switch
    */
   @NotNull
-  @GetMapping("/exchange-settings")
+  @GetMapping("/settings")
   @Operation(summary = "Get the global exchange switch")
   @ApiResponse(responseCode = "200", description = "The switch")
   public ResponseEntity<ExchangeSettingsDto> getSettings() {
@@ -205,7 +205,7 @@ public class AdminExchangeRegistryController {
    * @return the saved switch
    */
   @NotNull
-  @PutMapping("/exchange-settings")
+  @PutMapping("/settings")
   @Operation(
       summary = "Set the global exchange switch",
       description = "Switching off reaches the gateway's mirror before the commit or not at all.")

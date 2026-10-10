@@ -45,7 +45,7 @@ item-order material requirements (`job_order_item_material`) and material claims
 - A blueprint ingredient's default tier is the active tier with the highest floor its
   `minQuality` reaches.
 - Administrators maintain the catalogue at `/admin/quality-tiers`
-  (`/api/v1/admin/quality-tiers`, ADMIN only); every member reads it at `/api/v1/quality-tiers`.
+  (`/api/v1/catalog/admin/quality-tiers`, ADMIN only); every member reads it at `/api/v1/quality-tiers`.
   Every change is audited as `QUALITY_TIER_CREATED` / `_UPDATED` / `_DEACTIVATED` / `_DELETED`
   in the job-order domain (REQ-AUDIT-001).
 

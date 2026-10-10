@@ -137,7 +137,7 @@ class DataSubjectRightsAuditIntegrationTest {
   void adminExportJson_isServedAndAudited() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/admin/users/{id}/export", actor)
+            get("/api/v1/users/admin/{id}/export", actor)
                 .with(admin(actor))
                 .accept(FRONTEND_ACCEPT))
         .andExpect(status().isOk())
@@ -155,7 +155,7 @@ class DataSubjectRightsAuditIntegrationTest {
   void adminExportPdf_isServedAndAudited() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/admin/users/{id}/export/pdf", actor)
+            get("/api/v1/users/admin/{id}/export/pdf", actor)
                 .with(admin(actor))
                 .accept(FRONTEND_ACCEPT))
         .andExpect(status().isOk())
@@ -173,7 +173,8 @@ class DataSubjectRightsAuditIntegrationTest {
   @Test
   void personSearch_isServedAndAudited() throws Exception {
     mockMvc
-        .perform(get("/api/v1/admin/person-search").param("q", SEARCH_TERM).with(admin(actor)))
+        .perform(
+            get("/api/v1/users/admin/person-search").param("q", SEARCH_TERM).with(admin(actor)))
         .andExpect(status().isOk());
 
     assertThat(auditRows(AuditEventType.PERSON_SEARCH_PERFORMED))

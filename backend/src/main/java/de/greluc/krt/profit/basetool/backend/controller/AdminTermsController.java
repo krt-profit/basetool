@@ -45,7 +45,7 @@ import org.springframework.web.server.ResponseStatusException;
 /** Admin view of which users have and have not accepted the Terms of Use (REQ-SEC-028). */
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/admin/terms")
+@RequestMapping("/api/v1/terms/admin")
 @RequiredArgsConstructor
 @PreAuthorize(Roles.HAS_ROLE_ADMIN)
 @Tag(name = "Admin — Terms of Use", description = "Who has accepted the Terms of Use")

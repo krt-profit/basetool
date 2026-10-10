@@ -2356,7 +2356,7 @@ this rule is what notices.
   both reported; an `execute(…)` fixture declaring `GET` while sending `POST` is reported.
 - [x] A probe template that is no `GET` of the document is reported.
 - [x] The guard found the admin update and delete of a member's personal-inventory item calling
-  `PUT`/`DELETE /api/v1/admin/personal-inventory/{id}`, which the backend never served (it serves
+  `PUT`/`DELETE /api/v1/personal-inventory/admin/{id}`, which the backend never served (it serves
   `…/items/{id}`); both now call the backend's paths.
 
 **Enforced by:** `BackendCallExistenceTest`, `DeprecatedBackendEndpointCallGuardTest`,

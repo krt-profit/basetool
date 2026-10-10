@@ -46,7 +46,8 @@ class AdminSyncReportsPageControllerTest {
   void deleteOld_blankSource_purgesCombinedViewAndRedirectsToCombinedTab() {
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.delete(
-            eq("/api/v1/sync-reports?olderThanDays=30"), eq(SyncReportPurgeResultDto.class)))
+            eq("/api/v1/catalog/admin/sync-reports?olderThanDays=30"),
+            eq(SyncReportPurgeResultDto.class)))
         .thenReturn(new SyncReportPurgeResultDto(7));
     AdminSyncReportsPageController controller =
         new AdminSyncReportsPageController(new CatalogueBackendClient(client));
@@ -56,14 +57,16 @@ class AdminSyncReportsPageControllerTest {
 
     assertEquals("redirect:/admin/sync-reports", view);
     assertEquals(7, attrs.getFlashAttributes().get("deletedCount"));
-    verify(client).delete("/api/v1/sync-reports?olderThanDays=30", SyncReportPurgeResultDto.class);
+    verify(client)
+        .delete(
+            "/api/v1/catalog/admin/sync-reports?olderThanDays=30", SyncReportPurgeResultDto.class);
   }
 
   @Test
   void deleteOld_withSource_relaysSourceAndRedirectsToThatTab() {
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.delete(
-            eq("/api/v1/sync-reports?olderThanDays=14&source=UEX"),
+            eq("/api/v1/catalog/admin/sync-reports?olderThanDays=14&source=UEX"),
             eq(SyncReportPurgeResultDto.class)))
         .thenReturn(new SyncReportPurgeResultDto(2));
     AdminSyncReportsPageController controller =
@@ -75,7 +78,9 @@ class AdminSyncReportsPageControllerTest {
     assertEquals("redirect:/admin/sync-reports/uex", view);
     assertEquals(2, attrs.getFlashAttributes().get("deletedCount"));
     verify(client)
-        .delete("/api/v1/sync-reports?olderThanDays=14&source=UEX", SyncReportPurgeResultDto.class);
+        .delete(
+            "/api/v1/catalog/admin/sync-reports?olderThanDays=14&source=UEX",
+            SyncReportPurgeResultDto.class);
   }
 
   @Test
@@ -107,7 +112,8 @@ class AdminSyncReportsPageControllerTest {
     assertEquals("redirect:/admin/sync-reports/scwiki", view);
     verify(client)
         .delete(
-            "/api/v1/sync-reports?olderThanDays=30&source=SCWIKI", SyncReportPurgeResultDto.class);
+            "/api/v1/catalog/admin/sync-reports?olderThanDays=30&source=SCWIKI",
+            SyncReportPurgeResultDto.class);
   }
 
   @Test
@@ -122,7 +128,9 @@ class AdminSyncReportsPageControllerTest {
     String view = controller.deleteOld("UEX&olderThanDays=99999", 30, attrs);
 
     assertEquals("redirect:/admin/sync-reports", view);
-    verify(client).delete("/api/v1/sync-reports?olderThanDays=30", SyncReportPurgeResultDto.class);
+    verify(client)
+        .delete(
+            "/api/v1/catalog/admin/sync-reports?olderThanDays=30", SyncReportPurgeResultDto.class);
   }
 
   @Test
@@ -136,7 +144,9 @@ class AdminSyncReportsPageControllerTest {
     controller.deleteOldAjax("uex", 7);
 
     verify(client)
-        .delete("/api/v1/sync-reports?olderThanDays=7&source=UEX", SyncReportPurgeResultDto.class);
+        .delete(
+            "/api/v1/catalog/admin/sync-reports?olderThanDays=7&source=UEX",
+            SyncReportPurgeResultDto.class);
   }
 
   @Test

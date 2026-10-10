@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
- * How many users still owe Terms-of-Use consent, as {@code GET /api/v1/admin/terms/pending-count}
+ * How many users still owe Terms-of-Use consent, as {@code GET /api/v1/terms/admin/pending-count}
  * returns it (REQ-SEC-028).
  *
  * @param pending how many login-capable users still owe consent

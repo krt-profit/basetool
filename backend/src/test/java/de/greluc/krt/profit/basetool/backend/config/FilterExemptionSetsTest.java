@@ -55,8 +55,9 @@ class FilterExemptionSetsTest {
           "/api/v1/users/me/registration-status",
           "/api/v1/app/version-policy");
 
-  /** The mappings under {@code /api/v1/terms} reviewed as gated by consent; none today. */
-  private static final List<String> TERMS_GATED = List.of();
+  /** The mappings under {@code /api/v1/terms} reviewed as gated by consent: the administration. */
+  private static final List<String> TERMS_GATED =
+      List.of("/api/v1/terms/admin", "/api/v1/terms/admin/pending-count");
 
   /** The endpoints the ingest gateway may act on for a member. */
   private static final List<String> ACTING_PATHS =

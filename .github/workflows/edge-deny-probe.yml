@@ -549,7 +549,6 @@ jobs:
           GET /api/v1/terms/admin 404
           GET /api/v1/terms/admin/pending-count 404
           GET /api/v1/terms/a-path-not-built-yet 404
-          GET /api/v1/admin/terms 404
           HEAD /api/v1/terms/document 404
           HEAD /api/v1/app/version-policy 404
           GET /api/v1/exchange/me/blueprints 404
@@ -567,7 +566,7 @@ jobs:
           POST /api/v1/refinery-orders/import-extract 404
           POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants 404
           POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/slim 404
-          GET /api/v1/hangar/users/00000000-0000-4000-8000-00000000cafe/ships 404
+          GET /api/v1/hangar/admin/users/00000000-0000-4000-8000-00000000cafe/ships 404
           GET /api/v1/bank/accounts/00000000-0000-4000-8000-00000000cafe/balance-series 404
           GET /api/v1/bank/admin/audit 404
           POST /api/v1/bank/admin/wipe-reset 404

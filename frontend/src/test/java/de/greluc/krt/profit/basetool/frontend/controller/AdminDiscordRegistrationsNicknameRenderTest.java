@@ -92,7 +92,7 @@ class AdminDiscordRegistrationsNicknameRenderTest {
             false,
             1L);
 
-    when(backendApiClient.get(eq("/api/v1/admin/registrations"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/users/admin/registrations"), anyTypeRef()))
         .thenReturn(List.of(withNick, withoutNick));
 
     String html =
@@ -136,7 +136,7 @@ class AdminDiscordRegistrationsNicknameRenderTest {
             false,
             1L);
 
-    when(backendApiClient.get(eq("/api/v1/admin/registrations"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/users/admin/registrations"), anyTypeRef()))
         .thenReturn(List.of(colliding, ordinary));
 
     String html =
@@ -156,7 +156,7 @@ class AdminDiscordRegistrationsNicknameRenderTest {
 
   @Test
   void queue_rendersLinkActionAndAccountPicker() throws Exception {
-    when(backendApiClient.get(eq("/api/v1/admin/registrations"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/users/admin/registrations"), anyTypeRef()))
         .thenReturn(
             List.of(
                 new PendingRegistrationDto(
@@ -191,7 +191,7 @@ class AdminDiscordRegistrationsNicknameRenderTest {
     UUID id = UUID.randomUUID();
     UUID target = UUID.randomUUID();
     when(backendApiClient.post(
-            eq("/api/v1/admin/registrations/{id}/link"),
+            eq("/api/v1/users/admin/registrations/{id}/link"),
             any(),
             eq(PendingRegistrationDto.class),
             eq(id)))
@@ -218,9 +218,10 @@ class AdminDiscordRegistrationsNicknameRenderTest {
 
   @Test
   void rejectedTable_rendersRejectedRowsWithReopenAction() throws Exception {
-    when(backendApiClient.get(eq("/api/v1/admin/registrations"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/users/admin/registrations"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(eq("/api/v1/admin/registrations?status=REJECTED"), anyTypeRef()))
+    when(backendApiClient.get(
+            eq("/api/v1/users/admin/registrations?status=REJECTED"), anyTypeRef()))
         .thenReturn(
             List.of(
                 new PendingRegistrationDto(
@@ -260,7 +261,7 @@ class AdminDiscordRegistrationsNicknameRenderTest {
    */
   @Test
   void queue_rendersTheListPatternWithOpenAndRejectedTabs() throws Exception {
-    when(backendApiClient.get(eq("/api/v1/admin/registrations"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/users/admin/registrations"), anyTypeRef()))
         .thenReturn(
             List.of(
                 new PendingRegistrationDto(
@@ -305,7 +306,7 @@ class AdminDiscordRegistrationsNicknameRenderTest {
 
   @Test
   void rejectedListFailure_doesNotBlankThePendingQueue() throws Exception {
-    when(backendApiClient.get(eq("/api/v1/admin/registrations"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/users/admin/registrations"), anyTypeRef()))
         .thenReturn(
             List.of(
                 new PendingRegistrationDto(
@@ -316,7 +317,8 @@ class AdminDiscordRegistrationsNicknameRenderTest {
                     null,
                     false,
                     1L)));
-    when(backendApiClient.get(eq("/api/v1/admin/registrations?status=REJECTED"), anyTypeRef()))
+    when(backendApiClient.get(
+            eq("/api/v1/users/admin/registrations?status=REJECTED"), anyTypeRef()))
         .thenThrow(new IllegalStateException("backend does not know ?status="));
 
     String html =
@@ -339,7 +341,7 @@ class AdminDiscordRegistrationsNicknameRenderTest {
   void reopenAjax_forwardsToBackend_andReturnsOk() throws Exception {
     UUID id = UUID.randomUUID();
     when(backendApiClient.post(
-            eq("/api/v1/admin/registrations/{id}/reopen"),
+            eq("/api/v1/users/admin/registrations/{id}/reopen"),
             any(),
             eq(PendingRegistrationDto.class),
             eq(id)))

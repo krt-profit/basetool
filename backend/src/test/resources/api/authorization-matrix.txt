@@ -1,63 +1,8 @@
 [operations]
-GET /api/v1/admin/default-blueprints | AdminDefaultBlueprintController#list | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/admin/default-blueprints | AdminDefaultBlueprintController#add | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-DELETE /api/v1/admin/default-blueprints/{id} | AdminDefaultBlueprintController#remove | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/admin/deletion-requests | AdminDeletionRequestController#pending | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/admin/deletion-requests/{id}/decline | AdminDeletionRequestController#decline | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/admin/deletion-requests/{id}/execute | AdminDeletionRequestController#execute | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/admin/exchange-clients | AdminExchangeRegistryController#listClients | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/admin/exchange-clients | AdminExchangeRegistryController#createClient | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/admin/exchange-clients/usage | AdminExchangeRegistryController#usage | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/admin/exchange-clients/{id} | AdminExchangeRegistryController#getClient | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-PUT /api/v1/admin/exchange-clients/{id} | AdminExchangeRegistryController#updateClient | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/admin/exchange-clients/{id}/activate | AdminExchangeRegistryController#activateClient | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/admin/exchange-clients/{id}/suspend | AdminExchangeRegistryController#suspendClient | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/admin/exchange-clients/{id}/undo | AdminExchangeBulkUndoController#start | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/admin/exchange-clients/{id}/undo/installations | AdminExchangeBulkUndoController#installations | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/admin/exchange-clients/{id}/undo/preview | AdminExchangeBulkUndoController#preview | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/admin/exchange-settings | AdminExchangeRegistryController#getSettings | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-PUT /api/v1/admin/exchange-settings | AdminExchangeRegistryController#updateSettings | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/admin/exchange-undo-runs | AdminExchangeBulkUndoController#runs | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/admin/exchange-undo-runs/{runId} | AdminExchangeBulkUndoController#run | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/admin/import/p4k/jobs | AdminP4kImportController#listJobs | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/admin/import/p4k/jobs | AdminP4kImportController#enqueuePreview | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/admin/import/p4k/jobs/{id} | AdminP4kImportController#getJob | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/admin/import/p4k/jobs/{id}/apply | AdminP4kImportController#enqueueApply | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/admin/person-search | AdminPersonSearchController#search | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-DELETE /api/v1/admin/personal-blueprints | AdminPersonalBlueprintController#deleteAllForAllUsers | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-DELETE /api/v1/admin/personal-blueprints/items/{id} | AdminPersonalBlueprintController#deleteForUser | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-PUT /api/v1/admin/personal-blueprints/items/{id} | AdminPersonalBlueprintController#updateForUser | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/admin/personal-blueprints/{userId} | AdminPersonalBlueprintController#listForUser | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/admin/personal-blueprints/{userId} | AdminPersonalBlueprintController#addForUser | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/admin/personal-blueprints/{userId}/batch | AdminPersonalBlueprintController#addBatchForUser | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/admin/personal-blueprints/{userId}/import/apply | AdminPersonalBlueprintController#applyImportForUser | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/admin/personal-blueprints/{userId}/import/preview | AdminPersonalBlueprintController#previewImportForUser | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-DELETE /api/v1/admin/personal-inventory/items/{id} | AdminPersonalInventoryController#deleteForUser | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-PUT /api/v1/admin/personal-inventory/items/{id} | AdminPersonalInventoryController#updateForUser | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/admin/personal-inventory/{userId} | AdminPersonalInventoryController#listForUser | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/admin/personal-inventory/{userId} | AdminPersonalInventoryController#createForUser | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/admin/quality-tiers | AdminQualityTierController#listAllQualityTiers | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/admin/quality-tiers | AdminQualityTierController#createQualityTier | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-DELETE /api/v1/admin/quality-tiers/{id} | AdminQualityTierController#deleteQualityTier | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-PUT /api/v1/admin/quality-tiers/{id} | AdminQualityTierController#updateQualityTier | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/admin/registrations | DiscordRegistrationAdminController#list | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/admin/registrations/{id}/approve | DiscordRegistrationAdminController#approve | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/admin/registrations/{id}/link | DiscordRegistrationAdminController#link | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/admin/registrations/{id}/merge | DiscordRegistrationAdminController#merge | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/admin/registrations/{id}/reject | DiscordRegistrationAdminController#reject | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/admin/registrations/{id}/reopen | DiscordRegistrationAdminController#reopen | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/admin/roles | AdminController#getAllRoles | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-PUT /api/v1/admin/roles/{name}/description | AdminController#updateRoleDescription | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-PUT /api/v1/admin/roles/{name}/permissions | AdminController#updatePermissions | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/admin/terms | AdminTermsController#listAcceptanceStatus | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/admin/terms/pending-count | AdminTermsController#getPendingCount | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-PUT /api/v1/admin/users/{id}/attributes | AdminController#updateUserAttributes | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/admin/users/{userId}/export | AdminDataExportController#exportJson | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/admin/users/{userId}/export/pdf | AdminDataExportController#exportPdf | pre=hasRole('ADMIN') | url=/api/v1/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 DELETE /api/v1/announcement | AnnouncementController#deleteAnnouncement | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/announcement | AnnouncementController#getPublicAnnouncement | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/announcement | AnnouncementController#updateAnnouncement | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
-GET /api/v1/announcement/admin | AnnouncementController#getAdminAnnouncement | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
+GET /api/v1/announcement/admin | AnnouncementController#getAdminAnnouncement | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/app/version-policy | AppVersionPolicyController#versionPolicy | pre=permitAll() | url=GET /api/v1/app/version-policy -> permitAll
 DELETE /api/v1/audit/{domain} | AuditAdminController#purgeAuditLog | pre=hasRole('ADMIN') | url=/api/v1/audit/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/audit/{domain} | AuditAdminController#getAuditLog | pre=hasRole('ADMIN') | url=/api/v1/audit/** -> hasAnyAuthority(ROLE_ADMIN)
@@ -74,11 +19,11 @@ POST /api/v1/bank/accounts/{id}/close | BankAccountController#closeAccount | pre
 POST /api/v1/bank/accounts/{id}/reopen | BankAccountController#reopenAccount | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
 GET /api/v1/bank/accounts/{id}/statement | BankAccountController#downloadStatement | pre=@bankSecurityService.canSee(#id, authentication) | url=anyRequest -> authenticated
 GET /api/v1/bank/accounts/{id}/transactions | BankAccountController#getBookings | pre=@bankSecurityService.canSee(#id, authentication) | url=anyRequest -> authenticated
-DELETE /api/v1/bank/admin/audit | BankAdminController#purgeAuditLog | pre=hasRole('ADMIN') | url=/api/v1/bank/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/bank/admin/audit | BankAdminController#getAuditLog | pre=hasRole('ADMIN') | url=/api/v1/bank/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/bank/admin/audit/export | BankAdminController#exportAuditLog | pre=hasRole('ADMIN') | url=/api/v1/bank/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/bank/admin/audit/export.json | BankAdminController#exportAuditLogJson | pre=hasRole('ADMIN') | url=/api/v1/bank/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/bank/admin/wipe-reset | BankAdminController#wipeReset | pre=hasRole('ADMIN') | url=/api/v1/bank/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+DELETE /api/v1/bank/admin/audit | BankAdminController#purgeAuditLog | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/bank/admin/audit | BankAdminController#getAuditLog | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/bank/admin/audit/export | BankAdminController#exportAuditLog | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/bank/admin/audit/export.json | BankAdminController#exportAuditLogJson | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/bank/admin/wipe-reset | BankAdminController#wipeReset | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/bank/dashboard | BankDashboardController#getDashboard | pre=hasRole('BANK_EMPLOYEE') | url=anyRequest -> authenticated
 POST /api/v1/bank/deposits | BankBookingController#bookDeposit | pre=hasRole('BANK_EMPLOYEE') and @bankSecurityService.canDeposit(#request.accountId, authentication) | url=anyRequest -> authenticated
 GET /api/v1/bank/export/three-month-report | BankExportController#downloadThreeMonthReport | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
@@ -100,12 +45,39 @@ GET /api/v1/bank/transfer-fee-rate | BankBookingController#getTransferFeeRate | 
 POST /api/v1/bank/transfers | BankBookingController#bookTransfer | pre=hasRole('BANK_EMPLOYEE') and @bankSecurityService.canTransfer(#request.sourceAccountId, authentication) | url=anyRequest -> authenticated
 POST /api/v1/bank/withdrawals | BankBookingController#bookWithdrawal | pre=hasRole('BANK_EMPLOYEE') and @bankSecurityService.canWithdraw(#request.accountId, authentication) | url=anyRequest -> authenticated
 GET /api/v1/blueprints | BlueprintController#getBlueprints | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
+GET /api/v1/blueprints/admin/defaults | AdminDefaultBlueprintController#list | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/blueprints/admin/defaults | AdminDefaultBlueprintController#add | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+DELETE /api/v1/blueprints/admin/defaults/{id} | AdminDefaultBlueprintController#remove | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/blueprints/products/search | BlueprintProductController#search | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/catalog/admin/import/p4k/jobs | AdminP4kImportController#listJobs | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/catalog/admin/import/p4k/jobs | AdminP4kImportController#enqueuePreview | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/catalog/admin/import/p4k/jobs/{id} | AdminP4kImportController#getJob | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/catalog/admin/import/p4k/jobs/{id}/apply | AdminP4kImportController#enqueueApply | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/catalog/admin/quality-tiers | AdminQualityTierController#listAllQualityTiers | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/catalog/admin/quality-tiers | AdminQualityTierController#createQualityTier | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+DELETE /api/v1/catalog/admin/quality-tiers/{id} | AdminQualityTierController#deleteQualityTier | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+PUT /api/v1/catalog/admin/quality-tiers/{id} | AdminQualityTierController#updateQualityTier | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+DELETE /api/v1/catalog/admin/sync-reports | SyncReportController#deleteOldEvents | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/catalog/admin/sync-reports | SyncReportController#listEvents | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/cities | CityController#getAllCities | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/cities/{id} | CityController#getCity | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 PATCH /api/v1/cities/{id}/loading-dock | CityController#setLoadingDockOverride | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 DELETE /api/v1/cities/{id}/loading-dock-override | CityController#clearLoadingDockOverride | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/connected-apps | ConnectedAppsController#list | pre=@connectedAppsGate.isMemberSession(authentication) | url=anyRequest -> authenticated
+GET /api/v1/connected-apps/admin/clients | AdminExchangeRegistryController#listClients | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/connected-apps/admin/clients | AdminExchangeRegistryController#createClient | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/connected-apps/admin/clients/usage | AdminExchangeRegistryController#usage | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/connected-apps/admin/clients/{id} | AdminExchangeRegistryController#getClient | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+PUT /api/v1/connected-apps/admin/clients/{id} | AdminExchangeRegistryController#updateClient | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/connected-apps/admin/clients/{id}/activate | AdminExchangeRegistryController#activateClient | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/connected-apps/admin/clients/{id}/suspend | AdminExchangeRegistryController#suspendClient | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/connected-apps/admin/clients/{id}/undo | AdminExchangeBulkUndoController#start | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/connected-apps/admin/clients/{id}/undo/installations | AdminExchangeBulkUndoController#installations | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/connected-apps/admin/clients/{id}/undo/preview | AdminExchangeBulkUndoController#preview | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/connected-apps/admin/settings | AdminExchangeRegistryController#getSettings | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+PUT /api/v1/connected-apps/admin/settings | AdminExchangeRegistryController#updateSettings | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/connected-apps/admin/undo-runs | AdminExchangeBulkUndoController#runs | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/connected-apps/admin/undo-runs/{runId} | AdminExchangeBulkUndoController#run | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 DELETE /api/v1/connected-apps/installations/{installationId} | ConnectedAppsController#disconnectInstallation | pre=@connectedAppsGate.isMemberSession(authentication) | url=anyRequest -> authenticated
 POST /api/v1/connected-apps/installations/{installationId}/seen | ConnectedAppsController#markSeen | pre=@connectedAppsGate.isMemberSession(authentication) | url=anyRequest -> authenticated
 POST /api/v1/connected-apps/mass-changes/confirm | ConnectedAppsController#confirmMassChange | pre=@connectedAppsGate.isMemberSession(authentication) | url=anyRequest -> authenticated
@@ -136,6 +108,10 @@ DELETE /api/v1/frequency-types/{id} | FrequencyTypeController#deleteFrequencyTyp
 GET /api/v1/frequency-types/{id} | FrequencyTypeController#getFrequencyType | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/frequency-types/{id} | FrequencyTypeController#updateFrequencyType | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 POST /api/v1/frequency-types/{id}/activate | FrequencyTypeController#activateFrequencyType | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
+GET /api/v1/hangar/admin/users/{userId}/ships | HangarController#getUserShips | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/hangar/admin/users/{userId}/ships | HangarController#addUserShip | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+DELETE /api/v1/hangar/admin/users/{userId}/ships/{shipId} | HangarController#deleteUserShip | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+PUT /api/v1/hangar/admin/users/{userId}/ships/{shipId} | HangarController#updateUserShip | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/hangar/import/fleetview | HangarController#importFleetview | pre=isAuthenticated() | url=POST /api/v1/hangar/import/fleetview -> authenticated
 POST /api/v1/hangar/import/ships | HangarController#importShips | pre=isAuthenticated() | url=POST /api/v1/hangar/import/ships -> authenticated
 GET /api/v1/hangar/my-ships | HangarController#getMyShips | pre=isAuthenticated() | url=GET /api/v1/hangar/my-ships -> authenticated
@@ -147,10 +123,6 @@ POST /api/v1/hangar/ships/reset-fitted | HangarController#resetAllFittedStatus |
 DELETE /api/v1/hangar/ships/{id} | HangarController#deleteMyShip | pre=isAuthenticated() and @ownerScopeService.canEditShip(#id) | url=DELETE /api/v1/hangar/ships/* -> authenticated
 PUT /api/v1/hangar/ships/{id} | HangarController#updateMyShip | pre=isAuthenticated() and @ownerScopeService.canEditShip(#id) | url=PUT /api/v1/hangar/ships/* -> authenticated
 GET /api/v1/hangar/squadron-overview | HangarController#getSquadronOverview | pre=hasAnyAuthority('HANGAR_READ','HANGAR_WRITE','ROLE_ADMIN') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
-GET /api/v1/hangar/users/{userId}/ships | HangarController#getUserShips | pre=hasRole('ADMIN') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
-POST /api/v1/hangar/users/{userId}/ships | HangarController#addUserShip | pre=hasRole('ADMIN') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
-DELETE /api/v1/hangar/users/{userId}/ships/{shipId} | HangarController#deleteUserShip | pre=hasRole('ADMIN') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
-PUT /api/v1/hangar/users/{userId}/ships/{shipId} | HangarController#updateUserShip | pre=hasRole('ADMIN') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
 POST /api/v1/inventory | InventoryItemController#createInventoryItem | pre=hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','KRT_MEMBER') | url=/api/v1/inventory -> hasAnyAuthority(ROLE_ADMIN,ROLE_KRT_MEMBER,ROLE_LOGISTICIAN,ROLE_OFFICER)
 GET /api/v1/inventory/aggregated | InventoryItemController#getAggregatedInventory | pre=hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','KRT_MEMBER') | url=/api/v1/inventory/** -> hasAnyAuthority(ROLE_ADMIN,ROLE_KRT_MEMBER,ROLE_LOGISTICIAN,ROLE_OFFICER)
 DELETE /api/v1/inventory/all | InventoryItemController#deleteAllGlobalInventory | pre=hasRole('ADMIN') | url=/api/v1/inventory/** -> hasAnyAuthority(ROLE_ADMIN,ROLE_KRT_MEMBER,ROLE_LOGISTICIAN,ROLE_OFFICER)
@@ -299,12 +271,12 @@ PUT /api/v1/missions/{id}/units/{unitId}/slim | MissionController#updateUnitSlim
 GET /api/v1/missions/{missionId}/finance-entries | MissionFinanceEntryController#getFinanceEntries | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canSeeMission(#missionId) | url=anyRequest -> authenticated
 GET /api/v1/missions/{missionId}/finance-entries/sum | MissionFinanceEntryController#getFinanceEntriesSum | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canSeeMission(#missionId) | url=anyRequest -> authenticated
 GET /api/v1/missions/{missionId}/finance-entries/summary | MissionFinanceEntryController#getFinanceSummary | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canSeeMission(#missionId) | url=anyRequest -> authenticated
-GET /api/v1/notification-rules | NotificationRuleController#list | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
-POST /api/v1/notification-rules | NotificationRuleController#create | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
-DELETE /api/v1/notification-rules/{id} | NotificationRuleController#delete | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
-GET /api/v1/notification-rules/{id} | NotificationRuleController#get | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
-PUT /api/v1/notification-rules/{id} | NotificationRuleController#update | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/notifications | NotificationController#list | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/notifications/admin/rules | NotificationRuleController#list | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/notifications/admin/rules | NotificationRuleController#create | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+DELETE /api/v1/notifications/admin/rules/{id} | NotificationRuleController#delete | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/notifications/admin/rules/{id} | NotificationRuleController#get | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+PUT /api/v1/notifications/admin/rules/{id} | NotificationRuleController#update | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/notifications/preferences | NotificationController#preferences | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/notifications/preferences/{type} | NotificationController#setPreference | pre=isAuthenticated() | url=anyRequest -> authenticated
 DELETE /api/v1/notifications/read | NotificationController#deleteAllRead | pre=isAuthenticated() | url=anyRequest -> authenticated
@@ -421,6 +393,14 @@ DELETE /api/v1/outposts/{id}/loading-dock-override | OutpostController#clearLoad
 DELETE /api/v1/personal-blueprints | PersonalBlueprintController#deleteAll | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/personal-blueprints | PersonalBlueprintController#list | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/personal-blueprints | PersonalBlueprintController#add | pre=isAuthenticated() | url=anyRequest -> authenticated
+DELETE /api/v1/personal-blueprints/admin | AdminPersonalBlueprintController#deleteAllForAllUsers | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+DELETE /api/v1/personal-blueprints/admin/items/{id} | AdminPersonalBlueprintController#deleteForUser | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+PUT /api/v1/personal-blueprints/admin/items/{id} | AdminPersonalBlueprintController#updateForUser | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/personal-blueprints/admin/{userId} | AdminPersonalBlueprintController#listForUser | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/personal-blueprints/admin/{userId} | AdminPersonalBlueprintController#addForUser | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/personal-blueprints/admin/{userId}/batch | AdminPersonalBlueprintController#addBatchForUser | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/personal-blueprints/admin/{userId}/import/apply | AdminPersonalBlueprintController#applyImportForUser | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/personal-blueprints/admin/{userId}/import/preview | AdminPersonalBlueprintController#previewImportForUser | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/personal-blueprints/batch | PersonalBlueprintController#addBatch | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/personal-blueprints/craftability | PersonalBlueprintController#craftability | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/personal-blueprints/import/apply | PersonalBlueprintController#applyImport | pre=isAuthenticated() | url=anyRequest -> authenticated
@@ -432,6 +412,10 @@ PUT /api/v1/personal-blueprints/{id} | PersonalBlueprintController#update | pre=
 GET /api/v1/personal-blueprints/{id}/recipe | PersonalBlueprintController#recipe | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/personal-inventory | PersonalInventoryController#list | pre=isAuthenticated() | url=/api/v1/personal-inventory -> authenticated
 POST /api/v1/personal-inventory | PersonalInventoryController#create | pre=isAuthenticated() | url=/api/v1/personal-inventory -> authenticated
+DELETE /api/v1/personal-inventory/admin/items/{id} | AdminPersonalInventoryController#deleteForUser | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+PUT /api/v1/personal-inventory/admin/items/{id} | AdminPersonalInventoryController#updateForUser | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/personal-inventory/admin/{userId} | AdminPersonalInventoryController#listForUser | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/personal-inventory/admin/{userId} | AdminPersonalInventoryController#createForUser | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 DELETE /api/v1/personal-inventory/{id} | PersonalInventoryController#delete | pre=isAuthenticated() | url=/api/v1/personal-inventory/** -> authenticated
 GET /api/v1/personal-inventory/{id} | PersonalInventoryController#get | pre=isAuthenticated() | url=/api/v1/personal-inventory/** -> authenticated
 PUT /api/v1/personal-inventory/{id} | PersonalInventoryController#update | pre=isAuthenticated() | url=/api/v1/personal-inventory/** -> authenticated
@@ -493,6 +477,9 @@ POST /api/v1/refining-methods | RefiningMethodController#createRefiningMethod | 
 DELETE /api/v1/refining-methods/{id} | RefiningMethodController#deleteRefiningMethod | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/refining-methods/{id} | RefiningMethodController#getRefiningMethod | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/refining-methods/{id} | RefiningMethodController#updateRefiningMethod | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
+GET /api/v1/roles | AdminController#getAllRoles | pre=hasRole('ADMIN') | url=/api/v1/roles -> hasAnyAuthority(ROLE_ADMIN)
+PUT /api/v1/roles/{name}/description | AdminController#updateRoleDescription | pre=hasRole('ADMIN') | url=/api/v1/roles/** -> hasAnyAuthority(ROLE_ADMIN)
+PUT /api/v1/roles/{name}/permissions | AdminController#updatePermissions | pre=hasRole('ADMIN') | url=/api/v1/roles/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/settings | SystemSettingController#getAllSettings | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/settings/{key} | SystemSettingController#getSetting | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/settings/{key} | SystemSettingController#updateSetting | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
@@ -532,9 +519,6 @@ POST /api/v1/star-systems | StarSystemController#createStarSystem | pre=hasRole(
 DELETE /api/v1/star-systems/{id} | StarSystemController#deleteStarSystem | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/star-systems/{id} | StarSystemController#getStarSystem | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/star-systems/{id} | StarSystemController#updateStarSystem | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
-DELETE /api/v1/sync-reports | SyncReportController#deleteOldEvents | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
-GET /api/v1/sync-reports | SyncReportController#listEvents | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
-GET /api/v1/system/ping | SystemController#pingV1 | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/terminals | TerminalController#getAllTerminals | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/terminals/{id} | TerminalController#getTerminal | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/terminals/{id} | TerminalController#updateTerminal | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
@@ -543,10 +527,24 @@ DELETE /api/v1/terminals/{id}/auto-load-override | TerminalController#clearAutoL
 PATCH /api/v1/terminals/{id}/loading-dock | TerminalController#setLoadingDockOverride | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 DELETE /api/v1/terminals/{id}/loading-dock-override | TerminalController#clearLoadingDockOverride | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 POST /api/v1/terms/acceptance | TermsController#accept | pre=isAuthenticated() and !hasRole('INGEST_GATEWAY') | url=anyRequest -> authenticated
+GET /api/v1/terms/admin | AdminTermsController#listAcceptanceStatus | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/terms/admin/pending-count | AdminTermsController#getPendingCount | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/terms/document | TermsDocumentController#document | pre=permitAll() | url=GET /api/v1/terms/document -> permitAll
 GET /api/v1/terms/status | TermsController#getStatus | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/uex/locations/search | UexLocationController#search | pre=isAuthenticated() | url=/api/v1/uex/locations/** -> authenticated
 GET /api/v1/users | UserController#getAllUsers | pre=hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER') | url=GET /api/v1/users -> hasAnyAuthority(ROLE_ADMIN,ROLE_KRT_MEMBER,ROLE_OFFICER)
+GET /api/v1/users/admin/deletion-requests | AdminDeletionRequestController#pending | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/users/admin/deletion-requests/{id}/decline | AdminDeletionRequestController#decline | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/users/admin/deletion-requests/{id}/execute | AdminDeletionRequestController#execute | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/users/admin/person-search | AdminPersonSearchController#search | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/users/admin/registrations | DiscordRegistrationAdminController#list | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/users/admin/registrations/{id}/approve | DiscordRegistrationAdminController#approve | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/users/admin/registrations/{id}/link | DiscordRegistrationAdminController#link | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/users/admin/registrations/{id}/merge | DiscordRegistrationAdminController#merge | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/users/admin/registrations/{id}/reject | DiscordRegistrationAdminController#reject | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/users/admin/registrations/{id}/reopen | DiscordRegistrationAdminController#reopen | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/users/admin/{userId}/export | AdminDataExportController#exportJson | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/users/admin/{userId}/export/pdf | AdminDataExportController#exportPdf | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/users/lookup | UserController#lookupUsers | pre=hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER', 'BANK_EMPLOYEE') | url=/api/v1/users/lookup -> hasAnyAuthority(ROLE_ADMIN,ROLE_BANK_EMPLOYEE,ROLE_BANK_MANAGEMENT,ROLE_KRT_MEMBER,ROLE_OFFICER)
 GET /api/v1/users/me | UserController#getCurrentUser | pre=isAuthenticated() | url=/api/v1/users/me -> authenticated
 GET /api/v1/users/me/blueprint-sharing | UserController#getMyBlueprintSharing | pre=isAuthenticated() | url=/api/v1/users/me/** -> authenticated
@@ -579,7 +577,6 @@ GET /api/v1/users/{id}/memberships | UserController#getUserMemberships | pre=has
 PATCH /api/v1/users/{id}/memberships | UserController#patchMemberships | pre=hasRole('ADMIN') | url=/api/v1/users/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/users/{id}/memberships/detail | UserController#getMembershipsDetail | pre=hasRole('ADMIN') | url=/api/v1/users/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/users/{id}/rsi-handle | UserController#getUserRsiHandle | pre=hasRole('ADMIN') | url=/api/v1/users/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v2/system/ping | SystemController#pingV2 | pre=isAuthenticated() | url=anyRequest -> authenticated
 DELETE /error | BasetoolErrorController#handleError | pre=permitAll() | url=/error -> permitAll
 GET /error | BasetoolErrorController#handleError | pre=permitAll() | url=/error -> permitAll
 PATCH /error | BasetoolErrorController#handleError | pre=permitAll() | url=/error -> permitAll

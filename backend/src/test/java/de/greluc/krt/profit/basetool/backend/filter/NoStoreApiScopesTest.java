@@ -54,7 +54,7 @@ class NoStoreApiScopesTest {
         "/api/v1/hangar/ships",
         "/api/v1/refinery-orders/all",
         "/api/v1/promotion/eligibility",
-        "/api/v1/admin/person-search",
+        "/api/v1/users/admin/person-search",
         "/api/v1/audit/MISSION",
         "/api/v1/connected-apps",
         "/api/v1/exchange/me/stock",
@@ -63,7 +63,12 @@ class NoStoreApiScopesTest {
         "/api/v1/material-exchange/offers",
         "/api/v1/material-exchange/releasable-items",
         "/api/v1/material-requests",
-        "/api/v1/notification-rules",
+        "/api/v1/notifications/admin/rules",
+        "/api/v1/roles",
+        "/api/v1/catalog/admin/quality-tiers",
+        "/api/v1/catalog/admin/sync-reports",
+        "/api/v1/blueprints/admin/defaults",
+        "/api/v1/personal-blueprints/admin/00000000-0000-4000-8000-000000000000",
         "/api/v1/orders",
         "/api/v1/orders/00000000-0000-4000-8000-000000000000/item-blueprint-owners",
         "/api/v1/org-chart",
@@ -87,7 +92,6 @@ class NoStoreApiScopesTest {
         "/api/v1/orders/item-catalog",
         "/api/v1/exchange/catalog/locations",
         "/api/v1/terms/document",
-        "/api/v2/system/ping",
         "/actuator/health",
         "/"
       })
@@ -105,6 +109,8 @@ class NoStoreApiScopesTest {
     "/api/v1/exchange/catalog/locations, REVALIDATE",
     "/api/v1/exchange/me/installation, NO_STORE",
     "/api/v1/org-units/bank/balances, NO_STORE",
+    "/api/v1/blueprints/admin/defaults, NO_STORE",
+    "/api/v1/blueprints/00000000-0000-4000-8000-000000000000, REVALIDATE",
     "/api/v1/org-units/active, REVALIDATE",
     "/api/v1/missions/00000000-0000-4000-8000-000000000000/finance-entries/sum, NO_STORE",
     "/api/v1/missions/00000000-0000-4000-8000-000000000000, REVALIDATE",
@@ -163,7 +169,7 @@ class NoStoreApiScopesTest {
         .as(
             "the number of no-store families. Raise it here when you add one, and add the path to"
                 + " sensitiveFamiliesMatch in the same change")
-        .isEqualTo(28);
-    assertThat(NoStoreApiScopes.revalidateFamilies()).hasSize(33);
+        .isEqualTo(29);
+    assertThat(NoStoreApiScopes.revalidateFamilies()).hasSize(30);
   }
 }

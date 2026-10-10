@@ -52,7 +52,7 @@ import org.springframework.web.bind.annotation.RestController;
  * grant-to-everyone side effect of an add lives in the delegated service.
  */
 @RestController
-@RequestMapping("/api/v1/admin/default-blueprints")
+@RequestMapping("/api/v1/blueprints/admin/defaults")
 @RequiredArgsConstructor
 @PreAuthorize(Roles.HAS_ROLE_ADMIN)
 @Tag(

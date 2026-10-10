@@ -67,7 +67,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 /**
  * Admin counterpart of {@link PersonalInventoryBlueprintsPageController}: manages a selected user's
  * owned blueprints (list, multi-select add, note edit, remove, import) via {@code
- * /api/v1/admin/personal-blueprints/...}. ADMIN only.
+ * /api/v1/personal-blueprints/admin/...}. ADMIN only.
  */
 @Controller
 @UsesLayoutModel

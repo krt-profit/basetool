@@ -63,7 +63,7 @@ class AdminPersonSearchControllerSecurityTest {
   void personSearch_member_isForbidden() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/admin/person-search")
+            get("/api/v1/users/admin/person-search")
                 .param("q", "somebody")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isForbidden());
@@ -75,7 +75,7 @@ class AdminPersonSearchControllerSecurityTest {
   void personSearch_officer_isForbidden() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/admin/person-search")
+            get("/api/v1/users/admin/person-search")
                 .param("q", "somebody")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
         .andExpect(status().isForbidden());
@@ -87,7 +87,7 @@ class AdminPersonSearchControllerSecurityTest {
   void personSearch_bankManagement_isForbidden() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/admin/person-search")
+            get("/api/v1/users/admin/person-search")
                 .param("q", "somebody")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_MANAGEMENT"))))
         .andExpect(status().isForbidden());
@@ -102,7 +102,7 @@ class AdminPersonSearchControllerSecurityTest {
 
     mockMvc
         .perform(
-            get("/api/v1/admin/person-search")
+            get("/api/v1/users/admin/person-search")
                 .param("q", "somebody")
                 .with(
                     jwt()
@@ -119,7 +119,7 @@ class AdminPersonSearchControllerSecurityTest {
 
     mockMvc
         .perform(
-            get("/api/v1/admin/person-search")
+            get("/api/v1/users/admin/person-search")
                 .param("q", "SomeVeryDistinctiveHandle")
                 .with(
                     jwt()

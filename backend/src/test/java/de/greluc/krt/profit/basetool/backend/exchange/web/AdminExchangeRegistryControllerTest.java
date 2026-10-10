@@ -46,7 +46,7 @@ import org.springframework.web.context.WebApplicationContext;
 @Transactional
 class AdminExchangeRegistryControllerTest {
 
-  private static final String CLIENTS = "/api/v1/admin/exchange-clients";
+  private static final String CLIENTS = "/api/v1/connected-apps/admin/clients";
 
   private static final String VALID =
       """
@@ -271,7 +271,7 @@ class AdminExchangeRegistryControllerTest {
   void theSwitchIsReadAndSet() throws Exception {
     String settings =
         mockMvc
-            .perform(get("/api/v1/admin/exchange-settings").with(admin()))
+            .perform(get("/api/v1/connected-apps/admin/settings").with(admin()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.enabled").value(false))
             .andReturn()
@@ -281,7 +281,7 @@ class AdminExchangeRegistryControllerTest {
 
     mockMvc
         .perform(
-            put("/api/v1/admin/exchange-settings")
+            put("/api/v1/connected-apps/admin/settings")
                 .with(admin())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"enabled\":true,\"version\":" + version + "}"))

@@ -301,13 +301,13 @@ class CatalogueBackendClientTest {
     client.p4kImportJob(ID);
     client.applyP4kImportJob(ID, true);
 
-    RecordedRequest upload = backend.expect("POST", "/api/v1/admin/import/p4k/jobs");
+    RecordedRequest upload = backend.expect("POST", "/api/v1/catalog/admin/import/p4k/jobs");
     assertThat(upload.getHeader("Content-Type")).startsWith("multipart/form-data");
     assertThat(bodyOf(upload))
         .contains("name=\"file\"", "filename=\"catalog.json\"", "{\"items\":[]}");
-    backend.expect("GET", "/api/v1/admin/import/p4k/jobs");
-    backend.expect("GET", "/api/v1/admin/import/p4k/jobs/" + ID);
-    backend.expect("POST", "/api/v1/admin/import/p4k/jobs/" + ID + "/apply?seedNew=true");
+    backend.expect("GET", "/api/v1/catalog/admin/import/p4k/jobs");
+    backend.expect("GET", "/api/v1/catalog/admin/import/p4k/jobs/" + ID);
+    backend.expect("POST", "/api/v1/catalog/admin/import/p4k/jobs/" + ID + "/apply?seedNew=true");
   }
 
   @Test
@@ -322,10 +322,11 @@ class CatalogueBackendClientTest {
     assertThat(client.purgeSyncReports("SCWIKI", 30).deleted()).isEqualTo(3);
     client.purgeSyncReports(null, 7);
 
-    backend.expect("GET", "/api/v1/sync-reports?page=2&size=100&source=UEX");
-    backend.expect("GET", "/api/v1/sync-reports?page=0&size=100");
-    backend.expect("DELETE", "/api/v1/sync-reports?olderThanDays=30&source=SCWIKI", null);
-    backend.expect("DELETE", "/api/v1/sync-reports?olderThanDays=7", null);
+    backend.expect("GET", "/api/v1/catalog/admin/sync-reports?page=2&size=100&source=UEX");
+    backend.expect("GET", "/api/v1/catalog/admin/sync-reports?page=0&size=100");
+    backend.expect(
+        "DELETE", "/api/v1/catalog/admin/sync-reports?olderThanDays=30&source=SCWIKI", null);
+    backend.expect("DELETE", "/api/v1/catalog/admin/sync-reports?olderThanDays=7", null);
   }
 
   @Test
@@ -431,10 +432,10 @@ class CatalogueBackendClientTest {
     String json =
         "{\"code\":\"A\",\"minQuality\":900,\"labelDe\":\"Hoch\",\"labelEn\":\"High\","
             + "\"sortOrder\":1,\"active\":true,\"version\":null}";
-    backend.expect("GET", "/api/v1/admin/quality-tiers");
-    backend.expect("POST", "/api/v1/admin/quality-tiers", json);
-    backend.expect("PUT", "/api/v1/admin/quality-tiers/" + ID, json);
-    backend.expect("DELETE", "/api/v1/admin/quality-tiers/" + ID, null);
+    backend.expect("GET", "/api/v1/catalog/admin/quality-tiers");
+    backend.expect("POST", "/api/v1/catalog/admin/quality-tiers", json);
+    backend.expect("PUT", "/api/v1/catalog/admin/quality-tiers/" + ID, json);
+    backend.expect("DELETE", "/api/v1/catalog/admin/quality-tiers/" + ID, null);
   }
 
   /**
