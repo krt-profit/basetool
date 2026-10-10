@@ -17,8 +17,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/**
- * The Materialbörse module's internals: the offer and request entities and repositories, the board
- * services, the offer ratchet and the stock-offer lookup the Lager asks (plan §5.2, §5.3).
- */
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
+
+import java.util.UUID;
+
+/**
+ * Grouped interest count per Materialbörse offer, filled by a JPQL constructor expression; carries
+ * no interessent identity (REQ-MARKET-006).
+ *
+ * @param offerId the offer the count belongs to.
+ * @param count the number of members who have registered interest on that offer.
+ */
+public record MaterialExchangeInterestCount(UUID offerId, Long count) {}

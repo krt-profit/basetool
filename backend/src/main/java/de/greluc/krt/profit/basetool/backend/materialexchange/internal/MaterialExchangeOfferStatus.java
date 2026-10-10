@@ -17,8 +17,18 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/**
- * The Materialbörse module's internals: the offer and request entities and repositories, the board
- * services, the offer ratchet and the stock-offer lookup the Lager asks (plan §5.2, §5.3).
- */
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
+
+/**
+ * Lifecycle state of a {@link MaterialExchangeOffer}: {@link #ACTIVE} while listed, {@link
+ * #DEACTIVATED} once the owner takes it off the board. At most one active offer exists per Lager
+ * row.
+ */
+public enum MaterialExchangeOfferStatus {
+
+  /** Publicly listed on the board and visible to every member. */
+  ACTIVE,
+
+  /** Taken off the board by the owner; retained for the audit trail but never listed. */
+  DEACTIVATED
+}

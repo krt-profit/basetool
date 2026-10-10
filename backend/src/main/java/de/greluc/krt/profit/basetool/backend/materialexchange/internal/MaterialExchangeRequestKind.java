@@ -17,8 +17,20 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/**
- * The Materialbörse module's internals: the offer and request entities and repositories, the board
- * services, the offer ratchet and the stock-offer lookup the Lager asks (plan §5.2, §5.3).
- */
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
+
+import de.greluc.krt.profit.basetool.backend.model.Material;
+
+/**
+ * Discriminator for the two kinds of {@link MaterialExchangeRequest} (REQ-MARKET-015): a {@link
+ * #MATERIAL} request names a catalogue {@link Material}, an {@link #ITEM} request names a craftable
+ * item by {@code product_key}. A DB {@code CHECK} enforces the exactly-one-branch rule.
+ */
+public enum MaterialExchangeRequestKind {
+
+  /** A request for a catalogue material, in a stated SCU/piece quantity. */
+  MATERIAL,
+
+  /** A request for a craftable item (blueprint product), in a stated whole-piece quantity. */
+  ITEM
+}

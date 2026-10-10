@@ -102,7 +102,7 @@ public final class ScopeSpecifications {
    * InventoryItem's scope predicate (alias {@code i}): the plain triple; the direct Lager view is
    * strict-staffel (REQ-ORG-003).
    */
-  static final String INVENTORY_ITEM_SCOPE_TRIPLE =
+  public static final String INVENTORY_ITEM_SCOPE_TRIPLE =
       """
       (
         :isAdminAllScope = true

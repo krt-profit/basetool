@@ -17,8 +17,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/**
- * The Materialbörse module's internals: the offer and request entities and repositories, the board
- * services, the offer ratchet and the stock-offer lookup the Lager asks (plan §5.2, §5.3).
- */
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
+
+/**
+ * The Materialbörse tab counts — the total number of active offers on the whole board and the
+ * caller's own active offers. Drives the "Alle Angebote" / "Meine Angebote" tab counters, which are
+ * unaffected by the search/quality/amount filters (they are board totals).
+ *
+ * @param all the number of active offers across the whole board.
+ * @param mine the number of the caller's own active offers.
+ */
+public record MaterialExchangeCountsDto(long all, long mine) {}

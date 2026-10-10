@@ -966,7 +966,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    *
    * <p>Earmarks and {@code delivered} are not part of the key. {@code null} material, game item or
    * quality match only rows where that column is {@code NULL}. Rows backing a {@link
-   * de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer} are excluded.
+   * de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOffer} are
+   * excluded.
    *
    * @param userId the owning user of the stack; never {@code null}.
    * @param materialId the stack's material, or {@code null} for a game-item stack (matches rows
