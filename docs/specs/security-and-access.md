@@ -3115,8 +3115,9 @@ asserts that a redaction method is *called*, never that the redaction is *comple
 - [x] ~~The strict outsider level inherits the pass from the member-peer level.~~ Retired with the
   outsider tier (ADR-0159); there is one level left.
 - [x] A unit with no assigned ship redacts without error.
+- [x] A walk over the types, not a list of cases: every record reachable from `MissionDto` is filled with sentinel values, peer redaction runs, and every `UserDto` left anywhere in the result holds only the public tuple (`id`, `username`, `displayName`, `effectiveName`, `rank`, `inKeycloak`, `version`); the owner and managers are hidden from a reader; no other type reachable from a mission declares a private member component (PRV-10). Proven able to fail with a planted `email`.
 
-**Enforced by:** `MissionPeerRedactorTest` · **Code:** `MissionPeerRedactor#cleanupUnitForPeer`,
+**Enforced by:** `MissionPeerRedactorTest`, `MissionPeerRedactionSentinelTest` · **Code:** `MissionPeerRedactor#cleanupUnitForPeer`,
 `#cleanupShipForPeer` · **Related:** REQ-SEC-007, REQ-SEC-009, ADR-0159 (supersedes ADR-0034)
 
 ### REQ-SEC-041 — The mission description is gated on membership, not on authentication

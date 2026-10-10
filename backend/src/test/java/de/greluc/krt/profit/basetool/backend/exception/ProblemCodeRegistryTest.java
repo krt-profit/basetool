@@ -184,7 +184,7 @@ class ProblemCodeRegistryTest {
     }
     for (String type :
         List.of(
-            "de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler",
+            "de.greluc.krt.profit.basetool.backend.exception.ProblemSupport",
             "de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException",
             "de.greluc.krt.profit.basetool.backend.config.TermsAcceptanceAccessFilter",
             "de.greluc.krt.profit.basetool.backend.config.PendingApprovalAccessFilter",
