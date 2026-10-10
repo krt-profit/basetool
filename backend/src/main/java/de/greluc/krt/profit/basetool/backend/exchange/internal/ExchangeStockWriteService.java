@@ -32,6 +32,8 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStock
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeEffects;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
@@ -45,12 +47,10 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemStolenMarkDt
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryStolenMarkService;
-import de.greluc.krt.profit.basetool.backend.service.MaterialExchangeOfferRatchet;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -140,7 +140,7 @@ public class ExchangeStockWriteService {
   private final InventoryItemRepository inventoryRepository;
   private final InventoryCheckoutService checkoutService;
   private final InventoryStolenMarkService stolenMarkService;
-  private final MaterialExchangeOfferRepository offerRepository;
+  private final StockOfferLookup stockOfferLookup;
   private final UserRepository userRepository;
   private final AuditRecorder auditRecorder;
   private final InventoryProperties inventoryProperties;
@@ -664,7 +664,7 @@ public class ExchangeStockWriteService {
       if (Boolean.TRUE.equals(row.getStolen()) == stolen
           || row.getAmount() == null
           || row.getAmount() <= 0
-          || offerRepository.existsByInventoryItemId(row.getId())) {
+          || stockOfferLookup.isOffered(row.getId())) {
         continue;
       }
       BigDecimal rowAmount = round(BigDecimal.valueOf(row.getAmount()), change.lot().unit());
@@ -848,7 +848,7 @@ public class ExchangeStockWriteService {
       if (take.signum() <= 0) {
         continue;
       }
-      MaterialExchangeOfferRatchet.Effects effects =
+      StockChangeEffects effects =
           checkoutService.bookOutForClient(
               row.getId(),
               new InventoryItemBookOutDto(

@@ -993,6 +993,33 @@ wave: `materialexchange` (the offer ratchet as `StockChangeObserver`), `refinery
 moved into inventory), `hangar`, `blueprint`. The eight business associations become id references
 as each pair is decoupled.
 
+- `materialexchange` — **done 2026-10-10.**
+  1. *Characterise*: the ratchet's audit rows were pinned (`MaterialExchangeOfferRatchetDataTest`,
+     `ExchangeStockWriteControllerTest`); `MaterialExchangeStockLinksDataTest` adds the two other
+     reads the Lager made of the Materialbörse — the stolen-split floor and the merge refusal.
+  2. *Observer SPI* (§5.3, write family 3): `inventory.api.StockChangeObserver` (`@ObserverSpi`:
+     `lower`, `beforeDelete`, `beforeWipe`, `beforeUserPurge`), implemented unchanged by
+     `MaterialExchangeOfferRatchet` (every method `MANDATORY`, same clamps, same
+     `MARKET_OFFER_REDUCED`/`REMOVED` rows before the cascading delete); the reason codes and the
+     effects record moved with it as `StockChangeReason` and `StockChangeEffects` (codes
+     unchanged). A second inventory-owned SPI, `StockOfferLookup` (`isOffered`,
+     `activeOfferedAmount`), answers the two reads. The Lager, the three job-order handover and
+     production services, the exchange's stock writes and the account deletion use only these.
+     Baseline **103 → 98** (the `inventory -> materialexchange` pair is gone).
+  3. *Move*: the two controllers into `materialexchange.web`, the 8 entities and enums, 13 DTOs,
+     4 repositories, 5 services and the lookup into `materialexchange.internal`.
+  No access policy left the scope hub: the boards are gated by `hasRole('KRT_MEMBER')` and decide
+  ownership inside their services; their only scope-hub call is `currentOrgUnit` for stamping.
+  No command API is published yet: no other module writes an offer or a request. **Corrections:**
+  (1) `beforeWipe` takes the three scope components instead of `ScopePredicate`, which lives in
+  the `service` package, so `inventory.api` depends on no layer package; `beforeUserPurge` stays on
+  the stock observer rather than a GDPR participant until §7.6 introduces those. (2)
+  `MaterialExchangeOffer.inventoryItem` stays an association for now: converting it rewrites the
+  fetch plan of eight queries and two entity graphs, and nothing needs the id until `InventoryItem`
+  leaves `model` with the inventory move (P3-5), where it belongs. (3)
+  `ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE` is public, because the offer board's JPQL
+  splices it from another package.
+
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
 | Inventory command API | Lock order (advisory lock first, ascending by key), bulk update after the loop, the `FORCE_INCREMENT` version echo | Existing concurrency and E2E tests (`MaterialCollectionDeliveredInPlaceE2eTest`), the ADR-0229 load-test cases, "only inventory writes `InventoryItem`", an audit contract per command, a 403 test per foreign entry point |
@@ -1131,8 +1158,8 @@ features only, no preview flags) stands; every proposal below uses final feature
 
 | Proposal | Pros | Cons and risks | Guard | Effort |
 | --- | --- | --- | --- | --- |
-| **Exhaustive enum switches.** Checkstyle's `MissingSwitchDefault` forces a `default` into all 20 switch statements; on nine of them every constant is already covered, so the `default` hides the next constant. Write them as switch expressions or with `case null ->`, which javac 25 checks for exhaustiveness and Checkstyle 14.3.0 accepts (probed). Policy: no `default` on a switch over a project enum unless it handles a deliberate subset (decided, D-15) | A new `BankAccountType`, `OrgUnitKind` or `SelectorKind` breaks the build at every decision site instead of shipping a 400, an exception or a silent no-op | `case null ->` is an unfamiliar idiom | The compiler; existing service tests | S |
-| **Enum predicates instead of `==` chains.** `OrgUnitKind` is compared 43 times in 19 files; add behaviour on the enum as `switch (this)` without `default` (precedent `OperationStatus.canTransitionTo`), with a `values()` test per predicate; the same for `FinanceType` in payout arithmetic | Tenancy rules stated once, as the kernel's API | Each site's current fail-open or fail-closed behaviour must be kept exactly — one predicate per rule, never two rules merged | Access-gate and scope tests | M |
+| **Exhaustive enum switches** — **done 2026-10-10** (nine dead `default` arms became `case null`; the deliberate subsets keep theirs; ADR-0238 *Implementation*). *Correction:* the 20 statements of the audit are 51 `default` arms across `main` today, nine of them dead. Checkstyle's `MissingSwitchDefault` forces a `default` into all 20 switch statements; on nine of them every constant is already covered, so the `default` hides the next constant. Write them as switch expressions or with `case null ->`, which javac 25 checks for exhaustiveness and Checkstyle 14.3.0 accepts (probed). Policy: no `default` on a switch over a project enum unless it handles a deliberate subset (decided, D-15) | A new `BankAccountType`, `OrgUnitKind` or `SelectorKind` breaks the build at every decision site instead of shipping a 400, an exception or a silent no-op | `case null ->` is an unfamiliar idiom | The compiler; existing service tests | S |
+| **Enum predicates instead of `==` chains** — **done 2026-10-10** for the multi-constant rules: `OrgUnitKind.isTenantUnit()` (three sites) and `FinanceType.signed` (payout totals). *Correction:* of the 43 `OrgUnitKind` comparisons only three are chains; the rest compare one constant, which a predicate would only rename. `OrgUnitKind` is compared 43 times in 19 files; add behaviour on the enum as `switch (this)` without `default` (precedent `OperationStatus.canTransitionTo`), with a `values()` test per predicate; the same for `FinanceType` in payout arithmetic | Tenancy rules stated once, as the kernel's API | Each site's current fail-open or fail-closed behaviour must be kept exactly — one predicate per rule, never two rules merged | Access-gate and scope tests | M |
 | **Sealed types where they are legal** — **done 2026-10-10**: the blueprint and stock write loops switch over `Planned` (the ship loop already did); the resolve status, the journal labels and the undo refresh name their last constant; `ExchangeResource` carries the mass-change name, the write capability and the metric tag, and the mass-change service maps the request's name to it before the capability is chosen (`ExchangeMassChangeServiceResourceTest`); the ship operation names `remove` and refuses any other value instead of defaulting to a removal. Exhaustive `switch` over the exchange's private sealed `Planned` types (two are read with `if/else` without `else`, so a new variant is silently dropped); name the last constant instead of `default` in three exchange switches; the exchange's resource and operation vocabulary as one enum mapped at the boundary (the mass-change capability is chosen from a string with `default -> HANGAR_WRITE` today, which Bean Validation happens to shield) | No silently dropped external write; no path can default to a capability | Must keep the external contract byte-identical | Exchange contract tests; a test that an unknown value never reaches the capability choice | S |
 | **Never seal across packages or entities.** Sealed hierarchies stay inside one package (class-path rule) and never cover JPA entities (a Hibernate proxy cannot subclass a sealed class) | Avoids a refactor dead end | — | javac | — |
 | **Unnamed variables `_`** (final since 22) for 107 unused lambda parameters, meaningless catch parameters and unused pattern components; empty catches too, with the ADR-0214 amendment and the Checkstyle `EmptyCatchBlock` pattern change this needs (decided, D-14); descriptive names stay where the name states intent; not in keycloak-spi (Java 21 bytecode) | The compiler forbids accidental use | About 260 edits in `main` | Compile and Checkstyle | S–M |

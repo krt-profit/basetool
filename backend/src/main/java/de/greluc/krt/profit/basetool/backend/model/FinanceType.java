@@ -19,8 +19,28 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
-/** Enumeration of Finance Type values. */
+import java.math.BigDecimal;
+import org.jetbrains.annotations.NotNull;
+
+/** Whether a mission finance entry adds to or takes from the mission's total. */
 public enum FinanceType {
+  /** Money earned; adds to the total. */
   INCOME,
-  EXPENSE
+  /** Money spent; takes from the total. */
+  EXPENSE;
+
+  /**
+   * The entry's contribution to a mission or operation total: the amount for income, its negation
+   * for an expense.
+   *
+   * @param amount the entry's amount
+   * @return the signed contribution
+   */
+  @NotNull
+  public BigDecimal signed(@NotNull BigDecimal amount) {
+    return switch (this) {
+      case INCOME -> amount;
+      case EXPENSE -> amount.negate();
+    };
+  }
 }

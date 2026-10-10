@@ -32,6 +32,8 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -43,7 +45,6 @@ import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -74,10 +75,10 @@ class InventoryStockMergeTest {
   @Mock private LocationRepository locationRepository;
   @Mock private MissionFinanceEntryRepository missionFinanceEntryRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
-  @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
+  @Mock private StockOfferLookup stockOfferLookup;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private OwnerScopeService ownerScopeService;
-  @Mock private MaterialExchangeOfferRatchet offerRatchet;
+  @Mock private StockChangeObserver offerRatchet;
   @Mock private AuditService auditService;
   @Mock private ApplicationEventPublisher eventPublisher;
   @InjectMocks private InventoryCheckoutService service;
@@ -142,7 +143,7 @@ class InventoryStockMergeTest {
     InventoryItem victim2 = row(UUID.randomUUID(), QuantityType.PIECE, 2.0, "note-a");
     InventoryAllocations.addJobOrder(victim2, order, 2.0, true);
 
-    when(materialExchangeOfferRepository.existsByInventoryItemId(survivorId)).thenReturn(false);
+    when(stockOfferLookup.isOffered(survivorId)).thenReturn(false);
     when(inventoryItemRepository.findMergeGroupForUpdate(
             USER_ID, MATERIAL_ID, LOCATION_ID, 100, false, false, null))
         .thenReturn(List.of(survivor, victim1, victim2));
@@ -178,7 +179,7 @@ class InventoryStockMergeTest {
 
     assertSame(row, result);
     assertEquals(5.0, row.getAmount(), 1e-9, "the amount is untouched");
-    verifyNoInteractions(inventoryItemRepository, materialExchangeOfferRepository, auditService);
+    verifyNoInteractions(inventoryItemRepository, stockOfferLookup, auditService);
   }
 
   @Test
@@ -187,7 +188,7 @@ class InventoryStockMergeTest {
     InventoryItem survivor = row(survivorId, QuantityType.SCU, 5.0, "x");
     InventoryItem victim = row(UUID.randomUUID(), QuantityType.SCU, 2.0, "y");
 
-    when(materialExchangeOfferRepository.existsByInventoryItemId(survivorId)).thenReturn(false);
+    when(stockOfferLookup.isOffered(survivorId)).thenReturn(false);
     when(inventoryItemRepository.findMergeGroupForUpdate(
             USER_ID, MATERIAL_ID, LOCATION_ID, 100, false, false, null))
         .thenReturn(List.of(survivor, victim));
@@ -209,7 +210,7 @@ class InventoryStockMergeTest {
     UUID rowId = UUID.randomUUID();
     InventoryItem row = row(rowId, QuantityType.PIECE, 5.0, "n");
 
-    when(materialExchangeOfferRepository.existsByInventoryItemId(rowId)).thenReturn(true);
+    when(stockOfferLookup.isOffered(rowId)).thenReturn(true);
 
     InventoryItem result = service.mergeStockIfRequested(row, false);
 
@@ -225,7 +226,7 @@ class InventoryStockMergeTest {
     UUID rowId = UUID.randomUUID();
     InventoryItem row = row(rowId, QuantityType.PIECE, 5.0, "n");
 
-    when(materialExchangeOfferRepository.existsByInventoryItemId(rowId)).thenReturn(false);
+    when(stockOfferLookup.isOffered(rowId)).thenReturn(false);
     when(inventoryItemRepository.findMergeGroupForUpdate(
             USER_ID, MATERIAL_ID, LOCATION_ID, 100, false, false, null))
         .thenReturn(List.of(row));
@@ -271,7 +272,7 @@ class InventoryStockMergeTest {
     UUID survivorId = UUID.randomUUID();
     InventoryItem survivor = itemRow(survivorId, gameItem, 3.0);
     InventoryItem victim = itemRow(UUID.randomUUID(), gameItem, 2.0);
-    when(materialExchangeOfferRepository.existsByInventoryItemId(survivorId)).thenReturn(false);
+    when(stockOfferLookup.isOffered(survivorId)).thenReturn(false);
     when(inventoryItemRepository.findMergeGroupForUpdate(
             USER_ID, null, gameItem.getId(), LOCATION_ID, null, false, false, null))
         .thenReturn(List.of(survivor, victim));
@@ -310,6 +311,6 @@ class InventoryStockMergeTest {
 
     assertSame(row, result);
     assertEquals(5.0, row.getAmount(), 1e-9, "the amount is untouched");
-    verifyNoInteractions(inventoryItemRepository, materialExchangeOfferRepository, auditService);
+    verifyNoInteractions(inventoryItemRepository, stockOfferLookup, auditService);
   }
 }

@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ResponsibleHolderTracker;
@@ -99,7 +100,7 @@ public class UserDeletionService {
   private final ClientDirectory clientDirectory;
   private final UserRepository userRepository;
   private final InventoryItemRepository inventoryItemRepository;
-  private final MaterialExchangeOfferRatchet offerRatchet;
+  private final StockChangeObserver stockChangeObserver;
   private final ShipRepository shipRepository;
   private final RefineryOrderRepository refineryOrderRepository;
   private final MissionRepository missionRepository;
@@ -222,7 +223,7 @@ public class UserDeletionService {
                             () ->
                                 new IllegalStateException("No admin user found to reassign data")));
 
-    offerRatchet.beforeUserPurge(userId);
+    stockChangeObserver.beforeUserPurge(userId);
     int inventoryDeleted = inventoryItemRepository.deleteByUserId(userId);
     int shipsDeleted = shipRepository.deleteByOwnerId(userId);
 
