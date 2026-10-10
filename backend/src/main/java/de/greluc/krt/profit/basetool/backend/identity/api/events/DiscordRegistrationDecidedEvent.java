@@ -17,11 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.bank.api.events;
+package de.greluc.krt.profit.basetool.backend.identity.api.events;
 
 import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import java.util.Map;
 import java.util.Set;
@@ -31,23 +32,23 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published when a requester cancels their own pending bank booking request
- * (REQ-BANK-022, REQ-NOTIF-018).
+ * Published when a pending registration leaves the admin queue — approved, rejected or deleted
+ * (REQ-NOTIF-012, REQ-NOTIF-018).
  *
- * <p>Directed at nobody: it only {@linkplain #resolvesNotificationTypes() clears} the stale {@code
- * BANK_BOOKING_REQUEST_CREATED} items shown to the bank staff. Carries only scalars.
+ * <p>Directed at nobody: its only effect is to clear every admin's {@code
+ * DISCORD_REGISTRATION_PENDING} item for the registration, so the other admins are not left with a
+ * decision that has already been made.
  *
- * @param requestId the cancelled request's id (also the notification's loose entity id)
- * @param accountId the target bank account id
- * @param actorSub the withdrawing requester's sub
+ * @param userId the registration that was decided; the loose entity id of the cleared items
+ * @param actorSub the admin who decided it, or {@code null} when no admin is known
  */
-public record BankBookingRequestCancelledEvent(
-    UUID requestId, UUID accountId, @Nullable UUID actorSub) implements BankBookingRequestEvent {
+public record DiscordRegistrationDecidedEvent(@NotNull UUID userId, @Nullable UUID actorSub)
+    implements NotificationEvent {
 
   @NotNull
   @Override
   public NotificationEventType eventType() {
-    return NotificationEventType.BANK_BOOKING_REQUEST_CANCELLED;
+    return NotificationEventType.DISCORD_REGISTRATION_DECIDED;
   }
 
   @NotNull
@@ -57,14 +58,16 @@ public record BankBookingRequestCancelledEvent(
     return Map.of();
   }
 
+  @NotNull
   @Override
-  public UUID contextAccountId() {
-    return accountId;
+  public String entityType() {
+    return DiscordRegistrationPendingEvent.ENTITY_TYPE;
   }
 
+  @NotNull
   @Override
   public UUID entityId() {
-    return requestId;
+    return userId;
   }
 
   @NotNull
@@ -75,15 +78,14 @@ public record BankBookingRequestCancelledEvent(
   }
 
   /**
-   * Withdrawing the request settles its lifecycle, so the "new booking request" items the bank
-   * staff were shown are now stale and get cleared (REQ-NOTIF-018).
+   * The registration is decided, so the admins' "registration awaits approval" items are stale.
    *
-   * @return {@link #OPEN_REQUEST_NOTICES}
+   * @return the singleton {@link NotificationType#DISCORD_REGISTRATION_PENDING}
    */
   @NotNull
   @Unmodifiable
   @Override
   public Set<NotificationType> resolvesNotificationTypes() {
-    return OPEN_REQUEST_NOTICES;
+    return Set.of(NotificationType.DISCORD_REGISTRATION_PENDING);
   }
 }

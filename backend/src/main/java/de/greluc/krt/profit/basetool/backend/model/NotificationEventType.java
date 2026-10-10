@@ -125,5 +125,30 @@ public enum NotificationEventType {
    * once per action and previous owner; the default rule notifies that member via the {@code
    * EVENT_RECIPIENT} selector.
    */
-  INVENTORY_TRANSFERRED_FROM_USER
+  INVENTORY_TRANSFERRED_FROM_USER,
+
+  /**
+   * A pending registration was approved, rejected or deleted (REQ-NOTIF-012). Creates no
+   * notification; it clears every admin's {@code DISCORD_REGISTRATION_PENDING} item for it.
+   */
+  DISCORD_REGISTRATION_DECIDED,
+
+  /**
+   * A job order was completed, rejected or deleted (REQ-NOTIF-008). Creates no notification; it
+   * clears the open {@code JOB_ORDER_CREATED} and {@code JOB_ORDER_UPDATED_BY_REQUESTER} items.
+   */
+  JOB_ORDER_CLOSED,
+
+  /**
+   * A requester corrected their own pending booking request (REQ-BANK-056). The default rule
+   * notifies the recipients of {@link #BANK_BOOKING_REQUEST_CREATED} anew; the event clears their
+   * outdated items first.
+   */
+  BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER,
+
+  /**
+   * A member became a responsible holder of a bank account (REQ-BANK-034). Published once per new
+   * holder; the default rule notifies them via the {@code EVENT_RECIPIENT} selector.
+   */
+  BANK_ACCOUNT_RESPONSIBLE_ASSIGNED
 }

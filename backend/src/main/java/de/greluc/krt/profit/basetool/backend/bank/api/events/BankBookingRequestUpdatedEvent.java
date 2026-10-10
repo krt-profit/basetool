@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.bank.api.events;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
@@ -34,34 +35,37 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published when a bank employee rejects a booking request (REQ-BANK-026).
+ * Domain event published when a requester corrects their own pending booking request
+ * (REQ-BANK-056).
  *
- * <p>Directed at the requester via {@link #contextRecipientUserId()}; {@link #contextAccountId()}
- * lets the {@code ACCOUNT_RESPONSIBLE} selector notify the account's responsible holder
- * (REQ-BANK-034). Carries only scalars.
+ * <p>Clears the open notices about the request and tells the same recipients as {@link
+ * BankBookingRequestCreatedEvent} again, so nobody acts on the old amount. Carries only scalars.
  *
- * @param requestId the rejected request's id (also the notification's loose entity id)
- * @param accountId the target bank account id ({@code ACCOUNT_RESPONSIBLE} selector input)
- * @param accountNo the target account's human-readable number, for rendering
- * @param amount the requested whole-aUEC amount, for rendering
- * @param reason the rejection reason, for rendering
- * @param requesterSub the requesting officer/lead's sub; the directed recipient
- * @param actorSub the rejecting employee's sub
+ * @param requestId the corrected request's id (also the notification's loose entity id)
+ * @param accountId the request's bank account id ({@code ACCOUNT_GRANT} and {@code
+ *     ACCOUNT_RESPONSIBLE} selector input)
+ * @param type deposit, withdrawal or transfer
+ * @param amount the corrected whole-aUEC amount
+ * @param accountNo the account's human-readable number, for rendering
+ * @param requesterHandle the requester's effective-name snapshot, for rendering
+ * @param orgUnitShorthand the account's org-unit shorthand, for rendering, or {@code null}
+ * @param actorSub the requester's sub, excluded from recipients
  */
-public record BankBookingRequestRejectedEvent(
+public record BankBookingRequestUpdatedEvent(
     UUID requestId,
     UUID accountId,
-    String accountNo,
+    BankBookingRequestType type,
     BigDecimal amount,
-    String reason,
-    @Nullable UUID requesterSub,
+    String accountNo,
+    String requesterHandle,
+    @Nullable String orgUnitShorthand,
     @Nullable UUID actorSub)
     implements BankBookingRequestEvent {
 
   @NotNull
   @Override
   public NotificationEventType eventType() {
-    return NotificationEventType.BANK_BOOKING_REQUEST_REJECTED;
+    return NotificationEventType.BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER;
   }
 
   @NotNull
@@ -69,11 +73,6 @@ public record BankBookingRequestRejectedEvent(
   @Override
   public Map<NotificationContextRole, OrgUnitRef> contextOrgUnits() {
     return Map.of();
-  }
-
-  @Override
-  public UUID contextRecipientUserId() {
-    return requesterSub;
   }
 
   @Override
@@ -90,17 +89,20 @@ public record BankBookingRequestRejectedEvent(
   @Override
   public Map<String, String> renderParams() {
     Map<String, String> params = new LinkedHashMap<>();
-    params.put("accountNo", accountNo);
+    params.put("type", type.name());
     params.put("amount", BankAmounts.plain(amount));
-    if (reason != null && !reason.isBlank()) {
-      params.put("reason", reason);
+    params.put("accountNo", accountNo);
+    if (requesterHandle != null && !requesterHandle.isBlank()) {
+      params.put("requester", requesterHandle);
+    }
+    if (orgUnitShorthand != null && !orgUnitShorthand.isBlank()) {
+      params.put("orgUnit", orgUnitShorthand);
     }
     return params;
   }
 
   /**
-   * Rejecting the request settles its lifecycle, so the "new booking request" items the bank staff
-   * were shown are now stale and get cleared (REQ-NOTIF-018).
+   * The earlier notices show the old values, so they are cleared before the new ones are written.
    *
    * @return {@link #OPEN_REQUEST_NOTICES}
    */
