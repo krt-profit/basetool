@@ -997,7 +997,7 @@ is listed with where the plan adopts it.
   in `MissionDto` with sentinel values and asserts that peer redaction removes them; a user summary
   without an `email` component. *Partly adopted*: the kernel's `UserRef` (§5.1) carries cross-domain
   member references and the wave checklist keeps the redaction selection floors (§6.2); the
-  reflective test is not yet a named guard and belongs to the mission step (§7.5).
+  reflective test is now a named guard, `MissionPeerRedactionSentinelTest` (done 2026-10-10, REQ-SEC-040); it walks the types reachable from `MissionDto`, so it follows the DTOs through the mission move.
 - **PRV-11 — An audit-completeness guard per audited module** (in place of the rejected base
   template). Every mutating public service method of an audited module reaches an audit call or sits
   on a reviewed exemption list. *Adopted in changed form*: an audit contract per command (§6.2,
