@@ -7,7 +7,6 @@ catalogue -> refinery: LocationService -> RefineryOrderRepository
 hangar -> mission: HangarService -> Mission
 hangar -> mission: HangarService -> MissionUnit
 hangar -> mission: HangarService -> MissionUnitRepository
-identity -> bank: UserSyncService -> BankHolderReconciliationService
 identity -> blueprint: UserReconciliationService -> DefaultBlueprintProvisioningService
 identity -> inventory: MeController -> InventoryProperties
 identity -> joborder: UserDtoRedaction -> JobOrderAssigneeDto
@@ -80,7 +79,6 @@ mission -> refinery: MissionFinanceEntryService -> RefineryOrderRepository
 mission -> refinery: MissionFinanceSummaryDto -> RefineryOrderDto
 mission -> refinery: MissionService -> RefineryOrder
 notification -> orgunit: OrgUnitRef -> OrgUnitKind
-orgunit -> bank: OrgUnitMembershipService -> OrgUnitBankResponsibilityService
 orgunit -> inventory: OrgUnitMembershipService -> InventoryOrgUnitReconciler
 scope -> hangar: AccessGateService -> Ship
 scope -> hangar: AccessGateService -> ShipRepository

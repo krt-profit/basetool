@@ -28,18 +28,21 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAuditEventRepository;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAuditEventType;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAuditService;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestRepository;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankHandleSnapshotService;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankHolderRepository;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankTransactionRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
-import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankAuditEventRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -49,6 +52,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Mockito unit tests for {@link HandleAnonymisationService}, the granted Art. 17 erasure of a
@@ -80,6 +84,19 @@ class HandleAnonymisationServiceTest {
   @Mock private BankAuditService bankAuditService;
 
   @InjectMocks private HandleAnonymisationService service;
+
+  @BeforeEach
+  void wireTheBankPart() {
+    ReflectionTestUtils.setField(
+        service,
+        "bankHandleSnapshots",
+        new BankHandleSnapshotService(
+            bankAuditEventRepository,
+            bankTransactionRepository,
+            bankBookingRequestRepository,
+            bankHolderRepository,
+            bankAuditService));
+  }
 
   private void stubCounts(int each) {
     when(auditEventRepository.anonymiseActorHandle(any(), any())).thenReturn(each);

@@ -22,11 +22,13 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.model.BankAccountGrant;
-import de.greluc.krt.profit.basetool.backend.model.BankAccountGrantId;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountGrant;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountGrantId;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountGrantRepository;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankRecipientDirectory;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankResponsibilityService;
 import de.greluc.krt.profit.basetool.backend.model.OrgRelativeRole;
 import de.greluc.krt.profit.basetool.backend.model.Role;
-import de.greluc.krt.profit.basetool.backend.repository.BankAccountGrantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
