@@ -64,6 +64,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankAccountViewGrantRepo
 import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BereichRepository;
+import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -108,6 +109,7 @@ class OrgUnitBankAccessServiceTest {
   @Mock private BankStatementReportService bankStatementReportService;
   @Mock private BankBookingRequestService bankBookingRequestService;
   @Mock private BankAuditService bankAuditService;
+  @Mock private OrgUnitRepository orgUnitRepository;
 
   private OrgUnitBankAccessService service;
 
@@ -150,7 +152,8 @@ class OrgUnitBankAccessServiceTest {
             bankBookingRequestService,
             bankAuditService,
             visibilityService,
-            approvalLimitService);
+            approvalLimitService,
+            orgUnitRepository);
   }
 
   private static OrgUnit squadron(UUID id, String name, String shorthand) {
@@ -1685,7 +1688,7 @@ class OrgUnitBankAccessServiceTest {
     when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(
             bereichId, MembershipRole.BEREICHSKOORDINATOR))
         .thenReturn(true);
-    when(ownerScopeService.currentUserIsMemberOfAreaCascade(bereichId)).thenReturn(true);
+    when(ownerScopeService.currentDirectMembershipOrgUnitIds()).thenReturn(Set.of(bereichId));
     when(bankBookingRequestService.create(
             eq(accountId),
             eq(BankBookingRequestType.WITHDRAWAL),

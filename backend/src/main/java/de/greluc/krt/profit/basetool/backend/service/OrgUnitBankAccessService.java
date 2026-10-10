@@ -61,6 +61,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankAccountViewGrantRepo
 import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BereichRepository;
+import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.util.BankAmounts;
 import java.math.BigDecimal;
@@ -145,6 +146,7 @@ public class OrgUnitBankAccessService {
   private final BankAuditService bankAuditService;
   private final OrgUnitBankVisibilityService orgUnitBankVisibilityService;
   private final OrgUnitBankApprovalLimitService orgUnitBankApprovalLimitService;
+  private final OrgUnitRepository orgUnitRepository;
 
   /**
    * Lists every active account the caller may view, with balance, 30-day trend, balance target and
@@ -1122,8 +1124,7 @@ public class OrgUnitBankAccessService {
                   && ownerScopeService.currentUserHoldsRoleOnOrgUnit(owningOrgUnitId, role);
             }
             case ALL_MEMBERS -> ownerScopeService.currentUserIsMemberOfOrgUnit(owningOrgUnitId);
-            case AREA_MEMBERS ->
-                ownerScopeService.currentUserIsMemberOfAreaCascade(owningOrgUnitId);
+            case AREA_MEMBERS -> callerIsMemberOfAreaCascade(owningOrgUnitId);
             case USER -> userId.isPresent() && userId.get().equals(grant.getGranteeUserId());
             case GLOBAL_ROLE -> false;
           };
@@ -1385,8 +1386,7 @@ public class OrgUnitBankAccessService {
             }
             case GLOBAL_ROLE ->
                 authHelperService.hasReachableRole(Roles.authority(limit.getRoleCode()));
-            case AREA_MEMBERS ->
-                owner != null && ownerScopeService.currentUserIsMemberOfAreaCascade(owner);
+            case AREA_MEMBERS -> owner != null && callerIsMemberOfAreaCascade(owner);
             case ALL_MEMBERS ->
                 owner != null && ownerScopeService.currentUserIsMemberOfOrgUnit(owner);
             case USER -> false;
@@ -1749,5 +1749,32 @@ public class OrgUnitBankAccessService {
         canManageSettings,
         approvalLimit,
         approvalExempt);
+  }
+
+  /**
+   * Whether the caller is a member of the given Bereich or of any of its child units, the {@code
+   * AREA_MEMBERS} grant and approval-limit tier (REQ-BANK-048).
+   *
+   * @param bereichId the owning Bereich org unit
+   * @return {@code true} iff the caller has any direct membership on the Bereich or a child unit
+   */
+  boolean callerIsMemberOfAreaCascade(@NotNull UUID bereichId) {
+    List<UUID> childIds = orgUnitRepository.findChildOrgUnitIds(bereichId);
+    return isMemberOfAreaCascade(
+        bereichId, ownerScopeService.currentDirectMembershipOrgUnitIds(), childIds);
+  }
+
+  /**
+   * Decides the {@code AREA_MEMBERS} cascade from the caller's direct memberships and the Bereich's
+   * child units.
+   *
+   * @param bereichId the owning Bereich org unit
+   * @param directMemberships the org units the caller is a direct member of
+   * @param childIds the Bereich's direct child org units
+   * @return {@code true} iff a direct membership is the Bereich or one of its children
+   */
+  static boolean isMemberOfAreaCascade(
+      @NotNull UUID bereichId, @NotNull Set<UUID> directMemberships, @NotNull List<UUID> childIds) {
+    return directMemberships.stream().anyMatch(ou -> ou.equals(bereichId) || childIds.contains(ou));
   }
 }
