@@ -45,10 +45,12 @@ public interface TimedNoticeProducer {
    *
    * <p>Called inside its own transaction. An implementation sets the entity's „already notified"
    * marker in that same transaction, so a notice fires at most once, and publishes the event with
-   * {@code ApplicationEventPublisher} so it is delivered after the commit.
+   * {@code ApplicationEventPublisher} so it is delivered after the commit. It handles at most
+   * {@code limit} entities and marks only those, so the rest follow on the next run.
    *
    * @param now the instant the run is evaluated against
+   * @param limit the most events to publish in this run; at least one
    * @return the number of notices published; never negative
    */
-  int produce(@NotNull Instant now);
+  int produce(@NotNull Instant now, int limit);
 }

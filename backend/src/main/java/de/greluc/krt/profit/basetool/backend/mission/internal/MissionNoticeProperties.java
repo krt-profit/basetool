@@ -32,8 +32,12 @@ import org.springframework.validation.annotation.Validated;
  *
  * @param overdueAfter how long after its planned end a mission without an end time is reported as
  *     never ended; at least one hour, default {@code PT6H}
+ * @param overdueWindow how far behind {@code overdueAfter} a planned end may lie and still be
+ *     reported; older missions are history and are never announced; at least one day, default
+ *     {@code P14D}
  */
 @Validated
 @ConfigurationProperties("app.missions.notices")
 public record MissionNoticeProperties(
-    @DefaultValue("PT6H") @NotNull @DurationMin(hours = 1) Duration overdueAfter) {}
+    @DefaultValue("PT6H") @NotNull @DurationMin(hours = 1) Duration overdueAfter,
+    @DefaultValue("P14D") @NotNull @DurationMin(days = 1) Duration overdueWindow) {}

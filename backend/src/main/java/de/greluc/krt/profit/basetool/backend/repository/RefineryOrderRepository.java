@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -323,11 +324,13 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   int updateOwner(@NotNull User oldUser, @NotNull User newUser);
 
   /**
-   * Returns the ids of the open orders whose run has ended and that have not been announced yet
-   * (REQ-REFINERY-023).
+   * Returns the ids of the open orders whose run ended in {@code (notBefore, now]} and that have
+   * not been announced yet (REQ-REFINERY-023).
    *
-   * @param now the instant the run ends are compared with
-   * @return the ids; never {@code null}
+   * @param notBefore the earliest run end that is still announced, exclusive
+   * @param now the instant the run ends are compared with, inclusive
+   * @param limit the most ids to return
+   * @return the ids, oldest run end first; never {@code null}
    */
   @Query(
       """
@@ -335,9 +338,11 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
       WHERE o.status IN (de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus.OPEN,
                          de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus.IN_PROGRESS)
         AND o.storedAt IS NULL AND o.readyNotifiedAt IS NULL
-        AND o.endsAt IS NOT NULL AND o.endsAt <= :now
+        AND o.endsAt IS NOT NULL AND o.endsAt > :notBefore AND o.endsAt <= :now
+      ORDER BY o.endsAt, o.id
       """)
-  List<UUID> findReadyUnannouncedIds(@Param("now") Instant now);
+  List<UUID> findReadyUnannouncedIds(
+      @Param("notBefore") Instant notBefore, @Param("now") Instant now, Limit limit);
 
   /**
    * Marks an order as announced, atomically, without touching its version: the one caller whose

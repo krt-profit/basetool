@@ -1565,6 +1565,12 @@ the boot run carries the last run's values over and re-reads only the reboot fla
   job; `NotificationTimedStale` (> 15 min, warning) fires when it stops succeeding, and a panel
   on `07-basetool-operations.json` charts the notices raised per hour by kind. Added with issue
   #2414.
+- `basetool_notification_created_total{notification_type}` counter (`NotificationCreationService`,
+  bounded by the notification types) counts the inbox rows written; `NotificationCreationFlood` (> 2000
+  in 15 min, warning) fires on a runaway producer (REQ-NOTIF-029).
+- `basetool_notification_executor_rejected_total` counter (untagged, `BackpressureRejectedExecutionHandler`)
+  counts the after-commit notification callbacks the executor refused after its 30 s wait; each is a
+  lost notice and `NotificationExecutorRejected` (any in 10 min, warning) fires (REQ-NOTIF-029).
 - `basetool_notification_retention_deleted_total{kind}` counter (`read` / `unread`,
   `NotificationRetentionTask`) splits the inbox sweep's two windows, which its `items` total
   conflated. The halves are isolated from each other in the task, so one can be stuck while the

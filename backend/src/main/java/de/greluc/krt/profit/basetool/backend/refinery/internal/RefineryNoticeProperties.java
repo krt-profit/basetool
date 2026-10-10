@@ -17,10 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.notification.internal;
+package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.time.Duration;
 import org.hibernate.validator.constraints.time.DurationMin;
@@ -29,18 +27,13 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Validated configuration of the time-based notification producer (REQ-NOTIF-026, prefix {@code
- * app.notifications.timed}). A violation refuses to start the context.
+ * Validated configuration of the refinery notices raised by time (REQ-REFINERY-023, prefix {@code
+ * app.refinery.notices}). A violation refuses to start the context.
  *
- * @param enabled whether the scheduled task exists (default {@code true}, {@code false} under the
- *     {@code test} profile)
- * @param interval the pause between two runs; at least ten seconds, default {@code PT1M}
- * @param maxEventsPerTick the most events all producers together publish per run, so a backlog
- *     drains over several runs and never floods the notification executor; 1 to 150, default 100
+ * @param readyWindow how far back a run end may lie and still be announced as ready; an older order
+ *     is history and is never announced; at least one day, default {@code P7D}
  */
 @Validated
-@ConfigurationProperties("app.notifications.timed")
-public record NotificationTimedProperties(
-    @DefaultValue("true") boolean enabled,
-    @DefaultValue("PT1M") @NotNull @DurationMin(seconds = 10) Duration interval,
-    @DefaultValue("100") @Min(1) @Max(150) int maxEventsPerTick) {}
+@ConfigurationProperties("app.refinery.notices")
+public record RefineryNoticeProperties(
+    @DefaultValue("P7D") @NotNull @DurationMin(days = 1) Duration readyWindow) {}

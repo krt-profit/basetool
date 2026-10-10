@@ -30,6 +30,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -416,18 +417,22 @@ public interface MissionRepository
   List<Mission> findDueForReminder1h(@Param("from") Instant from, @Param("to") Instant to);
 
   /**
-   * Returns the active or completed missions whose planned end is before the cutoff and that have
-   * no actual end time and no never-ended notice yet (REQ-MISSION-025).
+   * Returns the oldest active or completed missions whose planned end lies in {@code [notBefore,
+   * cutoff)} and that have no actual end time and no never-ended notice yet (REQ-MISSION-025).
    *
-   * @param cutoff the latest planned end that counts as overdue
-   * @return the missions; never {@code null}
+   * @param notBefore the earliest planned end that is still announced, inclusive
+   * @param cutoff the latest planned end that counts as overdue, exclusive
+   * @param limit the most missions to return
+   * @return the missions, oldest planned end first; never {@code null}
    */
   @Query(
       """
       SELECT m FROM Mission m
       WHERE m.status IN ('ACTIVE', 'COMPLETED') AND m.actualEndTime IS NULL
         AND m.neverEndedNotifiedAt IS NULL AND m.plannedEndTime IS NOT NULL
-        AND m.plannedEndTime < :cutoff
+        AND m.plannedEndTime >= :notBefore AND m.plannedEndTime < :cutoff
+      ORDER BY m.plannedEndTime, m.id
       """)
-  List<Mission> findOverdueWithoutEnd(@Param("cutoff") Instant cutoff);
+  List<Mission> findOverdueWithoutEnd(
+      @Param("notBefore") Instant notBefore, @Param("cutoff") Instant cutoff, Limit limit);
 }

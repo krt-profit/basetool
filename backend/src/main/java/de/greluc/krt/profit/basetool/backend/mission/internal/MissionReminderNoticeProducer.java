@@ -30,6 +30,7 @@ import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
@@ -40,6 +41,7 @@ import org.springframework.stereotype.Component;
  * for the day itself gets no reminder that would lie about its lead.
  */
 @Component
+@Order(1)
 @RequiredArgsConstructor
 public class MissionReminderNoticeProducer implements TimedNoticeProducer {
 
@@ -56,14 +58,20 @@ public class MissionReminderNoticeProducer implements TimedNoticeProducer {
   }
 
   @Override
-  public int produce(@NotNull Instant now) {
+  public int produce(@NotNull Instant now, int limit) {
     int raised = 0;
     for (Mission mission :
         missionRepository.findDueForReminder24h(now.plus(DAY).minus(HOUR), now.plus(DAY))) {
+      if (raised >= limit) {
+        return raised;
+      }
       mission.setReminder24hSentAt(now);
       raised += remind(mission, "24 h");
     }
     for (Mission mission : missionRepository.findDueForReminder1h(now, now.plus(HOUR))) {
+      if (raised >= limit) {
+        return raised;
+      }
       mission.setReminder1hSentAt(now);
       raised += remind(mission, "1 h");
     }

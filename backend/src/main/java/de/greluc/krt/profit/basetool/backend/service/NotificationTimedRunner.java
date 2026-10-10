@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.notification.api.TimedNoticeProducer;
+import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationTimedProperties;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
@@ -40,6 +41,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>The run takes the transaction-scoped Postgres advisory lock {@link #LOCK_KEY}; an instance
  * that does not get it skips the run. Each producer runs in its own transaction, so one failing
  * producer neither blocks the others nor rolls back what they have marked.
+ *
+ * <p>All producers share one budget of {@code app.notifications.timed.max-events-per-tick} events
+ * per run, spent in producer order; what the budget does not cover stays unmarked and follows on
+ * the next run.
  */
 @Service
 @Slf4j
@@ -51,6 +56,7 @@ public class NotificationTimedRunner {
   private final List<TimedNoticeProducer> producers;
   private final NotificationRepository notificationRepository;
   private final MeterRegistry meterRegistry;
+  private final int maxEventsPerTick;
   private final TransactionTemplate lockTransaction;
   private final TransactionTemplate producerTransaction;
 
@@ -60,16 +66,19 @@ public class NotificationTimedRunner {
    * @param producers every producer bean, possibly none
    * @param notificationRepository the repository taking the advisory lock
    * @param meterRegistry where the produced-notices counter is registered
+   * @param properties the producer configuration, read for the per-run event budget
    * @param transactionManager the manager both transaction templates use
    */
   public NotificationTimedRunner(
       @NotNull List<TimedNoticeProducer> producers,
       @NotNull NotificationRepository notificationRepository,
       @NotNull MeterRegistry meterRegistry,
+      @NotNull NotificationTimedProperties properties,
       @NotNull PlatformTransactionManager transactionManager) {
     this.producers = List.copyOf(producers);
     this.notificationRepository = notificationRepository;
     this.meterRegistry = meterRegistry;
+    this.maxEventsPerTick = properties.maxEventsPerTick();
     this.lockTransaction = new TransactionTemplate(transactionManager);
     this.producerTransaction = new TransactionTemplate(transactionManager);
     this.producerTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -95,8 +104,17 @@ public class NotificationTimedRunner {
     int total = 0;
     RuntimeException firstFailure = null;
     for (TimedNoticeProducer producer : producers) {
+      int budget = maxEventsPerTick - total;
+      if (budget <= 0) {
+        log.info(
+            "Timed-notification budget of {} events spent; '{}' and later producers follow next"
+                + " run",
+            maxEventsPerTick,
+            producer.kind());
+        break;
+      }
       try {
-        Integer count = producerTransaction.execute(_ -> producer.produce(now));
+        Integer count = producerTransaction.execute(_ -> producer.produce(now, budget));
         int produced = count == null ? 0 : count;
         meterRegistry
             .counter(MetricNames.NOTIFICATION_TIMED_PRODUCED, MetricNames.TAG_KIND, producer.kind())

@@ -1,0 +1,65 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: NotificationExecutorRejected fires when a callback is refused
+    interval: 1m
+    input_series:
+      - series: 'basetool_notification_executor_rejected_total{application="basetool-backend"}'
+        values: "0 0 0 0 0 3 3 3 3 3"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: NotificationExecutorRejected
+        exp_alerts:
+          - exp_labels:
+              severity: "warning"
+            exp_annotations:
+              summary: "Notification callbacks rejected (notices lost)"
+              description: "The notification executor refused 3 after-commit callback(s) in the last 10 minutes even after waiting for room, so those notices were never created and nothing retries them (REQ-NOTIF-029). Check the backend logs for 'rejected a task' and the database for a stall that keeps the four notification threads busy."
+
+  - name: NotificationExecutorRejected stays silent while the counter never moves
+    interval: 1m
+    input_series:
+      - series: 'basetool_notification_executor_rejected_total{application="basetool-backend"}'
+        values: "0x20"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: NotificationExecutorRejected
+        exp_alerts: []
+
+  - name: NotificationCreationFlood fires on a sustained flood
+    interval: 1m
+    input_series:
+      - series: 'basetool_notification_created_total{application="basetool-backend",notification_type="MISSION_NEVER_ENDED"}'
+        values: "0+500x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: NotificationCreationFlood
+        exp_alerts:
+          - exp_labels:
+              severity: "warning"
+            exp_annotations:
+              summary: "More than 2000 notices created in 15 min"
+              description: "7500 inbox rows were written in the last 15 minutes, far above the normal rate. Look at sum by (notification_type)(increase(basetool_notification_created_total[15m])) for the type and at basetool_notification_timed_produced_total for a timed producer that is flooding (REQ-NOTIF-029)."
+
+  - name: NotificationCreationFlood stays silent at a normal rate
+    interval: 1m
+    input_series:
+      - series: 'basetool_notification_created_total{application="basetool-backend",notification_type="MISSION_NEVER_ENDED"}'
+        values: "0+5x60"
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: NotificationCreationFlood
+        exp_alerts: []
+
+  - name: NotificationCreationFlood stays silent for a short bulk burst
+    interval: 1m
+    input_series:
+      - series: 'basetool_notification_created_total{application="basetool-backend",notification_type="HANGAR_FITTED_RESET"}'
+        values: "0 0 0 0 0 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500 1500"
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: NotificationCreationFlood
+        exp_alerts: []

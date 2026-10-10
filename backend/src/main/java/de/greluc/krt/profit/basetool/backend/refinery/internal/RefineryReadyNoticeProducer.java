@@ -33,19 +33,24 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.core.annotation.Order;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 
 /**
  * Tells the owner of a refinery order when its run has ended and the output can be collected
  * (REQ-REFINERY-023), once per order: the marker is set by an atomic update that does not touch the
- * order's version, and only the caller whose update changed the row publishes.
+ * order's version, and only the caller whose update changed the row publishes. Only runs that ended
+ * within {@code app.refinery.notices.ready-window} are announced, so history stays silent.
  */
 @Component
+@Order(3)
 @RequiredArgsConstructor
 public class RefineryReadyNoticeProducer implements TimedNoticeProducer {
 
   private final RefineryOrderRepository refineryOrderRepository;
   private final ApplicationEventPublisher eventPublisher;
+  private final RefineryNoticeProperties properties;
 
   @Override
   @NotNull
@@ -54,9 +59,11 @@ public class RefineryReadyNoticeProducer implements TimedNoticeProducer {
   }
 
   @Override
-  public int produce(@NotNull Instant now) {
+  public int produce(@NotNull Instant now, int limit) {
     int raised = 0;
-    for (UUID id : refineryOrderRepository.findReadyUnannouncedIds(now)) {
+    for (UUID id :
+        refineryOrderRepository.findReadyUnannouncedIds(
+            now.minus(properties.readyWindow()), now, Limit.of(limit))) {
       if (refineryOrderRepository.markReadyNotified(id, now) != 1) {
         continue;
       }
