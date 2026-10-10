@@ -17,19 +17,19 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.personalinventory.web;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
-import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryLocationType;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemCreateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemUpdateRequest;
-import de.greluc.krt.profit.basetool.backend.service.PersonalInventoryItemService;
+import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemCreateRequest;
+import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemResponse;
+import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemService;
+import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryLocationType;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

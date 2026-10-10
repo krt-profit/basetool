@@ -17,10 +17,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.personalinventory.web;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.UexLocationDto;
-import de.greluc.krt.profit.basetool.backend.service.PersonalInventoryItemService;
+import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemService;
+import de.greluc.krt.profit.basetool.backend.personalinventory.internal.UexLocationDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

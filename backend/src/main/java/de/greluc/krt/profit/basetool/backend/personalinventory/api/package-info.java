@@ -17,13 +17,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model;
-
 /**
- * Discriminator for the UEX location referenced by a {@link PersonalInventoryItem}. The numeric UEX
- * id alone is not unique across location categories, so the type is persisted alongside it.
+ * The personal-inventory module's published API: the erasure command of the GDPR user deletion
+ * (plan §5.2).
  */
-public enum PersonalInventoryLocationType {
-  CITY,
-  SPACE_STATION
-}
+@NamedInterface("api")
+package de.greluc.krt.profit.basetool.backend.personalinventory.api;
+
+import org.springframework.modulith.NamedInterface;

@@ -199,21 +199,21 @@ annotation's default is Spring Modulith's "everything allowed" sentinel, not an 
 
 Declared on `main`: `admin`, `audit`, `bank`, `catalogue`, `dashboard`, `exchange`, `identity`,
 `inventory`, `joborder`, `kernel`, `livesync`, `materialexchange`, `mission`, `notification`,
-`operation`, `orgchart`, `orgunit`, `platform`, `privacy`, `promotion`, `refinery`, `scope`
-(floor 22). `mission`
-publishes `mission.api.MissionCommands`, its first command (`detachFromOperation`, plan §5.3).
+`operation`, `orgchart`, `orgunit`, `personalinventory`, `platform`, `privacy`, `promotion`,
+`refinery`, `scope` (floor 23). `mission` publishes `mission.api.MissionCommands`, its first
+command (`detachFromOperation`, plan §5.3).
 Every `<module>.web` and `<module>.internal` package is internal to its module.
 
 A domain whose services return its REST DTOs keeps those DTOs in `<module>.internal`, beside the
 services, so `web` depends on `internal` and never the other way: the layers inside a module stay
 acyclic (ADR-0047) until the module API returns its own records (plan §5.2). `orgchart`, `admin`,
-`promotion` and `exchange` are laid out this way; the exchange's frozen relay wire records sit in
-`exchange.internal.dto`.
+`personalinventory`, `promotion` and `exchange` are laid out this way; the exchange's frozen relay
+wire records sit in `exchange.internal.dto`.
 
 **Acceptance**
 
 - [x] The module packages found in the compiled backend equal `ModularityTest.DECLARED_MODULES`,
-      which equals the detected Modulith modules, with a floor of 22.
+      which equals the detected Modulith modules, with a floor of 23.
 - [x] Each declared module's only named interface is `api`, and it contains every top-level type
       of the module's `api` package tree and nothing outside it — except `kernel`, whose types all
       lie in its base package, and a module that publishes nothing, which has no named interface

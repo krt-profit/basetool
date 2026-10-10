@@ -17,31 +17,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/**
- * The GDPR module, transitional until its participants become identity-owned SPIs (plan §5.1 rank
- * 13, §7.6).
- */
-@ApplicationModule(
-    allowedDependencies = {
-      "admin::api",
-      "audit::api",
-      "bank::api",
-      "catalogue::api",
-      "exchange::api",
-      "identity::api",
-      "inventory::api",
-      "joborder::api",
-      "kernel",
-      "livesync::api",
-      "materialexchange::api",
-      "mission::api",
-      "notification::api",
-      "orgunit::api",
-      "personalinventory::api",
-      "platform::api",
-      "refinery::api",
-      "scope::api"
-    })
-package de.greluc.krt.profit.basetool.backend.privacy;
+package de.greluc.krt.profit.basetool.backend.personalinventory.internal;
 
-import org.springframework.modulith.ApplicationModule;
+/**
+ * Discriminator for the UEX location referenced by a {@link PersonalInventoryItem}. The numeric UEX
+ * id alone is not unique across location categories, so the type is persisted alongside it.
+ */
+public enum PersonalInventoryLocationType {
+  CITY,
+  SPACE_STATION
+}

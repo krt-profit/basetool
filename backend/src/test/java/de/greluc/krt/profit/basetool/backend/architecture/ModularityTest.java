@@ -73,13 +73,14 @@ class ModularityTest {
           "operation",
           "orgchart",
           "orgunit",
+          "personalinventory",
           "platform",
           "privacy",
           "promotion",
           "refinery",
           "scope");
 
-  private static final int DECLARED_MODULE_FLOOR = 22;
+  private static final int DECLARED_MODULE_FLOOR = 23;
 
   /**
    * Modules without an {@code api} package: their types lie in the base package, which is their

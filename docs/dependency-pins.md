@@ -80,6 +80,7 @@ plugins only, so neither reaches a runtime classpath or an image.
 |---|---|---|
 | `springBoot` | 4.2.0-M1, 4.2.0-M2 | Milestones only. |
 | `mapstruct` | 1.7.0.Beta1, 1.7.0.Beta2 | Betas only. |
-| `lombok` | 1.18.48 | Equality with the Boot-managed version (still 1.18.46 under Boot 4.1.1, re-verified 2026-09-21, 2026-09-25, 2026-09-28 and 2026-10-04). |
+| `springModulith` | 2.2.0-M1, 2.2.0-M2 | Milestones only; test scope plus the `compileOnly` `spring-modulith-api` (REQ-MOD-006). |
+| `lombok` | 1.18.48 | Equality with the Boot-managed version (still 1.18.46 under Boot 4.1.1, re-verified 2026-09-21, 2026-09-25, 2026-09-28, 2026-10-04 and 2026-10-09). |
 | `googleJavaFormat` | 1.37.0 | Spotless 8.10.3 (the newest release) cannot drive it: every file fails with `InvocationTargetException` in `spotlessJavaCheck` (2026-10-04). Stay on 1.36.1. |
 | `protobuf3` | 4.0.0-rc-1 … 4.36.2 | grpc-protobuf is still 1.65.0, built for the 3.x line; 3.25.9 is still the newest 3.25 patch. |

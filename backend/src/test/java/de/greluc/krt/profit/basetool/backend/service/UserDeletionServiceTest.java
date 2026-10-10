@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientDir
 import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.personalinventory.api.PersonalInventoryErasure;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import java.util.ArrayList;
@@ -74,7 +75,7 @@ class UserDeletionServiceTest {
   @Mock private MaterialExchangeOfferRatchet offerRatchet;
   @Mock private AuditService auditService;
   @Mock private KeycloakService keycloakService;
-  @Mock private PersonalInventoryItemRepository personalInventoryItemRepository;
+  @Mock private PersonalInventoryErasure personalInventoryErasure;
   @Mock private PersonalBlueprintRepository personalBlueprintRepository;
   @Mock private NotificationRepository notificationRepository;
   @Mock private NotificationRuleRepository notificationRuleRepository;
@@ -138,7 +139,7 @@ class UserDeletionServiceTest {
     purge.verify(offerRatchet).beforeUserPurge(userId);
     purge.verify(inventoryItemRepository).deleteByUserId(userId);
     verify(shipRepository).deleteByOwnerId(userId);
-    verify(personalInventoryItemRepository).deleteByOwnerUserId(userId);
+    verify(personalInventoryErasure).deleteAllItemsOf(userId);
     verify(personalBlueprintRepository).deleteAllByOwnerUserId(userId);
     verify(notificationRepository).deleteAllForRecipient(userId);
     verify(notificationRuleRepository).deleteSelectorsByUserId(userId);
@@ -306,7 +307,7 @@ class UserDeletionServiceTest {
 
     verify(userRepository, never()).delete(any());
     verify(inventoryItemRepository, never()).deleteByUserId(any());
-    verify(personalInventoryItemRepository, never()).deleteByOwnerUserId(any());
+    verify(personalInventoryErasure, never()).deleteAllItemsOf(any());
   }
 
   @Test
