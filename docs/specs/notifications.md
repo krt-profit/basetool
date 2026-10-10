@@ -909,6 +909,43 @@ stays. With either set empty nothing is deleted. An event may combine this with 
 [ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md) ·
 **Issues:** #2414
 
+### REQ-NOTIF-026 — Time-based notices
+
+Some notices have no user action behind them: a reminder before a mission, a refinery order that is
+ready, a mission that was never ended. They come from **one scheduled producer**.
+
+- Every module that owns such a time implements `TimedNoticeProducer` (`kind()`, `produce(now)`).
+  `NotificationTimedTask` runs them every `app.notifications.timed.interval` (default one minute,
+  `app.notifications.timed.enabled`), through `NotificationTimedRunner`.
+- **At most once.** A producer sets the entity's „already notified" marker and publishes the event in
+  the **same** transaction, so a notice cannot fire twice and is delivered after the commit like every
+  other (REQ-NOTIF-002). Editing the underlying time resets the marker.
+- **One instance produces.** The run takes the transaction-scoped Postgres advisory lock
+  `pg_try_advisory_xact_lock`; an instance that does not get it skips the run. Each producer runs in
+  its own transaction, so one failing producer neither blocks the others nor rolls back what they
+  marked; the first failure is rethrown after all have run, so the job is recorded as failed.
+- **Observable.** The run is the `notification_timed` scheduled job (executions, duration,
+  last-success, enabled, items = notices raised) and each producer counts its notices in
+  `basetool_notification_timed_produced_total{kind}`. `NotificationTimedStale` fires when the job has
+  not succeeded for 15 minutes (REQ-OBS-011).
+
+**Acceptance**
+
+- [x] Every registered producer runs once per run and the notices it raised are counted by kind.
+- [x] An instance that cannot take the advisory lock produces nothing; once the lock is free the next
+  run produces.
+- [x] A failing producer does not stop the others, and the run is recorded as a failure.
+- [x] The task records the notices raised as the job's item count, survives a failure and publishes
+  its enabled gauge.
+
+**Enforced by:** `NotificationTimedRunnerTest`, `NotificationTimedRunnerIntegrationTest`,
+`NotificationTimedTaskTest`, `notification_timed_stale_test.yml` · **Code:**
+`notification/api/TimedNoticeProducer`, `service/NotificationTimedRunner`,
+`task/NotificationTimedTask`, `notification/internal/NotificationTimedProperties`,
+`repository/NotificationRepository#tryTimedProducerLock` · **Decision:**
+[ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md) ·
+**Issues:** #2414
+
 ## Out of scope (v1)
 
 - Per-notification e-mail routing (generic fan-out of in-app notification types to e-mail), user

@@ -4,6 +4,12 @@
 
 ### Added
 
+- **Zeitgesteuerte Benachrichtigungen (Grundlage).** Ein Dienst im Minutentakt kann künftig
+  Hinweise auslösen, hinter denen keine Nutzeraktion steht (Erinnerungen, abholbereite
+  Raffinerieaufträge); er läuft nur auf einer Instanz und meldet sich im Monitoring (Alarm
+  `NotificationTimedStale`). Neue Variablen `APP_NOTIFICATIONS_TIMED_ENABLED` und
+  `APP_NOTIFICATIONS_TIMED_INTERVAL` (REQ-NOTIF-026, #2414).
+
 - **Benachrichtigungsregeln erreichen Gruppen.** Der Regel-Editor bietet vier neue Empfängerarten
   (Einsatz-Teilnehmer, Einsatzleitung, Inhaber einer verbundenen Anwendung, Ereignis-Adressaten) und
   die Rolle „Einheitsleitung"; eine Nachricht lässt sich außerdem nur für einzelne Empfänger

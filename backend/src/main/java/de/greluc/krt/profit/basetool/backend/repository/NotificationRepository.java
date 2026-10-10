@@ -249,4 +249,14 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
       @Param("entityType") String entityType,
       @Param("entityId") UUID entityId,
       @Param("recipientUserIds") Set<UUID> recipientUserIds);
+
+  /**
+   * Tries to take the transaction-scoped advisory lock that lets one backend instance at a time
+   * raise the time-based notices (REQ-NOTIF-026); released at commit or rollback.
+   *
+   * @param key the lock key
+   * @return {@code true} when this transaction now holds the lock, {@code false} when another does
+   */
+  @Query(value = "SELECT pg_try_advisory_xact_lock(:key)", nativeQuery = true)
+  boolean tryTimedProducerLock(@Param("key") long key);
 }
