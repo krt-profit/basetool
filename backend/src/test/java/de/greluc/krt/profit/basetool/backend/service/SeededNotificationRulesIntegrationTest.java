@@ -151,6 +151,21 @@ class SeededNotificationRulesIntegrationTest {
             true,
             SelectorKind.EVENT_RECIPIENT),
         rule(
+            NotificationEventType.MATERIAL_EXCHANGE_OFFER_UNAVAILABLE,
+            NotificationType.MATERIAL_EXCHANGE_OFFER_UNAVAILABLE,
+            true,
+            SelectorKind.EVENT_RECIPIENTS),
+        rule(
+            NotificationEventType.MATERIAL_REQUEST_UNAVAILABLE,
+            NotificationType.MATERIAL_REQUEST_UNAVAILABLE,
+            true,
+            SelectorKind.EVENT_RECIPIENTS),
+        rule(
+            NotificationEventType.INVENTORY_BOOKED_OUT_BY_OTHER,
+            NotificationType.INVENTORY_BOOKED_OUT_BY_OTHER,
+            true,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
             NotificationEventType.OPERATION_COMPLETED_UNOWNED,
             NotificationType.OPERATION_COMPLETED,
             true,

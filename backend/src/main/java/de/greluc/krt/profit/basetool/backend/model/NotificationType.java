@@ -243,7 +243,22 @@ public enum NotificationType {
    * onto the recipient (REQ-REFINERY-024), rendered with {@code order}, {@code location}, {@code
    * actor} and the {@code change} word.
    */
-  REFINERY_ORDER_CHANGED_BY_OTHER;
+  REFINERY_ORDER_CHANGED_BY_OTHER,
+
+  /**
+   * An offer the recipient was interested in is gone (REQ-MARKET-021), rendered with {@code item}
+   * and the {@code reason} word.
+   */
+  MATERIAL_EXCHANGE_OFFER_UNAVAILABLE,
+
+  /** A request the recipient could supply is gone (REQ-MARKET-022), rendered with {@code item}. */
+  MATERIAL_REQUEST_UNAVAILABLE,
+
+  /**
+   * Somebody else discarded or sold part of the recipient's Lager stock (REQ-INV-056), rendered
+   * with {@code actor}, the {@code action} word, {@code count} and the {@code lots}.
+   */
+  INVENTORY_BOOKED_OUT_BY_OTHER;
 
   /**
    * Whether a member may mute this type (REQ-NOTIF-027). The account-deletion types serve a legal
@@ -290,7 +305,10 @@ public enum NotificationType {
           JOB_ORDER_ASSIGNED,
           JOB_ORDER_CLAIM_WITHDRAWN,
           REFINERY_ORDER_READY,
-          REFINERY_ORDER_CHANGED_BY_OTHER ->
+          REFINERY_ORDER_CHANGED_BY_OTHER,
+          MATERIAL_EXCHANGE_OFFER_UNAVAILABLE,
+          MATERIAL_REQUEST_UNAVAILABLE,
+          INVENTORY_BOOKED_OUT_BY_OTHER ->
           true;
     };
   }

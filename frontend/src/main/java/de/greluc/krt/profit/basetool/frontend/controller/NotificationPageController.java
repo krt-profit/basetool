@@ -113,16 +113,19 @@ public class NotificationPageController {
 
   /** The page each notification type links to when its subject is a page rather than a record. */
   private static final Map<String, String> PAGE_TARGETS =
-      Map.of(
-          "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "/materialboerse",
-          "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "/materialboerse",
-          "EXCHANGE_INSTALLATION_CONNECTED", "/connected-apps",
-          "EXCHANGE_BULK_UNDO_APPLIED", "/connected-apps",
-          "INVENTORY_TRANSFERRED_TO_USER", "/inventory/my",
-          "INVENTORY_TRANSFERRED_FROM_USER", "/inventory/my",
-          "ACCOUNT_DELETION_REQUEST_DECLINED", "/profile",
-          "ACCOUNT_DELETION_REQUESTED", "/admin/deletion-requests",
-          "DISCORD_REGISTRATION_PENDING", "/admin/discord-registrations");
+      Map.ofEntries(
+          Map.entry("MATERIAL_EXCHANGE_INTEREST_REGISTERED", "/materialboerse"),
+          Map.entry("MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "/materialboerse"),
+          Map.entry("MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "/materialboerse"),
+          Map.entry("MATERIAL_REQUEST_UNAVAILABLE", "/materialboerse"),
+          Map.entry("EXCHANGE_INSTALLATION_CONNECTED", "/connected-apps"),
+          Map.entry("EXCHANGE_BULK_UNDO_APPLIED", "/connected-apps"),
+          Map.entry("INVENTORY_TRANSFERRED_TO_USER", "/inventory/my"),
+          Map.entry("INVENTORY_TRANSFERRED_FROM_USER", "/inventory/my"),
+          Map.entry("INVENTORY_BOOKED_OUT_BY_OTHER", "/inventory/my"),
+          Map.entry("ACCOUNT_DELETION_REQUEST_DECLINED", "/profile"),
+          Map.entry("ACCOUNT_DELETION_REQUESTED", "/admin/deletion-requests"),
+          Map.entry("DISCORD_REGISTRATION_PENDING", "/admin/discord-registrations"));
 
   /** The suffix that marks a render parameter as a code with a localized word (REQ-NOTIF-028). */
   private static final String CODE_SUFFIX = "Code";

@@ -85,6 +85,9 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `REFINERY_ORDER_READY` | `REFINERY_ORDER_READY` | V276 | `EVENT_RECIPIENT` (the owner); raised once by the `refinery_ready` timed producer | REQ-REFINERY-023 |
 | `REFINERY_ORDER_READY_CLEARED` | none (no rule) | — | supersedes the order's `REFINERY_ORDER_READY` | REQ-REFINERY-023 |
 | `REFINERY_ORDER_CHANGED_BY_OTHER` | `REFINERY_ORDER_CHANGED_BY_OTHER` | V276 | `EVENT_RECIPIENT` (the owner, or the member the yield was booked onto); coded `changeCode` | REQ-REFINERY-024 |
+| `MATERIAL_EXCHANGE_OFFER_UNAVAILABLE` | `MATERIAL_EXCHANGE_OFFER_UNAVAILABLE` | V277 | `EVENT_RECIPIENTS` (the members who registered interest); coded `reasonCode`; supersedes `MATERIAL_EXCHANGE_INTEREST_REGISTERED` | REQ-MARKET-021 |
+| `MATERIAL_REQUEST_UNAVAILABLE` | `MATERIAL_REQUEST_UNAVAILABLE` | V277 | `EVENT_RECIPIENTS` (the members who signalled they can supply); supersedes `MATERIAL_REQUEST_FULFILLMENT_SIGNALLED` | REQ-MARKET-022 |
+| `INVENTORY_BOOKED_OUT_BY_OTHER` | `INVENTORY_BOOKED_OUT_BY_OTHER` | V277 | `EVENT_RECIPIENT` (the row's owner); coded `actionCode`, one notice per action | REQ-INV-056 |
 
 Every notification type renders through `notifications.type.<TYPE>` in all three frontend bundles.
 The e-mail consumers of REQ-NOTIF-013 (`UserApprovalMailService`, `PendingRegistrationMailService`)

@@ -296,5 +296,24 @@ public enum NotificationEventType {
    * A refinery order was stored, cancelled or got a new run time (REQ-REFINERY-023). Creates no
    * notification; clears the order's collect-me notice.
    */
-  REFINERY_ORDER_READY_CLEARED
+  REFINERY_ORDER_READY_CLEARED,
+
+  /**
+   * A Materialbörse offer left the board, withdrawn by its owner or because its stock is gone
+   * (REQ-MARKET-021). The default rule notifies every member who registered interest; the event
+   * clears the owner's interest notices.
+   */
+  MATERIAL_EXCHANGE_OFFER_UNAVAILABLE,
+
+  /**
+   * A Materialbörse request was withdrawn by its owner (REQ-MARKET-022). The default rule notifies
+   * every member who signalled they can supply it; the event clears the owner's fulfilment notices.
+   */
+  MATERIAL_REQUEST_UNAVAILABLE,
+
+  /**
+   * Somebody other than the owner discarded or sold part of a member's Lager stock (REQ-INV-056).
+   * The default rule notifies the owner.
+   */
+  INVENTORY_BOOKED_OUT_BY_OTHER
 }
