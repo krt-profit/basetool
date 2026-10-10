@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One of the caller's own Lager rows in the Materialbörse release picker, either a material row or
@@ -44,8 +45,8 @@ public record MaterialExchangeReleasableItemDto(
     MaterialExchangeOfferKind kind,
     String materialName,
     QuantityType quantityType,
-    Integer quality,
+    @Nullable Integer quality,
     Double amount,
-    String locationName,
+    @Nullable String locationName,
     boolean alreadyReleased,
     boolean stolen) {}

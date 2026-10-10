@@ -34,6 +34,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
@@ -112,6 +113,8 @@ class OwnerScopeServiceTest {
 
   private RefineryAccessPolicy refineryPolicy;
 
+  private JobOrderAccessPolicy jobOrderPolicy;
+
   private static final UUID MEMBER_USER_ID = UUID.randomUUID();
   private static final UUID SQUADRON_A_ID = UUID.randomUUID();
   private static final UUID SQUADRON_B_ID = UUID.randomUUID();
@@ -179,9 +182,6 @@ class OwnerScopeServiceTest {
             requestScopeResolver,
             authHelper,
             missionRepository,
-            jobOrderRepository,
-            jobOrderHandoverRepository,
-            jobOrderItemHandoverRepository,
             inventoryItemRepository,
             shipRepository,
             orgUnitMembershipRepository);
@@ -196,6 +196,13 @@ class OwnerScopeServiceTest {
         new OwnerScopeService(requestScopeResolver, accessGateService, orgUnitStampingService);
     operationPolicy = new OperationAccessPolicy(service, authHelper, operationRepository);
     refineryPolicy = new RefineryAccessPolicy(service, refineryOrderRepository);
+    jobOrderPolicy =
+        new JobOrderAccessPolicy(
+            service,
+            authHelper,
+            jobOrderRepository,
+            jobOrderHandoverRepository,
+            jobOrderItemHandoverRepository);
   }
 
   /** Returns a Staffel membership row pointing the given user at the given Squadron. */
@@ -481,7 +488,7 @@ class OwnerScopeServiceTest {
           .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
 
-      assertTrue(service.canSeeJobOrderBlueprintOwners(order.getId()));
+      assertTrue(jobOrderPolicy.canSeeJobOrderBlueprintOwners(order.getId()));
     }
 
     @Test
@@ -494,7 +501,7 @@ class OwnerScopeServiceTest {
           .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
 
-      assertFalse(service.canSeeJobOrderBlueprintOwners(order.getId()));
+      assertFalse(jobOrderPolicy.canSeeJobOrderBlueprintOwners(order.getId()));
     }
 
     @Test
@@ -510,7 +517,7 @@ class OwnerScopeServiceTest {
           .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
 
-      assertFalse(service.canSeeJobOrderBlueprintOwners(order.getId()));
+      assertFalse(jobOrderPolicy.canSeeJobOrderBlueprintOwners(order.getId()));
     }
 
     @Test
@@ -526,7 +533,7 @@ class OwnerScopeServiceTest {
           .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(skMembership(MEMBER_USER_ID, skId)));
 
-      assertTrue(service.canSeeJobOrderBlueprintOwners(order.getId()));
+      assertTrue(jobOrderPolicy.canSeeJobOrderBlueprintOwners(order.getId()));
     }
 
     @Test
@@ -536,7 +543,7 @@ class OwnerScopeServiceTest {
       when(authHelper.isAdmin()).thenReturn(true);
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
-      assertTrue(service.canSeeJobOrderBlueprintOwners(order.getId()));
+      assertTrue(jobOrderPolicy.canSeeJobOrderBlueprintOwners(order.getId()));
     }
 
     @Test
@@ -544,7 +551,7 @@ class OwnerScopeServiceTest {
       UUID missing = UUID.randomUUID();
       when(jobOrderRepository.findById(missing)).thenReturn(Optional.empty());
 
-      assertFalse(service.canSeeJobOrderBlueprintOwners(missing));
+      assertFalse(jobOrderPolicy.canSeeJobOrderBlueprintOwners(missing));
     }
   }
 
@@ -566,7 +573,7 @@ class OwnerScopeServiceTest {
           .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
 
-      assertTrue(service.canSeeJobOrderInventoryOwners(order.getId()));
+      assertTrue(jobOrderPolicy.canSeeJobOrderInventoryOwners(order.getId()));
     }
 
     @Test
@@ -579,7 +586,7 @@ class OwnerScopeServiceTest {
           .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
 
-      assertFalse(service.canSeeJobOrderInventoryOwners(order.getId()));
+      assertFalse(jobOrderPolicy.canSeeJobOrderInventoryOwners(order.getId()));
     }
 
     @Test
@@ -595,7 +602,7 @@ class OwnerScopeServiceTest {
           .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
 
-      assertFalse(service.canSeeJobOrderInventoryOwners(order.getId()));
+      assertFalse(jobOrderPolicy.canSeeJobOrderInventoryOwners(order.getId()));
     }
 
     @Test
@@ -611,7 +618,7 @@ class OwnerScopeServiceTest {
           .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(skMembership(MEMBER_USER_ID, skId)));
 
-      assertTrue(service.canSeeJobOrderInventoryOwners(order.getId()));
+      assertTrue(jobOrderPolicy.canSeeJobOrderInventoryOwners(order.getId()));
     }
 
     @Test
@@ -621,7 +628,7 @@ class OwnerScopeServiceTest {
       when(authHelper.isAdmin()).thenReturn(true);
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
-      assertTrue(service.canSeeJobOrderInventoryOwners(order.getId()));
+      assertTrue(jobOrderPolicy.canSeeJobOrderInventoryOwners(order.getId()));
     }
 
     @Test
@@ -629,7 +636,7 @@ class OwnerScopeServiceTest {
       UUID missing = UUID.randomUUID();
       when(jobOrderRepository.findById(missing)).thenReturn(Optional.empty());
 
-      assertFalse(service.canSeeJobOrderInventoryOwners(missing));
+      assertFalse(jobOrderPolicy.canSeeJobOrderInventoryOwners(missing));
     }
   }
 
@@ -755,7 +762,7 @@ class OwnerScopeServiceTest {
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
       stubMemberInSquadronA();
 
-      assertTrue(service.canSeeJobOrder(orderId));
+      assertTrue(jobOrderPolicy.canSeeJobOrder(orderId));
     }
 
     @Test
@@ -765,7 +772,7 @@ class OwnerScopeServiceTest {
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
       stubNonProfitMember();
 
-      assertFalse(service.canSeeJobOrder(orderId));
+      assertFalse(jobOrderPolicy.canSeeJobOrder(orderId));
     }
 
     @Test
@@ -775,7 +782,7 @@ class OwnerScopeServiceTest {
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
       when(authHelper.isAdmin()).thenReturn(true);
 
-      assertTrue(service.canSeeJobOrder(orderId));
+      assertTrue(jobOrderPolicy.canSeeJobOrder(orderId));
     }
 
     @Test
@@ -785,7 +792,7 @@ class OwnerScopeServiceTest {
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronA)));
       stubMemberInSquadronA();
 
-      assertTrue(service.canSeeJobOrder(orderId));
+      assertTrue(jobOrderPolicy.canSeeJobOrder(orderId));
     }
 
     @Test
@@ -795,7 +802,7 @@ class OwnerScopeServiceTest {
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronB)));
       stubMemberInSquadronA();
 
-      assertFalse(service.canSeeJobOrder(orderId));
+      assertFalse(jobOrderPolicy.canSeeJobOrder(orderId));
     }
 
     @Test
@@ -806,7 +813,7 @@ class OwnerScopeServiceTest {
       when(authHelper.isAdmin()).thenReturn(true);
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
-      assertTrue(service.canSeeJobOrder(orderId));
+      assertTrue(jobOrderPolicy.canSeeJobOrder(orderId));
     }
 
     @Test
@@ -818,7 +825,7 @@ class OwnerScopeServiceTest {
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
           .thenReturn(SQUADRON_B_ID.toString());
 
-      assertFalse(service.canSeeJobOrder(orderId));
+      assertFalse(jobOrderPolicy.canSeeJobOrder(orderId));
     }
 
     @Test
@@ -826,7 +833,7 @@ class OwnerScopeServiceTest {
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId)).thenReturn(Optional.empty());
 
-      assertFalse(service.canSeeJobOrder(orderId));
+      assertFalse(jobOrderPolicy.canSeeJobOrder(orderId));
     }
   }
 
@@ -846,8 +853,8 @@ class OwnerScopeServiceTest {
       when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       stubNonProfitMember();
 
-      assertFalse(service.canSeeJobOrder(orderId));
-      assertTrue(service.canSeeJobOrderAsRequester(orderId));
+      assertFalse(jobOrderPolicy.canSeeJobOrder(orderId));
+      assertTrue(jobOrderPolicy.canSeeJobOrderAsRequester(orderId));
     }
 
     @Test
@@ -858,7 +865,7 @@ class OwnerScopeServiceTest {
       when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       stubNonProfitMember();
 
-      assertFalse(service.canSeeJobOrderAsRequester(orderId));
+      assertFalse(jobOrderPolicy.canSeeJobOrderAsRequester(orderId));
     }
 
     @Test
@@ -869,8 +876,8 @@ class OwnerScopeServiceTest {
       when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       stubNonProfitMember();
 
-      assertFalse(service.canEditJobOrder(orderId));
-      assertTrue(service.canEditJobOrderAsRequester(orderId));
+      assertFalse(jobOrderPolicy.canEditJobOrder(orderId));
+      assertTrue(jobOrderPolicy.canEditJobOrderAsRequester(orderId));
     }
 
     @Test
@@ -882,7 +889,7 @@ class OwnerScopeServiceTest {
       stubNonProfitMember();
       when(jobOrderHandoverRepository.existsByJobOrderId(orderId)).thenReturn(true);
 
-      assertFalse(service.canEditJobOrderAsRequester(orderId));
+      assertFalse(jobOrderPolicy.canEditJobOrderAsRequester(orderId));
     }
 
     @Test
@@ -893,7 +900,7 @@ class OwnerScopeServiceTest {
       when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       stubNonProfitMember();
 
-      assertFalse(service.canEditJobOrderAsRequester(orderId));
+      assertFalse(jobOrderPolicy.canEditJobOrderAsRequester(orderId));
     }
   }
 
@@ -907,7 +914,7 @@ class OwnerScopeServiceTest {
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
       stubMemberInSquadronA();
 
-      assertTrue(service.canEditJobOrder(orderId));
+      assertTrue(jobOrderPolicy.canEditJobOrder(orderId));
     }
 
     @Test
@@ -917,7 +924,7 @@ class OwnerScopeServiceTest {
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
       stubNonProfitMember();
 
-      assertFalse(service.canEditJobOrder(orderId));
+      assertFalse(jobOrderPolicy.canEditJobOrder(orderId));
     }
 
     @Test
@@ -927,7 +934,7 @@ class OwnerScopeServiceTest {
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
       when(authHelper.isAdmin()).thenReturn(true);
 
-      assertTrue(service.canEditJobOrder(orderId));
+      assertTrue(jobOrderPolicy.canEditJobOrder(orderId));
     }
 
     @Test
@@ -937,7 +944,7 @@ class OwnerScopeServiceTest {
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronA)));
       stubMemberInSquadronA();
 
-      assertTrue(service.canEditJobOrder(orderId));
+      assertTrue(jobOrderPolicy.canEditJobOrder(orderId));
     }
 
     @Test
@@ -947,7 +954,7 @@ class OwnerScopeServiceTest {
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronB)));
       stubMemberInSquadronA();
 
-      assertFalse(service.canEditJobOrder(orderId));
+      assertFalse(jobOrderPolicy.canEditJobOrder(orderId));
     }
 
     @Test
@@ -955,7 +962,7 @@ class OwnerScopeServiceTest {
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId)).thenReturn(Optional.empty());
 
-      assertFalse(service.canEditJobOrder(orderId));
+      assertFalse(jobOrderPolicy.canEditJobOrder(orderId));
     }
   }
 

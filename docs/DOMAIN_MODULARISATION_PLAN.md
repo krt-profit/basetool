@@ -1054,6 +1054,44 @@ as each pair is decoupled.
   fragment yet either. (2) No command API: no other module writes a refinery order. The
   store still creates Lager rows itself (write family 2 of the evidence appendix); that write
   becomes a call of the Lager's `StockCommands` with P3-5.
+- `joborder` — **done 2026-10-10.**
+  1. *Characterise*: `JobOrderModuleContractTest` pins that create, priority change, assignee add,
+     status change and delete each record their audit event in the command's transaction, and that
+     a member of another org unit is refused on every per-order read and write entry point (the
+     "403 per foreign entry point" of the risk table).
+  2. *Access policy out of the scope hub* (§5.4, ADR-0236): `JobOrderAccessPolicy` (bean
+     `jobOrderAccessPolicy`) holds `canSeeJobOrder` (id and entity), `canEditJobOrder`,
+     `canSeeJobOrderBlueprintOwners`, `canSeeJobOrderInventoryOwners`, `canSeeJobOrderAsRequester`
+     and `canEditJobOrderAsRequester`, on the kernel's `canViewJobOrders`, `canSeeSquadron`,
+     `canEditSquadron` and `currentUserIsMemberOfOrgUnit`; the queue capabilities
+     (`canViewJobOrders`, `canViewOwnJobOrders`) stay in the kernel, which identity and the
+     exchange ask too. The Lager's row flag for earmarked stock asks its own SPI
+     `inventory.api.EarmarkTargetPolicy` (`mayEditJobOrderEarmarks`), which the policy implements,
+     so the earmark target SPI of P3-5 starts here. The order, claim, item-stock and
+     material-collection endpoints, the order query and the live-sync room ask the policy; the
+     authorization matrix changed on exactly 28 lines, in expression text. The differential verdict
+     test compared old and new over 28 callers × 21 orders × 7 gates = 4116 verdicts before the old
+     methods went (proven able to fail by dropping the Spezialkommando escape) and keeps comparing
+     against a restatement on the kernel primitives. Baseline **92 → 87**
+     (`scope -> joborder` is gone).
+  3. *Inversion*: the order's stock projection asks `service.ClaimBucketSource` for the
+     Spezialkommando claim view, implemented by `MaterialClaimService`, so the claim service moves.
+  4. *Move*: the four controllers into `joborder.web`; the order, assignee, priority, item
+     production, handover, handover-report, blueprint-owner, integrity, demand and claim services,
+     the policy, the live-sync authorizer, the org-unit resolver, the integrity task, the item,
+     material and handover-item repositories and the request DTOs into `joborder.internal`.
+  The move leaves the baseline at **87**: the 18 edges still into the job order are the Lager's
+  (17, the earmark and its reads, P3-5) and the assignee redaction in identity (1).
+  **Corrections:** (1) `JobOrder` and its items, materials, handovers and claims, their
+  repositories, `JobOrderMapper`, `JobOrderHandoverMapper`, `JobOrderItemHandoverMapper`, the
+  response DTOs, `JobOrderItemService`, `JobOrderStockProjectionService`,
+  `JobOrderMaterialRequirementResolver` and `QualityBucketAllocator` stay in the layer packages:
+  the Lager's earmark (`InventoryJobOrderAllocation`) holds the job-order association, and the Lager, the refinery, the exchange's
+  demand board, the GDPR services and the business metrics read them, so a move closes a package
+  cycle. They move once the earmark becomes an id with P3-5. (2) No command API: no other module
+  writes a job order; the exchange only reads the demand. (3) The earmark caller rule of the risk
+  table (the ungated order-linked stock query callable only from joborder) is P3-5's: that query
+  is the Lager's and still has no module to be guarded from.
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
@@ -1200,11 +1238,11 @@ features only, no preview flags) stands; every proposal below uses final feature
 | **Unnamed variables `_`** — **done 2026-10-10** in `main` (225 sites: 114 catch, 110 lambda, 1 pattern; descriptive names kept; ADR-0214 amendment) (final since 22) for 107 unused lambda parameters, meaningless catch parameters and unused pattern components; empty catches too, with the ADR-0214 amendment and the Checkstyle `EmptyCatchBlock` pattern change this needs (decided, D-14); descriptive names stay where the name states intent; not in keycloak-spi (Java 21 bytecode) | The compiler forbids accidental use | About 260 edits in `main` | Compile and Checkstyle | S–M |
 | **`ScopedValue`** — **done 2026-10-10** (final in 25) for the backend's `ChangeSource.ON_BEHALF` `ThreadLocal`, which attributes exchange writes in the change feed; the frontend holders stay `ThreadLocal` (ADR-0223 decision 4) | A binding cannot leak into a reused thread | ADR-0223 amendment | `ChangeSourceTransactionManager` integration test | S |
 | **Records** — **done 2026-10-10** (`AnnouncementRequest`, `UserAttributesRequest`, `UserDescriptionRequest`, `ShipTypeMatcher.TokenView`; their frontend mirrors are now paired by `DtoMirrorConsistencyTest`) — for the last three `@Data` request classes and one hand-written carrier; defensive `List.copyOf` only for records that become cached, shared or module-API values; redaction DTOs keep their canonical constructors | Immutability where values cross a boundary | `List.copyOf` rejects `null` elements | Contract tests; `toString` ratchet (G-22) | S |
-| **Small idioms** — **done 2026-10-10** outside the job-order, refinery and Materialbörse code the Phase 3 moves touch (`Math.clamp` 9 sites, `getFirst()` 9, `Environment.matchesProfiles` 4, 27 `@Query` text blocks, 6 `isPresent() && get()` pairs as `Optional.filter`; a query that mixes literals with a constant or splits a token keeps its concatenation; `isPresent()` used as a plain boolean stays). *Correction:* of the 68 `isPresent()` calls only these few are followed by `get()`: `Math.clamp` for 11 constant bounds, `getFirst()` in frontend and ingest, `Environment.matchesProfiles`, `Optional` chains instead of `isPresent()`/`get()`, text blocks for the 47 concatenated `@Query` strings and test JSON; keep `trim()`/`strip()` and `Collections.unmodifiable*` where they are deliberate | Consistency with the 90 % that already uses the modern form | Diff churn — batch into files the refactor touches anyway | Compile, tests | S |
+| **Small idioms** — **done 2026-10-10**, the job-order, refinery and Materialbörse code with the job-order move (2 more `Math.clamp`, 9 more `@Query` text blocks; the two Materialbörse `max(0, min(offered, stock))` stay, because their bounds can cross); elsewhere (`Math.clamp` 9 sites, `getFirst()` 9, `Environment.matchesProfiles` 4, 27 `@Query` text blocks, 6 `isPresent() && get()` pairs as `Optional.filter`; a query that mixes literals with a constant or splits a token keeps its concatenation; `isPresent()` used as a plain boolean stays). *Correction:* of the 68 `isPresent()` calls only these few are followed by `get()`: `Math.clamp` for 11 constant bounds, `getFirst()` in frontend and ingest, `Environment.matchesProfiles`, `Optional` chains instead of `isPresent()`/`get()`, text blocks for the 47 concatenated `@Query` strings and test JSON; keep `trim()`/`strip()` and `Collections.unmodifiable*` where they are deliberate | Consistency with the 90 % that already uses the modern form | Diff churn — batch into files the refactor touches anyway | Compile, tests | S |
 | **Do not adopt** Markdown documentation comments (`///`, JEP 467): Checkstyle 14.3.0 does not treat them as Javadoc; gatherers: no loop here is clearer as one | — | — | — | — |
 | **ADR-0223 corrections** — **done 2026-10-10** (the corrections were recorded in the ADR on 2026-10-02; the missing gate is `scripts/check-final-java-only.py`, REQ-OPS-043): JDK 26 does add a final library feature (JEP 517, HTTP/3 for the HTTP client); JEP 510 (KDF) is final in 25; Checkstyle already enforces the module-import and compact-source bans in `main` (not in `test`/`e2e`); there are 42 `super(…)` calls, not 34; a `--enable-preview` gate is still missing | The decision record stays authoritative | — | Review | S |
 
-**Nullness** — **started 2026-10-10** (ADR-0237 *Implementation*: the backend's 18 module `api` packages are checked; seven annotations were wrong or missing). Error Prone 2.50.0 with NullAway 0.14.2 runs on JDK 25 and accepts the JetBrains
+**Nullness** — **started 2026-10-10** (ADR-0237 *Implementation*: the backend's 18 module `api` packages are checked; seven annotations were wrong or missing; the whole `joborder`, `refinery` and `materialexchange` modules followed with the job-order move). Error Prone 2.50.0 with NullAway 0.14.2 runs on JDK 25 and accepts the JetBrains
 annotations by simple name; Spring Framework builds itself with the same pair. Starting with the new
 module API packages, it would turn the annotations into a checked contract and close arc42 §11.4
 ("derived nullity annotations have no gate"). Cost: a compile-time dependency, about ten javac
