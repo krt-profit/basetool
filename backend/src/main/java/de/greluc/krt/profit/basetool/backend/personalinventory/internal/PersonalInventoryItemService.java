@@ -238,7 +238,7 @@ public class PersonalInventoryItemService {
    */
   public List<UexLocationDto> searchLocations(@Nullable String query, int limit) {
     String needle = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
-    final int cap = Math.max(1, Math.min(limit, 2000));
+    final int cap = Math.clamp(limit, 1, 2000);
 
     List<UexLocationDto> hits = new ArrayList<>();
     for (City c : cityRepository.findAll()) {

@@ -130,14 +130,14 @@ public class ExchangeDepartureService {
               "revocation",
               () ->
                   requiresNew.executeWithoutResult(
-                      status -> revocationRepository.upsert(client.getId(), member, now)));
+                      _ -> revocationRepository.upsert(client.getId(), member, now)));
     }
     boolean incomplete = failed;
     attempt(
         "audit",
         () ->
             requiresNew.executeWithoutResult(
-                status ->
+                _ ->
                     auditRecorder.record(
                         AuditEventType.EXCHANGE_MEMBER_DEPARTED,
                         null,

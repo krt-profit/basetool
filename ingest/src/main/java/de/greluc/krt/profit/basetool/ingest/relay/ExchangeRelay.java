@@ -371,7 +371,7 @@ public class ExchangeRelay {
             request.contentType(MediaType.APPLICATION_JSON).body(body);
           }
           return request.exchange(
-              (req, res) -> new Raw(res.getStatusCode().value(), read(res.getBody())));
+              (_, res) -> new Raw(res.getStatusCode().value(), read(res.getBody())));
         });
   }
 
@@ -513,7 +513,7 @@ public class ExchangeRelay {
     }
     try {
       return objectMapper.readTree(body);
-    } catch (RuntimeException ignored) {
+    } catch (RuntimeException _) {
       return null;
     }
   }

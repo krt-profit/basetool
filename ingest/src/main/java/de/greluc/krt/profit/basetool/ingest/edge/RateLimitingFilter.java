@@ -90,7 +90,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     Bucket bucket =
         buckets.computeIfAbsent(
             clientIp(request),
-            ip ->
+            _ ->
                 RateLimitBuckets.newBucket(
                     properties.ipCapacity(),
                     properties.ipRefillTokens(),

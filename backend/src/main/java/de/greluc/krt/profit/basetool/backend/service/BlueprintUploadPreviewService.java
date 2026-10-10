@@ -69,7 +69,7 @@ public class BlueprintUploadPreviewService {
     JsonNode root;
     try {
       root = objectMapper.readTree(file.getInputStream());
-    } catch (IOException | JacksonException e) {
+    } catch (IOException | JacksonException _) {
       return importService.previewImport(ownerUserId, file);
     }
     if (root == null

@@ -137,13 +137,13 @@ public class LiveSyncPresenceService {
       @NotNull String userId,
       @NotNull String displayName) {
     Map<String, Map<String, Entry>> sections =
-        byTopic.computeIfAbsent(topic, ignored -> new ConcurrentHashMap<>());
+        byTopic.computeIfAbsent(topic, _ -> new ConcurrentHashMap<>());
     Map<String, Entry> editors = sections.get(sectionKey);
     if (editors == null) {
       if (sections.size() >= MAX_SECTIONS_PER_TOPIC) {
         return false;
       }
-      editors = sections.computeIfAbsent(sectionKey, ignored -> new ConcurrentHashMap<>());
+      editors = sections.computeIfAbsent(sectionKey, _ -> new ConcurrentHashMap<>());
     }
     Instant now = Instant.now();
     Entry prev = editors.put(userId, new Entry(userId, displayName, now));
@@ -254,7 +254,7 @@ public class LiveSyncPresenceService {
     if (result.isEmpty()) {
       return Map.of();
     }
-    result.replaceAll((section, editors) -> Collections.unmodifiableList(editors));
+    result.replaceAll((_, editors) -> Collections.unmodifiableList(editors));
     return Collections.unmodifiableMap(result);
   }
 
@@ -313,7 +313,7 @@ public class LiveSyncPresenceService {
     }
     Map<String, List<PresenceEditor>> bounded = boundedPartition(sections);
     Map<String, RemotePartition> origins =
-        remoteByTopic.computeIfAbsent(topic, ignored -> new ConcurrentHashMap<>());
+        remoteByTopic.computeIfAbsent(topic, _ -> new ConcurrentHashMap<>());
     RemotePartition previous = origins.get(originId);
     if (previous == null && origins.size() >= MAX_REMOTE_ORIGINS_PER_TOPIC) {
       log.debug(
@@ -412,8 +412,7 @@ public class LiveSyncPresenceService {
         continue;
       }
       for (Map.Entry<String, List<PresenceEditor>> sectionEntry : partition.sections().entrySet()) {
-        List<Entry> merged =
-            target.computeIfAbsent(sectionEntry.getKey(), ignored -> new ArrayList<>());
+        List<Entry> merged = target.computeIfAbsent(sectionEntry.getKey(), _ -> new ArrayList<>());
         for (PresenceEditor editor : sectionEntry.getValue()) {
           boolean alreadyPresent =
               merged.stream().anyMatch(e -> e.userId().equals(editor.userId()));

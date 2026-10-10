@@ -464,7 +464,7 @@ public class UserReconciliationService {
     return roleRepository.findAllWithPermissions().stream()
         .collect(
             Collectors.toUnmodifiableMap(
-                role -> role.getName().toLowerCase(Locale.ROOT), role -> role, (a, b) -> a));
+                role -> role.getName().toLowerCase(Locale.ROOT), role -> role, (a, _) -> a));
   }
 
   /**
