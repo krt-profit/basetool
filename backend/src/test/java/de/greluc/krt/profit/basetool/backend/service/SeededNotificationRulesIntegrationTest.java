@@ -117,6 +117,30 @@ class SeededNotificationRulesIntegrationTest {
             SelectorKind.ORG_RELATIVE_ROLE,
             SelectorKind.ORG_RELATIVE_ROLE),
         rule(
+            NotificationEventType.JOB_ORDER_REASSIGNED,
+            NotificationType.JOB_ORDER_REASSIGNED,
+            true,
+            SelectorKind.ORG_RELATIVE_ROLE,
+            SelectorKind.ORG_RELATIVE_ROLE,
+            SelectorKind.ORG_RELATIVE_ROLE),
+        rule(
+            NotificationEventType.JOB_ORDER_FINISHED,
+            NotificationType.JOB_ORDER_FINISHED,
+            true,
+            SelectorKind.ORG_RELATIVE_ROLE,
+            SelectorKind.ORG_RELATIVE_ROLE,
+            SelectorKind.ORG_RELATIVE_ROLE),
+        rule(
+            NotificationEventType.JOB_ORDER_ASSIGNEE_ADDED,
+            NotificationType.JOB_ORDER_ASSIGNED,
+            true,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
+            NotificationEventType.JOB_ORDER_CLAIM_WITHDRAWN,
+            NotificationType.JOB_ORDER_CLAIM_WITHDRAWN,
+            true,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
             NotificationEventType.OPERATION_COMPLETED_UNOWNED,
             NotificationType.OPERATION_COMPLETED,
             true,

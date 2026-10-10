@@ -247,5 +247,36 @@ public enum NotificationEventType {
    * An operation without an owning unit was completed (REQ-MISSION-029). The default rule notifies
    * every officer.
    */
-  OPERATION_COMPLETED_UNOWNED
+  OPERATION_COMPLETED_UNOWNED,
+
+  /**
+   * A job order moved to another responsible unit (REQ-ORDERS-041). The default rule notifies the
+   * officers, leads and logisticians of the new unit; the event clears the order's earlier creation
+   * notices.
+   */
+  JOB_ORDER_REASSIGNED,
+
+  /**
+   * A job order was completed, rejected or deleted (REQ-ORDERS-042). The default rule notifies the
+   * officers, leads and logisticians of the requesting unit.
+   */
+  JOB_ORDER_FINISHED,
+
+  /**
+   * Somebody assigned a member to a job order (REQ-ORDERS-043). The default rule notifies that
+   * member.
+   */
+  JOB_ORDER_ASSIGNEE_ADDED,
+
+  /**
+   * A member was removed from a job order's assignees (REQ-ORDERS-043). Creates no notification;
+   * clears that member's assignment notice.
+   */
+  JOB_ORDER_ASSIGNEE_REMOVED,
+
+  /**
+   * A material claim was withdrawn by an order edit or a de-escalation (REQ-ORDERS-044). The
+   * default rule notifies the member who made the claim.
+   */
+  JOB_ORDER_CLAIM_WITHDRAWN
 }

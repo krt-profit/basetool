@@ -212,6 +212,21 @@ class NotificationPageControllerTest {
   }
 
   @Test
+  void targetOf_everyOrderNoticeLinksTheOrderExceptADeletedOne() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/orders/" + id,
+        NotificationPageController.targetOf("JOB_ORDER_REASSIGNED", "JOB_ORDER", id));
+    assertEquals(
+        "/orders/" + id,
+        NotificationPageController.targetOf("JOB_ORDER_ASSIGNED", "JOB_ORDER", id));
+    assertEquals(
+        "/orders/" + id,
+        NotificationPageController.targetOf("JOB_ORDER_CLAIM_WITHDRAWN", "JOB_ORDER", id));
+    assertNull(NotificationPageController.targetOf("JOB_ORDER_FINISHED", "JOB_ORDER_DELETED", id));
+  }
+
+  @Test
   void targetOf_jobOrderLinksTheOrder() {
     UUID orderId = UUID.fromString("00000000-0000-0000-0000-000000000099");
 

@@ -54,6 +54,7 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.QualityTierService;
+import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -148,7 +149,8 @@ class JobOrderServiceTest {
             jobOrderStockProjectionService,
             jobOrderPriorityService,
             qualityTierService,
-            ownerScopeService);
+            ownerScopeService,
+            actingUserService());
     jobOrderQueryService =
         new JobOrderQueryService(
             jobOrderRepository,
@@ -2070,5 +2072,14 @@ class JobOrderServiceTest {
       verify(jobOrderRepository, never()).saveAndFlush(any());
       verify(auditService, never()).record(any(), any(), any(), any(), any());
     }
+  }
+
+  private static UserService actingUserService() {
+    UserService userService = org.mockito.Mockito.mock(UserService.class);
+    org.mockito.Mockito.lenient()
+        .when(userService.currentActor())
+        .thenReturn(
+            de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef.system());
+    return userService;
   }
 }
