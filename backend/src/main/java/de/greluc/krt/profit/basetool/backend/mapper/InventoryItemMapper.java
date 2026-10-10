@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
+import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -43,6 +45,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 public abstract class InventoryItemMapper {
 
   @Autowired protected StockViewerAccess stockAccess;
+
+  @Autowired protected EarmarkTargets.Lookup earmarkTargets;
 
   /**
    * Resolves the caller-dependent {@code canEdit} projection of one Lager row: the row's scope
@@ -96,11 +100,20 @@ public abstract class InventoryItemMapper {
    * @param allocation the mission slice; {@code null} returns {@code null}.
    * @return the populated slice DTO.
    */
-  @Mapping(source = "mission.id", target = "missionId")
-  @Mapping(source = "mission.name", target = "missionName")
-  @Mapping(source = "mission.plannedStartTime", target = "missionPlannedStartTime")
-  public abstract MissionAllocationDto missionAllocationToDto(
-      InventoryMissionAllocation allocation);
+  public MissionAllocationDto missionAllocationToDto(InventoryMissionAllocation allocation) {
+    if (allocation == null) {
+      return null;
+    }
+    MissionEarmark mission =
+        allocation.getMissionId() == null
+            ? null
+            : earmarkTargets.mission(allocation.getMissionId());
+    return new MissionAllocationDto(
+        allocation.getMissionId(),
+        mission == null ? null : mission.name(),
+        mission == null ? null : mission.plannedStartTime(),
+        allocation.getAmount());
+  }
 
   /** Nested mapping for the item's {@link Location} (used as {@code uses} target). */
   public abstract LocationDto locationToDto(Location location);

@@ -155,8 +155,8 @@ public final class AllocationReductions {
       }
     } else {
       for (InventoryMissionAllocation a : item.getMissionAllocations()) {
-        if (a.getMission() != null) {
-          targets.add(a.getMission().getId());
+        if (a.getMissionId() != null) {
+          targets.add(a.getMissionId());
           sliceAmounts.add(a.getAmount() != null ? a.getAmount() : 0.0);
         }
       }

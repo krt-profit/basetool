@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import jakarta.persistence.EntityManagerFactory;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -87,6 +88,8 @@ class InventoryEarmarkReadNoNPlusOneTest {
 
   private Squadron unit;
 
+  private final List<Object> created = new ArrayList<>();
+
   /**
    * One seeded Lager.
    *
@@ -116,8 +119,21 @@ class InventoryEarmarkReadNoNPlusOneTest {
   }
 
   @AfterEach
-  void signOut() {
+  void signOutAndCleanUp() {
     SecurityContextHolder.clearContext();
+    for (Object entity : created.reversed()) {
+      switch (entity) {
+        case InventoryItem item -> inventoryItemRepository.deleteById(item.getId());
+        case JobOrder order -> jobOrderRepository.deleteById(order.getId());
+        case Mission mission -> missionRepository.deleteById(mission.getId());
+        case Material material -> materialRepository.deleteById(material.getId());
+        case Location location -> locationRepository.deleteById(location.getId());
+        case User user -> userRepository.deleteById(user.getId());
+        default -> throw new IllegalStateException("unexpected " + entity);
+      }
+    }
+    created.clear();
+    squadronRepository.deleteById(unit.getId());
   }
 
   @Test
@@ -210,14 +226,17 @@ class InventoryEarmarkReadNoNPlusOneTest {
     owner.setId(UUID.randomUUID());
     owner.setUsername("earmark-" + tag);
     owner = userRepository.save(owner);
+    created.add(owner);
     Material material = new Material();
     material.setName("Earmark Ore " + tag);
     material.setType(MaterialType.REFINED);
     material.setQuantityType(QuantityType.SCU);
     material = materialRepository.save(material);
+    created.add(material);
     Location location = new Location();
     location.setName("Earmark Depot " + tag);
     location = locationRepository.save(location);
+    created.add(location);
     Mission shared = mission("Shared " + tag);
     for (int i = 0; i < rows; i++) {
       InventoryItem item = new InventoryItem();
@@ -228,10 +247,10 @@ class InventoryEarmarkReadNoNPlusOneTest {
       item.setAmount(10.0);
       item.setPersonal(false);
       item.setStolen(false);
-      InventoryAllocations.addMission(item, shared, 1.0);
-      InventoryAllocations.addMission(item, mission("Own " + tag + " " + i), 2.0);
+      InventoryAllocations.addMission(item, shared.getId(), 1.0);
+      InventoryAllocations.addMission(item, mission("Own " + tag + " " + i).getId(), 2.0);
       InventoryAllocations.addJobOrder(item, jobOrder("earmark-" + tag + "-" + i), 3.0, false);
-      inventoryItemRepository.save(item);
+      created.add(inventoryItemRepository.save(item));
     }
     return new Seed(owner, material, location, shared);
   }
@@ -239,16 +258,21 @@ class InventoryEarmarkReadNoNPlusOneTest {
   private Mission mission(String name) {
     Mission mission = new Mission();
     mission.setName(name);
-    return missionRepository.save(mission);
+    Mission saved = missionRepository.save(mission);
+    created.add(saved);
+    return saved;
   }
 
   private JobOrder jobOrder(String handle) {
-    return jobOrderRepository.save(
-        JobOrder.builder()
-            .responsibleOrgUnit(unit)
-            .requestingOrgUnit(unit)
-            .handle(handle)
-            .status(JobOrderStatus.OPEN)
-            .build());
+    JobOrder saved =
+        jobOrderRepository.save(
+            JobOrder.builder()
+                .responsibleOrgUnit(unit)
+                .requestingOrgUnit(unit)
+                .handle(handle)
+                .status(JobOrderStatus.OPEN)
+                .build());
+    created.add(saved);
+    return saved;
   }
 }

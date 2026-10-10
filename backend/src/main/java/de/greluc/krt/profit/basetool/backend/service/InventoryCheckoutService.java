@@ -444,7 +444,7 @@ public class InventoryCheckoutService {
     for (Map.Entry<UUID, Double> reduction : missionReductions.entrySet()) {
       InventoryMissionAllocation slice =
           InventoryAllocations.missionSlice(item, reduction.getKey());
-      if (slice == null || slice.getMission() == null) {
+      if (slice == null || slice.getMissionId() == null) {
         continue;
       }
       BigDecimal credit =
@@ -454,7 +454,7 @@ public class InventoryCheckoutService {
       if (credit.signum() <= 0) {
         continue;
       }
-      shares.add(new StockSoldForTarget.MissionShare(slice.getMission().getId(), credit));
+      shares.add(new StockSoldForTarget.MissionShare(slice.getMissionId(), credit));
     }
     return stockSoldForTarget.soldForMissions(
         currentUserId,
@@ -489,8 +489,8 @@ public class InventoryCheckoutService {
     for (Map.Entry<UUID, Double> reduction : missionReductions.entrySet()) {
       InventoryMissionAllocation slice =
           InventoryAllocations.missionSlice(source, reduction.getKey());
-      if (slice != null && slice.getMission() != null) {
-        InventoryAllocations.addMission(target, slice.getMission(), reduction.getValue());
+      if (slice != null && slice.getMissionId() != null) {
+        InventoryAllocations.addMission(target, slice.getMissionId(), reduction.getValue());
       }
     }
   }

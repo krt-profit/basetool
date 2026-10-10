@@ -23,7 +23,10 @@ import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
 import java.util.Objects;
+import java.util.UUID;
+import java.util.function.Function;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Shared renderers for the audit-subject strings of an inventory row, so the item-CRUD service and
@@ -74,14 +77,16 @@ public final class InventoryAuditLabels {
    * Renders an inventory row's first earmarked mission name for an audit details payload.
    *
    * @param item the inventory row; allocations must be loadable in the transaction
+   * @param names a mission's name by id, {@code null} when unknown or unnamed
    * @return the name of the first earmarked mission, {@code -} when none
    */
-  public static String missionName(@NotNull InventoryItem item) {
+  public static String missionName(
+      @NotNull InventoryItem item, @NotNull Function<UUID, @Nullable String> names) {
     return item.getMissionAllocations().stream()
-        .map(InventoryMissionAllocation::getMission)
+        .map(InventoryMissionAllocation::getMissionId)
         .filter(Objects::nonNull)
         .findFirst()
-        .map(mission -> mission.getName())
+        .map(names)
         .orElse("-");
   }
 }

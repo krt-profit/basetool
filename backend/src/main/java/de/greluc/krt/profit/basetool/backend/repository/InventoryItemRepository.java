@@ -149,7 +149,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @Query(
       """
       SELECT i FROM InventoryItem i WHERE EXISTS (SELECT 1 FROM InventoryMissionAllocation ma
-      WHERE ma.inventoryItem = i AND ma.mission.id = :missionId)
+      WHERE ma.inventoryItem = i AND ma.missionId = :missionId)
       """)
   List<InventoryItem> findByMissionId(@Param("missionId") UUID missionId);
 
@@ -166,7 +166,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @EntityGraph(attributePaths = {"material", "location", "user"})
   @Query(
       "SELECT i FROM InventoryItem i WHERE EXISTS (SELECT 1 FROM InventoryMissionAllocation ma"
-          + " WHERE ma.inventoryItem = i AND ma.mission.id = :missionId) AND "
+          + " WHERE ma.inventoryItem = i AND ma.missionId = :missionId) AND "
           + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE)
   List<InventoryItem> findByMissionIdScoped(
       @Param("missionId") UUID missionId,
@@ -258,7 +258,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
           + " NULL OR i.quality >= :minQuality) AND (:hasJobOrders = false OR EXISTS (SELECT 1"
           + " FROM InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id"
           + " IN :jobOrderIds)) AND (:hasMissions = false OR EXISTS (SELECT 1 FROM"
-          + " InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.mission.id IN"
+          + " InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.missionId IN"
           + " :missionIds)) AND (:hasLocations = false OR i.location.id IN :locationIds)")
   Page<InventoryItem> findGlobalByFilters(
       @Param("hasMaterials") boolean hasMaterials,
@@ -288,7 +288,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       AND (:hasJobOrders = false OR EXISTS (SELECT 1 FROM InventoryJobOrderAllocation ja
       WHERE ja.inventoryItem = i AND ja.jobOrder.id IN :jobOrderIds)) AND (:hasMissions =
       false OR EXISTS (SELECT 1 FROM InventoryMissionAllocation ma WHERE ma.inventoryItem =
-      i AND ma.mission.id IN :missionIds))
+      i AND ma.missionId IN :missionIds))
       AND (:hasLocations = false OR i.location.id IN :locationIds)
       """)
   Page<InventoryItem> findUserByFilters(
@@ -365,7 +365,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
           + " NULL OR i.quality >= :minQuality) AND (:hasJobOrders = false OR EXISTS (SELECT 1"
           + " FROM InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id"
           + " IN :jobOrderIds)) AND (:hasMissions = false OR EXISTS (SELECT 1 FROM"
-          + " InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.mission.id IN"
+          + " InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.missionId IN"
           + " :missionIds)) AND (:hasLocations = false OR i.location.id IN :locationIds)"
           + " AND (:stolenOnly = false OR i.stolen = true) AND (:nonStolenOnly = false OR"
           + " i.stolen = false)"
@@ -410,7 +410,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       OR i.quality >= :minQuality) AND (:hasJobOrders = false OR EXISTS (SELECT 1 FROM
       InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id IN
       :jobOrderIds)) AND (:hasMissions = false OR EXISTS (SELECT 1 FROM
-      InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.mission.id IN
+      InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.missionId IN
       :missionIds)) AND (:hasLocations = false OR i.location.id IN :locationIds)
       GROUP BY m, i.user, i.location, i.quality, i.personal, i.stolen, oou
       """)
@@ -563,7 +563,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       OR i.quality >= :minQuality) AND (:hasJobOrders = false OR EXISTS (SELECT 1 FROM
       InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id IN
       :jobOrderIds)) AND (:hasMissions = false OR EXISTS (SELECT 1 FROM
-      InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.mission.id IN
+      InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.missionId IN
       :missionIds)) AND (:hasLocations = false OR i.location.id IN :locationIds)
       ORDER BY i.createdAt ASC
       """)

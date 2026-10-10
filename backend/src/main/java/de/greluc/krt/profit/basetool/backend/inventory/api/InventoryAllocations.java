@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
 import jakarta.persistence.EntityManager;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -145,38 +144,19 @@ public final class InventoryAllocations {
    * Appends a mission slice earmarking {@code amount} of the entry.
    *
    * @param item the owning entry; never {@code null}
-   * @param mission the earmarked mission; never {@code null}
+   * @param missionId the earmarked mission; never {@code null}
    * @param amount the SCU to earmark
    * @return the created slice, already added to the entry
    */
   @NotNull
   public static InventoryMissionAllocation addMission(
-      InventoryItem item, Mission mission, double amount) {
+      InventoryItem item, UUID missionId, double amount) {
     InventoryMissionAllocation slice = new InventoryMissionAllocation();
     slice.setInventoryItem(item);
-    slice.setMission(mission);
+    slice.setMissionId(missionId);
     slice.setAmount(amount);
     item.getMissionAllocations().add(slice);
     return slice;
-  }
-
-  /**
-   * Earmarks part of a row to a mission known by id, through a reference the persistence context
-   * resolves.
-   *
-   * @param item the row
-   * @param entityManager the persistence context
-   * @param missionId the mission
-   * @param amount the earmarked amount
-   * @return the new slice
-   */
-  @NotNull
-  public static InventoryMissionAllocation addMission(
-      InventoryItem item,
-      @NotNull EntityManager entityManager,
-      @NotNull UUID missionId,
-      double amount) {
-    return addMission(item, entityManager.getReference(Mission.class, missionId), amount);
   }
 
   /**
@@ -244,12 +224,12 @@ public final class InventoryAllocations {
       }
     }
     for (InventoryMissionAllocation va : victim.getMissionAllocations()) {
-      UUID missionId = va.getMission() != null ? va.getMission().getId() : null;
+      UUID missionId = va.getMissionId();
       InventoryMissionAllocation existing = missionSlice(survivor, missionId);
       if (existing != null) {
         existing.setAmount(existing.getAmount() + va.getAmount());
       } else {
-        addMission(survivor, va.getMission(), va.getAmount());
+        addMission(survivor, va.getMissionId(), va.getAmount());
       }
     }
   }
@@ -287,7 +267,7 @@ public final class InventoryAllocations {
       return null;
     }
     return item.getMissionAllocations().stream()
-        .filter(a -> a.getMission() != null && missionId.equals(a.getMission().getId()))
+        .filter(a -> missionId.equals(a.getMissionId()))
         .findFirst()
         .orElse(null);
   }
