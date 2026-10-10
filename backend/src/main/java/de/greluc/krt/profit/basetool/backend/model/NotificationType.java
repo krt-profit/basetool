@@ -312,7 +312,43 @@ public enum NotificationType {
    * A member of the recipient's unit left the organisation (REQ-ORG-030), rendered with {@code
    * member}, {@code unit}, the {@code reason} word and the {@code vacancy} word.
    */
-  ORG_MEMBER_DEPARTED;
+  ORG_MEMBER_DEPARTED,
+
+  /**
+   * The recipient's ship was assigned to a mission unit (REQ-HANGAR-005), rendered with {@code
+   * shipType}, {@code mission}, {@code unit} and {@code start}.
+   */
+  HANGAR_SHIP_ASSIGNED,
+
+  /**
+   * A deleted ship falls out of a planned mission (REQ-HANGAR-006), rendered with {@code shipType},
+   * {@code mission} and {@code unit}.
+   */
+  HANGAR_SHIP_REMOVED_FROM_UNIT,
+
+  /**
+   * The fitted marks of the recipient's ships were reset (REQ-HANGAR-007), rendered with {@code
+   * count}.
+   */
+  HANGAR_FITTED_RESET,
+
+  /**
+   * An admin changed the recipient's hangar (REQ-HANGAR-008), rendered with {@code actor}, the
+   * {@code change} word and {@code shipType}.
+   */
+  HANGAR_CHANGED_BY_ADMIN,
+
+  /**
+   * An admin changed the recipient's blueprints (REQ-HANGAR-008), rendered with {@code actor}, the
+   * {@code change} word and {@code subject}.
+   */
+  BLUEPRINT_CHANGED_BY_ADMIN,
+
+  /**
+   * An admin cleared the recipient's removable blueprints (REQ-HANGAR-008), rendered with {@code
+   * actor} and {@code count}.
+   */
+  BLUEPRINT_PURGED_BY_ADMIN;
 
   /**
    * Whether a member may mute this type (REQ-NOTIF-027). The account-deletion types serve a legal
@@ -371,7 +407,13 @@ public enum NotificationType {
           BANK_ACCOUNT_DEBITED,
           BANK_HOLDER_DEACTIVATED_WITH_BALANCE,
           ORG_LEADERSHIP_ROLE_MISMATCH,
-          ORG_MEMBER_DEPARTED ->
+          ORG_MEMBER_DEPARTED,
+          HANGAR_SHIP_ASSIGNED,
+          HANGAR_SHIP_REMOVED_FROM_UNIT,
+          HANGAR_FITTED_RESET,
+          HANGAR_CHANGED_BY_ADMIN,
+          BLUEPRINT_CHANGED_BY_ADMIN,
+          BLUEPRINT_PURGED_BY_ADMIN ->
           true;
     };
   }

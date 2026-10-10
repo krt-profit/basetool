@@ -391,4 +391,67 @@ public final class MissionNotices {
                 "actor", text(actor.name())))
         .build();
   }
+
+  /** Loose entity-type tag of the notices about one mission unit. */
+  public static final String UNIT_ENTITY_TYPE = "MISSION_UNIT";
+
+  private static final Set<NotificationType> SHIP_ASSIGNED =
+      Set.of(NotificationType.HANGAR_SHIP_ASSIGNED);
+
+  /**
+   * A member's ship was assigned to a mission unit; the owner's earlier assignment notice for the
+   * unit goes.
+   *
+   * @param unitId the mission unit
+   * @param ownerId the ship's owner, the single recipient
+   * @param shipType the ship's type name
+   * @param missionName the mission's name
+   * @param unitName the unit's name
+   * @param start the mission's planned start, or {@code null}
+   * @param actor who assigned it
+   * @return the event
+   */
+  @NotNull
+  public static NoticeEvent shipAssigned(
+      @NotNull UUID unitId,
+      @NotNull UUID ownerId,
+      @Nullable String shipType,
+      @Nullable String missionName,
+      @Nullable String unitName,
+      @Nullable Instant start,
+      @NotNull ActorRef actor) {
+    return NoticeEvent.builder()
+        .eventType(NotificationEventType.HANGAR_SHIP_ASSIGNED_TO_UNIT)
+        .actorSub(actor.id())
+        .entityType(UNIT_ENTITY_TYPE)
+        .entityId(unitId)
+        .contextRecipientUserId(ownerId)
+        .renderParams(
+            params(
+                "shipType", text(shipType),
+                "mission", text(missionName),
+                "unit", text(unitName),
+                "start", time(start)))
+        .supersedeRecipients(Set.of(ownerId))
+        .resolvesNotificationTypesForRecipients(SHIP_ASSIGNED)
+        .build();
+  }
+
+  /**
+   * A ship was taken off a mission unit; the owner's assignment notice for the unit goes.
+   *
+   * @param unitId the mission unit
+   * @param ownerId the former ship's owner
+   * @return the event
+   */
+  @NotNull
+  public static NoticeEvent shipUnassigned(@NotNull UUID unitId, @NotNull UUID ownerId) {
+    return NoticeEvent.builder()
+        .eventType(NotificationEventType.HANGAR_SHIP_UNASSIGNED_FROM_UNIT)
+        .entityType(UNIT_ENTITY_TYPE)
+        .entityId(unitId)
+        .supersedeRecipients(Set.of(ownerId))
+        .resolvesNotificationTypesForRecipients(SHIP_ASSIGNED)
+        .build();
+  }
 }

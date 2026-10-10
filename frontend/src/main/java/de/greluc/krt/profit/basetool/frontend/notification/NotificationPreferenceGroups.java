@@ -54,6 +54,8 @@ public final class NotificationPreferenceGroups {
     prefixes.put("MISSION_", "missions");
     prefixes.put("REFINERY_", "refinery");
     prefixes.put("ORG_", "organisation");
+    prefixes.put("HANGAR_", "hangar");
+    prefixes.put("BLUEPRINT_", "blueprints");
     prefixes.put("OPERATION_", "operations");
     prefixes.put("JOB_ORDER_", "orders");
     prefixes.put("BANK_", "bank");

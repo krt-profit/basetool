@@ -388,5 +388,48 @@ public enum NotificationEventType {
    * A member left the organisation (REQ-ORG-030). The default rule notifies the leadership of each
    * unit the member belonged to, and of the parent Bereich when a seat became vacant.
    */
-  ORG_MEMBER_DEPARTED
+  ORG_MEMBER_DEPARTED,
+
+  /**
+   * A ship was assigned to a mission unit by somebody other than its owner (REQ-HANGAR-005). The
+   * default rule notifies the ship's owner.
+   */
+  HANGAR_SHIP_ASSIGNED_TO_UNIT,
+
+  /**
+   * A ship was taken off a mission unit (REQ-HANGAR-005). Creates no notification; clears the
+   * owner's assignment notice for the unit.
+   */
+  HANGAR_SHIP_UNASSIGNED_FROM_UNIT,
+
+  /**
+   * A ship that was assigned to a mission unit of a mission that is not finished was deleted
+   * (REQ-HANGAR-006). The default rule notifies the mission leadership and the unit's responsible
+   * member.
+   */
+  HANGAR_SHIP_DELETED_FROM_MISSION,
+
+  /**
+   * The fitted marks of a member's ships were reset in bulk (REQ-HANGAR-007). The default rule
+   * notifies that member.
+   */
+  HANGAR_FITTED_RESET_FOR_OWNER,
+
+  /**
+   * An admin added, changed or deleted a ship in a member's hangar (REQ-HANGAR-008). The default
+   * rule notifies that member.
+   */
+  HANGAR_CHANGED_BY_ADMIN,
+
+  /**
+   * An admin added, changed, deleted or imported blueprints of a member (REQ-HANGAR-008). The
+   * default rule notifies that member.
+   */
+  BLUEPRINT_CHANGED_BY_ADMIN,
+
+  /**
+   * An admin cleared the removable blueprints of every member (REQ-HANGAR-008). The default rule
+   * notifies each member who lost some.
+   */
+  BLUEPRINT_PURGED_BY_ADMIN
 }

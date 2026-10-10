@@ -26,16 +26,21 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.model.Location;
+import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
@@ -46,9 +51,11 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -67,6 +74,8 @@ class HangarServiceTest {
   @Mock private de.greluc.krt.profit.basetool.backend.service.OwnerScopeService ownerScopeService;
   @Mock private ShipTypeMapper shipTypeMapper;
   @Mock private AuditService auditService;
+  @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private UserService userService;
 
   @InjectMocks private HangarService hangarService;
 
@@ -262,11 +271,94 @@ class HangarServiceTest {
             argThat(d -> d.toString().contains("detachedUnits=1")));
   }
 
+  private static final ActorRef ACTOR = new ActorRef(UUID.randomUUID(), "Ada");
+
+  private List<NoticeEvent> published(int expected) {
+    ArgumentCaptor<Object> captured = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher, times(expected)).publishEvent(captured.capture());
+    return captured.getAllValues().stream().map(NoticeEvent.class::cast).toList();
+  }
+
+  @Test
+  void resettingTheFittedMarksTellsEachOwnerOnceWithTheirCount() {
+    UUID first = UUID.randomUUID();
+    UUID second = UUID.randomUUID();
+    ShipRepository.OwnerShipCount a = org.mockito.Mockito.mock(ShipRepository.OwnerShipCount.class);
+    ShipRepository.OwnerShipCount b = org.mockito.Mockito.mock(ShipRepository.OwnerShipCount.class);
+    when(a.getOwnerId()).thenReturn(first);
+    when(a.getShipCount()).thenReturn(3L);
+    when(b.getOwnerId()).thenReturn(second);
+    when(b.getShipCount()).thenReturn(1L);
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    when(shipRepository.countFittedByOwnerScoped(false, null, Set.of())).thenReturn(List.of(a, b));
+    when(shipRepository.resetAllFittedScoped(false, null, Set.of())).thenReturn(4);
+    when(userService.currentActor()).thenReturn(ACTOR);
+
+    hangarService.resetAllFittedStatus();
+
+    List<NoticeEvent> sent = published(2);
+    assertEquals(first, sent.get(0).contextRecipientUserId());
+    assertEquals("3", sent.get(0).renderParams().get("count"));
+    assertEquals(second, sent.get(1).contextRecipientUserId());
+    assertEquals(NotificationEventType.HANGAR_FITTED_RESET_FOR_OWNER, sent.get(1).eventType());
+  }
+
+  @Test
+  void anAdminsShipChangesTellTheMember() {
+    UUID member = UUID.randomUUID();
+    UUID shipId = UUID.randomUUID();
+    ShipType type = new ShipType();
+    type.setName("Cutlass Black");
+    Ship ship = new Ship();
+    ship.setId(shipId);
+    ship.setShipType(type);
+    HangarService spied = org.mockito.Mockito.spy(hangarService);
+    org.mockito.Mockito.doReturn(ship).when(spied).addShip(any(), any());
+    org.mockito.Mockito.doReturn(ship).when(spied).updateShip(any(), any(), any());
+    org.mockito.Mockito.doReturn(0).when(spied).deleteShip(any(), any());
+    when(shipRepository.findById(shipId)).thenReturn(Optional.of(ship));
+    when(userService.currentActor()).thenReturn(ACTOR);
+    ShipRequestDto dto =
+        new ShipRequestDto("Test", UUID.randomUUID(), "LTI", null, false, null, null);
+
+    spied.addShipByAdmin(member, dto);
+    spied.updateShipByAdmin(member, shipId, dto);
+    spied.deleteShipByAdmin(member, shipId);
+
+    List<NoticeEvent> sent = published(3);
+    assertEquals(
+        List.of("ADDED", "UPDATED", "DELETED"),
+        sent.stream().map(e -> e.renderParams().get("changeCode")).toList());
+    assertEquals(member, sent.getFirst().contextRecipientUserId());
+    assertEquals("Cutlass Black", sent.getFirst().renderParams().get("shipType"));
+    assertEquals("Ada", sent.getFirst().renderParams().get("actor"));
+  }
+
+  @Test
+  void anAdminChangingTheirOwnHangarTellsNobody() {
+    UUID shipId = UUID.randomUUID();
+    Ship ship = new Ship();
+    ship.setId(shipId);
+    ShipType type = new ShipType();
+    type.setName("Cutlass Black");
+    ship.setShipType(type);
+    HangarService spied = org.mockito.Mockito.spy(hangarService);
+    org.mockito.Mockito.doReturn(ship).when(spied).addShip(any(), any());
+    when(userService.currentActor()).thenReturn(ACTOR);
+
+    spied.addShipByAdmin(
+        ACTOR.id(), new ShipRequestDto("Test", UUID.randomUUID(), "LTI", null, false, null, null));
+
+    verify(eventPublisher, never()).publishEvent(any(Object.class));
+  }
+
   @Test
   void resetAllFittedStatus_recordsOnlyWhenShipsChanged() {
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(shipRepository.resetAllFittedScoped(false, null, Set.of())).thenReturn(0, 4);
+    org.mockito.Mockito.lenient().when(userService.currentActor()).thenReturn(ACTOR);
 
     hangarService.resetAllFittedStatus();
     verifyNoInteractions(auditService);

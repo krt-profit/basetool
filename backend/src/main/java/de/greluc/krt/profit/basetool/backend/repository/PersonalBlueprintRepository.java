@@ -322,4 +322,36 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
           """,
       nativeQuery = true)
   int grantDefaultBlueprintsToAllUsers();
+
+  /**
+   * Counts, per owner, the blueprints {@link #deleteAllRemovable()} is about to delete
+   * (REQ-HANGAR-008).
+   *
+   * @return one row per owner with at least one removable blueprint
+   */
+  @Query(
+      """
+      SELECT b.ownerUserId AS ownerId, COUNT(b) AS blueprintCount FROM PersonalBlueprint b
+      WHERE b.productKey NOT IN (SELECT d.productKey FROM DefaultBlueprint d)
+      GROUP BY b.ownerUserId
+      """)
+  List<OwnerBlueprintCount> countRemovableByOwner();
+
+  /** Row of {@link #countRemovableByOwner()}: an owner and how many blueprints they lose. */
+  interface OwnerBlueprintCount {
+
+    /**
+     * The blueprints' owner.
+     *
+     * @return the owner id
+     */
+    UUID getOwnerId();
+
+    /**
+     * How many removable blueprints the owner holds.
+     *
+     * @return the count, at least one
+     */
+    long getBlueprintCount();
+  }
 }

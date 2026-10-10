@@ -213,6 +213,37 @@ class SeededNotificationRulesIntegrationTest {
             true,
             SelectorKind.ORG_RELATIVE_ROLE),
         rule(
+            NotificationEventType.HANGAR_SHIP_ASSIGNED_TO_UNIT,
+            NotificationType.HANGAR_SHIP_ASSIGNED,
+            true,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
+            NotificationEventType.HANGAR_SHIP_DELETED_FROM_MISSION,
+            NotificationType.HANGAR_SHIP_REMOVED_FROM_UNIT,
+            true,
+            SelectorKind.MISSION_LEADERSHIP,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
+            NotificationEventType.HANGAR_FITTED_RESET_FOR_OWNER,
+            NotificationType.HANGAR_FITTED_RESET,
+            true,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
+            NotificationEventType.HANGAR_CHANGED_BY_ADMIN,
+            NotificationType.HANGAR_CHANGED_BY_ADMIN,
+            true,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
+            NotificationEventType.BLUEPRINT_CHANGED_BY_ADMIN,
+            NotificationType.BLUEPRINT_CHANGED_BY_ADMIN,
+            true,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
+            NotificationEventType.BLUEPRINT_PURGED_BY_ADMIN,
+            NotificationType.BLUEPRINT_PURGED_BY_ADMIN,
+            true,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
             NotificationEventType.OPERATION_COMPLETED_UNOWNED,
             NotificationType.OPERATION_COMPLETED,
             true,
