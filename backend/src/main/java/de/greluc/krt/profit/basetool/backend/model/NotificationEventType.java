@@ -278,5 +278,23 @@ public enum NotificationEventType {
    * A material claim was withdrawn by an order edit or a de-escalation (REQ-ORDERS-044). The
    * default rule notifies the member who made the claim.
    */
-  JOB_ORDER_CLAIM_WITHDRAWN
+  JOB_ORDER_CLAIM_WITHDRAWN,
+
+  /**
+   * A refinery order's run has ended and the output can be collected (REQ-REFINERY-023). Published
+   * once by the time-based producer; the default rule notifies the order's owner.
+   */
+  REFINERY_ORDER_READY,
+
+  /**
+   * Somebody other than the owner changed, cancelled or stored a refinery order, or booked its
+   * yield onto another member (REQ-REFINERY-024). The default rule notifies that member.
+   */
+  REFINERY_ORDER_CHANGED_BY_OTHER,
+
+  /**
+   * A refinery order was stored, cancelled or got a new run time (REQ-REFINERY-023). Creates no
+   * notification; clears the order's collect-me notice.
+   */
+  REFINERY_ORDER_READY_CLEARED
 }

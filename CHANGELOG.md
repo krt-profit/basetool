@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Benachrichtigungen zur Raffinerie.** Der Besitzer erfährt, wenn ein Raffinerieauftrag fertig ist und abgeholt werden kann, und wenn jemand anderes den Auftrag ändert, storniert oder einlagert, auch auf wessen Lager die Ausbeute gebucht wurde (REQ-REFINERY-023, -024, Migrationen V275/V276, #2414).
+
 - **Benachrichtigungen zu Aufträgen.** Wer einen Auftrag übernimmt, an den er übergeben wurde, erfährt es (Offiziere, Leads und Logistiker der neuen Einheit); die anfragende Einheit hört, wenn ihr Auftrag abgeschlossen, abgelehnt oder gelöscht wurde. Wer einem Auftrag zugewiesen wird, und wessen Materialzusage durch eine Änderung oder Rückstufung entfällt, wird benachrichtigt (REQ-ORDERS-041…044, Migration V274, #2414).
 
 - **Benachrichtigungen zu Einsätzen und Operationen.** Teilnehmer erfahren, wenn ein Einsatz verschoben,

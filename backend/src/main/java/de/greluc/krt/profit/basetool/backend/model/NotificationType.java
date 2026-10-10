@@ -230,7 +230,20 @@ public enum NotificationType {
    * The recipient's material claim on a job order was withdrawn (REQ-ORDERS-044), rendered with
    * {@code displayId}, {@code handle}, {@code material} and the {@code reason} word.
    */
-  JOB_ORDER_CLAIM_WITHDRAWN;
+  JOB_ORDER_CLAIM_WITHDRAWN,
+
+  /**
+   * A refinery order is ready to collect (REQ-REFINERY-023), rendered with {@code order}, {@code
+   * location} and the {@code outputs}.
+   */
+  REFINERY_ORDER_READY,
+
+  /**
+   * Somebody else changed, cancelled or stored the recipient's refinery order, or booked its yield
+   * onto the recipient (REQ-REFINERY-024), rendered with {@code order}, {@code location}, {@code
+   * actor} and the {@code change} word.
+   */
+  REFINERY_ORDER_CHANGED_BY_OTHER;
 
   /**
    * Whether a member may mute this type (REQ-NOTIF-027). The account-deletion types serve a legal
@@ -275,7 +288,9 @@ public enum NotificationType {
           JOB_ORDER_REASSIGNED,
           JOB_ORDER_FINISHED,
           JOB_ORDER_ASSIGNED,
-          JOB_ORDER_CLAIM_WITHDRAWN ->
+          JOB_ORDER_CLAIM_WITHDRAWN,
+          REFINERY_ORDER_READY,
+          REFINERY_ORDER_CHANGED_BY_OTHER ->
           true;
     };
   }

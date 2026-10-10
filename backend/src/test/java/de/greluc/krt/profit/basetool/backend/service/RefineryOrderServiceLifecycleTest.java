@@ -29,6 +29,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -42,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.RefineryGood;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
@@ -50,6 +53,8 @@ import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.model.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.refinery.api.MissionParticipantRequiredException;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
@@ -75,6 +80,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -102,6 +108,9 @@ class RefineryOrderServiceLifecycleTest {
   @Mock private OwnerScopeService ownerScopeService;
 
   @Mock private AuditService auditService;
+
+  @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private UserService userService;
   @InjectMocks private RefineryOrderService service;
 
   private static final UUID ORDER_ID = UUID.randomUUID();
@@ -119,6 +128,7 @@ class RefineryOrderServiceLifecycleTest {
 
   @BeforeEach
   void setUpEntities() {
+    lenient().when(userService.currentActor()).thenReturn(ActorRef.system());
     owner = new User();
     owner.setId(OWNER_ID);
     owner.setUsername("alice");
@@ -889,6 +899,62 @@ class RefineryOrderServiceLifecycleTest {
     }
 
     @Test
+    void anUpdateByAnotherMemberTellsTheOwnerAndAChangedRunTimeClearsTheReadyNotice() {
+      RefineryOrder existing = newSavedOrder();
+      existing.setStartedAt(Instant.parse("2026-01-01T10:00:00Z"));
+      existing.setDurationMinutes(30L);
+      existing.setReadyNotifiedAt(Instant.parse("2026-01-01T10:30:00Z"));
+      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.save(existing)).thenReturn(existing);
+      when(userService.currentActor()).thenReturn(new ActorRef(OTHER_USER_ID, "Bob"));
+      RefineryOrder details = new RefineryOrder();
+      details.setStartedAt(Instant.parse("2026-01-01T10:00:00Z"));
+      details.setDurationMinutes(90L);
+
+      service.updateRefineryOrder(OTHER_USER_ID, ORDER_ID, details, true);
+
+      assertNull(existing.getReadyNotifiedAt());
+      assertEquals(
+          List.of(
+              NotificationEventType.REFINERY_ORDER_READY_CLEARED,
+              NotificationEventType.REFINERY_ORDER_CHANGED_BY_OTHER),
+          publishedTypes());
+    }
+
+    @Test
+    void anUpdateByTheOwnerWithTheSameRunTimeKeepsTheMarkerAndTellsNobody() {
+      RefineryOrder existing = newSavedOrder();
+      existing.setStartedAt(Instant.parse("2026-01-01T10:00:00Z"));
+      existing.setDurationMinutes(30L);
+      Instant marker = Instant.parse("2026-01-01T10:30:00Z");
+      existing.setReadyNotifiedAt(marker);
+      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.save(existing)).thenReturn(existing);
+      RefineryOrder details = new RefineryOrder();
+      details.setStartedAt(Instant.parse("2026-01-01T10:00:00Z"));
+      details.setDurationMinutes(30L);
+
+      service.updateRefineryOrder(OWNER_ID, ORDER_ID, details, false);
+
+      assertEquals(marker, existing.getReadyNotifiedAt());
+      assertEquals(List.of(), publishedTypes());
+    }
+
+    @Test
+    void anUpdateThatCancelsTheOrderNamesTheCancellation() {
+      RefineryOrder existing = newSavedOrder();
+      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.save(existing)).thenReturn(existing);
+      when(userService.currentActor()).thenReturn(new ActorRef(OTHER_USER_ID, "Bob"));
+      RefineryOrder details = new RefineryOrder();
+      details.setStatus(RefineryOrderStatus.CANCELED);
+
+      service.updateRefineryOrder(OTHER_USER_ID, ORDER_ID, details, true);
+
+      assertEquals("CANCELED", changeCodeOfLastNotice());
+    }
+
+    @Test
     void locationProvided_isLookedUpAndValidated() {
       RefineryOrder existing = newSavedOrder();
       when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
@@ -1092,6 +1158,32 @@ class RefineryOrderServiceLifecycleTest {
     }
 
     @Test
+    void aCancellationByAnotherMemberTellsTheOwnerAndClearsTheReadyNotice() {
+      RefineryOrder existing = newSavedOrder();
+      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(userService.currentActor()).thenReturn(new ActorRef(OTHER_USER_ID, "Bob"));
+
+      service.deleteRefineryOrder(OTHER_USER_ID, ORDER_ID, true);
+
+      assertEquals(
+          List.of(
+              NotificationEventType.REFINERY_ORDER_READY_CLEARED,
+              NotificationEventType.REFINERY_ORDER_CHANGED_BY_OTHER),
+          publishedTypes());
+      assertEquals("CANCELED", changeCodeOfLastNotice());
+    }
+
+    @Test
+    void aCancellationByTheOwnerOnlyClearsTheReadyNotice() {
+      RefineryOrder existing = newSavedOrder();
+      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+
+      service.deleteRefineryOrder(OWNER_ID, ORDER_ID, false);
+
+      assertEquals(List.of(NotificationEventType.REFINERY_ORDER_READY_CLEARED), publishedTypes());
+    }
+
+    @Test
     void logisticianCanCancelAnyOrder() {
       RefineryOrder existing = newSavedOrder();
       when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
@@ -1193,6 +1285,21 @@ class RefineryOrderServiceLifecycleTest {
       }
       return null;
     }
+  }
+
+  private List<NotificationEventType> publishedTypes() {
+    ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher, atLeast(0)).publishEvent(published.capture());
+    return published.getAllValues().stream()
+        .map(event -> ((NoticeEvent) event).eventType())
+        .toList();
+  }
+
+  private String changeCodeOfLastNotice() {
+    ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher, atLeast(1)).publishEvent(published.capture());
+    NoticeEvent last = (NoticeEvent) published.getAllValues().getLast();
+    return last.renderParams().get("changeCode");
   }
 
   private RefineryOrder newSavedOrder() {

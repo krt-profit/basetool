@@ -44,7 +44,9 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderStoreDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderStoreItemDto;
 import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.refinery.api.MissionParticipantRequiredException;
+import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
@@ -59,15 +61,18 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
@@ -98,6 +103,11 @@ public class RefineryOrderService {
   private final RefineryYieldRepository refineryYieldRepository;
   private final OwnerScopeService ownerScopeService;
   private final AuditRecorder auditRecorder;
+
+  /** Publishes the refinery notices after the commit (REQ-REFINERY-024). */
+  private final ApplicationEventPublisher eventPublisher;
+
+  private final UserService userService;
 
   /**
    * Owner-scoped paged list under the list filters (REQ-REFINERY-019).
@@ -476,8 +486,16 @@ public class RefineryOrderService {
       order.setRefiningMethod(null);
     }
 
+    final Instant previousStart = order.getStartedAt();
+    final Long previousDuration = order.getDurationMinutes();
     order.setStartedAt(details.getStartedAt() != null ? details.getStartedAt() : Instant.now());
     order.setDurationMinutes(details.getDurationMinutes());
+    final boolean runTimeChanged =
+        !Objects.equals(previousStart, order.getStartedAt())
+            || !Objects.equals(previousDuration, order.getDurationMinutes());
+    if (runTimeChanged) {
+      order.setReadyNotifiedAt(null);
+    }
     order.setExpenses(zeroToNull(details.getExpenses()));
     order.setOtherExpenses(zeroToNull(details.getOtherExpenses()));
     order.setOreSales(zeroToNull(details.getOreSales()));
@@ -498,6 +516,13 @@ public class RefineryOrderService {
     }
 
     RefineryOrder saved = refineryOrderRepository.save(order);
+    if (runTimeChanged
+        || saved.getStatus() == RefineryOrderStatus.COMPLETED
+        || saved.getStatus() == RefineryOrderStatus.CANCELED) {
+      eventPublisher.publishEvent(RefineryNotices.readyCleared(saved.getId()));
+    }
+    announceByOther(
+        saved, userId, saved.getStatus() == RefineryOrderStatus.CANCELED ? "CANCELED" : "UPDATED");
     auditRecorder.record(
         AuditEventType.REFINERY_ORDER_UPDATED,
         saved.getId(),
@@ -583,6 +608,8 @@ public class RefineryOrderService {
     final RefineryOrderStatus previousStatus = order.getStatus();
     order.setStatus(RefineryOrderStatus.CANCELED);
     refineryOrderRepository.save(order);
+    eventPublisher.publishEvent(RefineryNotices.readyCleared(order.getId()));
+    announceByOther(order, userId, "CANCELED");
     auditRecorder.record(
         AuditEventType.REFINERY_ORDER_CANCELED,
         order.getId(),
@@ -625,6 +652,7 @@ public class RefineryOrderService {
     }
 
     final RefineryOrderStatus previousStatus = order.getStatus();
+    final Set<UUID> bookedOnto = new LinkedHashSet<>();
 
     for (RefineryOrderStoreItemDto itemDto : dto.items()) {
       final Material mat =
@@ -700,6 +728,7 @@ public class RefineryOrderService {
       }
 
       inventoryItemRepository.save(item);
+      bookedOnto.add(assignee.getId());
       auditRecorder.record(
           AuditEventType.INVENTORY_RECEIVED_FROM_REFINERY,
           item.getId(),
@@ -719,6 +748,8 @@ public class RefineryOrderService {
     order.setStatus(RefineryOrderStatus.COMPLETED);
     order.setStoredAt(Instant.now());
     refineryOrderRepository.save(order);
+    eventPublisher.publishEvent(RefineryNotices.readyCleared(order.getId()));
+    announceStored(order, userId, bookedOnto);
     auditRecorder.record(
         AuditEventType.REFINERY_ORDER_STORED,
         order.getId(),
@@ -745,6 +776,64 @@ public class RefineryOrderService {
               + " is not required by job order "
               + jobOrder.getId()
               + "; an inventory item can only be linked to an order that needs its material.");
+    }
+  }
+
+  /**
+   * Tells the owner that somebody else changed or cancelled their order (REQ-REFINERY-024). Nothing
+   * happens when the owner acted.
+   *
+   * @param order the order
+   * @param actorId the acting member
+   * @param changeCode {@code UPDATED} or {@code CANCELED}
+   */
+  private void announceByOther(
+      @NotNull RefineryOrder order, @NotNull UUID actorId, @NotNull String changeCode) {
+    if (order.getOwner() == null || actorId.equals(order.getOwner().getId())) {
+      return;
+    }
+    eventPublisher.publishEvent(
+        RefineryNotices.changedByOther(
+            order.getId(),
+            order.getOwner().getId(),
+            order.getLocation() == null ? null : order.getLocation().getName(),
+            changeCode,
+            userService.currentActor()));
+  }
+
+  /**
+   * Tells the owner that somebody else stored their order, and every other member whose stock
+   * received a yield the acting member booked onto them (REQ-REFINERY-024).
+   *
+   * @param order the stored order
+   * @param actorId the acting member
+   * @param bookedOnto the members whose stock received a row
+   */
+  private void announceStored(
+      @NotNull RefineryOrder order, @NotNull UUID actorId, @NotNull Set<UUID> bookedOnto) {
+    UUID ownerId = order.getOwner() == null ? null : order.getOwner().getId();
+    String location = order.getLocation() == null ? null : order.getLocation().getName();
+    ActorRef actor = null;
+    if (ownerId != null && !actorId.equals(ownerId)) {
+      actor = userService.currentActor();
+      eventPublisher.publishEvent(
+          RefineryNotices.changedByOther(
+              order.getId(),
+              ownerId,
+              location,
+              bookedOnto.contains(ownerId) ? "STORED_TO_YOU" : "STORED",
+              actor));
+    }
+    for (UUID memberId : bookedOnto) {
+      if (memberId.equals(actorId) || memberId.equals(ownerId)) {
+        continue;
+      }
+      if (actor == null) {
+        actor = userService.currentActor();
+      }
+      eventPublisher.publishEvent(
+          RefineryNotices.changedByOther(
+              order.getId(), memberId, location, "STORED_TO_YOU", actor));
     }
   }
 

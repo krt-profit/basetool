@@ -98,7 +98,15 @@ public class NotificationPageController {
 
   /** The detail page of the record a notification is about, by the notification's entity type. */
   private static final Map<String, String> ENTITY_PAGES =
-      Map.of("MISSION", "/missions/", "OPERATION", "/operations/", "JOB_ORDER", "/orders/");
+      Map.of(
+          "MISSION",
+          "/missions/",
+          "OPERATION",
+          "/operations/",
+          "JOB_ORDER",
+          "/orders/",
+          "REFINERY_ORDER",
+          "/refinery-orders/");
 
   /** The types whose record is gone, so the row has nothing to link to. */
   private static final Set<String> UNLINKED_TYPES = Set.of("MISSION_DELETED");

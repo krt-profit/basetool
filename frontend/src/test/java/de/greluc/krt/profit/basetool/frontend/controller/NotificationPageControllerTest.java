@@ -227,6 +227,18 @@ class NotificationPageControllerTest {
   }
 
   @Test
+  void targetOf_refineryNoticesLinkTheOrder() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/refinery-orders/" + id,
+        NotificationPageController.targetOf("REFINERY_ORDER_READY", "REFINERY_ORDER", id));
+    assertEquals(
+        "/refinery-orders/" + id,
+        NotificationPageController.targetOf(
+            "REFINERY_ORDER_CHANGED_BY_OTHER", "REFINERY_ORDER", id));
+  }
+
+  @Test
   void targetOf_jobOrderLinksTheOrder() {
     UUID orderId = UUID.fromString("00000000-0000-0000-0000-000000000099");
 
