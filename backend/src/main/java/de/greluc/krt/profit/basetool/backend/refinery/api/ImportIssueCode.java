@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.refinery.api;
 
 /**
  * Machine-readable reason attached to an {@link ImportIssueDto} of a refinery screenshot import

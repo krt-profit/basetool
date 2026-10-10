@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankSecurityService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ConnectedAppsGate;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeGate;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.security.SecurityExpressionAnalyzer.Analysis;
 import de.greluc.krt.profit.basetool.backend.security.SecurityExpressionAnalyzer.BeanCall;
 import de.greluc.krt.profit.basetool.backend.security.SecurityExpressionSources.Declared;
@@ -60,8 +61,9 @@ class SecurityExpressionRulesTest {
    */
   private static final Map<String, Integer> REFERENCE_FLOORS =
       Map.of(
-          "ownerScopeService", 59,
+          "ownerScopeService", 51,
           "operationAccessPolicy", 8,
+          "refineryAccessPolicy", 8,
           "missionSecurityService", 40,
           "authHelperService", 17,
           "exchangeGate", 14,
@@ -78,6 +80,7 @@ class SecurityExpressionRulesTest {
       Map.of(
           "ownerScopeService", OwnerScopeService.class,
           "operationAccessPolicy", OperationAccessPolicy.class,
+          "refineryAccessPolicy", RefineryAccessPolicy.class,
           "missionSecurityService", MissionSecurityService.class,
           "authHelperService", AuthHelperService.class,
           "exchangeGate", ExchangeGate.class,

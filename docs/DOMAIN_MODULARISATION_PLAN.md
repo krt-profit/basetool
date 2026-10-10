@@ -992,7 +992,7 @@ their "must stay green" period here (D-01).
 In dependency order, each with its command API, its observer SPIs, its access policy and its REST
 wave: `materialexchange` (the offer ratchet as `StockChangeObserver`), `refinery`, `joborder`,
 `mission`, `inventory` (`StockCommands`, the earmark target SPI, the lot-lock protocol of ADR-0229
-moved into inventory), `hangar`, `blueprint`. The eight business associations become id references
+moved into inventory, and `MaterialExchangeOffer.inventoryItem` as an id), `hangar`, `blueprint`. The eight business associations become id references
 as each pair is decoupled.
 
 - `materialexchange` — **done 2026-10-10.**
@@ -1018,9 +1018,44 @@ as each pair is decoupled.
   the stock observer rather than a GDPR participant until §7.6 introduces those. (2)
   `MaterialExchangeOffer.inventoryItem` stays an association for now: converting it rewrites the
   fetch plan of eight queries and two entity graphs, and nothing needs the id until `InventoryItem`
-  leaves `model` with the inventory move (P3-5), where it belongs. (3)
+  leaves `model` with the inventory move (P3-5), where it belongs. **Tracked for P3-5:** convert
+  `MaterialExchangeOffer.inventoryItem` to the item id when `InventoryItem` moves. (3)
   `ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE` is public, because the offer board's JPQL
   splices it from another package.
+- `refinery` — **done 2026-10-10.**
+  1. *Characterise*: `RefineryModuleContractTest` pins that create, update and cancel each record
+     their audit event in the command's transaction, and that a member of another org unit is
+     refused on every per-order entry point (read, update, cancel, store) and a logistician of
+     another org unit on every on-behalf entry point (the "403 per foreign entry point" of the
+     risk table).
+  2. *Access policy out of the scope hub* (§5.4, ADR-0236): `RefineryAccessPolicy` (bean
+     `refineryAccessPolicy`) holds `canSeeRefineryOrder` (id and entity), `canEditRefineryOrder`,
+     `canViewUserRefineryOrders` and `canManageUserRefineryOrders`. The scope kernel publishes the
+     two blocks those gates shared privately, unchanged: `permitsOwnedRow` (owner escape, ownerless
+     rule, org-unit scope) and `canActOnTargetUser`. The eight refinery-order endpoints, the
+     controller's on-behalf owner check and the live-sync room ask the policy; the authorization
+     matrix changed on exactly those eight lines, in expression text. The differential verdict
+     test compared old and new over 9 callers × (7 orders × 2 gates + 5 target members × 2
+     gates) = 216 verdicts before the old methods went (proven able to fail by dropping the owner
+     from the edit gate) and keeps comparing against a restatement on the kernel primitives.
+  3. *Inversions*: the blueprint craftability asks its own SPI `CraftabilityYieldSource` (with its
+     own `YieldSlice` record, so the SPI adds no `blueprint -> inventory` edge), implemented by
+     `RefineryOrderService`; the exchange's refinery draft asks the published
+     `refinery.api.RefineryDraftBuilder`.
+  4. *Move*: controllers into `refinery.web`; the extract and draft records into `refinery.api`
+     (the exchange uses them); the two services, the policy, the live-sync authorizer, the import
+     settings and the store requests into `refinery.internal`.
+  Baseline **96 → 92** (`scope -> refinery` 3, `blueprint -> refinery` 1).
+  **Corrections:** (1) like the operation, `RefineryOrder`, `RefineryGood`, `RefineryOrderStatus`,
+  `RefineryOrderRepository` (with `RefineryMissionProfitAggregate`), `RefineryOrderMapper` and
+  `RefineryOrderDto`/`RefineryGoodDto`/`RefineryOrderListDto` stay in the layer packages: `Mission`,
+  `MissionFinanceSummaryDto`, `MissionService`, `MissionFinanceEntryService`, `LocationService` and
+  `UserDeletionService` use them, so a move closes a package cycle. They move with P3-8 (the
+  `mission -> refinery` association and the `MissionFinanceContributor` SPI), where
+  `RefineryOrder.mission` becomes an id. So the policy does not own the refinery's JPQL scope
+  fragment yet either. (2) No command API: no other module writes a refinery order. The
+  store still creates Lager rows itself (write family 2 of the evidence appendix); that write
+  becomes a call of the Lager's `StockCommands` with P3-5.
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
