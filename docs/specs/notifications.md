@@ -61,6 +61,58 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `EXCHANGE_BULK_UNDO_APPLIED` | `EXCHANGE_BULK_UNDO_APPLIED` | V257 | `EVENT_RECIPIENT` (the member whose entries an admin's bulk undo restored; one per member and run); rendered with the registry's `client` name and the restored `count` only | [REQ-XCH-034](external-exchange.md) |
 | `INVENTORY_TRANSFERRED_TO_USER` | `INVENTORY_TRANSFERRED_TO_USER` | V267 | `EVENT_RECIPIENT` (the member a Lager transfer booked stock onto; one per action and new owner); rendered with `actor`, `count` and `lots` | [REQ-INV-055](inventory-lager.md) |
 | `INVENTORY_TRANSFERRED_FROM_USER` | `INVENTORY_TRANSFERRED_FROM_USER` | V267 | `EVENT_RECIPIENT` (the member someone else moved stock away from; one per action, previous and new owner); rendered with `actor`, `newOwner`, `count` and `lots` | [REQ-INV-055](inventory-lager.md) |
+| `MISSION_RESCHEDULED` | `MISSION_RESCHEDULED` | V273 | `MISSION_PARTICIPANTS`; supersedes the earlier reschedule and reminder notices | REQ-MISSION-021 |
+| `MISSION_CANCELLED` | `MISSION_CANCELLED` | V273 | `MISSION_PARTICIPANTS`; supersedes every open notice of the mission | REQ-MISSION-021 |
+| `MISSION_DELETED` | `MISSION_DELETED` | V273 | `EVENT_RECIPIENTS` (the participants captured before the delete); supersedes every open notice of the mission | REQ-MISSION-021 |
+| `MISSION_REMINDER_DUE` | `MISSION_REMINDER` | V273 | `EVENT_RECIPIENT` (one event per participant, raised by the time-based producer) | REQ-MISSION-022 |
+| `MISSION_STARTED` | `MISSION_CHECKIN_OPEN` | V273 | `MISSION_PARTICIPANTS` not yet checked in; supersedes the reminders | REQ-MISSION-023 |
+| `MISSION_CHECKED_IN` | none (no rule) | — | supersedes that participant's `MISSION_CHECKIN_OPEN` only (REQ-NOTIF-025) | REQ-MISSION-023 |
+| `MISSION_PARTICIPANT_ADDED` | `MISSION_PARTICIPANT_ADDED_BY_OTHER` | V273 | `EVENT_RECIPIENT` (the added member) | REQ-MISSION-024 |
+| `MISSION_PARTICIPANT_REMOVED` | `MISSION_PARTICIPANT_REMOVED_BY_OTHER` | V273 | `EVENT_RECIPIENT` (the removed member); supersedes their add, reminder and check-in notices | REQ-MISSION-024 |
+| `MISSION_PARTICIPANT_LEFT` | `MISSION_PARTICIPANT_LEFT` | V273 | `MISSION_LEADERSHIP` | REQ-MISSION-027 |
+| `MISSION_NEVER_ENDED` | `MISSION_NEVER_ENDED` | V273 | `MISSION_LEADERSHIP` | REQ-MISSION-025 |
+| `MISSION_END_RECORDED` | none (no rule) | — | supersedes `MISSION_NEVER_ENDED` and `MISSION_CHECKIN_OPEN` | REQ-MISSION-025 |
+| `MISSION_RESPONSIBILITY_ASSIGNED` | `MISSION_RESPONSIBILITY_ASSIGNED` | V273 | `EVENT_RECIPIENT` (the new responsible member) | REQ-MISSION-026 |
+| `OPERATION_PAYOUT_MARKED` | `OPERATION_PAYOUT_PAID_OUT` | V273 | `EVENT_RECIPIENT` (the participant); the last open payout supersedes `OPERATION_COMPLETED` | REQ-MISSION-028 |
+| `OPERATION_PAYOUT_UNMARKED` | none (no rule) | — | supersedes that participant's `OPERATION_PAYOUT_PAID_OUT` | REQ-MISSION-028 |
+| `OPERATION_COMPLETED` | `OPERATION_COMPLETED` | V273 | `ORG_RELATIVE_ROLE` `MISSION_MANAGER` and `OFFICER` on `RESPONSIBLE` | REQ-MISSION-029 |
+| `OPERATION_COMPLETED_UNOWNED` | `OPERATION_COMPLETED` | V273 | `ROLE` `OFFICER` (an operation without an owning unit) | REQ-MISSION-029 |
+| `JOB_ORDER_REASSIGNED` | `JOB_ORDER_REASSIGNED` | V274 | `ORG_RELATIVE_ROLE` OFFICER / LEAD / LOGISTICIAN on `RESPONSIBLE` (the new unit); supersedes `JOB_ORDER_CREATED`, `…_UPDATED_BY_REQUESTER` and itself | REQ-ORDERS-041 |
+| `JOB_ORDER_FINISHED` | `JOB_ORDER_FINISHED` | V274 | `ORG_RELATIVE_ROLE` OFFICER / LEAD / LOGISTICIAN on `REQUESTING`; the status word is the coded parameter `statusCode` | REQ-ORDERS-042 |
+| `JOB_ORDER_ASSIGNEE_ADDED` | `JOB_ORDER_ASSIGNED` | V274 | `EVENT_RECIPIENT` (the assignee); clears a removal | REQ-ORDERS-043 |
+| `JOB_ORDER_ASSIGNEE_REMOVED` | none (no rule) | — | supersedes that member's `JOB_ORDER_ASSIGNED` (REQ-NOTIF-025) | REQ-ORDERS-043 |
+| `JOB_ORDER_CLAIM_WITHDRAWN` | `JOB_ORDER_CLAIM_WITHDRAWN` | V274 | `EVENT_RECIPIENT` (the member who made the claim); coded reason `reasonCode` | REQ-ORDERS-044 |
+| `REFINERY_ORDER_READY` | `REFINERY_ORDER_READY` | V276 | `EVENT_RECIPIENT` (the owner); raised once by the `refinery_ready` timed producer | REQ-REFINERY-023 |
+| `REFINERY_ORDER_READY_CLEARED` | none (no rule) | — | supersedes the order's `REFINERY_ORDER_READY` | REQ-REFINERY-023 |
+| `REFINERY_ORDER_CHANGED_BY_OTHER` | `REFINERY_ORDER_CHANGED_BY_OTHER` | V276 | `EVENT_RECIPIENT` (the owner, or the member the yield was booked onto); coded `changeCode` | REQ-REFINERY-024 |
+| `MATERIAL_EXCHANGE_OFFER_UNAVAILABLE` | `MATERIAL_EXCHANGE_OFFER_UNAVAILABLE` | V277 | `EVENT_RECIPIENTS` (the members who registered interest); coded `reasonCode`; supersedes `MATERIAL_EXCHANGE_INTEREST_REGISTERED` | REQ-MARKET-021 |
+| `MATERIAL_REQUEST_UNAVAILABLE` | `MATERIAL_REQUEST_UNAVAILABLE` | V277 | `EVENT_RECIPIENTS` (the members who signalled they can supply); supersedes `MATERIAL_REQUEST_FULFILLMENT_SIGNALLED` | REQ-MARKET-022 |
+| `INVENTORY_BOOKED_OUT_BY_OTHER` | `INVENTORY_BOOKED_OUT_BY_OTHER` | V277 | `EVENT_RECIPIENT` (the row's owner); coded `actionCode`, one notice per action | REQ-INV-056 |
+| `BANK_BOOKING_REQUEST_APPROVED` | `BANK_BOOKING_REQUEST_APPROVED` | V278 | `ROLE` `BANK_MANAGEMENT`, `ACCOUNT_GRANT`, `EVENT_RECIPIENT` (the requester); cleared by the revocation and by confirm / reject / cancel | REQ-BANK-057 |
+| `BANK_BOOKING_REQUEST_APPROVAL_REVOKED` | none (no rule) | — | supersedes the request's `BANK_BOOKING_REQUEST_APPROVED` | REQ-BANK-057 |
+| `BANK_GRANT_CHANGED` | `BANK_GRANT_CHANGED` | V278 | `EVENT_RECIPIENT` (the grantee); supersedes the grantee's earlier grant notices for the account | REQ-BANK-058 |
+| `BANK_GRANT_REVOKED` | `BANK_GRANT_REVOKED` | V278 | `EVENT_RECIPIENT` (the former grantee); supersedes the same | REQ-BANK-058 |
+| `BANK_PAYOUT_BOOKED` | `BANK_PAYOUT_RECEIVED` | V278 | `EVENT_RECIPIENT` (the member paid out to) | REQ-BANK-059 |
+| `BANK_HOLDER_TRANSFER_BOOKED` | `BANK_HOLDER_TRANSFER_RECEIVED` | V278 | `EVENT_RECIPIENT` (the receiving holder's member) | REQ-BANK-059 |
+| `BANK_ACCOUNT_DEBITED` | `BANK_ACCOUNT_DEBITED` | V278 | `ACCOUNT_RESPONSIBLE`; coded `debitCode` | REQ-BANK-059 |
+| `BANK_HOLDER_DEACTIVATED_WITH_BALANCE` | `BANK_HOLDER_DEACTIVATED_WITH_BALANCE` | V278 | `ROLE` `BANK_MANAGEMENT`; replaces itself | REQ-BANK-060 |
+| `BANK_HOLDER_NOTICE_CLEARED` | none (no rule) | — | supersedes the holder's deactivated-with-balance notice | REQ-BANK-060 |
+| `ORG_LEADERSHIP_ROLE_MISMATCH` | `ORG_LEADERSHIP_ROLE_MISMATCH` | V279 | `ROLE` `ADMIN`; coded `seatCode`, `rankCode`, `mismatchCode`; replaces itself | REQ-ORG-029 |
+| `ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED` | none (no rule) | — | supersedes the member's mismatch notice | REQ-ORG-029 |
+| `ORG_MEMBER_DEPARTED` | `ORG_MEMBER_DEPARTED` | V279 | `ORG_RELATIVE_ROLE` `UNIT_LEADERSHIP` on `RESPONSIBLE` (each unit of the member, the parent Bereich of a vacated seat); coded `reasonCode`, `vacancyCode` | REQ-ORG-030 |
+| `HANGAR_SHIP_ASSIGNED_TO_UNIT` | `HANGAR_SHIP_ASSIGNED` | V280 | `EVENT_RECIPIENT` (the ship's owner); supersedes the owner's earlier notice for the unit | REQ-HANGAR-005 |
+| `HANGAR_SHIP_UNASSIGNED_FROM_UNIT` | none (no rule) | — | supersedes the owner's `HANGAR_SHIP_ASSIGNED` for the unit | REQ-HANGAR-005 |
+| `HANGAR_SHIP_DELETED_FROM_MISSION` | `HANGAR_SHIP_REMOVED_FROM_UNIT` | V280 | `MISSION_LEADERSHIP`, `EVENT_RECIPIENT` (the unit's responsible member) | REQ-HANGAR-006 |
+| `HANGAR_FITTED_RESET_FOR_OWNER` | `HANGAR_FITTED_RESET` | V280 | `EVENT_RECIPIENT` (the owner); one per owner per reset | REQ-HANGAR-007 |
+| `HANGAR_CHANGED_BY_ADMIN` | `HANGAR_CHANGED_BY_ADMIN` | V280 | `EVENT_RECIPIENT` (the member); coded `changeCode` | REQ-HANGAR-008 |
+| `BLUEPRINT_CHANGED_BY_ADMIN` | `BLUEPRINT_CHANGED_BY_ADMIN` | V280 | `EVENT_RECIPIENT` (the member); coded `changeCode` | REQ-HANGAR-008 |
+| `BLUEPRINT_PURGED_BY_ADMIN` | `BLUEPRINT_PURGED_BY_ADMIN` | V280 | `EVENT_RECIPIENT` (each member who lost blueprints); one per member per purge | REQ-HANGAR-008 |
+| `EXCHANGE_CLIENT_SUSPENDED` | `EXCHANGE_CLIENT_SUSPENDED` | V281 | `EXCHANGE_CLIENT_HOLDERS` (the client); replaces a suspension and an activation | REQ-XCH-040 |
+| `EXCHANGE_CLIENT_ACTIVATED` | `EXCHANGE_CLIENT_ACTIVATED` | V281 | `EXCHANGE_CLIENT_HOLDERS` (the client); replaces a suspension and an activation | REQ-XCH-040 |
+| `EXCHANGE_CLIENT_UPDATE_REQUIRED` | `EXCHANGE_CLIENT_UPDATE_REQUIRED` | V281 | `EXCHANGE_CLIENT_HOLDERS` (the client); the new minimum version | REQ-XCH-040 |
+| `EXCHANGE_CLIENT_CAPABILITY_REMOVED` | `EXCHANGE_CLIENT_CAPABILITY_REMOVED` | V281 | `EXCHANGE_CLIENT_HOLDERS` (the client); the removed scopes | REQ-XCH-040 |
+| `EXCHANGE_SWITCHED_OFF` | `EXCHANGE_SWITCHED_OFF` | V281 | `EXCHANGE_CLIENT_HOLDERS` (any client, `contextAllExchangeClients`) | REQ-XCH-041 |
+| `EXCHANGE_SWITCHED_ON` | none (no rule) | — | supersedes `EXCHANGE_SWITCHED_OFF` | REQ-XCH-041 |
 
 Every notification type renders through `notifications.type.<TYPE>` in all three frontend bundles.
 The e-mail consumers of REQ-NOTIF-013 (`UserApprovalMailService`, `PendingRegistrationMailService`)
@@ -910,10 +962,119 @@ stays. With either set empty nothing is deleted. An event may combine this with 
 [ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md) ·
 **Issues:** #2414
 
+### REQ-NOTIF-026 — Time-based notices
+
+Some notices have no user action behind them: a reminder before a mission, a refinery order that is
+ready, a mission that was never ended. They come from **one scheduled producer**.
+
+- Every module that owns such a time implements `TimedNoticeProducer` (`kind()`, `produce(now)`).
+  `NotificationTimedTask` runs them every `app.notifications.timed.interval` (default one minute,
+  `app.notifications.timed.enabled`), through `NotificationTimedRunner`.
+- **At most once.** A producer sets the entity's „already notified" marker and publishes the event in
+  the **same** transaction, so a notice cannot fire twice and is delivered after the commit like every
+  other (REQ-NOTIF-002). Editing the underlying time resets the marker.
+- **One instance produces.** The run takes the transaction-scoped Postgres advisory lock
+  `pg_try_advisory_xact_lock`; an instance that does not get it skips the run. Each producer runs in
+  its own transaction, so one failing producer neither blocks the others nor rolls back what they
+  marked; the first failure is rethrown after all have run, so the job is recorded as failed.
+- **Observable.** The run is the `notification_timed` scheduled job (executions, duration,
+  last-success, enabled, items = notices raised) and each producer counts its notices in
+  `basetool_notification_timed_produced_total{kind}`. `NotificationTimedStale` fires when the job has
+  not succeeded for 15 minutes (REQ-OBS-011).
+
+**Acceptance**
+
+- [x] Every registered producer runs once per run and the notices it raised are counted by kind.
+- [x] An instance that cannot take the advisory lock produces nothing; once the lock is free the next
+  run produces.
+- [x] A failing producer does not stop the others, and the run is recorded as a failure.
+- [x] The task records the notices raised as the job's item count, survives a failure and publishes
+  its enabled gauge.
+
+**Enforced by:** `NotificationTimedRunnerTest`, `NotificationTimedRunnerIntegrationTest`,
+`NotificationTimedTaskTest`, `notification_timed_stale_test.yml` · **Code:**
+`notification/api/TimedNoticeProducer`, `service/NotificationTimedRunner`,
+`task/NotificationTimedTask`, `notification/internal/NotificationTimedProperties`,
+`repository/NotificationRepository#tryTimedProducerLock` · **Decision:**
+[ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md) ·
+**Issues:** #2414
+
+### REQ-NOTIF-027 — Members mute notification types
+
+A member MUST be able to choose which notification types they receive. Muting a type is the
+member's own decision; it changes nothing for anybody else and nothing about what the rules resolve.
+
+- **Stored.** A `notification_mute` row (member, notification type; unique; `ON DELETE CASCADE` on
+  the member) is the mute. Present = muted.
+- **Applied before anything is written.** `NotificationCreationService` removes a member who muted
+  the type from the recipients the rules resolved (`NotificationMuteService#withoutMuted`), in the
+  normal and in the reconcile path. A muted type is therefore **neither stored in the inbox nor
+  pushed**, so the Android app raises no OS notification for it. Notices already stored stay.
+- **Not mutable.** `NotificationType#isMutable()` is `false` for `ACCOUNT_DELETION_REQUESTED` and
+  `ACCOUNT_DELETION_REQUEST_DECLINED` (legal deadlines, REQ-SEC-061) and
+  `EXCHANGE_INSTALLATION_CONNECTED` (the phishing signal, REQ-XCH-032). Such a type is never
+  filtered, whatever rows exist, and muting it is refused. The method is an exhaustive switch, so a
+  new type fails the build until its mutability is decided.
+- **API.** `GET /api/v1/notifications/preferences` lists every type with `mutable` and `muted`;
+  `PUT /api/v1/notifications/preferences/{type}` with `{muted}` stores the choice. Both are
+  `isAuthenticated()` and keyed on the caller; the write is idempotent and carries no version (a
+  boolean toggle, last writer wins) and answers `400` for a type that cannot be muted. Both
+  operations are in the frozen contract set as `T1` (REQ-API-009, REQ-API-016) and admitted by the API
+  vhost, because the Android app calls them; from the first released app build on they can no longer
+  change incompatibly.
+- **Web.** The profile page has the card „Benachrichtigungen": one checkbox per type, grouped by the
+  area the type name's prefix names, a locked row for a non-mutable type, saved per click through
+  `krtFetch` without a reload; a failed write re-renders the card from the server (REQ-FE-001). The
+  Android app offers the same list in Einstellungen.
+- **Privacy.** The Art. 15 export has the section `notificationMutes`; the account merge moves the
+  rows and deduplicates on the type.
+- **Observable.** `basetool_notification_muted_total{notification_type}` counts the recipients
+  dropped.
+
+**Acceptance**
+
+- [x] A muted member gets no notification of the muted type, an unmuted one does, and a member who
+  muted nothing is unaffected.
+- [x] A non-mutable type is delivered even with a stray mute row, and muting it is refused.
+- [x] Muting twice changes nothing; unmuting removes the row.
+- [x] One member's mutes never show in or affect another's preferences.
+- [x] Every notification type has an area and a label in all three web bundles.
+
+**Enforced by:** `NotificationMuteServiceTest`, `NotificationPreferencesControllerTest`,
+`NotificationCreationServiceTest`, `NotificationPreferenceGroupsTest`,
+`NotificationPreferenceWriteControllerTest`, `NotificationPreferenceProxyControllerTest`,
+`ProfileControllerMvcTest`, `GdprParticipantCoverageTest`, `UserAccountMergeCoverageTest` ·
+**Code:** `model/NotificationMute`, `model/NotificationType#isMutable`,
+`service/NotificationMuteService`, `controller/NotificationController#preferences`,
+`V271__create_notification_mute.sql`, frontend `NotificationPreferenceWriteController`,
+`NotificationPreferenceProxyController`, `fragments/profile-notification-prefs.html`,
+`static/js/profile-notification-prefs.js` · **Decision:**
+[ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md) ·
+**Issues:** #2414
+
+### REQ-NOTIF-028 — Coded render parameters
+
+A notification stores no rendered text, so a word that differs by language — „verschoben" or
+„abgesagt", „Auszahlung" or „Spende" — cannot be a parameter value. A render parameter whose name
+ends in `Code` therefore gives the placeholder of the same name without the suffix its localized
+word: with `changeCode = cancelled`, `{change}` renders as `notifications.value.change.cancelled`
+in the member's language; a code without a word renders as itself. The type's own template names
+the placeholder (`{mission}: {change} durch {actor}`). A parameter named just `Code` is an ordinary
+parameter. Every client applies the rule when it fills a template: the web inbox and bell
+(`NotificationPageController#render`) and the Android app (`NotificationText`).
+
+**Acceptance**
+
+- [x] A `…Code` parameter renders as the word of the member's language and as itself without one.
+- [x] A parameter named `code` is not special.
+
+**Enforced by:** `NotificationRenderCodesTest` · **Code:**
+`NotificationPageController#render` · **Issues:** #2414
+
 ## Out of scope (v1)
 
-- Per-notification e-mail routing (generic fan-out of in-app notification types to e-mail), user
-  channel preferences/opt-in, and digest emails. A **basic transactional e-mail transport** now
+- Per-notification e-mail routing (generic fan-out of in-app notification types to e-mail), per-channel
+  preferences (a member can only mute a whole notification type, REQ-NOTIF-027), and digest emails. A **basic transactional e-mail transport** now
   exists (REQ-NOTIF-013, used so far by two hand-wired consumers — the account decision mail
   REQ-NOTIF-014 and the pending-registration admin mail REQ-NOTIF-015); wiring it into the rule
   engine per notification type is deferred.

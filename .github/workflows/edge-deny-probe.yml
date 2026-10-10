@@ -225,6 +225,8 @@ jobs:
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/finance-entries 401
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/finance-entries/summary 401
           GET /api/v1/notifications 401
+          GET /api/v1/notifications/preferences 401
+          PUT /api/v1/notifications/preferences/JOB_ORDER_CREATED 401
           DELETE /api/v1/notifications/read 401
           POST /api/v1/notifications/read-all 401
           GET /api/v1/notifications/stream 401
@@ -450,6 +452,8 @@ jobs:
           POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/finance-entries 404
           POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/finance-entries/summary 404
           POST /api/v1/notifications 404
+          POST /api/v1/notifications/preferences 404
+          GET /api/v1/notifications/preferences/JOB_ORDER_CREATED 404
           GET /api/v1/notifications/read 404
           GET /api/v1/notifications/read-all 404
           POST /api/v1/notifications/stream 404

@@ -49,6 +49,17 @@ public interface BankBookingRequestEvent extends NotificationEvent {
           NotificationType.BANK_BOOKING_REQUEST_UPDATED);
 
   /**
+   * The notification types a decision on a request clears: its open notices and its
+   * ready-to-confirm notice (REQ-BANK-057).
+   */
+  @Unmodifiable
+  Set<NotificationType> DECIDED_REQUEST_NOTICES =
+      Set.of(
+          NotificationType.BANK_BOOKING_REQUEST_CREATED,
+          NotificationType.BANK_BOOKING_REQUEST_UPDATED,
+          NotificationType.BANK_BOOKING_REQUEST_APPROVED);
+
+  /**
    * The loose entity-type tag shared by all bank-booking-request events.
    *
    * @return {@link #ENTITY_TYPE}

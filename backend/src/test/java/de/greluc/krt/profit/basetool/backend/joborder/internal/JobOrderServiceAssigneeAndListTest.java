@@ -56,6 +56,7 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
+import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.HashSet;
 import java.util.List;
@@ -112,7 +113,12 @@ class JobOrderServiceAssigneeAndListTest {
   void stubMapperEchoingEmptyMaterials() {
     jobOrderAssigneeService =
         new JobOrderAssigneeService(
-            jobOrderRepository, userRepository, auditService, jobOrderStockProjectionService);
+            jobOrderRepository,
+            userRepository,
+            auditService,
+            jobOrderStockProjectionService,
+            org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class),
+            actingUserService());
     service =
         new JobOrderService(
             jobOrderRepository,
@@ -131,7 +137,8 @@ class JobOrderServiceAssigneeAndListTest {
             jobOrderStockProjectionService,
             null,
             null,
-            ownerScopeService);
+            ownerScopeService,
+            actingUserService());
     queryService =
         new JobOrderQueryService(
             jobOrderRepository,
@@ -924,5 +931,14 @@ class JobOrderServiceAssigneeAndListTest {
     edge.setVersion(0L);
     order.addAssignee(edge);
     return edge;
+  }
+
+  private static UserService actingUserService() {
+    UserService userService = org.mockito.Mockito.mock(UserService.class);
+    org.mockito.Mockito.lenient()
+        .when(userService.currentActor())
+        .thenReturn(
+            de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef.system());
+    return userService;
   }
 }

@@ -53,6 +53,7 @@ import de.greluc.krt.profit.basetool.backend.service.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.QualityTierService;
+import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -123,7 +124,8 @@ class JobOrderServicePriorityAndStatusTest {
             jobOrderStockProjectionService,
             jobOrderPriorityService,
             qualityTierService,
-            ownerScopeService);
+            ownerScopeService,
+            actingUserService());
     lenient()
         .when(jobOrderMapper.toDto(any(JobOrder.class)))
         .thenAnswer(
@@ -217,6 +219,73 @@ class JobOrderServicePriorityAndStatusTest {
       assertEquals(JobOrderStatus.REJECTED, o.getStatus());
       verify(inventoryItemRepository).deleteJobOrderAllocationsByJobOrder(ORDER_ID);
       verify(eventPublisher).publishEvent(new JobOrderClosedEvent(ORDER_ID, null));
+    }
+
+    private de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent
+        finishedNotice() {
+      org.mockito.ArgumentCaptor<Object> captor = org.mockito.ArgumentCaptor.forClass(Object.class);
+      verify(eventPublisher, org.mockito.Mockito.atLeastOnce()).publishEvent(captor.capture());
+      return captor.getAllValues().stream()
+          .filter(
+              de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent.class
+                  ::isInstance)
+          .map(
+              de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent.class
+                  ::cast)
+          .filter(
+              e ->
+                  e.eventType()
+                      == de.greluc.krt.profit.basetool.backend.model.NotificationEventType
+                          .JOB_ORDER_FINISHED)
+          .findFirst()
+          .orElseThrow();
+    }
+
+    @Test
+    void completingAnOrderTellsTheRequestingUnitWithTheStatusCode() {
+      JobOrder o = newOrder(JobOrderStatus.OPEN, 3, 1L);
+      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(o));
+      when(jobOrderRepository.save(o)).thenReturn(o);
+      when(jobOrderRepository.lockAllJobOrders()).thenReturn(List.of());
+
+      service.updateJobOrderStatus(
+          ORDER_ID, new UpdateJobOrderStatusDto(JobOrderStatus.COMPLETED, 1L));
+
+      var notice = finishedNotice();
+      assertEquals("COMPLETED", notice.renderParams().get("statusCode"));
+      assertEquals("JOB_ORDER", notice.entityType());
+    }
+
+    @Test
+    void rejectingAnOrderTellsTheRequestingUnitWithTheStatusCode() {
+      JobOrder o = newOrder(JobOrderStatus.IN_PROGRESS, 2, 1L);
+      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(o));
+      when(jobOrderRepository.save(o)).thenReturn(o);
+      when(jobOrderRepository.lockAllJobOrders()).thenReturn(List.of());
+
+      service.updateJobOrderStatus(
+          ORDER_ID, new UpdateJobOrderStatusDto(JobOrderStatus.REJECTED, 1L));
+
+      assertEquals("REJECTED", finishedNotice().renderParams().get("statusCode"));
+    }
+
+    @Test
+    void anOpenToInProgressChangeTellsNobody() {
+      JobOrder o = newOrder(JobOrderStatus.OPEN, 3, 1L);
+      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(o));
+      when(jobOrderRepository.save(o)).thenReturn(o);
+
+      service.updateJobOrderStatus(
+          ORDER_ID, new UpdateJobOrderStatusDto(JobOrderStatus.IN_PROGRESS, 1L));
+
+      verify(eventPublisher, never())
+          .publishEvent(
+              org.mockito.ArgumentMatchers.<Object>argThat(
+                  e ->
+                      e
+                          instanceof
+                          de.greluc.krt.profit.basetool.backend.notification.api.events
+                              .NoticeEvent));
     }
 
     @Test
@@ -659,5 +728,14 @@ class JobOrderServicePriorityAndStatusTest {
 
   private CreateJobOrderDto newUpdateDto(Long version) {
     return new CreateJobOrderDto(null, null, "OP-X", null, List.of(), version);
+  }
+
+  private static UserService actingUserService() {
+    UserService userService = org.mockito.Mockito.mock(UserService.class);
+    org.mockito.Mockito.lenient()
+        .when(userService.currentActor())
+        .thenReturn(
+            de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef.system());
+    return userService;
   }
 }

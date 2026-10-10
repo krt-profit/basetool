@@ -4,6 +4,43 @@
 
 ### Added
 
+- **Benachrichtigungen zu verbundenen Anwendungen.** Wer eine Anwendung verbunden hat, erfährt, wenn sie gesperrt oder wieder aktiv ist, eine neuere Version braucht, eine Fähigkeit verliert oder wenn der Austausch ganz abgeschaltet wird (REQ-XCH-040, -041, Migration V281, #2414).
+
+- **Benachrichtigungen zu Hangar und Blueprints.** Wessen Schiff einem Einsatz zugeteilt wird, erfährt es; fällt ein gelöschtes Schiff aus einem geplanten Einsatz, hören die Einsatzleitung und der Verantwortliche der Einheit davon. Wer Ausgerüstet-Markierungen zurückgesetzt bekommt oder wessen Hangar oder Blueprints ein Admin ändert oder leert, wird benachrichtigt (REQ-HANGAR-005…008, Migration V280, #2414).
+
+- **Benachrichtigungen zur Organisation.** Admins erfahren, wenn nach einer Leitungsänderung die OFFICER-Rolle eines Mitglieds nicht zu seinen Posten passt; die Leitung einer Einheit erfährt, wenn ein Mitglied ausgeschieden ist, und die des übergeordneten Bereichs, wenn dadurch ein Leitungsposten frei wird (REQ-ORG-029, -030, Migration V279, #2414).
+
+- **Benachrichtigungen zur Bank.** Wer einen freigegebenen Antrag bestätigen kann, erfährt, dass er bereit ist; Bankmitarbeiter hören, wenn ihre Berechtigung auf ein Konto erteilt, geändert oder entzogen wird. Auszahlungen, Halterübertragungen und Direktbuchungen von Bankpersonal melden sich bei den Betroffenen (Konto-Verantwortliche), und die Bankleitung erfährt, wenn ein deaktivierter Halter noch Geld hält (REQ-BANK-057…060, Migration V278, #2414).
+
+- **Benachrichtigungen zu Materialbörse und Lager.** Wer an einem Angebot Interesse angemeldet oder zugesagt hat, ein Gesuch zu beliefern, erfährt, wenn das Angebot nicht mehr verfügbar oder das Gesuch zurückgezogen ist; wessen Bestand jemand anderes ausbucht oder verkauft, wird benachrichtigt (REQ-MARKET-021, -022, REQ-INV-056, Migration V277, #2414).
+
+- **Benachrichtigungen zur Raffinerie.** Der Besitzer erfährt, wenn ein Raffinerieauftrag fertig ist und abgeholt werden kann, und wenn jemand anderes den Auftrag ändert, storniert oder einlagert, auch auf wessen Lager die Ausbeute gebucht wurde (REQ-REFINERY-023, -024, Migrationen V275/V276, #2414).
+- **Keycloak-Härtung als Skript.** `scripts/harden-keycloak-realm.py` setzt die Runbook-Schritte 2 (Passwort
+  vergessen), 11 (OTP für Admins, auch über Discord) und 12 (Sitzungsfenster) trocken vorab prüfbar und mit
+  Rücknahme um; die Sitzungsfenster stehen jetzt in `scripts/keycloak/session-windows.json`, die der Provisioner
+  mitliest und neben `external-clients.json` auf den Host gehört. Alle offenen Schritte nur für den Betreiber:
+  `docs/OWNER_STEPS_2026-10.md` (REQ-SEC-082).
+
+- **Benachrichtigungen zu Aufträgen.** Wer einen Auftrag übernimmt, an den er übergeben wurde, erfährt es (Offiziere, Leads und Logistiker der neuen Einheit); die anfragende Einheit hört, wenn ihr Auftrag abgeschlossen, abgelehnt oder gelöscht wurde. Wer einem Auftrag zugewiesen wird, und wessen Materialzusage durch eine Änderung oder Rückstufung entfällt, wird benachrichtigt (REQ-ORDERS-041…044, Migration V274, #2414).
+
+- **Benachrichtigungen zu Einsätzen und Operationen.** Teilnehmer erfahren, wenn ein Einsatz verschoben,
+  abgesagt oder gelöscht wird, werden 24 Stunden und eine Stunde vorher erinnert und bekommen den offenen Check-in
+  gemeldet; wer von jemand anderem hinzugefügt oder entfernt wird, erfährt es ebenso wie neue Verantwortliche und die
+  Auszahlung einer Operation. Die Einsatzleitung hört, wenn ein Teilnehmer abspringt oder ein Einsatz nie beendet
+  wurde, Einsatzmanager und Offiziere, wenn eine Operation abgeschlossen und die Auszahlung fällig ist. Neue
+  Variable `APP_MISSIONS_NOTICES_OVERDUE_AFTER` (REQ-MISSION-021…029, Migrationen V272/V273, #2414).
+
+- **Benachrichtigungen abbestellen.** Unter Profil → Benachrichtigungen schaltest du jede Art von
+  Benachrichtigung einzeln ab; eine abbestellte Art landet weder im Posteingang noch in der App.
+  Die Löschantrags-Hinweise und die Warnung vor einer neuen Anwendungsverbindung bleiben immer
+  aktiv. Auch Teil des Datenexports (REQ-NOTIF-027, Migration V271, #2414).
+
+- **Zeitgesteuerte Benachrichtigungen (Grundlage).** Ein Dienst im Minutentakt kann künftig
+  Hinweise auslösen, hinter denen keine Nutzeraktion steht (Erinnerungen, abholbereite
+  Raffinerieaufträge); er läuft nur auf einer Instanz und meldet sich im Monitoring (Alarm
+  `NotificationTimedStale`). Neue Variablen `APP_NOTIFICATIONS_TIMED_ENABLED` und
+  `APP_NOTIFICATIONS_TIMED_INTERVAL` (REQ-NOTIF-026, #2414).
+
 - **Benachrichtigungsregeln erreichen Gruppen.** Der Regel-Editor bietet vier neue Empfängerarten
   (Einsatz-Teilnehmer, Einsatzleitung, Inhaber einer verbundenen Anwendung, Ereignis-Adressaten) und
   die Rolle „Einheitsleitung"; eine Nachricht lässt sich außerdem nur für einzelne Empfänger

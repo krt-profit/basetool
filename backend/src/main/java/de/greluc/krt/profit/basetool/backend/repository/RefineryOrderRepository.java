@@ -321,4 +321,35 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   @Modifying
   @Query("UPDATE RefineryOrder r SET r.owner = :newUser WHERE r.owner = :oldUser")
   int updateOwner(@NotNull User oldUser, @NotNull User newUser);
+
+  /**
+   * Returns the ids of the open orders whose run has ended and that have not been announced yet
+   * (REQ-REFINERY-023).
+   *
+   * @param now the instant the run ends are compared with
+   * @return the ids; never {@code null}
+   */
+  @Query(
+      """
+      SELECT o.id FROM RefineryOrder o
+      WHERE o.status IN (de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus.OPEN,
+                         de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus.IN_PROGRESS)
+        AND o.storedAt IS NULL AND o.readyNotifiedAt IS NULL
+        AND o.endsAt IS NOT NULL AND o.endsAt <= :now
+      """)
+  List<UUID> findReadyUnannouncedIds(@Param("now") Instant now);
+
+  /**
+   * Marks an order as announced, atomically, without touching its version: the one caller whose
+   * update changes a row is the one that announces it.
+   *
+   * @param id the order
+   * @param now the announcement time
+   * @return {@code 1} when this call marked the order, {@code 0} when it was marked already
+   */
+  @Modifying
+  @Query(
+      "UPDATE RefineryOrder o SET o.readyNotifiedAt = :now"
+          + " WHERE o.id = :id AND o.readyNotifiedAt IS NULL")
+  int markReadyNotified(@Param("id") UUID id, @Param("now") Instant now);
 }

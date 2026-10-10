@@ -100,6 +100,9 @@ public class MissionParticipantService {
   /** Resolves a free-text participant name to a registered member or an external name. */
   private final ParticipantTargetResolver participantTargetResolver;
 
+  /** Publishes the mission notifications (REQ-MISSION-021…029). */
+  private final MissionNotificationPublisher notificationPublisher;
+
   /**
    * Adds a participant with a user reference or guest name, an optional desired job type and
    * comment; delegates to the full overload without org units or payout choice.
@@ -200,6 +203,7 @@ public class MissionParticipantService {
 
     mission.getParticipants().add(participant);
     missionParticipantRepository.save(participant);
+    notificationPublisher.participantAdded(mission, participant);
     auditRecorder.record(
         AuditEventType.MISSION_PARTICIPANT_ADDED,
         mission.getId(),
@@ -252,6 +256,10 @@ public class MissionParticipantService {
   public Mission removeParticipant(@NotNull UUID missionId, @NotNull UUID participantId) {
     Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
 
+    mission.getParticipants().stream()
+        .filter(p -> p.getId().equals(participantId))
+        .findFirst()
+        .ifPresent(leaving -> notificationPublisher.participantRemoved(mission, leaving));
     boolean removed = mission.getParticipants().removeIf(p -> p.getId().equals(participantId));
 
     if (!removed) {
@@ -436,6 +444,7 @@ public class MissionParticipantService {
     }
     participant.setStartTime(Instant.now());
     missionParticipantRepository.saveAndFlush(participant);
+    notificationPublisher.checkedIn(mission, participant);
     auditRecorder.record(
         AuditEventType.MISSION_PARTICIPANT_CHECKED_IN,
         mission.getId(),
@@ -525,8 +534,13 @@ public class MissionParticipantService {
 
     if (userId != null) {
       User user = Entities.require(userRepository.findPlainById(userId), "User not found");
+      boolean newLead =
+          mission.getPartyLeadUser() == null || !userId.equals(mission.getPartyLeadUser().getId());
       mission.setPartyLeadUser(user);
       mission.setPartyLeadGuestName(null);
+      if (newLead) {
+        notificationPublisher.responsibilityAssigned(mission, userId, "PARTY_LEAD");
+      }
     } else if (guestName != null && !guestName.isBlank()) {
       mission.setPartyLeadUser(null);
       mission.setPartyLeadGuestName(guestName.trim());
@@ -557,7 +571,9 @@ public class MissionParticipantService {
   public Mission addManager(@NotNull UUID missionId, @NotNull UUID userId) {
     Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     User user = Entities.require(userRepository.findPlainById(userId), "User not found");
-    mission.getManagers().add(user);
+    if (mission.getManagers().add(user)) {
+      notificationPublisher.responsibilityAssigned(mission, userId, "MANAGER");
+    }
     auditRecorder.record(
         AuditEventType.MISSION_MANAGER_ADDED, mission.getId(), mission.getName(), userId, null);
     return mission;

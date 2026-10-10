@@ -118,6 +118,18 @@ public final class MetricNames {
       "basetool.notification.retention.deleted";
 
   /**
+   * Counter {@code basetool_notification_muted_total} — tag {@code notification_type}, the
+   * recipients dropped because they muted the type (REQ-NOTIF-027).
+   */
+  public static final String NOTIFICATION_MUTED = "basetool.notification.muted";
+
+  /**
+   * Counter {@code basetool_notification_timed_produced_total} — tag {@code kind}, the producer
+   * that raised the notices (REQ-NOTIF-026). Bounded by the number of producers.
+   */
+  public static final String NOTIFICATION_TIMED_PRODUCED = "basetool.notification.timed.produced";
+
+  /**
    * Counter {@code basetool_user_callsign_collisions_total} (untagged). Bumped when a login
    * presents a subject that matches no {@code app_user} row while another row holds the same {@code
    * preferred_username} (ADR-0142).
@@ -438,6 +450,12 @@ public final class MetricNames {
    * in every use.
    */
   public static final String TAG_KIND = "kind";
+
+  /**
+   * Tag key: the {@code NotificationType} name on {@link #NOTIFICATION_MUTED}. Bounded by the
+   * notification types.
+   */
+  public static final String TAG_NOTIFICATION_TYPE = "notification_type";
 
   /**
    * Tag key: the sync step ({@code commodity} / {@code vehicle} / {@code item} / {@code blueprint}
