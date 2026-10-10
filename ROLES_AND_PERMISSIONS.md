@@ -523,7 +523,7 @@ Notes are visible to everyone who sees the job order.
 ¹ Only as owner of the respective order.
 ² The per-item `userId` names the receiving stock owner, so it is gated separately from the
 order-ownership check: naming anybody but yourself requires
-`@ownerScopeService.canManageUserInventory(<receiver>)` — admin, self, or a **shared editable org
+`canManageUserInventory(<receiver>)` of the inventory access policy — admin, self, or a **shared editable org
 unit** with that receiver — and any other value is refused with `403` (REQ-SEC-039). The Einbuchen
 path (`POST /api/v1/inventory`) and the `owner` override of `POST /api/v1/refinery-orders` carry the
 same gate. **Amended 2026-08-30:** all three previously accepted the flat `ROLE_LOGISTICIAN`, which
