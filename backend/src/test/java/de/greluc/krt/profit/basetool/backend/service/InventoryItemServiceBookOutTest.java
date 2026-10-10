@@ -38,6 +38,9 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredFromUserEvent;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredToUserEvent;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.TransferredLot;
@@ -61,7 +64,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
@@ -100,8 +102,8 @@ class InventoryItemServiceBookOutTest {
   @Mock private MissionRepository missionRepository;
   @Mock private MissionFinanceEntryRepository missionFinanceEntryRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
-  @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
-  @Mock private MaterialExchangeOfferRatchet offerRatchet;
+  @Mock private StockOfferLookup stockOfferLookup;
+  @Mock private StockChangeObserver offerRatchet;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private MaterialMapper materialMapper;
   @Mock private OwnerScopeService ownerScopeService;
@@ -288,7 +290,7 @@ class InventoryItemServiceBookOutTest {
 
       verify(inventoryItemRepository, org.mockito.Mockito.times(1))
           .saveAndFlush(any(InventoryItem.class));
-      verify(offerRatchet).lower(ITEM_ID, 9.0, MaterialExchangeOfferRatchet.Reason.CHECKOUT);
+      verify(offerRatchet).lower(ITEM_ID, 9.0, StockChangeReason.CHECKOUT);
     }
   }
 
@@ -462,7 +464,7 @@ class InventoryItemServiceBookOutTest {
       assertSame(item, source, "the flushed row is the original source");
       assertSame(targetUser, newItem.getUser());
       verify(inventoryItemRepository, never()).delete(any());
-      verify(offerRatchet).lower(ITEM_ID, 7.0, MaterialExchangeOfferRatchet.Reason.TRANSFER);
+      verify(offerRatchet).lower(ITEM_ID, 7.0, StockChangeReason.TRANSFER);
     }
 
     @Test
@@ -483,8 +485,7 @@ class InventoryItemServiceBookOutTest {
           OWNER_ID,
           false);
 
-      verify(offerRatchet)
-          .beforeDelete(List.of(ITEM_ID), MaterialExchangeOfferRatchet.Reason.TRANSFER);
+      verify(offerRatchet).beforeDelete(List.of(ITEM_ID), StockChangeReason.TRANSFER);
       verify(inventoryItemRepository).delete(item);
       verify(inventoryItemRepository, org.mockito.Mockito.times(1)).save(any(InventoryItem.class));
     }
@@ -909,8 +910,7 @@ class InventoryItemServiceBookOutTest {
               false);
 
       assertNull(result, "full discard returns null");
-      verify(offerRatchet)
-          .beforeDelete(List.of(ITEM_ID), MaterialExchangeOfferRatchet.Reason.CHECKOUT);
+      verify(offerRatchet).beforeDelete(List.of(ITEM_ID), StockChangeReason.CHECKOUT);
       verify(inventoryItemRepository).delete(item);
       verify(inventoryItemRepository, never()).save(any());
     }

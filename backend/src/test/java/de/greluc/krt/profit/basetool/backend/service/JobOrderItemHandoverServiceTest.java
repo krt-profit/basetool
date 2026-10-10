@@ -34,6 +34,8 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderItemHandoverMapper;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -76,7 +78,7 @@ class JobOrderItemHandoverServiceTest {
   @Mock private JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   @Mock private JobOrderItemHandoverMapper jobOrderItemHandoverMapper;
   @Mock private InventoryItemRepository inventoryItemRepository;
-  @Mock private MaterialExchangeOfferRatchet offerRatchet;
+  @Mock private StockChangeObserver offerRatchet;
   @Mock private JobOrderService jobOrderService;
   @Mock private UserService userService;
   @Mock private OrgUnitMembershipService orgUnitMembershipService;
@@ -401,7 +403,7 @@ class JobOrderItemHandoverServiceTest {
 
     service.createItemHandover(orderId, payload(lineId, 3));
 
-    verify(offerRatchet).lower(rowId, 2.0, MaterialExchangeOfferRatchet.Reason.HANDOVER);
+    verify(offerRatchet).lower(rowId, 2.0, StockChangeReason.HANDOVER);
   }
 
   @Test
@@ -415,8 +417,7 @@ class JobOrderItemHandoverServiceTest {
     service.createItemHandover(orderId, payload(lineId, 5));
 
     verify(inventoryItemRepository).delete(row);
-    verify(offerRatchet)
-        .beforeDelete(List.of(row.getId()), MaterialExchangeOfferRatchet.Reason.HANDOVER);
+    verify(offerRatchet).beforeDelete(List.of(row.getId()), StockChangeReason.HANDOVER);
     verify(offerRatchet, never()).lower(any(UUID.class), anyDouble(), any());
   }
 
