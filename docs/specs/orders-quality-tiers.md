@@ -171,8 +171,12 @@ written.
 `JobOrderItemProductionService#bookProduction`, `static/js/orders-detail.js` (`_prodPrefill`,
 `_prodLoadHigherAttribution`)
 
-## Out of scope
+## The superseded columns
 
-- **Dropping the superseded columns.** `job_order_material.min_quality` and the two
-  `quality_requirement` columns are no longer written and are dropped one release later (two-phase
-  drop, `db/migration/README.md`).
+`job_order_material.min_quality`, `job_order_item_material.quality_requirement` and
+`material_claim.quality_requirement` held the requirement before the catalogue. V262–V264 stopped
+writing them and V282 drops them with the floor's range check, one release later (two-phase drop,
+`db/migration/README.md`). The tier a row names is `quality_tier_id` alone; the wire fields
+`qualityRequirement`, `quality` and `minQuality` are derived from the tier and keep their names.
+
+**Enforced by:** `V282MigrationTest`, `V261QualityTierMigrationTest`
