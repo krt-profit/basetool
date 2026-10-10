@@ -380,7 +380,7 @@ class InventoryItemServicePersonalRebookTest {
       InventoryItem item = newItem(10.0, 1L, false);
       Mission mission = new Mission();
       mission.setId(UUID.randomUUID());
-      InventoryAllocations.addMission(item, mission, item.getAmount());
+      InventoryAllocations.addMission(item, mission.getId(), item.getAmount());
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
       BadRequestException ex =

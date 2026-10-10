@@ -160,7 +160,7 @@ class JobOrderHandoverServiceTest {
     de.greluc.krt.profit.basetool.backend.model.Mission mission =
         new de.greluc.krt.profit.basetool.backend.model.Mission();
     mission.setId(UUID.randomUUID());
-    InventoryAllocations.addMission(inventoryItem, mission, 10.0);
+    InventoryAllocations.addMission(inventoryItem, mission.getId(), 10.0);
 
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null, null);
@@ -190,8 +190,8 @@ class JobOrderHandoverServiceTest {
     de.greluc.krt.profit.basetool.backend.model.Mission missionB =
         new de.greluc.krt.profit.basetool.backend.model.Mission();
     missionB.setId(UUID.randomUUID());
-    InventoryAllocations.addMission(inventoryItem, missionA, 6.0);
-    InventoryAllocations.addMission(inventoryItem, missionB, 4.0);
+    InventoryAllocations.addMission(inventoryItem, missionA.getId(), 6.0);
+    InventoryAllocations.addMission(inventoryItem, missionB.getId(), 4.0);
 
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(
@@ -211,13 +211,13 @@ class JobOrderHandoverServiceTest {
     assertEquals(6.0, inventoryItem.getAmount());
     double missionAAmount =
         inventoryItem.getMissionAllocations().stream()
-            .filter(a -> a.getMission().getId().equals(missionA.getId()))
+            .filter(a -> a.getMissionId().equals(missionA.getId()))
             .findFirst()
             .orElseThrow()
             .getAmount();
     double missionBAmount =
         inventoryItem.getMissionAllocations().stream()
-            .filter(a -> a.getMission().getId().equals(missionB.getId()))
+            .filter(a -> a.getMissionId().equals(missionB.getId()))
             .findFirst()
             .orElseThrow()
             .getAmount();

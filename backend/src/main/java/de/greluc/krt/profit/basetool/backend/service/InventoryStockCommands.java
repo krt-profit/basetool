@@ -386,7 +386,7 @@ public class InventoryStockCommands implements StockCommands {
       InventoryAllocations.addJobOrder(item, entityManager, jobOrderId, item.getAmount(), false);
     }
     if (!personal && missionId != null) {
-      InventoryAllocations.addMission(item, entityManager, missionId, item.getAmount());
+      InventoryAllocations.addMission(item, missionId, item.getAmount());
     }
 
     inventoryRepository.save(item);

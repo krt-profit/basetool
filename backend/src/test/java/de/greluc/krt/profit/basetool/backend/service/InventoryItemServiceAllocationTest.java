@@ -32,6 +32,8 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
+import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
@@ -50,7 +52,6 @@ import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.ArrayList;
 import java.util.List;
@@ -81,7 +82,7 @@ class InventoryItemServiceAllocationTest {
   @Mock private MaterialRepository materialRepository;
   @Mock private LocationRepository locationRepository;
   @Mock private JobOrderRepository jobOrderRepository;
-  @Mock private MissionRepository missionRepository;
+  @Mock private EarmarkTargets.Lookup earmarkTargets;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private JobOrderItemService jobOrderItemService;
@@ -184,7 +185,8 @@ class InventoryItemServiceAllocationTest {
     UUID missionId = UUID.randomUUID();
     Mission m = mission(missionId, "Op Nightfall");
     when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(m));
+    when(earmarkTargets.mission(missionId))
+        .thenReturn(new MissionEarmark(missionId, m.getName(), m.getPlannedStartTime()));
     when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
     when(inventoryItemMapper.toDto(item)).thenReturn(sentinelDto());
 
@@ -312,11 +314,12 @@ class InventoryItemServiceAllocationTest {
     Mission m = mission(missionId, "Op Nightfall");
     InventoryMissionAllocation slice = new InventoryMissionAllocation();
     slice.setInventoryItem(item);
-    slice.setMission(m);
+    slice.setMissionId(m.getId());
     slice.setAmount(3.0);
     item.getMissionAllocations().add(slice);
     when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(m));
+    when(earmarkTargets.mission(missionId))
+        .thenReturn(new MissionEarmark(missionId, m.getName(), m.getPlannedStartTime()));
 
     BadRequestException ex =
         assertThrows(
@@ -471,7 +474,7 @@ class InventoryItemServiceAllocationTest {
 
   /** Asserts the mission repository was never consulted (the item-row guard fires first). */
   private void verifyNoMissionLookups() {
-    verify(missionRepository, never()).findById(any());
+    verify(earmarkTargets, never()).mission(any());
   }
 
   @Test
@@ -584,7 +587,9 @@ class InventoryItemServiceAllocationTest {
     UUID missionId = UUID.randomUUID();
     InventoryMissionAllocation slice = new InventoryMissionAllocation();
     slice.setInventoryItem(item);
-    slice.setMission(mission(missionId, "Op Dawn"));
+    slice.setMissionId(missionId);
+    when(earmarkTargets.mission(missionId))
+        .thenReturn(new MissionEarmark(missionId, "Op Dawn", null));
     slice.setAmount(5.0);
     item.getMissionAllocations().add(slice);
     when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));

@@ -1,0 +1,111 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.service;
+
+import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
+import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
+import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
+import jakarta.persistence.EntityManager;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.hibernate.engine.spi.SessionImplementor;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+/**
+ * The Lager's per-transaction memo of its earmark targets (plan §7.5 P3-5d): the first miss loads
+ * every mission the Lager rows of the persistence context are earmarked to in one read, so a page
+ * of rows costs one lookup, not one per row (REQ-DATA-003).
+ */
+@Component
+@RequiredArgsConstructor
+public class InventoryEarmarkTargetCache implements EarmarkTargets.Lookup {
+
+  private final EarmarkTargets.Missions missions;
+  private final EntityManager entityManager;
+
+  @Override
+  public @Nullable MissionEarmark mission(@NotNull UUID missionId) {
+    Map<UUID, Optional<MissionEarmark>> memo = memo();
+    if (!memo.containsKey(missionId)) {
+      Set<UUID> wanted = new LinkedHashSet<>(earmarkedMissionsInContext());
+      wanted.add(missionId);
+      wanted.removeAll(memo.keySet());
+      Map<UUID, MissionEarmark> found = missions.missions(wanted);
+      for (UUID id : wanted) {
+        memo.put(id, Optional.ofNullable(found.get(id)));
+      }
+    }
+    return memo.get(missionId).orElse(null);
+  }
+
+  private Set<UUID> earmarkedMissionsInContext() {
+    Set<UUID> ids = new LinkedHashSet<>();
+    if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+      return ids;
+    }
+    for (Map.Entry<Object, ?> entry :
+        entityManager
+            .unwrap(SessionImplementor.class)
+            .getPersistenceContextInternal()
+            .reentrantSafeEntityEntries()) {
+      if (entry.getKey() instanceof InventoryMissionAllocation allocation
+          && allocation.getMissionId() != null) {
+        ids.add(allocation.getMissionId());
+      }
+    }
+    return ids;
+  }
+
+  private Map<UUID, Optional<MissionEarmark>> memo() {
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      return new HashMap<>();
+    }
+    if (TransactionSynchronizationManager.getResource(this) instanceof Memo bound) {
+      return bound.missions;
+    }
+    Memo memo = new Memo();
+    TransactionSynchronizationManager.bindResource(this, memo);
+    TransactionSynchronizationManager.registerSynchronization(
+        new TransactionSynchronization() {
+          @Override
+          public void afterCompletion(int status) {
+            TransactionSynchronizationManager.unbindResourceIfPossible(
+                InventoryEarmarkTargetCache.this);
+          }
+        });
+    return memo.missions;
+  }
+
+  /** One transaction's memo. */
+  private static final class Memo {
+
+    /** The looked-up missions by id, empty for an unknown one. */
+    private final Map<UUID, Optional<MissionEarmark>> missions = new HashMap<>();
+  }
+}

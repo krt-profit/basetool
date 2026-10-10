@@ -630,7 +630,7 @@ class InventoryItemServiceBookOutTest {
       participant.setMission(mission);
 
       InventoryItem item = newItem(10.0, 1L);
-      InventoryAllocations.addMission(item, mission, 4.0);
+      InventoryAllocations.addMission(item, mission.getId(), 4.0);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(missionParticipantRepository.findByMissionIdAndUserId(mission.getId(), OWNER_ID))
@@ -673,8 +673,8 @@ class InventoryItemServiceBookOutTest {
       participantB.setMission(missionB);
 
       InventoryItem item = newItem(10.0, 1L);
-      InventoryAllocations.addMission(item, missionA, 1.0);
-      InventoryAllocations.addMission(item, missionB, 1.0);
+      InventoryAllocations.addMission(item, missionA.getId(), 1.0);
+      InventoryAllocations.addMission(item, missionB.getId(), 1.0);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(missionParticipantRepository.findByMissionIdAndUserId(missionA.getId(), OWNER_ID))
@@ -713,7 +713,7 @@ class InventoryItemServiceBookOutTest {
       participant.setMission(mission);
 
       InventoryItem item = newItem(5.0, 1L);
-      InventoryAllocations.addMission(item, mission, 5.0);
+      InventoryAllocations.addMission(item, mission.getId(), 5.0);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(missionParticipantRepository.findByMissionIdAndUserId(mission.getId(), OWNER_ID))
@@ -753,7 +753,7 @@ class InventoryItemServiceBookOutTest {
       Mission mission = new Mission();
       mission.setId(UUID.randomUUID());
       InventoryItem item = newItem(10.0, 1L);
-      InventoryAllocations.addMission(item, mission, 1.0);
+      InventoryAllocations.addMission(item, mission.getId(), 1.0);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(missionParticipantRepository.findByMissionIdAndUserId(mission.getId(), OWNER_ID))
@@ -777,7 +777,7 @@ class InventoryItemServiceBookOutTest {
       Mission earmarked = new Mission();
       earmarked.setId(UUID.randomUUID());
       InventoryItem item = newItem(10.0, 1L);
-      InventoryAllocations.addMission(item, earmarked, 1.0);
+      InventoryAllocations.addMission(item, earmarked.getId(), 1.0);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
@@ -804,8 +804,8 @@ class InventoryItemServiceBookOutTest {
       Mission missionB = new Mission();
       missionB.setId(UUID.randomUUID());
       InventoryItem item = newItem(10.0, 1L);
-      InventoryAllocations.addMission(item, missionA, 1.0);
-      InventoryAllocations.addMission(item, missionB, 1.0);
+      InventoryAllocations.addMission(item, missionA.getId(), 1.0);
+      InventoryAllocations.addMission(item, missionB.getId(), 1.0);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
@@ -832,7 +832,7 @@ class InventoryItemServiceBookOutTest {
       Mission mission = new Mission();
       mission.setId(UUID.randomUUID());
       InventoryItem item = newItem(10.0, 1L);
-      InventoryAllocations.addMission(item, mission, 2.0);
+      InventoryAllocations.addMission(item, mission.getId(), 2.0);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
@@ -859,7 +859,7 @@ class InventoryItemServiceBookOutTest {
       Mission mission = new Mission();
       mission.setId(UUID.randomUUID());
       InventoryItem item = newItem(10.0, 1L);
-      InventoryAllocations.addMission(item, mission, 1.0);
+      InventoryAllocations.addMission(item, mission.getId(), 1.0);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
@@ -987,7 +987,7 @@ class InventoryItemServiceBookOutTest {
       participant.setMission(mission);
 
       InventoryItem item = newItem(10.0, 1L);
-      InventoryAllocations.addMission(item, mission, 1.0);
+      InventoryAllocations.addMission(item, mission.getId(), 1.0);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(missionParticipantRepository.findByMissionIdAndUserId(mission.getId(), OWNER_ID))
           .thenReturn(Optional.of(participant));
@@ -1281,7 +1281,7 @@ class InventoryItemServiceBookOutTest {
 
       InventoryItem item = newItem(10.0, 1L);
       InventoryAllocations.addJobOrder(item, order, 6.0, true);
-      InventoryAllocations.addMission(item, mission, 4.0);
+      InventoryAllocations.addMission(item, mission.getId(), 4.0);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(userRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
       when(inventoryItemRepository.save(any(InventoryItem.class)))

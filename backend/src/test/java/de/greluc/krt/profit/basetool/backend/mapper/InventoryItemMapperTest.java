@@ -21,7 +21,9 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
@@ -106,7 +108,13 @@ class InventoryItemMapperTest {
     item.setNote("Strict QC");
     item.setVersion(7L);
     InventoryAllocations.addJobOrder(item, jobOrder, item.getAmount(), true);
-    InventoryAllocations.addMission(item, mission, item.getAmount());
+    InventoryAllocations.addMission(item, mission.getId(), item.getAmount());
+    EarmarkTargets.Lookup targets =
+        id ->
+            id.equals(missionId)
+                ? new MissionEarmark(missionId, mission.getName(), mission.getPlannedStartTime())
+                : null;
+    ReflectionTestUtils.setField(mapper, "earmarkTargets", targets);
 
     InventoryItemDto dto = mapper.toDto(item);
 

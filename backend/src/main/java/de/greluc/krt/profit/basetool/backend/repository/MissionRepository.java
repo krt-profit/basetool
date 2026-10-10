@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
@@ -382,6 +383,19 @@ public interface MissionRepository
    */
   @Query("SELECT u.id FROM Mission m JOIN m.managers u WHERE m.id = :id")
   Set<UUID> findManagerUserIdsById(@Param("id") UUID id);
+
+  /**
+   * Loads what the Lager shows of the given missions in one read (plan §7.5 P3-5d).
+   *
+   * @param ids the missions
+   * @return the existing missions' id, name and planned start
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark(
+      m.id, m.name, m.plannedStartTime) FROM Mission m WHERE m.id IN :ids
+      """)
+  List<MissionEarmark> findEarmarks(@Param("ids") Collection<UUID> ids);
 
   /**
    * Returns the planned missions that reach the 24-hour mark in the given window and have not been

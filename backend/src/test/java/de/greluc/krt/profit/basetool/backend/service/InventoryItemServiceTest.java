@@ -26,7 +26,9 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
@@ -53,7 +55,6 @@ import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.List;
 import java.util.Optional;
@@ -81,7 +82,7 @@ class InventoryItemServiceTest {
   @Mock private GameItemRepository gameItemRepository;
   @Mock private LocationRepository locationRepository;
   @Mock private JobOrderRepository jobOrderRepository;
-  @Mock private MissionRepository missionRepository;
+  @Mock private EarmarkTargets.Lookup earmarkTargets;
   @Mock private MissionFinanceEntryRepository missionFinanceEntryRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
@@ -134,7 +135,7 @@ class InventoryItemServiceTest {
             gameItemRepository,
             locationRepository,
             jobOrderRepository,
-            missionRepository,
+            earmarkTargets,
             inventoryItemMapper,
             ownerScopeService,
             inventoryAccessPolicy,
@@ -651,7 +652,7 @@ class InventoryItemServiceTest {
             gameItemRepository,
             locationRepository,
             jobOrderRepository,
-            missionRepository,
+            earmarkTargets,
             inventoryItemMapper,
             ownerScopeService,
             inventoryAccessPolicy,
@@ -746,7 +747,9 @@ class InventoryItemServiceTest {
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
     when(jobOrderRepository.findById(orderAId)).thenReturn(Optional.of(orderA));
     when(jobOrderRepository.findById(orderBId)).thenReturn(Optional.of(orderB));
-    when(missionRepository.findById(missionXId)).thenReturn(Optional.of(missionX));
+    when(earmarkTargets.mission(missionXId))
+        .thenReturn(
+            new MissionEarmark(missionXId, missionX.getName(), missionX.getPlannedStartTime()));
     when(jobOrderItemService.requiredMaterialIds(any(JobOrder.class)))
         .thenReturn(Set.of(materialId));
     when(inventoryItemRepository.save(any(InventoryItem.class)))
@@ -1743,7 +1746,7 @@ class InventoryItemServiceTest {
     existingItem.setAmount(10.0);
     existingItem.setUser(user);
     existingItem.setMaterial(material);
-    InventoryAllocations.addMission(existingItem, mission, 5.0);
+    InventoryAllocations.addMission(existingItem, mission.getId(), 5.0);
 
     MissionParticipant participant = new MissionParticipant();
     participant.setUser(user);

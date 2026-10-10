@@ -23,6 +23,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
@@ -39,7 +40,6 @@ import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryCheckoutService;
@@ -68,7 +68,7 @@ class InventoryItemServiceVersionFlushTest {
   @Mock private MaterialRepository materialRepository;
   @Mock private LocationRepository locationRepository;
   @Mock private JobOrderRepository jobOrderRepository;
-  @Mock private MissionRepository missionRepository;
+  @Mock private EarmarkTargets.Lookup earmarkTargets;
   @Mock private MissionFinanceEntryRepository missionFinanceEntryRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
@@ -106,7 +106,7 @@ class InventoryItemServiceVersionFlushTest {
             null,
             locationRepository,
             jobOrderRepository,
-            missionRepository,
+            earmarkTargets,
             inventoryItemMapper,
             ownerScopeService,
             null,

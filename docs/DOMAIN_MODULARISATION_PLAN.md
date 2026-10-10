@@ -1198,6 +1198,18 @@ as each pair is decoupled.
     the Lager still computes each share and skips a non-positive one, the mission still books
     nothing for a mission the seller does not take part in and saves after the loop. Baseline
     **79 → 75**.
+  - **5d-2 — done 2026-10-10.** `InventoryMissionAllocation.mission` becomes `missionId` (the same
+    `mission_id` column and foreign key; no migration), the first of the eight business associations
+    of §5.6 turned into an id. What the Lager shows of the mission (name, planned start) comes from
+    the read SPI `inventory.api.EarmarkTargets.Missions`, implemented by `MissionEarmarkTargets` with
+    one projection query, through `InventoryEarmarkTargetCache` (`EarmarkTargets.Lookup`): a
+    per-transaction memo whose first miss loads every mission the Lager rows of the persistence
+    context are earmarked to, so a page costs one lookup whatever its size. The mapper, the
+    allocation commands and the check-in's existence check (same `Mission not found`) ask it; the
+    DTOs and audit labels are byte-identical. `InventoryEarmarkReadNoNPlusOneTest`, added before
+    the change, keeps six Lager reads at the same statement count for 25 rows as for 3 (proven
+    able to fail: without the context scan the by-material read rises from 9 to 31 statements).
+    Baseline **75 → 67** (`inventory -> mission` is gone).
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
