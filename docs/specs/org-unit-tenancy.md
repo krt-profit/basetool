@@ -418,7 +418,8 @@ expanded set, so lists and per-row gates widen together (ADR-0026).
 > bank's read/write split: the balance **view** and the blueprint-availability overview cascade down
 > (`cascadedOfficerReach`), while bank booking **requests** use the separate, non-cascading
 > `currentOwnLevelOversightScope()` (REQ-BANK-027). *(Updated 2026-09-22: this note used to describe
-> the oversight scope as not yet cascaded.)*
+> the oversight scope as not yet cascaded. Corrected 2026-10-10: REQ-BANK-039 replaced the own-level
+> request scope with the view gate, and the unused method left the scope hub.)*
 
 Hard invariants:
 

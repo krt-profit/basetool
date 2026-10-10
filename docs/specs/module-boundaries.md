@@ -201,7 +201,8 @@ Declared on `main`: `admin`, `audit`, `bank`, `catalogue`, `dashboard`, `exchang
 `inventory`, `joborder`, `kernel`, `livesync`, `materialexchange`, `mission`, `notification`,
 `operation`, `orgchart`, `orgunit`, `personalinventory`, `platform`, `privacy`, `promotion`,
 `refinery`, `scope` (floor 23). `mission` publishes `mission.api.MissionCommands`, its first
-command (`detachFromOperation`, plan §5.3).
+command (`detachFromOperation`, plan §5.3). `bank.api` carries `BankAmounts` and `BankBookingRequestType`, which its
+events and its conflict exception expose.
 Every `<module>.web` and `<module>.internal` package is internal to its module.
 
 A domain whose services return its REST DTOs keeps those DTOs in `<module>.internal`, beside the
