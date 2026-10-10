@@ -118,6 +118,8 @@ class OwnerScopeServiceTest {
 
   private InventoryAccessPolicy inventoryPolicy;
 
+  private HangarAccessPolicy hangarPolicy;
+
   private JobOrderAccessPolicy jobOrderPolicy;
 
   private static final UUID MEMBER_USER_ID = UUID.randomUUID();
@@ -183,8 +185,7 @@ class OwnerScopeServiceTest {
             staffelMembershipResolver,
             request);
     AccessGateService accessGateService =
-        new AccessGateService(
-            requestScopeResolver, authHelper, shipRepository, orgUnitMembershipRepository);
+        new AccessGateService(requestScopeResolver, authHelper, orgUnitMembershipRepository);
     OrgUnitStampingService orgUnitStampingService =
         new OrgUnitStampingService(
             requestScopeResolver,
@@ -198,6 +199,7 @@ class OwnerScopeServiceTest {
     refineryPolicy = new RefineryAccessPolicy(service, refineryOrderRepository);
     missionPolicy = new MissionAccessPolicy(service, authHelper, missionRepository);
     inventoryPolicy = new InventoryAccessPolicy(service, inventoryItemRepository);
+    hangarPolicy = new HangarAccessPolicy(service, shipRepository);
     jobOrderPolicy =
         new JobOrderAccessPolicy(
             service,
@@ -1125,8 +1127,8 @@ class OwnerScopeServiceTest {
       when(shipRepository.findById(ship.getId())).thenReturn(Optional.of(ship));
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
 
-      assertTrue(service.canSeeShip(ship.getId()), "owner sees their own foreign-org ship");
-      assertTrue(service.canEditShip(ship.getId()), "owner edits their own foreign-org ship");
+      assertTrue(hangarPolicy.canSeeShip(ship.getId()), "owner sees their own foreign-org ship");
+      assertTrue(hangarPolicy.canEditShip(ship.getId()), "owner edits their own foreign-org ship");
     }
 
     @Test
@@ -1137,8 +1139,10 @@ class OwnerScopeServiceTest {
       when(shipRepository.findById(ship.getId())).thenReturn(Optional.of(ship));
       stubMemberInSquadronA();
 
-      assertFalse(service.canSeeShip(ship.getId()), "a non-owner outside scope must not see it");
-      assertFalse(service.canEditShip(ship.getId()), "a non-owner outside scope must not edit it");
+      assertFalse(
+          hangarPolicy.canSeeShip(ship.getId()), "a non-owner outside scope must not see it");
+      assertFalse(
+          hangarPolicy.canEditShip(ship.getId()), "a non-owner outside scope must not edit it");
     }
 
     @Test
@@ -1375,8 +1379,8 @@ class OwnerScopeServiceTest {
       when(shipRepository.findById(ship.getId())).thenReturn(Optional.of(ship));
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
 
-      assertTrue(service.canSeeShip(ship.getId()));
-      assertTrue(service.canEditShip(ship.getId()));
+      assertTrue(hangarPolicy.canSeeShip(ship.getId()));
+      assertTrue(hangarPolicy.canEditShip(ship.getId()));
     }
 
     @Test
@@ -1386,8 +1390,8 @@ class OwnerScopeServiceTest {
       when(authHelper.isAdmin()).thenReturn(true);
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
-      assertTrue(service.canSeeShip(ship.getId()));
-      assertTrue(service.canEditShip(ship.getId()));
+      assertTrue(hangarPolicy.canSeeShip(ship.getId()));
+      assertTrue(hangarPolicy.canEditShip(ship.getId()));
     }
 
     @Test
@@ -1399,8 +1403,8 @@ class OwnerScopeServiceTest {
           .thenReturn(SQUADRON_A_ID.toString());
       when(authHelper.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
 
-      assertFalse(service.canSeeShip(ship.getId()));
-      assertFalse(service.canEditShip(ship.getId()));
+      assertFalse(hangarPolicy.canSeeShip(ship.getId()));
+      assertFalse(hangarPolicy.canEditShip(ship.getId()));
     }
 
     @Test

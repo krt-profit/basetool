@@ -107,11 +107,7 @@ class HangarAccessPolicyDifferentialTest {
       for (Map.Entry<String, UUID> ship : fixture.ships.entrySet()) {
         for (Gate gate : gates()) {
           boolean restated = gate.scopeHub().test(fixture.scopeHub, ship.getValue());
-          boolean live = gate.liveHub().test(fixture.liveHub, ship.getValue());
           boolean now = gate.policy().test(fixture.policy, ship.getValue());
-          assertThat(restated)
-              .as("restatement of %s on %s for %s", gate.name(), ship.getKey(), caller.name())
-              .isEqualTo(live);
           assertThat(now)
               .as("%s on %s for %s", gate.name(), ship.getKey(), caller.name())
               .isEqualTo(restated);
@@ -126,39 +122,27 @@ class HangarAccessPolicyDifferentialTest {
   }
 
   /**
-   * One ship gate, as the restated scope hub, the live scope hub and the policy decide it.
+   * One ship gate, as the restated scope hub and the policy decide it.
    *
    * @param name the gate's method name
    * @param scopeHub the restated scope hub's verdict
-   * @param liveHub the live scope hub's verdict
    * @param policy the policy's verdict
    */
   private record Gate(
       String name,
       BiPredicate<ScopeHubShipGates, UUID> scopeHub,
-      BiPredicate<AccessGateService, UUID> liveHub,
       BiPredicate<HangarAccessPolicy, UUID> policy) {}
 
   private static List<Gate> gates() {
     return List.of(
-        new Gate(
-            "canSeeShip",
-            ScopeHubShipGates::canSeeShip,
-            AccessGateService::canSeeShip,
-            HangarAccessPolicy::canSeeShip),
-        new Gate(
-            "canEditShip",
-            ScopeHubShipGates::canEditShip,
-            AccessGateService::canEditShip,
-            HangarAccessPolicy::canEditShip));
+        new Gate("canSeeShip", ScopeHubShipGates::canSeeShip, HangarAccessPolicy::canSeeShip),
+        new Gate("canEditShip", ScopeHubShipGates::canEditShip, HangarAccessPolicy::canEditShip));
   }
 
   /** One caller's freshly wired scope hub and policy over the scenario mocks. */
   private static final class Fixture {
 
     private final ScopeHubShipGates scopeHub;
-
-    private final AccessGateService liveHub;
 
     private final HangarAccessPolicy policy;
 
@@ -219,14 +203,13 @@ class HangarAccessPolicyDifferentialTest {
               new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
               request);
       AccessGateService accessGateService =
-          new AccessGateService(resolver, authHelper, repository, memberships);
+          new AccessGateService(resolver, authHelper, memberships);
       OwnerScopeService ownerScopeService =
           new OwnerScopeService(
               resolver,
               accessGateService,
               new OrgUnitStampingService(
                   resolver, accessGateService, authHelper, memberships, orgUnits));
-      liveHub = accessGateService;
       scopeHub = new ScopeHubShipGates(accessGateService, authHelper, resolver, repository);
       policy = new HangarAccessPolicy(ownerScopeService, repository);
     }
