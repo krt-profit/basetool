@@ -813,7 +813,7 @@ class RefineryOrderServiceTest {
   @Test
   void storingAnotherMembersOrderIntoTheirStockTellsThemTheYieldWasBookedOntoThem() {
     stubLookupsForSingleItem();
-    when(ownerScopeService.canManageUserInventory(OWNER_ID)).thenReturn(true);
+    when(bookInPolicy.mayBookInFor(OWNER_ID)).thenReturn(true);
     when(userService.currentActor()).thenReturn(new ActorRef(OTHER_USER_ID, "Bob"));
 
     refineryOrderService.storeRefineryOrder(
@@ -832,7 +832,7 @@ class RefineryOrderServiceTest {
     thirdUser.setId(third);
     stubLookupsForSingleItem();
     when(userRepository.findById(third)).thenReturn(Optional.of(thirdUser));
-    when(ownerScopeService.canManageUserInventory(third)).thenReturn(true);
+    when(bookInPolicy.mayBookInFor(third)).thenReturn(true);
     when(userService.currentActor()).thenReturn(new ActorRef(OTHER_USER_ID, "Bob"));
 
     refineryOrderService.storeRefineryOrder(
