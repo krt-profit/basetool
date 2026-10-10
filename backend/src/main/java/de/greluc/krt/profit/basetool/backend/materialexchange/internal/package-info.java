@@ -17,5 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/** The Materialbörse module's internal helpers: the board query parameters (plan §5.2). */
+/**
+ * The Materialbörse module's internals: the offer and request entities and repositories, the board
+ * services, the offer ratchet and the stock-offer lookup the Lager asks (plan §5.2, §5.3).
+ */
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;

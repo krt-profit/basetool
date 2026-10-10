@@ -32,6 +32,7 @@ import static org.mockito.Mockito.verify;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderHandoverMapper;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
@@ -66,7 +67,7 @@ class JobOrderHandoverQualityTierTest {
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private JobOrderHandoverRepository jobOrderHandoverRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
-  @Mock private MaterialExchangeOfferRatchet offerRatchet;
+  @Mock private StockChangeObserver offerRatchet;
   @Mock private JobOrderHandoverMapper jobOrderHandoverMapper;
   @Mock private JobOrderMaterialRepository jobOrderMaterialRepository;
   @Mock private JobOrderService jobOrderService;

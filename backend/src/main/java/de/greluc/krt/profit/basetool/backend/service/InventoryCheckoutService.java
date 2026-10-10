@@ -28,6 +28,10 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeEffects;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredFromUserEvent;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredToUserEvent;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.TransferredLot;
@@ -58,7 +62,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebo
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -89,8 +92,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Inventory is append-only: a transfer or rebooking inserts a new row and decrements or deletes
  * the source, and only {@link #mergeStockIfRequested} folds rows together. Partial moves {@code
  * saveAndFlush} the reduced source so its {@code @Version} stays current (REQ-FE-003). Every
- * reduced or deleted row passes through {@link MaterialExchangeOfferRatchet}, which lowers or
- * audits the removal of the Materialbörse offers on it.
+ * reduced or deleted row passes through {@link StockChangeObserver}, which lowers or audits the
+ * removal of the Materialbörse offers on it.
  */
 @Slf4j
 @Service
@@ -121,8 +124,8 @@ public class InventoryCheckoutService {
   private final LocationRepository locationRepository;
   private final MissionFinanceEntryRepository missionFinanceEntryRepository;
   private final MissionParticipantRepository missionParticipantRepository;
-  private final MaterialExchangeOfferRepository materialExchangeOfferRepository;
-  private final MaterialExchangeOfferRatchet offerRatchet;
+  private final StockOfferLookup stockOfferLookup;
+  private final StockChangeObserver stockChangeObserver;
   private final InventoryItemMapper inventoryItemMapper;
   private final OwnerScopeService ownerScopeService;
   private final AuditRecorder auditRecorder;
@@ -162,9 +165,8 @@ public class InventoryCheckoutService {
    */
   @NotNull
   @Transactional(propagation = Propagation.MANDATORY)
-  public MaterialExchangeOfferRatchet.Effects bookOutForClient(
-      UUID id, InventoryItemBookOutDto dto, UUID memberId) {
-    return bookOut(id, dto, memberId, false, MaterialExchangeOfferRatchet.Reason.STOCK).offers();
+  public StockChangeEffects bookOutForClient(UUID id, InventoryItemBookOutDto dto, UUID memberId) {
+    return bookOut(id, dto, memberId, false, StockChangeReason.STOCK).offers();
   }
 
   /**
@@ -185,7 +187,7 @@ public class InventoryCheckoutService {
       InventoryItemBookOutDto dto,
       UUID currentUserId,
       boolean isAdmin,
-      MaterialExchangeOfferRatchet.@Nullable Reason offerReason) {
+      @Nullable StockChangeReason offerReason) {
     InventoryItem item =
         Entities.require(inventoryItemRepository.findById(id), "Inventory item not found");
 
@@ -253,10 +255,9 @@ public class InventoryCheckoutService {
           sourceLabel,
           materialName,
           depleted,
-          offerReason != null ? offerReason : MaterialExchangeOfferRatchet.Reason.TRANSFER);
+          offerReason != null ? offerReason : StockChangeReason.TRANSFER);
     }
-    final MaterialExchangeOfferRatchet.Reason reason =
-        offerReason != null ? offerReason : MaterialExchangeOfferRatchet.Reason.CHECKOUT;
+    final StockChangeReason reason = offerReason != null ? offerReason : StockChangeReason.CHECKOUT;
 
     Map<UUID, Double> orderReductions =
         AllocationReductions.resolveReductionPlan(
@@ -272,7 +273,7 @@ public class InventoryCheckoutService {
     AllocationReductions.applyPlan(item, missionReductions, false);
 
     if (remainingAmount <= QUANTITY_EPSILON) {
-      int removed = offerRatchet.beforeDelete(List.of(sourceId), reason);
+      int removed = stockChangeObserver.beforeDelete(List.of(sourceId), reason);
       inventoryItemRepository.delete(item);
       recordBookOutTail(
           checkoutType,
@@ -283,14 +284,14 @@ public class InventoryCheckoutService {
           dto,
           0.0,
           financeEntryIds);
-      return new BookOut(null, new MaterialExchangeOfferRatchet.Effects(0, removed));
+      return new BookOut(null, new StockChangeEffects(0, removed));
     } else {
       item.setAmount(remainingAmount);
       if (!InventoryAllocations.fits(item)) {
         throw new OverAllocationException();
       }
       InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
-      int reduced = offerRatchet.lower(sourceId, remainingAmount, reason);
+      int reduced = stockChangeObserver.lower(sourceId, remainingAmount, reason);
       recordBookOutTail(
           checkoutType,
           sourceId,
@@ -300,8 +301,7 @@ public class InventoryCheckoutService {
           dto,
           remainingAmount,
           financeEntryIds);
-      return new BookOut(
-          inventoryItemMapper.toDto(saved), new MaterialExchangeOfferRatchet.Effects(reduced, 0));
+      return new BookOut(inventoryItemMapper.toDto(saved), new StockChangeEffects(reduced, 0));
     }
   }
 
@@ -333,7 +333,7 @@ public class InventoryCheckoutService {
       String sourceLabel,
       String materialName,
       boolean depleted,
-      MaterialExchangeOfferRatchet.@NotNull Reason offerReason) {
+      @NotNull StockChangeReason offerReason) {
     final User sourceUser = item.getUser();
     final Location sourceLocation = item.getLocation();
     User targetUser = item.getUser();
@@ -379,11 +379,11 @@ public class InventoryCheckoutService {
     final InventoryItem savedNew = inventoryItemRepository.save(newItem);
     AllocationReductions.applyPlan(item, orderReductions, true);
     AllocationReductions.applyPlan(item, missionReductions, false);
-    final MaterialExchangeOfferRatchet.Effects offers;
+    final StockChangeEffects offers;
     if (remainingAmount <= QUANTITY_EPSILON) {
       offers =
-          new MaterialExchangeOfferRatchet.Effects(
-              0, offerRatchet.beforeDelete(List.of(sourceId), offerReason));
+          new StockChangeEffects(
+              0, stockChangeObserver.beforeDelete(List.of(sourceId), offerReason));
       inventoryItemRepository.delete(item);
     } else {
       item.setAmount(remainingAmount);
@@ -392,8 +392,8 @@ public class InventoryCheckoutService {
       }
       inventoryItemRepository.saveAndFlush(item);
       offers =
-          new MaterialExchangeOfferRatchet.Effects(
-              offerRatchet.lower(sourceId, remainingAmount, offerReason), 0);
+          new StockChangeEffects(
+              stockChangeObserver.lower(sourceId, remainingAmount, offerReason), 0);
     }
     auditRecorder.record(
         AuditEventType.INVENTORY_ITEM_TRANSFERRED,
@@ -650,7 +650,7 @@ public class InventoryCheckoutService {
     InventoryItem savedNew = inventoryItemRepository.save(newItem);
 
     if (depleted) {
-      offerRatchet.beforeDelete(List.of(sourceId), MaterialExchangeOfferRatchet.Reason.REBOOK);
+      stockChangeObserver.beforeDelete(List.of(sourceId), StockChangeReason.REBOOK);
       inventoryItemRepository.delete(item);
     } else {
       item.setAmount(remainingAmount);
@@ -658,7 +658,7 @@ public class InventoryCheckoutService {
         throw new OverAllocationException();
       }
       inventoryItemRepository.saveAndFlush(item);
-      offerRatchet.lower(sourceId, remainingAmount, MaterialExchangeOfferRatchet.Reason.REBOOK);
+      stockChangeObserver.lower(sourceId, remainingAmount, StockChangeReason.REBOOK);
     }
 
     auditRecorder.record(
@@ -704,7 +704,7 @@ public class InventoryCheckoutService {
     if (!autoMerge && !clientRequestedMerge) {
       return row;
     }
-    if (materialExchangeOfferRepository.existsByInventoryItemId(row.getId())) {
+    if (stockOfferLookup.isOffered(row.getId())) {
       return row;
     }
 
@@ -847,7 +847,8 @@ public class InventoryCheckoutService {
         scope.adminAllScope(),
         scope.activeOrgUnitId(),
         scope.memberOrgUnitIds().size());
-    offerRatchet.beforeWipe(scope);
+    stockChangeObserver.beforeWipe(
+        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
     int removed =
         inventoryItemRepository.deleteAllNonPersonal(
             scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
@@ -900,7 +901,7 @@ public class InventoryCheckoutService {
       toDelete.add(itemId);
     }
 
-    offerRatchet.beforeDelete(toDelete, MaterialExchangeOfferRatchet.Reason.BULK_CHECKOUT);
+    stockChangeObserver.beforeDelete(toDelete, StockChangeReason.BULK_CHECKOUT);
     inventoryItemRepository.deleteAllById(toDelete);
     log.info(
         "Bulk checkout completed: {} items removed for user {}", toDelete.size(), currentUserId);
@@ -1279,7 +1280,7 @@ public class InventoryCheckoutService {
         AllocationReductions.resolveReductionPlan(source, null, amount, false);
     applyTransferInherit(source, newItem, orderReductions, missionReductions);
     final InventoryItem savedNew = inventoryItemRepository.save(newItem);
-    offerRatchet.beforeDelete(List.of(source.getId()), MaterialExchangeOfferRatchet.Reason.REBOOK);
+    stockChangeObserver.beforeDelete(List.of(source.getId()), StockChangeReason.REBOOK);
     inventoryItemRepository.delete(source);
 
     mergeStockIfRequested(savedNew, mergeStock);
@@ -1339,8 +1340,7 @@ public class InventoryCheckoutService {
    *     depleted discard or sale
    * @param offers the Materialbörse offers the book-out lowered and removed
    */
-  private record BookOut(
-      @Nullable InventoryItemDto item, MaterialExchangeOfferRatchet.@NotNull Effects offers) {}
+  private record BookOut(@Nullable InventoryItemDto item, @NotNull StockChangeEffects offers) {}
 
   /**
    * One row a transfer action moved, snapshotted before the source row is reduced or deleted.

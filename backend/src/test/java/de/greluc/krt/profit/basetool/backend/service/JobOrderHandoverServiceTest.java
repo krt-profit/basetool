@@ -26,6 +26,8 @@ import static org.mockito.Mockito.*;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderHandoverMapper;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
@@ -57,7 +59,7 @@ class JobOrderHandoverServiceTest {
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private JobOrderHandoverRepository jobOrderHandoverRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
-  @Mock private MaterialExchangeOfferRatchet offerRatchet;
+  @Mock private StockChangeObserver offerRatchet;
   @Mock private JobOrderHandoverMapper jobOrderHandoverMapper;
   @Mock private JobOrderMaterialRepository jobOrderMaterialRepository;
   @Mock private JobOrderService jobOrderService;
@@ -144,7 +146,7 @@ class JobOrderHandoverServiceTest {
     verify(jobOrderService, never()).completeJobOrderWithinTransaction(any());
     verify(jobOrderHandoverRepository).save(any(JobOrderHandover.class));
     verify(jobOrderRepository, times(2)).findById(orderId);
-    verify(offerRatchet).lower(inventoryId, 6.0, MaterialExchangeOfferRatchet.Reason.HANDOVER);
+    verify(offerRatchet).lower(inventoryId, 6.0, StockChangeReason.HANDOVER);
   }
 
   @Test
@@ -271,8 +273,7 @@ class JobOrderHandoverServiceTest {
     assertEquals(0.0, jobOrderMaterial.getAmount());
     verify(inventoryItemRepository).delete(inventoryItem);
     verify(inventoryItemRepository, never()).save(any());
-    verify(offerRatchet)
-        .beforeDelete(List.of(inventoryItem.getId()), MaterialExchangeOfferRatchet.Reason.HANDOVER);
+    verify(offerRatchet).beforeDelete(List.of(inventoryItem.getId()), StockChangeReason.HANDOVER);
     verify(offerRatchet, never()).lower(any(), anyDouble(), any());
     verify(inventoryItemRepository)
         .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, materialId);
