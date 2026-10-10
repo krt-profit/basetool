@@ -409,7 +409,7 @@ def plan_forgot_password(kc: HardenKcadm, args: argparse.Namespace) -> Plan:
             merged["password"] = KEEP_STORED_VALUE
         if any(str(smtp.get(key)) != str(value) for key, value in merged.items()
                if key != "password") or password:
-            shown = {key: value for key, value in merged.items() if key != "password"}
+            shown = dict(desired)
             plan.changes.append(Change(
                 f"~ smtpServer: {shown}{' and a new password' if password else ''}",
                 lambda m=merged: kc.write("update", f"realms/{kc.realm}", {"smtpServer": m},
