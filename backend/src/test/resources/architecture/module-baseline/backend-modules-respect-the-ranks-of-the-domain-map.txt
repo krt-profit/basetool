@@ -83,10 +83,5 @@ scope -> hangar: AccessGateService -> Ship
 scope -> hangar: AccessGateService -> ShipRepository
 scope -> inventory: AccessGateService -> InventoryItem
 scope -> inventory: AccessGateService -> InventoryItemRepository
-scope -> joborder: AccessGateService -> JobOrder
-scope -> joborder: AccessGateService -> JobOrderHandoverRepository
-scope -> joborder: AccessGateService -> JobOrderItemHandoverRepository
-scope -> joborder: AccessGateService -> JobOrderRepository
-scope -> joborder: OwnerScopeService -> JobOrder
 scope -> mission: AccessGateService -> Mission
 scope -> mission: AccessGateService -> MissionRepository
