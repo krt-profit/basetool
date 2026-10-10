@@ -43,7 +43,6 @@ import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
@@ -62,13 +61,10 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockGroupDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -107,13 +103,12 @@ public class InventoryItemService {
   private final MaterialRepository materialRepository;
   private final GameItemRepository gameItemRepository;
   private final LocationRepository locationRepository;
-  private final JobOrderRepository jobOrderRepository;
   private final EarmarkTargets.Lookup earmarkTargets;
   private final InventoryItemMapper inventoryItemMapper;
   private final OwnerScopeService ownerScopeService;
   private final InventoryAccessPolicy inventoryAccessPolicy;
   private final StockCommands stockCommands;
-  private final JobOrderItemService jobOrderItemService;
+  private final EarmarkTargets.JobOrders jobOrders;
   private final AuditRecorder auditRecorder;
   private final InventoryAggregationService inventoryAggregationService;
   private final InventoryCheckoutService inventoryCheckoutService;
@@ -522,16 +517,13 @@ public class InventoryItemService {
         throw new BadRequestException("A job order may be assigned at most once at check-in");
       }
       requireWholeUnits(wholeUnits, gameItem != null, allocation.amount());
-      JobOrder order =
-          Entities.require(
-              jobOrderRepository.findById(allocation.targetId()), "JobOrder not found");
       if (gameItem != null) {
-        assertGameItemRequiredByJobOrder(gameItem, order);
+        assertGameItemRequiredByJobOrder(gameItem, allocation.targetId());
       } else {
-        assertMaterialRequiredByJobOrder(material, order);
+        assertMaterialRequiredByJobOrder(material, allocation.targetId());
       }
       InventoryAllocations.addJobOrder(
-          item, order.getId(), InventoryItem.roundToScuScale(allocation.amount()), false);
+          item, allocation.targetId(), InventoryItem.roundToScuScale(allocation.amount()), false);
     }
     Set<UUID> seenMissions = new HashSet<>();
     for (InventoryAllocationInput allocation : missionAllocations) {
@@ -662,12 +654,10 @@ public class InventoryItemService {
     double amount = requireWriteAmount(dto, item);
     switch (dto.field()) {
       case JOB_ORDER -> {
-        JobOrder jobOrder =
-            Entities.require(jobOrderRepository.findById(dto.targetId()), "JobOrder not found");
         if (item.getGameItem() != null) {
-          assertGameItemRequiredByJobOrder(item.getGameItem(), jobOrder);
+          assertGameItemRequiredByJobOrder(item.getGameItem(), dto.targetId());
         } else {
-          assertMaterialRequiredByJobOrder(item.getMaterial(), jobOrder);
+          assertMaterialRequiredByJobOrder(item.getMaterial(), dto.targetId());
         }
         if (findJobOrderSlice(item, dto.targetId()) != null) {
           throw new BadRequestException("error.inventory.allocation.duplicate.jobOrder");
@@ -675,14 +665,14 @@ public class InventoryItemService {
         assertFits(sumJobOrderAllocated(item, null) + amount, item.getAmount());
         InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
         slice.setInventoryItem(item);
-        slice.setJobOrderId(jobOrder.getId());
+        slice.setJobOrderId(dto.targetId());
         slice.setAmount(amount);
         item.getJobOrderAllocations().add(slice);
         recordAllocation(
             AuditEventType.INVENTORY_ALLOCATION_ADDED,
             item,
             dto.field(),
-            "#" + jobOrder.getDisplayId(),
+            "#" + jobOrderDisplayIdOf(dto.targetId()),
             amount);
       }
       case MISSION -> {
@@ -1021,16 +1011,20 @@ public class InventoryItemService {
    * would never appear in the order (REQ-ORDERS-018). Must run inside a transaction.
    *
    * @param material the inventory item's material
-   * @param jobOrder the order the item is being linked to
+   * @param jobOrderId the order the item is being linked to
+   * @throws NotFoundException when the order does not exist
    * @throws BadRequestException when the order does not require the material
    */
-  private void assertMaterialRequiredByJobOrder(Material material, JobOrder jobOrder) {
-    if (!jobOrderItemService.requiredMaterialIds(jobOrder).contains(material.getId())) {
+  private void assertMaterialRequiredByJobOrder(Material material, UUID jobOrderId) {
+    Set<UUID> required =
+        Entities.require(
+            Optional.ofNullable(jobOrders.requiredMaterialIds(jobOrderId)), "JobOrder not found");
+    if (!required.contains(material.getId())) {
       throw new BadRequestException(
           "Material "
               + material.getId()
               + " is not required by job order "
-              + jobOrder.getId()
+              + jobOrderId
               + "; an inventory item can only be linked to an order that needs its material.");
     }
   }
@@ -1040,16 +1034,20 @@ public class InventoryItemService {
    * order never accepts item stock (REQ-INV-031). Must run inside a transaction.
    *
    * @param gameItem the inventory row's game item
-   * @param jobOrder the order the row is being linked to
+   * @param jobOrderId the order the row is being linked to
+   * @throws NotFoundException when the order does not exist
    * @throws BadRequestException when the order does not request the game item
    */
-  private void assertGameItemRequiredByJobOrder(GameItem gameItem, JobOrder jobOrder) {
-    if (!jobOrderItemService.requiredGameItemIds(jobOrder).contains(gameItem.getId())) {
+  private void assertGameItemRequiredByJobOrder(GameItem gameItem, UUID jobOrderId) {
+    Set<UUID> required =
+        Entities.require(
+            Optional.ofNullable(jobOrders.requiredGameItemIds(jobOrderId)), "JobOrder not found");
+    if (!required.contains(gameItem.getId())) {
       throw new BadRequestException(
           "Game item "
               + gameItem.getId()
               + " is not requested by job order "
-              + jobOrder.getId()
+              + jobOrderId
               + "; an item stock row can only be linked to an ITEM order that requests its game"
               + " item.");
     }
@@ -1215,30 +1213,6 @@ public class InventoryItemService {
   @Transactional
   public BulkRebookResultDto bulkRebook(BulkRebookRequest request, UUID currentUserId) {
     return inventoryCheckoutService.bulkRebook(request, currentUserId);
-  }
-
-  /**
-   * Returns all inventory items linked to a job order, sorted by owner, location, material, quality
-   * and quantity; delegates to {@link InventoryAggregationService#getMaterialCollection}.
-   *
-   * @param jobOrderId the job order id
-   * @return sorted list of {@link MaterialCollectionEntryDto}
-   * @throws NotFoundException when the job order is unknown
-   */
-  public List<MaterialCollectionEntryDto> getMaterialCollection(UUID jobOrderId) {
-    return inventoryAggregationService.getMaterialCollection(jobOrderId);
-  }
-
-  /**
-   * Returns the game-item stock earmarked to a job order, grouped per game item (REQ-ORDERS-028);
-   * delegates to {@link InventoryAggregationService#getItemStockForJobOrder}.
-   *
-   * @param jobOrderId the job order id
-   * @return name-sorted list of {@link JobOrderItemStockGroupDto}; empty when none
-   * @throws NotFoundException when the job order is unknown
-   */
-  public List<JobOrderItemStockGroupDto> getItemStockForJobOrder(UUID jobOrderId) {
-    return inventoryAggregationService.getItemStockForJobOrder(jobOrderId);
   }
 
   /**

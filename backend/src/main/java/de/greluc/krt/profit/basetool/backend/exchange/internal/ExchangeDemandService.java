@@ -25,13 +25,13 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeDeman
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRefDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgDemandDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeQuantityDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemStockRow;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;

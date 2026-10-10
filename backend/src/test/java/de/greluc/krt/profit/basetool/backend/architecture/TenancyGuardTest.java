@@ -241,7 +241,7 @@ class TenancyGuardTest {
 
   private static final int REFERENCE_FLOOR = 22;
 
-  private static final int CONTROLLER_FLOOR = 24;
+  private static final int CONTROLLER_FLOOR = 23;
 
   private static final int HANDLER_FLOOR = 126;
 

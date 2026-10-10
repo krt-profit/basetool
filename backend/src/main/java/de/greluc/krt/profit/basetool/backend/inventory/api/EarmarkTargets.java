@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.api;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -59,6 +60,25 @@ public final class EarmarkTargets {
      */
     @NotNull
     Map<UUID, JobOrderEarmark> jobOrders(@NotNull Collection<UUID> ids);
+
+    /**
+     * Returns the materials a job order requires, for the Lager's link check (REQ-ORDERS-018).
+     *
+     * @param jobOrderId the job order
+     * @return the required materials, or {@code null} when the order does not exist
+     */
+    @Nullable
+    Set<UUID> requiredMaterialIds(@NotNull UUID jobOrderId);
+
+    /**
+     * Returns the game items a job order requests, for the Lager's link check (REQ-INV-031); a
+     * material order requests none.
+     *
+     * @param jobOrderId the job order
+     * @return the requested game items, or {@code null} when the order does not exist
+     */
+    @Nullable
+    Set<UUID> requiredGameItemIds(@NotNull UUID jobOrderId);
   }
 
   /** The Lager-side lookup of the earmark targets, memoised for the running transaction. */
