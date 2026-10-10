@@ -1321,7 +1321,7 @@ Full tables, per finding with status, evidence and verdict:
   PR #1256, issues #1250–#1255 and PRs #1257–#1262. Every finding shipped and holds, all nine
   service splits included, with three gaps: `HangarPageModelLoader` was never built,
   `CachedCatalogListLoader` has one consumer, and the per-family split of `GlobalExceptionHandler`
-  is open. Its diagnosis — "the architecture is sound, the debt is size inside
+  was open (done 2026-10-10: a chain of family classes under the one advice). Its diagnosis — "the architecture is sound, the debt is size inside
   correct layers" — holds for layers and not for domains (files over 600 lines grew from 49 of 1,477
   to 53 of 2,044). **14 of its 15 rejected simplifications still hold** (Mission section counters,
   `…WithinTransaction` hops, the find-or-create retry, bulk updates after loops, no generic CRUD base,
