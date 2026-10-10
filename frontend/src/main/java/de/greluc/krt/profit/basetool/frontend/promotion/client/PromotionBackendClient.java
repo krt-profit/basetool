@@ -19,19 +19,19 @@
 
 package de.greluc.krt.profit.basetool.frontend.promotion.client;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.MemberEvaluationDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MemberEvaluationUpdateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionCategoryDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionCategoryWriteRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionEligibilityDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionLevelContentDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionLevelContentWriteRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionTopicDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionTopicWriteRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.RankRequirementDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.RankRequirementWriteRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.MemberEvaluationDto;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.MemberEvaluationUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionCategoryDto;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionCategoryWriteRequest;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionEligibilityDto;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionLevelContentDto;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionLevelContentWriteRequest;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionTopicDto;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionTopicWriteRequest;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.RankRequirementDto;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.RankRequirementWriteRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import java.util.UUID;

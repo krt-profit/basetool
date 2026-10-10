@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionCategoryDto;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionCategoryDto;
 import java.io.StringWriter;
 import java.time.Instant;
 import java.time.LocalDateTime;

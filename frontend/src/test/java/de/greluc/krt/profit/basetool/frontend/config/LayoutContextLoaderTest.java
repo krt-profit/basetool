@@ -28,7 +28,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.frontend.config.CapabilityFlagsAdvice.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.config.LayoutContextLoader.LayoutContext;
 import de.greluc.krt.profit.basetool.frontend.config.LayoutContextLoader.MeLayoutResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;

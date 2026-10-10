@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.logging;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.frontend.controller.MeFrontendController;
+import de.greluc.krt.profit.basetool.frontend.orgunit.web.MeFrontendController;
 import jakarta.servlet.DispatcherType;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;

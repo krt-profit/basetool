@@ -21,8 +21,8 @@ package de.greluc.krt.profit.basetool.frontend.dashboard.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.AnnouncementDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.AnnouncementRequest;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementDto;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
 import java.time.Instant;
 import java.util.UUID;

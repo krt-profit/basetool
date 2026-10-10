@@ -19,21 +19,21 @@
 
 package de.greluc.krt.profit.basetool.frontend.refinery.client;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.LocationDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryImportDraftDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderListDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderStoreDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.RefiningMethodDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.RefiningMethodDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
+import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryImportDraftDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingDto;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;

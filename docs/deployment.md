@@ -1085,7 +1085,7 @@ sum(increase(basetool_client_error_total{kind="csp_violation"}[7d])) > 0
 ```
 
 A hit is a violation, not necessarily a Trusted Types one. To name it, raise
-`de.greluc.krt.profit.basetool.frontend.controller.ClientErrorReportController` to DEBUG through
+`de.greluc.krt.profit.basetool.frontend.shell.web.ClientErrorReportController` to DEBUG through
 `/actuator/loggers` (REQ-OBS-016; a production write as well) and read `{app="frontend"} |= "Client
 error reported [kind=csp_violation"`: a Trusted Types sink shows as `message=require-trusted-types-for
 Element innerHTML` (the directive and the sink, never the markup), an unlisted policy as

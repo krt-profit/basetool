@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.service;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.QualityTierDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.QualityTierDto;
 import java.util.Comparator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

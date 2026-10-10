@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.logging;
 
-import de.greluc.krt.profit.basetool.frontend.controller.MeFrontendController;
+import de.greluc.krt.profit.basetool.frontend.orgunit.web.MeFrontendController;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

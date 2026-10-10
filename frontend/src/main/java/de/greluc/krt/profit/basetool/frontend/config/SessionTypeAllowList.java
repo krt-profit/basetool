@@ -91,28 +91,31 @@ public final class SessionTypeAllowList {
    */
   static final @Unmodifiable List<String> SESSION_BOUND_TYPES =
       List.of(
-          "de.greluc.krt.profit.basetool.frontend.model.dto.BankWipeResetResultDto",
-          "de.greluc.krt.profit.basetool.frontend.model.dto.ImportIssueCode",
-          "de.greluc.krt.profit.basetool.frontend.model.dto.ImportIssueDto",
-          "de.greluc.krt.profit.basetool.frontend.model.dto.ImportIssueSeverity",
-          "de.greluc.krt.profit.basetool.frontend.model.dto.ImportSuggestionDto",
-          "de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryLocationType",
-          "de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderStatus",
-          "de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm",
-          "de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm$AllocationRow",
-          "de.greluc.krt.profit.basetool.frontend.model.form.JobOrderForm",
-          "de.greluc.krt.profit.basetool.frontend.model.form.JobOrderForm$JobOrderMaterialForm",
-          "de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemForm",
-          "de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemForm$JobOrderItemLineForm",
-          "de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemForm"
+          "de.greluc.krt.profit.basetool.frontend.bank.model.BankWipeResetResultDto",
+          "de.greluc.krt.profit.basetool.frontend.hangar.model.ShipForm",
+          "de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryForm",
+          "de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryForm$AllocationRow",
+          "de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderForm",
+          "de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderForm"
+              + "$JobOrderMaterialForm",
+          "de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemForm",
+          "de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemForm"
+              + "$JobOrderItemLineForm",
+          "de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemForm"
               + "$JobOrderItemMaterialForm",
-          "de.greluc.krt.profit.basetool.frontend.model.form.MissionForm",
-          "de.greluc.krt.profit.basetool.frontend.model.form.PersonalInventoryForm",
-          "de.greluc.krt.profit.basetool.frontend.model.form.RefineryGoodForm",
-          "de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderForm",
-          "de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderStoreForm",
-          "de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderStoreItemForm",
-          "de.greluc.krt.profit.basetool.frontend.model.form.ShipForm");
+          "de.greluc.krt.profit.basetool.frontend.mission.model.MissionForm",
+          "de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryForm",
+          "de.greluc.krt.profit.basetool.frontend.personalinventory.model"
+              + ".PersonalInventoryLocationType",
+          "de.greluc.krt.profit.basetool.frontend.refinery.model.ImportIssueCode",
+          "de.greluc.krt.profit.basetool.frontend.refinery.model.ImportIssueDto",
+          "de.greluc.krt.profit.basetool.frontend.refinery.model.ImportIssueSeverity",
+          "de.greluc.krt.profit.basetool.frontend.refinery.model.ImportSuggestionDto",
+          "de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodForm",
+          "de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderForm",
+          "de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStatus",
+          "de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreForm",
+          "de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreItemForm");
 
   /**
    * Individually allowed class names, matched exactly so a class sharing a prefix is not allowed by

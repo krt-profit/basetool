@@ -19,19 +19,19 @@
 
 package de.greluc.krt.profit.basetool.frontend.leadership.client;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.AddBereichLeaderRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.AddOlMemberRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.AssignSquadronRankRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.BereichMemberResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.CreateKommandoGroupRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.GrandAdmiralRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.KommandoGroupDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.LeitungViewDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MembershipLeadToggleRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OlMemberResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateKommandoGroupRequest;
+import de.greluc.krt.profit.basetool.frontend.leadership.model.AddBereichLeaderRequest;
+import de.greluc.krt.profit.basetool.frontend.leadership.model.AddOlMemberRequest;
+import de.greluc.krt.profit.basetool.frontend.leadership.model.AssignSquadronRankRequest;
+import de.greluc.krt.profit.basetool.frontend.leadership.model.BereichMemberResponse;
+import de.greluc.krt.profit.basetool.frontend.leadership.model.CreateKommandoGroupRequest;
+import de.greluc.krt.profit.basetool.frontend.leadership.model.GrandAdmiralRequest;
+import de.greluc.krt.profit.basetool.frontend.leadership.model.KommandoGroupDto;
+import de.greluc.krt.profit.basetool.frontend.leadership.model.LeitungViewDto;
+import de.greluc.krt.profit.basetool.frontend.leadership.model.OlMemberResponse;
+import de.greluc.krt.profit.basetool.frontend.leadership.model.UpdateKommandoGroupRequest;
+import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartDto;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipLeadToggleRequest;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import java.util.UUID;

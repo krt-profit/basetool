@@ -19,14 +19,14 @@
 
 package de.greluc.krt.profit.basetool.frontend.hangar.client;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.FleetviewImportResponseDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.LocationDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.SetHomeLocationRequestDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ShipDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ShipRequestDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronShipOverviewDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.FleetviewImportResponseDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.SetHomeLocationRequestDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipRequestDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.SquadronShipOverviewDto;
+import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.util.List;

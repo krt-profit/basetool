@@ -75,7 +75,7 @@ class SessionTypeAllowListBreadthTest {
   void aWildcardOrForeignSessionBoundTypeIsReported() {
     assertThat(
             List.of(
-                "de.greluc.krt.profit.basetool.frontend.model.form.ShipForm",
+                "de.greluc.krt.profit.basetool.frontend.hangar.model.ShipForm",
                 "de.greluc.krt.profit.basetool.frontend.model.*",
                 "de.greluc.krt.profit.basetool.frontend.model.",
                 "java.util.concurrent.ConcurrentHashMap"))

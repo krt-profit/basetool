@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages.CompleteCatalog;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;

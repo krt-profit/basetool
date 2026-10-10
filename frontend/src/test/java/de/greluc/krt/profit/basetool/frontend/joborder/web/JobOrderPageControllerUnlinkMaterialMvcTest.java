@@ -1,0 +1,137 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.joborder.web;
+
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+/**
+ * MVC tests for {@link JobOrderWriteController#unlinkMaterial}: a logistician unlinks with a
+ * success toast, a plain member gets 403, and a backend error yields an error toast.
+ */
+@SpringBootTest
+class JobOrderPageControllerUnlinkMaterialMvcTest {
+
+  @Autowired private WebApplicationContext context;
+
+  private MockMvc mockMvc;
+
+  @MockitoBean private BackendApiClient backendApiClient;
+
+  @MockitoBean
+  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
+      clientRegistrationRepository;
+
+  @BeforeEach
+  void setup() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
+  void unlinkMaterial_AsLogistician_ShouldCallBackendAndRedirectWithSuccessToast()
+      throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+
+    doReturn(null)
+        .when(backendApiClient)
+        .delete(
+            eq("/api/v1/orders/{id}/materials/{materialId}"),
+            eq(Void.class),
+            eq(orderId),
+            eq(materialId));
+
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/materials/unlink")
+                .with(csrf())
+                .param("materialId", materialId.toString()))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/orders/" + orderId))
+        .andExpect(flash().attribute("successToast", "orders.detail.material.unlink.success"));
+
+    verify(backendApiClient)
+        .delete(
+            eq("/api/v1/orders/{id}/materials/{materialId}"),
+            eq(Void.class),
+            eq(orderId),
+            eq(materialId));
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER"})
+  void unlinkMaterial_AsPlainMember_ShouldReturn403() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/materials/unlink")
+                .with(csrf())
+                .param("materialId", materialId.toString()))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
+  void unlinkMaterial_WhenBackendFails_ShouldRedirectWithErrorToast() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+
+    doThrow(new BackendServiceException("Internal Server Error", null, 500))
+        .when(backendApiClient)
+        .delete(
+            eq("/api/v1/orders/{id}/materials/{materialId}"),
+            eq(Void.class),
+            eq(orderId),
+            eq(materialId));
+
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/materials/unlink")
+                .with(csrf())
+                .param("materialId", materialId.toString()))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/orders/" + orderId))
+        .andExpect(flash().attribute("errorToast", "orders.detail.material.unlink.error"));
+  }
+}

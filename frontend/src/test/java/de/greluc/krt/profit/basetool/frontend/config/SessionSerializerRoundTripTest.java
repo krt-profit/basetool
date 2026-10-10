@@ -24,8 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.ImportSuggestionDto;
-import de.greluc.krt.profit.basetool.frontend.model.form.PersonalInventoryForm;
+import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryForm;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.ImportSuggestionDto;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

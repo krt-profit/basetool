@@ -1,0 +1,260 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.blueprint.web;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
+import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintImportPreviewDto;
+import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintImportResultDto;
+import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintBatchCreateRequest;
+import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintBatchResultDto;
+import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintBulkDeleteResultDto;
+import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import okhttp3.mockwebserver.MockResponse;
+import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
+
+/**
+ * Unit tests for {@link AdminPersonalBlueprintsPageController}: every write proxies to the admin
+ * backend surface with the target {@code sub} from the path. {@link MockWebServer} exercises the
+ * multipart import-preview chain; the JSON paths mock {@link BackendApiClient}.
+ */
+class AdminPersonalBlueprintsControllerTest {
+
+  /**
+   * The target member, a Keycloak {@code sub} — which Keycloak issues, and the backend binds, as a
+   * UUID.
+   */
+  private static final UUID TARGET = UUID.fromString("11111111-2222-3333-4444-555555555555");
+
+  private MockWebServer server;
+  private BackendApiClient backendApiClient;
+  private AdminPersonalBlueprintsPageController controller;
+
+  @BeforeEach
+  void setUp() throws Exception {
+    server = new MockWebServer();
+    server.start();
+    WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
+    backendApiClient = RealBackendApiClient.mockExecutingOver(webClient);
+    controller =
+        new AdminPersonalBlueprintsPageController(new BlueprintBackendClient(backendApiClient));
+  }
+
+  @AfterEach
+  void tearDown() throws Exception {
+    try {
+      server.shutdown();
+    } catch (Exception ignored) {
+    }
+  }
+
+  @Test
+  void addSelected_relaysToAdminBatchEndpointForTargetUser() {
+    when(backendApiClient.post(
+            eq("/api/v1/admin/personal-blueprints/{userSub}/batch"),
+            any(PersonalBlueprintBatchCreateRequest.class),
+            eq(PersonalBlueprintBatchResultDto.class),
+            eq(TARGET)))
+        .thenReturn(new PersonalBlueprintBatchResultDto(2, 0, 0));
+
+    PersonalBlueprintBatchResultDto result = controller.addSelected(TARGET, List.of("a", "b"));
+
+    assertEquals(2, result.added());
+  }
+
+  @Test
+  void updateNote_relaysToAdminItemEndpointAndRedirectsToUser() {
+    UUID id = UUID.randomUUID();
+    RedirectAttributesModelMap flash = new RedirectAttributesModelMap();
+
+    String view = controller.updateNote(TARGET, id, "note", null, 1L, flash);
+
+    assertEquals("redirect:/admin/personal-blueprints?userSub=" + TARGET, view);
+    verify(backendApiClient)
+        .put(eq("/api/v1/admin/personal-blueprints/items/{id}"), any(), any(), eq(id));
+    assertEquals(
+        "personalInventory.blueprints.toast.noteUpdated",
+        flash.getFlashAttributes().get("successToast"));
+  }
+
+  @Test
+  void delete_relaysToAdminItemEndpointAndRedirectsToUser() {
+    UUID id = UUID.randomUUID();
+    RedirectAttributesModelMap flash = new RedirectAttributesModelMap();
+
+    String view = controller.delete(TARGET, id, flash);
+
+    assertEquals("redirect:/admin/personal-blueprints?userSub=" + TARGET, view);
+    verify(backendApiClient)
+        .delete(eq("/api/v1/admin/personal-blueprints/items/{id}"), eq(Void.class), eq(id));
+  }
+
+  @Test
+  void deleteAllUsers_relaysToAdminPurgeEndpointAndRedirects() {
+    when(backendApiClient.delete(
+            eq("/api/v1/admin/personal-blueprints"),
+            eq(PersonalBlueprintBulkDeleteResultDto.class)))
+        .thenReturn(new PersonalBlueprintBulkDeleteResultDto(3));
+    RedirectAttributesModelMap flash = new RedirectAttributesModelMap();
+
+    String view = controller.deleteAllUsers(flash);
+
+    assertEquals("redirect:/admin/personal-blueprints", view);
+    verify(backendApiClient)
+        .delete(
+            eq("/api/v1/admin/personal-blueprints"),
+            eq(PersonalBlueprintBulkDeleteResultDto.class));
+    assertEquals(
+        "admin.personalInventory.blueprints.purge.toast.done",
+        flash.getFlashAttributes().get("successToast"));
+  }
+
+  @Test
+  void deleteAllUsersAjax_relaysToAdminPurgeEndpointAndReturnsCount() {
+    when(backendApiClient.delete(
+            eq("/api/v1/admin/personal-blueprints"),
+            eq(PersonalBlueprintBulkDeleteResultDto.class)))
+        .thenReturn(new PersonalBlueprintBulkDeleteResultDto(8));
+
+    ResponseEntity<Object> response = controller.deleteAllUsersAjax();
+
+    assertEquals(200, response.getStatusCode().value());
+    assertEquals(new PersonalBlueprintBulkDeleteResultDto(8), response.getBody());
+  }
+
+  @Test
+  void previewImport_forwardsMultipartToAdminBackendPath() throws Exception {
+    server.enqueue(
+        new MockResponse()
+            .setResponseCode(200)
+            .setHeader("Content-Type", "application/json")
+            .setBody(
+                "{\"total\":0,\"matched\":0,\"matchedByAlias\":0,\"suggested\":0,\"unmatched\":0,"
+                    + "\"alreadyOwned\":0,\"entries\":[]}"));
+
+    MultipartFile file =
+        new MockMultipartFile(
+            "file",
+            "scmdb.json",
+            "application/json",
+            "{\"blueprints\":[]}".getBytes(StandardCharsets.UTF_8));
+
+    BlueprintImportPreviewDto preview =
+        (BlueprintImportPreviewDto) controller.previewImport(TARGET, file).getBody();
+
+    assertNotNull(preview);
+    assertEquals(0, preview.total());
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertEquals("/api/v1/admin/personal-blueprints/" + TARGET + "/import/preview", req.getPath());
+  }
+
+  @Test
+  void previewImport_onABackendRefusal_relaysItsLocalisedDetail() {
+    server.enqueue(
+        new MockResponse()
+            .setResponseCode(400)
+            .setHeader("Content-Type", "application/problem+json")
+            .setBody(
+                "{\"status\":400,\"code\":\"BAD_REQUEST\","
+                    + "\"detail\":\"Die Datei ist kein lesbares JSON.\"}"));
+    MultipartFile file =
+        new MockMultipartFile(
+            "file", "broken.json", "application/json", "x".getBytes(StandardCharsets.UTF_8));
+
+    ResponseEntity<Object> refused = controller.previewImport(TARGET, file);
+
+    assertEquals(HttpStatus.BAD_REQUEST, refused.getStatusCode());
+    assertEquals(
+        "Die Datei ist kein lesbares JSON.", ((Map<?, ?>) refused.getBody()).get("detail"));
+  }
+
+  @Test
+  void applyImport_relaysToAdminApplyEndpoint() {
+    when(backendApiClient.post(
+            eq("/api/v1/admin/personal-blueprints/{userSub}/import/apply"),
+            any(),
+            eq(BlueprintImportResultDto.class),
+            eq(TARGET)))
+        .thenReturn(new BlueprintImportResultDto(1, 1, 0, 0, 0));
+
+    BlueprintImportResultDto result =
+        (BlueprintImportResultDto) controller.applyImport(TARGET, List.of()).getBody();
+
+    assertNotNull(result);
+    assertEquals(1, result.added());
+    assertEquals(1, result.aliasesLearned());
+  }
+
+  @Test
+  void applyImport_onABackendRefusal_relaysItsLocalisedDetail() {
+    when(backendApiClient.post(
+            any(), any(), eq(BlueprintImportResultDto.class), any(Object[].class)))
+        .thenThrow(
+            new BackendServiceException(
+                "Backend returned 400",
+                null,
+                400,
+                "BAD_REQUEST",
+                null,
+                List.of(),
+                "Die Auswahl ist ungueltig."));
+
+    ResponseEntity<Object> refused = controller.applyImport(TARGET, List.of());
+
+    assertEquals(HttpStatus.BAD_REQUEST, refused.getStatusCode());
+    assertEquals("Die Auswahl ist ungueltig.", ((Map<?, ?>) refused.getBody()).get("detail"));
+  }
+
+  @Test
+  void applyImport_onAnUnexpectedError_answersAnEmpty500() {
+    when(backendApiClient.post(
+            any(), any(), eq(BlueprintImportResultDto.class), any(Object[].class)))
+        .thenThrow(new RuntimeException("boom"));
+
+    ResponseEntity<Object> failed = controller.applyImport(TARGET, List.of());
+
+    assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, failed.getStatusCode());
+    assertNull(failed.getBody());
+  }
+}

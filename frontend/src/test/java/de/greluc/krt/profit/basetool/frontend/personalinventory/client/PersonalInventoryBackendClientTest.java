@@ -21,10 +21,10 @@ package de.greluc.krt.profit.basetool.frontend.personalinventory.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemCreateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemUpdateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryLocationType;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.client.PersonalInventoryBackendClient.ItemQuery;
+import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemCreateRequest;
+import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryLocationType;
 import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;

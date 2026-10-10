@@ -1,0 +1,102 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.mission.web;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+
+import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus;
+import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncTopicClass;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.context.MessageSource;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
+
+/**
+ * Tests the server-side live-sync publish for the {@code /missions} list (REQ-FE-015, ADR-0094):
+ * the delete path, and consistency of the hardcoded topic and section strings with the registry.
+ * The list topic must stay distinct from the per-mission detail room.
+ */
+class MissionListLiveSyncPublishTest {
+
+  /** The list section of the global {@code missions} room. */
+  private static final List<String> LIST = List.of("list");
+
+  private BackendApiClient backendApiClient;
+  private LiveSyncLocalBus liveSyncLocalBus;
+  private MissionWriteController controller;
+  private RedirectAttributes redirectAttributes;
+
+  @BeforeEach
+  void setUp() {
+    backendApiClient = mock(BackendApiClient.class);
+    liveSyncLocalBus = mock(LiveSyncLocalBus.class);
+    controller =
+        new MissionWriteController(
+            new MissionBackendClient(backendApiClient),
+            mock(MessageSource.class),
+            mock(MissionPageController.class),
+            liveSyncLocalBus);
+    redirectAttributes = new RedirectAttributesModelMap();
+  }
+
+  @Test
+  void missionsListTopic_isDistinctFromTheMissionDetailRoom() {
+    assertThat(LiveSyncTopicClass.MISSIONS_LIST.prefix()).isEqualTo("missions");
+    assertThat(LiveSyncTopicClass.MISSIONS_LIST.allowedSections()).containsExactlyElementsOf(LIST);
+    assertThat(LiveSyncTopicClass.MISSIONS_LIST.presenceEnabled()).isFalse();
+    assertThat(LiveSyncTopicClass.MISSION.prefix()).isEqualTo("mission");
+    assertThat(LiveSyncTopicClass.MISSION.presenceEnabled()).isTrue();
+    assertThat(LiveSyncTopicClass.MISSIONS_LIST.metricLabel())
+        .as("distinct topic_class series on the ops dashboard (REQ-OBS-011)")
+        .isNotEqualTo(LiveSyncTopicClass.MISSION.metricLabel());
+  }
+
+  @Test
+  void deleteMission_publishesTheListSection() {
+    String view = controller.deleteMission(UUID.randomUUID(), redirectAttributes);
+
+    assertThat(view).isEqualTo("redirect:/missions");
+    verify(liveSyncLocalBus).publish("missions", LIST);
+  }
+
+  @Test
+  void deleteMission_onBackendFailure_doesNotPublish() {
+    UUID id = UUID.randomUUID();
+    doThrow(new RuntimeException("backend down"))
+        .when(backendApiClient)
+        .delete(anyString(), any(), any(Object[].class));
+
+    String view = controller.deleteMission(id, redirectAttributes);
+
+    assertThat(view).isEqualTo("redirect:/missions/" + id);
+    verify(liveSyncLocalBus, never()).publish(anyString(), any());
+  }
+}

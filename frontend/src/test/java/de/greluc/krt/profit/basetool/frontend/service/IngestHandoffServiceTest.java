@@ -26,10 +26,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportPreviewDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.HandoffKind;
-import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryImportDraftDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.StagedHandoff;
+import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintImportPreviewDto;
+import de.greluc.krt.profit.basetool.frontend.model.HandoffKind;
+import de.greluc.krt.profit.basetool.frontend.model.StagedHandoff;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryImportDraftDto;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

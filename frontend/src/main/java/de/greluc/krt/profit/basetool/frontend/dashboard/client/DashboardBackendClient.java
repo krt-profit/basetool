@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.client;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.AnnouncementDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.AnnouncementRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementDto;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementRequest;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
+import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.time.Instant;
 import java.util.List;

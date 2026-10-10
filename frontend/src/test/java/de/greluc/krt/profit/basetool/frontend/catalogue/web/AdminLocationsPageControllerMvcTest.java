@@ -1,0 +1,247 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.catalogue.web;
+
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
+
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
+import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+/**
+ * Regression test for the Thymeleaf JS-inline truncation on {@code /admin/locations}: the {@code
+ * locations.js} module tag, emitted after the inline bootstrap, and the closing {@code </html>} tag
+ * must be present in the rendered page.
+ */
+@SpringBootTest
+class AdminLocationsPageControllerMvcTest {
+
+  private MockMvc mockMvc;
+
+  @Autowired private WebApplicationContext context;
+
+  @MockitoBean private BackendApiClient backendApiClient;
+
+  @MockitoBean
+  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
+      clientRegistrationRepository;
+
+  @BeforeEach
+  void setup() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+  }
+
+  /**
+   * Asserts the {@code locations.js} module tag appears in the rendered HTML, proving the inline
+   * script was not truncated.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listData_ShouldRenderModuleTag_AfterDatalist() throws Exception {
+    LocationDto location =
+        new LocationDto(UUID.randomUUID(), "ARC-L1", "Arc-Corp Lagrange 1", false, false, 0L);
+    PageResponse<LocationDto> page =
+        new PageResponse<>(List.of(location), 0, 1000, 1, 1, Collections.emptyList());
+
+    when(backendApiClient.get(
+            eq("/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page={page}"),
+            anyTypeRef(),
+            eq(0)))
+        .thenReturn(page);
+
+    mockMvc
+        .perform(get("/admin/locations"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("admin/locations"))
+        .andExpect(content().string(containsString("id=\"locationNames-data\"")))
+        .andExpect(content().string(containsString("value=\"ARC-L1\"")))
+        .andExpect(content().string(containsString("src=\"/js/locations.js\"")))
+        .andExpect(content().string(containsString("</html>")));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listData_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
+    PageResponse<LocationDto> page = new PageResponse<>(List.of(), 0, 1000, 0, 1, List.of());
+    when(backendApiClient.get(
+            eq("/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page={page}"),
+            anyTypeRef(),
+            eq(0)))
+        .thenReturn(page);
+
+    mockMvc
+        .perform(get("/admin/locations"))
+        .andExpect(status().isOk())
+        .andExpect(
+            PageStylesheets.content(
+                containsString(
+                    ".form-group input:where(:not([type='checkbox'], [type='radio']))")));
+  }
+
+  /**
+   * Renders {@code /admin/locations} in German with the given locations from the backend.
+   *
+   * @param locations the locations the catalogue returns
+   * @return the rendered HTML
+   * @throws Exception if the request fails
+   */
+  private @NotNull String renderList(@NotNull List<LocationDto> locations) throws Exception {
+    when(backendApiClient.get(
+            eq("/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page={page}"),
+            anyTypeRef(),
+            eq(0)))
+        .thenReturn(
+            new PageResponse<>(locations, 0, 1000, locations.size(), 1, Collections.emptyList()));
+    return mockMvc
+        .perform(get("/admin/locations").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+  }
+
+  /** The list renders on the list pattern: page head, toolbar search, stacked data table. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listData_rendersTheListPattern() throws Exception {
+    String html =
+        renderList(
+            List.of(new LocationDto(UUID.randomUUID(), "ARC-L1", "Arc-Corp L1", false, true, 0L)));
+
+    assertThat(html)
+        .contains("data-testid=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Stammdaten<")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box");
+    assertThat(html.substring(html.indexOf("<main"), html.indexOf("</main>")))
+        .doesNotContain("krtm-")
+        .doesNotContain("colspan");
+    assertThat(html.split("btn--cta", -1)).hasSize(1);
+    assertThat(html)
+        .contains("data-testid=\"toolbar-search\"")
+        .containsPattern(
+            "id=\"filterLocations\"[^>]*data-trigger=\"filter-table\""
+                + " data-table-id=\"locationsTable\"")
+        .contains("class=\"data-table data-table--stack\"")
+        .containsPattern("class=\"cell-title\">ARC-L1<")
+        .contains("class=\"btn btn-ghost btn-xs\"")
+        .contains(">Ausblenden<")
+        .doesNotContain("data-testid=\"empty-state\"");
+    assertThat(html.substring(html.indexOf("<main"), html.indexOf("</main>")))
+        .doesNotContain("btn-secondary");
+  }
+
+  /** An empty catalogue renders the empty state and no table. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listData_rendersTheEmptyState() throws Exception {
+    String html = renderList(List.of());
+
+    assertThat(html)
+        .contains("data-testid=\"empty-state\"")
+        .doesNotContain("<table id=\"locationsTable\"")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>0<");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void toggleLocationVisibilityAjax_withHeader_returns200WithLocation() throws Exception {
+    UUID id = UUID.randomUUID();
+    LocationDto before = new LocationDto(id, "ARC-L1", "desc", false, false, 0L);
+    LocationDto after = new LocationDto(id, "ARC-L1", "desc", true, false, 1L);
+    when(backendApiClient.get(eq("/api/v1/locations/{id}"), eq(LocationDto.class), eq(id)))
+        .thenReturn(before, after);
+    when(backendApiClient.put(eq("/api/v1/locations/{id}"), any(), eq(Void.class), eq(id)))
+        .thenReturn(null);
+
+    mockMvc
+        .perform(
+            post("/admin/locations/" + id + "/toggle-visibility")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("ARC-L1")));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void toggleLocationVisibilityAjax_backendConflict_relays409() throws Exception {
+    UUID id = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/locations/{id}"), eq(LocationDto.class), eq(id)))
+        .thenReturn(new LocationDto(id, "ARC-L1", "desc", false, false, 0L));
+    when(backendApiClient.put(eq("/api/v1/locations/{id}"), any(), eq(Void.class), eq(id)))
+        .thenThrow(
+            new BackendServiceException(
+                "conflict", null, 409, "OPTIMISTIC_LOCK", null, java.util.List.of(), "conflict"));
+
+    mockMvc
+        .perform(
+            post("/admin/locations/" + id + "/toggle-visibility")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf()))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void toggleLocationVisibility_withoutHeader_redirects() throws Exception {
+    UUID id = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/locations/{id}"), eq(LocationDto.class), eq(id)))
+        .thenReturn(new LocationDto(id, "ARC-L1", "desc", false, false, 0L));
+    when(backendApiClient.put(eq("/api/v1/locations/{id}"), any(), eq(Void.class), eq(id)))
+        .thenReturn(null);
+
+    mockMvc
+        .perform(
+            post("/admin/locations/" + id + "/toggle-visibility")
+                .with(csrf())
+                .param("hidden", "true"))
+        .andExpect(status().is3xxRedirection());
+  }
+}

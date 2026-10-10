@@ -1,0 +1,206 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.bank.web;
+
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankAccountDetailDto;
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankAccountDto;
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankApprovalLimitsDto;
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingDto;
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankCapabilitiesDto;
+import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.hamcrest.Matchers;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+/**
+ * MVC render test for the read-only approval-limit box on the bank-staff account view
+ * (REQ-BANK-041): it renders identically for {@code BANK_EMPLOYEE} and {@code BANK_MANAGEMENT}, and
+ * above the tabs instead of inside the Konto-Info tab.
+ */
+@SpringBootTest
+class BankAccountDetailLimitsMvcTest {
+
+  /**
+   * Marker of the read-only limits box rendered by {@code bank-approval-limits :: limitsDisplay}.
+   */
+  private static final String LIMITS_BOX = "data-testid=\"bank-approval-limits-display\"";
+
+  /** Marker of the Konto-Info card in its tab, which the limits box must not be nested in. */
+  private static final String INFO_PANEL = "data-testid=\"bank-info-panel\"";
+
+  @Autowired private WebApplicationContext context;
+  private MockMvc mockMvc;
+
+  @MockitoBean private BackendApiClient backendApiClient;
+
+  @MockitoBean
+  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
+      clientRegistrationRepository;
+
+  /** Builds the MockMvc instance with the Spring Security filter chain applied. */
+  @BeforeEach
+  void setup() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+  }
+
+  /**
+   * Stubs the bank-staff account detail of an ORG_UNIT account carrying one role-bucket ceiling and
+   * one all-members ceiling, assembled read-only ({@code canEdit=false}) exactly as {@code
+   * BankAccountService#getAccountDetail} does for every caller of this surface.
+   *
+   * @param accountId the account id used in every backend URI
+   */
+  private void stubDetail(UUID accountId) {
+    BankAccountDto account =
+        new BankAccountDto(
+            accountId,
+            "KB-0001",
+            "Staffel IRIDIUM",
+            "ORG_UNIT",
+            "ACTIVE",
+            null,
+            null,
+            new BigDecimal("1850000"),
+            null,
+            null,
+            null,
+            0L,
+            Instant.parse("2026-01-15T10:00:00Z"));
+    BankApprovalLimitsDto limits =
+        new BankApprovalLimitsDto(
+            false,
+            true,
+            true,
+            false,
+            List.of("KOMMANDOLEITER"),
+            Map.of("KOMMANDOLEITER", new BigDecimal("1000000")),
+            new BigDecimal("500000"),
+            null,
+            List.of());
+    BankAccountDetailDto detail =
+        new BankAccountDetailDto(
+            account,
+            new BigDecimal("420000"),
+            128L,
+            new BankCapabilitiesDto(true, true, true, false),
+            limits);
+
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(
+            eq("/api/v1/bank/accounts/{id}"), eq(BankAccountDetailDto.class), eq(accountId)))
+        .thenReturn(detail);
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef(), eq(accountId)))
+        .thenReturn(new PageResponse<BankBookingDto>(List.of(), 0, 20, 0L, 0, List.of()));
+  }
+
+  /**
+   * A plain bank employee sees the configured ceilings, and sees them without opening the
+   * Konto-Info tab.
+   *
+   * @throws Exception when the MockMvc exchange fails
+   */
+  @Test
+  @WithMockUser(roles = {"BANK_EMPLOYEE"})
+  void accountDetail_asBankEmployee_showsLimitsAboveTheTabs() throws Exception {
+    UUID accountId = UUID.randomUUID();
+    stubDetail(accountId);
+
+    String html =
+        mockMvc
+            .perform(get("/bank/accounts/" + accountId))
+            .andExpect(status().isOk())
+            .andExpect(content().string(Matchers.containsString(LIMITS_BOX)))
+            .andExpect(content().string(Matchers.containsString("Alle Mitglieder der Org-Einheit")))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    int limitsAt = html.indexOf(LIMITS_BOX);
+    int infoPanelAt = html.indexOf(INFO_PANEL);
+    assertTrue(infoPanelAt > 0, "the Konto-Info card should still render");
+    assertTrue(
+        limitsAt < infoPanelAt,
+        "the read-only limits box must render above the tabs, not inside the Konto-Info tab");
+  }
+
+  /**
+   * Bank management sees the same read-only limits box as a bank employee.
+   *
+   * @throws Exception when the MockMvc exchange fails
+   */
+  @Test
+  @WithMockUser(roles = {"BANK_MANAGEMENT"})
+  void accountDetail_asBankManagement_showsTheSameReadOnlyLimits() throws Exception {
+    UUID accountId = UUID.randomUUID();
+    stubDetail(accountId);
+
+    mockMvc
+        .perform(get("/bank/accounts/" + accountId))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString(LIMITS_BOX)))
+        .andExpect(
+            content()
+                .string(
+                    Matchers.not(
+                        Matchers.containsString("data-testid=\"bank-approval-limit-settings\""))));
+  }
+
+  /**
+   * The box stays part of the {@code accountBody} swap, so a peer's limit write refreshes it in
+   * place instead of leaving a stale ceiling on screen (REQ-FE-005).
+   *
+   * @throws Exception when the MockMvc exchange fails
+   */
+  @Test
+  @WithMockUser(roles = {"BANK_EMPLOYEE"})
+  void accountDetail_accountBodyFragment_stillCarriesTheLimits() throws Exception {
+    UUID accountId = UUID.randomUUID();
+    stubDetail(accountId);
+
+    mockMvc
+        .perform(get("/bank/accounts/" + accountId).param("fragment", "accountBody"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString(LIMITS_BOX)));
+  }
+}

@@ -1,0 +1,254 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.identity.web;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
+import de.greluc.krt.profit.basetool.frontend.identity.model.PersonSearchHitDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.PersonSearchResultDto;
+import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.ui.ConcurrentModel;
+import org.springframework.ui.Model;
+
+/**
+ * Mockito tests for {@link AdminPersonSearchPageController} (REQ-SEC-060): a too-short term never
+ * reaches the backend, the term is sent once-encoded as a URI-template variable with its casing
+ * untouched, and a backend failure leaves {@code searched} false.
+ */
+class AdminPersonSearchPageControllerTest {
+
+  private static final PersonSearchResultDto ONE_HIT =
+      new PersonSearchResultDto(
+          List.of(new PersonSearchHitDto("MEMBER", "app_user", "username", "id", "Snippet", null)),
+          false,
+          List.of());
+
+  private static final String SEARCH_URI = "/api/v1/admin/person-search?q={q}";
+
+  @Test
+  void aTermUnderThreeCharactersNeverReachesTheBackend() {
+    BackendApiClient client = mock(BackendApiClient.class);
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
+    Model model = new ConcurrentModel();
+
+    String view = controller.page("Zz", null, model);
+
+    assertEquals("admin/person-search", view);
+    assertEquals("admin.personSearch.tooShort", model.getAttribute("error"));
+    assertEquals(false, model.getAttribute("searched"));
+    verifyNoSearch(client);
+  }
+
+  @Test
+  void anEmptyTermIsTheInitialStateAndNotAnError() {
+    BackendApiClient client = mock(BackendApiClient.class);
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
+    Model model = new ConcurrentModel();
+
+    controller.page(null, null, model);
+
+    assertFalse(model.containsAttribute("error"));
+    assertEquals(false, model.getAttribute("searched"));
+    assertEquals(List.of(), model.getAttribute("hits"));
+    verifyNoSearch(client);
+  }
+
+  @Test
+  void whitespaceIsTrimmedBeforeTheLengthIsJudged() {
+    BackendApiClient client = mock(BackendApiClient.class);
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
+    Model model = new ConcurrentModel();
+
+    controller.page("  Zz  ", null, model);
+
+    assertEquals("admin.personSearch.tooShort", model.getAttribute("error"));
+    assertEquals("Zz", model.getAttribute("term"), "the trimmed term is echoed back into the box");
+  }
+
+  @Test
+  void theTermIsBoundAsAUriVariableAndNeverEncodedByHand() {
+    BackendApiClient client = mock(BackendApiClient.class);
+    stubOneHit(client);
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
+
+    controller.page("Müller & Söhne", null, new ConcurrentModel());
+
+    verify(client).get(eq(SEARCH_URI), resultType(), eq("Müller & Söhne"));
+  }
+
+  @Test
+  void theTypedCasingIsRelayedUntouched() {
+    BackendApiClient client = mock(BackendApiClient.class);
+    stubOneHit(client);
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
+
+    controller.page("MixedCase", null, new ConcurrentModel());
+
+    verify(client).get(eq(SEARCH_URI), resultType(), eq("MixedCase"));
+  }
+
+  @Test
+  void aSuccessfulSearchPublishesTheHitsAndMarksThePageSearched() {
+    BackendApiClient client = mock(BackendApiClient.class);
+    when(client.get(any(String.class), resultType(), any(Object[].class)))
+        .thenReturn(
+            new PersonSearchResultDto(
+                List.of(
+                    new PersonSearchHitDto(
+                        "MEMBER", "app_user", "username", "id", "Snippet", "MEMBER")),
+                true,
+                List.of("mission_participant.comment")));
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
+    Model model = new ConcurrentModel();
+
+    controller.page("SomeHandle", null, model);
+
+    assertEquals(true, model.getAttribute("searched"));
+    assertEquals(true, model.getAttribute("truncated"));
+    assertEquals(List.of("mission_participant.comment"), model.getAttribute("cappedColumns"));
+    assertEquals(1, ((List<?>) model.getAttribute("hits")).size());
+    assertFalse(model.containsAttribute("error"));
+  }
+
+  @Test
+  void anEmptyBodyFromTheBackendIsNoHitsRatherThanAFailure() {
+    BackendApiClient client = mock(BackendApiClient.class);
+    when(client.get(any(String.class), resultType(), any(Object[].class))).thenReturn(null);
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
+    Model model = new ConcurrentModel();
+
+    controller.page("SomeHandle", null, model);
+
+    assertEquals(List.of(), model.getAttribute("hits"));
+    assertEquals(false, model.getAttribute("truncated"));
+    assertEquals(List.of(), model.getAttribute("cappedColumns"));
+    assertEquals(true, model.getAttribute("searched"));
+  }
+
+  @Test
+  void aBackendFailureLeavesSearchedFalseSoThePageCannotClaimNoMentions() {
+    BackendApiClient client = mock(BackendApiClient.class);
+    when(client.get(any(String.class), resultType(), any(Object[].class)))
+        .thenThrow(new BackendServiceException("boom", new RuntimeException(), 503));
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
+    Model model = new ConcurrentModel();
+
+    controller.page("SomeHandle", null, model);
+
+    assertEquals("admin.personSearch.error.load", model.getAttribute("error"));
+    assertEquals(false, model.getAttribute("searched"));
+  }
+
+  @Test
+  void anUnexpectedFailureIsHandledTheSameWay() {
+    BackendApiClient client = mock(BackendApiClient.class);
+    when(client.get(any(String.class), resultType(), any(Object[].class)))
+        .thenThrow(new IllegalStateException("boom"));
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
+    Model model = new ConcurrentModel();
+
+    controller.page("SomeHandle", null, model);
+
+    assertEquals("admin.personSearch.error.load", model.getAttribute("error"));
+    assertEquals(false, model.getAttribute("searched"));
+  }
+
+  @Test
+  void theFragmentParameterSelectsTheResultsBlockForTheInPlaceSwap() {
+    BackendApiClient client = mock(BackendApiClient.class);
+    stubOneHit(client);
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
+
+    String view = controller.page("SomeHandle", "results", new ConcurrentModel());
+
+    assertEquals("admin/person-search :: results", view);
+  }
+
+  @Test
+  void anUnknownFragmentValueRendersTheWholePage() {
+    BackendApiClient client = mock(BackendApiClient.class);
+    stubOneHit(client);
+    AdminPersonSearchPageController controller =
+        new AdminPersonSearchPageController(new IdentityBackendClient(client));
+
+    String view = controller.page("SomeHandle", "nonsense", new ConcurrentModel());
+
+    assertEquals("admin/person-search", view);
+  }
+
+  /**
+   * The {@code ParameterizedTypeReference} matcher, spelled once.
+   *
+   * @return an {@code any()} matcher of the controller's result type
+   */
+  private static ParameterizedTypeReference<PersonSearchResultDto> resultType() {
+    return ArgumentMatchers.any();
+  }
+
+  /**
+   * Stubs the one overload the controller calls.
+   *
+   * @param client the mocked client
+   */
+  private static void stubOneHit(BackendApiClient client) {
+    when(client.get(any(String.class), resultType(), any(Object[].class))).thenReturn(ONE_HIT);
+  }
+
+  /**
+   * Asserts the controller made no backend call, on either overload.
+   *
+   * @param client the mocked client
+   */
+  private static void verifyNoSearch(BackendApiClient client) {
+    verify(client, never())
+        .get(
+            ArgumentMatchers.<String>any(),
+            ArgumentMatchers.<ParameterizedTypeReference<Object>>any());
+    verify(client, never())
+        .get(
+            ArgumentMatchers.<String>any(),
+            ArgumentMatchers.<ParameterizedTypeReference<Object>>any(),
+            any(Object[].class));
+    verify(client, never()).get(ArgumentMatchers.<String>any(), ArgumentMatchers.<Class<?>>any());
+  }
+}

@@ -30,13 +30,13 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryBookOutForm;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryForm;
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ImportIssueCode;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ImportIssueDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ImportIssueSeverity;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ImportSuggestionDto;
-import de.greluc.krt.profit.basetool.frontend.model.form.InventoryBookOutForm;
-import de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.ImportIssueCode;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.ImportIssueDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.ImportIssueSeverity;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.ImportSuggestionDto;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.nio.charset.StandardCharsets;
@@ -277,11 +277,11 @@ class SessionTypeAllowListTest {
     "org.springframework.validation.beanvalidation.LocalValidatorFactoryBean,false",
     "org.springframework.web.servlet.FlashMap,true",
     "org.springframework.web.servlet.FlashMapManager,false",
-    "de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm,true",
-    "de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm$AllocationRow,true",
-    "de.greluc.krt.profit.basetool.frontend.model.form.InventoryBookOutForm,false",
-    "de.greluc.krt.profit.basetool.frontend.model.dto.ImportIssueDto,true",
-    "de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto,false",
+    "de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryForm,true",
+    "de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryForm$AllocationRow,true",
+    "de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryBookOutForm,false",
+    "de.greluc.krt.profit.basetool.frontend.refinery.model.ImportIssueDto,true",
+    "de.greluc.krt.profit.basetool.frontend.mission.model.MissionDto,false",
     "de.greluc.krt.profit.basetool.frontend.config.SessionTypeAllowList,false"
   })
   void theNamePatternsCoverExactlyTheirPackage(String className, boolean allowed) {

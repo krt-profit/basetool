@@ -21,11 +21,11 @@ package de.greluc.krt.profit.basetool.frontend.blueprint.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportApplyRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportResolutionDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.DefaultBlueprintCreateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintBatchCreateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintImportApplyRequest;
+import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintImportResolutionDto;
+import de.greluc.krt.profit.basetool.frontend.blueprint.model.DefaultBlueprintCreateRequest;
+import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintBatchCreateRequest;
+import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
 import java.nio.charset.StandardCharsets;
 import java.util.List;

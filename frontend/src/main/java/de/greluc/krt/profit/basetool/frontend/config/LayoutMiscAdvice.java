@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;

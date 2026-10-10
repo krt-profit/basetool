@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
-import de.greluc.krt.profit.basetool.frontend.model.dto.TermsStatusDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.TermsStatusDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.TermsGateHandoff;

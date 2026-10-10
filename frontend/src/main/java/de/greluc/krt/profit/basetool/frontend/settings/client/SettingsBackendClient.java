@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.settings.client;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.SpecialCommandDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingUpdateDto;
+import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.SpecialCommandDto;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingDto;
+import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingUpdateDto;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

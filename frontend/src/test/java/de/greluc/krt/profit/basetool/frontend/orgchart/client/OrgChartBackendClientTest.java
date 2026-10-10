@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.frontend.orgchart.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartPositionCreateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartPositionDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartPositionUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartPositionCreateRequest;
+import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartPositionDto;
+import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartPositionUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;

@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;

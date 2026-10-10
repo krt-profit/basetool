@@ -52,8 +52,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  *
  * <p>Every session write of the compiled main classes is resolved to its static type by {@link
  * SessionBoundTypeScan}; the closure over the application types' members must be admitted by the
- * enforcing validator, so a flashed form moved out of {@code frontend.model} fails here instead of
- * being dropped in production. The application part of the closure must equal {@link
+ * enforcing validator, so a flashed form the list does not name fails here instead of being dropped
+ * in production. The application part of the closure must equal {@link
  * SessionTypeAllowList#SESSION_BOUND_TYPES}, the exact list the allow-list admits (D-10): a new
  * session-bound type without an entry, and an entry no session write reaches, both fail.
  */
@@ -155,14 +155,14 @@ class SessionBoundTypeClosureTest {
     Set<String> derived = new TreeSet<>(SessionTypeAllowList.SESSION_BOUND_TYPES);
     derived.addAll(applicationTypes(closure));
     Set<String> listed = new TreeSet<>(SessionTypeAllowList.SESSION_BOUND_TYPES);
-    listed.add("de.greluc.krt.profit.basetool.frontend.model.form.RetiredForm");
+    listed.add("de.greluc.krt.profit.basetool.frontend.inventory.model.RetiredForm");
 
     assertThat(listDifference(derived, listed))
         .containsExactlyInAnyOrder(
             "missing from SESSION_BOUND_TYPES: " + MovedForm.class.getName(),
             "missing from SESSION_BOUND_TYPES: " + MovedRow.class.getName(),
             "stale in SESSION_BOUND_TYPES: "
-                + "de.greluc.krt.profit.basetool.frontend.model.form.RetiredForm");
+                + "de.greluc.krt.profit.basetool.frontend.inventory.model.RetiredForm");
     assertThat(refused(Set.of(MovedForm.class.getName(), MovedRow.class.getName())))
         .as("the enforcing validator refuses a session-bound type that has no entry")
         .containsExactlyInAnyOrder(MovedForm.class.getName(), MovedRow.class.getName());
@@ -354,9 +354,7 @@ class SessionBoundTypeClosureTest {
     }
   }
 
-  /**
-   * A planted flash site: a form outside {@code frontend.model}, a raw list and an untyped value.
-   */
+  /** A planted flash site: a form the list does not name, a raw list and an untyped value. */
   static final class FlashingFixture {
 
     /**
@@ -381,7 +379,7 @@ class SessionBoundTypeClosureTest {
     }
   }
 
-  /** A form moved out of {@code frontend.model}, with a nested row type. */
+  /** A form the list does not name, with a nested row type. */
   @Getter
   static class MovedForm {
 

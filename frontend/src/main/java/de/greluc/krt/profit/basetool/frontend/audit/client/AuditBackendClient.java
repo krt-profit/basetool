@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.audit.client;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.AuditEventDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.BankAuditEventDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeClientDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.audit.model.AuditEventDto;
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankAuditEventDto;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientDto;
+import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.time.Instant;
 import java.util.List;

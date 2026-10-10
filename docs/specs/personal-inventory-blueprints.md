@@ -215,10 +215,10 @@ fallback), `DefaultBlueprintsE2eTest` (in-place remove, no-reload marker).
 [`DefaultBlueprintBootstrap`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/DefaultBlueprintBootstrap.java),
 [`DefaultBlueprintCatalog`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/DefaultBlueprintCatalog.java),
 [`V157__create_default_blueprint.sql`](../../backend/src/main/resources/db/migration/V157__create_default_blueprint.sql),
-[`AdminDefaultBlueprintsPageController`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/controller/AdminDefaultBlueprintsPageController.java),
+[`AdminDefaultBlueprintsPageController`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/AdminDefaultBlueprintsPageController.java),
 [`admin/default-blueprints.html`](../../frontend/src/main/resources/templates/admin/default-blueprints.html),
 [`admin-default-blueprints.js`](../../frontend/src/main/resources/static/js/admin-default-blueprints.js),
-[`AdminDefaultBlueprintsPageControllerMvcTest`](../../frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/controller/AdminDefaultBlueprintsPageControllerMvcTest.java).
+[`AdminDefaultBlueprintsPageControllerMvcTest`](../../frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/AdminDefaultBlueprintsPageControllerMvcTest.java).
 
 ### REQ-INV-018 — Opt-in global blueprint sharing
 
@@ -407,7 +407,7 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
 [`InventoryItemService#getOwnedStockSlices`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/InventoryItemService.java),
 [`RefineryOrderService#getOwnedOpenRefineryYieldSlices`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/RefineryOrderService.java),
 [`BlueprintCraftabilityDto`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/model/dto/BlueprintCraftabilityDto.java),
-[`PersonalInventoryBlueprintsPageController#craftability`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/controller/PersonalInventoryBlueprintsPageController.java),
+[`PersonalInventoryBlueprintsPageController#craftability`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/PersonalInventoryBlueprintsPageController.java),
 [`personal-inventory-blueprints-recipe.js`](../../frontend/src/main/resources/static/js/personal-inventory-blueprints-recipe.js).
 
 ### REQ-INV-049 — Import preview: auto-selected top suggestion, honest include checkbox
@@ -499,7 +499,7 @@ implementation rather than a second bespoke one.
 - [ ] The member `<select>`, the `#bp-results` filter swap (REQ-FE-002), and the edit / remove /
   import flows keep working unchanged.
 
-**Enforced by:** [`AdminPersonalBlueprintsPageControllerMvcTest`](../../frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/controller/AdminPersonalBlueprintsPageControllerMvcTest.java)
+**Enforced by:** [`AdminPersonalBlueprintsPageControllerMvcTest`](../../frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/AdminPersonalBlueprintsPageControllerMvcTest.java)
 (admin gate + `fragment=results` swap target), the frontend lint gates
 (`htmlhint` / `stylelint` / `eslint` / `prettier`) and `MessageBundleConsistencyTest` (DE/EN/default
 i18n) · **Code:**
@@ -547,7 +547,7 @@ caller's **entire removable owned-blueprint set** in one action, so a user who w
 **Code links:** [`PersonalBlueprintController#deleteAll`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/PersonalBlueprintController.java),
 [`PersonalBlueprintService#deleteAllOwn`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/PersonalBlueprintService.java),
 [`PersonalBlueprintRepository#deleteRemovableByOwnerUserId`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
-[`PersonalInventoryBlueprintsPageController#deleteAll`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/controller/PersonalInventoryBlueprintsPageController.java),
+[`PersonalInventoryBlueprintsPageController#deleteAll`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/PersonalInventoryBlueprintsPageController.java),
 [`personal-inventory-blueprints.js`](../../frontend/src/main/resources/static/js/personal-inventory-blueprints.js)
 (`submitDeleteAll`).
 
@@ -586,7 +586,7 @@ removable owned blueprints of **every** user at once — a maintenance/reset too
 **Code links:** [`AdminPersonalBlueprintController#deleteAllForAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/AdminPersonalBlueprintController.java),
 [`PersonalBlueprintService#deleteAllForAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/PersonalBlueprintService.java),
 [`PersonalBlueprintRepository#deleteAllRemovable`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
-[`AdminPersonalBlueprintsPageController#deleteAllUsers`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/controller/AdminPersonalBlueprintsPageController.java),
+[`AdminPersonalBlueprintsPageController#deleteAllUsers`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/AdminPersonalBlueprintsPageController.java),
 [`admin-personal-blueprints-purge.js`](../../frontend/src/main/resources/static/js/admin-personal-blueprints-purge.js).
 
 ### REQ-INV-038 — SC Extractor release link beside the import
@@ -624,7 +624,7 @@ and search for it.
 - [ ] After an in-place list re-render the link is still present and unchanged.
 
 **Code links:** [`personal-inventory-blueprints.html`](../../frontend/src/main/resources/templates/personal-inventory-blueprints.html),
-[`PersonalInventoryBlueprintsPageControllerMvcTest`](../../frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/controller/PersonalInventoryBlueprintsPageControllerMvcTest.java).
+[`PersonalInventoryBlueprintsPageControllerMvcTest`](../../frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/PersonalInventoryBlueprintsPageControllerMvcTest.java).
 
 *Amended 2026-10-03 (website overhaul phase 3):* the link moved from a ghost button in the add bar
 into the page head's ⋯ menu; label, tooltip, target and `rel` are unchanged.

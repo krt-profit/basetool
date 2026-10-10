@@ -1,0 +1,180 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.bank.web;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+/**
+ * Shared time-window arithmetic for the bank-staff and org-unit account-detail pages: booking
+ * history period, page-size options and balance-chart range (REQ-BANK-049, REQ-BANK-051).
+ */
+public final class BankAccountDetailSupport {
+
+  /** Booking-history page-size options offered to the user; the picker's default is {@code 50}. */
+  public static final List<Integer> PAGE_SIZES = List.of(10, 50, 100);
+
+  /** Default booking-history page size when the caller has not picked one (matches the backend). */
+  public static final int DEFAULT_PAGE_SIZE = 50;
+
+  /** The default booking-history look-back when the caller has not picked a period: 90 days. */
+  public static final int DEFAULT_HISTORY_DAYS = 90;
+
+  /** The short booking-history look-back offered as the first segment: 30 days. */
+  public static final int SHORT_HISTORY_DAYS = 30;
+
+  /** The booking-history segment value of a period that matches no preset. */
+  public static final String HISTORY_PRESET_CUSTOM = "custom";
+
+  /** The chart range keys, in display order; each maps to a {@code bank.chart.range.*} label. */
+  public static final List<String> CHART_RANGES = List.of("30d", "90d", "365d", "all");
+
+  /** The default chart range: the last 90 days, matching the booking-history default. */
+  public static final String DEFAULT_CHART_RANGE = "90d";
+
+  /** Utility class — not instantiable. */
+  private BankAccountDetailSupport() {}
+
+  /**
+   * A resolved booking-history period: the two calendar dates as picked (for the date inputs and
+   * the pagination base URL) and their inclusive UTC instant bounds (for the backend query).
+   *
+   * @param fromDate the inclusive start date (UTC calendar day)
+   * @param toDate the inclusive end date (UTC calendar day)
+   * @param fromInstant the inclusive start instant ({@code fromDate} at 00:00 UTC)
+   * @param toInstant the inclusive end instant ({@code toDate} at 23:59:59.999 UTC)
+   */
+  public record HistoryPeriod(
+      LocalDate fromDate, LocalDate toDate, Instant fromInstant, Instant toInstant) {}
+
+  /**
+   * Resolves the booking-history period from the optional {@code from} / {@code to} parameters,
+   * defaulting to the last {@value #DEFAULT_HISTORY_DAYS} days (REQ-BANK-051). Blank or invalid
+   * values use their default; an inverted range becomes the default look-back ending at {@code to}.
+   *
+   * @param from the raw {@code from} date ({@code yyyy-MM-dd}), or {@code null}
+   * @param to the raw {@code to} date ({@code yyyy-MM-dd}), or {@code null}
+   * @return the resolved period
+   */
+  @NotNull
+  public static HistoryPeriod resolveHistoryPeriod(@Nullable String from, @Nullable String to) {
+    LocalDate today = LocalDate.now(ZoneOffset.UTC);
+    LocalDate toDate = parseDateOrDefault(to, today);
+    LocalDate fromDate = parseDateOrDefault(from, toDate.minusDays(DEFAULT_HISTORY_DAYS));
+    if (fromDate.isAfter(toDate)) {
+      fromDate = toDate.minusDays(DEFAULT_HISTORY_DAYS);
+    }
+    Instant fromInstant = fromDate.atStartOfDay(ZoneOffset.UTC).toInstant();
+    Instant toInstant = toDate.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().minusMillis(1);
+    return new HistoryPeriod(fromDate, toDate, fromInstant, toInstant);
+  }
+
+  /**
+   * Names the booking-history segment a resolved period matches: {@code 30d} or {@code 90d} for a
+   * period of that many days ending on {@code today}, otherwise {@code custom}.
+   *
+   * @param period the resolved booking-history period
+   * @param today the current UTC calendar day
+   * @return {@code 30d}, {@code 90d} or {@code custom}
+   */
+  @NotNull
+  public static String historyPreset(@NotNull HistoryPeriod period, @NotNull LocalDate today) {
+    if (!today.equals(period.toDate())) {
+      return HISTORY_PRESET_CUSTOM;
+    }
+    long days = ChronoUnit.DAYS.between(period.fromDate(), period.toDate());
+    if (days == SHORT_HISTORY_DAYS) {
+      return "30d";
+    }
+    if (days == DEFAULT_HISTORY_DAYS) {
+      return "90d";
+    }
+    return HISTORY_PRESET_CUSTOM;
+  }
+
+  /**
+   * Names the booking-history segment a resolved period matches, relative to the current UTC day.
+   *
+   * @param period the resolved booking-history period
+   * @return {@code 30d}, {@code 90d} or {@code custom}
+   */
+  @NotNull
+  public static String historyPreset(@NotNull HistoryPeriod period) {
+    return historyPreset(period, LocalDate.now(ZoneOffset.UTC));
+  }
+
+  /**
+   * Clamps a raw chart-range parameter to a known key, defaulting to {@link #DEFAULT_CHART_RANGE}.
+   *
+   * @param range the raw {@code chartRange} parameter, or {@code null}
+   * @return a valid range key
+   */
+  @NotNull
+  public static String normalizeChartRange(@Nullable String range) {
+    return range != null && CHART_RANGES.contains(range) ? range : DEFAULT_CHART_RANGE;
+  }
+
+  /**
+   * Returns the inclusive start of a chart range: {@code now} minus the range's span, or for {@code
+   * "all"} the account's creation instant (five years back when unknown).
+   *
+   * @param range a valid range key (see {@link #normalizeChartRange})
+   * @param createdAt the account's creation instant, used for {@code "all"}; may be {@code null}
+   * @param now the period end
+   * @return the chart's inclusive start instant
+   */
+  @NotNull
+  public static Instant chartFromInstant(
+      @NotNull String range, @Nullable Instant createdAt, @NotNull Instant now) {
+    return switch (range) {
+      case "30d" -> now.minus(Duration.ofDays(30));
+      case "365d" -> now.minus(Duration.ofDays(365));
+      case "all" -> createdAt != null ? createdAt : now.minus(Duration.ofDays(365L * 5));
+      default -> now.minus(Duration.ofDays(DEFAULT_HISTORY_DAYS));
+    };
+  }
+
+  /**
+   * Parses an ISO {@code yyyy-MM-dd} date, falling back to a default on null/blank/unparseable
+   * input so a hand-edited query string never 500s the page.
+   *
+   * @param value the raw date string, or {@code null}
+   * @param fallback the value returned when {@code value} is absent or invalid
+   * @return the parsed date, or {@code fallback}
+   */
+  @NotNull
+  private static LocalDate parseDateOrDefault(@Nullable String value, @NotNull LocalDate fallback) {
+    if (value == null || value.isBlank()) {
+      return fallback;
+    }
+    try {
+      return LocalDate.parse(value.trim());
+    } catch (DateTimeParseException e) {
+      return fallback;
+    }
+  }
+}

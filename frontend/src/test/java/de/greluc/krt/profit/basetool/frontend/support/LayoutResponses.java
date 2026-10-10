@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.support;
 
 import de.greluc.krt.profit.basetool.frontend.config.CapabilityFlagsAdvice.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.config.LayoutContextLoader.MeLayoutResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.util.List;
 import java.util.UUID;
 

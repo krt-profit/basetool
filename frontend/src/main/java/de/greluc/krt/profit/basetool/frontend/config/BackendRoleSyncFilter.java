@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
-import de.greluc.krt.profit.basetool.frontend.model.dto.RegistrationStatusDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.RegistrationStatusDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;

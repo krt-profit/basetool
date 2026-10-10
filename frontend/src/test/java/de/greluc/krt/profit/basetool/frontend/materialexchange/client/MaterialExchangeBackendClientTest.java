@@ -22,12 +22,12 @@ package de.greluc.krt.profit.basetool.frontend.materialexchange.client;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.frontend.materialexchange.client.MaterialExchangeBackendClient.BoardFilter;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeItemReleaseRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeOfferUpdateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeReleaseRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialItemRequestCreateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialRequestCreateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialRequestUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeItemReleaseRequest;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeOfferUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeReleaseRequest;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialItemRequestCreateRequest;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialRequestCreateRequest;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialRequestUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;

@@ -252,7 +252,7 @@ class BackendApiClientResilienceTest {
       stubGet(
           termsDocumentClient,
           "/api/v1/terms/document",
-          de.greluc.krt.profit.basetool.frontend.model.dto.TermsDocumentDto.class,
+          de.greluc.krt.profit.basetool.frontend.identity.model.TermsDocumentDto.class,
           new RuntimeException("wrap", new TimeoutException("terms-3s")));
 
       BackendServiceException ex =

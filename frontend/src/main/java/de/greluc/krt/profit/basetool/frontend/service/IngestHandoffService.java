@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.service;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.HandoffKind;
-import de.greluc.krt.profit.basetool.frontend.model.dto.StagedHandoff;
+import de.greluc.krt.profit.basetool.frontend.model.HandoffKind;
+import de.greluc.krt.profit.basetool.frontend.model.StagedHandoff;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;

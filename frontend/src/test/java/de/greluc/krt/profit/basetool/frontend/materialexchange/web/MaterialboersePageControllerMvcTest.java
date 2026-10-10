@@ -1,0 +1,554 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.materialexchange.web;
+
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyClass;
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeCountsDto;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeOfferDto;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeOfferUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeReleasableItemDto;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeReleaseRequest;
+import de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.model.OrgUnitReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+/**
+ * Render and proxy tests for {@link MaterialboersePageController}: the master-detail page renders
+ * with the Markdown remark, and the remark-edit proxy relays a lock conflict as 409 with its
+ * problem code.
+ */
+@SpringBootTest
+class MaterialboersePageControllerMvcTest {
+
+  private MockMvc mockMvc;
+
+  @Autowired private WebApplicationContext context;
+
+  @MockitoBean private BackendApiClient backendApiClient;
+
+  @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
+
+  private final UUID offerId = UUID.randomUUID();
+
+  @BeforeEach
+  void setup() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+  }
+
+  private void stubBoard() {
+    MaterialExchangeOfferDto offer =
+        new MaterialExchangeOfferDto(
+            offerId,
+            "MATERIAL",
+            new MaterialReferenceDto(UUID.randomUUID(), "Agricium", "SCU"),
+            null,
+            null,
+            new UserReferenceDto(UUID.randomUUID(), "Lenoro", "Lenoro", "Lenoro", null),
+            List.of(new OrgUnitReferenceDto(UUID.randomUUID(), "IRIDIUM", "IRI", "SQUADRON")),
+            false,
+            796,
+            120.0,
+            340.0,
+            Instant.now(),
+            "Tausche gegen **Titanium**.",
+            2,
+            null,
+            false,
+            "ACTIVE",
+            0L,
+            false);
+    when(backendApiClient.get(contains("/material-exchange/offers?"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(offer), 0, 200, 1, 1, List.of()));
+    when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
+        .thenReturn(new MaterialExchangeCountsDto(1, 0));
+    when(backendApiClient.get(
+            contains("/material-exchange/offers/"), anyClass(), any(Object[].class)))
+        .thenReturn(offer);
+  }
+
+  /** The full page renders with the title, an offer row and the server-rendered Markdown remark. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void page_rendersMasterDetailAndRenderedMarkdown() throws Exception {
+    stubBoard();
+
+    mockMvc
+        .perform(get("/materialboerse"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Agricium")))
+        .andExpect(content().string(containsString("data-mb-mode")))
+        .andExpect(content().string(containsString("<strong>Titanium</strong>")))
+        .andExpect(content().string(containsString("squadron-badge")))
+        .andExpect(content().string(containsString(">IRI<")));
+  }
+
+  /** The default offers page renders only the offers board, never the Gesuche board. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void page_offersMode_rendersOnlyOffersBoardNotRequestsBoard() throws Exception {
+    stubBoard();
+
+    mockMvc
+        .perform(get("/materialboerse"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("id=\"mb-listwrap\"")))
+        .andExpect(content().string(containsString("id=\"mb-search\"")))
+        .andExpect(content().string(not(containsString("id=\"mg-listwrap\""))))
+        .andExpect(content().string(not(containsString("data-mg-select"))));
+  }
+
+  /** A PIECE material renders its amount as a count in the piece unit ("12 Piece"), not SCU. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void page_pieceMaterial_rendersPieceUnitNotScu() throws Exception {
+    MaterialExchangeOfferDto piece =
+        new MaterialExchangeOfferDto(
+            offerId,
+            "MATERIAL",
+            new MaterialReferenceDto(UUID.randomUUID(), "Ballistic Gatling", "PIECE"),
+            null,
+            null,
+            new UserReferenceDto(UUID.randomUUID(), "Lenoro", "Lenoro", "Lenoro", null),
+            List.of(new OrgUnitReferenceDto(UUID.randomUUID(), "IRIDIUM", "IRI", "SQUADRON")),
+            false,
+            500,
+            12.0,
+            null,
+            Instant.now(),
+            "Tausche.",
+            0,
+            null,
+            false,
+            "ACTIVE",
+            0L,
+            false);
+    when(backendApiClient.get(contains("/material-exchange/offers?"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(piece), 0, 200, 1, 1, List.of()));
+    when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
+        .thenReturn(new MaterialExchangeCountsDto(1, 0));
+
+    mockMvc
+        .perform(get("/materialboerse").param("lang", "en"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("12 Piece")))
+        .andExpect(content().string(not(containsString("12.000 SCU"))))
+        .andExpect(content().string(not(containsString("12,000 SCU"))));
+  }
+
+  /**
+   * An item offer renders its item name, whole-piece quantity and "Item" marker, without a quality.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void page_itemOffer_rendersNameQuantityAndKindTagWithoutQuality() throws Exception {
+    MaterialExchangeOfferDto item =
+        new MaterialExchangeOfferDto(
+            offerId,
+            "ITEM",
+            null,
+            "Venture Helmet",
+            7,
+            new UserReferenceDto(UUID.randomUUID(), "Lenoro", "Lenoro", "Lenoro", null),
+            List.of(new OrgUnitReferenceDto(UUID.randomUUID(), "IRIDIUM", "IRI", "SQUADRON")),
+            false,
+            null,
+            null,
+            null,
+            Instant.now(),
+            "Trade for **aUEC**.",
+            0,
+            null,
+            false,
+            "ACTIVE",
+            0L,
+            false);
+    when(backendApiClient.get(contains("/material-exchange/offers?"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(item), 0, 200, 1, 1, List.of()));
+    when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
+        .thenReturn(new MaterialExchangeCountsDto(1, 0));
+    when(backendApiClient.get(
+            contains("/material-exchange/offers/"), anyClass(), any(Object[].class)))
+        .thenReturn(item);
+
+    mockMvc
+        .perform(get("/materialboerse").param("lang", "en"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Venture Helmet")))
+        .andExpect(content().string(containsString("7 Piece")))
+        .andExpect(content().string(containsString("mb-kind-tag")))
+        .andExpect(content().string(not(containsString("Q null"))));
+  }
+
+  /**
+   * A stock-backed item offer owned by the viewer renders the edit button with {@code
+   * data-kind="ITEM"}, {@code data-quantity-type="PIECE"} and the quantity as {@code data-amount}
+   * (REQ-MARKET-014).
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void page_stockBackedItemOffer_mine_rendersEditCta() throws Exception {
+    MaterialExchangeOfferDto stockBacked =
+        new MaterialExchangeOfferDto(
+            offerId,
+            "ITEM",
+            null,
+            "Quantum Drive",
+            5,
+            new UserReferenceDto(UUID.randomUUID(), "Lenoro", "Lenoro", "Lenoro", null),
+            List.of(new OrgUnitReferenceDto(UUID.randomUUID(), "IRIDIUM", "IRI", "SQUADRON")),
+            true,
+            null,
+            null,
+            8.0,
+            Instant.now(),
+            "Trade for **aUEC**.",
+            0,
+            List.of(),
+            false,
+            "ACTIVE",
+            0L,
+            false);
+    when(backendApiClient.get(contains("/material-exchange/offers?"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(stockBacked), 0, 200, 1, 1, List.of()));
+    when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
+        .thenReturn(new MaterialExchangeCountsDto(1, 1));
+    when(backendApiClient.get(
+            contains("/material-exchange/offers/"), anyClass(), any(Object[].class)))
+        .thenReturn(stockBacked);
+
+    mockMvc
+        .perform(get("/materialboerse").param("lang", "en"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-mb-edit")))
+        .andExpect(content().string(containsString("data-kind=\"ITEM\"")))
+        .andExpect(content().string(containsString("data-quantity-type=\"PIECE\"")))
+        .andExpect(content().string(containsString("Quantum Drive")));
+  }
+
+  /** The list fragment renders on its own for an in-place filter swap. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void listFragment_rendersRows() throws Exception {
+    stubBoard();
+
+    mockMvc
+        .perform(get("/materialboerse").param("fragment", "list").param("tab", "alle"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("mb-mrow")))
+        .andExpect(content().string(containsString("Agricium")));
+  }
+
+  /**
+   * An offer of stock marked „gestohlen" carries the danger chip in the list and the detail
+   * (REQ-INV-053).
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void page_stolenOffer_rendersTheChipInListAndDetail() throws Exception {
+    MaterialExchangeOfferDto stolen =
+        new MaterialExchangeOfferDto(
+            offerId,
+            "MATERIAL",
+            new MaterialReferenceDto(UUID.randomUUID(), "Agricium", "SCU"),
+            null,
+            null,
+            new UserReferenceDto(UUID.randomUUID(), "Lenoro", "Lenoro", "Lenoro", null),
+            List.of(),
+            false,
+            796,
+            120.0,
+            null,
+            Instant.now(),
+            null,
+            0,
+            null,
+            false,
+            "ACTIVE",
+            0L,
+            true);
+    when(backendApiClient.get(contains("/material-exchange/offers?"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(stolen), 0, 200, 1, 1, List.of()));
+    when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
+        .thenReturn(new MaterialExchangeCountsDto(1, 0));
+    when(backendApiClient.get(
+            contains("/material-exchange/offers/"), anyClass(), any(Object[].class)))
+        .thenReturn(stolen);
+
+    String body =
+        mockMvc
+            .perform(get("/materialboerse"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    org.assertj.core.api.Assertions.assertThat(body.split("data-testid=\"stolen-chip\"", -1))
+        .hasSize(3);
+  }
+
+  /** A legitimate offer carries no stolen chip (REQ-INV-053). */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void page_legitimateOffer_rendersNoStolenChip() throws Exception {
+    stubBoard();
+
+    mockMvc
+        .perform(get("/materialboerse"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-mb-exclude-stolen")))
+        .andExpect(content().string(not(containsString("data-testid=\"stolen-chip\""))));
+  }
+
+  /** The board filter „ohne gestohlene" is relayed as {@code excludeStolen} and stays checked. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void page_excludeStolen_isRelayedAndRenderedChecked() throws Exception {
+    stubBoard();
+
+    String body =
+        mockMvc
+            .perform(get("/materialboerse").param("excludeStolen", "true"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    org.assertj.core.api.Assertions.assertThat(body)
+        .containsPattern("data-testid=\"mb-exclude-stolen\"\\s+checked=\"checked\"");
+    verify(backendApiClient).get(contains("excludeStolen=true"), anyTypeRef());
+  }
+
+  /** The release picker relays each row's „gestohlen" marker to the page (REQ-INV-053). */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void releasableItemsProxy_relaysTheStolenMarker() throws Exception {
+    when(backendApiClient.get(eq("/api/v1/material-exchange/releasable-items"), anyTypeRef()))
+        .thenReturn(
+            List.of(
+                new MaterialExchangeReleasableItemDto(
+                    UUID.randomUUID(),
+                    "MATERIAL",
+                    "Agricium",
+                    "SCU",
+                    700,
+                    5.0,
+                    "Port Olisar",
+                    false,
+                    true)));
+
+    mockMvc
+        .perform(get("/materialboerse/releasable-items"))
+        .andExpect(status().isOk())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                    "$[0].stolen")
+                .value(true));
+  }
+
+  /** The deactivate proxy returns 200 on a successful backend call. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void deactivateProxy_returns200() throws Exception {
+    when(backendApiClient.post(
+            contains("/deactivate"), any(), eq(MaterialExchangeOfferDto.class), any()))
+        .thenReturn(null);
+
+    mockMvc
+        .perform(post("/materialboerse/offers/" + offerId + "/deactivate/ajax").with(csrf()))
+        .andExpect(status().isOk());
+  }
+
+  /**
+   * The release-picker item search sends a multi-word {@code q} as a single-encoded URI variable.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void releasableItemsProxy_passesMultiWordQueryAsUriVariable() throws Exception {
+    when(backendApiClient.get(
+            eq("/api/v1/material-exchange/releasable-items?q={q}"),
+            anyTypeRef(),
+            eq("E2E Boerse Item Stock Widget")))
+        .thenReturn(List.of());
+
+    mockMvc
+        .perform(get("/materialboerse/releasable-items").param("q", "E2E Boerse Item Stock Widget"))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient)
+        .get(
+            eq("/api/v1/material-exchange/releasable-items?q={q}"),
+            anyTypeRef(),
+            eq("E2E Boerse Item Stock Widget"));
+  }
+
+  /**
+   * The release-picker forwards the Material/Item radio's {@code kind} to the backend as a safe,
+   * pre-encoded query parameter alongside the single-encoded {@code q} URI variable
+   * (REQ-MARKET-002). {@code kind} is a fixed enum token, so it rides on the base URI ({@code
+   * ?kind=ITEM&q={q}}) without the double-encoding guard the free-text {@code q} needs.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void releasableItemsProxy_forwardsKindFilter() throws Exception {
+    when(backendApiClient.get(
+            eq("/api/v1/material-exchange/releasable-items?kind=ITEM&q={q}"),
+            anyTypeRef(),
+            eq("widget")))
+        .thenReturn(List.of());
+
+    mockMvc
+        .perform(get("/materialboerse/releasable-items").param("q", "widget").param("kind", "ITEM"))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient)
+        .get(
+            eq("/api/v1/material-exchange/releasable-items?kind=ITEM&q={q}"),
+            anyTypeRef(),
+            eq("widget"));
+  }
+
+  /**
+   * An unexpected {@code kind} value is NOT reflected into the outbound backend URI: the proxy maps
+   * it through a fixed-literal allow-list and drops anything outside {@code MATERIAL}/{@code ITEM},
+   * so the backend call carries no {@code kind} at all (the picker then lists both kinds). Guards
+   * the SSRF mitigation — no caller-controlled string reaches the backend URL on this hop.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void releasableItemsProxy_dropsUnknownKind() throws Exception {
+    when(backendApiClient.get(eq("/api/v1/material-exchange/releasable-items"), anyTypeRef()))
+        .thenReturn(List.of());
+
+    mockMvc
+        .perform(get("/materialboerse/releasable-items").param("kind", "evil://example.com"))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient).get(eq("/api/v1/material-exchange/releasable-items"), anyTypeRef());
+  }
+
+  /**
+   * The remark-edit proxy relays a backend optimistic-lock conflict as 409 with the problem code.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void remarkProxy_backendConflict_relays409() throws Exception {
+    when(backendApiClient.put(
+            contains("/remark"), any(), eq(MaterialExchangeOfferDto.class), any()))
+        .thenThrow(
+            new BackendServiceException(
+                "conflict", null, 409, "OPTIMISTIC_LOCK", null, List.of(), "conflict"));
+
+    mockMvc
+        .perform(
+            put("/materialboerse/offers/" + offerId + "/remark/ajax")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType("application/json")
+                .content("{\"offeredAmount\":120,\"remark\":\"neu\",\"version\":0}"))
+        .andExpect(status().isConflict())
+        .andExpect(content().string(containsString("OPTIMISTIC_LOCK")));
+
+    verify(backendApiClient)
+        .put(
+            eq("/api/v1/material-exchange/offers/{id}/remark"),
+            eq(new MaterialExchangeOfferUpdateRequest(120.0, "neu", 0L)),
+            eq(MaterialExchangeOfferDto.class),
+            eq(offerId));
+  }
+
+  /** The release proxy relays the typed release body and answers the created offer's id. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void releaseProxy_relaysTheTypedBodyAndAnswersTheOffer() throws Exception {
+    UUID itemId = UUID.fromString("3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b");
+    MaterialExchangeOfferDto offer =
+        new MaterialExchangeOfferDto(
+            offerId,
+            "MATERIAL",
+            null,
+            null,
+            null,
+            null,
+            List.of(),
+            true,
+            700,
+            5.0,
+            5.0,
+            null,
+            "r",
+            0,
+            null,
+            false,
+            "ACTIVE",
+            0L,
+            false);
+    when(backendApiClient.post(
+            eq("/api/v1/material-exchange/offers"),
+            eq(new MaterialExchangeReleaseRequest(itemId, 5.0, "r")),
+            eq(MaterialExchangeOfferDto.class)))
+        .thenReturn(offer);
+
+    mockMvc
+        .perform(
+            post("/materialboerse/offers/ajax")
+                .with(csrf())
+                .contentType("application/json")
+                .content(
+                    "{\"inventoryItemId\":\""
+                        + itemId
+                        + "\",\"offeredAmount\":5,\"remark\":\"r\"}"))
+        .andExpect(status().isOk())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.id")
+                .value(offerId.toString()));
+  }
+}

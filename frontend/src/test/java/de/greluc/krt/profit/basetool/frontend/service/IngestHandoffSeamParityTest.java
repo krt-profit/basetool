@@ -22,9 +22,9 @@ package de.greluc.krt.profit.basetool.frontend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.greluc.krt.profit.basetool.frontend.controller.ConnectedAppsConfirmRelayController;
-import de.greluc.krt.profit.basetool.frontend.model.dto.HandoffKind;
-import de.greluc.krt.profit.basetool.frontend.model.dto.StagedHandoff;
+import de.greluc.krt.profit.basetool.frontend.exchange.web.ConnectedAppsConfirmRelayController;
+import de.greluc.krt.profit.basetool.frontend.model.HandoffKind;
+import de.greluc.krt.profit.basetool.frontend.model.StagedHandoff;
 import de.greluc.krt.profit.basetool.testsupport.exchange.ExchangeSeam;
 import java.lang.reflect.Field;
 import java.lang.reflect.RecordComponent;

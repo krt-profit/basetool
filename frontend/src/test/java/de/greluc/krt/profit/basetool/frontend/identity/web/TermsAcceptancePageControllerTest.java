@@ -1,0 +1,231 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.identity.web;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
+
+import de.greluc.krt.profit.basetool.frontend.identity.model.TermsClauseDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.TermsDocumentDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.TermsSectionDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.TermsStatusDto;
+import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+/**
+ * Tests the Terms-of-Use consent gate page (REQ-SEC-028): a failed status read still renders the
+ * page, and a failure to record consent reports an error.
+ */
+@SpringBootTest
+class TermsAcceptancePageControllerTest {
+
+  private static final String STATUS_URI = "/api/v1/terms/status";
+  private static final String ACCEPTANCE_URI = "/api/v1/terms/acceptance";
+
+  @Autowired private WebApplicationContext context;
+
+  @MockitoBean private BackendApiClient backendApiClient;
+
+  /** Backend endpoint serving the wording the gate asks about (ADR-0138). */
+  private static final String DOCUMENT_URI = "/api/v1/terms/document";
+
+  @MockitoBean
+  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
+      clientRegistrationRepository;
+
+  private MockMvc mockMvc;
+
+  @BeforeEach
+  void setup() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    when(backendApiClient.get(eq(DOCUMENT_URI), eq(TermsDocumentDto.class))).thenReturn(document());
+  }
+
+  /**
+   * The wording the backend serves, trimmed to what the gate has to prove it renders.
+   *
+   * @return a one-section document with a bulleted clause
+   */
+  private static TermsDocumentDto document() {
+    return new TermsDocumentDto(
+        "v1",
+        "Nutzungsbedingungen",
+        "Diese Nutzungsbedingungen regeln die Nutzung des Profit Basetool.",
+        List.of(
+            new TermsSectionDto(
+                "4. Pflichten der Nutzer",
+                List.of(
+                    new TermsClauseDto(
+                        "Der Nutzer verpflichtet sich zu Folgendem:",
+                        List.of("Keine technischen Eingriffe."))))),
+        "Stand dieser Nutzungsbedingungen: 05.08.2026");
+  }
+
+  /**
+   * The gate shows the wording it is asking about.
+   *
+   * <p>The point of the whole move: a gate that rendered from its own copy could ask for consent to
+   * text other than the one the acceptance is recorded against, and no other test would notice.
+   */
+  @Test
+  @WithMockUser
+  void rendersTheWordingServedByTheBackend() throws Exception {
+    when(backendApiClient.get(eq(STATUS_URI), eq(TermsStatusDto.class)))
+        .thenReturn(new TermsStatusDto(false, "v1"));
+
+    mockMvc
+        .perform(get("/terms/accept"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("4. Pflichten der Nutzer")))
+        .andExpect(content().string(containsString("Keine technischen Eingriffe.")));
+  }
+
+  /**
+   * Agreeing is the page's one primary action and declining is the quiet one, on a card under the
+   * page head (REQ-UI-027).
+   */
+  @Test
+  @WithMockUser
+  void agreeingIsThePrimaryAction() throws Exception {
+    when(backendApiClient.get(eq(STATUS_URI), eq(TermsStatusDto.class)))
+        .thenReturn(new TermsStatusDto(false, "v1"));
+
+    String html =
+        mockMvc
+            .perform(get("/terms/accept"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("class=\"page-head\"")
+        .containsPattern("id=\"terms-accept-submit\"[^>]*class=\"btn btn--cta\"")
+        .contains("class=\"btn btn-ghost\"")
+        .doesNotContain("btn-outline")
+        .doesNotContain("hud-box");
+    assertThat(html.split("btn--cta", -1)).hasSize(2);
+  }
+
+  /**
+   * A failure to load the terms wording is an error, because consent to text never shown is not
+   * consent.
+   */
+  @Test
+  @WithMockUser
+  void failsWhenTheWordingCannotBeRead() throws Exception {
+    when(backendApiClient.get(eq(STATUS_URI), eq(TermsStatusDto.class)))
+        .thenReturn(new TermsStatusDto(false, "v1"));
+    when(backendApiClient.get(eq(DOCUMENT_URI), eq(TermsDocumentDto.class)))
+        .thenThrow(new BackendServiceException("backend down", null, 503));
+
+    mockMvc
+        .perform(get("/terms/accept"))
+        .andExpect(view().name("error/error"))
+        .andExpect(content().string(not(containsString("4. Pflichten der Nutzer"))));
+  }
+
+  /** A user who has not consented sees the gate. */
+  @Test
+  @WithMockUser
+  void rendersTheGateForAUserWhoHasNotConsented() throws Exception {
+    when(backendApiClient.get(eq(STATUS_URI), eq(TermsStatusDto.class)))
+        .thenReturn(new TermsStatusDto(false, "v1"));
+
+    mockMvc
+        .perform(get("/terms/accept"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("terms-accept"));
+  }
+
+  /**
+   * A user who already consented is sent into the tool rather than asked again — the second-tab
+   * case, where the gate would otherwise look broken.
+   */
+  @Test
+  @WithMockUser
+  void redirectsAUserWhoAlreadyConsented() throws Exception {
+    when(backendApiClient.get(eq(STATUS_URI), eq(TermsStatusDto.class)))
+        .thenReturn(new TermsStatusDto(true, "v1"));
+
+    mockMvc
+        .perform(get("/terms/accept"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/"));
+  }
+
+  /** An unreadable status still renders the gate; failing closed here would block everyone. */
+  @Test
+  @WithMockUser
+  void rendersTheGateWhenTheStatusCannotBeRead() throws Exception {
+    when(backendApiClient.get(eq(STATUS_URI), eq(TermsStatusDto.class)))
+        .thenThrow(new BackendServiceException("backend down", null, 503));
+
+    mockMvc
+        .perform(get("/terms/accept"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("terms-accept"));
+  }
+
+  /** Accepting relays to the backend and reports success to the page's AJAX write. */
+  @Test
+  @WithMockUser
+  void recordsConsentAndAnswersNoContent() throws Exception {
+    mockMvc.perform(post("/terms/accept").with(csrf())).andExpect(status().isNoContent());
+
+    verify(backendApiClient).post(eq(ACCEPTANCE_URI), any(), eq(Void.class));
+  }
+
+  /**
+   * A backend that cannot record consent answers 502, so the page shows its retry message instead
+   * of navigating the user into a tool that will bounce them straight back to this gate.
+   */
+  @Test
+  @WithMockUser
+  void reportsABadGatewayWhenConsentCannotBeRecorded() throws Exception {
+    when(backendApiClient.post(eq(ACCEPTANCE_URI), any(), eq(Void.class)))
+        .thenThrow(new BackendServiceException("backend down", null, 503));
+
+    mockMvc.perform(post("/terms/accept").with(csrf())).andExpect(status().isBadGateway());
+  }
+}

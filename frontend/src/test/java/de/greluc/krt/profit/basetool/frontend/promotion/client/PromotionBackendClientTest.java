@@ -21,13 +21,13 @@ package de.greluc.krt.profit.basetool.frontend.promotion.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.MemberEvaluationDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MemberEvaluationUpdateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionCategoryWriteRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionLevelContentWriteRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionTopicDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionTopicWriteRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.RankRequirementWriteRequest;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.MemberEvaluationDto;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.MemberEvaluationUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionCategoryWriteRequest;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionLevelContentWriteRequest;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionTopicDto;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionTopicWriteRequest;
+import de.greluc.krt.profit.basetool.frontend.promotion.model.RankRequirementWriteRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
 import java.time.Instant;
 import java.util.UUID;

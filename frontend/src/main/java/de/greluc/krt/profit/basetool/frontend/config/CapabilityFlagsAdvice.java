@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;

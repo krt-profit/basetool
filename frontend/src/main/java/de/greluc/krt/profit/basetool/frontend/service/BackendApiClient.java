@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.service;
 
 import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.TermsDocumentDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.TermsDocumentDto;
+import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;

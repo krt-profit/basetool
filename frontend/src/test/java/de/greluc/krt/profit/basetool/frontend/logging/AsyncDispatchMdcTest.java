@@ -30,7 +30,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.frontend.config.LoggingProperties;
-import de.greluc.krt.profit.basetool.frontend.controller.MeFrontendController;
+import de.greluc.krt.profit.basetool.frontend.orgunit.web.MeFrontendController;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;

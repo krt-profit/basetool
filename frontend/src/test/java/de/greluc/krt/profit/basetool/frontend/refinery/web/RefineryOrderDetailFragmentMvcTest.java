@@ -1,0 +1,261 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.refinery.web;
+
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
+import de.greluc.krt.profit.basetool.frontend.config.LayoutContextLoader;
+import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStatus;
+import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
+import java.time.Instant;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
+import org.springframework.security.oauth2.core.oidc.OidcIdToken;
+import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+/**
+ * MVC render tests for the refinery-order detail page's {@code order} and {@code store} fragments
+ * (REQ-FE-001, REQ-FE-015): each renders section-sized, an unknown fragment name or a backend
+ * failure degrades to an inline error instead of a redirect, and each skips the catalog lookup only
+ * the other needs.
+ */
+@SpringBootTest
+class RefineryOrderDetailFragmentMvcTest {
+
+  /** Marker text of the section-sized inline error fragment (the EN bundle is not active here). */
+  private static final String SECTION_ERROR_TEXT = "Der Abschnitt konnte nicht aktualisiert werden";
+
+  @Autowired private WebApplicationContext context;
+
+  private MockMvc mockMvc;
+
+  @MockitoBean private BackendApiClient backendApiClient;
+
+  @MockitoBean
+  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
+      clientRegistrationRepository;
+
+  @BeforeEach
+  void setup() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.capabilities(true, true, true));
+  }
+
+  private OAuth2AuthenticationToken logisticianToken(UUID userId) {
+    Map<String, Object> claims = new HashMap<>();
+    claims.put(IdTokenClaimNames.SUB, userId.toString());
+    claims.put("preferred_username", "logistician");
+    OidcIdToken idToken =
+        new OidcIdToken("token-value", Instant.now(), Instant.now().plusSeconds(3600), claims);
+    OidcUser oidcUser =
+        new DefaultOidcUser(
+            Collections.singletonList(new SimpleGrantedAuthority("ROLE_LOGISTICIAN")), idToken);
+    return new OAuth2AuthenticationToken(oidcUser, oidcUser.getAuthorities(), "keycloak");
+  }
+
+  private MaterialDto material(String name) {
+    return new MaterialDto(
+        UUID.randomUUID(),
+        name,
+        null,
+        "SCU",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        1L);
+  }
+
+  /** Stubs the order read for {@code orderId} with a single SCU output good. */
+  private void stubOrder(UUID orderId, UUID userId) {
+    RefineryGoodDto good =
+        new RefineryGoodDto(
+            UUID.randomUUID(),
+            material("Quantanium Ore"),
+            100,
+            material("Refined Quantanium"),
+            100,
+            100,
+            null);
+    RefineryOrderDto order =
+        new RefineryOrderDto(
+            orderId,
+            new UserReferenceDto(userId, "logistician", null, "Logistician", 0),
+            new LocationDto(UUID.randomUUID(), "ArcCorp Mining", null, false, false, 1L),
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            List.of(good),
+            RefineryOrderStatus.OPEN,
+            null,
+            1L,
+            null);
+    when(backendApiClient.get(
+            eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(orderId)))
+        .thenReturn(order);
+  }
+
+  private String render(UUID orderId, UUID userId, String query) throws Exception {
+    return mockMvc
+        .perform(
+            get("/refinery-orders/" + orderId + query)
+                .with(authentication(logisticianToken(userId))))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+  }
+
+  @Test
+  void fullPage_rendersBothSwapContainers_andParksTheErrorFragmentInAnInertTemplate()
+      throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    stubOrder(orderId, userId);
+
+    String html = render(orderId, userId, "");
+
+    assertThat(html).as("order swap container").contains("id=\"refinery-order-results\"");
+    assertThat(html).as("store swap container").contains("id=\"refinery-store-results\"");
+    assertThat(html).contains("<template id=\"refinery-fragment-error-tpl\">");
+    int templateStart = html.indexOf("<template id=\"refinery-fragment-error-tpl\">");
+    int templateEnd = html.indexOf("</template>", templateStart);
+    assertThat(html.indexOf(SECTION_ERROR_TEXT))
+        .as("the section error text appears only inside the inert <template>")
+        .isBetween(templateStart, templateEnd);
+  }
+
+  @Test
+  void orderFragment_rendersOnlyTheMainForm_andSkipsTheJobOrderLookup() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    stubOrder(orderId, userId);
+
+    String html = render(orderId, userId, "?fragment=order");
+
+    assertThat(html).as("main edit form").contains("id=\"refineryOrderMainForm\"");
+    assertThat(html).as("no page shell").doesNotContain("<!DOCTYPE");
+    assertThat(html).as("store dialog is a separate section").doesNotContain("id=\"storeForm\"");
+    assertThat(html).as("no re-nested container").doesNotContain("id=\"refinery-order-results\"");
+    verify(backendApiClient, never()).get(eq("/api/v1/orders/lookup"), anyTypeRef());
+  }
+
+  @Test
+  void storeFragment_rendersOnlyTheStoreForm_andSkipsTheMissionsCatalog() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    stubOrder(orderId, userId);
+
+    String html = render(orderId, userId, "?fragment=store");
+
+    assertThat(html).as("store form").contains("id=\"storeForm\"");
+    assertThat(html).as("no page shell").doesNotContain("<!DOCTYPE");
+    assertThat(html).as("main form is a separate section").doesNotContain("refineryOrderMainForm");
+    assertThat(html).as("no re-nested container").doesNotContain("id=\"refinery-store-results\"");
+    verify(backendApiClient, never()).get(contains("/api/v1/missions"), anyTypeRef());
+  }
+
+  @Test
+  void unknownFragment_rendersTheSectionSizedError_notAWholePage() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    stubOrder(orderId, userId);
+
+    String html = render(orderId, userId, "?fragment=bogus");
+
+    assertThat(html).contains(SECTION_ERROR_TEXT);
+    assertThat(html).as("no page shell").doesNotContain("<!DOCTYPE");
+    assertThat(html).doesNotContain("<template");
+  }
+
+  @Test
+  void fragmentLoadFailure_degradesToTheSectionError_neverARedirect() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    when(backendApiClient.get(
+            eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(orderId)))
+        .thenThrow(
+            new BackendServiceException(
+                "boom", null, 500, null, null, Collections.emptyList(), null));
+
+    String html = render(orderId, userId, "?fragment=order");
+
+    assertThat(html).contains(SECTION_ERROR_TEXT);
+  }
+
+  @Test
+  void fullPageLoadFailure_stillRedirectsToTheList() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    when(backendApiClient.get(
+            eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(orderId)))
+        .thenThrow(
+            new BackendServiceException(
+                "boom", null, 500, null, null, Collections.emptyList(), null));
+
+    mockMvc
+        .perform(get("/refinery-orders/" + orderId).with(authentication(logisticianToken(userId))))
+        .andExpect(status().is3xxRedirection());
+  }
+}

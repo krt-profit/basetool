@@ -21,10 +21,10 @@ package de.greluc.krt.profit.basetool.frontend.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.ImportIssueCode;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ImportIssueDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ImportIssueSeverity;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ImportSuggestionDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.ImportIssueCode;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.ImportIssueDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.ImportIssueSeverity;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.ImportSuggestionDto;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;

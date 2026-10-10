@@ -223,8 +223,8 @@ class IngestHandoffE2eTest {
   }
 
   /**
-   * Wraps a backend draft as the {@link
-   * de.greluc.krt.profit.basetool.frontend.model.dto.StagedHandoff} JSON the gateway stores.
+   * Wraps a backend draft as the {@link de.greluc.krt.profit.basetool.frontend.model.StagedHandoff}
+   * JSON the gateway stores.
    */
   private static String stagedHandoff(String draft) {
     JsonObject staged = new JsonObject();

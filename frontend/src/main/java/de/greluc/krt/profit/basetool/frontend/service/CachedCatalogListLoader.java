@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.service;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
