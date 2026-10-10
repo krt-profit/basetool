@@ -162,6 +162,9 @@ app:
     redis-fanout:
       enabled: ${APP_NOTIFICATIONS_REDIS_FANOUT_ENABLED:false}
       channel: ${APP_NOTIFICATIONS_REDIS_FANOUT_CHANNEL:basetool:notify:published}
+  missions:
+    notices:
+      overdue-after: ${APP_MISSIONS_NOTICES_OVERDUE_AFTER:PT6H}
   live-sync:
     sse:
       heartbeat-interval: ${APP_LIVE_SYNC_SSE_HEARTBEAT_INTERVAL:PT20S}

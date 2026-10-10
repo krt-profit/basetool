@@ -17,31 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/**
- * The exchange module: the external client exchange the ingest gateway relays to (REQ-INGEST-*).
- */
-@ApplicationModule(
-    allowedDependencies = {
-      "admin::api",
-      "audit::api",
-      "bank::api",
-      "catalogue::api",
-      "hangar::api",
-      "identity::api",
-      "inventory::api",
-      "joborder::api",
-      "kernel",
-      "livesync::api",
-      "materialexchange::api",
-      "mission::api",
-      "notification::api",
-      "operation::api",
-      "orgunit::api",
-      "personalinventory::api",
-      "platform::api",
-      "refinery::api",
-      "scope::api"
-    })
-package de.greluc.krt.profit.basetool.backend.exchange;
+/** The notification events the operation module publishes (REQ-MISSION-028, -029). */
+@NamedInterface("api")
+package de.greluc.krt.profit.basetool.backend.operation.api.events;
 
-import org.springframework.modulith.ApplicationModule;
+import org.springframework.modulith.NamedInterface;

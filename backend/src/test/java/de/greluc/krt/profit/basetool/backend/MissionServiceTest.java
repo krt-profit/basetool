@@ -28,12 +28,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionNotificationPublisher;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.ParticipantTargetResolver;
@@ -97,6 +99,7 @@ class MissionServiceTest {
    */
   @Mock private ParticipantTargetResolver participantTargetResolver;
 
+  @Mock private MissionNotificationPublisher notificationPublisher;
   @InjectMocks private MissionParticipantService missionParticipantService;
   private MissionService missionService;
 
@@ -123,7 +126,8 @@ class MissionServiceTest {
             auditService,
             null,
             missionParticipantService,
-            null);
+            null,
+            mock(MissionNotificationPublisher.class));
   }
 
   @Test

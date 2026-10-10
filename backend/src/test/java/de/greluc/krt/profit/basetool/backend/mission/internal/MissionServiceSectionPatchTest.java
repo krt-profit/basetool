@@ -88,6 +88,7 @@ class MissionServiceSectionPatchTest {
 
   @Mock private AuditService auditService;
 
+  @Mock private MissionNotificationPublisher notificationPublisher;
   @InjectMocks private MissionParticipantService missionParticipantService;
 
   @InjectMocks private MissionStructureService missionStructureService;
@@ -114,7 +115,8 @@ class MissionServiceSectionPatchTest {
             auditService,
             null,
             missionParticipantService,
-            missionStructureService);
+            missionStructureService,
+            mock(MissionNotificationPublisher.class));
     missionId = UUID.randomUUID();
     existing = new Mission();
     existing.setId(missionId);
