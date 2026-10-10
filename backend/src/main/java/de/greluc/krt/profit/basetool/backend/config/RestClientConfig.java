@@ -24,8 +24,13 @@ import java.net.http.HttpClient;
 import java.time.Duration;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.HttpClientSettings;
+import org.springframework.boot.http.client.HttpRedirects;
+import org.springframework.boot.http.client.InetAddressFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Scope;
 import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -40,6 +45,12 @@ import org.springframework.web.client.RestClient;
  */
 @Configuration
 public class RestClientConfig {
+
+  /**
+   * Bean name of the builder for the external integrations, selected with {@code @Qualifier}; the
+   * unqualified builder is the internal one.
+   */
+  public static final String EXTERNAL_REST_CLIENT_BUILDER = "externalRestClientBuilder";
 
   /**
    * Upper bound on establishing a TCP (and TLS) connection. Without it a connect to an unreachable
@@ -62,6 +73,14 @@ public class RestClientConfig {
       jdkRequestFactory(CONNECT_TIMEOUT, READ_TIMEOUT);
 
   /**
+   * The request factory every builder from {@link #externalRestClientBuilder} shares: one JDK
+   * client that refuses non-external addresses.
+   */
+  private final ClientHttpRequestFactory externalRequestFactory =
+      externalJdkRequestFactory(
+          CONNECT_TIMEOUT, READ_TIMEOUT, InetAddressFilter.externalAddresses());
+
+  /**
    * Creates a fresh {@link RestClient.Builder} per injection point, pre-wired with the shared JDK
    * request factory and the observation registry.
    *
@@ -71,10 +90,31 @@ public class RestClientConfig {
    * @return a new builder bounded by {@link #CONNECT_TIMEOUT} and {@link #READ_TIMEOUT}
    */
   @Bean
+  @Primary
   @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
   public RestClient.Builder restClientBuilder(@NotNull ObservationRegistry observationRegistry) {
     return RestClient.builder()
         .requestFactory(requestFactory)
+        .observationRegistry(observationRegistry);
+  }
+
+  /**
+   * Creates a fresh {@link RestClient.Builder} for the external integrations (UEX, SC Wiki), whose
+   * connections are refused unless the resolved address is external — no loopback, private,
+   * link-local or other special-purpose range.
+   *
+   * <p>Redirects are never followed. The internal clients, such as the Keycloak admin client, keep
+   * {@link #restClientBuilder}.
+   *
+   * @param observationRegistry the Micrometer observation registry
+   * @return a new builder bounded by {@link #CONNECT_TIMEOUT} and {@link #READ_TIMEOUT}
+   */
+  @Bean(name = EXTERNAL_REST_CLIENT_BUILDER)
+  @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
+  public RestClient.Builder externalRestClientBuilder(
+      @NotNull ObservationRegistry observationRegistry) {
+    return RestClient.builder()
+        .requestFactory(externalRequestFactory)
         .observationRegistry(observationRegistry);
   }
 
@@ -96,5 +136,28 @@ public class RestClientConfig {
     JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
     factory.setReadTimeout(readTimeout);
     return factory;
+  }
+
+  /**
+   * Builds a request factory over a JDK {@link HttpClient} pinned to HTTP/1.1 that follows no
+   * redirect and connects only to addresses the filter admits.
+   *
+   * @param connectTimeout the bound on establishing a connection
+   * @param readTimeout the bound on one exchange once connected
+   * @param filter the addresses a connection may reach
+   * @return a request factory over a new JDK client
+   */
+  static @NotNull ClientHttpRequestFactory externalJdkRequestFactory(
+      @NotNull Duration connectTimeout,
+      @NotNull Duration readTimeout,
+      @NotNull InetAddressFilter filter) {
+    HttpClientSettings settings =
+        HttpClientSettings.defaults()
+            .withTimeouts(connectTimeout, readTimeout)
+            .withRedirects(HttpRedirects.DONT_FOLLOW)
+            .withInetAddressFilter(filter);
+    return ClientHttpRequestFactoryBuilder.jdk()
+        .withHttpClientCustomizer(builder -> builder.version(HttpClient.Version.HTTP_1_1))
+        .build(settings);
   }
 }

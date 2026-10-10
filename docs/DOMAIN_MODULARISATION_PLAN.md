@@ -1229,23 +1229,28 @@ JSpecify stays out for now (ADR-0192).
 ### 8.3 SQL, persistence, platform
 
 - **PostgreSQL 18**: `RETURNING OLD/NEW` where a native bulk update needs the old value for its audit
-  row; review multicolumn indexes against skip scan with `EXPLAIN`; temporal `WITHOUT OVERLAPS` only
+  row (**checked 2026-10-10, nothing to adopt**: the backend has no native bulk `UPDATE`; its bulk
+  updates are JPQL and its native statements are retention `DELETE`s that write no audit row); review multicolumn indexes against skip scan with `EXPLAIN`; temporal `WITHOUT OVERLAPS` only
   with the leadership redesign (needs `btree_gist`). **No `uuidv7` ids** for anything whose id
   appears in a URL or an export without a privacy decision — they reveal creation times.
 - **Hibernate 7.4**: do not adopt `@Audited` (it would keep full row history, personal data included,
   outside the GDPR deletion flow) or Jakarta Data stateless repositories (they do not fit the
   `@Version` concurrency rules); write a characterisation test before touching
-  `fail_on_pagination_over_collection_fetch`.
+  `fail_on_pagination_over_collection_fetch` (**done 2026-10-10**: `PagedFindersNoCollectionFetchTest`
+  pins both halves, the shape the gate refuses and the shape it lets through).
 - **Spring Framework 7**: `@ConcurrencyLimit` for the backend's outbound fan-out to UEX and SC Wiki,
-  which virtual threads no longer bound; keep the find-or-create retry explicit. Spring's built-in API
+  which virtual threads no longer bound; keep the find-or-create retry explicit (**done 2026-10-10**,
+  REQ-SEC-081: 4 for UEX, 2 for SC Wiki, enabled by `AsyncConfig`; nothing else changed). Spring's built-in API
   versioning adds nothing under a hard cut; its standard deprecation headers only if
   `@ApiDeprecation` is ever used again.
 - **Spring Boot 4.1**: an `InetAddressFilter` restricting the external-integration HTTP clients (UEX,
   SC Wiki, Discord) to external addresses — a defence against redirects into internal networks; never
-  on the internal clients.
+  on the internal clients (**done 2026-10-10**, REQ-SEC-081, ADR-0204 amendment 3: UEX and SC Wiki use
+  the external builder; the backend has no Discord client, that federation lives in `keycloak-spi`).
 - **Jackson 3** reads unknown JSON properties tolerantly by default. That stays: the frontend and
   backend deploy together and are checked by the contract tests, and the exchange's tolerant reading
-  is part of its frozen behaviour. The policy is written into the API conventions.
+  is part of its frozen behaviour. The policy is written into the API conventions (**done 2026-10-10**, REQ-API-022,
+  `JacksonTolerantReadingTest`).
 
 ### 8.4 Gradle and CI
 
@@ -1356,7 +1361,7 @@ Full tables, per finding with status, evidence and verdict:
   PR #1256, issues #1250–#1255 and PRs #1257–#1262. Every finding shipped and holds, all nine
   service splits included, with three gaps: `HangarPageModelLoader` was never built,
   `CachedCatalogListLoader` has one consumer, and the per-family split of `GlobalExceptionHandler`
-  is open. Its diagnosis — "the architecture is sound, the debt is size inside
+  was open (done 2026-10-10: a chain of family classes under the one advice). Its diagnosis — "the architecture is sound, the debt is size inside
   correct layers" — holds for layers and not for domains (files over 600 lines grew from 49 of 1,477
   to 53 of 2,044). **14 of its 15 rejected simplifications still hold** (Mission section counters,
   `…WithinTransaction` hops, the find-or-create retry, bulk updates after loops, no generic CRUD base,
@@ -1431,6 +1436,12 @@ Full tables, per finding with status, evidence and verdict:
   read models), REQ-DATA-010 (one scope fragment per aggregate), REQ-AUDIT-001 (the audit contract
   per command), REQ-XCH-009/011/026 (domain APIs; build-time contract test), REQ-FE-018 (baseline and
   counts — done 2026-10-02), REQ-OBS (event-publication metrics, only if an outbox is ever adopted).
+  **Status 2026-10-10:** done — REQ-API-002 (the enforced rules, in place of the convention),
+  REQ-API-007 (the annotation sentence corrected to what the build requires), REQ-DATA-001 (one
+  location, one sequence; it keeps the plan's "REQ-DATA" row). Waiting for a later move — REQ-DATA-010
+  (the fragment per aggregate moves into each module with its repository, Phase 3), REQ-AUDIT-001
+  (the per-command contract, P3-11), REQ-XCH-009/011 (they name the domain APIs the exchange calls,
+  which exist when blueprint, inventory and hangar publish theirs, Phase 3).
 - **arc42:** §4.1, §4.2, §5.3 and §5.5 (corrected with this plan), §5.2 and §5.3 rewritten per
   module as the moves land, §8 (module rules, interaction styles — §8.14, done 2026-10-02), §11.9
   (the domain coupling as debt, opened with this plan; its decisions linked 2026-10-02).

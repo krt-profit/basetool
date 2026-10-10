@@ -67,7 +67,7 @@ Layered, with the direction enforced by ArchUnit rather than by convention:
 | `model` | JPA entities, `@Version`, the OrgUnit hierarchy |
 | `dto` / `mapper` | Records on the boundary, MapStruct between them and entities |
 | `task` | Scheduled jobs |
-| `integration` | Outbound third parties — `UexClient`, `scwiki` — on the blocking `RestClient` from `config.RestClientConfig` (JDK HTTP client, no WebFlux; ADR-0204), which `KeycloakService` shares |
+| `integration` | Outbound third parties — `UexClient`, `scwiki` — on the blocking `RestClient` from `config.RestClientConfig` (JDK HTTP client, no WebFlux; ADR-0204), through its external builder that refuses non-external addresses (REQ-SEC-081); the primary builder is `KeycloakService`'s |
 | `metrics` / `health` / `logging` | `basetool_*` business metrics, health indicators, MDC enrichment |
 | `filter` / `interceptor` / `annotation` / `validation` / `util` / `web` / `exception` / `config` | The usual Spring surface |
 
