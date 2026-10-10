@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
@@ -101,6 +102,7 @@ public class JobOrderItemProductionService {
   private final UserRepository userRepository;
   private final LocationRepository locationRepository;
   private final OwnerScopeService ownerScopeService;
+  private final BookInPolicy bookInPolicy;
   private final InventoryCheckoutService inventoryCheckoutService;
   private final AuthHelperService authHelperService;
 
@@ -322,9 +324,8 @@ public class JobOrderItemProductionService {
 
   /**
    * Refuses a book-in into another member's inventory the caller may not write (REQ-INV-032,
-   * REQ-SEC-005): a foreign {@code ownerUserId} requires {@link
-   * OwnerScopeService#canManageUserInventory(UUID)}, and a {@code personal} book-in for someone
-   * else is always refused.
+   * REQ-SEC-005): a foreign {@code ownerUserId} requires {@link BookInPolicy#mayBookInFor(UUID)},
+   * and a {@code personal} book-in for someone else is always refused.
    *
    * <p>Checked on the requested id before any lookup; an absent {@code ownerUserId} means the
    * caller.
@@ -339,7 +340,7 @@ public class JobOrderItemProductionService {
         || authHelperService.currentUserId().map(ownerUserId::equals).orElse(false)) {
       return;
     }
-    if (!ownerScopeService.canManageUserInventory(ownerUserId)) {
+    if (!bookInPolicy.mayBookInFor(ownerUserId)) {
       throw new AccessDeniedException(
           "You are not allowed to book produced stock in for this user");
     }

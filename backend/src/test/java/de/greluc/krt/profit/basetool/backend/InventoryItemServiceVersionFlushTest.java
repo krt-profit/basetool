@@ -109,6 +109,7 @@ class InventoryItemServiceVersionFlushTest {
             inventoryItemMapper,
             ownerScopeService,
             null,
+            null,
             auditService,
             null,
             realCheckoutService,

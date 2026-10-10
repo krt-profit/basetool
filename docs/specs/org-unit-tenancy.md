@@ -358,8 +358,9 @@ shared pools. A **non-owner** stays bound by the strict `owning_org_unit_id` sco
 
 **Enforced by:** `OwnerScopeServiceTest` (`PersonalAggregateOwnerRetainsAccessTests`),
 `InventoryTenancyE2eTest` (`ownerRetainsEditAfterLeavingOwningOrgUnit`) · **Code:**
-`OwnerScopeService#canSeeInventoryItem` / `#canEditInventoryItem` / `#canSeeShip` / `#canEditShip` /
-`#canSeeRefineryOrder` / `#canEditRefineryOrder`.
+`InventoryAccessPolicy#canSeeInventoryItem` / `#canEditInventoryItem`, `OwnerScopeService#canSeeShip` /
+`#canEditShip`, `RefineryAccessPolicy#canSeeRefineryOrder` / `#canEditRefineryOrder` (corrected
+2026-10-10: the refinery gates left the scope hub with the refinery module).
 
 ### REQ-ORG-014 — Three-tier org hierarchy (Organisationsleitung > Bereich > Staffel/SK)
 
