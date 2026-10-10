@@ -108,6 +108,7 @@ val nullAwayPackages =
       "bank",
       "catalogue",
       "exchange",
+      "hangar",
       "identity",
       "inventory",
       "joborder",

@@ -17,25 +17,20 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/** The job-order module (Aufträge): orders, their production allocations and deliveries. */
+/** The hangar module: members' ships and their fleet views (plan §5.1 rank 7). */
 @ApplicationModule(
     allowedDependencies = {
       "admin::api",
       "audit::api",
       "catalogue::api",
-      "hangar::api",
       "identity::api",
-      "inventory::api",
       "kernel",
       "livesync::api",
-      "materialexchange::api",
-      "mission::api",
       "notification::api",
       "orgunit::api",
-      "personalinventory::api",
       "platform::api",
       "scope::api"
     })
-package de.greluc.krt.profit.basetool.backend.joborder;
+package de.greluc.krt.profit.basetool.backend.hangar;
 
 import org.springframework.modulith.ApplicationModule;

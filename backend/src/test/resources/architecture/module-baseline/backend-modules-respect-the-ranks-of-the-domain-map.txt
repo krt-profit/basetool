@@ -1,11 +1,7 @@
 blueprint -> inventory: BlueprintCraftabilityService -> InventoryItemService
 blueprint -> inventory: BlueprintCraftabilityService -> OwnedStockSlice
 catalogue -> hangar: LocationService -> ShipRepository
-catalogue -> mission: JobTypeService -> MissionParticipantRepository
 catalogue -> refinery: LocationService -> RefineryOrderRepository
-hangar -> mission: HangarService -> Mission
-hangar -> mission: HangarService -> MissionUnit
-hangar -> mission: HangarService -> MissionUnitRepository
 identity -> blueprint: UserReconciliationService -> DefaultBlueprintProvisioningService
 identity -> inventory: MeController -> InventoryProperties
 identity -> joborder: UserDtoRedaction -> JobOrderAssigneeDto

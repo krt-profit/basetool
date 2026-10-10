@@ -176,6 +176,7 @@ package materialexchange materialexchange the Materialboerse module's package tr
 package notification notification the notification module's package tree (plan 5.2)
 package privacy privacy the GDPR module's package tree, transitional (plan 5.1 rank 13, 7.6)
 package inventory inventory the inventory module's package tree (plan 5.2)
+package hangar hangar the hangar module's package tree (plan 5.2)
 package refinery refinery the refinery module's package tree (plan 5.2)
 package scope scope the scope module's package tree (plan 5.2)
 package kernel kernel the kernel's package tree (plan 5.1 rank 0)

@@ -17,25 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/** The job-order module (Aufträge): orders, their production allocations and deliveries. */
-@ApplicationModule(
-    allowedDependencies = {
-      "admin::api",
-      "audit::api",
-      "catalogue::api",
-      "hangar::api",
-      "identity::api",
-      "inventory::api",
-      "kernel",
-      "livesync::api",
-      "materialexchange::api",
-      "mission::api",
-      "notification::api",
-      "orgunit::api",
-      "personalinventory::api",
-      "platform::api",
-      "scope::api"
-    })
-package de.greluc.krt.profit.basetool.backend.joborder;
+/** The hangar module's published API: the ship-deletion observer SPI (plan §5.2, §5.3). */
+@NamedInterface("api")
+package de.greluc.krt.profit.basetool.backend.hangar.api;
 
-import org.springframework.modulith.ApplicationModule;
+import org.springframework.modulith.NamedInterface;

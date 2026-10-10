@@ -17,25 +17,25 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/** The job-order module (Aufträge): orders, their production allocations and deliveries. */
-@ApplicationModule(
-    allowedDependencies = {
-      "admin::api",
-      "audit::api",
-      "catalogue::api",
-      "hangar::api",
-      "identity::api",
-      "inventory::api",
-      "kernel",
-      "livesync::api",
-      "materialexchange::api",
-      "mission::api",
-      "notification::api",
-      "orgunit::api",
-      "personalinventory::api",
-      "platform::api",
-      "scope::api"
-    })
-package de.greluc.krt.profit.basetool.backend.joborder;
+package de.greluc.krt.profit.basetool.backend.hangar.api;
 
-import org.springframework.modulith.ApplicationModule;
+import de.greluc.krt.profit.basetool.backend.annotation.ObserverSpi;
+import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
+
+/**
+ * Reacts to a ship being deleted, inside the transaction that deletes it (plan §5.3); implemented
+ * by the mission module, whose units may carry the ship. Every implementation joins the caller's
+ * transaction ({@code MANDATORY}).
+ */
+@ObserverSpi
+public interface ShipDeletionObserver {
+
+  /**
+   * A ship is about to be deleted; whatever references it lets go of it first.
+   *
+   * @param shipId the ship to be deleted
+   * @return the number of references released
+   */
+  int beforeShipDelete(@NotNull UUID shipId);
+}
