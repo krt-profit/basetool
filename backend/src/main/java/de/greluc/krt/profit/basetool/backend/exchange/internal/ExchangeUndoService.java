@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
@@ -87,6 +88,7 @@ public class ExchangeUndoService {
   private final PersonalBlueprintRepository blueprintRepository;
   private final PersonalBlueprintService blueprintService;
   private final ExchangeStockWriteService stockWriteService;
+  private final StockCommands stockCommands;
   private final ShipRepository shipRepository;
   private final ShipTypeRepository shipTypeRepository;
   private final LocationRepository locationRepository;
@@ -197,7 +199,7 @@ public class ExchangeUndoService {
               entry.getResource().name() + ':' + entry.getEntityKey(), _ -> new ArrayList<>())
           .add(entry);
     }
-    stockWriteService.lockLots(
+    stockCommands.lockLots(
         member,
         groups.values().stream()
             .map(List::getFirst)

@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
+import jakarta.persistence.EntityManager;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -119,6 +120,28 @@ public final class InventoryAllocations {
   }
 
   /**
+   * Earmarks part of a row to a job order known by id, through a reference the persistence context
+   * resolves; the caller's managed order is that same instance.
+   *
+   * @param item the row
+   * @param entityManager the persistence context
+   * @param orderId the order
+   * @param amount the earmarked amount
+   * @param delivered whether the slice counts as delivered
+   * @return the new slice
+   */
+  @NotNull
+  public static InventoryJobOrderAllocation addJobOrder(
+      InventoryItem item,
+      @NotNull EntityManager entityManager,
+      @NotNull UUID orderId,
+      double amount,
+      boolean delivered) {
+    return addJobOrder(
+        item, entityManager.getReference(JobOrder.class, orderId), amount, delivered);
+  }
+
+  /**
    * Appends a mission slice earmarking {@code amount} of the entry.
    *
    * @param item the owning entry; never {@code null}
@@ -135,6 +158,25 @@ public final class InventoryAllocations {
     slice.setAmount(amount);
     item.getMissionAllocations().add(slice);
     return slice;
+  }
+
+  /**
+   * Earmarks part of a row to a mission known by id, through a reference the persistence context
+   * resolves.
+   *
+   * @param item the row
+   * @param entityManager the persistence context
+   * @param missionId the mission
+   * @param amount the earmarked amount
+   * @return the new slice
+   */
+  @NotNull
+  public static InventoryMissionAllocation addMission(
+      InventoryItem item,
+      @NotNull EntityManager entityManager,
+      @NotNull UUID missionId,
+      double amount) {
+    return addMission(item, entityManager.getReference(Mission.class, missionId), amount);
   }
 
   /**

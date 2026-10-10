@@ -45,7 +45,10 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -145,8 +148,8 @@ class RefineryNoticeIntegrationTest {
     RefineryOrder due =
         order(Instant.now().minus(3, ChronoUnit.HOURS), 60, RefineryOrderStatus.OPEN);
 
-    assertThat(producer.produce(Instant.now())).isEqualTo(1);
-    assertThat(producer.produce(Instant.now())).isZero();
+    assertThat(producer.produce(Instant.now(), 100)).isEqualTo(1);
+    assertThat(producer.produce(Instant.now(), 100)).isZero();
 
     List<NoticeEvent> raised = readyEventsOf(due);
     assertThat(raised).hasSize(1);
@@ -164,7 +167,7 @@ class RefineryNoticeIntegrationTest {
     RefineryOrder due =
         order(Instant.now().minus(3, ChronoUnit.HOURS), 60, RefineryOrderStatus.IN_PROGRESS);
 
-    assertThat(producer.produce(Instant.now())).isEqualTo(1);
+    assertThat(producer.produce(Instant.now(), 100)).isEqualTo(1);
 
     assertThat(readyEventsOf(due)).hasSize(1);
   }
@@ -180,7 +183,7 @@ class RefineryNoticeIntegrationTest {
     stored.setStoredAt(Instant.now());
     refineryOrderRepository.saveAndFlush(stored);
 
-    assertThat(producer.produce(Instant.now())).isZero();
+    assertThat(producer.produce(Instant.now(), 100)).isZero();
 
     assertThat(readyEventsOf(running)).isEmpty();
     assertThat(readyEventsOf(canceled)).isEmpty();
@@ -194,19 +197,69 @@ class RefineryNoticeIntegrationTest {
     open.setDurationMinutes(null);
     refineryOrderRepository.saveAndFlush(open);
 
-    assertThat(producer.produce(Instant.now())).isZero();
+    assertThat(producer.produce(Instant.now(), 100)).isZero();
   }
 
   @Test
   void aNewRunTimeMakesTheOrderAnnounceableAgain() {
     RefineryOrder due =
         order(Instant.now().minus(3, ChronoUnit.HOURS), 60, RefineryOrderStatus.OPEN);
-    assertThat(producer.produce(Instant.now())).isEqualTo(1);
+    assertThat(producer.produce(Instant.now(), 100)).isEqualTo(1);
 
     due.setReadyNotifiedAt(null);
     refineryOrderRepository.saveAndFlush(due);
 
-    assertThat(producer.produce(Instant.now())).isEqualTo(1);
+    assertThat(producer.produce(Instant.now(), 100)).isEqualTo(1);
+  }
+
+  @Test
+  void aRunThatEndedBeforeTheWindowIsHistoryAndNeverAnnounced() {
+    RefineryOrder history =
+        order(Instant.now().minus(8, ChronoUnit.DAYS), 60, RefineryOrderStatus.OPEN);
+    RefineryOrder recent =
+        order(Instant.now().minus(6, ChronoUnit.DAYS), 60, RefineryOrderStatus.OPEN);
+
+    assertThat(producer.produce(Instant.now(), 100)).isEqualTo(1);
+
+    assertThat(readyEventsOf(history)).isEmpty();
+    assertThat(readyEventsOf(recent)).hasSize(1);
+  }
+
+  @Test
+  void aBacklogOfAThousandOrdersIsAnnouncedOverSuccessiveTicksAndNeverTwice() {
+    List<RefineryOrder> backlog = new ArrayList<>();
+    for (int i = 0; i < 1_000; i++) {
+      RefineryOrder pending = new RefineryOrder();
+      pending.setOwner(owner);
+      pending.setLocation(location);
+      pending.setStatus(RefineryOrderStatus.OPEN);
+      pending.setStartedAt(Instant.now().minus(3, ChronoUnit.HOURS).minusSeconds(i));
+      pending.setDurationMinutes(60L);
+      backlog.add(pending);
+    }
+    refineryOrderRepository.saveAllAndFlush(backlog);
+
+    int ticks = 0;
+    int raised;
+    do {
+      raised = producer.produce(Instant.now(), 100);
+      assertThat(raised).isLessThanOrEqualTo(100);
+      ticks += raised > 0 ? 1 : 0;
+    } while (raised > 0);
+
+    Set<UUID> announced = new HashSet<>();
+    long events = 0;
+    for (NoticeEvent event :
+        this.events.stream(NoticeEvent.class)
+            .filter(e -> e.eventType() == NotificationEventType.REFINERY_ORDER_READY)
+            .toList()) {
+      announced.add(event.entityId());
+      events++;
+    }
+    assertThat(ticks).isEqualTo(10);
+    assertThat(events).isEqualTo(1_000);
+    assertThat(announced).hasSize(1_000);
+    assertThat(producer.produce(Instant.now(), 100)).isZero();
   }
 
   @Test

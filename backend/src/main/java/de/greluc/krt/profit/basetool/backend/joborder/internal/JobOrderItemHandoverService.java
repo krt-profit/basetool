@@ -25,13 +25,11 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
-import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockConsumption;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderItemHandoverMapper;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItemHandover;
@@ -40,7 +38,6 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverDto;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
@@ -83,8 +80,7 @@ public class JobOrderItemHandoverService {
   private final JobOrderRepository jobOrderRepository;
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   private final JobOrderItemHandoverMapper jobOrderItemHandoverMapper;
-  private final InventoryItemRepository inventoryItemRepository;
-  private final StockChangeObserver stockChangeObserver;
+  private final StockCommands stockCommands;
   private final JobOrderService jobOrderService;
   private final UserService userService;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
@@ -187,8 +183,7 @@ public class JobOrderItemHandoverService {
     final Integer orderDisplayId = jobOrder.getDisplayId();
     for (ConsumedItem consumed : consumedItems) {
       if (!consumed.depleted()) {
-        stockChangeObserver.lower(
-            consumed.itemId(), consumed.remaining(), StockChangeReason.HANDOVER);
+        stockCommands.lowered(consumed.itemId(), consumed.remaining(), StockChangeReason.HANDOVER);
       }
       auditRecorder.record(
           AuditEventType.INVENTORY_HANDED_OVER,
@@ -231,45 +226,17 @@ public class JobOrderItemHandoverService {
       UUID jobOrderId, Map<UUID, Integer> handedByGameItem) {
     final List<ConsumedItem> consumed = new ArrayList<>();
     for (Map.Entry<UUID, Integer> handed : handedByGameItem.entrySet()) {
-      UUID gameItemId = handed.getKey();
-      double remainingToConsume = handed.getValue();
-      if (remainingToConsume <= QUANTITY_EPSILON) {
-        continue;
-      }
-      for (InventoryItem row :
-          inventoryItemRepository.findGameItemRowsByJobOrderAndGameItemForUpdate(
-              jobOrderId, gameItemId)) {
-        if (remainingToConsume <= QUANTITY_EPSILON) {
-          break;
-        }
-        var slice = InventoryAllocations.jobOrderSlice(row, jobOrderId);
-        double sliceAmount = slice != null && slice.getAmount() != null ? slice.getAmount() : 0.0;
-        if (sliceAmount <= QUANTITY_EPSILON) {
-          continue;
-        }
-        double take = Math.min(remainingToConsume, sliceAmount);
-        double rowAmount = row.getAmount() != null ? row.getAmount() : 0.0;
-        double rowRemaining = InventoryItem.roundToScuScale(rowAmount - take);
-        boolean depleted = rowRemaining <= QUANTITY_EPSILON;
-        String gameItemName = row.getGameItem() != null ? row.getGameItem().getName() : "—";
+      for (StockConsumption row :
+          stockCommands.consumeEarmarkedItems(
+              jobOrderId, handed.getKey(), handed.getValue(), StockChangeReason.HANDOVER)) {
         consumed.add(
             new ConsumedItem(
-                row.getId(),
-                InventoryAuditLabels.label(row),
-                gameItemName,
-                take,
-                depleted ? 0.0 : rowRemaining,
-                depleted));
-
-        InventoryAllocations.reduceJobOrder(row, jobOrderId, take);
-        if (depleted) {
-          stockChangeObserver.beforeDelete(List.of(row.getId()), StockChangeReason.HANDOVER);
-          inventoryItemRepository.delete(row);
-        } else {
-          row.setAmount(rowRemaining);
-          inventoryItemRepository.save(row);
-        }
-        remainingToConsume -= take;
+                row.rowId(),
+                row.label(),
+                row.name(),
+                row.amount(),
+                row.remaining(),
+                row.depleted()));
       }
     }
     return consumed;

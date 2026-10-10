@@ -27,10 +27,12 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
@@ -106,6 +108,7 @@ public class InventoryItemService {
   private final InventoryItemMapper inventoryItemMapper;
   private final OwnerScopeService ownerScopeService;
   private final InventoryAccessPolicy inventoryAccessPolicy;
+  private final StockCommands stockCommands;
   private final JobOrderItemService jobOrderItemService;
   private final AuditRecorder auditRecorder;
   private final InventoryAggregationService inventoryAggregationService;
@@ -446,15 +449,12 @@ public class InventoryItemService {
   public InventoryItemDto createInventoryItem(
       @NotNull InventoryItemCreateDto dto, UUID currentUserId) {
     UUID targetUserId = dto.userId() != null ? dto.userId() : currentUserId;
-    final boolean onBehalfOfSomeoneElse = !targetUserId.equals(currentUserId);
-    if (onBehalfOfSomeoneElse && !inventoryAccessPolicy.canManageUserInventory(targetUserId)) {
-      throw new AccessDeniedException(
-          "You are not allowed to create inventory items for other users");
-    }
-    if (onBehalfOfSomeoneElse && Boolean.TRUE.equals(dto.personal())) {
-      throw new AccessDeniedException(
-          "You are not allowed to create personal inventory items for other users");
-    }
+    stockCommands.requireBookIn(
+        targetUserId,
+        currentUserId,
+        false,
+        Boolean.TRUE.equals(dto.personal()),
+        BookInRule.lager());
 
     final User user = Entities.require(userRepository.findById(targetUserId), "User not found");
     final Material material =

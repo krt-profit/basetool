@@ -19,9 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeCatalogKind;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
@@ -30,39 +27,27 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResol
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockChangeSet;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeEffects;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemStolenMarkDto;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.service.InventoryCheckoutService;
-import de.greluc.krt.profit.basetool.backend.service.InventoryStolenMarkService;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -73,7 +58,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -126,9 +110,6 @@ public class ExchangeStockWriteService {
   /** The refusal of taking stock that is reserved for a job order or mission. */
   static final String STOCK_EARMARKED = "STOCK_EARMARKED";
 
-  /** The prefix that keeps the exchange's lot locks apart from any other advisory lock. */
-  private static final String LOT_LOCK_PREFIX = "exchange-stock-lot|";
-
   /** The refusal of a stolen lot while the stolen marking is switched off. */
   static final String STOLEN_MARKING_DISABLED = "STOLEN_MARKING_DISABLED";
 
@@ -138,11 +119,8 @@ public class ExchangeStockWriteService {
   private final ExchangeLocationResolver locationResolver;
   private final LocationRepository locationRepository;
   private final InventoryItemRepository inventoryRepository;
-  private final InventoryCheckoutService checkoutService;
-  private final InventoryStolenMarkService stolenMarkService;
+  private final StockCommands stockCommands;
   private final StockOfferLookup stockOfferLookup;
-  private final UserRepository userRepository;
-  private final AuditRecorder auditRecorder;
   private final InventoryProperties inventoryProperties;
   private final ExchangeChangeRepository changeRepository;
   private final ExchangeJournalService journalService;
@@ -271,11 +249,11 @@ public class ExchangeStockWriteService {
       return false;
     }
     Lot lot = parsed.get();
-    lockLots(member, List.of(lotKey));
-    List<InventoryItem> rows = lockRows(member, lot);
+    stockCommands.lockLots(member, List.of(lotKey));
+    List<InventoryItem> rows = stockCommands.lockLotRows(member, lot.stock());
     BigDecimal delta = round(target, unit).subtract(round(sum(rows), unit));
     if (delta.signum() > 0) {
-      bookIn(member, lot, delta);
+      stockCommands.bookIn(member, lot.stock(), delta.doubleValue());
     } else if (delta.signum() < 0) {
       bookOut(member, rows, delta.negate(), unit, new OfferEffects());
     }
@@ -464,76 +442,10 @@ public class ExchangeStockWriteService {
         byKey.putIfAbsent(lot.key(), lot);
       }
     }
-    lockLots(member, byKey.keySet());
+    stockCommands.lockLots(member, byKey.keySet());
     Map<String, List<InventoryItem>> locked = new HashMap<>();
-    byKey.forEach((key, lot) -> locked.put(key, lockRows(member, lot)));
+    byKey.forEach((key, lot) -> locked.put(key, stockCommands.lockLotRows(member, lot.stock())));
     return locked;
-  }
-
-  /**
-   * Takes the transaction-scoped advisory lock of each of a member's lots, in the order of the lock
-   * keys, before any of their rows is read (ADR-0229).
-   *
-   * <p>The lock exists whether or not the lot has rows, so a writer that waited reads the rows the
-   * holder booked in. Two lots whose keys collide share one lock, which only serialises them.
-   *
-   * @param member the member
-   * @param lotKeys the lots' keys as the change feed records them
-   */
-  @Transactional(propagation = Propagation.MANDATORY)
-  public void lockLots(@NotNull UUID member, @NotNull Collection<String> lotKeys) {
-    Set<Long> keys = new TreeSet<>();
-    for (String lotKey : lotKeys) {
-      keys.add(lotLockKey(member, lotKey));
-    }
-    keys.forEach(inventoryRepository::lockExchangeLot);
-  }
-
-  /**
-   * Derives a lot's 64-bit advisory lock key: the first eight bytes of the SHA-256 of the member
-   * and the lot key under the exchange's own prefix.
-   *
-   * @param member the member
-   * @param lotKey the lot's key
-   * @return the lock key
-   */
-  static long lotLockKey(@NotNull UUID member, @NotNull String lotKey) {
-    try {
-      byte[] digest =
-          MessageDigest.getInstance("SHA-256")
-              .digest((LOT_LOCK_PREFIX + member + '|' + lotKey).getBytes(StandardCharsets.UTF_8));
-      return ByteBuffer.wrap(digest).getLong();
-    } catch (NoSuchAlgorithmException e) {
-      throw new IllegalStateException("SHA-256 is not available", e);
-    }
-  }
-
-  /**
-   * Locks the member's rows of a lot, personal and shared, in the order a book-out takes them: the
-   * personal rows first, then the rows without an org unit, then the oldest.
-   *
-   * @param member the member
-   * @param lot the lot
-   * @return the rows, locked for this transaction
-   */
-  private @NotNull List<InventoryItem> lockRows(@NotNull UUID member, @NotNull Lot lot) {
-    List<InventoryItem> rows =
-        new ArrayList<>(
-            lot.material() != null
-                ? inventoryRepository.lockMaterialLot(
-                    member,
-                    lot.material().getId(),
-                    lot.location().getId(),
-                    lot.quality() == null ? 0 : lot.quality(),
-                    lot.stolen())
-                : inventoryRepository.lockItemLot(
-                    member, lot.gameItem().getId(), lot.location().getId(), lot.stolen()));
-    rows.sort(
-        Comparator.comparing((InventoryItem r) -> Boolean.TRUE.equals(r.getPersonal()) ? 0 : 1)
-            .thenComparing(r -> r.getOwningOrgUnit() == null ? 0 : 1)
-            .thenComparing(
-                InventoryItem::getCreatedAt, Comparator.nullsFirst(Comparator.naturalOrder())));
-    return rows;
   }
 
   /**
@@ -678,12 +590,8 @@ public class ExchangeStockWriteService {
       if (take.signum() <= 0) {
         continue;
       }
-      stolenMarkService.mark(
-          row.getId(),
-          new InventoryItemStolenMarkDto(
-              row.getVersion(), stolen, take.compareTo(rowAmount) == 0 ? null : take.doubleValue()),
-          member,
-          false);
+      stockCommands.markStolen(
+          member, row, stolen, take.compareTo(rowAmount) == 0 ? null : take.doubleValue());
       left = left.subtract(take);
     }
     return amount.subtract(left);
@@ -772,7 +680,7 @@ public class ExchangeStockWriteService {
     BigDecimal delta = change.target().subtract(change.current());
     BigDecimal booked = delta.abs().subtract(flipped.getOrDefault(change, BigDecimal.ZERO));
     if (booked.signum() > 0 && delta.signum() > 0) {
-      bookIn(caller.member(), change.lot(), booked);
+      stockCommands.bookIn(caller.member(), change.lot().stock(), booked.doubleValue());
     } else if (booked.signum() > 0) {
       List<InventoryItem> stillInLot =
           change.rows().stream()
@@ -788,38 +696,6 @@ public class ExchangeStockWriteService {
         isRemoval(caller, change, moves),
         state(change.current(), change.lot().unit()),
         state(change.target(), change.lot().unit()));
-  }
-
-  /**
-   * Books stock in as a new personal row without an org unit, which piece-counted stock then joins
-   * to its existing row as a book-in in the Lager does (REQ-INV-026).
-   *
-   * @param member the member
-   * @param lot the lot
-   * @param amount the amount
-   */
-  private void bookIn(@NotNull UUID member, @NotNull Lot lot, @NotNull BigDecimal amount) {
-    User user = userRepository.findById(member).orElseThrow();
-    InventoryItem item = new InventoryItem();
-    item.setUser(user);
-    item.setOwningOrgUnit(null);
-    item.setMaterial(lot.material());
-    item.setGameItem(lot.gameItem());
-    item.setLocation(lot.location());
-    item.setQuality(lot.material() == null ? null : lot.quality() == null ? 0 : lot.quality());
-    item.setAmount(InventoryItem.roundToScuScale(amount.doubleValue()));
-    item.setPersonal(true);
-    item.setStolen(lot.stolen());
-    InventoryItem saved = inventoryRepository.save(item);
-    auditRecorder.record(
-        AuditEventType.INVENTORY_ITEM_CREATED,
-        saved.getId(),
-        InventoryAuditLabels.label(saved),
-        member,
-        AuditDetails.of("qty", saved.getAmount())
-            .with("q", saved.getQuality())
-            .with("personal", true));
-    checkoutService.mergeStockIfRequested(saved, false);
   }
 
   /**
@@ -848,22 +724,7 @@ public class ExchangeStockWriteService {
       if (take.signum() <= 0) {
         continue;
       }
-      StockChangeEffects effects =
-          checkoutService.bookOutForClient(
-              row.getId(),
-              new InventoryItemBookOutDto(
-                  take.doubleValue(),
-                  null,
-                  null,
-                  CheckoutType.DISCARD,
-                  null,
-                  null,
-                  row.getVersion(),
-                  null,
-                  null,
-                  null,
-                  null),
-              member);
+      StockChangeEffects effects = stockCommands.bookOutRow(member, row, take.doubleValue());
       offers.reduced += effects.reduced();
       offers.removed += effects.removed();
       remaining = remaining.subtract(take);
@@ -1046,6 +907,16 @@ public class ExchangeStockWriteService {
       @Nullable Integer quality,
       boolean stolen,
       @NotNull String unit) {
+
+    /**
+     * The lot as the Lager's stock commands take it.
+     *
+     * @return the stock lot
+     */
+    @NotNull
+    StockLot stock() {
+      return new StockLot(material(), gameItem(), location(), quality(), stolen());
+    }
 
     /**
      * The material's or item's id.

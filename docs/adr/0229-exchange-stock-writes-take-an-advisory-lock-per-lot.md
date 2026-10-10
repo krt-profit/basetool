@@ -93,3 +93,15 @@ through the command API in their own transaction (`MANDATORY`). The protocol its
 order, transaction scope — is unchanged, so the move changes no lock and no deadlock property; the
 ADR-0229 load-test cases and the inventory concurrency tests guard it. Whether the Lager's web and
 app paths also take the lock stays the separate decision the consequences name.
+
+## Implementation of the amendment — 2026-10-10
+
+`inventory.api.StockCommands`, implemented by `InventoryStockCommands`, holds the protocol:
+`lockLots` (the advisory lock per lot, key and prefix unchanged, ascending key order, each lot
+once), `lockLotRows` (the row-lock order: personal rows, then rows without an org unit, then the
+oldest) and the book-in, book-out and stolen-marking writes the exchange made on Lager rows. Every
+command is `MANDATORY`. `ExchangeStockWriteService` and `ExchangeUndoService` call it; neither
+derives a lock key nor creates a Lager row any more. `InventoryStockCommandsTest` pins the key
+derivation against fixed values and the lock order, and the four cases of
+`ExchangeStockWriteConcurrencyIntegrationTest` (the load test's findings) stay green. The Lager's
+web and app paths still take no lot lock.
