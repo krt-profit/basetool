@@ -315,5 +315,60 @@ public enum NotificationEventType {
    * Somebody other than the owner discarded or sold part of a member's Lager stock (REQ-INV-056).
    * The default rule notifies the owner.
    */
-  INVENTORY_BOOKED_OUT_BY_OTHER
+  INVENTORY_BOOKED_OUT_BY_OTHER,
+
+  /**
+   * The responsible holder approved an over-limit booking request, so it is ready to be confirmed
+   * (REQ-BANK-057). The default rule notifies the bank employees granted on the account, the bank
+   * management and the requester.
+   */
+  BANK_BOOKING_REQUEST_APPROVED,
+
+  /**
+   * The approval of a booking request was revoked (REQ-BANK-057). Creates no notification; clears
+   * the request's ready-to-confirm notices.
+   */
+  BANK_BOOKING_REQUEST_APPROVAL_REVOKED,
+
+  /**
+   * A bank employee was granted access to an account or the grant's rights changed (REQ-BANK-058).
+   * The default rule notifies the grantee.
+   */
+  BANK_GRANT_CHANGED,
+
+  /**
+   * A bank employee's access to an account was withdrawn (REQ-BANK-058). The default rule notifies
+   * the former grantee.
+   */
+  BANK_GRANT_REVOKED,
+
+  /**
+   * Bank staff booked a withdrawal that pays out to a member (REQ-BANK-059). The default rule
+   * notifies that member.
+   */
+  BANK_PAYOUT_BOOKED,
+
+  /**
+   * Bank staff moved aUEC from one holder to another (REQ-BANK-059). The default rule notifies the
+   * receiving holder's member, who must take the aUEC over.
+   */
+  BANK_HOLDER_TRANSFER_BOOKED,
+
+  /**
+   * Bank staff debited an account directly or reversed a booking on it (REQ-BANK-059). The default
+   * rule notifies the account's responsible holders.
+   */
+  BANK_ACCOUNT_DEBITED,
+
+  /**
+   * The roster reconciliation deactivated a bank holder who still holds aUEC (REQ-BANK-060). The
+   * default rule notifies the bank management.
+   */
+  BANK_HOLDER_DEACTIVATED_WITH_BALANCE,
+
+  /**
+   * A deactivated holder was reactivated or their balance reached zero (REQ-BANK-060). Creates no
+   * notification; clears the holder's deactivated-with-balance notice.
+   */
+  BANK_HOLDER_NOTICE_CLEARED
 }

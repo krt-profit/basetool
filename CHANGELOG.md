@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Benachrichtigungen zur Bank.** Wer einen freigegebenen Antrag bestätigen kann, erfährt, dass er bereit ist; Bankmitarbeiter hören, wenn ihre Berechtigung auf ein Konto erteilt, geändert oder entzogen wird. Auszahlungen, Halterübertragungen und Direktbuchungen von Bankpersonal melden sich bei den Betroffenen (Konto-Verantwortliche), und die Bankleitung erfährt, wenn ein deaktivierter Halter noch Geld hält (REQ-BANK-057…060, Migration V278, #2414).
+
 - **Benachrichtigungen zu Materialbörse und Lager.** Wer an einem Angebot Interesse angemeldet oder zugesagt hat, ein Gesuch zu beliefern, erfährt, wenn das Angebot nicht mehr verfügbar oder das Gesuch zurückgezogen ist; wessen Bestand jemand anderes ausbucht oder verkauft, wird benachrichtigt (REQ-MARKET-021, -022, REQ-INV-056, Migration V277, #2414).
 
 - **Benachrichtigungen zur Raffinerie.** Der Besitzer erfährt, wenn ein Raffinerieauftrag fertig ist und abgeholt werden kann, und wenn jemand anderes den Auftrag ändert, storniert oder einlagert, auch auf wessen Lager die Ausbeute gebucht wurde (REQ-REFINERY-023, -024, Migrationen V275/V276, #2414).

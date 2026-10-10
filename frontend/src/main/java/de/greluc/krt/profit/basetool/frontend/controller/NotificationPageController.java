@@ -106,10 +106,14 @@ public class NotificationPageController {
           "JOB_ORDER",
           "/orders/",
           "REFINERY_ORDER",
-          "/refinery-orders/");
+          "/refinery-orders/",
+          "BANK_ACCOUNT_GRANT",
+          "/bank/accounts/",
+          "BANK_HOLDER",
+          "/bank/holders/");
 
   /** The types whose record is gone, so the row has nothing to link to. */
-  private static final Set<String> UNLINKED_TYPES = Set.of("MISSION_DELETED");
+  private static final Set<String> UNLINKED_TYPES = Set.of("MISSION_DELETED", "BANK_GRANT_REVOKED");
 
   /** The page each notification type links to when its subject is a page rather than a record. */
   private static final Map<String, String> PAGE_TARGETS =
@@ -123,6 +127,7 @@ public class NotificationPageController {
           Map.entry("INVENTORY_TRANSFERRED_TO_USER", "/inventory/my"),
           Map.entry("INVENTORY_TRANSFERRED_FROM_USER", "/inventory/my"),
           Map.entry("INVENTORY_BOOKED_OUT_BY_OTHER", "/inventory/my"),
+          Map.entry("BANK_BOOKING_REQUEST_APPROVED", "/bank/requests"),
           Map.entry("ACCOUNT_DELETION_REQUEST_DECLINED", "/profile"),
           Map.entry("ACCOUNT_DELETION_REQUESTED", "/admin/deletion-requests"),
           Map.entry("DISCORD_REGISTRATION_PENDING", "/admin/discord-registrations"));

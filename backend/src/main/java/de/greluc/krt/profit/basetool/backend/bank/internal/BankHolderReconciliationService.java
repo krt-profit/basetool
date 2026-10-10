@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankNotices;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncFollowUp;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +33,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,6 +57,8 @@ public class BankHolderReconciliationService implements UserSyncFollowUp {
   private final UserRepository userRepository;
   private final BankHolderRepository holderRepository;
   private final BankAuditService bankAuditService;
+  private final BankHolderPostingRepository holderPostingRepository;
+  private final ApplicationEventPublisher eventPublisher;
 
   /**
    * Reconciles the whole roster in one sweep: creates a holder for every bank-role user that lacks
@@ -112,6 +117,7 @@ public class BankHolderReconciliationService implements UserSyncFollowUp {
             null,
             holder.getUser() == null ? null : holder.getUser().getId(),
             holder.getHandle());
+        eventPublisher.publishEvent(BankNotices.holderNoticeCleared(holder.getId()));
         reactivated++;
       }
     }
@@ -124,6 +130,12 @@ public class BankHolderReconciliationService implements UserSyncFollowUp {
         holderRepository.save(holder);
         bankAuditService.record(
             BankAuditEventType.HOLDER_DEACTIVATED, null, null, userId, holder.getHandle());
+        BigDecimal balance = holderPostingRepository.holderTotal(holder.getId());
+        if (balance.signum() != 0) {
+          eventPublisher.publishEvent(
+              BankNotices.holderDeactivatedWithBalance(
+                  holder.getId(), holder.getHandle(), balance));
+        }
         deactivated++;
       }
     }
