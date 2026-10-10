@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 concurrency:
@@ -244,7 +246,7 @@ jobs:
       - name: adr-numbering / Check ADR numbering
         if: ${{ !cancelled() }}
         env:
-          ADR_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
+          ADR_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.merge_group.base_sha || '' }}
         run: scripts/check-adr-numbering.sh
 
       - name: adr-registry / Self-test the ADR registry checker
