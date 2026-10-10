@@ -130,6 +130,8 @@ PUT /api/v1/missions/{id}/units/{unitId}/slim q=- f=- s=MissionRepository.update
 GET /api/v1/missions/{missionId}/finance-entries q=page,size f=amount,comment,content,desiredMissionJobType,endTime,guestName,id,missionId,note,orgUnits,page,participant,payoutPreference,plannedMissionJobType,size,sort,startTime,totalElements,totalPages,type,user,version s=MissionRepository.financesWith.b434a002
 GET /api/v1/missions/{missionId}/finance-entries/summary q=- f=expenseCount,expenseSum,incomeCount,incomeSum,total s=MissionRepository.finances.d4321bb5
 GET /api/v1/notifications q=page,size,sort f=content,createdAt,entityId,entityType,id,page,params,read,size,sort,totalElements,totalPages,type,updatedAt,version s=NotificationRepository.inbox.b8d41756
+GET /api/v1/notifications/preferences q=- f=mutable,muted,type s=NotificationPreferencesRepository.preferences.6a713d2e
+PUT /api/v1/notifications/preferences/{type} q=- f=mutable,muted,type s=NotificationPreferencesRepository.setMuted.dfe00273
 DELETE /api/v1/notifications/read q=- f=affected,unreadCount s=NotificationRepository.deleteRead.29c26412
 POST /api/v1/notifications/read-all q=- f=affected,unreadCount s=NotificationRepository.markAllRead.7ea6ff78
 GET /api/v1/notifications/stream q=- f=- s=NotificationRepository.changes.46be0820

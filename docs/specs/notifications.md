@@ -965,7 +965,10 @@ member's own decision; it changes nothing for anybody else and nothing about wha
 - **API.** `GET /api/v1/notifications/preferences` lists every type with `mutable` and `muted`;
   `PUT /api/v1/notifications/preferences/{type}` with `{muted}` stores the choice. Both are
   `isAuthenticated()` and keyed on the caller; the write is idempotent and carries no version (a
-  boolean toggle, last writer wins) and answers `400` for a type that cannot be muted.
+  boolean toggle, last writer wins) and answers `400` for a type that cannot be muted. Both
+  operations are in the frozen contract set as `T1` (REQ-API-009, REQ-API-016) and admitted by the API
+  vhost, because the Android app calls them; from the first released app build on they can no longer
+  change incompatibly.
 - **Web.** The profile page has the card „Benachrichtigungen": one checkbox per type, grouped by the
   area the type name's prefix names, a locked row for a non-mutable type, saved per click through
   `krtFetch` without a reload; a failed write re-renders the card from the server (REQ-FE-001). The
