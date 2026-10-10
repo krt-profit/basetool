@@ -93,7 +93,7 @@ class InventoryStolenMarkServiceTest {
   private InventoryStolenMarkService serviceWith(boolean enabled) {
     return new InventoryStolenMarkService(
         inventoryItemRepository,
-        materialExchangeOfferRepository,
+        new MaterialExchangeStockOfferLookup(materialExchangeOfferRepository),
         inventoryCheckoutService,
         inventoryItemMapper,
         new InventoryProperties(enabled),

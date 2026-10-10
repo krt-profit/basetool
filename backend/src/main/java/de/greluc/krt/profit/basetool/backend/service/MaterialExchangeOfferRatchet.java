@@ -22,15 +22,18 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferKind;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository.OfferStock;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,7 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @RequiredArgsConstructor
-public class MaterialExchangeOfferRatchet {
+public class MaterialExchangeOfferRatchet implements StockChangeObserver {
 
   private final MaterialExchangeOfferRepository offerRepository;
   private final AuditRecorder auditRecorder;
@@ -60,8 +63,9 @@ public class MaterialExchangeOfferRatchet {
    * @param reason the stock change
    * @return the number of offers lowered
    */
+  @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public int lower(@NotNull UUID inventoryItemId, double stock, @NotNull Reason reason) {
+  public int lower(@NotNull UUID inventoryItemId, double stock, @NotNull StockChangeReason reason) {
     List<OfferStock> offers =
         offerRepository.findActiveStockByInventoryItemIds(List.of(inventoryItemId));
     if (offers.isEmpty()) {
@@ -92,8 +96,10 @@ public class MaterialExchangeOfferRatchet {
    * @param reason the stock change
    * @return the number of offers the delete will remove
    */
+  @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public int beforeDelete(@NotNull Collection<UUID> inventoryItemIds, @NotNull Reason reason) {
+  public int beforeDelete(
+      @NotNull Collection<UUID> inventoryItemIds, @NotNull StockChangeReason reason) {
     if (inventoryItemIds.isEmpty()) {
       return 0;
     }
@@ -107,12 +113,14 @@ public class MaterialExchangeOfferRatchet {
    * @param scope the wipe's scope
    * @return the number of offers the wipe will remove
    */
+  @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public int beforeWipe(@NotNull ScopePredicate scope) {
+  public int beforeWipe(
+      boolean adminAllScope, @Nullable UUID activeOrgUnitId, @NotNull Set<UUID> memberOrgUnitIds) {
     return removed(
         offerRepository.findActiveStockOnNonPersonalRows(
-            scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds()),
-        Reason.WIPE);
+            adminAllScope, activeOrgUnitId, memberOrgUnitIds),
+        StockChangeReason.WIPE);
   }
 
   /**
@@ -122,9 +130,11 @@ public class MaterialExchangeOfferRatchet {
    * @param userId the member
    * @return the number of offers the purge will remove
    */
+  @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public int beforeUserPurge(@NotNull UUID userId) {
-    return removed(offerRepository.findActiveStockByRowOwner(userId), Reason.USER_DELETION);
+    return removed(
+        offerRepository.findActiveStockByRowOwner(userId), StockChangeReason.USER_DELETION);
   }
 
   /**
@@ -134,7 +144,7 @@ public class MaterialExchangeOfferRatchet {
    * @param reason the stock change
    * @return the number of offers
    */
-  private int removed(@NotNull List<OfferStock> offers, @NotNull Reason reason) {
+  private int removed(@NotNull List<OfferStock> offers, @NotNull StockChangeReason reason) {
     for (OfferStock offer : offers) {
       auditRecorder.record(
           AuditEventType.MARKET_OFFER_REMOVED,
@@ -155,7 +165,10 @@ public class MaterialExchangeOfferRatchet {
    * @param reason the stock change
    */
   private void reduced(
-      @NotNull OfferStock offer, @NotNull Number from, @NotNull Number to, @NotNull Reason reason) {
+      @NotNull OfferStock offer,
+      @NotNull Number from,
+      @NotNull Number to,
+      @NotNull StockChangeReason reason) {
     auditRecorder.record(
         AuditEventType.MARKET_OFFER_REDUCED,
         offer.getId(),
@@ -175,53 +188,5 @@ public class MaterialExchangeOfferRatchet {
    */
   private static String label(@NotNull OfferStock offer) {
     return offer.getItemName() != null ? offer.getItemName() : offer.getMaterialName();
-  }
-
-  /**
-   * The offers one stock change lowered and removed.
-   *
-   * @param reduced the offers lowered
-   * @param removed the offers removed
-   */
-  public record Effects(int reduced, int removed) {
-
-    /** A stock change that touched no offer. */
-    public static final Effects NONE = new Effects(0, 0);
-  }
-
-  /** The stock change that lowered or removed an offer, written as the audit {@code reason}. */
-  @Getter
-  @RequiredArgsConstructor
-  public enum Reason {
-
-    /** A discard or sale booked out of the Lager. */
-    CHECKOUT("checkout"),
-
-    /** A selection of rows booked out at once. */
-    BULK_CHECKOUT("bulk-checkout"),
-
-    /** A transfer to another member or location. */
-    TRANSFER("transfer"),
-
-    /** A move across the personal marker, alone or as part of a bulk rebooking. */
-    REBOOK("rebook"),
-
-    /** The global wipe of the shared Lager. */
-    WIPE("wipe"),
-
-    /** A job-order material handover or item delivery. */
-    HANDOVER("handover"),
-
-    /** Materials consumed by booked job-order production. */
-    PRODUCTION("production"),
-
-    /** A connected application setting the member's stock. */
-    STOCK("stock"),
-
-    /** The deletion of the member's account. */
-    USER_DELETION("user-deletion");
-
-    /** The value written to the audit details. */
-    private final String code;
   }
 }

@@ -27,6 +27,8 @@ import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderItemHandoverMapper;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -82,7 +84,7 @@ public class JobOrderItemHandoverService {
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   private final JobOrderItemHandoverMapper jobOrderItemHandoverMapper;
   private final InventoryItemRepository inventoryItemRepository;
-  private final MaterialExchangeOfferRatchet offerRatchet;
+  private final StockChangeObserver stockChangeObserver;
   private final JobOrderService jobOrderService;
   private final UserService userService;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
@@ -185,8 +187,8 @@ public class JobOrderItemHandoverService {
     final Integer orderDisplayId = jobOrder.getDisplayId();
     for (ConsumedItem consumed : consumedItems) {
       if (!consumed.depleted()) {
-        offerRatchet.lower(
-            consumed.itemId(), consumed.remaining(), MaterialExchangeOfferRatchet.Reason.HANDOVER);
+        stockChangeObserver.lower(
+            consumed.itemId(), consumed.remaining(), StockChangeReason.HANDOVER);
       }
       auditRecorder.record(
           AuditEventType.INVENTORY_HANDED_OVER,
@@ -261,8 +263,7 @@ public class JobOrderItemHandoverService {
 
         InventoryAllocations.reduceJobOrder(row, jobOrderId, take);
         if (depleted) {
-          offerRatchet.beforeDelete(
-              List.of(row.getId()), MaterialExchangeOfferRatchet.Reason.HANDOVER);
+          stockChangeObserver.beforeDelete(List.of(row.getId()), StockChangeReason.HANDOVER);
           inventoryItemRepository.delete(row);
         } else {
           row.setAmount(rowRemaining);

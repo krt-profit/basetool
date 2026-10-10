@@ -31,6 +31,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferKind;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository.OfferStock;
@@ -65,7 +66,7 @@ class MaterialExchangeOfferRatchetTest {
     when(offerRepository.findActiveStockByInventoryItemIds(List.of(ROW)))
         .thenReturn(List.of(offer));
 
-    int lowered = ratchet.lower(ROW, 30.0, MaterialExchangeOfferRatchet.Reason.CHECKOUT);
+    int lowered = ratchet.lower(ROW, 30.0, StockChangeReason.CHECKOUT);
 
     assertThat(lowered).isEqualTo(1);
     assertThat(details(AuditEventType.MARKET_OFFER_REDUCED, offer.getId(), "Laranite"))
@@ -80,7 +81,7 @@ class MaterialExchangeOfferRatchetTest {
     when(offerRepository.findActiveStockByInventoryItemIds(List.of(ROW)))
         .thenReturn(List.of(offer));
 
-    int lowered = ratchet.lower(ROW, 2.0, MaterialExchangeOfferRatchet.Reason.HANDOVER);
+    int lowered = ratchet.lower(ROW, 2.0, StockChangeReason.HANDOVER);
 
     assertThat(lowered).isEqualTo(1);
     assertThat(details(AuditEventType.MARKET_OFFER_REDUCED, offer.getId(), "Arden-SL Helmet"))
@@ -93,7 +94,7 @@ class MaterialExchangeOfferRatchetTest {
     when(offerRepository.findActiveStockByInventoryItemIds(List.of(ROW)))
         .thenReturn(List.of(material(20.0, "Laranite"), item(3, "Arden-SL Helmet")));
 
-    int lowered = ratchet.lower(ROW, 20.0, MaterialExchangeOfferRatchet.Reason.PRODUCTION);
+    int lowered = ratchet.lower(ROW, 20.0, StockChangeReason.PRODUCTION);
 
     assertThat(lowered).isZero();
     verifyNoInteractions(auditService);
@@ -103,7 +104,7 @@ class MaterialExchangeOfferRatchetTest {
   void lowerOnARowWithoutAnOfferWritesNothing() {
     when(offerRepository.findActiveStockByInventoryItemIds(List.of(ROW))).thenReturn(List.of());
 
-    int lowered = ratchet.lower(ROW, 1.0, MaterialExchangeOfferRatchet.Reason.TRANSFER);
+    int lowered = ratchet.lower(ROW, 1.0, StockChangeReason.TRANSFER);
 
     assertThat(lowered).isZero();
     verify(offerRepository, never()).clampOfferedAmountToStock(any(), anyDouble());
@@ -118,7 +119,7 @@ class MaterialExchangeOfferRatchetTest {
     when(offerRepository.findActiveStockByInventoryItemIds(List.of(ROW)))
         .thenReturn(List.of(first, second));
 
-    int removed = ratchet.beforeDelete(List.of(ROW), MaterialExchangeOfferRatchet.Reason.REBOOK);
+    int removed = ratchet.beforeDelete(List.of(ROW), StockChangeReason.REBOOK);
 
     assertThat(removed).isEqualTo(2);
     assertThat(details(AuditEventType.MARKET_OFFER_REMOVED, first.getId(), "Laranite"))
@@ -129,7 +130,7 @@ class MaterialExchangeOfferRatchetTest {
 
   @Test
   void beforeDeleteOfNoRowsQueriesNothing() {
-    int removed = ratchet.beforeDelete(List.of(), MaterialExchangeOfferRatchet.Reason.CHECKOUT);
+    int removed = ratchet.beforeDelete(List.of(), StockChangeReason.CHECKOUT);
 
     assertThat(removed).isZero();
     verify(offerRepository, never()).findActiveStockByInventoryItemIds(anyCollection());
@@ -143,7 +144,7 @@ class MaterialExchangeOfferRatchetTest {
     when(offerRepository.findActiveStockOnNonPersonalRows(false, unit, Set.of()))
         .thenReturn(List.of(offer));
 
-    int removed = ratchet.beforeWipe(new ScopePredicate(false, unit, Set.of()));
+    int removed = ratchet.beforeWipe(false, unit, Set.of());
 
     assertThat(removed).isEqualTo(1);
     assertThat(details(AuditEventType.MARKET_OFFER_REMOVED, offer.getId(), "Quantainium"))

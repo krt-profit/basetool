@@ -57,11 +57,6 @@ inventory -> joborder: InventoryItemService -> JobOrderItemService
 inventory -> joborder: InventoryItemService -> JobOrderItemStockGroupDto
 inventory -> joborder: InventoryItemService -> JobOrderRepository
 inventory -> joborder: InventoryJobOrderAllocation -> JobOrder
-inventory -> materialexchange: InventoryCheckoutService -> MaterialExchangeOfferRatchet
-inventory -> materialexchange: InventoryCheckoutService -> MaterialExchangeOfferRepository
-inventory -> materialexchange: InventoryStolenMarkService -> MaterialExchangeOffer
-inventory -> materialexchange: InventoryStolenMarkService -> MaterialExchangeOfferRepository
-inventory -> materialexchange: InventoryStolenMarkService -> MaterialExchangeOfferStatus
 inventory -> mission: AllocationReductions -> Mission
 inventory -> mission: InventoryAllocations -> Mission
 inventory -> mission: InventoryAuditLabels -> Mission
