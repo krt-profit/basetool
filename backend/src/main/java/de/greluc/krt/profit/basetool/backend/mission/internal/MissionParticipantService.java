@@ -55,6 +55,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -106,10 +107,10 @@ public class MissionParticipantService {
   @Transactional
   public Mission addParticipant(
       @NotNull UUID missionId,
-      UUID userId,
-      String guestName,
-      UUID desiredJobTypeId,
-      String comment) {
+      @Nullable UUID userId,
+      @Nullable String guestName,
+      @Nullable UUID desiredJobTypeId,
+      @Nullable String comment) {
     return addParticipant(missionId, userId, guestName, desiredJobTypeId, comment, null, null);
   }
 
@@ -127,12 +128,12 @@ public class MissionParticipantService {
   @Transactional
   public Mission addParticipant(
       @NotNull UUID missionId,
-      UUID userId,
-      String guestName,
-      UUID desiredJobTypeId,
-      String comment,
-      List<UUID> orgUnitIds,
-      PayoutPreference payoutPreference) {
+      @Nullable UUID userId,
+      @Nullable String guestName,
+      @Nullable UUID desiredJobTypeId,
+      @Nullable String comment,
+      @Nullable List<UUID> orgUnitIds,
+      @Nullable PayoutPreference payoutPreference) {
     Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
 
     if (mission.getParticipants() != null
@@ -515,8 +516,8 @@ public class MissionParticipantService {
   @Transactional
   public Mission setPartyLead(
       @NotNull UUID missionId,
-      UUID userId,
-      String guestName,
+      @Nullable UUID userId,
+      @Nullable String guestName,
       @NotNull Long expectedPartyLeadVersion) {
     Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
@@ -604,7 +605,7 @@ public class MissionParticipantService {
    * @param submittedOrgUnitIds the caller-supplied org-unit ids from the request DTO.
    * @return the managed org units to persist; never {@code null}, possibly empty.
    */
-  private List<OrgUnit> resolveSubmittedOrgUnits(List<UUID> submittedOrgUnitIds) {
+  private List<OrgUnit> resolveSubmittedOrgUnits(@Nullable List<UUID> submittedOrgUnitIds) {
     if (submittedOrgUnitIds == null || submittedOrgUnitIds.isEmpty()) {
       return List.of();
     }

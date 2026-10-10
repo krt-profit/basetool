@@ -125,7 +125,7 @@ val nullAwayPackages =
     )
     .map { "de.greluc.krt.profit.basetool.backend.$it.api" }
     .plus(
-      listOf("joborder", "materialexchange", "refinery").map {
+      listOf("joborder", "materialexchange", "mission", "refinery").map {
         "de.greluc.krt.profit.basetool.backend.$it"
       }
     )

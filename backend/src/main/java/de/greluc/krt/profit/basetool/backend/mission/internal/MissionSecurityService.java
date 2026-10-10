@@ -155,13 +155,13 @@ public class MissionSecurityService {
         roleHierarchy.getReachableGrantedAuthorities(authentication.getAuthorities());
 
     boolean isAdmin =
-        reachable.stream().anyMatch(a -> a.getAuthority().equals(Roles.authority(Roles.ADMIN)));
+        reachable.stream().anyMatch(a -> Roles.authority(Roles.ADMIN).equals(a.getAuthority()));
     if (isAdmin) {
       return true;
     }
 
     boolean isOfficer =
-        reachable.stream().anyMatch(a -> a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
+        reachable.stream().anyMatch(a -> Roles.authority(Roles.OFFICER).equals(a.getAuthority()));
     if (isOfficer && missionAccessPolicy.canEditMission(entry.getMission().getId())) {
       return true;
     }
@@ -198,7 +198,7 @@ public class MissionSecurityService {
     Collection<? extends GrantedAuthority> reachable =
         roleHierarchy.getReachableGrantedAuthorities(authentication.getAuthorities());
     boolean isAdmin =
-        reachable.stream().anyMatch(a -> a.getAuthority().equals(Roles.authority(Roles.ADMIN)));
+        reachable.stream().anyMatch(a -> Roles.authority(Roles.ADMIN).equals(a.getAuthority()));
     if (isAdmin) {
       return true;
     }
@@ -207,10 +207,10 @@ public class MissionSecurityService {
         reachable.stream()
             .anyMatch(
                 a ->
-                    a.getAuthority().equals(Roles.authority(Roles.MISSION_MANAGER))
-                        || a.getAuthority().equals(Roles.MISSION_MANAGER)
-                        || a.getAuthority().equals(Permissions.MISSION_MANAGE)
-                        || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
+                    Roles.authority(Roles.MISSION_MANAGER).equals(a.getAuthority())
+                        || Roles.MISSION_MANAGER.equals(a.getAuthority())
+                        || Permissions.MISSION_MANAGE.equals(a.getAuthority())
+                        || Roles.authority(Roles.OFFICER).equals(a.getAuthority()));
     if (hasElevatedMissionAuthority && missionAccessPolicy.canEditMission(missionId)) {
       return true;
     }
@@ -242,7 +242,7 @@ public class MissionSecurityService {
         "User {} authorities: {}, Reachable: {}", authentication.getName(), authorities, reachable);
 
     boolean isAdmin =
-        reachable.stream().anyMatch(a -> a.getAuthority().equals(Roles.authority(Roles.ADMIN)));
+        reachable.stream().anyMatch(a -> Roles.authority(Roles.ADMIN).equals(a.getAuthority()));
     if (isAdmin) {
       log.debug(
           "Access granted for user {} via ROLE_ADMIN for mission {}",
@@ -255,10 +255,10 @@ public class MissionSecurityService {
         reachable.stream()
             .anyMatch(
                 a ->
-                    a.getAuthority().equals(Roles.authority(Roles.MISSION_MANAGER))
-                        || a.getAuthority().equals(Roles.MISSION_MANAGER)
-                        || a.getAuthority().equals(Permissions.MISSION_MANAGE)
-                        || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
+                    Roles.authority(Roles.MISSION_MANAGER).equals(a.getAuthority())
+                        || Roles.MISSION_MANAGER.equals(a.getAuthority())
+                        || Permissions.MISSION_MANAGE.equals(a.getAuthority())
+                        || Roles.authority(Roles.OFFICER).equals(a.getAuthority()));
 
     if (hasElevatedAuthority && missionAccessPolicy.canEditMission(missionId)) {
       log.debug(
@@ -302,12 +302,12 @@ public class MissionSecurityService {
     Collection<? extends GrantedAuthority> reachable =
         roleHierarchy.getReachableGrantedAuthorities(authentication.getAuthorities());
     boolean isAdmin =
-        reachable.stream().anyMatch(a -> a.getAuthority().equals(Roles.authority(Roles.ADMIN)));
+        reachable.stream().anyMatch(a -> Roles.authority(Roles.ADMIN).equals(a.getAuthority()));
     if (isAdmin) {
       return true;
     }
     boolean isOfficer =
-        reachable.stream().anyMatch(a -> a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
+        reachable.stream().anyMatch(a -> Roles.authority(Roles.OFFICER).equals(a.getAuthority()));
     if (isOfficer && missionAccessPolicy.canEditMission(missionId)) {
       return true;
     }
@@ -337,17 +337,17 @@ public class MissionSecurityService {
     }
     Collection<? extends GrantedAuthority> reachable =
         roleHierarchy.getReachableGrantedAuthorities(authentication.getAuthorities());
-    if (reachable.stream().anyMatch(a -> a.getAuthority().equals(Roles.authority(Roles.ADMIN)))) {
+    if (reachable.stream().anyMatch(a -> Roles.authority(Roles.ADMIN).equals(a.getAuthority()))) {
       return true;
     }
     boolean hasElevatedMissionAuthority =
         reachable.stream()
             .anyMatch(
                 a ->
-                    a.getAuthority().equals(Roles.authority(Roles.MISSION_MANAGER))
-                        || a.getAuthority().equals(Roles.MISSION_MANAGER)
-                        || a.getAuthority().equals(Permissions.MISSION_MANAGE)
-                        || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
+                    Roles.authority(Roles.MISSION_MANAGER).equals(a.getAuthority())
+                        || Roles.MISSION_MANAGER.equals(a.getAuthority())
+                        || Permissions.MISSION_MANAGE.equals(a.getAuthority())
+                        || Roles.authority(Roles.OFFICER).equals(a.getAuthority()));
     if (hasElevatedMissionAuthority && missionAccessPolicy.canEditMission(mission.getId())) {
       return true;
     }

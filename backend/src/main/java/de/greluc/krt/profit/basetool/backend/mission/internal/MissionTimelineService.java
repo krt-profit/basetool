@@ -38,11 +38,13 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -86,7 +88,10 @@ public class MissionTimelineService {
    */
   @Transactional
   public Mission addStep(
-      @NotNull UUID missionId, String title, String meta, @NotNull Long expectedStepsVersion) {
+      @NotNull UUID missionId,
+      String title,
+      @Nullable String meta,
+      @NotNull Long expectedStepsVersion) {
     Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
         missionRepository, mission, MissionSection.STEPS, expectedStepsVersion, missionId);
@@ -119,7 +124,8 @@ public class MissionTimelineService {
    * @param orderIndex the 0-based position to assign this step
    */
   @Transactional(propagation = Propagation.MANDATORY)
-  public void addStepAtCreate(@NotNull Mission mission, String title, String meta, int orderIndex) {
+  public void addStepAtCreate(
+      @NotNull Mission mission, String title, @Nullable String meta, int orderIndex) {
     MissionStep step = new MissionStep();
     step.setTitle(title == null ? null : title.trim());
     step.setMeta(StringNormalization.trimToNull(meta));
@@ -147,7 +153,7 @@ public class MissionTimelineService {
       @NotNull UUID missionId,
       @NotNull UUID stepId,
       String title,
-      String meta,
+      @Nullable String meta,
       @NotNull Long expectedStepsVersion) {
     Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
@@ -224,7 +230,7 @@ public class MissionTimelineService {
     Map<UUID, MissionStep> byId =
         mission.getSteps().stream().collect(Collectors.toMap(MissionStep::getId, s -> s));
     for (int i = 0; i < orderedStepIds.size(); i++) {
-      byId.get(orderedStepIds.get(i)).setOrderIndex(i);
+      Objects.requireNonNull(byId.get(orderedStepIds.get(i))).setOrderIndex(i);
     }
 
     missionRepository.save(mission);
@@ -470,7 +476,7 @@ public class MissionTimelineService {
     Map<UUID, MissionObjective> byId =
         mission.getObjectives().stream().collect(Collectors.toMap(MissionObjective::getId, o -> o));
     for (int i = 0; i < orderedObjectiveIds.size(); i++) {
-      byId.get(orderedObjectiveIds.get(i)).setOrderIndex(i);
+      Objects.requireNonNull(byId.get(orderedObjectiveIds.get(i))).setOrderIndex(i);
     }
 
     missionRepository.save(mission);

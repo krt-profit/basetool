@@ -66,6 +66,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -188,12 +189,12 @@ public class MissionService implements MissionCommands {
    * @return paged matching missions
    */
   public Page<Mission> searchMissions(
-      String query,
-      Instant start,
-      Instant end,
-      List<String> status,
-      Boolean isInternal,
-      UUID operationId,
+      @Nullable String query,
+      @Nullable Instant start,
+      @Nullable Instant end,
+      @Nullable List<String> status,
+      @Nullable Boolean isInternal,
+      @Nullable UUID operationId,
       @NotNull Pageable pageable) {
     if (status == null || status.isEmpty()) {
       status = List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
@@ -462,11 +463,11 @@ public class MissionService implements MissionCommands {
   public Mission updateCoreSection(
       @NotNull UUID missionId,
       @NotNull String name,
-      String description,
-      String calendarLink,
-      String status,
-      UUID operationId,
-      String meetingPoint,
+      @Nullable String description,
+      @Nullable String calendarLink,
+      @Nullable String status,
+      @Nullable UUID operationId,
+      @Nullable String meetingPoint,
       @NotNull Long expectedCoreVersion) {
     Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
@@ -514,11 +515,11 @@ public class MissionService implements MissionCommands {
   @Transactional
   public Mission updateScheduleSection(
       @NotNull UUID missionId,
-      Instant meetingTime,
-      Instant plannedStartTime,
-      Instant plannedEndTime,
-      Instant actualStartTime,
-      Instant actualEndTime,
+      @Nullable Instant meetingTime,
+      @Nullable Instant plannedStartTime,
+      @Nullable Instant plannedEndTime,
+      @Nullable Instant actualStartTime,
+      @Nullable Instant actualEndTime,
       @NotNull Long expectedScheduleVersion) {
     Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
@@ -629,10 +630,10 @@ public class MissionService implements MissionCommands {
   @Transactional
   public Mission addParticipant(
       @NotNull UUID missionId,
-      UUID userId,
-      String guestName,
-      UUID desiredJobTypeId,
-      String comment) {
+      @Nullable UUID userId,
+      @Nullable String guestName,
+      @Nullable UUID desiredJobTypeId,
+      @Nullable String comment) {
     return missionParticipantService.addParticipant(
         missionId, userId, guestName, desiredJobTypeId, comment);
   }
@@ -651,12 +652,12 @@ public class MissionService implements MissionCommands {
   @Transactional
   public Mission addParticipant(
       @NotNull UUID missionId,
-      UUID userId,
-      String guestName,
-      UUID desiredJobTypeId,
-      String comment,
-      List<UUID> orgUnitIds,
-      PayoutPreference payoutPreference) {
+      @Nullable UUID userId,
+      @Nullable String guestName,
+      @Nullable UUID desiredJobTypeId,
+      @Nullable String comment,
+      @Nullable List<UUID> orgUnitIds,
+      @Nullable PayoutPreference payoutPreference) {
     return missionParticipantService.addParticipant(
         missionId, userId, guestName, desiredJobTypeId, comment, orgUnitIds, payoutPreference);
   }
@@ -840,7 +841,10 @@ public class MissionService implements MissionCommands {
    */
   @Transactional
   public Mission addStep(
-      @NotNull UUID missionId, String title, String meta, @NotNull Long expectedStepsVersion) {
+      @NotNull UUID missionId,
+      String title,
+      @Nullable String meta,
+      @NotNull Long expectedStepsVersion) {
     return missionTimelineService.addStep(missionId, title, meta, expectedStepsVersion);
   }
 
@@ -856,7 +860,7 @@ public class MissionService implements MissionCommands {
       @NotNull UUID missionId,
       @NotNull UUID stepId,
       String title,
-      String meta,
+      @Nullable String meta,
       @NotNull Long expectedStepsVersion) {
     return missionTimelineService.updateStep(missionId, stepId, title, meta, expectedStepsVersion);
   }
@@ -1255,7 +1259,9 @@ public class MissionService implements MissionCommands {
    */
   @Transactional
   public Mission updateOwningOrgUnit(
-      @NotNull UUID missionId, UUID targetOrgUnitId, @NotNull Long expectedOwningOrgUnitVersion) {
+      @NotNull UUID missionId,
+      @Nullable UUID targetOrgUnitId,
+      @NotNull Long expectedOwningOrgUnitVersion) {
     Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
         missionRepository,
@@ -1307,8 +1313,8 @@ public class MissionService implements MissionCommands {
   @Transactional
   public Mission setPartyLead(
       @NotNull UUID missionId,
-      UUID userId,
-      String guestName,
+      @Nullable UUID userId,
+      @Nullable String guestName,
       @NotNull Long expectedPartyLeadVersion) {
     return missionParticipantService.setPartyLead(
         missionId, userId, guestName, expectedPartyLeadVersion);
