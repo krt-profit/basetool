@@ -501,7 +501,7 @@ public class ExchangeShipWriteService {
     Optional<ExchangeShipLink> ofShip =
         linkRepository.findByUserIdAndClientIdAndInstallationKeyAndShipId(
             caller.member(), caller.clientId(), caller.installationKey(), shipId);
-    if (ofShip.isPresent() && ofShip.get().getExternalId().equals(externalId)) {
+    if (ofShip.filter(ship -> ship.getExternalId().equals(externalId)).isPresent()) {
       return externalId;
     }
     ofShip.ifPresent(linkRepository::delete);

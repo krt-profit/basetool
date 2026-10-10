@@ -83,7 +83,7 @@ public class NotificationService {
    * @return the most-recent-first list of DTOs
    */
   public List<NotificationDto> listRecentOwn(@NotNull UUID recipientUserId, int limit) {
-    int capped = Math.max(1, Math.min(limit, 50));
+    int capped = Math.clamp(limit, 1, 50);
     return notificationRepository
         .findByRecipientUserIdOrderByCreatedAtDesc(recipientUserId, PageRequest.of(0, capped))
         .stream()

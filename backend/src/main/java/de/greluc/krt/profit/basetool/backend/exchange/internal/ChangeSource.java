@@ -93,10 +93,10 @@ public class ChangeSource {
       return "client|" + subject.externalClient() + "|" + (key == null ? "" : key);
     }
     Optional<String> party = AuthenticatedSubject.authorizedParty(authentication);
-    if (party.isPresent() && properties.webClientIds().contains(party.get())) {
+    if (party.filter(properties.webClientIds()::contains).isPresent()) {
       return "web";
     }
-    if (party.isPresent() && properties.appClientIds().contains(party.get())) {
+    if (party.filter(properties.appClientIds()::contains).isPresent()) {
       return "app";
     }
     return "system";

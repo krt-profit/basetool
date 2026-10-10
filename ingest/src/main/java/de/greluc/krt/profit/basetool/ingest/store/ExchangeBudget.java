@@ -382,10 +382,10 @@ public class ExchangeBudget {
     List<String> sets = List.of(memberScope(clientId, member), clientScope(clientId), totalScope());
     List<String> keys =
         List.of(
-            sets.get(0),
+            sets.getFirst(),
             sets.get(1),
             sets.get(2),
-            sum(sets.get(0)),
+            sum(sets.getFirst()),
             sum(sets.get(1)),
             sum(sets.get(2)));
     String result;
@@ -433,10 +433,10 @@ public class ExchangeBudget {
           redisTemplate.execute(
               WAIT_SCRIPT,
               List.of(
-                  sets.get(0),
+                  sets.getFirst(),
                   sets.get(1),
                   sets.get(2),
-                  sum(sets.get(0)),
+                  sum(sets.getFirst()),
                   sum(sets.get(1)),
                   sum(sets.get(2))),
               Long.toString(clock.millis()),

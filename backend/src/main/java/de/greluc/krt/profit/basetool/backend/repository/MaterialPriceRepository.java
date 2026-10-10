@@ -224,7 +224,9 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
    * @return one (parent id, terminal id, row id) row per matrix row
    */
   @Query(
-      "SELECT e.material.id AS parentId, e.terminal.id AS terminalId, e.id AS id FROM MaterialPrice"
-          + " e")
+      """
+      SELECT e.material.id AS parentId, e.terminal.id AS terminalId, e.id AS id FROM MaterialPrice
+      e
+      """)
   List<PairKeyRef> findPriceKeyRefs();
 }
