@@ -990,7 +990,7 @@ their "must stay green" period here (D-01).
 In dependency order, each with its command API, its observer SPIs, its access policy and its REST
 wave: `materialexchange` (the offer ratchet as `StockChangeObserver`), `refinery`, `joborder`,
 `mission`, `inventory` (`StockCommands`, the earmark target SPI, the lot-lock protocol of ADR-0229
-moved into inventory), `hangar`, `blueprint`. The eight business associations become id references
+moved into inventory, and `MaterialExchangeOffer.inventoryItem` as an id), `hangar`, `blueprint`. The eight business associations become id references
 as each pair is decoupled.
 
 - `materialexchange` — **done 2026-10-10.**
@@ -1016,7 +1016,8 @@ as each pair is decoupled.
   the stock observer rather than a GDPR participant until §7.6 introduces those. (2)
   `MaterialExchangeOffer.inventoryItem` stays an association for now: converting it rewrites the
   fetch plan of eight queries and two entity graphs, and nothing needs the id until `InventoryItem`
-  leaves `model` with the inventory move (P3-5), where it belongs. (3)
+  leaves `model` with the inventory move (P3-5), where it belongs. **Tracked for P3-5:** convert
+  `MaterialExchangeOffer.inventoryItem` to the item id when `InventoryItem` moves. (3)
   `ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE` is public, because the offer board's JPQL
   splices it from another package.
 - `refinery` — **done 2026-10-10.**

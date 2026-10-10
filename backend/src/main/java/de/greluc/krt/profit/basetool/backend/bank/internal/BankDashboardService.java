@@ -169,7 +169,7 @@ public class BankDashboardService {
     if (owner.getKind() == OrgUnitKind.BEREICH) {
       return owner;
     }
-    if (owner.getKind() == OrgUnitKind.SQUADRON || owner.getKind() == OrgUnitKind.SPECIAL_COMMAND) {
+    if (owner.getKind().isTenantUnit()) {
       OrgUnit parent = owner.getParent();
       return parent != null && parent.getKind() == OrgUnitKind.BEREICH ? parent : null;
     }

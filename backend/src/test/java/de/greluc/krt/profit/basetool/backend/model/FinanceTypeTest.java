@@ -19,28 +19,25 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import java.math.BigDecimal;
-import org.jetbrains.annotations.NotNull;
+import java.util.Arrays;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
 
-/** Whether a mission finance entry adds to or takes from the mission's total. */
-public enum FinanceType {
-  /** Money earned; adds to the total. */
-  INCOME,
-  /** Money spent; takes from the total. */
-  EXPENSE;
+/** Pins every {@link FinanceType} predicate over all constants (ADR-0238). */
+class FinanceTypeTest {
 
-  /**
-   * The entry's contribution to a mission or operation total: the amount for income, its negation
-   * for an expense.
-   *
-   * @param amount the entry's amount
-   * @return the signed contribution
-   */
-  @NotNull
-  public BigDecimal signed(@NotNull BigDecimal amount) {
-    return switch (this) {
-      case INCOME -> amount;
-      case EXPENSE -> amount.negate();
-    };
+  @Test
+  void incomeAddsAndExpenseSubtractsTheAmount() {
+    BigDecimal amount = new BigDecimal("1250.50");
+    Map<FinanceType, BigDecimal> expected =
+        Map.of(FinanceType.INCOME, amount, FinanceType.EXPENSE, new BigDecimal("-1250.50"));
+
+    assertThat(expected).containsOnlyKeys(Arrays.asList(FinanceType.values()));
+    for (FinanceType type : FinanceType.values()) {
+      assertThat(type.signed(amount)).as(type.name()).isEqualTo(expected.get(type));
+    }
   }
 }

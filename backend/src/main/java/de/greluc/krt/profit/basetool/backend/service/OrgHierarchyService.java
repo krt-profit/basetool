@@ -219,7 +219,7 @@ public class OrgHierarchyService {
       }
       case ORGANISATIONSLEITUNG ->
           throw new BadRequestException("The Organisationsleitung has no parent.");
-      default -> throw new IllegalStateException("Unhandled org-unit kind: " + child.getKind());
+      case null -> throw new NullPointerException("org-unit kind");
     }
   }
 }

@@ -1,7 +1,6 @@
 # ADR-0238 — A switch over a project enum has no `default`
 
-- **Status:** Accepted — implementation pending (the existing switches are converted as their files
-  are touched)
+- **Status:** Accepted — implemented 2026-10-10 for every existing switch (plan §8.1)
 - **Date:** 2026-10-01
 - **Deciders:** @greluc (owner decision D-15)
 - **Related:** [domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) §8.1 ·
@@ -45,6 +44,22 @@ label, for exhaustiveness: a missing enum constant is a compile error. Checkstyl
 - `case null ->` is an unfamiliar idiom; the switch-expression form is preferred where the switch
   produces a value.
 - Existing switches move when their file is touched; the conversion changes no behaviour.
+
+## Implementation (2026-10-10)
+
+The 51 `default` arms in `main` were classified. Nine sat on switches that already named every
+constant of a project enum (`BankAccountType`, `BankAccountViewGranteeKind`,
+`BlueprintImportStatus`, three over `InventoryAllocationDimension`, `SelectorKind`, `OrgUnitKind`,
+`MembershipDeltaRequest.Action`); their `default` became `case null -> throw new
+NullPointerException(…)`, which keeps the former behaviour for a `null` selector and makes javac
+check the switch. The deliberate subsets keep their `default`: the deposit/withdrawal/transfer
+labels of the two bank statement reports over `BankTransactionType`, the two org-chart switches over
+`MembershipRole` and `OrgChartPositionType`, and the squadron-rank check over `MembershipRole`.
+The exchange switches follow with the exchange vocabulary (plan §8.1, sealed types). Every other
+`default` switches over a string, an `int`, a JDK or Spring type. Decision 3 starts with
+`OrgUnitKind.isTenantUnit()` (three `==` chains) and `FinanceType.signed(BigDecimal)` (two payout
+totals; a third site became an exhaustive switch with `case null -> {}`, the former skip of an
+untyped entry), each tested over `values()`; single-constant comparisons stay as they are.
 
 ## Alternatives considered
 

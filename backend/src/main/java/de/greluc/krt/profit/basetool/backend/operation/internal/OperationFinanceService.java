@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MissionMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.RefineryOrderMapper;
-import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.Operation;
@@ -112,10 +111,8 @@ public class OperationFinanceService {
       BigDecimal missionTotalSum = BigDecimal.ZERO;
 
       for (MissionFinanceEntry entry : entries) {
-        if (entry.getType() == FinanceType.INCOME) {
-          missionTotalSum = missionTotalSum.add(entry.getAmount());
-        } else if (entry.getType() == FinanceType.EXPENSE) {
-          missionTotalSum = missionTotalSum.subtract(entry.getAmount());
+        if (entry.getType() != null) {
+          missionTotalSum = missionTotalSum.add(entry.getType().signed(entry.getAmount()));
         }
       }
 
@@ -227,10 +224,10 @@ public class OperationFinanceService {
     BigDecimal incomeSum = BigDecimal.ZERO;
     BigDecimal expenseSum = BigDecimal.ZERO;
     for (MissionFinanceEntry entry : entries) {
-      if (entry.getType() == FinanceType.INCOME) {
-        incomeSum = incomeSum.add(entry.getAmount());
-      } else if (entry.getType() == FinanceType.EXPENSE) {
-        expenseSum = expenseSum.add(entry.getAmount());
+      switch (entry.getType()) {
+        case INCOME -> incomeSum = incomeSum.add(entry.getAmount());
+        case EXPENSE -> expenseSum = expenseSum.add(entry.getAmount());
+        case null -> {}
       }
     }
     double refineryProfit = 0d;

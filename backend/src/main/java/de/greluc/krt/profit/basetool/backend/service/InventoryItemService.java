@@ -700,7 +700,7 @@ public class InventoryItemService {
             mission.getName(),
             amount);
       }
-      default -> throw new IllegalStateException("Unhandled allocation dimension: " + dto.field());
+      case null -> throw new NullPointerException("allocation dimension");
     }
     return mapWithForcedVersion(inventoryItemRepository.saveAndFlush(item));
   }
@@ -757,7 +757,7 @@ public class InventoryItemService {
             slice.getMission().getName(),
             amount);
       }
-      default -> throw new IllegalStateException("Unhandled allocation dimension: " + dto.field());
+      case null -> throw new NullPointerException("allocation dimension");
     }
     return mapWithForcedVersion(inventoryItemRepository.saveAndFlush(item));
   }
@@ -799,7 +799,7 @@ public class InventoryItemService {
         item.getMissionAllocations().remove(slice);
         recordAllocation(AuditEventType.INVENTORY_ALLOCATION_REMOVED, item, dto.field(), ref, null);
       }
-      default -> throw new IllegalStateException("Unhandled allocation dimension: " + dto.field());
+      case null -> throw new NullPointerException("allocation dimension");
     }
     return mapWithForcedVersion(inventoryItemRepository.saveAndFlush(item));
   }

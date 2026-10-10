@@ -543,9 +543,7 @@ public class UserService {
               userId,
               new MembershipFlagsPatchRequest(
                   change.isLogistician(), change.isMissionManager(), change.version()));
-      default ->
-          throw new IllegalArgumentException(
-              "Unsupported SpecialCommandChange action: " + change.action());
+      case null -> throw new NullPointerException("special-command change action");
     }
   }
 
