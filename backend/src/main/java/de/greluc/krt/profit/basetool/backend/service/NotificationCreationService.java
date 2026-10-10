@@ -182,7 +182,7 @@ public class NotificationCreationService {
           .computeIfAbsent(
               new NotificationSignal(
                   entry.getKey(), event.entityType(), event.entityId(), event.renderParams()),
-              key -> new HashSet<>())
+              _ -> new HashSet<>())
           .addAll(missing);
     }
     if (!toCreate.isEmpty()) {

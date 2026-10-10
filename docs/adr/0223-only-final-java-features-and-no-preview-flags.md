@@ -122,12 +122,14 @@ Each was checked against the code as it stands:
   are not covered. "Nothing enforces decision 3 in CI" was therefore wrong for `main`.
 - **There are 42 explicit `super(args)` calls in `src/main`, not 34** (recounted on 2026-10-02:
   backend 27, ingest 9, frontend 4, keycloak-spi 2).
-- **A `--enable-preview` gate is still missing**: decision 1 is held by review alone.
+- **A `--enable-preview` gate is still missing**: decision 1 is held by review alone. *(Closed 2026-10-10: `scripts/check-final-java-only.py`
+  in `repo-lint.yml` fails on a preview flag, an incubator module or a module import anywhere, REQ-OPS-043.)*
 
 **`ScopedValue` for `ChangeSource.ON_BEHALF`.** The backend's `ChangeSource` keeps the exchange
 client a confirmed write is recorded for in a `ThreadLocal` that `asClient` sets and restores
 around one block, and the change-feed attribution (ADR-0224) reads it. That is exactly the binding a
 `ScopedValue` (JEP 506, final in 25) expresses, without a value that can leak into a reused thread.
 It becomes a `ScopedValue` bound with `ScopedValue.where(…).call(…)`, guarded by the
-`ChangeSourceTransactionManager` integration test. Decision 4 is unchanged: it concerns the
+`ChangeSourceTransactionManager` integration test. *(Done 2026-10-10; the integration test also pins a
+confirmed write's attribution, its end with the call, and the restore after a nested call.)* Decision 4 is unchanged: it concerns the
 frontend's request-context holders, which the Reactor relay still cannot carry as scoped values.

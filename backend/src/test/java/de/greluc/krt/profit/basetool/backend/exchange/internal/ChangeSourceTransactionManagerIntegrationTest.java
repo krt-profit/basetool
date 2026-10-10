@@ -120,6 +120,48 @@ class ChangeSourceTransactionManagerIntegrationTest {
   }
 
   @Test
+  void aConfirmedWriteIsRecordedAsTheClientItRunsForAndOnlyInsideTheCall() {
+    authenticate(jwt("basetool-frontend"));
+
+    ChangeSource.asClient(
+        "versekit",
+        "k".repeat(43),
+        () -> {
+          write("confirmed");
+          return null;
+        });
+    ExchangeChange confirmed = last();
+    write("after");
+
+    assertThat(confirmed.getSourceChannel()).isEqualTo("client");
+    assertThat(confirmed.getSourceClient()).isEqualTo("versekit");
+    assertThat(confirmed.getSourceKey()).isEqualTo("k".repeat(43));
+    assertThat(last().getSourceChannel()).isEqualTo("web");
+  }
+
+  @Test
+  void aNestedConfirmationIsRecordedForTheInnerClientAndRestoresTheOuterOne() {
+    ChangeSource.asClient(
+        "outer",
+        "o".repeat(43),
+        () -> {
+          ChangeSource.asClient(
+              "inner",
+              "i".repeat(43),
+              () -> {
+                write("inner");
+                return null;
+              });
+          assertThat(last().getSourceClient()).isEqualTo("inner");
+          write("outer");
+          return null;
+        });
+
+    assertThat(last().getSourceClient()).isEqualTo("outer");
+    assertThat(last().getSourceKey()).isEqualTo("o".repeat(43));
+  }
+
+  @Test
   void theVariableEndsWithItsTransaction() {
     authenticate(jwt("basetool-frontend"));
     write("first");
