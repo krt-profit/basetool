@@ -26,11 +26,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDesignationObserver;
 import de.greluc.krt.profit.basetool.backend.model.JobType;
 import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobTypeRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,7 +49,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class JobTypeServiceTest {
 
   @Mock private JobTypeRepository jobTypeRepository;
-  @Mock private MissionParticipantRepository missionParticipantRepository;
+  @Mock private JobTypeDesignationObserver jobTypeDesignationObserver;
   @InjectMocks private JobTypeService jobTypeService;
 
   private static JobType missionLeadership() {
@@ -79,6 +79,7 @@ class JobTypeServiceTest {
     assertTrue(saved.isMissionLead(), "the new type is the Einsatzleiter");
     assertFalse(prior.isMissionLead(), "the prior holder was cleared");
     verify(jobTypeRepository).save(prior);
+    verify(jobTypeDesignationObserver).missionLeadRevoked(prior.getId());
   }
 
   @Test
@@ -116,5 +117,6 @@ class JobTypeServiceTest {
     JobType saved = jobTypeService.updateJobType(id, dto);
 
     assertFalse(saved.isMissionLead(), "the designation was cleared");
+    verify(jobTypeDesignationObserver).missionLeadRevoked(id);
   }
 }

@@ -255,7 +255,7 @@ GET /api/v1/missions/lookup | MissionController#lookupMissions | pre=isAuthentic
 GET /api/v1/missions/next | MissionController#getNextMission | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() | url=anyRequest -> authenticated
 GET /api/v1/missions/search | MissionController#searchMissions | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() | url=anyRequest -> authenticated
 DELETE /api/v1/missions/{id} | MissionController#deleteMission | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
-GET /api/v1/missions/{id} | MissionController#getMissionById | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @ownerScopeService.canSeeMission(#id) | url=anyRequest -> authenticated
+GET /api/v1/missions/{id} | MissionController#getMissionById | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canSeeMission(#id) | url=anyRequest -> authenticated
 PUT /api/v1/missions/{id} | MissionController#updateMission | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
 PATCH /api/v1/missions/{id}/core | MissionController#patchMissionCore | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
 PATCH /api/v1/missions/{id}/flags | MissionController#patchMissionFlags | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
@@ -263,7 +263,7 @@ POST /api/v1/missions/{id}/frequencies/custom/slim | MissionController#addCustom
 PUT /api/v1/missions/{id}/frequencies/custom/{frequencyId}/slim | MissionController#updateCustomFrequencySlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
 POST /api/v1/missions/{id}/frequencies/slim | MissionController#addOrUpdateFrequencySlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
 DELETE /api/v1/missions/{id}/frequencies/{frequencyId}/slim | MissionController#removeFrequencySlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-POST /api/v1/missions/{id}/join | MissionController#joinMission | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @ownerScopeService.canSeeMission(#id) | url=anyRequest -> authenticated
+POST /api/v1/missions/{id}/join | MissionController#joinMission | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canSeeMission(#id) | url=anyRequest -> authenticated
 DELETE /api/v1/missions/{id}/managers/{userId}/slim | MissionController#removeManagerSlim | pre=@missionSecurityService.canManageManagers(#id, authentication) | url=anyRequest -> authenticated
 POST /api/v1/missions/{id}/managers/{userId}/slim | MissionController#addManagerSlim | pre=@missionSecurityService.canManageManagers(#id, authentication) | url=anyRequest -> authenticated
 PUT /api/v1/missions/{id}/objectives/reorder/slim | MissionController#reorderObjectivesSlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
@@ -272,9 +272,9 @@ DELETE /api/v1/missions/{id}/objectives/{objectiveId}/slim | MissionController#d
 PUT /api/v1/missions/{id}/objectives/{objectiveId}/slim | MissionController#updateObjectiveSlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
 PUT /api/v1/missions/{id}/owner | MissionController#updateMissionOwner | pre=@missionSecurityService.canChangeOwner(#id, authentication) | url=anyRequest -> authenticated
 PUT /api/v1/missions/{id}/owning-org-unit | MissionController#updateMissionOwningOrgUnit | pre=@missionSecurityService.canChangeOwner(#id, authentication) | url=anyRequest -> authenticated
-POST /api/v1/missions/{id}/participants/add | MissionController#addParticipantPublic | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @ownerScopeService.canSeeMission(#id) | url=anyRequest -> authenticated
+POST /api/v1/missions/{id}/participants/add | MissionController#addParticipantPublic | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canSeeMission(#id) | url=anyRequest -> authenticated
 POST /api/v1/missions/{id}/participants/by-id/slim | MissionController#addParticipantByIdSlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-POST /api/v1/missions/{id}/participants/slim | MissionController#addParticipantSlim | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @ownerScopeService.canSeeMission(#id) | url=anyRequest -> authenticated
+POST /api/v1/missions/{id}/participants/slim | MissionController#addParticipantSlim | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canSeeMission(#id) | url=anyRequest -> authenticated
 GET /api/v1/missions/{id}/participants/unassigned | MissionController#getUnassignedParticipants | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
 POST /api/v1/missions/{id}/participants/{participantId}/check-in/slim | MissionController#checkInParticipantSlim | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication) | url=anyRequest -> authenticated
 POST /api/v1/missions/{id}/participants/{participantId}/check-out/slim | MissionController#checkOutParticipantSlim | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication) | url=anyRequest -> authenticated
@@ -296,9 +296,9 @@ DELETE /api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim | MissionC
 PUT /api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim | MissionController#updateCrewSlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
 DELETE /api/v1/missions/{id}/units/{unitId}/slim | MissionController#deleteUnitSlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
 PUT /api/v1/missions/{id}/units/{unitId}/slim | MissionController#updateUnitSlim | pre=@missionSecurityService.canManageMission(#id, authentication) | url=anyRequest -> authenticated
-GET /api/v1/missions/{missionId}/finance-entries | MissionFinanceEntryController#getFinanceEntries | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @ownerScopeService.canSeeMission(#missionId) | url=anyRequest -> authenticated
-GET /api/v1/missions/{missionId}/finance-entries/sum | MissionFinanceEntryController#getFinanceEntriesSum | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @ownerScopeService.canSeeMission(#missionId) | url=anyRequest -> authenticated
-GET /api/v1/missions/{missionId}/finance-entries/summary | MissionFinanceEntryController#getFinanceSummary | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @ownerScopeService.canSeeMission(#missionId) | url=anyRequest -> authenticated
+GET /api/v1/missions/{missionId}/finance-entries | MissionFinanceEntryController#getFinanceEntries | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canSeeMission(#missionId) | url=anyRequest -> authenticated
+GET /api/v1/missions/{missionId}/finance-entries/sum | MissionFinanceEntryController#getFinanceEntriesSum | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canSeeMission(#missionId) | url=anyRequest -> authenticated
+GET /api/v1/missions/{missionId}/finance-entries/summary | MissionFinanceEntryController#getFinanceSummary | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canSeeMission(#missionId) | url=anyRequest -> authenticated
 GET /api/v1/notification-rules | NotificationRuleController#list | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 POST /api/v1/notification-rules | NotificationRuleController#create | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 DELETE /api/v1/notification-rules/{id} | NotificationRuleController#delete | pre=hasRole('ADMIN') | url=anyRequest -> authenticated

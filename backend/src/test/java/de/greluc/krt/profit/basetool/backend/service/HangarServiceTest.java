@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -30,15 +29,14 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.model.Location;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import jakarta.persistence.EntityManager;
@@ -63,7 +61,7 @@ class HangarServiceTest {
   @Mock private ShipRepository shipRepository;
   @Mock private ShipTypeRepository shipTypeRepository;
   @Mock private LocationRepository locationRepository;
-  @Mock private MissionUnitRepository missionUnitRepository;
+  @Mock private ShipDeletionObserver shipDeletionObserver;
   @Mock private EntityManager entityManager;
   @Mock private de.greluc.krt.profit.basetool.backend.repository.UserRepository userRepository;
   @Mock private de.greluc.krt.profit.basetool.backend.service.OwnerScopeService ownerScopeService;
@@ -131,33 +129,23 @@ class HangarServiceTest {
     Ship ship2 = new Ship();
     ship2.setId(shipId2);
 
-    Mission mission = new Mission();
-    mission.setId(UUID.randomUUID());
-    mission.setName("Op Aurora");
-    de.greluc.krt.profit.basetool.backend.model.MissionUnit unit =
-        new de.greluc.krt.profit.basetool.backend.model.MissionUnit();
-    unit.setShip(ship1);
-    unit.setMission(mission);
-
     when(shipRepository.findByOwnerId(userId)).thenReturn(List.of(ship1, ship2));
-    when(missionUnitRepository.findByShipId(shipId1)).thenReturn(List.of(unit));
-    when(missionUnitRepository.findByShipId(shipId2)).thenReturn(List.of());
+    when(shipDeletionObserver.beforeShipDelete(shipId1)).thenReturn(1);
+    when(shipDeletionObserver.beforeShipDelete(shipId2)).thenReturn(0);
 
     hangarService.deleteAllShipsForUser(userId);
 
-    verify(missionUnitRepository, times(1)).save(unit);
-    assertNull(unit.getShip(), "MissionUnit.ship should be null after unlink");
+    verify(shipDeletionObserver).beforeShipDelete(shipId1);
+    verify(shipDeletionObserver).beforeShipDelete(shipId2);
     verify(entityManager, times(1)).flush();
     verify(shipRepository, times(1)).deleteAll(List.of(ship1, ship2));
     verify(auditService)
         .record(
-            eq(AuditEventType.MISSION_UNIT_UPDATED),
-            eq(mission.getId()),
-            eq("Op Aurora"),
+            eq(AuditEventType.HANGAR_EMPTIED),
             isNull(),
-            any());
-    verify(auditService)
-        .record(eq(AuditEventType.HANGAR_EMPTIED), isNull(), isNull(), eq(userId), any());
+            isNull(),
+            eq(userId),
+            argThat(d -> d.toString().contains("detachedUnits=1")));
   }
 
   @Test
@@ -167,7 +155,7 @@ class HangarServiceTest {
 
     hangarService.deleteAllShipsForUser(userId);
 
-    verify(missionUnitRepository, never()).findByShipId(any());
+    verify(shipDeletionObserver, never()).beforeShipDelete(any());
     verify(shipRepository, never()).deleteAll(anyList());
     verify(entityManager, never()).flush();
     verifyNoInteractions(auditService);
@@ -183,7 +171,6 @@ class HangarServiceTest {
     ship.setId(shipId);
 
     when(shipRepository.findByOwnerId(userId)).thenReturn(List.of(ship));
-    when(missionUnitRepository.findByShipId(shipId)).thenReturn(List.of());
 
     hangarService.deleteAllShipsForUser(userId);
 
@@ -260,27 +247,12 @@ class HangarServiceTest {
     ship.setOwner(owner);
     ship.setShipType(type);
     ship.setName("Private free-text name");
-    Mission mission = new Mission();
-    mission.setId(UUID.randomUUID());
-    mission.setName("Op Aurora");
-    de.greluc.krt.profit.basetool.backend.model.MissionUnit unit =
-        new de.greluc.krt.profit.basetool.backend.model.MissionUnit();
-    unit.setId(UUID.randomUUID());
-    unit.setShip(ship);
-    unit.setMission(mission);
     when(shipRepository.findById(shipId)).thenReturn(Optional.of(ship));
-    when(missionUnitRepository.findByShipId(shipId)).thenReturn(List.of(unit));
+    when(shipDeletionObserver.beforeShipDelete(shipId)).thenReturn(1);
 
     hangarService.deleteShip(userId, shipId);
 
-    assertNull(unit.getShip());
-    verify(auditService)
-        .record(
-            eq(AuditEventType.MISSION_UNIT_UPDATED),
-            eq(mission.getId()),
-            eq("Op Aurora"),
-            isNull(),
-            any());
+    verify(shipDeletionObserver).beforeShipDelete(shipId);
     verify(auditService)
         .record(
             eq(AuditEventType.HANGAR_SHIP_DELETED),
