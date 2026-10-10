@@ -25,6 +25,8 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.kernel.Quality;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderHandoverMapper;
@@ -96,7 +98,7 @@ public class JobOrderHandoverService {
   private final JobOrderRepository jobOrderRepository;
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
   private final InventoryItemRepository inventoryItemRepository;
-  private final MaterialExchangeOfferRatchet offerRatchet;
+  private final StockChangeObserver stockChangeObserver;
   private final JobOrderHandoverMapper jobOrderHandoverMapper;
   private final JobOrderMaterialRepository jobOrderMaterialRepository;
   private final JobOrderService jobOrderService;
@@ -327,8 +329,8 @@ public class JobOrderHandoverService {
               null));
 
       if (remainingAmount <= QUANTITY_EPSILON) {
-        offerRatchet.beforeDelete(
-            List.of(inventoryItem.getId()), MaterialExchangeOfferRatchet.Reason.HANDOVER);
+        stockChangeObserver.beforeDelete(
+            List.of(inventoryItem.getId()), StockChangeReason.HANDOVER);
         inventoryItemRepository.delete(inventoryItem);
       } else {
         Map<UUID, Double> missionPlan =
@@ -377,7 +379,7 @@ public class JobOrderHandoverService {
 
     for (HandedItem h : handedItems) {
       if (!h.depleted()) {
-        offerRatchet.lower(h.itemId(), h.remaining(), MaterialExchangeOfferRatchet.Reason.HANDOVER);
+        stockChangeObserver.lower(h.itemId(), h.remaining(), StockChangeReason.HANDOVER);
       }
       auditRecorder.record(
           AuditEventType.INVENTORY_HANDED_OVER,

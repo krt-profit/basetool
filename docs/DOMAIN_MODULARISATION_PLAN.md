@@ -995,6 +995,33 @@ wave: `materialexchange` (the offer ratchet as `StockChangeObserver`), `refinery
 moved into inventory), `hangar`, `blueprint`. The eight business associations become id references
 as each pair is decoupled.
 
+- `materialexchange` — **done 2026-10-10.**
+  1. *Characterise*: the ratchet's audit rows were pinned (`MaterialExchangeOfferRatchetDataTest`,
+     `ExchangeStockWriteControllerTest`); `MaterialExchangeStockLinksDataTest` adds the two other
+     reads the Lager made of the Materialbörse — the stolen-split floor and the merge refusal.
+  2. *Observer SPI* (§5.3, write family 3): `inventory.api.StockChangeObserver` (`@ObserverSpi`:
+     `lower`, `beforeDelete`, `beforeWipe`, `beforeUserPurge`), implemented unchanged by
+     `MaterialExchangeOfferRatchet` (every method `MANDATORY`, same clamps, same
+     `MARKET_OFFER_REDUCED`/`REMOVED` rows before the cascading delete); the reason codes and the
+     effects record moved with it as `StockChangeReason` and `StockChangeEffects` (codes
+     unchanged). A second inventory-owned SPI, `StockOfferLookup` (`isOffered`,
+     `activeOfferedAmount`), answers the two reads. The Lager, the three job-order handover and
+     production services, the exchange's stock writes and the account deletion use only these.
+     Baseline **103 → 98** (the `inventory -> materialexchange` pair is gone).
+  3. *Move*: the two controllers into `materialexchange.web`, the 8 entities and enums, 13 DTOs,
+     4 repositories, 5 services and the lookup into `materialexchange.internal`.
+  No access policy left the scope hub: the boards are gated by `hasRole('KRT_MEMBER')` and decide
+  ownership inside their services; their only scope-hub call is `currentOrgUnit` for stamping.
+  No command API is published yet: no other module writes an offer or a request. **Corrections:**
+  (1) `beforeWipe` takes the three scope components instead of `ScopePredicate`, which lives in
+  the `service` package, so `inventory.api` depends on no layer package; `beforeUserPurge` stays on
+  the stock observer rather than a GDPR participant until §7.6 introduces those. (2)
+  `MaterialExchangeOffer.inventoryItem` stays an association for now: converting it rewrites the
+  fetch plan of eight queries and two entity graphs, and nothing needs the id until `InventoryItem`
+  leaves `model` with the inventory move (P3-5), where it belongs. (3)
+  `ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE` is public, because the offer board's JPQL
+  splices it from another package.
+
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
 | Inventory command API | Lock order (advisory lock first, ascending by key), bulk update after the loop, the `FORCE_INCREMENT` version echo | Existing concurrency and E2E tests (`MaterialCollectionDeliveredInPlaceE2eTest`), the ADR-0229 load-test cases, "only inventory writes `InventoryItem`", an audit contract per command, a 403 test per foreign entry point |
