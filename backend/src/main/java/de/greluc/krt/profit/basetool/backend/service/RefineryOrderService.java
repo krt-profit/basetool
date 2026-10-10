@@ -43,7 +43,6 @@ import de.greluc.krt.profit.basetool.backend.model.RefineryYield;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderStoreDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderStoreItemDto;
-import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
 import de.greluc.krt.profit.basetool.backend.refinery.api.MissionParticipantRequiredException;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
@@ -83,7 +82,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class RefineryOrderService {
+public class RefineryOrderService implements CraftabilityYieldSource {
 
   private final RefineryOrderRepository refineryOrderRepository;
   private final UserRepository userRepository;
@@ -176,8 +175,9 @@ public class RefineryOrderService {
    * @param userId the owning user; never {@code null}
    * @return one slice per (output material, quality), with the summed SCU yield; never {@code null}
    */
+  @Override
   @NotNull
-  public List<OwnedStockSlice> getOwnedOpenRefineryYieldSlices(@NotNull UUID userId) {
+  public List<YieldSlice> pendingYieldSlices(@NotNull UUID userId) {
     List<RefineryOrder> orders =
         refineryOrderRepository.findOwnedWithGoodsByStatusIn(
             userId, List.of(RefineryOrderStatus.OPEN, RefineryOrderStatus.IN_PROGRESS));
@@ -203,11 +203,11 @@ public class RefineryOrderService {
             .merge(good.getQuality(), scu, Double::sum);
       }
     }
-    List<OwnedStockSlice> slices = new ArrayList<>();
+    List<YieldSlice> slices = new ArrayList<>();
     pooled.forEach(
         (materialId, byQuality) ->
             byQuality.forEach(
-                (quality, scu) -> slices.add(new OwnedStockSlice(materialId, quality, scu))));
+                (quality, scu) -> slices.add(new YieldSlice(materialId, quality, scu))));
     return slices;
   }
 

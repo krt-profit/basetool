@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryImportDraftDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryDraftBuilder;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
@@ -82,7 +83,7 @@ import org.springframework.util.StringUtils;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class RefineryImportService {
+public class RefineryImportService implements RefineryDraftBuilder {
 
   /** The only {@code RefineryExtract} schema version this backend accepts. */
   public static final int SUPPORTED_SCHEMA_VERSION = 1;
@@ -125,6 +126,7 @@ public class RefineryImportService {
    * @throws BadRequestException with an i18n key when {@code schemaVersion != 1} or {@code
    *     orders[0].panelType} is not {@code SETUP}
    */
+  @Override
   @NotNull
   public RefineryImportDraftDto buildDraft(
       @NotNull RefineryExtractDto extract, @Nullable UUID callerId) {

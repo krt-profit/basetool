@@ -31,9 +31,9 @@ import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractGoodDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractImageDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryImportDraftDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryDraftBuilder;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintExportParser;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService;
-import de.greluc.krt.profit.basetool.backend.service.RefineryImportService;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -57,7 +57,7 @@ public class ExchangeDraftService {
 
   private final ExchangeResolveService resolveService;
   private final BlueprintImportService blueprintImportService;
-  private final RefineryImportService refineryImportService;
+  private final RefineryDraftBuilder refineryDraftBuilder;
 
   /**
    * Previews a blueprint draft for the member: each reference resolved through {@code
@@ -107,7 +107,7 @@ public class ExchangeDraftService {
    */
   public @NotNull RefineryImportDraftDto refinery(
       @NotNull UUID member, @NotNull ExchangeRefineryDraftRequest draft) {
-    return refineryImportService.buildDraft(extract(draft), member);
+    return refineryDraftBuilder.buildDraft(extract(draft), member);
   }
 
   /**

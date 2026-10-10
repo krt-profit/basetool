@@ -1,6 +1,5 @@
 blueprint -> inventory: BlueprintCraftabilityService -> InventoryItemService
 blueprint -> inventory: BlueprintCraftabilityService -> OwnedStockSlice
-blueprint -> refinery: BlueprintCraftabilityService -> RefineryOrderService
 catalogue -> hangar: LocationService -> ShipRepository
 catalogue -> mission: JobTypeService -> MissionParticipantRepository
 catalogue -> refinery: LocationService -> RefineryOrderRepository
