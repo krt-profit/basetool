@@ -468,6 +468,7 @@ jobs:
           out="$(mktemp -d)"
           export PROM_IMAGE out
           cd monitoring/prometheus
+          # shellcheck disable=SC2016
           printf '%s\n' tests/*_test.yml | xargs -P "$(nproc)" -I{} sh -c '
             file="$1"
             log="$out/$(basename "$file").log"
