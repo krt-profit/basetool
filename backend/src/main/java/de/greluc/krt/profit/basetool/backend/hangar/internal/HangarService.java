@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
+import de.greluc.krt.profit.basetool.backend.service.UserService;
 import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.Collections;
