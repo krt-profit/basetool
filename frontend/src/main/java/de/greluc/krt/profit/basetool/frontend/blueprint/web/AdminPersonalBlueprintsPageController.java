@@ -359,7 +359,7 @@ public class AdminPersonalBlueprintsPageController {
     }
     try {
       return Instant.parse(iso.trim());
-    } catch (Exception e) {
+    } catch (Exception _) {
       return null;
     }
   }

@@ -602,7 +602,7 @@ public class GlobalExceptionHandler {
       return messageSource.getMessage(key, null, fallback, locale) != null
           ? messageSource.getMessage(key, null, fallback, locale)
           : fallback;
-    } catch (Exception ex) {
+    } catch (Exception _) {
       return fallback;
     }
   }

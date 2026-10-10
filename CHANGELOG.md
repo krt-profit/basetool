@@ -4,6 +4,12 @@
 
 ### Added
 
+- **Benachrichtigungen räumen auf und folgen Änderungen.** Entschiedene Registrierungen und
+  abgeschlossene, abgelehnte oder gelöschte Aufträge verschwinden aus allen Posteingängen. Ein
+  geänderter Buchungsantrag ersetzt die alte Nachricht durch eine mit dem neuen Betrag. Neue
+  Kontoverantwortliche erfahren davon samt wartender Freigaben, und offene Anträge wandern zu ihnen
+  (REQ-NOTIF-018/-023, REQ-BANK-034/-056, Migration V269).
+
 - **Benachrichtigung bei Lager-Umbuchungen auf ein anderes Mitglied.** Wer Bestand auf dich umbucht,
   löst eine Benachrichtigung mit Material, Qualität, Menge und Ort aus; bucht jemand anderes deinen
   Bestand weg (z. B. ein Logistiker), erfährt auch der bisherige Besitzer davon. Eine
@@ -456,6 +462,9 @@
 
 ### Security
 
+- **Frontend-Lint-Werkzeug: `source-map-js` 1.2.2.** Behebt GHSA-68fv-2mgg-jv7q (Denial of Service über
+  indizierte Source-Map-Abschnitte) in der Abhängigkeit von Stylelint/PostCSS; läuft nur im Build,
+  nicht in der App.
 - **Frontend: Trusted Types im Report-Modus.** Jede Seite sendet zusätzlich den Header
   `Content-Security-Policy-Report-Only: require-trusted-types-for 'script'; trusted-types krt-html
   krt-fragment`; ein ungeschützter DOM-Schreibzugriff wird als `csp_violation` gemeldet, nichts wird

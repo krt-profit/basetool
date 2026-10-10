@@ -60,7 +60,7 @@ public class ResilienceEventLogger {
                                 e.getStateTransition().getFromState(),
                                 e.getStateTransition().getToState()))
                     .onCallNotPermitted(
-                        e -> log.debug("CircuitBreaker[{}] call not permitted", cb.getName()))
+                        _ -> log.debug("CircuitBreaker[{}] call not permitted", cb.getName()))
                     .onError(
                         e ->
                             log.info(
@@ -96,13 +96,13 @@ public class ResilienceEventLogger {
         .forEach(
             bh ->
                 bh.getEventPublisher()
-                    .onCallRejected(e -> log.warn("Bulkhead[{}] call rejected", bh.getName())));
+                    .onCallRejected(_ -> log.warn("Bulkhead[{}] call rejected", bh.getName())));
 
     timeLimiterRegistry
         .getAllTimeLimiters()
         .forEach(
             tl ->
                 tl.getEventPublisher()
-                    .onTimeout(e -> log.warn("TimeLimiter[{}] call timed out", tl.getName())));
+                    .onTimeout(_ -> log.warn("TimeLimiter[{}] call timed out", tl.getName())));
   }
 }

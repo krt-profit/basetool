@@ -179,7 +179,7 @@ public class LiveSyncStreamService {
     List<Subscription> evicted = new ArrayList<>();
     bySub.compute(
         sub,
-        (key, queue) -> {
+        (_, queue) -> {
           Queue<Subscription> streams = (queue != null) ? queue : new ConcurrentLinkedQueue<>();
           while (streams.size() >= MAX_STREAMS_PER_SUB) {
             Subscription oldest = streams.poll();
@@ -192,7 +192,7 @@ public class LiveSyncStreamService {
           return streams;
         });
     for (String topic : subscription.topics()) {
-      byTopic.computeIfAbsent(topic, key -> ConcurrentHashMap.newKeySet()).add(subscription);
+      byTopic.computeIfAbsent(topic, _ -> ConcurrentHashMap.newKeySet()).add(subscription);
     }
     for (Subscription old : evicted) {
       meterRegistry.counter(MetricNames.LIVESYNC_STREAMS_EVICTED).increment();
@@ -203,7 +203,7 @@ public class LiveSyncStreamService {
     SseEmitter emitter = subscription.emitter();
     emitter.onCompletion(() -> retire(subscription, false));
     emitter.onTimeout(() -> retire(subscription, true));
-    emitter.onError(error -> retire(subscription, false));
+    emitter.onError(_ -> retire(subscription, false));
     return emitter;
   }
 
@@ -240,7 +240,7 @@ public class LiveSyncStreamService {
   @Scheduled(fixedRateString = "${app.live-sync.sse.heartbeat-interval:PT20S}")
   public void heartbeat() {
     bySub.forEach(
-        (sub, streams) ->
+        (_, streams) ->
             streams.forEach(
                 subscription -> send(subscription, MetricNames.LIVESYNC_EVENT_HEARTBEAT, "ok")));
   }
@@ -369,14 +369,14 @@ public class LiveSyncStreamService {
     for (String topic : subscription.topics()) {
       byTopic.computeIfPresent(
           topic,
-          (key, room) -> {
+          (_, room) -> {
             room.remove(subscription);
             return room.isEmpty() ? null : room;
           });
     }
     bySub.computeIfPresent(
         subscription.sub(),
-        (key, streams) -> {
+        (_, streams) -> {
           streams.remove(subscription);
           return streams.isEmpty() ? null : streams;
         });

@@ -135,7 +135,7 @@ public class BackendServiceException extends RuntimeException {
         } else if (pd != null && pd.getTitle() != null) {
           return pd.getTitle();
         }
-      } catch (Exception ignored) {
+      } catch (Exception _) {
       }
     }
     return String.valueOf(getMessage());
@@ -156,7 +156,7 @@ public class BackendServiceException extends RuntimeException {
           }
           return type;
         }
-      } catch (Exception ignored) {
+      } catch (Exception _) {
       }
     }
     return null;
@@ -197,7 +197,7 @@ public class BackendServiceException extends RuntimeException {
             fieldErrors.add(new FieldError(field, msg));
           }
         }
-      } catch (Exception ignored) {
+      } catch (Exception _) {
       }
     }
 

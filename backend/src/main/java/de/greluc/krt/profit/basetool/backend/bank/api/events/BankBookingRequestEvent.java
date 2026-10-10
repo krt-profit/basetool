@@ -19,7 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.api.events;
 
+import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
+import java.util.Set;
+import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * Shared supertype of the bank-booking-request notification events, holding their common {@link
@@ -34,6 +37,16 @@ public interface BankBookingRequestEvent extends NotificationEvent {
    * resolving for any existing reference.
    */
   String ENTITY_TYPE = "BANK_BOOKING_REQUEST";
+
+  /**
+   * The notification types that ask their recipient to act on an open request — raised when it is
+   * created or corrected, cleared when it is decided, cancelled or corrected again (REQ-NOTIF-018).
+   */
+  @Unmodifiable
+  Set<NotificationType> OPEN_REQUEST_NOTICES =
+      Set.of(
+          NotificationType.BANK_BOOKING_REQUEST_CREATED,
+          NotificationType.BANK_BOOKING_REQUEST_UPDATED);
 
   /**
    * The loose entity-type tag shared by all bank-booking-request events.

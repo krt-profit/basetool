@@ -215,7 +215,7 @@ public class RedisSessionConfig {
   private static Class<?> resolveIfPresent(@NotNull String className, ClassLoader loader) {
     try {
       return Class.forName(className, false, loader);
-    } catch (ClassNotFoundException | LinkageError ex) {
+    } catch (ClassNotFoundException | LinkageError _) {
       log.debug(
           "Session type {} is not on the classpath; its forced type-id mix-in is not registered.",
           className);
@@ -285,7 +285,7 @@ public class RedisSessionConfig {
     String normalised = flushModeValue.strip().toUpperCase(Locale.ROOT).replace('-', '_');
     try {
       return FlushMode.valueOf(normalised);
-    } catch (IllegalArgumentException ex) {
+    } catch (IllegalArgumentException _) {
       log.warn(
           "Unrecognised spring.session.redis.flush-mode '{}'; falling back to IMMEDIATE. "
               + "Valid values: IMMEDIATE, ON_SAVE.",

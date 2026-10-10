@@ -237,7 +237,7 @@ public class RefineryImportProxyController {
     for (ImportIssueDto issue : issues) {
       Integer row = draftRowIndex(issue);
       if (row != null) {
-        byRow.computeIfAbsent(String.valueOf(row), k -> new ArrayList<>()).add(issue);
+        byRow.computeIfAbsent(String.valueOf(row), _ -> new ArrayList<>()).add(issue);
       }
     }
     return byRow;
@@ -281,7 +281,7 @@ public class RefineryImportProxyController {
     }
     try {
       return Integer.valueOf(matcher.group(1));
-    } catch (NumberFormatException e) {
+    } catch (NumberFormatException _) {
       log.warn("Refinery import issue field index out of int range: {}", issue.field());
       return null;
     }

@@ -63,7 +63,7 @@ public final class RelayParams {
     }
     try {
       return UUID.fromString(raw.strip());
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalArgumentException _) {
       return null;
     }
   }

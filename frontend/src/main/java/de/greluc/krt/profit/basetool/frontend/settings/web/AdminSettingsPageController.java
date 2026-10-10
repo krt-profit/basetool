@@ -285,7 +285,7 @@ public class AdminSettingsPageController {
       }
 
       redirectAttributes.addFlashAttribute("successToast", "success.settings.update");
-    } catch (NumberFormatException e) {
+    } catch (NumberFormatException _) {
       redirectAttributes.addFlashAttribute("errorToast", "error.settings.invalid.format");
     } catch (Exception e) {
       log.error("Failed to update settings", e);
@@ -352,7 +352,7 @@ public class AdminSettingsPageController {
       } finally {
         cacheEviction.clearStaticDataCache();
       }
-    } catch (NumberFormatException e) {
+    } catch (NumberFormatException _) {
       return validationProblem("error.settings.invalid.format", locale);
     } catch (BackendServiceException e) {
       log.debug("Failed to update settings (ajax)", e);

@@ -109,7 +109,7 @@ public final class BankDashboardViewAssembler {
         case "SPECIAL" -> special.add(card);
         default -> {
           if (account.bereichId() != null) {
-            byBereich.computeIfAbsent(account.bereichId(), k -> new ArrayList<>()).add(card);
+            byBereich.computeIfAbsent(account.bereichId(), _ -> new ArrayList<>()).add(card);
             bereichMeta.putIfAbsent(account.bereichId(), card);
           } else {
             ungrouped.add(card);

@@ -60,7 +60,7 @@ public final class SessionIdFingerprint {
       byte[] digest =
           MessageDigest.getInstance("SHA-256").digest(sessionId.getBytes(StandardCharsets.UTF_8));
       return HexFormat.of().formatHex(digest).substring(0, FINGERPRINT_HEX_CHARS);
-    } catch (NoSuchAlgorithmException e) {
+    } catch (NoSuchAlgorithmException _) {
       return NONE;
     }
   }

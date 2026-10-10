@@ -1405,7 +1405,7 @@ public class InventoryPageController {
       if (content != null) {
         return content;
       }
-    } catch (Exception e) {
+    } catch (Exception _) {
       log.warn("Failed to fetch users (might not be an admin/officer)");
     }
     return new ArrayList<>();

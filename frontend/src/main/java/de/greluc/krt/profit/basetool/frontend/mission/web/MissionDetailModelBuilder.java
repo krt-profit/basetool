@@ -139,7 +139,7 @@ public final class MissionDetailModelBuilder {
       JobTypeDto job = p.plannedMissionJobType();
       if (job != null && job.isLeadershipRole()) {
         UUID jobId = job.id();
-        participantsByLeadType.computeIfAbsent(jobId.toString(), k -> new ArrayList<>()).add(p);
+        participantsByLeadType.computeIfAbsent(jobId.toString(), _ -> new ArrayList<>()).add(p);
         if (addedLeadTypes.add(jobId)) {
           missionLeadTypes.add(job);
         }

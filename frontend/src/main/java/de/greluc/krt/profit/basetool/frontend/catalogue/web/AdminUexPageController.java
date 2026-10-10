@@ -452,13 +452,13 @@ public class AdminUexPageController {
           bySystem.computeIfAbsent(term.starSystemName(), SystemAccumulator::new);
       if (term.cityName() != null && !term.cityName().isBlank()) {
         cityTerminals
-            .computeIfAbsent(system, s -> new LinkedHashMap<>())
-            .computeIfAbsent(term.cityName().toLowerCase(), k -> new ArrayList<>())
+            .computeIfAbsent(system, _ -> new LinkedHashMap<>())
+            .computeIfAbsent(term.cityName().toLowerCase(), _ -> new ArrayList<>())
             .add(term);
       } else if (term.spaceStationName() != null && !term.spaceStationName().isBlank()) {
         stationTerminals
-            .computeIfAbsent(system, s -> new LinkedHashMap<>())
-            .computeIfAbsent(term.spaceStationName().toLowerCase(), k -> new ArrayList<>())
+            .computeIfAbsent(system, _ -> new LinkedHashMap<>())
+            .computeIfAbsent(term.spaceStationName().toLowerCase(), _ -> new ArrayList<>())
             .add(term);
       } else {
         acc.orphanTerminals.add(term);

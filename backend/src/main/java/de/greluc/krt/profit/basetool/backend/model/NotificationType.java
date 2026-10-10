@@ -128,5 +128,17 @@ public enum NotificationType {
    * actor}, the {@code newOwner}, the lot {@code count} and the {@code lots} list (amount,
    * material, quality, source location).
    */
-  INVENTORY_TRANSFERRED_FROM_USER
+  INVENTORY_TRANSFERRED_FROM_USER,
+
+  /**
+   * A booking request the recipient was told about was corrected by its requester (REQ-BANK-056),
+   * rendered with the same parameters as {@link #BANK_BOOKING_REQUEST_CREATED}.
+   */
+  BANK_BOOKING_REQUEST_UPDATED,
+
+  /**
+   * The recipient became a responsible holder of a bank account (REQ-BANK-034), rendered with the
+   * {@code accountNo} and the number of requests {@code pending} their approval.
+   */
+  BANK_ACCOUNT_RESPONSIBLE_ASSIGNED
 }

@@ -358,32 +358,32 @@ public class MissionPageController {
       try {
         PageResponse<JobTypeDto> jobTypesPage = missionClient.missionJobTypes();
         model.addAttribute("jobTypes", jobTypesPage.content());
-      } catch (Exception ignored) {
+      } catch (Exception _) {
       }
 
       try {
         PageResponse<JobTypeDto> crewJobTypesPage = missionClient.crewJobTypes();
         model.addAttribute("crewJobTypes", crewJobTypesPage.content());
-      } catch (Exception ignored) {
+      } catch (Exception _) {
       }
 
       try {
         PageResponse<SquadronDto> squadronsPage = missionClient.squadrons();
         model.addAttribute("squadrons", squadronsPage.content());
-      } catch (Exception ignored) {
+      } catch (Exception _) {
       }
 
       try {
         List<OrgUnitMembershipOptionDto> orgUnits = missionClient.activeOrgUnits();
         model.addAttribute("orgUnits", orgUnits != null ? orgUnits : List.of());
-      } catch (Exception e) {
+      } catch (Exception _) {
         model.addAttribute("orgUnits", List.of());
       }
 
       try {
         PageResponse<FrequencyTypeDto> freqTypesPage = missionClient.frequencyTypes();
         model.addAttribute("frequencyTypes", freqTypesPage.content());
-      } catch (Exception ignored) {
+      } catch (Exception _) {
       }
 
       Boolean canEdit = mission.canEdit();
@@ -391,14 +391,14 @@ public class MissionPageController {
         try {
           List<ShipDto> unitShipOptions = missionClient.unitShipOptions(id);
           model.addAttribute("unitShipOptions", unitShipOptions);
-        } catch (Exception ignored) {
+        } catch (Exception _) {
         }
       }
 
       try {
         PageResponse<ShipTypeDto> allShipTypesPage = missionClient.shipTypes();
         model.addAttribute("allShipTypes", allShipTypesPage.content());
-      } catch (Exception ignored) {
+      } catch (Exception _) {
       }
 
       if (authHelperService.isMemberOrAbove() && needFinance) {
@@ -569,7 +569,7 @@ public class MissionPageController {
       if (setting != null && setting.value() != null) {
         return setting.value();
       }
-    } catch (Exception e) {
+    } catch (Exception _) {
       log.warn("Failed to fetch refinery rounding mode, using default UP");
     }
     return "UP";
@@ -601,7 +601,7 @@ public class MissionPageController {
       }
       ZonedDateTime zdt = instant.atZone(MISSION_TIME_ZONE);
       return zdt.toLocalDateTime().truncatedTo(ChronoUnit.SECONDS).toString();
-    } catch (Exception e) {
+    } catch (Exception _) {
       log.warn("Failed to format instant: {}", instantObj);
       return String.valueOf(instantObj);
     }

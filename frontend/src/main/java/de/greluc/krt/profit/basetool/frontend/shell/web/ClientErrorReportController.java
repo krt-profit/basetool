@@ -164,7 +164,7 @@ public class ClientErrorReportController {
             + uri.getHost()
             + (uri.getPort() >= 0 ? ":" + uri.getPort() : "");
       }
-    } catch (URISyntaxException ignored) {
+    } catch (URISyntaxException _) {
     }
     int cut = blocked.length();
     for (int i = 0; i < blocked.length(); i++) {

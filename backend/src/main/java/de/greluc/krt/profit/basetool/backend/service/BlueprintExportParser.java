@@ -171,7 +171,7 @@ public final class BlueprintExportParser {
     }
     try {
       return Instant.parse(iso.trim());
-    } catch (DateTimeParseException e) {
+    } catch (DateTimeParseException _) {
       log.debug("Blueprint import: ignoring unparseable receivedAt '{}'", iso);
       return null;
     }

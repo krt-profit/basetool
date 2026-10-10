@@ -67,7 +67,7 @@ public record LiveSyncTopic(
       UUID id;
       try {
         id = UUID.fromString(idPart);
-      } catch (IllegalArgumentException e) {
+      } catch (IllegalArgumentException _) {
         return null;
       }
       return new LiveSyncTopic(topicClass, id, prefix + ":" + id);

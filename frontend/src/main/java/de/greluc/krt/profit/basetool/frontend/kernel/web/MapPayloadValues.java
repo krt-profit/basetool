@@ -57,7 +57,7 @@ public final class MapPayloadValues {
     }
     try {
       return UUID.fromString(String.valueOf(value));
-    } catch (Exception ignored) {
+    } catch (Exception _) {
       return null;
     }
   }
@@ -96,7 +96,7 @@ public final class MapPayloadValues {
     }
     try {
       return Long.parseLong(String.valueOf(value));
-    } catch (Exception ignored) {
+    } catch (Exception _) {
       return 0L;
     }
   }

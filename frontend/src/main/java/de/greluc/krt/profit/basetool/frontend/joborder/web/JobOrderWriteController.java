@@ -861,13 +861,13 @@ public class JobOrderWriteController {
       if (rawHandoverTime != null && !rawHandoverTime.isBlank()) {
         try {
           handoverTime = Instant.parse(rawHandoverTime);
-        } catch (Exception eiso) {
+        } catch (Exception _) {
           try {
             handoverTime =
                 LocalDateTime.parse(rawHandoverTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                     .atZone(ZoneId.systemDefault())
                     .toInstant();
-          } catch (Exception elocal) {
+          } catch (Exception _) {
             log.warn(
                 "Could not parse handoverTime {}, using now()", LogSafe.text(rawHandoverTime, 64));
           }
@@ -938,13 +938,13 @@ public class JobOrderWriteController {
       if (rawHandoverTime != null && !rawHandoverTime.isBlank()) {
         try {
           handoverTime = Instant.parse(rawHandoverTime);
-        } catch (Exception eiso) {
+        } catch (Exception _) {
           try {
             handoverTime =
                 LocalDateTime.parse(rawHandoverTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                     .atZone(ZoneId.systemDefault())
                     .toInstant();
-          } catch (Exception elocal) {
+          } catch (Exception _) {
             log.warn(
                 "Could not parse item handoverTime {}, using now()",
                 LogSafe.text(rawHandoverTime, 64));
@@ -982,12 +982,12 @@ public class JobOrderWriteController {
     if (raw != null && !raw.isBlank()) {
       try {
         return Instant.parse(raw);
-      } catch (Exception eiso) {
+      } catch (Exception _) {
         try {
           return LocalDateTime.parse(raw, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
               .atZone(ZoneId.systemDefault())
               .toInstant();
-        } catch (Exception elocal) {
+        } catch (Exception _) {
           log.warn("Could not parse handoverTime {}, using now()", LogSafe.text(raw, 64));
         }
       }

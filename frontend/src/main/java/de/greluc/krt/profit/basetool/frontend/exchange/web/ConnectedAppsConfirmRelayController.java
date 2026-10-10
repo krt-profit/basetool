@@ -203,7 +203,7 @@ public class ConnectedAppsConfirmRelayController {
       return request == null || request.stagedAt() == null || expired(request.stagedAt())
           ? null
           : request;
-    } catch (JacksonException ignored) {
+    } catch (JacksonException _) {
       return null;
     }
   }

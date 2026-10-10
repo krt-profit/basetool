@@ -628,7 +628,7 @@ public class MaterialboersePageController {
     }
     try {
       return UUID.fromString(value);
-    } catch (IllegalArgumentException ignored) {
+    } catch (IllegalArgumentException _) {
       return null;
     }
   }

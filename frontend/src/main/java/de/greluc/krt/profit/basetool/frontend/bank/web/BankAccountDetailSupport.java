@@ -173,7 +173,7 @@ public final class BankAccountDetailSupport {
     }
     try {
       return LocalDate.parse(value.trim());
-    } catch (DateTimeParseException e) {
+    } catch (DateTimeParseException _) {
       return fallback;
     }
   }

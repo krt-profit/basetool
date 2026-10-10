@@ -905,7 +905,7 @@ public class MissionWriteController {
         String message;
         try {
           message = messageSource.getMessage(fe, locale);
-        } catch (NoSuchMessageException ex) {
+        } catch (NoSuchMessageException _) {
           message = fe.getDefaultMessage();
         }
         fieldErrors.putIfAbsent(fe.getField(), message);

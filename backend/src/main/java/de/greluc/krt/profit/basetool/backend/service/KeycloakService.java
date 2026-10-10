@@ -478,9 +478,9 @@ public class KeycloakService {
         if (member.get("id") instanceof String idText) {
           try {
             byUser
-                .computeIfAbsent(UUID.fromString(idText), k -> new HashSet<>())
+                .computeIfAbsent(UUID.fromString(idText), _ -> new HashSet<>())
                 .addAll(storedRoleNames);
-          } catch (IllegalArgumentException ignored) {
+          } catch (IllegalArgumentException _) {
           }
         }
       }

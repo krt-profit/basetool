@@ -43,10 +43,15 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `JOB_ORDER_CREATED` | `JOB_ORDER_CREATED` | V156 | `ORG_RELATIVE_ROLE` OFFICER / LEAD / LOGISTICIAN on `RESPONSIBLE` + `ROLE` ADMIN | REQ-NOTIF-008 |
 | `JOB_ORDER_UPDATED_BY_REQUESTER` | `JOB_ORDER_UPDATED_BY_REQUESTER` | V214 | `ORG_RELATIVE_ROLE` OFFICER / LEAD on `RESPONSIBLE` | REQ-NOTIF-017 |
 | `BANK_BOOKING_REQUEST_CREATED` | `BANK_BOOKING_REQUEST_CREATED` | V160 + V194 | `ROLE` BANK_MANAGEMENT, `ACCOUNT_GRANT`, `ACCOUNT_RESPONSIBLE` | REQ-NOTIF-011, [REQ-BANK-026](bank.md) |
-| `BANK_BOOKING_REQUEST_CONFIRMED` | `BANK_BOOKING_REQUEST_CONFIRMED` · `BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED` | V161 · V194 | `EVENT_RECIPIENT` (requester) · `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED` | REQ-NOTIF-011/-018, REQ-BANK-026 |
-| `BANK_BOOKING_REQUEST_REJECTED` | `BANK_BOOKING_REQUEST_REJECTED` · `BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED` | V161 · V194 | `EVENT_RECIPIENT` (requester) · `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED` | REQ-NOTIF-011/-018, REQ-BANK-026 |
-| `BANK_BOOKING_REQUEST_CANCELLED` | none (no rule) | — | supersedes `…_CREATED` only | REQ-NOTIF-018 |
+| `BANK_BOOKING_REQUEST_CONFIRMED` | `BANK_BOOKING_REQUEST_CONFIRMED` · `BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED` | V161 · V194 | `EVENT_RECIPIENT` (requester) · `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED` and `…_UPDATED` | REQ-NOTIF-011/-018, REQ-BANK-026 |
+| `BANK_BOOKING_REQUEST_REJECTED` | `BANK_BOOKING_REQUEST_REJECTED` · `BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED` | V161 · V194 | `EVENT_RECIPIENT` (requester) · `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED` and `…_UPDATED` | REQ-NOTIF-011/-018, REQ-BANK-026 |
+| `BANK_BOOKING_REQUEST_CANCELLED` | none (no rule) | — | supersedes `…_CREATED` and `…_UPDATED` only | REQ-NOTIF-018 |
+| `BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER` | `BANK_BOOKING_REQUEST_UPDATED` | V269 | `ROLE` BANK_MANAGEMENT, `ACCOUNT_GRANT`, `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED` and `…_UPDATED` first, so the new notice replaces the old one | REQ-NOTIF-018, [REQ-BANK-056](bank.md) |
+| `BANK_ACCOUNT_RESPONSIBLE_ASSIGNED` | `BANK_ACCOUNT_RESPONSIBLE_ASSIGNED` | V269 | `EVENT_RECIPIENT` (each member who became a responsible holder of the account); rendered with `accountNo` and the number of requests `pending` their approval | [REQ-BANK-034](bank.md) |
+| `BANK_BOOKING_REQUEST_CREATED` (reconcile, `BankBookingRequestNoticesReconciledEvent`) | `BANK_BOOKING_REQUEST_CREATED` | V160 + V194 | the rules of `…_CREATED`, applied only to the members who became or stopped being responsible holders of the request's account | REQ-NOTIF-023, [REQ-BANK-034](bank.md) |
 | `DISCORD_REGISTRATION_PENDING` | `DISCORD_REGISTRATION_PENDING` | V174 | `ROLE` ADMIN (`exclude_actor = false`) | REQ-NOTIF-012 ([discord-integration.md](discord-integration.md)) |
+| `DISCORD_REGISTRATION_DECIDED` | none (no rule) | — | supersedes `DISCORD_REGISTRATION_PENDING` only (approve, reject, deletion while pending) | REQ-NOTIF-012, REQ-NOTIF-018 |
+| `JOB_ORDER_CLOSED` | none (no rule) | — | supersedes `JOB_ORDER_CREATED` and `JOB_ORDER_UPDATED_BY_REQUESTER` only (completed, rejected, deleted) | REQ-NOTIF-008, REQ-NOTIF-018 |
 | `MATERIAL_EXCHANGE_INTEREST_REGISTERED` | `MATERIAL_EXCHANGE_INTEREST_REGISTERED` | V211 | `EVENT_RECIPIENT` (offer owner) | REQ-NOTIF-016, [REQ-MARKET-011](materialboerse.md) |
 | `MATERIAL_REQUEST_FULFILLMENT_SIGNALLED` | `MATERIAL_REQUEST_FULFILLMENT_SIGNALLED` | V225 | `EVENT_RECIPIENT` (requester) | [REQ-MARKET-020](materialboerse.md) |
 | `ACCOUNT_DELETION_REQUESTED` | `ACCOUNT_DELETION_REQUESTED` | V243 | `ROLE` ADMIN (`exclude_actor = false`) | [REQ-SEC-061](security-and-access.md) |
@@ -226,15 +231,23 @@ freshly-promoted-but-not-yet-logged-in officer becomes a recipient only after th
 Keycloak reconciliation (`UserSyncTask`, daily at 05:00 Europe/Berlin by default, or an admin's
 manual sync) — an accepted eventual-consistency window. A login re-syncs the roles at once.
 
+The notice leaves the inbox when the order closes: completing it (status change or the last
+handover), rejecting it or deleting it publishes `JOB_ORDER_CLOSED`, which supersedes the order's
+`JOB_ORDER_CREATED` and `JOB_ORDER_UPDATED_BY_REQUESTER` notices (REQ-NOTIF-018).
+
 **Acceptance**
 
 - [x] Creating a job order publishes `JobOrderCreatedEvent` after commit.
 - [x] The seeded rule (V156, id `62200000-0000-0000-0000-000000000001`) has the four UC1
   selectors and `exclude_actor = true`.
+- [x] Completing, rejecting or deleting the order publishes `JobOrderClosedEvent`; reopening it or
+  moving it between two closed states does not.
 
 **Enforced by:** `RuleEvaluationServiceTest`, `NotificationRuleEngineIntegrationTest`,
-`JobOrderServiceTest` · **Code:** `service/JobOrderService#publishJobOrderCreated`,
-`joborder/api/events/JobOrderCreatedEvent`, `service/RecipientResolutionService`
+`JobOrderServiceTest`, `JobOrderServicePriorityAndStatusTest` · **Code:**
+`service/JobOrderService#publishJobOrderCreated`, `service/JobOrderService#publishJobOrderClosed`,
+`joborder/api/events/JobOrderCreatedEvent`, `joborder/api/events/JobOrderClosedEvent`,
+`service/RecipientResolutionService`
 
 ### REQ-NOTIF-009 — Retention
 
@@ -647,16 +660,38 @@ request is decided or withdrawn the "new booking request" items shown to the ban
 account's grant holders disappear from their inboxes. `BANK_BOOKING_REQUEST_CANCELLED` notifies
 nobody (the requester is the actor and seeds no rule); its sole pipeline effect is the removal.
 
+Since #2413 the open-request notices are `BANK_BOOKING_REQUEST_CREATED` **and**
+`BANK_BOOKING_REQUEST_UPDATED` (`BankBookingRequestEvent.OPEN_REQUEST_NOTICES`): a requester's
+correction (REQ-BANK-056) clears both and raises `BANK_BOOKING_REQUEST_UPDATED` for the same
+recipients, and confirm / reject / cancel clear both.
+
 **Second wired use case:** the Art. 17 deletion request (REQ-SEC-061).
 `ACCOUNT_DELETION_REQUEST_DECLINED` and the notify-nobody `ACCOUNT_DELETION_REQUEST_RESOLVED` each
 resolve `ACCOUNT_DELETION_REQUESTED`, so the admins' "erasure requested" items disappear once the
 request is closed.
 
+**Third wired use case:** the pending registration (REQ-NOTIF-012). The notify-nobody
+`DISCORD_REGISTRATION_DECIDED` resolves `DISCORD_REGISTRATION_PENDING`; it is published when an admin
+approves or rejects the registration (`UserRegistrationService#decide`) and when a still-pending
+registration is deleted (`UserDeletionService#deleteUser`, which also covers linking it onto an
+existing account). Merging an older account into a pending registration decides nothing — the
+registration stays pending — and clears nothing.
+
+**Fourth wired use case:** the job order (REQ-NOTIF-008, REQ-NOTIF-017). The notify-nobody
+`JOB_ORDER_CLOSED` resolves `JOB_ORDER_CREATED` and `JOB_ORDER_UPDATED_BY_REQUESTER`; it is published
+when an order becomes `COMPLETED` or `REJECTED` (by status change or by the last handover) and when it
+is deleted, so no inbox keeps an order that is settled or a link that leads nowhere.
+
 **Acceptance**
 
 - [x] A confirm / reject / cancel of a booking request (after commit) deletes the
-  `BANK_BOOKING_REQUEST_CREATED` notifications for that request across all recipients, and only those
-  (other types and other entities are untouched).
+  `BANK_BOOKING_REQUEST_CREATED` and `BANK_BOOKING_REQUEST_UPDATED` notifications for that request
+  across all recipients, and only those (other types and other entities are untouched).
+- [x] One admin's decision on a registration, or its deletion while pending, clears every admin's
+  `DISCORD_REGISTRATION_PENDING` item for it.
+- [x] Completing, rejecting or deleting a job order clears its `JOB_ORDER_CREATED` and
+  `JOB_ORDER_UPDATED_BY_REQUESTER` items; a move between two closed states or back to open clears
+  nothing.
 - [x] The affected staff are included in the pushed recipient set so their badge/dropdown refresh
   live; the removal runs even when the event resolves no new recipients (cancel).
 - [x] Adding the `BANK_BOOKING_REQUEST_CANCELLED` event type and the `resolvesNotificationTypes()`
@@ -668,8 +703,11 @@ request is closed.
 `service/NotificationCreationService#removeSupersededNotifications`,
 `repository/NotificationRepository#{findRecipientUserIdsByTypeInAndEntity,deleteByTypeInAndEntity}`,
 `bank/internal/BankBookingRequestService#cancelOwn`, `privacy/api/events/AccountDeletionRequest{Declined,Resolved}Event`,
-`model/NotificationEventType` · **Decision:**
-[ADR-0096](../adr/0096-notification-supersede-on-lifecycle-close.md) · **Issues:** #1252
+`identity/api/events/DiscordRegistrationDecidedEvent`, `joborder/api/events/JobOrderClosedEvent`,
+`model/NotificationEventType` · **Also enforced by:** `NotificationLifecycleEventsTest`,
+`NotificationRuleEngineIntegrationTest`, `UserRegistrationServiceTest`, `UserDeletionServiceTest`,
+`JobOrderServicePriorityAndStatusTest` · **Decision:**
+[ADR-0096](../adr/0096-notification-supersede-on-lifecycle-close.md) · **Issues:** #1252, #2413
 
 ### REQ-NOTIF-019 — The inbox page shows its full history (hint + load-more), never a silent cap
 
@@ -755,6 +793,53 @@ the overflow menu. The bell dropdown keeps its rows without links.
 `href` on `/page-items`) · `NotificationCenterE2eTest` · **Code:** `notifications.html`,
 `static/js/notifications-page.js`, `static/js/notifications.js` (`buildItem(item, linkable)`),
 `NotificationPageController`, `NotificationViewDto` · **Related:** REQ-NOTIF-019, REQ-UI-027
+
+### REQ-NOTIF-023 — Reconciling a notice for named members
+
+Some changes do not create a new subject; they change **who should hold** an existing notice — the
+responsible holders of a bank account change while requests on it are open (REQ-BANK-034). Clearing
+the notice for everyone and raising it again would re-notify members whose standing did not change,
+including any who deleted the notice on purpose. Superseding (REQ-NOTIF-018) cannot narrow to
+individual recipients.
+
+An event may therefore name the members to reconcile, via
+`NotificationEvent.reconcileRecipients()`. When the set is non-empty, `NotificationCreationService`
+processes the event in reconcile mode instead of the normal one:
+
+- The rules of the event's `eventType` are evaluated as usual, giving the members **entitled** to the
+  notice now (including the actor exclusion).
+- A named member who is entitled and holds **no** notification of `resolvesNotificationTypes()` for
+  the event's entity gets one, of the type the rule produces.
+- A named member who holds such a notification and is **no longer** entitled loses it
+  (`NotificationRepository#deleteByTypeInAndEntityForRecipients`).
+- Everyone else — every member the event does not name — is neither notified nor cleared.
+- Both kinds of change are pushed live (REQ-NOTIF-010): new rows with their signal, cleared ones as a
+  refresh-only signal.
+
+**Wired use case:** `BankBookingRequestNoticesReconciledEvent`, published per open request when an
+account's responsible holders change, names the members who became or stopped being holders and is
+evaluated against the `BANK_BOOKING_REQUEST_CREATED` rules: the new holder gets the request's notice,
+a former holder loses it unless another selector (bank management, an account grant) still reaches
+them, and the bank staff keep theirs untouched.
+
+**Acceptance**
+
+- [x] A former holder loses the open request's notice and a new holder receives one; a staff member
+  holding the notice is left alone.
+- [x] A former holder whom another selector still reaches keeps the notice.
+- [x] An entitled member the event does not name is never notified, even without a notice.
+- [x] The per-recipient deletion touches only the named recipients' rows of the given types and
+  entity.
+
+**Enforced by:** `NotificationCreationServiceTest` (`reconcile…`),
+`NotificationRepositoryIntegrationTest` (`supersedeForRecipients…`),
+`NotificationLifecycleEventsTest`, `OrgUnitBankResponsibilityServiceTest` · **Code:**
+`notification/api/events/NotificationEvent#reconcileRecipients`,
+`service/NotificationCreationService#reconcile`,
+`repository/NotificationRepository#deleteByTypeInAndEntityForRecipients`,
+`bank/api/events/BankBookingRequestNoticesReconciledEvent` · **Decision:**
+[ADR-0244](../adr/0244-a-notification-event-can-reconcile-a-notice-for-named-members.md) ·
+**Issues:** #2413
 
 ## Out of scope (v1)
 

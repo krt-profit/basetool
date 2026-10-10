@@ -72,3 +72,9 @@ the names `ignored` and `expected` of the consequence above. Checkstyle's `Empty
 accepts `^(ignored|expected|_)$` as its `exceptionVariableName`. A descriptive name stays where the
 name states intent. Not in `keycloak-spi`: it emits Java-21 bytecode, where `_` is not a valid
 identifier, so javac refuses it there.
+
+Applied to `main` on 2026-10-10 (backend, frontend, ingest, logging-support): 114 catch parameters,
+110 lambda parameters and one type-pattern binding whose name did not occur in their body became `_`.
+Names that state why the value is unused stay (`notFound`, `absent`, `race`, `malformed`,
+`notAnId`, `userGone`, `alreadyRegistered` and the like). Test sources follow when their files are
+touched.

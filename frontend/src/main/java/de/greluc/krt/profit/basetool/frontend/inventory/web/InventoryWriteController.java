@@ -437,7 +437,7 @@ public class InventoryWriteController {
     try {
       URI uri = URI.create(referer);
       query = uri.getRawQuery();
-    } catch (IllegalArgumentException ex) {
+    } catch (IllegalArgumentException _) {
       return basePath;
     }
     if (query == null || query.isBlank()) {

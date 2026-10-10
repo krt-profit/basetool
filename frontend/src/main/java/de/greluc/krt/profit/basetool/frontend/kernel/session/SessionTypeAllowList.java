@@ -166,7 +166,7 @@ public final class SessionTypeAllowList {
       }
       try {
         return valueOf(raw.strip().toUpperCase(Locale.ROOT));
-      } catch (IllegalArgumentException ex) {
+      } catch (IllegalArgumentException _) {
         log.warn(
             "Unrecognised app.session.type-allow-list '{}'; falling back to ENFORCE."
                 + " Valid values: OFF, REPORT, ENFORCE.",
@@ -191,7 +191,7 @@ public final class SessionTypeAllowList {
   interface RefusalListener {
 
     /** A listener that does nothing, for callers that only need the validator's verdict. */
-    RefusalListener NONE = (className, mode) -> {};
+    RefusalListener NONE = (_, _) -> {};
 
     /**
      * Called once per refusal the validator reaches.

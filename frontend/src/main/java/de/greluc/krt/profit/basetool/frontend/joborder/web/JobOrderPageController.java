@@ -223,13 +223,13 @@ public class JobOrderPageController {
       try {
         SystemSettingDto yellowSetting = jobOrderClient.ageYellowSetting();
         yellowDays = Integer.parseInt(yellowSetting.value());
-      } catch (Exception e) {
+      } catch (Exception _) {
         log.warn("Could not fetch yellow days setting, using default");
       }
       try {
         SystemSettingDto redSetting = jobOrderClient.ageRedSetting();
         redDays = Integer.parseInt(redSetting.value());
-      } catch (Exception e) {
+      } catch (Exception _) {
         log.warn("Could not fetch red days setting, using default");
       }
     } catch (Exception e) {
@@ -404,13 +404,13 @@ public class JobOrderPageController {
       try {
         SystemSettingDto yellowSetting = jobOrderClient.ageYellowSetting();
         yellowDays = Integer.parseInt(yellowSetting.value());
-      } catch (Exception e) {
+      } catch (Exception _) {
         log.warn("Could not fetch yellow days setting, using default");
       }
       try {
         SystemSettingDto redSetting = jobOrderClient.ageRedSetting();
         redDays = Integer.parseInt(redSetting.value());
-      } catch (Exception e) {
+      } catch (Exception _) {
         log.warn("Could not fetch red days setting, using default");
       }
       model.addAttribute("ageYellowDays", yellowDays);

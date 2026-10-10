@@ -137,7 +137,7 @@ public class LayoutContextLoader {
         instanceof HandlerMethod handler)) {
       return true;
     }
-    return DECISIONS.computeIfAbsent(handler.getMethod(), m -> decide(handler));
+    return DECISIONS.computeIfAbsent(handler.getMethod(), _ -> decide(handler));
   }
 
   /**

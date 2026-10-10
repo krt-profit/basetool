@@ -81,7 +81,11 @@ public class AdminNotificationRulePageController {
           "EXCHANGE_INSTALLATION_CONNECTED",
           "EXCHANGE_BULK_UNDO_APPLIED",
           "INVENTORY_TRANSFERRED_TO_USER",
-          "INVENTORY_TRANSFERRED_FROM_USER");
+          "INVENTORY_TRANSFERRED_FROM_USER",
+          "DISCORD_REGISTRATION_DECIDED",
+          "JOB_ORDER_CLOSED",
+          "BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER",
+          "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED");
 
   /**
    * {@code NotificationType} codes, labelled via {@code admin.notificationRules.notificationType}.
@@ -103,7 +107,9 @@ public class AdminNotificationRulePageController {
           "EXCHANGE_INSTALLATION_CONNECTED",
           "EXCHANGE_BULK_UNDO_APPLIED",
           "INVENTORY_TRANSFERRED_TO_USER",
-          "INVENTORY_TRANSFERRED_FROM_USER");
+          "INVENTORY_TRANSFERRED_FROM_USER",
+          "BANK_BOOKING_REQUEST_UPDATED",
+          "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED");
 
   /**
    * {@code SelectorKind} codes, labelled via {@code admin.notificationRules.selector.kind}. The
