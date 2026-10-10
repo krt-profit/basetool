@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -39,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.model.City;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
+import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.RefineryGood;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
@@ -46,6 +48,9 @@ import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.RefineryYield;
 import de.greluc.krt.profit.basetool.backend.model.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
+import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
@@ -57,6 +62,7 @@ import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -72,6 +78,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
@@ -106,6 +113,9 @@ class RefineryOrderServiceTest {
   @Mock private BookInPolicy bookInPolicy;
 
   @Mock private AuditService auditService;
+
+  @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private UserService userService;
   @InjectMocks private RefineryOrderService refineryOrderService;
 
   private static final UUID ORDER_ID = UUID.randomUUID();
@@ -136,6 +146,7 @@ class RefineryOrderServiceTest {
             null,
             de.greluc.krt.profit.basetool.backend.service.ReferenceResolvingEntityManager
                 .create()));
+    lenient().when(userService.currentActor()).thenReturn(ActorRef.system());
     owner = new User();
     owner.setId(OWNER_ID);
     owner.setUsername("alice");
@@ -813,6 +824,62 @@ class RefineryOrderServiceTest {
    * Stubs the repositories required by a single-item store call where the item references the
    * default material + location + no explicit user + no job order.
    */
+  @Test
+  void storingAnotherMembersOrderIntoTheirStockTellsThemTheYieldWasBookedOntoThem() {
+    stubLookupsForSingleItem();
+    when(bookInPolicy.mayBookInFor(OWNER_ID)).thenReturn(true);
+    when(userService.currentActor()).thenReturn(new ActorRef(OTHER_USER_ID, "Bob"));
+
+    refineryOrderService.storeRefineryOrder(
+        OTHER_USER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(item(null, null))), true);
+
+    assertEquals(
+        List.of("STORED_TO_YOU"),
+        notices().stream().map(e -> e.renderParams().get("changeCode")).toList());
+    assertEquals(OWNER_ID, notices().getFirst().contextRecipientUserId());
+  }
+
+  @Test
+  void storingAnotherMembersOrderIntoThirdPartyStockSplitsTheTwoNotices() {
+    UUID third = UUID.randomUUID();
+    User thirdUser = new User();
+    thirdUser.setId(third);
+    stubLookupsForSingleItem();
+    when(userRepository.findById(third)).thenReturn(Optional.of(thirdUser));
+    when(bookInPolicy.mayBookInFor(third)).thenReturn(true);
+    when(userService.currentActor()).thenReturn(new ActorRef(OTHER_USER_ID, "Bob"));
+
+    refineryOrderService.storeRefineryOrder(
+        OTHER_USER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(item(third, null))), true);
+
+    List<NoticeEvent> sent = notices();
+    assertEquals(2, sent.size());
+    assertEquals(OWNER_ID, sent.get(0).contextRecipientUserId());
+    assertEquals("STORED", sent.get(0).renderParams().get("changeCode"));
+    assertEquals(third, sent.get(1).contextRecipientUserId());
+    assertEquals("STORED_TO_YOU", sent.get(1).renderParams().get("changeCode"));
+  }
+
+  @Test
+  void storingYourOwnOrderOnlyClearsTheReadyNotice() {
+    stubLookupsForSingleItem();
+
+    refineryOrderService.storeRefineryOrder(
+        OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(item(null, null))), false);
+
+    assertEquals(List.of(), notices());
+    verify(eventPublisher).publishEvent(RefineryNotices.readyCleared(ORDER_ID));
+  }
+
+  private List<NoticeEvent> notices() {
+    ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher, atLeast(0)).publishEvent(published.capture());
+    return published.getAllValues().stream()
+        .map(NoticeEvent.class::cast)
+        .filter(e -> e.eventType() == NotificationEventType.REFINERY_ORDER_CHANGED_BY_OTHER)
+        .toList();
+  }
+
   private void stubLookupsForSingleItem() {
     lenient().when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
     lenient().when(materialRepository.findById(MATERIAL_ID)).thenReturn(Optional.of(material));

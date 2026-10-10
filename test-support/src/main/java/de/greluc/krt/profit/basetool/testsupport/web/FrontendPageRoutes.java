@@ -133,6 +133,7 @@ public final class FrontendPageRoutes {
       List.of(
           "/app/callback",
           "/profile/deletion-request",
+          "/profile/notification-preferences",
           "/inventory/all/stack/entries",
           "/inventory/all/game-item-stack/entries",
           "/inventory/my/stack/entries",

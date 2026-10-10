@@ -229,3 +229,22 @@ in the `offline_access` section; the exchange clients' specs name it, so they ke
 second built-in object decision 8 no longer leaves alone. Pinned by cases 19 and 20; production gets it with a separate
 owner-approved dry run and apply (`INGEST_KEYCLOAK_SETUP.md` → *Withholding `offline_access` from
 the first-party clients*).
+
+
+## Amendment 6 — 2026-10-10: the realm-wide hardening steps 2, 11 and 12 are a script, and the session windows are one file
+
+Owner decision D-26 (2026-10-04) put hardening steps 2, 11 and 12 in scope. They are realm-wide, so
+the provisioner (decision 1: the Basetool's own objects) still does not carry them, but a sibling
+script does: `scripts/harden-keycloak-realm.py`, with the same conventions (dry run by default, exit
+`2` when something is to do, `--apply` re-reads and verifies, nothing deleted). Its additions to the
+realm are the browser-flow copy `browser-admin-otp`, the top-level flow `post-broker-admin-otp`, the
+required action Configure OTP, and the bindings; REQ-SEC-082 states the shape.
+
+- **One file for the two session windows** both scripts touch: `scripts/keycloak/session-windows.json`.
+  The provisioner reads its `active` profile for `ssoSessionIdleTimeout` and `ssoSessionMaxLifespan`
+  (it used to hold the literals), so adopting new numbers is one reviewed change and the provisioner
+  can never put the old ones back. The file travels with the provisioner to the host, next to
+  `keycloak/external-clients.json`.
+- **A found trap, not a decision:** the runbook told the owner to bind the browser-flow copy as the
+  Discord provider's post login flow. A post login flow runs after the provider; the browser copy
+  would ask a brokered user for a username and password. The script builds a small flow for it.

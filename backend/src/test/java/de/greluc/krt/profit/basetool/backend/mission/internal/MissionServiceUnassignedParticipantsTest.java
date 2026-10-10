@@ -44,6 +44,7 @@ class MissionServiceUnassignedParticipantsTest {
   @Mock private SquadronRepository squadronRepository;
 
   @Mock private AuditService auditService;
+  @Mock private MissionNotificationPublisher notificationPublisher;
   @InjectMocks private MissionParticipantService missionParticipantService;
 
   @Test

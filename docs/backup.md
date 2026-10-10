@@ -218,6 +218,10 @@ sudo -u deploy /var/iri/code/scripts/backup.sh --dry-run   # show plan + snapsho
 sudo systemctl start iri-restore-drill.service   # prove a restore works
 ```
 
+After a release that changes the backup helper's image handling (S-09 did), run the drill once by
+hand and read the `drill image:` line: it must carry an `@sha256:` digest. Expected output and the
+rollback: [`OWNER_STEPS_2026-10.md` § 3](OWNER_STEPS_2026-10.md#3-the-restore-drill-s-09).
+
 The units append stdout/stderr to `/var/log/iri-backup.log` and `/var/log/iri-restore-drill.log`
 (not to the journal); Alloy ships them to Loki as `{app="ops-backup"}` and
 `{app="ops-restore-drill"}`. In the backup log, confirm the captures that are best-effort and

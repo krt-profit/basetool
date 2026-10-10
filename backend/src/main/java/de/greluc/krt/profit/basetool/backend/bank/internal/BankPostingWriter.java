@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankNotices;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
@@ -31,6 +32,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,6 +55,7 @@ public class BankPostingWriter {
   private final BankPostingRepository postingRepository;
   private final BankHolderPostingRepository holderPostingRepository;
   private final AuthHelperService authHelperService;
+  private final ApplicationEventPublisher eventPublisher;
 
   /**
    * Locks one account row for the surrounding transaction (the serialization point of every account
@@ -190,5 +193,8 @@ public class BankPostingWriter {
             .createdAt(now)
             .build();
     holderPostingRepository.save(posting);
+    if (!holder.isActive() && holderPostingRepository.holderTotal(holder.getId()).signum() == 0) {
+      eventPublisher.publishEvent(BankNotices.holderNoticeCleared(holder.getId()));
+    }
   }
 }

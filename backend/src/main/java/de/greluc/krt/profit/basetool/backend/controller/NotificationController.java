@@ -19,10 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationBulkResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.NotificationPreferenceDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.NotificationPreferenceWriteRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationUnreadCountDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.backend.service.NotificationMuteService;
 import de.greluc.krt.profit.basetool.backend.service.NotificationService;
 import de.greluc.krt.profit.basetool.backend.service.NotificationStreamService;
 import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
@@ -33,6 +37,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +51,8 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -69,6 +76,7 @@ public class NotificationController {
 
   private final NotificationService service;
   private final NotificationStreamService streamService;
+  private final NotificationMuteService muteService;
 
   /**
    * Opens a Server-Sent-Event stream of the caller's own notifications (REQ-NOTIF-010); the
@@ -230,5 +238,48 @@ public class NotificationController {
   public NotificationBulkResultDto deleteAllRead(@CurrentUserId UUID recipientUserId) {
     int affected = service.deleteAllRead(recipientUserId);
     return new NotificationBulkResultDto(affected, service.unreadCount(recipientUserId));
+  }
+
+  /**
+   * Lists every notification type with whether the caller may mute it and whether they have
+   * (REQ-NOTIF-027).
+   *
+   * @param userId the caller's id, resolved from the JWT subject claim
+   * @return one entry per notification type
+   */
+  @NotNull
+  @GetMapping("/preferences")
+  @Operation(summary = "List the caller's notification preferences, one entry per type.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "The preferences."),
+    @ApiResponse(responseCode = "401", description = "Authentication required.")
+  })
+  public List<NotificationPreferenceDto> preferences(@CurrentUserId UUID userId) {
+    return muteService.preferences(userId);
+  }
+
+  /**
+   * Mutes or unmutes one notification type for the caller. Idempotent (REQ-NOTIF-027).
+   *
+   * @param type the notification type
+   * @param request whether the type is muted
+   * @param userId the caller's id, resolved from the JWT subject claim
+   * @return the type's preference after the change
+   */
+  @NotNull
+  @PutMapping("/preferences/{type}")
+  @Operation(summary = "Mute or unmute one notification type for the caller.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "The preference was stored."),
+    @ApiResponse(responseCode = "400", description = "The type cannot be muted."),
+    @ApiResponse(responseCode = "401", description = "Authentication required.")
+  })
+  public NotificationPreferenceDto setPreference(
+      @PathVariable NotificationType type,
+      @RequestBody @Valid NotificationPreferenceWriteRequest request,
+      @CurrentUserId UUID userId) {
+    muteService.setMuted(userId, type, Boolean.TRUE.equals(request.muted()));
+    return new NotificationPreferenceDto(
+        type, type.isMutable(), type.isMutable() && Boolean.TRUE.equals(request.muted()));
   }
 }

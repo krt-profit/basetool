@@ -254,6 +254,14 @@ public final class DataExportSections {
               FROM notification WHERE recipient_user_id = :userId ORDER BY created_at
               """),
           new Section(
+              "notificationMutes",
+              ART_15_20,
+              "Chosen by the member: the notification types they do not receive.",
+              """
+              SELECT notification_type, created_at
+              FROM notification_mute WHERE user_id = :userId ORDER BY notification_type
+              """),
+          new Section(
               "notificationRuleTargets",
               ART_15,
               "Rules that name the member as a recipient; configured by an administrator.",

@@ -103,12 +103,12 @@ public record BankBookingRequestRejectedEvent(
    * Rejecting the request settles its lifecycle, so the "new booking request" items the bank staff
    * were shown are now stale and get cleared (REQ-NOTIF-018).
    *
-   * @return {@link #OPEN_REQUEST_NOTICES}
+   * @return {@link #DECIDED_REQUEST_NOTICES}
    */
   @NotNull
   @Unmodifiable
   @Override
   public Set<NotificationType> resolvesNotificationTypes() {
-    return OPEN_REQUEST_NOTICES;
+    return DECIDED_REQUEST_NOTICES;
   }
 }

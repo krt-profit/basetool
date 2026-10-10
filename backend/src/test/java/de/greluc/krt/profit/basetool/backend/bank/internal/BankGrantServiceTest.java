@@ -31,8 +31,11 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import java.util.Optional;
@@ -40,9 +43,11 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
@@ -60,6 +65,8 @@ class BankGrantServiceTest {
   @Mock private BankGrantMapper bankGrantMapper;
   @Mock private BankAuditService bankAuditService;
   @Mock private AuthHelperService authHelperService;
+  @Mock private BankActorResolver actors;
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks private BankGrantService bankGrantService;
 
@@ -102,6 +109,71 @@ class BankGrantServiceTest {
             any(),
             eq(userId),
             eq("[deposit transfer]"));
+  }
+
+  @Test
+  void createGrant_tellsTheGranteeWhichRightsTheyGot() {
+    User user = userWithRoleCodes("BANK_EMPLOYEE");
+    UUID actor = UUID.randomUUID();
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(account()));
+    when(grantRepository.existsById(new BankAccountGrantId(userId, accountId))).thenReturn(false);
+    when(grantRepository.save(any(BankAccountGrant.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(actor));
+
+    bankGrantService.createGrant(new CreateBankGrantRequest(userId, accountId, true, false, true));
+
+    ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher).publishEvent(published.capture());
+    NoticeEvent notice = (NoticeEvent) published.getValue();
+    assertEquals(NotificationEventType.BANK_GRANT_CHANGED, notice.eventType());
+    assertEquals(userId, notice.contextRecipientUserId());
+    assertEquals(actor, notice.actorSub());
+    assertEquals(accountId, notice.entityId());
+    assertEquals("CREATED", notice.renderParams().get("grantChangeCode"));
+    assertEquals("YES", notice.renderParams().get("canDepositCode"));
+    assertEquals("NO", notice.renderParams().get("canWithdrawCode"));
+    assertEquals("YES", notice.renderParams().get("canTransferCode"));
+    assertEquals(java.util.Set.of(userId), notice.supersedeRecipients());
+  }
+
+  @Test
+  void updateGrant_tellsTheGranteeTheRightsChanged() {
+    BankAccountGrant grant = grantWithFlags(true, false, false, 2L);
+    when(grantRepository.findById(new BankAccountGrantId(userId, accountId)))
+        .thenReturn(Optional.of(grant));
+    when(grantRepository.save(any(BankAccountGrant.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    bankGrantService.updateGrant(
+        userId, accountId, new UpdateBankGrantRequest(false, true, false, 2L));
+
+    ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher).publishEvent(published.capture());
+    NoticeEvent notice = (NoticeEvent) published.getValue();
+    assertEquals("UPDATED", notice.renderParams().get("grantChangeCode"));
+    assertEquals("NO", notice.renderParams().get("canDepositCode"));
+    assertEquals("YES", notice.renderParams().get("canWithdrawCode"));
+  }
+
+  @Test
+  void deleteGrant_tellsTheFormerGranteeWhoWithdrewTheAccess() {
+    BankAccountGrant grant = grantWithFlags(true, false, false, 2L);
+    UUID actor = UUID.randomUUID();
+    when(grantRepository.findById(new BankAccountGrantId(userId, accountId)))
+        .thenReturn(Optional.of(grant));
+    when(actors.current()).thenReturn(new ActorRef(actor, "Ada"));
+
+    bankGrantService.deleteGrant(userId, accountId);
+
+    ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher).publishEvent(published.capture());
+    NoticeEvent notice = (NoticeEvent) published.getValue();
+    assertEquals(NotificationEventType.BANK_GRANT_REVOKED, notice.eventType());
+    assertEquals(userId, notice.contextRecipientUserId());
+    assertEquals(actor, notice.actorSub());
+    assertEquals("Ada", notice.renderParams().get("actor"));
   }
 
   @Test
@@ -157,6 +229,7 @@ class BankGrantServiceTest {
     BankAccountGrant grant = grantWithFlags(true, true, false, 1L);
     when(grantRepository.findById(new BankAccountGrantId(userId, accountId)))
         .thenReturn(Optional.of(grant));
+    when(actors.current()).thenReturn(ActorRef.system());
 
     bankGrantService.deleteGrant(userId, accountId);
 
