@@ -433,7 +433,7 @@ public class InventoryWriteController {
     try {
       java.net.URI uri = java.net.URI.create(referer);
       query = uri.getRawQuery();
-    } catch (IllegalArgumentException ex) {
+    } catch (IllegalArgumentException _) {
       return basePath;
     }
     if (query == null || query.isBlank()) {

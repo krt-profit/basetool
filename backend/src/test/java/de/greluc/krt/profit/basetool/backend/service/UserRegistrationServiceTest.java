@@ -35,6 +35,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.UserApprovalDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalDecision;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
@@ -134,6 +135,7 @@ class UserRegistrationServiceTest {
     assertEquals("pilot@example.test", mail.getValue().recipientEmail());
     assertEquals("Maverick", mail.getValue().recipientName());
     assertNull(mail.getValue().reason());
+    verify(eventPublisher).publishEvent(new DiscordRegistrationDecidedEvent(USER_ID, ADMIN_ID));
   }
 
   @Test
@@ -157,6 +159,7 @@ class UserRegistrationServiceTest {
     assertFalse(mail.getValue().approved());
     assertEquals("reject@example.test", mail.getValue().recipientEmail());
     assertEquals("not a real member", mail.getValue().reason());
+    verify(eventPublisher).publishEvent(new DiscordRegistrationDecidedEvent(USER_ID, ADMIN_ID));
   }
 
   @Test

@@ -72,7 +72,7 @@ public class BlueprintVariantFamilyCatalog {
       if (familyKey.isEmpty()) {
         continue;
       }
-      index.computeIfAbsent(familyKey, k -> new HashSet<>()).add(productKey);
+      index.computeIfAbsent(familyKey, _ -> new HashSet<>()).add(productKey);
     }
     Map<String, Set<String>> frozen = new HashMap<>(index.size());
     index.forEach((family, keys) -> frozen.put(family, Set.copyOf(keys)));

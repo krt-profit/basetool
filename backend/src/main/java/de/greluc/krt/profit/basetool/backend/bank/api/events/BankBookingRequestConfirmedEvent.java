@@ -98,12 +98,12 @@ public record BankBookingRequestConfirmedEvent(
    * Confirming the request settles its lifecycle, so the "new booking request" items the bank staff
    * were shown are now stale and get cleared (REQ-NOTIF-018).
    *
-   * @return the singleton {@link NotificationType#BANK_BOOKING_REQUEST_CREATED}
+   * @return {@link #OPEN_REQUEST_NOTICES}
    */
   @NotNull
   @Unmodifiable
   @Override
   public Set<NotificationType> resolvesNotificationTypes() {
-    return Set.of(NotificationType.BANK_BOOKING_REQUEST_CREATED);
+    return OPEN_REQUEST_NOTICES;
   }
 }

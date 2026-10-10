@@ -20,13 +20,17 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankAccountResponsibleAssignedEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestNoticesReconciledEvent;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.Department;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ResponsibleHolderTracker;
 import de.greluc.krt.profit.basetool.backend.repository.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -37,6 +41,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,6 +62,9 @@ public class OrgUnitBankResponsibilityService implements ResponsibleHolderTracke
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final BereichRepository bereichRepository;
   private final BankAuditService bankAuditService;
+  private final BankBookingRequestRepository bankBookingRequestRepository;
+  private final AuthHelperService authHelperService;
+  private final ApplicationEventPublisher eventPublisher;
 
   /**
    * Resolves the user ids of an account's responsible holders (REQ-BANK-034), used to notify them
@@ -172,10 +180,13 @@ public class OrgUnitBankResponsibilityService implements ResponsibleHolderTracke
 
   /**
    * Records one {@code ACCOUNT_RESPONSIBLE_CHANGED} bank audit event (REQ-BANK-034) for every
-   * account whose responsible-holder set differs from the {@code before} snapshot.
+   * account whose responsible-holder set differs from the {@code before} snapshot, and hands the
+   * account's open requests over to the new holders.
    *
    * <p>Runs in the mutation's transaction; {@link BankAuditService} captures the actor. {@code
-   * targetUserId} is the sole new holder for a singleton set, else {@code null}.
+   * targetUserId} is the sole new holder for a singleton set, else {@code null}. Every new holder
+   * is told how many requests await their approval, and every open request's notice moves from the
+   * former to the new holders (REQ-NOTIF-023).
    *
    * @param before the pre-mutation snapshot from {@link #snapshotResponsibleHolders(UUID)}
    */
@@ -193,8 +204,64 @@ public class OrgUnitBankResponsibilityService implements ResponsibleHolderTracke
                 newHolders.size() == 1 ? newHolders.iterator().next() : null,
                 AuditDetails.of("old", joinResponsibleIds(oldHolders))
                     .with("new", joinResponsibleIds(newHolders)));
+            announceResponsibleHolderChange(accountId, oldHolders, newHolders);
           }
         });
+  }
+
+  /**
+   * Tells every member who became responsible for the account, and reconciles the notices of the
+   * account's open requests for everyone who became or stopped being responsible (REQ-BANK-034,
+   * REQ-NOTIF-023).
+   *
+   * @param accountId the account whose holders changed
+   * @param oldHolders the holders before the change
+   * @param newHolders the holders after it
+   */
+  private void announceResponsibleHolderChange(
+      @NotNull UUID accountId, @NotNull Set<UUID> oldHolders, @NotNull Set<UUID> newHolders) {
+    BankAccount account = bankAccountRepository.findById(accountId).orElse(null);
+    if (account == null) {
+      return;
+    }
+    Set<UUID> added = new LinkedHashSet<>(newHolders);
+    added.removeAll(oldHolders);
+    Set<UUID> changed = new LinkedHashSet<>(added);
+    oldHolders.stream().filter(holder -> !newHolders.contains(holder)).forEach(changed::add);
+
+    List<BankBookingRequest> open =
+        bankBookingRequestRepository.findByAccountIdAndStatusOrderByCreatedAtAsc(
+            accountId, BankBookingRequestStatus.PENDING);
+    int awaitingHolder =
+        (int)
+            open.stream()
+                .filter(BankBookingRequest::isRequiresOwnerApproval)
+                .filter(request -> !request.isOwnerApprovalGranted())
+                .filter(
+                    request ->
+                        request.getRequiredApprover() == BankRequestApprover.RESPONSIBLE_HOLDER)
+                .count();
+    UUID actor = authHelperService.currentUserId().orElse(null);
+    for (UUID holder : added) {
+      eventPublisher.publishEvent(
+          new BankAccountResponsibleAssignedEvent(
+              accountId, holder, account.getAccountNo(), awaitingHolder, actor));
+    }
+    OrgUnit orgUnit = account.getOrgUnit();
+    String shorthand = orgUnit == null ? null : orgUnit.getShorthand();
+    for (BankBookingRequest request : open) {
+      eventPublisher.publishEvent(
+          new BankBookingRequestNoticesReconciledEvent(
+              request.getId(),
+              accountId,
+              request.getType(),
+              request.getAmount(),
+              account.getAccountNo(),
+              request.getRequesterHandle(),
+              shorthand,
+              request.getRequestedBy(),
+              changed));
+    }
   }
 
   /**

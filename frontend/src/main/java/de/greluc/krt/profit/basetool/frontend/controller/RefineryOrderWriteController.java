@@ -92,11 +92,11 @@ public class RefineryOrderWriteController {
     String input = raw.trim();
     try {
       return java.time.Instant.parse(input);
-    } catch (Exception ignored) {
+    } catch (Exception _) {
     }
     try {
       return java.time.OffsetDateTime.parse(input).toInstant();
-    } catch (Exception ignored) {
+    } catch (Exception _) {
     }
     if (input.length() == 10) {
       return java.time.LocalDate.parse(input).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
