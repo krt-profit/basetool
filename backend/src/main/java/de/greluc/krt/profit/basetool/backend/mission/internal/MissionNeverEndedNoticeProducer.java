@@ -25,14 +25,18 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.core.annotation.Order;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 
 /**
  * Tells a mission's leadership when an active or completed mission is more than {@code
  * app.missions.notices.overdue-after} past its planned end and still has no actual end time
- * (REQ-MISSION-025), once per mission.
+ * (REQ-MISSION-025), once per mission. Only missions planned to end within {@code
+ * app.missions.notices.overdue-window} of that point are announced, so history stays silent.
  */
 @Component
+@Order(2)
 @RequiredArgsConstructor
 public class MissionNeverEndedNoticeProducer implements TimedNoticeProducer {
 
@@ -47,10 +51,12 @@ public class MissionNeverEndedNoticeProducer implements TimedNoticeProducer {
   }
 
   @Override
-  public int produce(@NotNull Instant now) {
+  public int produce(@NotNull Instant now, int limit) {
+    Instant cutoff = now.minus(properties.overdueAfter());
     int raised = 0;
     for (Mission mission :
-        missionRepository.findOverdueWithoutEnd(now.minus(properties.overdueAfter()))) {
+        missionRepository.findOverdueWithoutEnd(
+            cutoff.minus(properties.overdueWindow()), cutoff, Limit.of(limit))) {
       notificationPublisher.markNeverEnded(mission);
       raised++;
     }

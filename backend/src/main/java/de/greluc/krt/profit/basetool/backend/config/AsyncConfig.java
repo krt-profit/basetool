@@ -19,8 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import io.micrometer.core.instrument.MeterRegistry;
+import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.MDC;
@@ -36,7 +40,8 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
  * for asynchronous workloads.
  *
  * <p>Each pool rejects with a {@link java.util.concurrent.RejectedExecutionException} when full
- * instead of growing without bound.
+ * instead of growing without bound; the notification pool instead makes the submitter wait for room
+ * first.
  */
 @Configuration
 @EnableAsync
@@ -64,6 +69,9 @@ public class AsyncConfig {
    * {@code @Async("notificationExecutor")}.
    */
   public static final String NOTIFICATION_EXECUTOR = "notificationExecutor";
+
+  /** How long a thread publishing a notification event waits for room in the executor's queue. */
+  static final Duration NOTIFICATION_SUBMIT_WAIT = Duration.ofSeconds(30);
 
   /**
    * Bean name of the executor for after-commit transactional mail (REQ-NOTIF-014), referenced from
@@ -122,17 +130,28 @@ public class AsyncConfig {
   }
 
   /**
-   * Bounded executor for after-commit notification creation.
+   * Bounded executor for after-commit notification creation (REQ-NOTIF-029).
    *
-   * <p>Two core threads, at most four, a 200-slot queue, abort on overflow; propagates the
-   * publishing request's MDC.
+   * <p>Two core threads, at most four, a 200-slot queue; a full queue makes the publishing thread
+   * wait up to 30 s for room instead of dropping the callback, and only a longer wait is rejected
+   * and counted. Propagates the publishing request's MDC.
    *
+   * @param meterRegistry where the rejection counter is registered
    * @return configured notification async executor
    */
   @NotNull
   @Bean(name = NOTIFICATION_EXECUTOR)
-  public Executor notificationExecutor() {
-    return buildExecutor(2, 4, 200, "notification-async-", 20);
+  public Executor notificationExecutor(@NotNull MeterRegistry meterRegistry) {
+    return buildExecutor(
+        2,
+        4,
+        200,
+        "notification-async-",
+        20,
+        new BackpressureRejectedExecutionHandler(
+            NOTIFICATION_EXECUTOR,
+            NOTIFICATION_SUBMIT_WAIT,
+            meterRegistry.counter(MetricNames.NOTIFICATION_EXECUTOR_REJECTED)));
   }
 
   /**
@@ -184,12 +203,41 @@ public class AsyncConfig {
       int queueCapacity,
       String threadNamePrefix,
       int awaitTerminationSeconds) {
+    return buildExecutor(
+        corePoolSize,
+        maxPoolSize,
+        queueCapacity,
+        threadNamePrefix,
+        awaitTerminationSeconds,
+        new ThreadPoolExecutor.AbortPolicy());
+  }
+
+  /**
+   * Builds a bounded {@link ThreadPoolTaskExecutor} with the given rejection handler, graceful
+   * shutdown and MDC propagation.
+   *
+   * @param corePoolSize the number of always-alive worker threads
+   * @param maxPoolSize the maximum number of worker threads
+   * @param queueCapacity the work-queue depth; {@code 0} hands off directly
+   * @param threadNamePrefix the prefix of the worker thread names
+   * @param awaitTerminationSeconds the shutdown wait for in-flight tasks
+   * @param rejectionHandler what happens to a task the saturated pool refuses
+   * @return an initialised executor ready to accept work
+   */
+  @NotNull
+  private Executor buildExecutor(
+      int corePoolSize,
+      int maxPoolSize,
+      int queueCapacity,
+      String threadNamePrefix,
+      int awaitTerminationSeconds,
+      RejectedExecutionHandler rejectionHandler) {
     ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
     executor.setCorePoolSize(corePoolSize);
     executor.setMaxPoolSize(maxPoolSize);
     executor.setQueueCapacity(queueCapacity);
     executor.setThreadNamePrefix(threadNamePrefix);
-    executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+    executor.setRejectedExecutionHandler(rejectionHandler);
     executor.setWaitForTasksToCompleteOnShutdown(true);
     executor.setAwaitTerminationSeconds(awaitTerminationSeconds);
     executor.setTaskDecorator(new MdcPropagatingTaskDecorator());

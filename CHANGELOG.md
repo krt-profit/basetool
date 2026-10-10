@@ -39,7 +39,16 @@
   Hinweise auslösen, hinter denen keine Nutzeraktion steht (Erinnerungen, abholbereite
   Raffinerieaufträge); er läuft nur auf einer Instanz und meldet sich im Monitoring (Alarm
   `NotificationTimedStale`). Neue Variablen `APP_NOTIFICATIONS_TIMED_ENABLED` und
-  `APP_NOTIFICATIONS_TIMED_INTERVAL` (REQ-NOTIF-026, #2414).
+  `APP_NOTIFICATIONS_TIMED_INTERVAL` (REQ-NOTIF-026, #2414). Der Dienst meldet höchstens 100
+  Hinweise pro Lauf und nur noch Fälle der letzten 14 Tage (Einsatz nie beendet) bzw. 7 Tage
+  (Raffinerieauftrag fertig), sodass Altbestand die Posteingänge nicht flutet; ein Rückstau wird über
+  mehrere Läufe abgearbeitet.
+
+- **Kein stiller Verlust von Benachrichtigungen.** Ein Ereignisschwall über die Warteschlange der
+  Benachrichtigungen hinaus (etwa eine Admin-Massenaktion) wartet jetzt auf Platz statt Hinweise zu
+  verwerfen. Neue Metriken `basetool_notification_created_total` und
+  `basetool_notification_executor_rejected_total` mit den Alarmen `NotificationCreationFlood` und
+  `NotificationExecutorRejected` (REQ-NOTIF-029).
 
 - **Benachrichtigungsregeln erreichen Gruppen.** Der Regel-Editor bietet vier neue Empfängerarten
   (Einsatz-Teilnehmer, Einsatzleitung, Inhaber einer verbundenen Anwendung, Ereignis-Adressaten) und

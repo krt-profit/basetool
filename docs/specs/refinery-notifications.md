@@ -22,6 +22,9 @@ publishes `REFINERY_ORDER_READY`. The default rule notifies the owner (`EVENT_RE
 location and the outputs (`<amount> SCU <material>`, or `<amount>x <material>` for piece goods).
 
 - An order with no start or no duration, a stored order and a cancelled order are never announced.
+- Only a run that ended within `app.refinery.notices.ready-window` (default `P7D`) is announced; an
+  older order is history, is never announced and needs no marker. At most the tick's remaining event
+  budget of orders is handled per run, oldest first (REQ-NOTIF-026).
 - Changing the start or the duration through `updateRefineryOrder` resets `ready_notified_at`, so the
   order is announced again at its new end. That change, a store, a cancellation and a status change to
   `COMPLETED` or `CANCELED` publish `REFINERY_ORDER_READY_CLEARED`, which clears the order's collect-me

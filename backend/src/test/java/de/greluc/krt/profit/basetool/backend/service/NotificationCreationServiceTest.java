@@ -33,12 +33,15 @@ import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestC
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestNoticesReconciledEvent;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderCreatedEvent;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.Notification;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationParamsCodec;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
@@ -51,6 +54,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -63,6 +67,7 @@ class NotificationCreationServiceTest {
   @Mock private NotificationRepository notificationRepository;
   @Mock private NotificationParamsCodec notificationParamsCodec;
   @Mock private NotificationMuteService notificationMuteService;
+  @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();
   @InjectMocks private NotificationCreationService service;
 
   @BeforeEach
@@ -108,6 +113,14 @@ class NotificationCreationServiceTest {
               assertThat(n.isRead()).isFalse();
             });
     assertThat(saved).extracting(Notification::getRecipientUserId).containsExactlyInAnyOrder(A, B);
+    assertThat(
+            meterRegistry
+                .counter(
+                    MetricNames.NOTIFICATION_CREATED,
+                    MetricNames.TAG_NOTIFICATION_TYPE,
+                    NotificationType.JOB_ORDER_CREATED.name())
+                .count())
+        .isEqualTo(2);
   }
 
   @Test

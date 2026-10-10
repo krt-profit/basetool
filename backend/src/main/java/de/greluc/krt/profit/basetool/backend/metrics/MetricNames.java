@@ -130,6 +130,20 @@ public final class MetricNames {
   public static final String NOTIFICATION_TIMED_PRODUCED = "basetool.notification.timed.produced";
 
   /**
+   * Counter {@code basetool_notification_created_total} — tag {@code notification_type}, the inbox
+   * rows written for a fired event (REQ-NOTIF-029).
+   */
+  public static final String NOTIFICATION_CREATED = "basetool.notification.created";
+
+  /**
+   * Counter {@code basetool_notification_executor_rejected_total} (untagged), the after-commit
+   * notification callbacks the executor refused even after waiting for room; each one is a lost
+   * notice (REQ-NOTIF-029). Normally zero.
+   */
+  public static final String NOTIFICATION_EXECUTOR_REJECTED =
+      "basetool.notification.executor.rejected";
+
+  /**
    * Counter {@code basetool_user_callsign_collisions_total} (untagged). Bumped when a login
    * presents a subject that matches no {@code app_user} row while another row holds the same {@code
    * preferred_username} (ADR-0142).
