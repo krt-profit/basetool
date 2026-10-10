@@ -33,7 +33,7 @@ import lombok.experimental.Accessors;
 
 /** A configurable {@link NotificationEvent} for tests of the rule engine and the creation path. */
 @Builder
-@Getter
+@Getter(onMethod_ = @__(@Override))
 @Accessors(fluent = true)
 final class StubNotificationEvent implements NotificationEvent {
 
