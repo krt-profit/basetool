@@ -42,12 +42,31 @@ AUDIENCE_SCOPES = ("extractor-ingest", "extractor-ingest-only")
 
 OFFLINE_ACCESS = "offline_access"
 
+SESSION_WINDOWS_FILE = Path(__file__).resolve().parent / "keycloak" / "session-windows.json"
+
+
+def load_session_windows(profile: str = "active") -> dict[str, int]:
+    """The realm's SSO session windows of one profile in `keycloak/session-windows.json`.
+
+    The same file feeds scripts/harden-keycloak-realm.py, so the two cannot disagree about the
+    realm's session windows.
+    """
+    try:
+        data = json.loads(SESSION_WINDOWS_FILE.read_text(encoding="utf-8"))
+        return {key: int(value) for key, value in data[profile].items()}
+    except (OSError, ValueError, KeyError) as error:
+        raise SystemExit(f"FATAL: cannot read the session windows ({profile}) from "
+                         f"{SESSION_WINDOWS_FILE}: {error}")
+
+
+SESSION_WINDOWS = load_session_windows()
+
 REALM_SETTINGS: dict[str, bool | int | str] = {
     "revokeRefreshToken": False,
     "refreshTokenMaxReuse": 5,
     "accessTokenLifespan": 300,
-    "ssoSessionIdleTimeout": 2592000,
-    "ssoSessionMaxLifespan": 15552000,
+    "ssoSessionIdleTimeout": SESSION_WINDOWS["ssoSessionIdleTimeout"],
+    "ssoSessionMaxLifespan": SESSION_WINDOWS["ssoSessionMaxLifespan"],
     "offlineSessionMaxLifespanEnabled": True,
     "offlineSessionMaxLifespan": 7776000,
     "clientSessionIdleTimeout": 0,
