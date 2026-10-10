@@ -1037,6 +1037,12 @@ confirm/reject/queue surface; the audit log stays admin-only.
 
 ### REQ-BANK-026 — Notifications on booking-request lifecycle
 
+> **Amended 2026-10-10 (#2413):** a requester's correction (REQ-BANK-056) replaces the open notices
+> with `BANK_BOOKING_REQUEST_UPDATED` for the same recipients, so the decision events now clear both
+> `…_CREATED` and `…_UPDATED` (`BankBookingRequestEvent.OPEN_REQUEST_NOTICES`). A change of the
+> account's responsible holders moves each open request's notice from the former to the new holders
+> (REQ-BANK-034, REQ-NOTIF-023).
+>
 > **Amended (responsible-holder notifications, REQ-BANK-034, owner request):** the account's
 > **responsible holder** (Kontoverantwortliche) is now also notified when a request on their account
 > is **created or decided**. A new **`ACCOUNT_RESPONSIBLE`** selector resolves the responsible
@@ -1502,8 +1508,20 @@ the bank surface stays org-unit-blind (REQ-BANK-008, ADR-0011). Naming note: the
 > `ON DELETE CASCADE`. The bank stays org-unit-blind for **authorization**: all bank access stays
 > inside the seam (both ArchUnit pins hold), reached from the membership/user services via an
 > `ObjectProvider` to break the constructor cycle.
+>
+> **Amended 2026-10-10 (#2413, notifications on a holder change):** the same diff now also tells the
+> people concerned. Every member who **became** a responsible holder receives
+> `BANK_ACCOUNT_RESPONSIBLE_ASSIGNED` („Du bist jetzt für Konto {accountNo} verantwortlich …") with the
+> number of open requests waiting for a responsible holder's approval (`PENDING`, approval required,
+> not yet granted, approver class `RESPONSIBLE_HOLDER`); the actor is excluded (seed V269). Every open
+> request on the account then **follows the holders**: a `BankBookingRequestNoticesReconciledEvent`
+> per request reconciles its open notice for exactly the members who became or stopped being holders
+> against the rules of a newly created request (REQ-NOTIF-023) — a new holder gets the notice, a
+> former holder loses it unless the bank management or an account grant still reaches them, and every
+> other recipient is left alone. A holder change with no added holder (only a departure) tells nobody
+> and only reconciles.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` / `OrgUnitBankResponsibilityServiceTest` (holder resolution per type incl. CARTEL_BANK→PROFIT-Bereichsleiter, OL collegial; `snapshotResponsibleHolders` / `…ForUser` / `recordResponsibleHolderChanges` diff + audit), `OrgUnitMembershipServiceTest` (leadership + removal brackets), `UserDeletionServiceTest` / `UserDeletionForeignKeyIntegrityTest` (deletion bracket + flush) · **Code:** `bank/internal/OrgUnitBankResponsibilityService` (`resolveResponsibleHolderUserIds` / `snapshotResponsibleHolders(ForUser)` / `recordResponsibleHolderChanges`), `service/OrgUnitMembershipService` (leadership + `removeMember` + `reconcileStaffelMemberships` brackets), `service/UserDeletionService#deleteUser`, `repository/BereichRepository#findByDepartment`, `bank/internal/BankAccountRepository#findFirstByType` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md), [ADR-0070](../adr/0070-bank-responsible-holder-change-audit.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` / `OrgUnitBankResponsibilityServiceTest` (holder resolution per type incl. CARTEL_BANK→PROFIT-Bereichsleiter, OL collegial; `snapshotResponsibleHolders` / `…ForUser` / `recordResponsibleHolderChanges` diff + audit + assignment and reconcile events), `NotificationCreationServiceTest` (reconcile), `NotificationRuleEngineIntegrationTest` (V269 rule), `OrgUnitMembershipServiceTest` (leadership + removal brackets), `UserDeletionServiceTest` / `UserDeletionForeignKeyIntegrityTest` (deletion bracket + flush) · **Code:** `bank/internal/OrgUnitBankResponsibilityService` (`resolveResponsibleHolderUserIds` / `snapshotResponsibleHolders(ForUser)` / `recordResponsibleHolderChanges`), `service/OrgUnitMembershipService` (leadership + `removeMember` + `reconcileStaffelMemberships` brackets), `service/UserDeletionService#deleteUser`, `repository/BereichRepository#findByDepartment`, `bank/internal/BankAccountRepository#findFirstByType` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md), [ADR-0070](../adr/0070-bank-responsible-holder-change-audit.md) · **Issues:** #556
 
 ### REQ-BANK-035 — Configurable balance visibility
 
@@ -2801,10 +2819,17 @@ per-user isolation `cancelOwn` uses, so the endpoint cannot probe which ids exis
 (`BANK_REQUEST_NOT_PENDING`), not-yet-approved, and the echoed `@Version` (409). REQ-BANK-045 still
 binds, so an edit cannot blank a Begründung that the source account mandates.
 
-**Audit:** `BOOKING_REQUEST_UPDATED` (REQ-BANK-012). **Notifications:** an edit deliberately fires
-none — the request was already announced when it was raised and stays in the same queues; the staff
-queue and the approval tab pick the change up through the existing live-sync broadcast, and the
-approval chip flips there without a reload.
+**Audit:** `BOOKING_REQUEST_UPDATED` (REQ-BANK-012). **Notifications:** an edit clears the open
+notices about the request (`BANK_BOOKING_REQUEST_CREATED`, `…_UPDATED`) and tells the same recipients
+again with `BANK_BOOKING_REQUEST_UPDATED` — bank management, the account's grant holders and its
+responsible holder, the requester excluded (`BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER`, seed V269,
+REQ-NOTIF-018). The staff queue and the approval tab still pick the change up through the live-sync
+broadcast, and the approval chip flips there without a reload.
+
+> **Amended 2026-10-10 (#2413):** this paragraph said an edit "deliberately fires none", reasoning
+> that the request was already announced. The announcement went stale, though: the approvers' open
+> notice kept showing the old amount, and they acted on it. The owner decided in #2413 that a
+> correction replaces the notice.
 
 **UI:** a per-row "Bearbeiten" modal in "Meine Anträge", rendered once per editable row rather than
 as a primed singleton. The Empfänger picker is a **remote** combobox, which seeds itself from a
@@ -2825,9 +2850,12 @@ out, detaching it from its row.
   stale version is a 409.
 - [x] An edit cannot blank a Begründung the source account mandates (REQ-BANK-045).
 - [x] The edit action and its modal are withheld once the approval has been granted; cancel stays.
+- [x] An edit publishes `BankBookingRequestUpdatedEvent` with the new amount, which supersedes the
+  open `…_CREATED` / `…_UPDATED` notices and is seeded to the recipients of a new request.
 
-**Enforced by:** `BankBookingRequestServiceTest` (apply + audit, approval re-arming, already-approved
-409, not-pending 409, foreign 404, version 409, mandatory-Begründung guard),
+**Enforced by:** `BankBookingRequestServiceTest` (apply + audit + update event, approval re-arming,
+already-approved 409, not-pending 409, foreign 404, version 409, mandatory-Begründung guard),
+`NotificationRuleEngineIntegrationTest` (V269 rule),
 `OrgUnitBankAccessServiceTest` (re-derivation over/under the limit, foreign 404 before resolving),
 frontend `OrgUnitBankPageControllerMvcTest` (modal renders after the table, withheld once approved),
 `BankOrgUnitRequestsE2eTest` · **Code:** `bank/internal/BankBookingRequest` (relaxed `updatable`),

@@ -1613,7 +1613,7 @@ public class OrgUnitBankAccessService {
     }
     try {
       return MembershipRole.valueOf(code);
-    } catch (IllegalArgumentException ex) {
+    } catch (IllegalArgumentException _) {
       return null;
     }
   }

@@ -220,7 +220,7 @@ public class ExchangeRegistryMirrorSync {
     try {
       Boolean written =
           requiresNew.execute(
-              status -> {
+              _ -> {
                 lockSettings();
                 ExchangeRegistrySnapshot truth = load();
                 clientGauges.update(truth);

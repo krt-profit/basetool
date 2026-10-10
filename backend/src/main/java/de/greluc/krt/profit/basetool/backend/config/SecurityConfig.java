@@ -323,7 +323,7 @@ public class SecurityConfig {
 
     boolean armed =
         !isTest || env.getProperty(TERMS_GATE_ARMED_IN_TEST, Boolean.class, Boolean.FALSE);
-    TermsConsentCheck effectiveConsentCheck = armed ? termsConsentCheck : userId -> true;
+    TermsConsentCheck effectiveConsentCheck = armed ? termsConsentCheck : _ -> true;
 
     if (isTest && !env.getProperty(CSRF_ARMED_IN_TEST, Boolean.class, Boolean.FALSE)) {
       http.csrf(

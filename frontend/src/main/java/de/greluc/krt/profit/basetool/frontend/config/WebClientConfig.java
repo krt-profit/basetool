@@ -121,7 +121,7 @@ public class WebClientConfig {
    * invalid_scope}. Scopes are fixed on the client registration.
    */
   static final Function<OAuth2AuthorizeRequest, Map<String, Object>> NO_REQUEST_DERIVED_ATTRIBUTES =
-      authorizeRequest -> Map.of();
+      _ -> Map.of();
 
   private final AppBackendProperties backendProperties;
   private final AppHttpProperties httpProperties;
@@ -200,7 +200,7 @@ public class WebClientConfig {
           tmf.init(truststore);
           builder = builder.trustManager(tmf);
           pinnedTrust = true;
-        } catch (NoSuchSslBundleException ignored) {
+        } catch (NoSuchSslBundleException _) {
         }
       }
       if (http2) {

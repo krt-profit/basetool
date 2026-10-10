@@ -412,7 +412,7 @@ public class MemberManagementController {
       if (user != null && user.version() != null) {
         return user.version();
       }
-    } catch (Exception ignored) {
+    } catch (Exception _) {
     }
     return (priorVersion == null ? 0L : priorVersion) + 1;
   }
@@ -427,7 +427,7 @@ public class MemberManagementController {
   private String resolveFieldMessage(FieldError fieldError, Locale locale) {
     try {
       return messageSource.getMessage(fieldError, locale);
-    } catch (org.springframework.context.NoSuchMessageException e) {
+    } catch (org.springframework.context.NoSuchMessageException _) {
       return fieldError.getDefaultMessage();
     }
   }

@@ -220,7 +220,7 @@ public class BackendHealthIndicator implements HealthIndicator {
               : pinnedTrustSkippingHostname(tmf.getTrustManagers()),
           null);
       return context;
-    } catch (NoSuchSslBundleException ignored) {
+    } catch (NoSuchSslBundleException _) {
       log.warn(
           "No 'backend-trust' SSL bundle configured; the backend health probe falls back to a"
               + " trust-all TLS policy (matching WebClientConfig). Configure the 'backend-trust'"

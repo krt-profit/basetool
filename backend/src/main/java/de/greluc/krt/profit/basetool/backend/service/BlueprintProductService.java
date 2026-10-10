@@ -300,7 +300,7 @@ public class BlueprintProductService {
       if (productKey.isEmpty()) {
         continue;
       }
-      index.computeIfAbsent(tagKey, k -> new LinkedHashSet<>()).add(productKey);
+      index.computeIfAbsent(tagKey, _ -> new LinkedHashSet<>()).add(productKey);
     }
     return index;
   }

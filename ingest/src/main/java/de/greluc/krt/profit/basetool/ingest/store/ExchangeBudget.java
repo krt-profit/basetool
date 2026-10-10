@@ -353,7 +353,7 @@ public class ExchangeBudget {
       @NotNull String clientId, @NotNull String member, @NotNull String key, long bytes) {
     try {
       run(clientId, member, entry(key, bytes), "", SET_TTL, false);
-    } catch (ExchangeUnavailableException e) {
+    } catch (ExchangeUnavailableException _) {
       log.warn("An exchange budget entry could not be released");
     }
   }

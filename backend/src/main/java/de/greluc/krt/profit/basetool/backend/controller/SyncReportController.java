@@ -132,7 +132,7 @@ public class SyncReportController {
     }
     try {
       return SyncSourceSystem.valueOf(source.trim().toUpperCase(Locale.ROOT));
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalArgumentException _) {
       return null;
     }
   }

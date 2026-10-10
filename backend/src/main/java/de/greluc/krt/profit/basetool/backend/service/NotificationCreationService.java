@@ -54,7 +54,8 @@ public class NotificationCreationService {
 
   /**
    * Deletes the notifications the event supersedes (REQ-NOTIF-018), then writes one notification
-   * per recipient per produced type.
+   * per recipient per produced type; an event naming {@link
+   * NotificationEvent#reconcileRecipients()} is reconciled instead (REQ-NOTIF-023).
    *
    * <p>Pushes no SSE signal itself; the caller pushes after this transaction commits.
    *
@@ -65,6 +66,9 @@ public class NotificationCreationService {
   @Transactional
   @NotNull
   public Map<NotificationSignal, Set<UUID>> createFromEvent(@NotNull NotificationEvent event) {
+    if (!event.reconcileRecipients().isEmpty()) {
+      return reconcile(event);
+    }
     Map<NotificationSignal, Set<UUID>> bySignal = new LinkedHashMap<>();
     Set<UUID> cleared = removeSupersededNotifications(event);
     if (!cleared.isEmpty()) {
@@ -104,7 +108,91 @@ public class NotificationCreationService {
       NotificationSignal signal =
           new NotificationSignal(
               entry.getKey(), event.entityType(), event.entityId(), event.renderParams());
-      bySignal.computeIfAbsent(signal, key -> new HashSet<>()).addAll(entry.getValue());
+      bySignal.computeIfAbsent(signal, _ -> new HashSet<>()).addAll(entry.getValue());
+    }
+    return bySignal;
+  }
+
+  /**
+   * Re-decides, for the event's {@link NotificationEvent#reconcileRecipients() candidates} only,
+   * who holds a notice about the event's entity (REQ-NOTIF-023): a candidate the rules resolve now
+   * and who holds none of {@link NotificationEvent#resolvesNotificationTypes()} gets one, a
+   * candidate the rules no longer resolve loses theirs, and everyone else is left alone.
+   *
+   * @param event the reconciling event
+   * @return the candidates whose inbox changed, grouped by signal
+   */
+  @NotNull
+  private Map<NotificationSignal, Set<UUID>> reconcile(@NotNull NotificationEvent event) {
+    Map<NotificationSignal, Set<UUID>> bySignal = new LinkedHashMap<>();
+    Set<UUID> candidates = event.reconcileRecipients();
+    Set<NotificationType> noticeTypes = event.resolvesNotificationTypes();
+    if (noticeTypes.isEmpty() || event.entityType() == null || event.entityId() == null) {
+      log.warn("Event {} reconciles without notice types or entity; ignored", event.eventType());
+      return bySignal;
+    }
+    Set<UUID> holders =
+        new HashSet<>(
+            notificationRepository.findRecipientUserIdsByTypeInAndEntity(
+                noticeTypes, event.entityType(), event.entityId()));
+    holders.retainAll(candidates);
+
+    Map<NotificationType, Set<UUID>> resolved = ruleEvaluationService.resolveRecipients(event);
+    Set<UUID> entitled = new HashSet<>();
+    resolved.values().forEach(entitled::addAll);
+    entitled.retainAll(candidates);
+
+    Set<UUID> stale = new HashSet<>(holders);
+    stale.removeAll(entitled);
+    if (!stale.isEmpty()) {
+      int deleted =
+          notificationRepository.deleteByTypeInAndEntityForRecipients(
+              noticeTypes, event.entityType(), event.entityId(), stale);
+      log.info(
+          "Reconcile of {} {} removed {} notification(s) of {} member(s) on event {}",
+          event.entityType(),
+          event.entityId(),
+          deleted,
+          stale.size(),
+          event.eventType());
+      bySignal.put(NotificationSignal.refreshOnly(), stale);
+    }
+
+    String paramsJson = notificationParamsCodec.serialize(event.renderParams());
+    List<Notification> toCreate = new ArrayList<>();
+    for (Map.Entry<NotificationType, Set<UUID>> entry : resolved.entrySet()) {
+      Set<UUID> missing = new HashSet<>(entry.getValue());
+      missing.retainAll(candidates);
+      missing.removeAll(holders);
+      if (missing.isEmpty()) {
+        continue;
+      }
+      for (UUID recipientUserId : missing) {
+        toCreate.add(
+            Notification.builder()
+                .recipientUserId(recipientUserId)
+                .type(entry.getKey())
+                .params(paramsJson)
+                .entityType(event.entityType())
+                .entityId(event.entityId())
+                .read(false)
+                .build());
+      }
+      bySignal
+          .computeIfAbsent(
+              new NotificationSignal(
+                  entry.getKey(), event.entityType(), event.entityId(), event.renderParams()),
+              key -> new HashSet<>())
+          .addAll(missing);
+    }
+    if (!toCreate.isEmpty()) {
+      notificationRepository.saveAll(toCreate);
+      log.info(
+          "Reconcile of {} {} created {} notification(s) on event {}",
+          event.entityType(),
+          event.entityId(),
+          toCreate.size(),
+          event.eventType());
     }
     return bySignal;
   }

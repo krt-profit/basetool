@@ -103,7 +103,7 @@ public class NotificationStreamService {
     List<SseEmitter> evicted = new ArrayList<>();
     emittersBySub.compute(
         recipientUserId,
-        (key, queue) -> {
+        (_, queue) -> {
           Queue<SseEmitter> q = (queue != null) ? queue : new ConcurrentLinkedQueue<>();
           while (q.size() >= MAX_EMITTERS_PER_SUB) {
             SseEmitter oldest = q.poll();
@@ -129,7 +129,7 @@ public class NotificationStreamService {
           remove(recipientUserId, emitter);
           emitter.complete();
         });
-    emitter.onError(error -> remove(recipientUserId, emitter));
+    emitter.onError(_ -> remove(recipientUserId, emitter));
     try {
       emitter.send(SseEmitter.event().name("connected").data("ok"));
     } catch (IOException | RuntimeException e) {
@@ -268,7 +268,7 @@ public class NotificationStreamService {
   private void remove(@NotNull UUID recipientUserId, @NotNull SseEmitter emitter) {
     emittersBySub.compute(
         recipientUserId,
-        (key, queue) -> {
+        (_, queue) -> {
           if (queue == null) {
             return null;
           }

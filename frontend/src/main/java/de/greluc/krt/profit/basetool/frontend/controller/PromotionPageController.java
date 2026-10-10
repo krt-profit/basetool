@@ -118,7 +118,7 @@ public class PromotionPageController {
         .forEach(
             req -> {
               String key = req.fromRank() + "_" + req.toRank();
-              groupedRankRequirements.computeIfAbsent(key, k -> new ArrayList<>()).add(req);
+              groupedRankRequirements.computeIfAbsent(key, _ -> new ArrayList<>()).add(req);
             });
 
     model.addAttribute("topics", topics);
@@ -418,7 +418,7 @@ public class PromotionPageController {
         .forEach(
             req -> {
               String key = req.fromRank() + "_" + req.toRank();
-              groupedRequirements.computeIfAbsent(key, k -> new ArrayList<>()).add(req);
+              groupedRequirements.computeIfAbsent(key, _ -> new ArrayList<>()).add(req);
             });
 
     List<PromotionTopicDto> topics = fetchTopics();
@@ -431,7 +431,7 @@ public class PromotionPageController {
     Map<String, String> highestLevelByCell = new LinkedHashMap<>();
     for (RankRequirementDto req : requirements) {
       String cell = matrixCellKey(req);
-      requirementsByCell.computeIfAbsent(cell, k -> new ArrayList<>()).add(req);
+      requirementsByCell.computeIfAbsent(cell, _ -> new ArrayList<>()).add(req);
       String existing = highestLevelByCell.get(cell);
       if (req.minimumLevel() != null
           && (existing == null || compareLevels(req.minimumLevel(), existing) > 0)) {

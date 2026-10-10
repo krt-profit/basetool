@@ -412,7 +412,7 @@ public class UexClient {
     }
     try {
       return request.exchangeForRequiredValue(
-          (clientRequest, response) -> {
+          (_, response) -> {
             if (response.getStatusCode().value() == 304) {
               log.info(
                   "Fetched 0 {} from UEX API: unchanged since the last sync (304 Not Modified) —"
