@@ -300,7 +300,8 @@ handover), rejecting it or deleting it publishes `JOB_ORDER_CLOSED`, which super
 
 **Enforced by:** `RuleEvaluationServiceTest`, `NotificationRuleEngineIntegrationTest`,
 `JobOrderServiceTest`, `JobOrderServicePriorityAndStatusTest` · **Code:**
-`service/JobOrderService#publishJobOrderCreated`, `service/JobOrderService#publishJobOrderClosed`,
+`joborder/internal/JobOrderService#publishJobOrderCreated`,
+`joborder/internal/JobOrderService#publishJobOrderClosed`,
 `joborder/api/events/JobOrderCreatedEvent`, `joborder/api/events/JobOrderClosedEvent`,
 `service/RecipientResolutionService`
 
@@ -688,7 +689,7 @@ never the editing member's personal name (no PII in params).
   bundles, named placeholders `{displayId}`/`{orgUnit}`/`{requester}`).
 
 **Enforced by:** `JobOrderServiceTest`, `MessageBundleConsistencyTest` · **Code:**
-`joborder/api/events/JobOrderUpdatedByRequesterEvent`, `service/JobOrderService#publishJobOrderUpdatedByRequester`,
+`joborder/api/events/JobOrderUpdatedByRequesterEvent`, `joborder/internal/JobOrderService#publishJobOrderUpdatedByRequester`,
 `model/NotificationEventType`, `model/NotificationType`,
 `db/migration/V214__seed_job_order_requester_update_notification_rule.sql` · **Issues:** #1186
 

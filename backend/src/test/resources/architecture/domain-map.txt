@@ -86,8 +86,6 @@ class RefineryYield catalogue UEX refinery-yield matrix row, written by UexRefin
 class RefineryYieldRepository catalogue repository of the UEX yield matrix
 class RefineryImportProperties refinery refinery screenshot import tuning
 class ShipTypeMatcher hangar ShipType resolver for the hangar import
-class MaterialCollectionController joborder material collection overview of a job order
-class JobOrderItemStockController joborder order-detail item stock panel
 class MeController identity the caller's own profile surface (/me)
 class UserZone platform web argument binding
 class UserZoneArgumentResolver platform web argument binding
@@ -133,6 +131,11 @@ class NotFoundException kernel generic domain exception
 class ExternalServiceException kernel generic upstream failure
 class ReportGenerationException kernel generic report failure
 class GlobalExceptionHandler platform RFC 7807 handler
+class ProblemSupport platform RFC 7807 handler family of GlobalExceptionHandler
+class ConcurrencyProblemHandlers platform RFC 7807 handler family of GlobalExceptionHandler
+class SecurityProblemHandlers platform RFC 7807 handler family of GlobalExceptionHandler
+class RequestProblemHandlers platform RFC 7807 handler family of GlobalExceptionHandler
+class ApplicationProblemHandlers platform RFC 7807 handler family of GlobalExceptionHandler
 class ErrorDisclosurePolicy kernel the disclosure policy every AppException carries (ADR-0235)
 class LiveSyncChangedRequest livesync app live-sync relay payload
 class Department orgunit Bereich brand colour
