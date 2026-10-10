@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Benachrichtigungen zu Materialbörse und Lager.** Wer an einem Angebot Interesse angemeldet oder zugesagt hat, ein Gesuch zu beliefern, erfährt, wenn das Angebot nicht mehr verfügbar oder das Gesuch zurückgezogen ist; wessen Bestand jemand anderes ausbucht oder verkauft, wird benachrichtigt (REQ-MARKET-021, -022, REQ-INV-056, Migration V277, #2414).
+
 - **Benachrichtigungen zur Raffinerie.** Der Besitzer erfährt, wenn ein Raffinerieauftrag fertig ist und abgeholt werden kann, und wenn jemand anderes den Auftrag ändert, storniert oder einlagert, auch auf wessen Lager die Ausbeute gebucht wurde (REQ-REFINERY-023, -024, Migrationen V275/V276, #2414).
 - **Keycloak-Härtung als Skript.** `scripts/harden-keycloak-realm.py` setzt die Runbook-Schritte 2 (Passwort
   vergessen), 11 (OTP für Admins, auch über Discord) und 12 (Sitzungsfenster) trocken vorab prüfbar und mit

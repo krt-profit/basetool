@@ -239,6 +239,22 @@ class NotificationPageControllerTest {
   }
 
   @Test
+  void targetOf_marketAndStockNoticesLinkTheirPage() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/materialboerse",
+        NotificationPageController.targetOf(
+            "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_EXCHANGE_OFFER", id));
+    assertEquals(
+        "/materialboerse",
+        NotificationPageController.targetOf(
+            "MATERIAL_REQUEST_UNAVAILABLE", "MATERIAL_EXCHANGE_REQUEST", id));
+    assertEquals(
+        "/inventory/my",
+        NotificationPageController.targetOf("INVENTORY_BOOKED_OUT_BY_OTHER", "INVENTORY_ITEM", id));
+  }
+
+  @Test
   void targetOf_jobOrderLinksTheOrder() {
     UUID orderId = UUID.fromString("00000000-0000-0000-0000-000000000099");
 

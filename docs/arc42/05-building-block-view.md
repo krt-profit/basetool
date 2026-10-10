@@ -97,11 +97,11 @@ that published the event (REQ-AUDIT-007). Eleven modules publish today:
 | `privacy.api.events` | the three `AccountDeletionRequest…Event`s (transitional module, plan §7.6) |
 | `bank.api.events` | `BankBookingRequestEvent` and its created, updated, confirmed, rejected, cancelled and notices-reconciled records; `BankAccountResponsibleAssignedEvent` |
 | `joborder.api.events` | `JobOrderCreatedEvent`, `JobOrderUpdatedByRequesterEvent`, `JobOrderClosedEvent`, and `JobOrderNotices`, the factory of the reassigned, finished, assignee and withdrawn-claim notices (REQ-ORDERS-041…044) |
-| `materialexchange.api.events` | `MaterialExchangeInterestRegisteredEvent`, `MaterialRequestFulfillmentSignalledEvent` |
+| `materialexchange.api.events` | `MaterialExchangeInterestRegisteredEvent`, `MaterialRequestFulfillmentSignalledEvent`, and `MarketNotices`, the factory of the offer-gone and request-withdrawn notices (REQ-MARKET-021, -022) |
 | `exchange.api.events` | `ExchangeInstallationConnectedEvent`, `ExchangeBulkUndoAppliedEvent` |
 | `mission.api.events` | `MissionNotices`, the factory of the mission notices: rescheduled, cancelled, deleted, reminder, started, checked in, participant added / removed / left, never ended, end recorded, responsibility assigned (REQ-MISSION-021…027) |
 | `operation.api.events` | `OperationNotices`, the factory of the payout paid out / unmarked and operation completed notices (REQ-MISSION-028, -029) |
-| `inventory.api.events` | `InventoryTransferredToUserEvent`, `InventoryTransferredFromUserEvent` and the `TransferredLot` they list (REQ-INV-055) |
+| `inventory.api.events` | `InventoryTransferredToUserEvent`, `InventoryTransferredFromUserEvent` and the `TransferredLot` they list (REQ-INV-055), and `InventoryNotices`, the factory of the booked-out-by-somebody-else notice (REQ-INV-056) |
 | `refinery.api.events` | `RefineryNotices`, the factory of the order-ready, order-ready-cleared and changed-by-somebody-else notices (REQ-REFINERY-023, -024) |
 
 An event either notifies, supersedes the notices of its entity (REQ-NOTIF-018), or reconciles one notice for named members (REQ-NOTIF-023, ADR-0244). The publishing services and the listeners still sit in `service`. `OrgUnitRef` stays with the
