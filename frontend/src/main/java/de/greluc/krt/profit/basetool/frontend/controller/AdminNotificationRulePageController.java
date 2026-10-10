@@ -85,7 +85,23 @@ public class AdminNotificationRulePageController {
           "DISCORD_REGISTRATION_DECIDED",
           "JOB_ORDER_CLOSED",
           "BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER",
-          "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED");
+          "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED",
+          "MISSION_RESCHEDULED",
+          "MISSION_CANCELLED",
+          "MISSION_DELETED",
+          "MISSION_REMINDER_DUE",
+          "MISSION_STARTED",
+          "MISSION_CHECKED_IN",
+          "MISSION_PARTICIPANT_ADDED",
+          "MISSION_PARTICIPANT_REMOVED",
+          "MISSION_PARTICIPANT_LEFT",
+          "MISSION_NEVER_ENDED",
+          "MISSION_END_RECORDED",
+          "MISSION_RESPONSIBILITY_ASSIGNED",
+          "OPERATION_PAYOUT_MARKED",
+          "OPERATION_PAYOUT_UNMARKED",
+          "OPERATION_COMPLETED",
+          "OPERATION_COMPLETED_UNOWNED");
 
   /**
    * {@code NotificationType} codes, labelled via {@code admin.notificationRules.notificationType}.
@@ -109,7 +125,19 @@ public class AdminNotificationRulePageController {
           "INVENTORY_TRANSFERRED_TO_USER",
           "INVENTORY_TRANSFERRED_FROM_USER",
           "BANK_BOOKING_REQUEST_UPDATED",
-          "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED");
+          "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED",
+          "MISSION_RESCHEDULED",
+          "MISSION_CANCELLED",
+          "MISSION_DELETED",
+          "MISSION_REMINDER",
+          "MISSION_CHECKIN_OPEN",
+          "MISSION_PARTICIPANT_ADDED_BY_OTHER",
+          "MISSION_PARTICIPANT_REMOVED_BY_OTHER",
+          "MISSION_PARTICIPANT_LEFT",
+          "MISSION_NEVER_ENDED",
+          "MISSION_RESPONSIBILITY_ASSIGNED",
+          "OPERATION_PAYOUT_PAID_OUT",
+          "OPERATION_COMPLETED");
 
   /**
    * {@code SelectorKind} codes, labelled via {@code admin.notificationRules.selector.kind}. All but

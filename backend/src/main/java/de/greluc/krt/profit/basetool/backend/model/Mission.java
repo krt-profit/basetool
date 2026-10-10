@@ -126,6 +126,30 @@ public class Mission extends AbstractEntity<UUID> {
   @OptimisticLock(excluded = true)
   private Boolean isInternal = false;
 
+  /** When the 24-hour reminder was raised, or {@code null} (REQ-MISSION-051). */
+  @Column(name = "reminder_24h_sent_at")
+  @OptimisticLock(excluded = true)
+  private Instant reminder24hSentAt;
+
+  /** When the one-hour reminder was raised, or {@code null} (REQ-MISSION-051). */
+  @Column(name = "reminder_1h_sent_at")
+  @OptimisticLock(excluded = true)
+  private Instant reminder1hSentAt;
+
+  /** When the never-ended notice was raised, or {@code null} (REQ-MISSION-054). */
+  @Column(name = "never_ended_notified_at")
+  @OptimisticLock(excluded = true)
+  private Instant neverEndedNotifiedAt;
+
+  /**
+   * The time a mission starts by: the meeting time, or the planned start when there is none.
+   *
+   * @return the reference time, or {@code null} when neither is set
+   */
+  public Instant referenceTime() {
+    return meetingTime != null ? meetingTime : plannedStartTime;
+  }
+
   /**
    * Section counter for the {@code core} patch endpoint (name, description, calendar link, status,
    * operation), independent of {@link AbstractEntity#getVersion()}.

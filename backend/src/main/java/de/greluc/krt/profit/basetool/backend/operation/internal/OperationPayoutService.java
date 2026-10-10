@@ -28,9 +28,12 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.Operation;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
+import de.greluc.krt.profit.basetool.backend.operation.api.events.OperationNotices;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
@@ -52,6 +55,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
@@ -103,6 +107,9 @@ public class OperationPayoutService {
   private final AuthHelperService authHelperService;
   private final SystemSettings systemSettings;
   private final AuditRecorder auditRecorder;
+
+  /** Publishes the payout notifications after the commit (REQ-OPERATION-020). */
+  private final ApplicationEventPublisher eventPublisher;
 
   /**
    * Proxy-backed self-reference through which {@link #setPayoutStatus} runs each attempt of {@link
@@ -326,6 +333,7 @@ public class OperationPayoutService {
                   return s;
                 });
 
+    final boolean wasPaidOut = status.isPaidOut();
     status.setPaidOut(paidOut);
     if (paidOut) {
       status.setPaidOutAt(Instant.now());
@@ -341,10 +349,110 @@ public class OperationPayoutService {
         null,
         AuditDetails.of("paidOut", paidOut));
 
+    publishPayoutNotice(operation, participantKey, wasPaidOut, paidOut);
+
     String paidOutByName =
         status.getPaidOutByUser() != null ? status.getPaidOutByUser().getEffectiveName() : null;
     return new OperationPayoutStatusDto(
         participantKey, status.isPaidOut(), status.getPaidOutAt(), paidOutByName);
+  }
+
+  /**
+   * Tells a participant that their payout was paid out, or takes that notice back, when the mark
+   * really changed (REQ-OPERATION-020). A participant without an account has nobody to tell.
+   *
+   * @param operation the managed operation
+   * @param participantKey the participant key of the payout
+   * @param wasPaidOut the flag before the change
+   * @param paidOut the flag after the change
+   */
+  private void publishPayoutNotice(
+      @NotNull Operation operation,
+      @NotNull String participantKey,
+      boolean wasPaidOut,
+      boolean paidOut) {
+    if (wasPaidOut == paidOut) {
+      return;
+    }
+    UUID recipientId = memberOf(participantKey);
+    if (recipientId == null) {
+      return;
+    }
+    if (!paidOut) {
+      eventPublisher.publishEvent(OperationNotices.payoutUnmarked(operation.getId(), recipientId));
+      return;
+    }
+    List<OperationPayoutDto> payouts = getOperationPayouts(operation.getId());
+    OperationPayoutDto mine =
+        payouts.stream()
+            .filter(p -> participantKey.equals(p.participantId()))
+            .findFirst()
+            .orElse(null);
+    if (mine == null) {
+      return;
+    }
+    boolean lastOpenPayout = payouts.stream().allMatch(OperationPayoutDto::paidOut);
+    eventPublisher.publishEvent(
+        OperationNotices.payoutMarked(
+            operation.getId(),
+            operation.getName(),
+            recipientId,
+            mine.payoutAmount(),
+            mine.donatedAmount(),
+            mine.transferFee(),
+            userService.currentActor(),
+            lastOpenPayout));
+  }
+
+  /**
+   * Announces a completed operation to the people who have to pay it out (REQ-OPERATION-021).
+   *
+   * @param operation the managed operation, already completed
+   */
+  public void announceCompletion(@NotNull Operation operation) {
+    List<OperationPayoutDto> payouts = getOperationPayouts(operation.getId());
+    BigDecimal total = BigDecimal.ZERO;
+    BigDecimal open = BigDecimal.ZERO;
+    int paid = 0;
+    for (OperationPayoutDto payout : payouts) {
+      total = total.add(payout.payoutAmount());
+      if (payout.paidOut()) {
+        paid++;
+      } else {
+        open = open.add(payout.payoutAmount());
+      }
+    }
+    int unfinished =
+        (int)
+            operation.getMissions().stream()
+                .filter(m -> m.getActualStartTime() == null || m.getActualEndTime() == null)
+                .count();
+    OrgUnit owner = operation.getOwningOrgUnit();
+    eventPublisher.publishEvent(
+        OperationNotices.completed(
+            operation.getId(),
+            operation.getName(),
+            owner == null ? null : new OrgUnitRef(owner.getId(), owner.getKind()),
+            userService.currentActor(),
+            total,
+            open,
+            paid,
+            payouts.size(),
+            unfinished));
+  }
+
+  /**
+   * The member a payout key stands for.
+   *
+   * @param participantKey a participant key
+   * @return the member's id, or {@code null} for a guest or a deleted account
+   */
+  private static UUID memberOf(@NotNull String participantKey) {
+    try {
+      return UUID.fromString(participantKey);
+    } catch (IllegalArgumentException _) {
+      return null;
+    }
   }
 
   /**

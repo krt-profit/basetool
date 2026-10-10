@@ -365,4 +365,53 @@ public interface MissionRepository
    */
   @Query("SELECT u.id FROM Mission m JOIN m.managers u WHERE m.id = :id")
   Set<UUID> findManagerUserIdsById(@Param("id") UUID id);
+
+  /**
+   * Returns the planned missions that reach the 24-hour mark in the given window and have not been
+   * reminded of it yet (REQ-MISSION-051).
+   *
+   * @param from the earliest start time, inclusive
+   * @param to the latest start time, inclusive
+   * @return the missions; never {@code null}
+   */
+  @Query(
+      """
+      SELECT m FROM Mission m
+      WHERE m.status = 'PLANNED' AND m.reminder24hSentAt IS NULL
+        AND COALESCE(m.meetingTime, m.plannedStartTime) BETWEEN :from AND :to
+      """)
+  List<Mission> findDueForReminder24h(@Param("from") Instant from, @Param("to") Instant to);
+
+  /**
+   * Returns the planned missions that start within the given window and have not been reminded of
+   * it yet (REQ-MISSION-051).
+   *
+   * @param from the earliest start time, exclusive
+   * @param to the latest start time, inclusive
+   * @return the missions; never {@code null}
+   */
+  @Query(
+      """
+      SELECT m FROM Mission m
+      WHERE m.status = 'PLANNED' AND m.reminder1hSentAt IS NULL
+        AND COALESCE(m.meetingTime, m.plannedStartTime) > :from
+        AND COALESCE(m.meetingTime, m.plannedStartTime) <= :to
+      """)
+  List<Mission> findDueForReminder1h(@Param("from") Instant from, @Param("to") Instant to);
+
+  /**
+   * Returns the active or completed missions whose planned end is before the cutoff and that have
+   * no actual end time and no never-ended notice yet (REQ-MISSION-054).
+   *
+   * @param cutoff the latest planned end that counts as overdue
+   * @return the missions; never {@code null}
+   */
+  @Query(
+      """
+      SELECT m FROM Mission m
+      WHERE m.status IN ('ACTIVE', 'COMPLETED') AND m.actualEndTime IS NULL
+        AND m.neverEndedNotifiedAt IS NULL AND m.plannedEndTime IS NOT NULL
+        AND m.plannedEndTime < :cutoff
+      """)
+  List<Mission> findOverdueWithoutEnd(@Param("cutoff") Instant cutoff);
 }

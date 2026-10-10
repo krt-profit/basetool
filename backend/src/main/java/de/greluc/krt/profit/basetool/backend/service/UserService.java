@@ -29,18 +29,21 @@ import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -460,6 +463,24 @@ public class UserService {
       return Optional.empty();
     }
     return userRepository.findById(requireUuidSubject(subject.get()));
+  }
+
+  /**
+   * The member who is acting, as a notification event names them.
+   *
+   * @return the caller's id and effective name, or the system actor when nobody is signed in or the
+   *     caller has no row
+   */
+  public @NotNull ActorRef currentActor() {
+    return getCurrentUser()
+        .map(
+            user ->
+                new ActorRef(
+                    user.getId(),
+                    Objects.requireNonNullElse(
+                        StringNormalization.trimToNull(user.getEffectiveName()),
+                        ActorRef.UNKNOWN_NAME)))
+        .orElseGet(ActorRef::system);
   }
 
   /**

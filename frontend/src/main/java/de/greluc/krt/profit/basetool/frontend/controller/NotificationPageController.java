@@ -100,6 +100,13 @@ public class NotificationPageController {
   private static final Set<String> JOB_ORDER_TYPES =
       Set.of("JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER");
 
+  /** The detail page of the record a notification is about, by the notification's entity type. */
+  private static final Map<String, String> ENTITY_PAGES =
+      Map.of("MISSION", "/missions/", "OPERATION", "/operations/");
+
+  /** The types whose record is gone, so the row has nothing to link to. */
+  private static final Set<String> UNLINKED_TYPES = Set.of("MISSION_DELETED");
+
   /** The page each notification type links to when its subject is a page rather than a record. */
   private static final Map<String, String> PAGE_TARGETS =
       Map.of(
@@ -448,7 +455,12 @@ public class NotificationPageController {
     if (JOB_ORDER_TYPES.contains(type)) {
       return "JOB_ORDER".equals(entityType) && entityId != null ? "/orders/" + entityId : null;
     }
-    return PAGE_TARGETS.get(type);
+    String fixed = PAGE_TARGETS.get(type);
+    if (fixed != null || UNLINKED_TYPES.contains(type)) {
+      return fixed;
+    }
+    String prefix = entityType == null ? null : ENTITY_PAGES.get(entityType);
+    return prefix != null && entityId != null ? prefix + entityId : null;
   }
 
   /**

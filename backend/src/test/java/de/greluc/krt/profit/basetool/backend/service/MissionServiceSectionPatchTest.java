@@ -112,7 +112,8 @@ class MissionServiceSectionPatchTest {
             auditService,
             null,
             missionParticipantService,
-            missionStructureService);
+            missionStructureService,
+            mock(MissionNotificationPublisher.class));
     missionId = UUID.randomUUID();
     existing = new Mission();
     existing.setId(missionId);

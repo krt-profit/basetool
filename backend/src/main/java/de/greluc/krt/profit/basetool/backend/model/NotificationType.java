@@ -140,7 +140,73 @@ public enum NotificationType {
    * The recipient became a responsible holder of a bank account (REQ-BANK-034), rendered with the
    * {@code accountNo} and the number of requests {@code pending} their approval.
    */
-  BANK_ACCOUNT_RESPONSIBLE_ASSIGNED;
+  BANK_ACCOUNT_RESPONSIBLE_ASSIGNED,
+
+  /**
+   * A mission's meeting time or planned start was moved (REQ-MISSION-050), rendered with {@code
+   * mission}, {@code old}, {@code new} and {@code actor}.
+   */
+  MISSION_RESCHEDULED,
+
+  /** A mission was cancelled (REQ-MISSION-050), rendered with {@code mission} and {@code actor}. */
+  MISSION_CANCELLED,
+
+  /** A mission was deleted (REQ-MISSION-050), rendered with {@code mission} and {@code actor}. */
+  MISSION_DELETED,
+
+  /**
+   * A mission starts in 24 hours or in one hour (REQ-MISSION-051), rendered with {@code mission},
+   * {@code lead}, {@code when}, {@code where} and the participant's {@code role}.
+   */
+  MISSION_REMINDER,
+
+  /**
+   * A mission started and the recipient has not checked in (REQ-MISSION-052), rendered with {@code
+   * mission} and {@code start}.
+   */
+  MISSION_CHECKIN_OPEN,
+
+  /**
+   * Somebody else added the recipient to a mission (REQ-MISSION-053), rendered with {@code
+   * mission}, {@code start}, {@code actor} and the stamped {@code payout} choice.
+   */
+  MISSION_PARTICIPANT_ADDED_BY_OTHER,
+
+  /**
+   * Somebody else removed the recipient from a mission (REQ-MISSION-053), rendered with {@code
+   * mission} and {@code actor}.
+   */
+  MISSION_PARTICIPANT_REMOVED_BY_OTHER,
+
+  /**
+   * A participant left a mission (REQ-MISSION-056), rendered with {@code mission}, {@code
+   * participant} and the {@code freed} slot or role.
+   */
+  MISSION_PARTICIPANT_LEFT,
+
+  /**
+   * A mission has no end time although it is over (REQ-MISSION-054), rendered with {@code mission}
+   * and {@code plannedEnd}.
+   */
+  MISSION_NEVER_ENDED,
+
+  /**
+   * The recipient became responsible for part of a mission (REQ-MISSION-055), rendered with {@code
+   * mission}, {@code actor} and the {@code role}.
+   */
+  MISSION_RESPONSIBILITY_ASSIGNED,
+
+  /**
+   * The recipient's payout of an operation was marked paid out (REQ-OPERATION-020), rendered with
+   * {@code operation}, {@code amount}, {@code donation}, {@code fee} and {@code actor}.
+   */
+  OPERATION_PAYOUT_PAID_OUT,
+
+  /**
+   * An operation was completed and its payouts are due (REQ-OPERATION-021), rendered with {@code
+   * operation}, {@code total}, {@code open}, {@code paid}, {@code count} and {@code unfinished}.
+   */
+  OPERATION_COMPLETED;
 
   /**
    * Whether a member may mute this type (REQ-NOTIF-027). The account-deletion types serve a legal
@@ -169,7 +235,19 @@ public enum NotificationType {
           INVENTORY_TRANSFERRED_TO_USER,
           INVENTORY_TRANSFERRED_FROM_USER,
           BANK_BOOKING_REQUEST_UPDATED,
-          BANK_ACCOUNT_RESPONSIBLE_ASSIGNED ->
+          BANK_ACCOUNT_RESPONSIBLE_ASSIGNED,
+          MISSION_RESCHEDULED,
+          MISSION_CANCELLED,
+          MISSION_DELETED,
+          MISSION_REMINDER,
+          MISSION_CHECKIN_OPEN,
+          MISSION_PARTICIPANT_ADDED_BY_OTHER,
+          MISSION_PARTICIPANT_REMOVED_BY_OTHER,
+          MISSION_PARTICIPANT_LEFT,
+          MISSION_NEVER_ENDED,
+          MISSION_RESPONSIBILITY_ASSIGNED,
+          OPERATION_PAYOUT_PAID_OUT,
+          OPERATION_COMPLETED ->
           true;
     };
   }

@@ -97,6 +97,9 @@ public class MissionStructureService {
   /** Records the state-mutating unit/crew activities into the audit log (REQ-AUDIT-001). */
   private final AuditRecorder auditRecorder;
 
+  /** Publishes the mission notifications (REQ-MISSION-050…056). */
+  private final MissionNotificationPublisher notificationPublisher;
+
   /**
    * Adds a unit (top-level team grouping) to a mission.
    *
@@ -143,6 +146,9 @@ public class MissionStructureService {
 
     missionUnit.setName(resolveUnitName(name, missionUnit));
     missionUnit.setResponsibleUser(resolveResponsibleUser(responsibleUserId));
+    if (responsibleUserId != null) {
+      notificationPublisher.responsibilityAssigned(mission, responsibleUserId, "UNIT_RESPONSIBLE");
+    }
     missionUnit.setNote(StringNormalization.trimToNull(note));
     missionUnit.setHighValueUnit(highValueUnit);
 
@@ -248,7 +254,12 @@ public class MissionStructureService {
         missionUnit.getVersion(), expectedVersion, MissionUnit.class, unitId);
 
     missionUnit.setHighValueUnit(highValueUnit);
+    final UUID previousResponsible =
+        missionUnit.getResponsibleUser() == null ? null : missionUnit.getResponsibleUser().getId();
     missionUnit.setResponsibleUser(resolveResponsibleUser(responsibleUserId));
+    if (responsibleUserId != null && !responsibleUserId.equals(previousResponsible)) {
+      notificationPublisher.responsibilityAssigned(mission, responsibleUserId, "UNIT_RESPONSIBLE");
+    }
     missionUnit.setNote(StringNormalization.trimToNull(note));
 
     if (shipTypeId != null) {
