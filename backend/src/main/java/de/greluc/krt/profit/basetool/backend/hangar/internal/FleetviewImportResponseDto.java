@@ -17,19 +17,19 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 /**
- * Root object of a StarJump FleetViewer JSON export; unknown layout fields are ignored.
+ * Response DTO for the Fleetview JSON import endpoint.
  *
- * @param type the export discriminator (expected {@code "starjumpFleetviewer"}, case-insensitive)
- * @param canvasItems the canvas elements, ship tiles and widgets intermixed; may be {@code null}
+ * <p>Returns import statistics and lists of ships that could not be processed, so the user can take
+ * corrective action (e.g. run a UEX sync or rename ships manually).
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
-public record StarjumpFleetviewerDto(
-    @JsonProperty("type") String type,
-    @JsonProperty("canvasItems") List<StarjumpCanvasItemDto> canvasItems) {}
+public record FleetviewImportResponseDto(
+    int importedCount,
+    int skippedCount,
+    int duplicateCount,
+    List<String> skippedShips,
+    List<String> duplicateShips) {}

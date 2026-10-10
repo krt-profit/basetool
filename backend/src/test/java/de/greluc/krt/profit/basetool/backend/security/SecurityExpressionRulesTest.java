@@ -27,6 +27,7 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankSecurityService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ConnectedAppsGate;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeGate;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
@@ -36,7 +37,6 @@ import de.greluc.krt.profit.basetool.backend.security.SecurityExpressionAnalyzer
 import de.greluc.krt.profit.basetool.backend.security.SecurityExpressionAnalyzer.BeanCall;
 import de.greluc.krt.profit.basetool.backend.security.SecurityExpressionSources.Declared;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.HangarAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.service.InventoryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;

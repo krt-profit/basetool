@@ -17,7 +17,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
-/** Data transfer record carrying Squadron Ship Detail payload. */
-public record SquadronShipDetailDto(String ownerName, String locationName, boolean fitted) {}
+/**
+ * Response for the hangar "set home location" bulk action.
+ *
+ * @param updatedCount the number of ships whose location was set
+ */
+public record SetHomeLocationResponseDto(int updatedCount) {}

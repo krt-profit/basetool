@@ -17,14 +17,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.model.dto.FleetviewEntryDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.FleetyardsEntryDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.ShiplistEntryDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.StarjumpCanvasItemDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.StarjumpFleetviewerDto;
+import de.greluc.krt.profit.basetool.backend.service.ShipTypeMatcher;
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;

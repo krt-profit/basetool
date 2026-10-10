@@ -17,24 +17,24 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.hangar.web;
 
 import de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.FleetviewImportResponseDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarImportService;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.SetHomeLocationRequestDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.SetHomeLocationResponseDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
-import de.greluc.krt.profit.basetool.backend.model.dto.FleetviewImportResponseDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.SetHomeLocationRequestDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.SetHomeLocationResponseDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.HangarImportService;
-import de.greluc.krt.profit.basetool.backend.service.HangarService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -83,7 +83,7 @@ public class HangarController {
    * {@code HANGAR_WRITE} or {@code ROLE_ADMIN}, the same set as the {@code /api/v1/hangar/**} URL
    * rule.
    */
-  static final String HANGAR_ACCESS =
+  public static final String HANGAR_ACCESS =
       "hasAnyAuthority('"
           + Permissions.HANGAR_READ
           + "','"

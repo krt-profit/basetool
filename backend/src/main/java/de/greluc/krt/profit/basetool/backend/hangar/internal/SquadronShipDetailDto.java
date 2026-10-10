@@ -17,10 +17,16 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
-import java.util.List;
+import org.jetbrains.annotations.Nullable;
 
-/** Data transfer record carrying Squadron Ship Overview payload. */
-public record SquadronShipOverviewDto(
-    ShipTypeDto shipType, long count, long fittedCount, List<SquadronShipDetailDto> details) {}
+/**
+ * One ship of a ship type on the squadron overview.
+ *
+ * @param ownerName the owner's effective name, or {@code Unknown}
+ * @param locationName the ship's location, or {@code null} when it has none
+ * @param fitted whether the ship is fitted
+ */
+public record SquadronShipDetailDto(
+    String ownerName, @Nullable String locationName, boolean fitted) {}

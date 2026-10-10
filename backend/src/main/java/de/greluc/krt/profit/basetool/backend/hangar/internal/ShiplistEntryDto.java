@@ -17,11 +17,18 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.hangar.internal;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Response for the hangar "set home location" bulk action.
- *
- * @param updatedCount the number of ships whose location was set
+ * One entry of a HangarXPLOR Shiplist JSON export, reduced to the fields the hangar import
+ * consumes; unknown fields are ignored.
  */
-public record SetHomeLocationResponseDto(int updatedCount) {}
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record ShiplistEntryDto(
+    @JsonProperty("name") String name,
+    @JsonProperty("ship_name") String shipName,
+    @JsonProperty("entity_type") String entityType,
+    @JsonProperty("lti") Boolean lti) {}

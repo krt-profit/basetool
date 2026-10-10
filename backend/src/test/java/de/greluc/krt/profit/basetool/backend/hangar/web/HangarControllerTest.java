@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.hangar.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,18 +28,19 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.controller.RoleGateFixture;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.FleetviewImportResponseDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarImportService;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.SetHomeLocationRequestDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.SetHomeLocationResponseDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
-import de.greluc.krt.profit.basetool.backend.model.dto.FleetviewImportResponseDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.SetHomeLocationRequestDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.SetHomeLocationResponseDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.SquadronShipOverviewDto;
-import de.greluc.krt.profit.basetool.backend.service.HangarImportService;
-import de.greluc.krt.profit.basetool.backend.service.HangarService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.util.List;
 import java.util.UUID;

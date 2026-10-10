@@ -35,9 +35,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The {@code can*} authorization gates behind every {@code @PreAuthorize} on the org-unit-scoped
- * aggregates, evaluated against the same scope as {@link RequestScopeResolver} so per-row checks
- * match the scoped lists.
+ * The scope kernel's org-unit gates and its per-row check, which the module access policies build
+ * on, evaluated against the same scope as {@link RequestScopeResolver} so per-row checks match the
+ * scoped lists.
  *
  * <p>Invoked from SpEL through the {@link OwnerScopeService} facade. Read-only transactional.
  */

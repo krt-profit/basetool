@@ -381,4 +381,5 @@ with the second module access policy, `joborder` with the third and `mission` wi
 the inventory followed in five parts (its access policy out of the scope hub, its stock commands,
 the job-order and refinery Lager writes through them, its business associations as ids, and the end
 of its job-order edges); its move into module packages waits for Phase 4, because layer classes
-still consume its API. The baseline is at 50 class edges.
+still consume its API; then `hangar` with the sixth module access policy and its ship
+commands. The baseline is at 48 class edges.
