@@ -144,7 +144,7 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
     ExchangeRequestContext context;
     try {
       context = admit(jwt, route.get(), request, response);
-    } catch (ExchangeUnavailableException e) {
+    } catch (ExchangeUnavailableException _) {
       response.setHeader(HttpHeaders.RETRY_AFTER, RETRY_AFTER_SECONDS);
       refuse(
           refusals.clientLabel(jwt.getClaimAsString("azp")),
@@ -367,7 +367,7 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
   private static @Nullable Instant authTime(@NotNull Jwt jwt) {
     try {
       return jwt.getClaimAsInstant(AUTH_TIME);
-    } catch (IllegalArgumentException ignored) {
+    } catch (IllegalArgumentException _) {
       return null;
     }
   }

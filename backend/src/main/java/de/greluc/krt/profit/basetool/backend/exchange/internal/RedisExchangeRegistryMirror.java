@@ -93,7 +93,7 @@ public class RedisExchangeRegistryMirror implements ExchangeRegistryMirror {
         return Optional.empty();
       }
       return Optional.of(document.snapshot());
-    } catch (JacksonException e) {
+    } catch (JacksonException _) {
       log.warn("The exchange registry mirror under {} is unreadable and will be rewritten", key);
       return Optional.empty();
     }

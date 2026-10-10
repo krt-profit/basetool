@@ -201,7 +201,7 @@ public class RefineryOrderService implements CraftabilityYieldSource {
           continue;
         }
         pooled
-            .computeIfAbsent(material.getId(), k -> new HashMap<>())
+            .computeIfAbsent(material.getId(), _ -> new HashMap<>())
             .merge(good.getQuality(), scu, Double::sum);
       }
     }

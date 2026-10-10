@@ -86,7 +86,7 @@ public class OpenApiCachingConfig {
    */
   private static void document(@NotNull String path, @NotNull ApiResponses responses) {
     boolean noStore = isNoStore(path);
-    ApiResponse ok = responses.computeIfAbsent("200", k -> new ApiResponse().description("OK"));
+    ApiResponse ok = responses.computeIfAbsent("200", _ -> new ApiResponse().description("OK"));
     if (ok.getHeaders() == null) {
       ok.setHeaders(new LinkedHashMap<>());
     }

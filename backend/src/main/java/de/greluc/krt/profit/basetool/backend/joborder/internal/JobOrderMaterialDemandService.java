@@ -125,7 +125,7 @@ public class JobOrderMaterialDemandService {
       GroupAccumulator group =
           groups.computeIfAbsent(
               groupKey(order),
-              key -> new GroupAccumulator(referenceOf(order.getResponsibleOrgUnit())));
+              _ -> new GroupAccumulator(referenceOf(order.getResponsibleOrgUnit())));
       List<MaterialRequirement> requirements = materialRequirementResolver.requirementsOf(order);
       double[] booked = stockIndex.bookedFor(order.getId(), requirements);
       for (int i = 0; i < requirements.size(); i++) {
@@ -171,7 +171,7 @@ public class JobOrderMaterialDemandService {
 
     BucketAccumulator bucket =
         group.buckets.computeIfAbsent(
-            key, unused -> new BucketAccumulator(requirement.material(), requirement.tier()));
+            key, _ -> new BucketAccumulator(requirement.material(), requirement.tier()));
     bucket.requiredAmount += requirement.requiredAmount();
     bucket.bookedAmount += booked;
     bucket.claimedAmount += claimed;

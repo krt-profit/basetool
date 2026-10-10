@@ -64,7 +64,7 @@ public class ExchangeRevocationSecond {
       Duration left = Duration.between(now, next);
       try {
         sleeper.sleep(left.compareTo(Duration.ofSeconds(1)) > 0 ? Duration.ofSeconds(1) : left);
-      } catch (InterruptedException e) {
+      } catch (InterruptedException _) {
         Thread.currentThread().interrupt();
         return;
       }

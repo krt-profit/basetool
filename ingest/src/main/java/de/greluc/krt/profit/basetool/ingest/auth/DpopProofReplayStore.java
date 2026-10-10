@@ -166,7 +166,7 @@ public final class DpopProofReplayStore {
     AtomicReference<Instant> oldest = new AtomicReference<>();
     perMember.compute(
         partition,
-        (k, queue) -> {
+        (_, queue) -> {
           PriorityQueue<Held> live = queue == null ? new PriorityQueue<>(BY_EXPIRY) : queue;
           dropExpired(live, now);
           Held first = live.peek();
@@ -268,7 +268,7 @@ public final class DpopProofReplayStore {
   private void release(@NotNull Held held) {
     perMember.computeIfPresent(
         held.entry().partition(),
-        (k, queue) -> {
+        (_, queue) -> {
           queue.remove(held);
           return queue.isEmpty() ? null : queue;
         });

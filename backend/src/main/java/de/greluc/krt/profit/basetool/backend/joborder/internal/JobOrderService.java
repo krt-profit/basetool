@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
+import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderClosedEvent;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderUpdatedByRequesterEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
@@ -245,6 +246,17 @@ public class JobOrderService {
   }
 
   /**
+   * Publishes a {@link JobOrderClosedEvent} so the order's open notices are cleared after commit
+   * (REQ-NOTIF-018).
+   *
+   * @param jobOrderId the completed, rejected or deleted order
+   */
+  private void publishJobOrderClosed(@NotNull UUID jobOrderId) {
+    eventPublisher.publishEvent(
+        new JobOrderClosedEvent(jobOrderId, authHelperService.currentUserId().orElse(null)));
+  }
+
+  /**
    * Updates the status of a job order with its own load, save and flush. Must not be called inside
    * a transaction that already modified the same order, since the double save fails the version
    * check; use {@link #completeJobOrderWithinTransaction(JobOrder)} there.
@@ -290,6 +302,7 @@ public class JobOrderService {
 
     if (isTerminal && !wasTerminal) {
       inventoryItemRepository.deleteJobOrderAllocationsByJobOrder(jobOrder.getId());
+      publishJobOrderClosed(jobOrder.getId());
     }
 
     if (status == JobOrderStatus.COMPLETED && previousStatus != JobOrderStatus.COMPLETED) {
@@ -845,6 +858,7 @@ public class JobOrderService {
         deletedLabel,
         null,
         AuditDetails.of("priorityWas", priority));
+    publishJobOrderClosed(deletedId);
   }
 
   /**
@@ -1001,6 +1015,7 @@ public class JobOrderService {
           orderLabel(jobOrder),
           null,
           "autoCompleted=true");
+      publishJobOrderClosed(jobOrder.getId());
     }
   }
 

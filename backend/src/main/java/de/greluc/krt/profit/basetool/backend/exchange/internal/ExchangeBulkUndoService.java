@@ -182,7 +182,7 @@ public class ExchangeBulkUndoService {
     try {
       run =
           new TransactionTemplate(transactionManager)
-              .execute(status -> create(suspended, scope, adminId));
+              .execute(_ -> create(suspended, scope, adminId));
     } catch (DataIntegrityViolationException e) {
       throw new BusinessConflictException("A bulk undo of this client is already running", e);
     }

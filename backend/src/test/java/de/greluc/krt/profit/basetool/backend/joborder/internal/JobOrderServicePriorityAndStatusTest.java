@@ -32,6 +32,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderClosedEvent;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
@@ -47,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
+import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.QualityTierService;
@@ -64,6 +66,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
@@ -86,6 +89,8 @@ class JobOrderServicePriorityAndStatusTest {
 
   @Mock private AuditService auditService;
   @Mock private QualityTierService qualityTierService;
+  @Mock private AuthHelperService authHelperService;
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks private JobOrderStockProjectionService jobOrderStockProjectionService;
   private JobOrderPriorityService jobOrderPriorityService;
@@ -107,8 +112,8 @@ class JobOrderServicePriorityAndStatusTest {
             null,
             null,
             null,
-            null,
-            null,
+            authHelperService,
+            eventPublisher,
             materialClaimService,
             auditService,
             null,
@@ -192,6 +197,7 @@ class JobOrderServicePriorityAndStatusTest {
       verify(jobOrderRepository).save(o);
       verify(jobOrderRepository).flush();
       verify(jobOrderRepository).lockAllJobOrders();
+      verify(eventPublisher).publishEvent(new JobOrderClosedEvent(ORDER_ID, null));
     }
 
     @Test
@@ -207,6 +213,7 @@ class JobOrderServicePriorityAndStatusTest {
       assertNull(o.getPriority());
       assertEquals(JobOrderStatus.REJECTED, o.getStatus());
       verify(inventoryItemRepository).deleteJobOrderAllocationsByJobOrder(ORDER_ID);
+      verify(eventPublisher).publishEvent(new JobOrderClosedEvent(ORDER_ID, null));
     }
 
     @Test
@@ -227,6 +234,7 @@ class JobOrderServicePriorityAndStatusTest {
               + "normalize doesn't see this order in lockAllJobOrders stub");
       verify(inventoryItemRepository, never()).deleteJobOrderAllocationsByJobOrder(any());
       verify(jobOrderRepository, times(2)).lockAllJobOrders();
+      verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test
@@ -258,6 +266,7 @@ class JobOrderServicePriorityAndStatusTest {
       assertNull(o.getPriority());
       verify(jobOrderRepository, never()).lockAllJobOrders();
       verify(inventoryItemRepository, never()).deleteJobOrderAllocationsByJobOrder(any());
+      verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test
@@ -466,6 +475,7 @@ class JobOrderServicePriorityAndStatusTest {
       verify(jobOrderRepository).delete(o);
       verify(jobOrderRepository).flush();
       verify(jobOrderRepository, times(2)).lockAllJobOrders();
+      verify(eventPublisher).publishEvent(new JobOrderClosedEvent(ORDER_ID, null));
     }
 
     @Test
@@ -477,6 +487,7 @@ class JobOrderServicePriorityAndStatusTest {
 
       verify(jobOrderRepository).delete(o);
       verify(jobOrderRepository, times(1)).lockAllJobOrders();
+      verify(eventPublisher).publishEvent(new JobOrderClosedEvent(ORDER_ID, null));
     }
   }
 
@@ -546,6 +557,7 @@ class JobOrderServicePriorityAndStatusTest {
       verify(jobOrderRepository, never()).flush();
       verify(jobOrderRepository, never()).lockAllJobOrders();
       verify(inventoryItemRepository, never()).deleteJobOrderAllocationsByJobOrder(any());
+      verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test
@@ -560,6 +572,7 @@ class JobOrderServicePriorityAndStatusTest {
       verify(jobOrderRepository).flush();
       verify(jobOrderRepository).lockAllJobOrders();
       verify(inventoryItemRepository).deleteJobOrderAllocationsByJobOrder(ORDER_ID);
+      verify(eventPublisher).publishEvent(new JobOrderClosedEvent(ORDER_ID, null));
     }
 
     @Test
@@ -573,6 +586,7 @@ class JobOrderServicePriorityAndStatusTest {
       assertNull(o.getPriority());
       verify(jobOrderRepository).flush();
       verify(inventoryItemRepository).deleteJobOrderAllocationsByJobOrder(ORDER_ID);
+      verify(eventPublisher).publishEvent(new JobOrderClosedEvent(ORDER_ID, null));
     }
   }
 
