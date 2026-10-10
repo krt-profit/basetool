@@ -947,10 +947,63 @@ ready, a mission that was never ended. They come from **one scheduled producer**
 [ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md) ·
 **Issues:** #2414
 
+### REQ-NOTIF-027 — Members mute notification types
+
+A member MUST be able to choose which notification types they receive. Muting a type is the
+member's own decision; it changes nothing for anybody else and nothing about what the rules resolve.
+
+- **Stored.** A `notification_mute` row (member, notification type; unique; `ON DELETE CASCADE` on
+  the member) is the mute. Present = muted.
+- **Applied before anything is written.** `NotificationCreationService` removes a member who muted
+  the type from the recipients the rules resolved (`NotificationMuteService#withoutMuted`), in the
+  normal and in the reconcile path. A muted type is therefore **neither stored in the inbox nor
+  pushed**, so the Android app raises no OS notification for it. Notices already stored stay.
+- **Not mutable.** `NotificationType#isMutable()` is `false` for `ACCOUNT_DELETION_REQUESTED` and
+  `ACCOUNT_DELETION_REQUEST_DECLINED` (legal deadlines, REQ-SEC-061) and
+  `EXCHANGE_INSTALLATION_CONNECTED` (the phishing signal, REQ-XCH-032). Such a type is never
+  filtered, whatever rows exist, and muting it is refused. The method is an exhaustive switch, so a
+  new type fails the build until its mutability is decided.
+- **API.** `GET /api/v1/notifications/preferences` lists every type with `mutable` and `muted`;
+  `PUT /api/v1/notifications/preferences/{type}` with `{muted}` stores the choice. Both are
+  `isAuthenticated()` and keyed on the caller; the write is idempotent and carries no version (a
+  boolean toggle, last writer wins) and answers `400` for a type that cannot be muted. Both
+  operations are in the frozen contract set as `T1` (REQ-API-009, REQ-API-016) and admitted by the API
+  vhost, because the Android app calls them; from the first released app build on they can no longer
+  change incompatibly.
+- **Web.** The profile page has the card „Benachrichtigungen": one checkbox per type, grouped by the
+  area the type name's prefix names, a locked row for a non-mutable type, saved per click through
+  `krtFetch` without a reload; a failed write re-renders the card from the server (REQ-FE-001). The
+  Android app offers the same list in Einstellungen.
+- **Privacy.** The Art. 15 export has the section `notificationMutes`; the account merge moves the
+  rows and deduplicates on the type.
+- **Observable.** `basetool_notification_muted_total{notification_type}` counts the recipients
+  dropped.
+
+**Acceptance**
+
+- [x] A muted member gets no notification of the muted type, an unmuted one does, and a member who
+  muted nothing is unaffected.
+- [x] A non-mutable type is delivered even with a stray mute row, and muting it is refused.
+- [x] Muting twice changes nothing; unmuting removes the row.
+- [x] One member's mutes never show in or affect another's preferences.
+- [x] Every notification type has an area and a label in all three web bundles.
+
+**Enforced by:** `NotificationMuteServiceTest`, `NotificationPreferencesControllerTest`,
+`NotificationCreationServiceTest`, `NotificationPreferenceGroupsTest`,
+`NotificationPreferenceWriteControllerTest`, `NotificationPreferenceProxyControllerTest`,
+`ProfileControllerMvcTest`, `GdprParticipantCoverageTest`, `UserAccountMergeCoverageTest` ·
+**Code:** `model/NotificationMute`, `model/NotificationType#isMutable`,
+`service/NotificationMuteService`, `controller/NotificationController#preferences`,
+`V271__create_notification_mute.sql`, frontend `NotificationPreferenceWriteController`,
+`NotificationPreferenceProxyController`, `fragments/profile-notification-prefs.html`,
+`static/js/profile-notification-prefs.js` · **Decision:**
+[ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md) ·
+**Issues:** #2414
+
 ## Out of scope (v1)
 
-- Per-notification e-mail routing (generic fan-out of in-app notification types to e-mail), user
-  channel preferences/opt-in, and digest emails. A **basic transactional e-mail transport** now
+- Per-notification e-mail routing (generic fan-out of in-app notification types to e-mail), per-channel
+  preferences (a member can only mute a whole notification type, REQ-NOTIF-027), and digest emails. A **basic transactional e-mail transport** now
   exists (REQ-NOTIF-013, used so far by two hand-wired consumers — the account decision mail
   REQ-NOTIF-014 and the pending-registration admin mail REQ-NOTIF-015); wiring it into the rule
   engine per notification type is deferred.

@@ -140,5 +140,37 @@ public enum NotificationType {
    * The recipient became a responsible holder of a bank account (REQ-BANK-034), rendered with the
    * {@code accountNo} and the number of requests {@code pending} their approval.
    */
-  BANK_ACCOUNT_RESPONSIBLE_ASSIGNED
+  BANK_ACCOUNT_RESPONSIBLE_ASSIGNED;
+
+  /**
+   * Whether a member may mute this type (REQ-NOTIF-027). The account-deletion types serve a legal
+   * deadline and {@link #EXCHANGE_INSTALLATION_CONNECTED} is the phishing signal, so none of them
+   * can be muted.
+   *
+   * @return {@code false} for the types a member cannot mute, {@code true} for every other
+   */
+  public boolean isMutable() {
+    return switch (this) {
+      case ACCOUNT_DELETION_REQUESTED,
+          ACCOUNT_DELETION_REQUEST_DECLINED,
+          EXCHANGE_INSTALLATION_CONNECTED ->
+          false;
+      case JOB_ORDER_CREATED,
+          JOB_ORDER_UPDATED_BY_REQUESTER,
+          BANK_BOOKING_REQUEST_CREATED,
+          BANK_BOOKING_REQUEST_CONFIRMED,
+          BANK_BOOKING_REQUEST_REJECTED,
+          BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED,
+          BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED,
+          DISCORD_REGISTRATION_PENDING,
+          MATERIAL_EXCHANGE_INTEREST_REGISTERED,
+          MATERIAL_REQUEST_FULFILLMENT_SIGNALLED,
+          EXCHANGE_BULK_UNDO_APPLIED,
+          INVENTORY_TRANSFERRED_TO_USER,
+          INVENTORY_TRANSFERRED_FROM_USER,
+          BANK_BOOKING_REQUEST_UPDATED,
+          BANK_ACCOUNT_RESPONSIBLE_ASSIGNED ->
+          true;
+    };
+  }
 }

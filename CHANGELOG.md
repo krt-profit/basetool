@@ -10,6 +10,11 @@
   mitliest und neben `external-clients.json` auf den Host gehört. Alle offenen Schritte nur für den Betreiber:
   `docs/OWNER_STEPS_2026-10.md` (REQ-SEC-082).
 
+- **Benachrichtigungen abbestellen.** Unter Profil → Benachrichtigungen schaltest du jede Art von
+  Benachrichtigung einzeln ab; eine abbestellte Art landet weder im Posteingang noch in der App.
+  Die Löschantrags-Hinweise und die Warnung vor einer neuen Anwendungsverbindung bleiben immer
+  aktiv. Auch Teil des Datenexports (REQ-NOTIF-027, Migration V271, #2414).
+
 - **Zeitgesteuerte Benachrichtigungen (Grundlage).** Ein Dienst im Minutentakt kann künftig
   Hinweise auslösen, hinter denen keine Nutzeraktion steht (Erinnerungen, abholbereite
   Raffinerieaufträge); er läuft nur auf einer Instanz und meldet sich im Monitoring (Alarm
