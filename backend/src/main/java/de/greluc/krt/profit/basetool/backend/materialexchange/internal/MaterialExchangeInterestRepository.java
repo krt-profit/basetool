@@ -122,4 +122,29 @@ public interface MaterialExchangeInterestRepository
    */
   @Modifying
   long deleteByOfferIdAndInterestedUserId(UUID offerId, UUID interestedUserId);
+
+  /**
+   * Returns the members who registered interest on one offer, to tell them it is gone
+   * (REQ-MARKET-021).
+   *
+   * @param offerId the offer
+   * @return the members' ids, never {@code null}
+   */
+  @Query("SELECT i.interestedUser.id FROM MaterialExchangeInterest i WHERE i.offer.id = :offerId")
+  Set<UUID> findInterestedUserIdsByOfferId(@Param("offerId") UUID offerId);
+
+  /**
+   * Returns every interest registration on the given offers, as offer and member.
+   *
+   * @param offerIds the offers; an empty collection yields an empty list
+   * @return the registrations, never {@code null}
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.materialexchange.internal.\
+      MaterialExchangeInterestRecipient(i.offer.id, i.interestedUser.id) \
+      FROM MaterialExchangeInterest i WHERE i.offer.id IN :offerIds
+      """)
+  List<MaterialExchangeInterestRecipient> findRecipientsByOfferIdIn(
+      @Param("offerIds") Collection<UUID> offerIds);
 }

@@ -227,6 +227,59 @@ class NotificationPageControllerTest {
   }
 
   @Test
+  void targetOf_refineryNoticesLinkTheOrder() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/refinery-orders/" + id,
+        NotificationPageController.targetOf("REFINERY_ORDER_READY", "REFINERY_ORDER", id));
+    assertEquals(
+        "/refinery-orders/" + id,
+        NotificationPageController.targetOf(
+            "REFINERY_ORDER_CHANGED_BY_OTHER", "REFINERY_ORDER", id));
+  }
+
+  @Test
+  void targetOf_marketAndStockNoticesLinkTheirPage() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/materialboerse",
+        NotificationPageController.targetOf(
+            "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_EXCHANGE_OFFER", id));
+    assertEquals(
+        "/materialboerse",
+        NotificationPageController.targetOf(
+            "MATERIAL_REQUEST_UNAVAILABLE", "MATERIAL_EXCHANGE_REQUEST", id));
+    assertEquals(
+        "/inventory/my",
+        NotificationPageController.targetOf("INVENTORY_BOOKED_OUT_BY_OTHER", "INVENTORY_ITEM", id));
+  }
+
+  @Test
+  void targetOf_bankNoticesLinkWhatTheirRecipientCanOpen() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/bank/requests",
+        NotificationPageController.targetOf(
+            "BANK_BOOKING_REQUEST_APPROVED", "BANK_BOOKING_REQUEST", id));
+    assertEquals(
+        "/bank/accounts/" + id,
+        NotificationPageController.targetOf("BANK_GRANT_CHANGED", "BANK_ACCOUNT_GRANT", id));
+    assertNull(NotificationPageController.targetOf("BANK_GRANT_REVOKED", "BANK_ACCOUNT_GRANT", id));
+    assertEquals(
+        "/bank/holders/" + id,
+        NotificationPageController.targetOf(
+            "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "BANK_HOLDER", id));
+  }
+
+  @Test
+  void targetOf_organisationNoticesHaveNoPageToLink() {
+    UUID id = UUID.randomUUID();
+    assertNull(NotificationPageController.targetOf("ORG_MEMBER_DEPARTED", "ORG_UNIT_MEMBER", id));
+    assertNull(
+        NotificationPageController.targetOf("ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_UNIT_MEMBER", id));
+  }
+
+  @Test
   void targetOf_jobOrderLinksTheOrder() {
     UUID orderId = UUID.fromString("00000000-0000-0000-0000-000000000099");
 

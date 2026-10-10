@@ -88,20 +88,22 @@ in the layer packages.
 The domain events live in their publisher's `<module>.api.events` package (plan §5.2, §5.3); there
 is no central `event` package. Every listener runs after commit (`@TransactionalEventListener`),
 so the reaction may happen later or fail on its own, and none records an audit row for the mutation
-that published the event (REQ-AUDIT-007). Ten modules publish today:
+that published the event (REQ-AUDIT-007). Twelve modules publish today:
 
 | Package | Events |
 | --- | --- |
 | `notification.api.events` | `NotificationEvent`, the contract every notification-producing event implements, the `OrgUnitRef` it carries, `NoticeEvent`, the plain event the newer producers build from their parts, and the `ActorRef` that names who acted |
 | `identity.api.events` | `DiscordRegistrationPendingEvent`, `DiscordRegistrationDecidedEvent`, `UserApprovalDecidedEvent`, `MemberDepartedEvent` (consumed by the exchange departure) |
 | `privacy.api.events` | the three `AccountDeletionRequest…Event`s (transitional module, plan §7.6) |
-| `bank.api.events` | `BankBookingRequestEvent` and its created, updated, confirmed, rejected, cancelled and notices-reconciled records; `BankAccountResponsibleAssignedEvent` |
+| `bank.api.events` | `BankBookingRequestEvent` and its created, updated, confirmed, rejected, cancelled and notices-reconciled records; `BankAccountResponsibleAssignedEvent`; and `BankNotices`, the factory of the approval, grant, direct-booking and holder notices (REQ-BANK-057…060) |
 | `joborder.api.events` | `JobOrderCreatedEvent`, `JobOrderUpdatedByRequesterEvent`, `JobOrderClosedEvent`, and `JobOrderNotices`, the factory of the reassigned, finished, assignee and withdrawn-claim notices (REQ-ORDERS-041…044) |
-| `materialexchange.api.events` | `MaterialExchangeInterestRegisteredEvent`, `MaterialRequestFulfillmentSignalledEvent` |
+| `materialexchange.api.events` | `MaterialExchangeInterestRegisteredEvent`, `MaterialRequestFulfillmentSignalledEvent`, and `MarketNotices`, the factory of the offer-gone and request-withdrawn notices (REQ-MARKET-021, -022) |
 | `exchange.api.events` | `ExchangeInstallationConnectedEvent`, `ExchangeBulkUndoAppliedEvent` |
 | `mission.api.events` | `MissionNotices`, the factory of the mission notices: rescheduled, cancelled, deleted, reminder, started, checked in, participant added / removed / left, never ended, end recorded, responsibility assigned (REQ-MISSION-021…027) |
 | `operation.api.events` | `OperationNotices`, the factory of the payout paid out / unmarked and operation completed notices (REQ-MISSION-028, -029) |
-| `inventory.api.events` | `InventoryTransferredToUserEvent`, `InventoryTransferredFromUserEvent` and the `TransferredLot` they list (REQ-INV-055) |
+| `inventory.api.events` | `InventoryTransferredToUserEvent`, `InventoryTransferredFromUserEvent` and the `TransferredLot` they list (REQ-INV-055), and `InventoryNotices`, the factory of the booked-out-by-somebody-else notice (REQ-INV-056) |
+| `orgunit.api.events` | `OrgNotices`, the factory of the leadership role-mismatch and member-departed notices (REQ-ORG-029, -030) |
+| `refinery.api.events` | `RefineryNotices`, the factory of the order-ready, order-ready-cleared and changed-by-somebody-else notices (REQ-REFINERY-023, -024) |
 
 An event either notifies, supersedes the notices of its entity (REQ-NOTIF-018), or reconciles one notice for named members (REQ-NOTIF-023, ADR-0244). The publishing services and the listeners still sit in `service`. `OrgUnitRef` stays with the
 notification contract rather than the kernel, because it carries the org-unit module's

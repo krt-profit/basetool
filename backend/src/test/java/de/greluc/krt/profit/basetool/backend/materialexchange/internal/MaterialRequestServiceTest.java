@@ -36,6 +36,8 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MaterialRequestFulfillmentSignalledEvent;
 import de.greluc.krt.profit.basetool.backend.model.Material;
+import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
@@ -44,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
@@ -56,6 +59,7 @@ import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -376,6 +380,28 @@ class MaterialRequestServiceTest {
             any());
   }
 
+  /** Withdrawing a request tells the members who signalled they can supply it. */
+  @Test
+  void deactivate_active_tellsTheSignallersItWasWithdrawn() {
+    UUID helper = UUID.randomUUID();
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(requestRepository.findById(requestId)).thenReturn(Optional.of(request));
+    when(interestRepository.findInterestedUserIdsByRequestId(requestId)).thenReturn(Set.of(helper));
+
+    service.deactivate(requestId);
+
+    ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher).publishEvent(published.capture());
+    NoticeEvent notice = (NoticeEvent) published.getValue();
+    assertThat(notice.eventType()).isEqualTo(NotificationEventType.MATERIAL_REQUEST_UNAVAILABLE);
+    assertThat(notice.entityId()).isEqualTo(requestId);
+    assertThat(notice.contextRecipientUserIds()).containsExactly(helper);
+    assertThat(notice.actorSub()).isEqualTo(ownerId);
+    assertThat(notice.renderParams()).containsEntry("item", "Agricium");
+    assertThat(notice.resolvesNotificationTypes())
+        .containsExactly(NotificationType.MATERIAL_REQUEST_FULFILLMENT_SIGNALLED);
+  }
+
   /** Deactivating an already-deactivated request is a no-op — no second audit event. */
   @Test
   void deactivate_alreadyDeactivated_noSecondAudit() {
@@ -388,6 +414,7 @@ class MaterialRequestServiceTest {
     verify(requestRepository, never()).saveAndFlush(any());
     verify(auditService, never())
         .record(eq(AuditEventType.MARKET_REQUEST_DEACTIVATED), any(), any(), any(), any());
+    verify(eventPublisher, never()).publishEvent(any(Object.class));
   }
 
   /** A member cannot signal fulfilment on their own request (403). */

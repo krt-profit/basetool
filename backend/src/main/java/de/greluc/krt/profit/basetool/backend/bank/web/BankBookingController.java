@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingGuards;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingOutcomeDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankDepositRequest;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankDirectBookingNotifier;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankLedgerService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankSecurityService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankTransactionDto;
@@ -69,6 +70,7 @@ public class BankBookingController {
   private final BankSecurityService bankSecurityService;
   private final BankTransferFeeService bankTransferFeeService;
   private final OrgUnitBankAccessService orgUnitBankAccessService;
+  private final BankDirectBookingNotifier bankDirectBookingNotifier;
 
   /**
    * Returns the current in-game transfer-fee rate (ADR-0052, REQ-BANK-033) so the booking modals
@@ -139,8 +141,9 @@ public class BankBookingController {
               null);
       return ResponseEntity.accepted().body(BankBookingOutcomeDto.requestRaised(raised));
     }
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(BankBookingOutcomeDto.booked(bankLedgerService.bookWithdrawal(request)));
+    BankTransactionDto booked = bankLedgerService.bookWithdrawal(request);
+    bankDirectBookingNotifier.withdrawalBooked(request, booked);
+    return ResponseEntity.status(HttpStatus.CREATED).body(BankBookingOutcomeDto.booked(booked));
   }
 
   /**
@@ -182,10 +185,9 @@ public class BankBookingController {
     }
     boolean destinationVisible =
         bankSecurityService.canSee(request.destinationAccountId(), authentication);
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(
-            BankBookingOutcomeDto.booked(
-                bankLedgerService.bookTransfer(request, destinationVisible)));
+    BankTransactionDto booked = bankLedgerService.bookTransfer(request, destinationVisible);
+    bankDirectBookingNotifier.transferBooked(request, booked);
+    return ResponseEntity.status(HttpStatus.CREATED).body(BankBookingOutcomeDto.booked(booked));
   }
 
   /**
@@ -203,6 +205,9 @@ public class BankBookingController {
   public BankTransactionDto reverseTransaction(
       @PathVariable @NotNull UUID id,
       @RequestBody(required = false) @Valid ReverseBankTransactionRequest request) {
-    return bankLedgerService.reverseTransaction(id, request == null ? null : request.note());
+    BankTransactionDto reversal =
+        bankLedgerService.reverseTransaction(id, request == null ? null : request.note());
+    bankDirectBookingNotifier.reversalBooked(reversal);
+    return reversal;
   }
 }

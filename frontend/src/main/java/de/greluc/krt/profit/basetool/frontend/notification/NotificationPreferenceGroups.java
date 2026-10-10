@@ -52,6 +52,8 @@ public final class NotificationPreferenceGroups {
   private static Map<String, String> prefixes() {
     Map<String, String> prefixes = new LinkedHashMap<>();
     prefixes.put("MISSION_", "missions");
+    prefixes.put("REFINERY_", "refinery");
+    prefixes.put("ORG_", "organisation");
     prefixes.put("OPERATION_", "operations");
     prefixes.put("JOB_ORDER_", "orders");
     prefixes.put("BANK_", "bank");

@@ -278,5 +278,115 @@ public enum NotificationEventType {
    * A material claim was withdrawn by an order edit or a de-escalation (REQ-ORDERS-044). The
    * default rule notifies the member who made the claim.
    */
-  JOB_ORDER_CLAIM_WITHDRAWN
+  JOB_ORDER_CLAIM_WITHDRAWN,
+
+  /**
+   * A refinery order's run has ended and the output can be collected (REQ-REFINERY-023). Published
+   * once by the time-based producer; the default rule notifies the order's owner.
+   */
+  REFINERY_ORDER_READY,
+
+  /**
+   * Somebody other than the owner changed, cancelled or stored a refinery order, or booked its
+   * yield onto another member (REQ-REFINERY-024). The default rule notifies that member.
+   */
+  REFINERY_ORDER_CHANGED_BY_OTHER,
+
+  /**
+   * A refinery order was stored, cancelled or got a new run time (REQ-REFINERY-023). Creates no
+   * notification; clears the order's collect-me notice.
+   */
+  REFINERY_ORDER_READY_CLEARED,
+
+  /**
+   * A Materialbörse offer left the board, withdrawn by its owner or because its stock is gone
+   * (REQ-MARKET-021). The default rule notifies every member who registered interest; the event
+   * clears the owner's interest notices.
+   */
+  MATERIAL_EXCHANGE_OFFER_UNAVAILABLE,
+
+  /**
+   * A Materialbörse request was withdrawn by its owner (REQ-MARKET-022). The default rule notifies
+   * every member who signalled they can supply it; the event clears the owner's fulfilment notices.
+   */
+  MATERIAL_REQUEST_UNAVAILABLE,
+
+  /**
+   * Somebody other than the owner discarded or sold part of a member's Lager stock (REQ-INV-056).
+   * The default rule notifies the owner.
+   */
+  INVENTORY_BOOKED_OUT_BY_OTHER,
+
+  /**
+   * The responsible holder approved an over-limit booking request, so it is ready to be confirmed
+   * (REQ-BANK-057). The default rule notifies the bank employees granted on the account, the bank
+   * management and the requester.
+   */
+  BANK_BOOKING_REQUEST_APPROVED,
+
+  /**
+   * The approval of a booking request was revoked (REQ-BANK-057). Creates no notification; clears
+   * the request's ready-to-confirm notices.
+   */
+  BANK_BOOKING_REQUEST_APPROVAL_REVOKED,
+
+  /**
+   * A bank employee was granted access to an account or the grant's rights changed (REQ-BANK-058).
+   * The default rule notifies the grantee.
+   */
+  BANK_GRANT_CHANGED,
+
+  /**
+   * A bank employee's access to an account was withdrawn (REQ-BANK-058). The default rule notifies
+   * the former grantee.
+   */
+  BANK_GRANT_REVOKED,
+
+  /**
+   * Bank staff booked a withdrawal that pays out to a member (REQ-BANK-059). The default rule
+   * notifies that member.
+   */
+  BANK_PAYOUT_BOOKED,
+
+  /**
+   * Bank staff moved aUEC from one holder to another (REQ-BANK-059). The default rule notifies the
+   * receiving holder's member, who must take the aUEC over.
+   */
+  BANK_HOLDER_TRANSFER_BOOKED,
+
+  /**
+   * Bank staff debited an account directly or reversed a booking on it (REQ-BANK-059). The default
+   * rule notifies the account's responsible holders.
+   */
+  BANK_ACCOUNT_DEBITED,
+
+  /**
+   * The roster reconciliation deactivated a bank holder who still holds aUEC (REQ-BANK-060). The
+   * default rule notifies the bank management.
+   */
+  BANK_HOLDER_DEACTIVATED_WITH_BALANCE,
+
+  /**
+   * A deactivated holder was reactivated or their balance reached zero (REQ-BANK-060). Creates no
+   * notification; clears the holder's deactivated-with-balance notice.
+   */
+  BANK_HOLDER_NOTICE_CLEARED,
+
+  /**
+   * A leadership seat was filled or vacated and the member's OFFICER role does not fit the new seat
+   * set (REQ-ORG-029). The default rule notifies the admins.
+   */
+  ORG_LEADERSHIP_ROLE_MISMATCH,
+
+  /**
+   * A member's roles were reconciled and now fit their seats (REQ-ORG-029). Creates no
+   * notification; clears the member's mismatch notice.
+   */
+  ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED,
+
+  /**
+   * A member left the organisation (REQ-ORG-030). The default rule notifies the leadership of each
+   * unit the member belonged to, and of the parent Bereich when a seat became vacant.
+   */
+  ORG_MEMBER_DEPARTED
 }

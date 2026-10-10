@@ -230,7 +230,89 @@ public enum NotificationType {
    * The recipient's material claim on a job order was withdrawn (REQ-ORDERS-044), rendered with
    * {@code displayId}, {@code handle}, {@code material} and the {@code reason} word.
    */
-  JOB_ORDER_CLAIM_WITHDRAWN;
+  JOB_ORDER_CLAIM_WITHDRAWN,
+
+  /**
+   * A refinery order is ready to collect (REQ-REFINERY-023), rendered with {@code order}, {@code
+   * location} and the {@code outputs}.
+   */
+  REFINERY_ORDER_READY,
+
+  /**
+   * Somebody else changed, cancelled or stored the recipient's refinery order, or booked its yield
+   * onto the recipient (REQ-REFINERY-024), rendered with {@code order}, {@code location}, {@code
+   * actor} and the {@code change} word.
+   */
+  REFINERY_ORDER_CHANGED_BY_OTHER,
+
+  /**
+   * An offer the recipient was interested in is gone (REQ-MARKET-021), rendered with {@code item}
+   * and the {@code reason} word.
+   */
+  MATERIAL_EXCHANGE_OFFER_UNAVAILABLE,
+
+  /** A request the recipient could supply is gone (REQ-MARKET-022), rendered with {@code item}. */
+  MATERIAL_REQUEST_UNAVAILABLE,
+
+  /**
+   * Somebody else discarded or sold part of the recipient's Lager stock (REQ-INV-056), rendered
+   * with {@code actor}, the {@code action} word, {@code count} and the {@code lots}.
+   */
+  INVENTORY_BOOKED_OUT_BY_OTHER,
+
+  /**
+   * A booking request is approved and ready to confirm (REQ-BANK-057), rendered with {@code type},
+   * {@code amount}, {@code accountNo} and {@code approver}.
+   */
+  BANK_BOOKING_REQUEST_APPROVED,
+
+  /**
+   * The recipient's bank access to an account was granted or changed (REQ-BANK-058), rendered with
+   * {@code accountNo}, the {@code grantChange} word and the three rights words.
+   */
+  BANK_GRANT_CHANGED,
+
+  /**
+   * The recipient's bank access to an account was withdrawn (REQ-BANK-058), rendered with {@code
+   * accountNo} and {@code actor}.
+   */
+  BANK_GRANT_REVOKED,
+
+  /**
+   * Bank staff paid an amount out to the recipient (REQ-BANK-059), rendered with {@code amount},
+   * {@code fee}, {@code accountNo} and {@code actor}.
+   */
+  BANK_PAYOUT_RECEIVED,
+
+  /**
+   * Bank staff moved an amount to the recipient's holder, who must take the aUEC over
+   * (REQ-BANK-059), rendered with {@code amount} and {@code actor}.
+   */
+  BANK_HOLDER_TRANSFER_RECEIVED,
+
+  /**
+   * Bank staff debited the recipient's account or reversed a booking on it (REQ-BANK-059), rendered
+   * with {@code accountNo}, {@code amount}, {@code fee}, the {@code debit} word and {@code actor}.
+   */
+  BANK_ACCOUNT_DEBITED,
+
+  /**
+   * A bank holder was deactivated but still holds aUEC (REQ-BANK-060), rendered with {@code holder}
+   * and {@code balance}.
+   */
+  BANK_HOLDER_DEACTIVATED_WITH_BALANCE,
+
+  /**
+   * A member's OFFICER role does not fit their leadership seats (REQ-ORG-029), rendered with {@code
+   * member}, {@code unit}, the {@code seat} and {@code rank} words and the {@code mismatch} word.
+   */
+  ORG_LEADERSHIP_ROLE_MISMATCH,
+
+  /**
+   * A member of the recipient's unit left the organisation (REQ-ORG-030), rendered with {@code
+   * member}, {@code unit}, the {@code reason} word and the {@code vacancy} word.
+   */
+  ORG_MEMBER_DEPARTED;
 
   /**
    * Whether a member may mute this type (REQ-NOTIF-027). The account-deletion types serve a legal
@@ -275,7 +357,21 @@ public enum NotificationType {
           JOB_ORDER_REASSIGNED,
           JOB_ORDER_FINISHED,
           JOB_ORDER_ASSIGNED,
-          JOB_ORDER_CLAIM_WITHDRAWN ->
+          JOB_ORDER_CLAIM_WITHDRAWN,
+          REFINERY_ORDER_READY,
+          REFINERY_ORDER_CHANGED_BY_OTHER,
+          MATERIAL_EXCHANGE_OFFER_UNAVAILABLE,
+          MATERIAL_REQUEST_UNAVAILABLE,
+          INVENTORY_BOOKED_OUT_BY_OTHER,
+          BANK_BOOKING_REQUEST_APPROVED,
+          BANK_GRANT_CHANGED,
+          BANK_GRANT_REVOKED,
+          BANK_PAYOUT_RECEIVED,
+          BANK_HOLDER_TRANSFER_RECEIVED,
+          BANK_ACCOUNT_DEBITED,
+          BANK_HOLDER_DEACTIVATED_WITH_BALANCE,
+          ORG_LEADERSHIP_ROLE_MISMATCH,
+          ORG_MEMBER_DEPARTED ->
           true;
     };
   }
