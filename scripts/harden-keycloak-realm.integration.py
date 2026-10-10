@@ -14,8 +14,8 @@ script against it through `docker exec ... kcadm.sh`, and then logs in over HTTP
     login, a member never is, a wrong code is refused, and the rollback gives the admin back a
     plain password login;
   * step 12: the SSO session windows of the chosen profile are on the realm;
-  * step 2: "Forgot password" mails a reset link through the realm's SMTP sender to a sink this
-    script runs itself.
+  * step 2: "Forgot password" mails a reset link through the realm's SMTP sender to a sink inside
+    the container (a single-file Java program on its loopback).
 
 Needs Docker and a free port; touches nothing else. Run it locally:
 
@@ -50,67 +50,89 @@ REDIRECT = "http://127.0.0.1:9/callback"
 MEMBER = ("sandbox-member", "sandbox-member-pw-do-not-use-in-prod")
 
 
+SINK_SOURCE = """
+import java.io.*;
+import java.net.*;
+import java.nio.file.*;
+
+public class Sink {
+    public static void main(String[] args) throws Exception {
+        try (ServerSocket server = new ServerSocket(2525, 5, InetAddress.getLoopbackAddress())) {
+            while (true) {
+                try (Socket socket = server.accept()) {
+                    BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                    PrintWriter out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true);
+                    out.print("220 sink\\r\\n"); out.flush();
+                    StringBuilder mail = new StringBuilder();
+                    boolean data = false;
+                    String line;
+                    while ((line = in.readLine()) != null) {
+                        if (data) {
+                            if (line.equals(".")) {
+                                data = false;
+                                Files.writeString(Path.of("/tmp/mail.log"), mail + "\\n=====\\n",
+                                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                                out.print("250 queued\\r\\n");
+                            } else {
+                                mail.append(line).append('\\n');
+                            }
+                        } else {
+                            String verb = line.length() >= 4 ? line.substring(0, 4).toUpperCase() : line;
+                            if (verb.equals("RCPT") || verb.equals("MAIL")) { mail.append(line).append('\\n'); }
+                            if (verb.equals("DATA")) { data = true; out.print("354 go\\r\\n"); }
+                            else if (verb.equals("QUIT")) { out.print("221 bye\\r\\n"); out.flush(); break; }
+                            else { out.print("250 ok\\r\\n"); }
+                        }
+                        out.flush();
+                    }
+                } catch (IOException ignored) {
+                }
+            }
+        }
+    }
+}
+"""
+
+
 class SmtpSink:
-    """A tiny SMTP server that keeps every message it is handed."""
+    """A tiny SMTP server that runs inside the Keycloak container, on its loopback only.
 
-    def __init__(self) -> None:
-        self.server = socket.socket()
-        self.server.bind(("0.0.0.0", 0))
-        self.server.listen(5)
-        self.port = self.server.getsockname()[1]
-        self.messages: list[dict] = []
-        threading.Thread(target=self._serve, daemon=True).start()
+    It is a single-file Java program started with the container's own JDK, so nothing listens on the
+    host and the test needs no extra image. Every message it is handed is appended to a file in the
+    container, which `messages()` reads.
+    """
 
-    def _serve(self) -> None:
-        while True:
-            try:
-                connection, _ = self.server.accept()
-            except OSError:
+    HOST = "localhost"
+    PORT = 2525
+    LOG = "/tmp/mail.log"
+
+    def __init__(self, stack: "Stack") -> None:
+        self.stack = stack
+
+    def start(self) -> None:
+        """Copy the program into the container and start it in the background."""
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "Sink.java"
+            source.write_text(SINK_SOURCE, encoding="utf-8")
+            self.stack.docker("cp", str(source), f"{self.stack.name}:/tmp/Sink.java")
+        self.stack.docker("exec", "-d", self.stack.name, "java", "/tmp/Sink.java")
+        for _ in range(60):
+            probe = self.stack.docker(
+                "exec", self.stack.name, "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/2525", check=False)
+            if probe.returncode == 0:
                 return
-            threading.Thread(target=self._session, args=(connection,), daemon=True).start()
+            time.sleep(1)
+        raise SystemExit("FATAL: the SMTP sink did not start")
 
-    def _session(self, connection: socket.socket) -> None:
-        reader = connection.makefile("rb")
-        message = {"from": "", "to": [], "data": ""}
-
-        def send(line: str) -> None:
-            connection.sendall(line.encode() + b"\r\n")
-
-        send("220 sink ready")
-        in_data = False
-        data: list[str] = []
-        try:
-            for raw in reader:
-                line = raw.decode("utf-8", "replace").rstrip("\r\n")
-                if in_data:
-                    if line == ".":
-                        in_data = False
-                        message["data"] = "\n".join(data)
-                        self.messages.append(dict(message))
-                        send("250 queued")
-                    else:
-                        data.append(line[1:] if line.startswith("..") else line)
-                    continue
-                verb = line.split(" ", 1)[0].upper()
-                if verb in ("EHLO", "HELO"):
-                    send("250 sink")
-                elif verb == "MAIL":
-                    message["from"] = line.split(":", 1)[1].strip()
-                    send("250 ok")
-                elif verb == "RCPT":
-                    message["to"].append(line.split(":", 1)[1].strip())
-                    send("250 ok")
-                elif verb == "DATA":
-                    in_data = True
-                    data = []
-                    send("354 go")
-                elif verb == "QUIT":
-                    send("221 bye")
-                    break
-                else:
-                    send("250 ok")
-        finally:
-            connection.close()
+    def messages(self) -> list[dict]:
+        """Every message received so far: the recipients and the body."""
+        completed = self.stack.docker("exec", self.stack.name, "bash", "-c",
+                                      f"cat {self.LOG} 2>/dev/null || true", check=False)
+        out = []
+        for raw in completed.stdout.split("\n=====\n"):
+            if raw.strip():
+                out.append({"to": re.findall(r"RCPT TO:\s*(\S+)", raw, re.I), "data": raw})
+        return out
 
 
 class Stack:
@@ -134,8 +156,7 @@ class Stack:
 
     def start(self) -> None:
         """Start the container and wait until the realm answers."""
-        self.docker("run", "-d", "--name", self.name, "--add-host", "host.docker.internal:host-gateway",
-                    "-p", f"127.0.0.1:{self.port}:8080",
+        self.docker("run", "-d", "--name", self.name, "-p", f"127.0.0.1:{self.port}:8080",
                     "-e", f"KC_BOOTSTRAP_ADMIN_USERNAME={self.admin[0]}",
                     "-e", f"KC_BOOTSTRAP_ADMIN_PASSWORD={self.admin[1]}",
                     self.image, "start-dev", "--import-realm", "--cache=local")
@@ -206,8 +227,8 @@ def run(stack: Stack, sink: SmtpSink, workdir: Path) -> None:
     stack.create_user("probe-forgetful", admin_pw, None)
     realm_before = stack.get_json(f"realms/{REALM}")
     backup = workdir / "hardening.before.json"
-    flags = ["--windows", "proposal", "--reset-password", "on", "--smtp-host", "host.docker.internal",
-             "--smtp-port", str(sink.port), "--smtp-from", "noreply@sandbox.invalid",
+    flags = ["--windows", "proposal", "--reset-password", "on", "--smtp-host", sink.HOST,
+             "--smtp-port", str(sink.PORT), "--smtp-from", "noreply@sandbox.invalid",
              "--backup-file", str(backup)]
 
     print("before: a password is all an admin needs")
@@ -259,7 +280,7 @@ def run(stack: Stack, sink: SmtpSink, workdir: Path) -> None:
                 "a second admin is forced too")
 
     print("step 2: forgot password")
-    before = len(sink.messages)
+    before = len(sink.messages())
     page = stack.browser()
     page.start()
     link = page.forgot_password_link()
@@ -271,11 +292,11 @@ def run(stack: Stack, sink: SmtpSink, workdir: Path) -> None:
         if forms:
             page.submit({"username": "probe-forgetful"})
         deadline = time.time() + 20
-        while len(sink.messages) == before and time.time() < deadline:
+        while len(sink.messages()) == before and time.time() < deadline:
             time.sleep(0.5)
-        stack.check(len(sink.messages) > before, "the realm's sender hands a mail to the SMTP sink")
-        if len(sink.messages) > before:
-            mail = sink.messages[-1]
+        stack.check(len(sink.messages()) > before, "the realm's sender hands a mail to the SMTP sink")
+        if len(sink.messages()) > before:
+            mail = sink.messages()[-1]
             stack.check(any("probe-forgetful@example.invalid" in recipient for recipient in mail["to"]),
                         "the mail goes to the member's address")
             stack.check("action-token" in mail["data"] and "key=" in mail["data"],
@@ -308,9 +329,10 @@ def main() -> int:
             probe.bind(("127.0.0.1", 0))
             port = probe.getsockname()[1]
     stack = Stack(args.image, port)
-    sink = SmtpSink()
+    sink = SmtpSink(stack)
     try:
         stack.start()
+        sink.start()
         with tempfile.TemporaryDirectory() as directory:
             run(stack, sink, Path(directory))
     finally:

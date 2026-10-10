@@ -53,7 +53,7 @@ OTP_PROVIDER = "auth-otp-form"
 WINDOW_FIELDS = ("ssoSessionIdleTimeout", "ssoSessionMaxLifespan",
                  "ssoSessionIdleTimeoutRememberMe", "ssoSessionMaxLifespanRememberMe")
 SMTP_FIELDS = ("host", "port", "from", "fromDisplayName", "auth", "user", "starttls", "ssl")
-SECRET_MASK = "**********"
+KEEP_STORED_VALUE = "**********"
 
 
 def _load_mobile_provisioner():
@@ -73,6 +73,19 @@ KcadmError = mobile.KcadmError
 
 class HardenKcadm(mobile.Kcadm):
     """The shared kcadm wrapper plus the two write shapes the flow endpoints need."""
+
+    def write(self, verb: str, path: str, payload: dict | list, what: str) -> None:
+        """Create or update `path`; names what is written and never prints the payload.
+
+        The shared wrapper prints payloads under --dry-run, which would show the SMTP password this
+        script can be handed through the environment.
+        """
+        if self.dry_run:
+            print(f"  [dry-run] {verb} {path} - {what}")
+            return
+        self._run([verb, path, "-r", self.realm, "-f", "-"],
+                  stdin=json.dumps(payload, indent=2, sort_keys=True))
+        print(f"  {verb} {path} - {what}")
 
     def post(self, path: str, payload: dict, what: str) -> None:
         """Create under `path`; under --dry-run only prints."""
@@ -241,7 +254,7 @@ def block_problems(kc: HardenKcadm, block: Block, role: str) -> list[str]:
             problems.append(f"'{label}' is {condition.get('requirement')}, not REQUIRED")
         live = config_of(kc, condition)
         if any(str(live.get(key)) != value for key, value in wanted.items()):
-            problems.append(f"'{label}' is not configured as {wanted}")
+            problems.append(f"'{label}' is not configured as intended")
     otp = find_provider(inner, OTP_PROVIDER)
     if otp is None:
         problems.append(f"'{block.name}' has no 'OTP Form'")
@@ -393,7 +406,7 @@ def plan_forgot_password(kc: HardenKcadm, args: argparse.Namespace) -> Plan:
         if password:
             merged["password"] = password
         elif smtp.get("password"):
-            merged["password"] = SECRET_MASK
+            merged["password"] = KEEP_STORED_VALUE
         if any(str(smtp.get(key)) != str(value) for key, value in merged.items()
                if key != "password") or password:
             shown = {key: value for key, value in merged.items() if key != "password"}
@@ -556,7 +569,7 @@ def snapshot(kc: HardenKcadm, args: argparse.Namespace) -> dict:
         idp = None
     return {
         "realm": {key: realm.get(key) for key in
-                  ("resetPasswordAllowed", "browserFlow", "smtpServer", *WINDOW_FIELDS)},
+                  ("resetPasswordAllowed", "browserFlow", *WINDOW_FIELDS)},
         "identityProvider": None if idp is None else {
             "alias": args.idp_alias, "postBrokerLoginFlowAlias": idp.get("postBrokerLoginFlowAlias")},
     }
@@ -654,7 +667,7 @@ class FakeKeycloak:
                       "ssoSessionIdleTimeout": 2592000, "ssoSessionMaxLifespan": 15552000,
                       "ssoSessionIdleTimeoutRememberMe": 2592000,
                       "ssoSessionMaxLifespanRememberMe": 15552000,
-                      "smtpServer": {"host": "smtp.test", "from": "noreply@test", "password": SECRET_MASK}}
+                      "smtpServer": {"host": "smtp.test", "from": "noreply@test", "password": KEEP_STORED_VALUE}}
         self.flows: dict[str, list[dict]] = {"browser": []}
         self.configs: dict[str, dict] = {}
         self.required_actions: dict[str, dict] = {}
