@@ -243,15 +243,15 @@ Dry run; it writes nothing. **Expected:**
 
 ```text
 [step 2 - Forgot password and the realm's SMTP sender]
-  resetPasswordAllowed=True; smtpServer host=<host> port=<port> from=<address> auth=<...> password set
+  forgot-password link on; smtpServer host=<host> port=<port> from=<address> auth=<...> password set
   The sender's own test is the console's Realm settings > Email > Test connection; ...
 
 No changes: the selected steps are in shape.
 ```
 
 If the sender is missing it prints `WARNING: the link is offered but the realm has no sender`. To
-switch the link off: add `--reset-password off`, read the plan (`~ resetPasswordAllowed: True ->
-False`, exit `2`), then the same command with `--apply`. **Verify:** the `[verify]` block says
+switch the link off: add `--reset-password off`, read the plan (`~ forgot-password link: on ->
+off`, exit `2`), then the same command with `--apply`. **Verify:** the `[verify]` block says
 `the selected steps are in shape`, and `kc get realms/iri --fields resetPasswordAllowed` agrees.
 **Rollback:** `--rollback /root/kc-harden/keycloak-hardening.before.json --apply`, or `kc update
 realms/iri -s resetPasswordAllowed=true`. The sender itself (host, user, password) is never changed

@@ -153,6 +153,11 @@ def desired_conditions(block: Block, role: str) -> list[tuple[str, str, str, dic
     return conditions
 
 
+def on_off(flag: object) -> str:
+    """A switch as the word an operator reads; the value itself is never interpolated."""
+    return "on" if flag else "off"
+
+
 def load_windows(profile: str) -> dict[str, int]:
     """The SSO session windows of one profile in keycloak/session-windows.json."""
     try:
@@ -374,7 +379,7 @@ def plan_forgot_password(kc: HardenKcadm, args: argparse.Namespace) -> Plan:
     smtp = realm.get("smtpServer") or {}
     password_set = bool(smtp.get("password"))
     plan.notes.append(
-        f"resetPasswordAllowed={realm.get('resetPasswordAllowed')}; smtpServer host="
+        f"forgot-password link {on_off(realm.get('resetPasswordAllowed'))}; smtpServer host="
         f"{smtp.get('host') or '<none>'} port={smtp.get('port') or '<default>'} from="
         f"{smtp.get('from') or '<none>'} auth={smtp.get('auth')} password "
         f"{'set' if password_set else 'NOT set'}")
@@ -387,7 +392,7 @@ def plan_forgot_password(kc: HardenKcadm, args: argparse.Namespace) -> Plan:
     wanted = {"on": True, "off": False}.get(args.reset_password)
     if wanted is not None and realm.get("resetPasswordAllowed") != wanted:
         plan.changes.append(Change(
-            f"~ resetPasswordAllowed: {realm.get('resetPasswordAllowed')} -> {wanted}",
+            f"~ forgot-password link: {on_off(realm.get('resetPasswordAllowed'))} -> {on_off(wanted)}",
             lambda: kc.write("update", f"realms/{kc.realm}", {"resetPasswordAllowed": wanted},
                              "Forgot password")))
 
@@ -531,7 +536,7 @@ def verify(kc: HardenKcadm, steps: set[str], args: argparse.Namespace) -> list[s
     if "2" in steps:
         wanted = {"on": True, "off": False}.get(args.reset_password)
         if wanted is not None and realm.get("resetPasswordAllowed") != wanted:
-            problems.append(f"resetPasswordAllowed is {realm.get('resetPasswordAllowed')}")
+            problems.append(f"the forgot-password link is {on_off(realm.get('resetPasswordAllowed'))}")
     if "12" in steps:
         for key, value in load_windows(args.windows).items():
             if realm.get(key) != value:
