@@ -133,6 +133,7 @@ val nullAwayPackages =
     .joinToString(",")
 
 tasks.named<JavaCompile>("compileJava") {
+  options.errorprone.enabled.set(!providers.gradleProperty("skipErrorprone").isPresent)
   options.errorprone {
     disableWarningsInGeneratedCode.set(true)
     check("NullAway", CheckSeverity.ERROR)
