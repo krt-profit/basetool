@@ -54,6 +54,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleReque
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipChangeObserver;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.ResponsibleHolderTracker;
 import de.greluc.krt.profit.basetool.backend.repository.KommandoGroupRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
@@ -92,10 +93,9 @@ class OrgUnitMembershipServiceTest {
   @Mock private AuditService auditService;
   @Mock private MembershipChangeObserver membershipChangeObserver;
 
-  @Mock
-  private ObjectProvider<OrgUnitBankResponsibilityService> orgUnitBankResponsibilityServiceProvider;
+  @Mock private ObjectProvider<ResponsibleHolderTracker> responsibleHolderTrackerProvider;
 
-  @Mock private OrgUnitBankResponsibilityService orgUnitBankResponsibilityService;
+  @Mock private ResponsibleHolderTracker responsibleHolderTracker;
 
   @Spy
   private OrgUnitMembershipMapper orgUnitMembershipMapper =
@@ -126,11 +126,9 @@ class OrgUnitMembershipServiceTest {
     id = new OrgUnitMembershipId(userId, scId);
 
     lenient()
-        .when(orgUnitBankResponsibilityServiceProvider.getObject())
-        .thenReturn(orgUnitBankResponsibilityService);
-    lenient()
-        .when(orgUnitBankResponsibilityService.snapshotResponsibleHolders(any()))
-        .thenReturn(Map.of());
+        .when(responsibleHolderTrackerProvider.getObject())
+        .thenReturn(responsibleHolderTracker);
+    lenient().when(responsibleHolderTracker.snapshotResponsibleHolders(any())).thenReturn(Map.of());
   }
 
   @Test

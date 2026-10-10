@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.ResponsibleHolderTracker;
 import de.greluc.krt.profit.basetool.backend.personalinventory.api.PersonalInventoryErasure;
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import java.util.ArrayList;
@@ -79,10 +80,9 @@ class UserDeletionServiceTest {
 
   @Mock private UserService userService;
 
-  @Mock
-  private ObjectProvider<OrgUnitBankResponsibilityService> orgUnitBankResponsibilityServiceProvider;
+  @Mock private ObjectProvider<ResponsibleHolderTracker> responsibleHolderTrackerProvider;
 
-  @Mock private OrgUnitBankResponsibilityService orgUnitBankResponsibilityService;
+  @Mock private ResponsibleHolderTracker responsibleHolderTracker;
 
   /** The gateway allowlist a test may extend; the properties record reads it by reference. */
   private final List<String> gatewayClientIds = new ArrayList<>();
@@ -116,10 +116,10 @@ class UserDeletionServiceTest {
     admin.setInKeycloak(true);
 
     lenient()
-        .when(orgUnitBankResponsibilityServiceProvider.getObject())
-        .thenReturn(orgUnitBankResponsibilityService);
+        .when(responsibleHolderTrackerProvider.getObject())
+        .thenReturn(responsibleHolderTracker);
     lenient()
-        .when(orgUnitBankResponsibilityService.snapshotResponsibleHoldersForUser(any()))
+        .when(responsibleHolderTracker.snapshotResponsibleHoldersForUser(any()))
         .thenReturn(Map.of());
   }
 

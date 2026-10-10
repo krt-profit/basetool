@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.Department;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.ResponsibleHolderTracker;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
@@ -54,7 +55,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @RequiredArgsConstructor
-public class OrgUnitBankResponsibilityService {
+public class OrgUnitBankResponsibilityService implements ResponsibleHolderTracker {
 
   private final BankAccountRepository bankAccountRepository;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
@@ -139,6 +140,7 @@ public class OrgUnitBankResponsibilityService {
    */
   @NotNull
   @Transactional
+  @Override
   public Map<UUID, Set<UUID>> snapshotResponsibleHolders(@NotNull UUID orgUnitId) {
     Map<UUID, Set<UUID>> snapshot = new HashMap<>();
     for (UUID accountId : responsibleAuditAccountIds(orgUnitId)) {
@@ -161,6 +163,7 @@ public class OrgUnitBankResponsibilityService {
    */
   @NotNull
   @Transactional
+  @Override
   public Map<UUID, Set<UUID>> snapshotResponsibleHoldersForUser(@NotNull UUID userId) {
     Set<UUID> orgUnitIds =
         new LinkedHashSet<>(orgUnitMembershipRepository.findOrgUnitIdsByUserId(userId));
@@ -181,6 +184,7 @@ public class OrgUnitBankResponsibilityService {
    * @param before the pre-mutation snapshot from {@link #snapshotResponsibleHolders(UUID)}
    */
   @Transactional
+  @Override
   public void recordResponsibleHolderChanges(@NotNull Map<UUID, Set<UUID>> before) {
     before.forEach(
         (accountId, oldHolders) -> {

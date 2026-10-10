@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncFollowUp;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.BankHolder;
@@ -47,7 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class BankHolderReconciliationService {
+public class BankHolderReconciliationService implements UserSyncFollowUp {
 
   /** Role codes whose holders must exist as active bank holders (REQ-BANK-029). */
   private static final List<String> BANK_ROLE_CODES =
@@ -65,6 +66,7 @@ public class BankHolderReconciliationService {
    * the sweep back cleanly (the next run retries).
    */
   @Transactional
+  @Override
   public void reconcileAll() {
     Set<UUID> staff = new HashSet<>();
     for (String code : BANK_ROLE_CODES) {

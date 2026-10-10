@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepo
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -49,6 +50,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Mockito unit tests for {@link HandleAnonymisationService}, the granted Art. 17 erasure of a
@@ -80,6 +82,19 @@ class HandleAnonymisationServiceTest {
   @Mock private BankAuditService bankAuditService;
 
   @InjectMocks private HandleAnonymisationService service;
+
+  @BeforeEach
+  void wireTheBankPart() {
+    ReflectionTestUtils.setField(
+        service,
+        "bankHandleSnapshots",
+        new BankHandleSnapshotService(
+            bankAuditEventRepository,
+            bankTransactionRepository,
+            bankBookingRequestRepository,
+            bankHolderRepository,
+            bankAuditService));
+  }
 
   private void stubCounts(int each) {
     when(auditEventRepository.anonymiseActorHandle(any(), any())).thenReturn(each);

@@ -245,6 +245,8 @@ import de.greluc.krt.profit.basetool.backend.service.BankBookingGuards;
 import de.greluc.krt.profit.basetool.backend.service.BankBookingRequestService;
 import de.greluc.krt.profit.basetool.backend.service.BankDashboardService;
 import de.greluc.krt.profit.basetool.backend.service.BankGrantService;
+import de.greluc.krt.profit.basetool.backend.service.BankHandleSnapshotService;
+import de.greluc.krt.profit.basetool.backend.service.BankHandleSnapshots;
 import de.greluc.krt.profit.basetool.backend.service.BankHolderReconciliationService;
 import de.greluc.krt.profit.basetool.backend.service.BankHolderService;
 import de.greluc.krt.profit.basetool.backend.service.BankLedgerIntegrityService;
@@ -528,6 +530,8 @@ class ArchitectureTest {
    */
   static final Set<Class<?>> BANK_CLASSES =
       Set.of(
+          BankHandleSnapshots.class,
+          BankHandleSnapshotService.class,
           BankAccountController.class,
           BankAdminController.class,
           BankBookingController.class,

@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.ResponsibleHolderTracker;
 import de.greluc.krt.profit.basetool.backend.personalinventory.api.PersonalInventoryErasure;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
@@ -139,8 +140,7 @@ public class UserDeletionService {
    * Lazily resolved audit seam for bank responsible-holder changes, used by {@link
    * #deleteUser(UUID)} when the deleted user led an org unit (REQ-BANK-034).
    */
-  private final ObjectProvider<OrgUnitBankResponsibilityService>
-      orgUnitBankResponsibilityServiceProvider;
+  private final ObjectProvider<ResponsibleHolderTracker> responsibleHolderTrackerProvider;
 
   /**
    * The identity seam. Consulted only for the fallback admin in {@link #deleteUser(UUID)} (the
@@ -293,9 +293,7 @@ public class UserDeletionService {
     userRepository.clearApprovedBy(userId);
 
     final Map<UUID, Set<UUID>> responsibleBefore =
-        orgUnitBankResponsibilityServiceProvider
-            .getObject()
-            .snapshotResponsibleHoldersForUser(userId);
+        responsibleHolderTrackerProvider.getObject().snapshotResponsibleHoldersForUser(userId);
 
     auditRecorder.record(
         AuditEventType.USER_DELETED,
@@ -313,9 +311,7 @@ public class UserDeletionService {
 
     userRepository.delete(user);
     userRepository.flush();
-    orgUnitBankResponsibilityServiceProvider
-        .getObject()
-        .recordResponsibleHolderChanges(responsibleBefore);
+    responsibleHolderTrackerProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
     log.info(
         "User {} deleted: purged {} inventory rows, {} ships, {} personal inventory, {} blueprints,"
             + " {} notifications, {} rule selectors, {} evaluations; missions and refinery orders"
