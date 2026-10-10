@@ -264,7 +264,7 @@ class MaterialExchangeRepositoryDataTest {
 
     MaterialExchangeOffer duplicate = new MaterialExchangeOffer();
     duplicate.setKind(MaterialExchangeOfferKind.MATERIAL);
-    duplicate.setInventoryItem(item);
+    duplicate.setInventoryItemId(item.getId());
     duplicate.setOwner(owner);
     duplicate.setOfferedAmount(item.getAmount());
     duplicate.setStatus(MaterialExchangeOfferStatus.ACTIVE);
@@ -529,7 +529,7 @@ class MaterialExchangeRepositoryDataTest {
       InventoryItem item, User owner, MaterialExchangeOfferStatus status, double offeredAmount) {
     MaterialExchangeOffer offer = new MaterialExchangeOffer();
     offer.setKind(MaterialExchangeOfferKind.MATERIAL);
-    offer.setInventoryItem(item);
+    offer.setInventoryItemId(item.getId());
     offer.setOwner(owner);
     offer.setOfferedAmount(offeredAmount);
     offer.setRemark("Tausche gegen **Titanium**.");
@@ -567,7 +567,7 @@ class MaterialExchangeRepositoryDataTest {
       InventoryItem row, User owner, int quantity) {
     MaterialExchangeOffer offer = new MaterialExchangeOffer();
     offer.setKind(MaterialExchangeOfferKind.ITEM);
-    offer.setInventoryItem(row);
+    offer.setInventoryItemId(row.getId());
     offer.setOwner(owner);
     offer.setItemProductKey("prod-key-" + UUID.randomUUID());
     offer.setItemName(row.getGameItem().getName());

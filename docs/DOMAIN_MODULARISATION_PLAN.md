@@ -1017,7 +1017,9 @@ as each pair is decoupled.
   `MaterialExchangeOffer.inventoryItem` stays an association for now: converting it rewrites the
   fetch plan of eight queries and two entity graphs, and nothing needs the id until `InventoryItem`
   leaves `model` with the inventory move (P3-5), where it belongs. **Tracked for P3-5:** convert
-  `MaterialExchangeOffer.inventoryItem` to the item id when `InventoryItem` moves. (3)
+  `MaterialExchangeOffer.inventoryItem` to the item id when `InventoryItem` moves — done in
+  P3-5d-4 (2026-10-10), ahead of the move. *Correction:* it was eight board queries, one entity
+  graph and two Lager queries (the releasable-row reads' `NOT EXISTS`), not two entity graphs. (3)
   `ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE` is public, because the offer board's JPQL
   splices it from another package.
 - `refinery` — **done 2026-10-10.**
@@ -1221,6 +1223,18 @@ as each pair is decoupled.
     scan the by-material read rises from 8 to 30 statements). Baseline **67 → 61**; the remaining
     `inventory -> joborder` edges are the requirement checks of the allocation and the order-facing
     stock reads (`JobOrderItemStockGroupDto`, the stock row projections), which move with 5e.
+  - **5d-4 — done 2026-10-10.** `MaterialExchangeOffer.inventoryItem` becomes `inventoryItemId`
+    (the same `inventory_item_id` column, foreign key and `ON DELETE CASCADE`; no migration). The
+    board's JPQL joins the row as an entity join (`LEFT JOIN InventoryItem ii ON ii.id =
+    o.inventoryItemId`), so its filters, sort and clamp stay in SQL; the detail's entity graph
+    drops the row. The board then loads the page's rows with their material in one read
+    (`InventoryItemRepository.findWithMaterialByIdIn`) and hands each row to the DTO mapping; the
+    detail, the update's clamp and the audit label load the one row by id. The DTOs and the audit
+    labels and details are byte-identical. `MaterialExchangeBoardNoNPlusOneTest`, added before
+    the change, keeps the "mein" board at the same count for 25 offers as for 3 (5 statements)
+    and the detail within the bound (proven able to fail: loading the rows per offer gives 10
+    against 54). The Materialbörse no longer holds an association into the Lager; its remaining
+    use of `InventoryItem` is the type, which leaves `model` with 5e. Baseline unchanged.
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |

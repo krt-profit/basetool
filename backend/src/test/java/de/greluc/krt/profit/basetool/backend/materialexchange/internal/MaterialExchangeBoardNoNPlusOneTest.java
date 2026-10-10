@@ -173,7 +173,7 @@ class MaterialExchangeBoardNoNPlusOneTest {
       created.add(item);
       MaterialExchangeOffer offer = new MaterialExchangeOffer();
       offer.setKind(MaterialExchangeOfferKind.MATERIAL);
-      offer.setInventoryItem(item);
+      offer.setInventoryItemId(item.getId());
       offer.setOwner(owner);
       offer.setOfferedAmount(4.0);
       offer.setStatus(MaterialExchangeOfferStatus.ACTIVE);

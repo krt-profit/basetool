@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -142,7 +143,7 @@ public class MaterialExchangeService {
     if (offer == null) {
       offer = new MaterialExchangeOffer();
       offer.setKind(MaterialExchangeOfferKind.MATERIAL);
-      offer.setInventoryItem(item);
+      offer.setInventoryItemId(item.getId());
       offer.setOwner(item.getUser());
       offer.setOwningOrgUnit(item.getOwningOrgUnit());
       offer.setStatus(MaterialExchangeOfferStatus.ACTIVE);
@@ -200,7 +201,7 @@ public class MaterialExchangeService {
     if (offer == null) {
       offer = new MaterialExchangeOffer();
       offer.setKind(MaterialExchangeOfferKind.ITEM);
-      offer.setInventoryItem(item);
+      offer.setInventoryItemId(item.getId());
       offer.setOwner(item.getUser());
       offer.setOwningOrgUnit(item.getOwningOrgUnit());
       offer.setStatus(MaterialExchangeOfferStatus.ACTIVE);
@@ -298,15 +299,17 @@ public class MaterialExchangeService {
 
     AuditDetails details;
     if (offer.getKind() == MaterialExchangeOfferKind.ITEM) {
+      InventoryItem row = boardService.rowOf(offer);
       int quantity =
-          offer.getInventoryItem() != null
-              ? requireOfferableItemQuantity(request.offeredAmount(), offer.getInventoryItem())
+          row != null
+              ? requireOfferableItemQuantity(request.offeredAmount(), row)
               : wholeItemQuantity(request.offeredAmount());
       offer.setItemQuantity(quantity);
       details = AuditDetails.of("kind", MaterialExchangeOfferKind.ITEM).with("qty", quantity);
     } else {
       double offeredAmount =
-          requireOfferableAmount(request.offeredAmount(), offer.getInventoryItem());
+          requireOfferableAmount(
+              request.offeredAmount(), Objects.requireNonNull(boardService.rowOf(offer)));
       offer.setOfferedAmount(offeredAmount);
       details = AuditDetails.of("amt", offeredAmount);
     }
@@ -576,11 +579,11 @@ public class MaterialExchangeService {
    * @param offer the offer
    * @return the audit subject label
    */
-  private static String offerLabel(MaterialExchangeOffer offer) {
+  private String offerLabel(MaterialExchangeOffer offer) {
     if (offer.getKind() == MaterialExchangeOfferKind.ITEM) {
       return offer.getItemName();
     }
-    return offer.getInventoryItem().getMaterial().getName();
+    return Objects.requireNonNull(boardService.rowOf(offer)).getMaterial().getName();
   }
 
   /**
@@ -596,7 +599,7 @@ public class MaterialExchangeService {
           .with("product", offer.getItemProductKey());
     }
     return AuditDetails.of("kind", MaterialExchangeOfferKind.MATERIAL)
-        .with("item", offer.getInventoryItem().getId());
+        .with("item", offer.getInventoryItemId());
   }
 
   /**
