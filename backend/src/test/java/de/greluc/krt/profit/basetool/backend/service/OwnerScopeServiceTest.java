@@ -35,6 +35,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
@@ -113,6 +114,8 @@ class OwnerScopeServiceTest {
 
   private RefineryAccessPolicy refineryPolicy;
 
+  private MissionAccessPolicy missionPolicy;
+
   private JobOrderAccessPolicy jobOrderPolicy;
 
   private static final UUID MEMBER_USER_ID = UUID.randomUUID();
@@ -181,7 +184,6 @@ class OwnerScopeServiceTest {
         new AccessGateService(
             requestScopeResolver,
             authHelper,
-            missionRepository,
             inventoryItemRepository,
             shipRepository,
             orgUnitMembershipRepository);
@@ -196,6 +198,7 @@ class OwnerScopeServiceTest {
         new OwnerScopeService(requestScopeResolver, accessGateService, orgUnitStampingService);
     operationPolicy = new OperationAccessPolicy(service, authHelper, operationRepository);
     refineryPolicy = new RefineryAccessPolicy(service, refineryOrderRepository);
+    missionPolicy = new MissionAccessPolicy(service, authHelper, missionRepository);
     jobOrderPolicy =
         new JobOrderAccessPolicy(
             service,
@@ -650,7 +653,7 @@ class OwnerScopeServiceTest {
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       stubMemberInSquadronA();
 
-      assertTrue(service.canSeeMission(missionId));
+      assertTrue(missionPolicy.canSeeMission(missionId));
     }
 
     @Test
@@ -660,7 +663,7 @@ class OwnerScopeServiceTest {
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       stubMemberInSquadronA();
 
-      assertTrue(service.canSeeMission(missionId));
+      assertTrue(missionPolicy.canSeeMission(missionId));
     }
 
     @Test
@@ -670,7 +673,7 @@ class OwnerScopeServiceTest {
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       stubMemberInSquadronA();
 
-      assertFalse(service.canSeeMission(missionId));
+      assertFalse(missionPolicy.canSeeMission(missionId));
     }
 
     @Test
@@ -679,7 +682,7 @@ class OwnerScopeServiceTest {
       Mission mission = newMission(missionId, null, false);
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
 
-      assertTrue(service.canSeeMission(missionId));
+      assertTrue(missionPolicy.canSeeMission(missionId));
     }
 
     @Test
@@ -689,7 +692,7 @@ class OwnerScopeServiceTest {
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       when(authHelper.isMemberOrAbove()).thenReturn(true);
 
-      assertTrue(service.canSeeMission(missionId));
+      assertTrue(missionPolicy.canSeeMission(missionId));
     }
 
     @Test
@@ -699,7 +702,7 @@ class OwnerScopeServiceTest {
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       when(authHelper.isMemberOrAbove()).thenReturn(false);
 
-      assertFalse(service.canSeeMission(missionId));
+      assertFalse(missionPolicy.canSeeMission(missionId));
     }
 
     @Test
@@ -707,7 +710,7 @@ class OwnerScopeServiceTest {
       UUID missionId = UUID.randomUUID();
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.empty());
 
-      assertFalse(service.canSeeMission(missionId));
+      assertFalse(missionPolicy.canSeeMission(missionId));
     }
   }
 
@@ -721,7 +724,7 @@ class OwnerScopeServiceTest {
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       stubMemberInSquadronA();
 
-      assertFalse(service.canEditMission(missionId));
+      assertFalse(missionPolicy.canEditMission(missionId));
     }
 
     @Test
@@ -731,7 +734,7 @@ class OwnerScopeServiceTest {
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       stubMemberInSquadronA();
 
-      assertTrue(service.canEditMission(missionId));
+      assertTrue(missionPolicy.canEditMission(missionId));
     }
 
     @Test
@@ -740,7 +743,7 @@ class OwnerScopeServiceTest {
       Mission mission = newMission(missionId, null, false);
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
 
-      assertTrue(service.canEditMission(missionId));
+      assertTrue(missionPolicy.canEditMission(missionId));
     }
 
     @Test
@@ -748,7 +751,7 @@ class OwnerScopeServiceTest {
       UUID missionId = UUID.randomUUID();
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.empty());
 
-      assertFalse(service.canEditMission(missionId));
+      assertFalse(missionPolicy.canEditMission(missionId));
     }
   }
 

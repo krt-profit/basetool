@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.mission.api.events.MissionNotices;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionNeverEndedNoticeProducer;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionReminderNoticeProducer;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
