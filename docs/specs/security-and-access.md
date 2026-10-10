@@ -20,7 +20,7 @@ read/write is isolated to the calling user unless the caller is privileged.
 > ends on a page with a way back). The mission finance-entry scope below shared `REQ-SEC-019` with the
 > Discord-link indicator until 2026-09-22, when it was renumbered to **REQ-SEC-065** on the owner's
 > decision (see the renumbering table in [`INDEX.md`](INDEX.md)). **REQ-SEC-054** was never
-> allocated. The next free id is **REQ-SEC-082** (corrected 2026-10-03: REQ-SEC-073…080 went to the
+> allocated. The next free id is **REQ-SEC-083** (corrected 2026-10-03: REQ-SEC-073…080 went to the
 > Phase 0 guard packages of the modularisation plan) — re-check `origin/main` and open PRs before claiming it. Requirements are grouped by subject, not strictly by number.
 
 ### REQ-SEC-001 — OIDC topology
@@ -391,7 +391,8 @@ REQ-SEC-009; this scope gate applies only to *user-linked* participants.)
 The same rule binds every **create-stock-for-another-member** path. `POST /api/v1/inventory`, `POST
 /api/v1/refinery-orders` (its `owner` override) and the per-item receiver of `POST
 /api/v1/refinery-orders/{id}/store` MUST each authorise the **target**, through
-`OwnerScopeService.canManageUserInventory(...)` / `canManageUserRefineryOrders(...)`, and MUST NOT
+`InventoryAccessPolicy.canManageUserInventory(...)` (published as `BookInPolicy.mayBookInFor`) /
+`RefineryAccessPolicy.canManageUserRefineryOrders(...)`, and MUST NOT
 substitute a bare `AuthHelperService.isLogisticianOrAbove()` for it. All three did until the
 2026-08-30 audit, which made them cross-tenant writes by construction; the fourth entry point,
 `POST /api/v1/refinery-orders/users/{userId}`, had been closed in PR #808 and is the shape the other
@@ -1143,7 +1144,7 @@ so a bare id was not an authorization secret.
   `X-Guest-Edit-Token`) that hashed to the stored hash, OR (b) held a mission-management role in
   scope (`canManageMission`). Only branch (b) survives, and it is now unconditional.
 - **The token proves *which row*, never *whether the mission is still open*.** Branch (a) MUST
-  additionally require `OwnerScopeService.canSeeMission(missionId)`. Without it the capability
+  additionally require `MissionAccessPolicy.canSeeMission(missionId)`. Without it the capability
   outlived the surface that granted it: a guest who signed up while the mission was public kept
   `PUT` / `DELETE` / check-in on their row after the mission was flipped to `isInternal = true` and
   after it reached `COMPLETED` / `CANCELLED`. Because `OperationPayoutService` recomputes the time
@@ -3031,7 +3032,8 @@ anonymous status of every admitted path), `EdgeProbeBackendStatusTest`, `EdgeAdm
 `POST /api/v1/refinery-orders/{id}/store` takes a `userId` per stored item that names the
 **receiving stock owner**. Because it decides whose ledger the output lands in, it MUST be
 authorized against **the caller and that target together**: naming somebody else requires
-`@ownerScopeService.canManageUserInventory(<receiver>)` — admin, self, or at least one shared
+`BookInPolicy.mayBookInFor(<receiver>)` (the inventory access policy's `canManageUserInventory`) —
+admin, self, or at least one shared
 **editable** org unit with the receiver — and any other value is refused with `403`. The check runs
 on the **requested** id and **before** the user is loaded, so an unauthorised caller cannot
 distinguish an existing member id from an unknown one.
@@ -3160,7 +3162,7 @@ a caller who may manage the mission (ADMIN; an OFFICER / MISSION_MANAGER whose o
 covers it; the owner or a co-manager) may book for any of its participants, and every other member
 may book **only against their own participant row** on that mission.
 
-It MUST NOT be gated on `OwnerScopeService#canSeeMission`, which deliberately grants the
+It MUST NOT be gated on `MissionAccessPolicy#canSeeMission`, which deliberately grants the
 cross-squadron **public escape** on a non-internal mission. That is the correct rule for a read and
 the wrong one for a write: combined with a service that checked only that the participant belonged
 to the mission, any member could post income/expense rows into another squadron's payout ledger and
@@ -3378,7 +3380,7 @@ layer directly.
 **Enforced by:** `MeControllerTest`, `StockViewerAccessServiceTest`, `InventoryItemMapperTest` ·
 **Code:** `MeController`, `StockViewerAccess`, `StockViewerAccessService`,
 `EarmarkTargetPolicy#mayEditJobOrderEarmarks` (implemented by `JobOrderAccessPolicy`),
-`AccessGateService#canEditInventoryItem`, `InventoryItemMapper`,
+`InventoryAccessPolicy#canEditInventoryItem`, `InventoryItemMapper`,
 `JobOrderMapper` · **Related:** REQ-SEC-046, ADR-0047, and the Android counterpart REQ-APP-AUTH-014
 (`basetool-android` `docs/specs/auth.md`)
 
@@ -5667,6 +5669,52 @@ stays an explicit loop, not an annotation.
 
 **Enforced by:** `RestClientConfigTest`, `ExternalClientConcurrencyLimitTest` · **Code:**
 `RestClientConfig`, `AsyncConfig`, `UexClient`, `ScWikiClient` · **Related:** REQ-OBS-009, ADR-0204
+
+---
+
+### REQ-SEC-082 — Admin accounts need a second factor, and the realm's session windows are one reviewed file
+
+Three realm-wide hardening steps of [`KEYCLOAK_HARDENING_RUNBOOK.md`](../KEYCLOAK_HARDENING_RUNBOOK.md)
+(D-26 of the modularisation plan) are code, not console clicks: `scripts/harden-keycloak-realm.py`,
+dry run by default, with a rollback file, never deleting.
+
+- **OTP for holders of `Admin` (step 11).** The realm binds a copy of the built-in browser flow,
+  `browser-admin-otp`, whose `forms` flow ends in a conditional sub-flow: the user holds the realm
+  role `Admin` **and** no OTP was presented in this login yet **and** an OTP Form is required. An
+  admin with a device is asked once, by the built-in second-factor step; an admin without one is
+  made to set one up at that login. The required action **Configure OTP** is registered and enabled
+  (without it such an admin is refused with *credential setup required*). The Discord identity
+  provider's *post login flow* is a small top-level flow of its own (`Admin` role, OTP Form), never
+  the browser copy: a brokered login must not run the username and password pages again.
+- **Forgot password (step 2).** The switch and the realm's own SMTP sender are one decision: a link
+  that cannot be answered with a mail is not offered.
+- **Session windows (step 12).** The four SSO windows are `keycloak/session-windows.json`, profile
+  `active`. The realm provisioner and the hardening script read the same file, so neither puts the
+  other's numbers back.
+
+**Acceptance**
+
+- [x] On a real Keycloak 26.8 with the sandbox realm, after the script: an admin without a device is
+  forced to set one up and the login then completes; the next login asks for the code, once; a wrong
+  code is refused; a member signs in with the password alone; a second admin is forced too
+  (`harden-keycloak-realm.integration.py`).
+- [x] The same run: the realm carries the session windows of the chosen profile, and "Forgot
+  password" hands a reset mail with an action token to the realm's SMTP sender (a test sink).
+- [x] A dry run changes nothing and writes no rollback file; a second run finds nothing to do; a
+  broken or misplaced block is repaired, not duplicated; `--rollback` binds the built-in flow again,
+  restores the windows and unbinds the post login flow, and deletes no flow
+  (`harden-keycloak-realm.py --selftest`, run in CI by `keycloak-provisioner.yml`).
+- [x] The provisioner's session windows are the file's `active` profile
+  (`harden-keycloak-realm.py --selftest`).
+- [ ] A login that comes in through Discord is gated: **not testable in the repository** (the test
+  realm has no Discord provider); the owner checks it at the production run
+  ([`OWNER_STEPS_2026-10.md`](../OWNER_STEPS_2026-10.md) § 7).
+
+**Enforced by:** `scripts/harden-keycloak-realm.py --selftest`,
+`scripts/harden-keycloak-realm.integration.py` (needs Docker; run before changing the script) ·
+**Code:** `scripts/harden-keycloak-realm.py`, `scripts/keycloak/session-windows.json`,
+`scripts/keycloak/hardening_probe.py` · **Related:** REQ-SEC-052, REQ-SEC-053, ADR-0159, ADR-0202,
+[`OWNER_STEPS_2026-10.md`](../OWNER_STEPS_2026-10.md)
 
 ---
 

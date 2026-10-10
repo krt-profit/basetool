@@ -28,6 +28,7 @@
       "bank::api",
       "catalogue::api",
       "exchange::api",
+      "hangar::api",
       "identity::api",
       "inventory::api",
       "joborder::api",

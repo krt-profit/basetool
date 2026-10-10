@@ -83,7 +83,7 @@ public class NotificationTimedRunner {
    * @throws RuntimeException the first failure of a producer, rethrown after the others have run
    */
   public int runOnce(@NotNull Instant now) {
-    Integer produced = lockTransaction.execute(status -> runLocked(now));
+    Integer produced = lockTransaction.execute(_ -> runLocked(now));
     return produced == null ? 0 : produced;
   }
 
@@ -96,7 +96,7 @@ public class NotificationTimedRunner {
     RuntimeException firstFailure = null;
     for (TimedNoticeProducer producer : producers) {
       try {
-        Integer count = producerTransaction.execute(status -> producer.produce(now));
+        Integer count = producerTransaction.execute(_ -> producer.produce(now));
         int produced = count == null ? 0 : count;
         meterRegistry
             .counter(MetricNames.NOTIFICATION_TIMED_PRODUCED, MetricNames.TAG_KIND, producer.kind())

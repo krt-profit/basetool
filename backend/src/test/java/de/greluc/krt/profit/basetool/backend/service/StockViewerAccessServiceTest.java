@@ -46,14 +46,14 @@ class StockViewerAccessServiceTest {
   private static final UUID CALLER_ID = UUID.randomUUID();
   private static final UUID OTHER_MEMBER_ID = UUID.randomUUID();
 
-  @Mock private AccessGateService accessGateService;
+  @Mock private InventoryAccessPolicy inventoryAccessPolicy;
   @Mock private AuthHelperService authHelperService;
 
   @InjectMocks private StockViewerAccessService service;
 
   @Test
   void mayEditInventoryItem_ownRowInScope_isTrueForAPlainMember() {
-    when(accessGateService.canEditInventoryItem(ITEM_ID)).thenReturn(true);
+    when(inventoryAccessPolicy.canEditInventoryItem(ITEM_ID)).thenReturn(true);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(CALLER_ID));
 
     assertTrue(service.mayEditInventoryItem(ITEM_ID, CALLER_ID));
@@ -61,7 +61,7 @@ class StockViewerAccessServiceTest {
 
   @Test
   void mayEditInventoryItem_anotherMembersRowInScope_isFalseForAPlainMember() {
-    when(accessGateService.canEditInventoryItem(ITEM_ID)).thenReturn(true);
+    when(inventoryAccessPolicy.canEditInventoryItem(ITEM_ID)).thenReturn(true);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(CALLER_ID));
     when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
 
@@ -70,7 +70,7 @@ class StockViewerAccessServiceTest {
 
   @Test
   void mayEditInventoryItem_anotherMembersRowInScope_isTrueForALogisticianOrAbove() {
-    when(accessGateService.canEditInventoryItem(ITEM_ID)).thenReturn(true);
+    when(inventoryAccessPolicy.canEditInventoryItem(ITEM_ID)).thenReturn(true);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(CALLER_ID));
     when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
 
@@ -79,7 +79,7 @@ class StockViewerAccessServiceTest {
 
   @Test
   void mayEditInventoryItem_rowOutOfScope_isFalseEvenForALogisticianOrAbove() {
-    when(accessGateService.canEditInventoryItem(ITEM_ID)).thenReturn(false);
+    when(inventoryAccessPolicy.canEditInventoryItem(ITEM_ID)).thenReturn(false);
     lenient().when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
 
     assertFalse(service.mayEditInventoryItem(ITEM_ID, OTHER_MEMBER_ID));
@@ -87,7 +87,7 @@ class StockViewerAccessServiceTest {
 
   @Test
   void mayEditInventoryItem_unknownOwner_countsAsNotTheCaller() {
-    when(accessGateService.canEditInventoryItem(ITEM_ID)).thenReturn(true);
+    when(inventoryAccessPolicy.canEditInventoryItem(ITEM_ID)).thenReturn(true);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
 
     assertFalse(service.mayEditInventoryItem(ITEM_ID, null));
@@ -96,7 +96,7 @@ class StockViewerAccessServiceTest {
 
   @Test
   void mayEditInventoryItem_unauthenticatedCaller_isNotTheOwner() {
-    when(accessGateService.canEditInventoryItem(ITEM_ID)).thenReturn(true);
+    when(inventoryAccessPolicy.canEditInventoryItem(ITEM_ID)).thenReturn(true);
     when(authHelperService.currentUserId()).thenReturn(Optional.empty());
     when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
 
@@ -106,6 +106,6 @@ class StockViewerAccessServiceTest {
   @Test
   void mayEditInventoryItem_nullItemId_isFalseWithoutAskingTheScopeGate() {
     assertFalse(service.mayEditInventoryItem(null, CALLER_ID));
-    verify(accessGateService, never()).canEditInventoryItem(any());
+    verify(inventoryAccessPolicy, never()).canEditInventoryItem(any());
   }
 }
