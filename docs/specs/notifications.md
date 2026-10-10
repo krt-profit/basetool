@@ -82,6 +82,9 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `JOB_ORDER_ASSIGNEE_ADDED` | `JOB_ORDER_ASSIGNED` | V274 | `EVENT_RECIPIENT` (the assignee); clears a removal | REQ-ORDERS-043 |
 | `JOB_ORDER_ASSIGNEE_REMOVED` | none (no rule) | — | supersedes that member's `JOB_ORDER_ASSIGNED` (REQ-NOTIF-025) | REQ-ORDERS-043 |
 | `JOB_ORDER_CLAIM_WITHDRAWN` | `JOB_ORDER_CLAIM_WITHDRAWN` | V274 | `EVENT_RECIPIENT` (the member who made the claim); coded reason `reasonCode` | REQ-ORDERS-044 |
+| `REFINERY_ORDER_READY` | `REFINERY_ORDER_READY` | V276 | `EVENT_RECIPIENT` (the owner); raised once by the `refinery_ready` timed producer | REQ-REFINERY-023 |
+| `REFINERY_ORDER_READY_CLEARED` | none (no rule) | — | supersedes the order's `REFINERY_ORDER_READY` | REQ-REFINERY-023 |
+| `REFINERY_ORDER_CHANGED_BY_OTHER` | `REFINERY_ORDER_CHANGED_BY_OTHER` | V276 | `EVENT_RECIPIENT` (the owner, or the member the yield was booked onto); coded `changeCode` | REQ-REFINERY-024 |
 
 Every notification type renders through `notifications.type.<TYPE>` in all three frontend bundles.
 The e-mail consumers of REQ-NOTIF-013 (`UserApprovalMailService`, `PendingRegistrationMailService`)

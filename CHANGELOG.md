@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Benachrichtigungen zur Raffinerie.** Der Besitzer erfährt, wenn ein Raffinerieauftrag fertig ist und abgeholt werden kann, und wenn jemand anderes den Auftrag ändert, storniert oder einlagert, auch auf wessen Lager die Ausbeute gebucht wurde (REQ-REFINERY-023, -024, Migrationen V275/V276, #2414).
 - **Keycloak-Härtung als Skript.** `scripts/harden-keycloak-realm.py` setzt die Runbook-Schritte 2 (Passwort
   vergessen), 11 (OTP für Admins, auch über Discord) und 12 (Sitzungsfenster) trocken vorab prüfbar und mit
   Rücknahme um; die Sitzungsfenster stehen jetzt in `scripts/keycloak/session-windows.json`, die der Provisioner

@@ -79,6 +79,10 @@ public class RefineryOrder extends AbstractEntity<UUID> {
 
   private Instant startedAt;
 
+  /** When the order-ready notice was raised, or {@code null} (REQ-REFINERY-023). */
+  @Column(name = "ready_notified_at")
+  private Instant readyNotifiedAt;
+
   @PositiveOrZero private Long durationMinutes;
 
   /**

@@ -141,6 +141,16 @@ class SeededNotificationRulesIntegrationTest {
             true,
             SelectorKind.EVENT_RECIPIENT),
         rule(
+            NotificationEventType.REFINERY_ORDER_READY,
+            NotificationType.REFINERY_ORDER_READY,
+            false,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
+            NotificationEventType.REFINERY_ORDER_CHANGED_BY_OTHER,
+            NotificationType.REFINERY_ORDER_CHANGED_BY_OTHER,
+            true,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
             NotificationEventType.OPERATION_COMPLETED_UNOWNED,
             NotificationType.OPERATION_COMPLETED,
             true,

@@ -106,7 +106,10 @@ public class AdminNotificationRulePageController {
           "JOB_ORDER_FINISHED",
           "JOB_ORDER_ASSIGNEE_ADDED",
           "JOB_ORDER_ASSIGNEE_REMOVED",
-          "JOB_ORDER_CLAIM_WITHDRAWN");
+          "JOB_ORDER_CLAIM_WITHDRAWN",
+          "REFINERY_ORDER_READY",
+          "REFINERY_ORDER_CHANGED_BY_OTHER",
+          "REFINERY_ORDER_READY_CLEARED");
 
   /**
    * {@code NotificationType} codes, labelled via {@code admin.notificationRules.notificationType}.
@@ -146,7 +149,9 @@ public class AdminNotificationRulePageController {
           "JOB_ORDER_REASSIGNED",
           "JOB_ORDER_FINISHED",
           "JOB_ORDER_ASSIGNED",
-          "JOB_ORDER_CLAIM_WITHDRAWN");
+          "JOB_ORDER_CLAIM_WITHDRAWN",
+          "REFINERY_ORDER_READY",
+          "REFINERY_ORDER_CHANGED_BY_OTHER");
 
   /**
    * {@code SelectorKind} codes, labelled via {@code admin.notificationRules.selector.kind}. All but
