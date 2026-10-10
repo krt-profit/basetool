@@ -25,17 +25,20 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
+import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderNotices;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderAssignee;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,6 +64,11 @@ public class JobOrderAssigneeService {
   /** Projects the updated order back to its stock/claim DTO. */
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
 
+  /** Publishes the assignment notices (REQ-ORDERS-043). */
+  private final ApplicationEventPublisher eventPublisher;
+
+  private final UserService userService;
+
   /**
    * Adds a user as an assignee of a job order; idempotent.
    *
@@ -85,6 +93,12 @@ public class JobOrderAssigneeService {
         Entities.require(userRepository.findById(userId), () -> "User not found: " + userId);
     jobOrder.addAssignee(JobOrderAssignee.builder().user(user).build());
     JobOrder saved = jobOrderRepository.saveAndFlush(jobOrder);
+    ActorRef actor = userService.currentActor();
+    if (!userId.equals(actor.id())) {
+      eventPublisher.publishEvent(
+          JobOrderNotices.assigneeAdded(
+              saved.getId(), saved.getDisplayId(), saved.getHandle(), userId, actor));
+    }
     auditRecorder.record(
         AuditEventType.JOB_ORDER_ASSIGNEE_ADDED,
         saved.getId(),
@@ -112,6 +126,8 @@ public class JobOrderAssigneeService {
             .removeIf(a -> a.getUser() != null && a.getUser().getId().equals(userId));
     JobOrder saved = jobOrderRepository.saveAndFlush(jobOrder);
     if (removed) {
+      eventPublisher.publishEvent(
+          JobOrderNotices.assigneeRemoved(saved.getId(), userId, userService.currentActor()));
       auditRecorder.record(
           AuditEventType.JOB_ORDER_ASSIGNEE_REMOVED,
           saved.getId(),

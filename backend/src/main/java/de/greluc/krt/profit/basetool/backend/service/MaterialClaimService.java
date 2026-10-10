@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
+import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderNotices;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.QualityTierMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
@@ -43,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ClaimDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateClaimDto;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
@@ -60,6 +62,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
@@ -98,6 +101,11 @@ public class MaterialClaimService {
    * #upsertClaimWithinTransaction} in its own {@code REQUIRES_NEW} transaction.
    */
   private final ObjectProvider<MaterialClaimService> self;
+
+  /** Publishes the withdrawal notices (REQ-ORDERS-044). */
+  private final ApplicationEventPublisher eventPublisher;
+
+  private final UserService userService;
 
   /**
    * Total attempts {@link #upsertClaim} makes against a concurrent same-bucket writer before the
@@ -406,6 +414,7 @@ public class MaterialClaimService {
         materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(order.getId());
     if (!claims.isEmpty()) {
       materialClaimRepository.deleteAll(claims);
+      announceWithdrawn(order, claims, "DE_ESCALATED");
       log.info(
           "Withdrew all {} material claim(s) on order {} (SK→squadron de-escalation)",
           claims.size(),
@@ -433,12 +442,39 @@ public class MaterialClaimService {
             .toList();
     if (!orphaned.isEmpty()) {
       materialClaimRepository.deleteAll(orphaned);
+      announceWithdrawn(order, orphaned, "ORDER_CHANGED");
       log.info(
           "Withdrew {} orphaned material claim(s) on order {} after a bucket was removed",
           orphaned.size(),
           order.getId());
     }
     return orphaned.size();
+  }
+
+  /**
+   * Tells each member whose claim was withdrawn, once per claim (REQ-ORDERS-044).
+   *
+   * @param order the order the claims were on
+   * @param claims the withdrawn claims
+   * @param reasonCode {@code ORDER_CHANGED} or {@code DE_ESCALATED}
+   */
+  private void announceWithdrawn(
+      @NotNull JobOrder order, @NotNull List<MaterialClaim> claims, @NotNull String reasonCode) {
+    ActorRef actor = userService.currentActor();
+    for (MaterialClaim claim : claims) {
+      if (claim.getClaimedByUser() == null) {
+        continue;
+      }
+      eventPublisher.publishEvent(
+          JobOrderNotices.claimWithdrawn(
+              order.getId(),
+              order.getDisplayId(),
+              order.getHandle(),
+              claim.getClaimedByUser().getId(),
+              claim.getMaterial().getName(),
+              reasonCode,
+              actor));
+    }
   }
 
   /**

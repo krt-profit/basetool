@@ -206,7 +206,31 @@ public enum NotificationType {
    * An operation was completed and its payouts are due (REQ-MISSION-029), rendered with {@code
    * operation}, {@code total}, {@code open}, {@code paid}, {@code count} and {@code unfinished}.
    */
-  OPERATION_COMPLETED;
+  OPERATION_COMPLETED,
+
+  /**
+   * A job order moved to the recipient's unit (REQ-ORDERS-041), rendered with {@code displayId},
+   * {@code handle}, {@code from} and {@code to}.
+   */
+  JOB_ORDER_REASSIGNED,
+
+  /**
+   * A job order of the recipient's unit was completed, rejected or deleted (REQ-ORDERS-042),
+   * rendered with {@code displayId}, {@code handle}, {@code unit} and the {@code status} word.
+   */
+  JOB_ORDER_FINISHED,
+
+  /**
+   * The recipient was assigned to a job order (REQ-ORDERS-043), rendered with {@code displayId},
+   * {@code handle} and {@code actor}.
+   */
+  JOB_ORDER_ASSIGNED,
+
+  /**
+   * The recipient's material claim on a job order was withdrawn (REQ-ORDERS-044), rendered with
+   * {@code displayId}, {@code handle}, {@code material} and the {@code reason} word.
+   */
+  JOB_ORDER_CLAIM_WITHDRAWN;
 
   /**
    * Whether a member may mute this type (REQ-NOTIF-027). The account-deletion types serve a legal
@@ -247,7 +271,11 @@ public enum NotificationType {
           MISSION_NEVER_ENDED,
           MISSION_RESPONSIBILITY_ASSIGNED,
           OPERATION_PAYOUT_PAID_OUT,
-          OPERATION_COMPLETED ->
+          OPERATION_COMPLETED,
+          JOB_ORDER_REASSIGNED,
+          JOB_ORDER_FINISHED,
+          JOB_ORDER_ASSIGNED,
+          JOB_ORDER_CLAIM_WITHDRAWN ->
           true;
     };
   }

@@ -144,7 +144,8 @@ class JobOrderServiceTest {
             jobOrderStockProjectionService,
             jobOrderPriorityService,
             qualityTierService,
-            ownerScopeService);
+            ownerScopeService,
+            actingUserService());
     jobOrderQueryService =
         new JobOrderQueryService(
             jobOrderRepository,
@@ -2064,5 +2065,14 @@ class JobOrderServiceTest {
       verify(jobOrderRepository, never()).saveAndFlush(any());
       verify(auditService, never()).record(any(), any(), any(), any(), any());
     }
+  }
+
+  private static UserService actingUserService() {
+    UserService userService = org.mockito.Mockito.mock(UserService.class);
+    org.mockito.Mockito.lenient()
+        .when(userService.currentActor())
+        .thenReturn(
+            de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef.system());
+    return userService;
   }
 }
