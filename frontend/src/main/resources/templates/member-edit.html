@@ -20,12 +20,12 @@
         <button class="tab active" id="member-tab-profile" type="button" role="tab" aria-selected="true"
                 aria-controls="member-panel-profile" data-tab="profile" data-testid="member-tab-profile"
                 th:text="#{members.edit.tab.profile}">Stammdaten</button>
-        <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+        <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
                 class="tab" id="member-tab-memberships" type="button" role="tab" aria-selected="false" tabindex="-1"
                 aria-controls="member-panel-memberships" data-tab="memberships" data-testid="member-tab-memberships"
             ><span th:text="#{members.memberships.title}">Mitgliedschaften</span>
             <span class="tab-count" th:text="${memberMemberships != null ? memberMemberships.size() : 0}">0</span></button>
-        <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+        <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
                 class="tab" id="member-tab-export" type="button" role="tab" aria-selected="false" tabindex="-1"
                 aria-controls="member-panel-export" data-tab="export" data-testid="member-tab-export"
                 th:text="#{members.export.title}">Datenauskunft</button>
@@ -93,7 +93,7 @@
         </div>
 
         <div id="member-panel-memberships" class="member-edit-panel" role="tabpanel" aria-labelledby="member-tab-memberships" hidden
-             sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+             sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
             <fieldset class="form-section" id="staffel-section">
                 <legend class="form-section__head" th:text="|1 · #{members.staffel.title}|">1 · Staffeln</legend>
 
@@ -216,7 +216,7 @@
     </form>
 
     <section id="member-panel-export" class="card member-export stack" role="tabpanel" aria-labelledby="member-tab-export" hidden
-             sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+             sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
         <h2 class="member-export__title" th:text="#{members.export.title}">Datenauskunft</h2>
         <div class="alert alert-info" th:text="#{members.export.hint}">F&uuml;r eine Auskunftsanfrage eines Mitglieds, das sich nicht anmelden kann. Namen anderer Mitglieder sind entfernt.</div>
         <div class="cluster">

@@ -17,7 +17,7 @@
             <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.organisation', titleText=#{orgChart.title}, actions=~{::oc-head-actions})}">
                 <th:block th:ref="oc-head-actions">
                     <button type="button" class="btn btn-ghost oc-edit-toggle" data-trigger="oc-toggle-edit"
-                            sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                            sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
                             data-testid="oc-edit-toggle" aria-pressed="false" th:text="#{orgChart.edit}">Bearbeiten</button>
                 </th:block>
             </th:block>
@@ -30,7 +30,7 @@
     <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${error}, extraClass='mt-2')}"></th:block>
 
     <div id="oc-edit-hint" class="oc-edit-hint" role="note"
-         sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${orgChart != null}"
+         sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:if="${orgChart != null}"
          th:text="#{orgChart.editHint}">Bearbeiten aktiv: Positionen zuweisen, umbenennen oder entfernen.</div>
 
     <div id="oc-chart" class="oc-chart" th:if="${orgChart != null}">
@@ -56,7 +56,7 @@
                     <th:block th:if="${ol.grandAdmiral() != null}">
                         <div class="oc-v"></div>
                         <th:block th:replace="~{fragments/org-chart-node :: ocNodeLabeled(${ol.grandAdmiral()}, 2, 'orgChart.rank.GRAND_ADMIRAL', false)}"></th:block>
-                        <div class="oc-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                        <div class="oc-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
                              th:if="${ol.grandAdmiral().userId() == null}">
                             <button type="button" class="oc-icon-btn" data-trigger="oc-ga-add"
                                     th:data-org-unit-id="${ol.orgUnitId()}"
@@ -72,7 +72,7 @@
                             </button>
                         </div>
                     </th:block>
-                    <button type="button" class="oc-add" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                    <button type="button" class="oc-add" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
                             th:if="${ol.grandAdmiral() == null}"
                             data-trigger="oc-ga-add" th:data-org-unit-id="${ol.orgUnitId()}"
                             th:data-rank-label="#{orgChart.rank.GRAND_ADMIRAL}"
@@ -84,7 +84,7 @@
                             </div>
                         </li>
                     </ul>
-                    <button type="button" class="oc-add" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                    <button type="button" class="oc-add" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
                             data-trigger="oc-add" data-position-type="OL_MEMBER"
                             th:data-org-unit-id="${ol.orgUnitId()}"
                             th:data-rank-label="#{orgChart.rank.OL_MEMBER}"
@@ -125,7 +125,7 @@
                     <span class="oc-node-name" th:text="#{orgChart.vacant}">Nicht besetzt</span>
                 </div>
                 <button th:if="${area.lead() == null}" type="button" class="oc-add"
-                        sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" data-trigger="oc-add" data-position-type="AREA_LEAD"
+                        sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" data-trigger="oc-add" data-position-type="AREA_LEAD"
                         th:data-rank-label="#{orgChart.rank.AREA_LEAD}"
                         th:text="#{orgChart.add.areaLead}">Bereichsleiter zuweisen</button>
 
@@ -144,7 +144,7 @@
                     </li>
                 </ul>
 
-                <button type="button" class="oc-add" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                <button type="button" class="oc-add" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
                         data-trigger="oc-add-staff" th:text="#{orgChart.add.staff}">Stab hinzufügen</button>
 
                 <th:block th:replace="~{fragments/org-chart-node :: ocUnitFan(${orgChart.squadrons()}, ${orgChart.specialCommands()})}"></th:block>
@@ -159,7 +159,7 @@
     </div>
 </main>
 
-<th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+<th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='oc-modal', titleKey='orgChart.modal.title', variant='krt-modal--wide', titleId='oc-modal-title', closeTrigger='oc-modal-cancel', body=~{::oc-modal-body})}">
     <th:block th:ref="oc-modal-body">
         <div class="krt-modal-body">
