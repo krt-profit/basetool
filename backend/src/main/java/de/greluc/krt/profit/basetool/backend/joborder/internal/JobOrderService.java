@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderClosedEvent;
@@ -927,13 +928,11 @@ public class JobOrderService {
             inventoryItemRepository.findById(inventoryItemId),
             () -> "InventoryItem not found: " + inventoryItemId);
 
-    if (item.getJobOrderAllocations().stream()
-        .noneMatch(a -> a.getJobOrder() != null && a.getJobOrder().getId().equals(jobOrderId))) {
+    if (InventoryAllocations.jobOrderSlice(item, jobOrderId) == null) {
       throw new NotFoundException("InventoryItem not linked to job order: " + inventoryItemId);
     }
 
-    item.getJobOrderAllocations()
-        .removeIf(a -> a.getJobOrder() != null && a.getJobOrder().getId().equals(jobOrderId));
+    stockCommands.releaseJobOrderEarmark(item, jobOrderId);
     auditRecorder.record(
         AuditEventType.JOB_ORDER_INVENTORY_UNLINKED,
         jobOrderId,

@@ -62,14 +62,16 @@ public final class InventoryAuditLabels {
    * Renders an inventory row's first earmarked job order for an audit details payload.
    *
    * @param item the inventory row; allocations must be loadable in the transaction
+   * @param displayIds a job order's running number by id
    * @return {@code #<displayId>} of the first earmarked job order, {@code -} when none
    */
-  public static String jobOrderRef(@NotNull InventoryItem item) {
+  public static String jobOrderRef(
+      @NotNull InventoryItem item, @NotNull Function<UUID, @Nullable Integer> displayIds) {
     return item.getJobOrderAllocations().stream()
-        .map(InventoryJobOrderAllocation::getJobOrder)
+        .map(InventoryJobOrderAllocation::getJobOrderId)
         .filter(Objects::nonNull)
         .findFirst()
-        .map(jobOrder -> "#" + jobOrder.getDisplayId())
+        .map(id -> "#" + displayIds.apply(id))
         .orElse("-");
   }
 

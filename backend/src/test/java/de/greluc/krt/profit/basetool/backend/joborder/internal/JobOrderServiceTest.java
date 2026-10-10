@@ -138,8 +138,7 @@ class JobOrderServiceTest {
             jobOrderRepository,
             materialRepository,
             inventoryItemRepository,
-            new InventoryStockCommands(
-                inventoryItemRepository, null, null, null, null, null, null, null),
+            new InventoryStockCommands(inventoryItemRepository, null, null, null, null, null, null),
             null,
             orgUnitRepository,
             jobOrderOrgUnitResolver,
@@ -1210,7 +1209,7 @@ class JobOrderServiceTest {
         new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
     item.setId(inventoryItemId);
     item.setAmount(10.0);
-    InventoryAllocations.addJobOrder(item, jobOrder, 10.0, false);
+    InventoryAllocations.addJobOrder(item, jobOrder.getId(), 10.0, false);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(inventoryItemRepository.findById(inventoryItemId)).thenReturn(Optional.of(item));
@@ -1218,8 +1217,7 @@ class JobOrderServiceTest {
     jobOrderService.unlinkInventoryItem(orderId, inventoryItemId);
 
     assertTrue(
-        item.getJobOrderAllocations().stream()
-            .noneMatch(a -> a.getJobOrder() != null && a.getJobOrder().getId().equals(orderId)),
+        item.getJobOrderAllocations().stream().noneMatch(a -> orderId.equals(a.getJobOrderId())),
         "the order's allocation slice should be removed after unlinking");
     verify(jobOrderRepository).findById(orderId);
     verify(inventoryItemRepository).findById(inventoryItemId);
@@ -1260,7 +1258,7 @@ class JobOrderServiceTest {
         new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
     item.setId(inventoryItemId);
     item.setAmount(10.0);
-    InventoryAllocations.addJobOrder(item, otherOrder, 10.0, false);
+    InventoryAllocations.addJobOrder(item, otherOrder.getId(), 10.0, false);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(inventoryItemRepository.findById(inventoryItemId)).thenReturn(Optional.of(item));

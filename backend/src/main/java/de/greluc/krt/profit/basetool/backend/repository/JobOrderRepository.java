@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import jakarta.persistence.LockModeType;
@@ -316,4 +317,17 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       WHERE lower(o.handle) = lower(:handle) AND o.handle <> :sentinel
       """)
   int anonymiseHandle(@Param("handle") String handle, @Param("sentinel") String sentinel);
+
+  /**
+   * Loads what the Lager shows of the given job orders in one read (plan §7.5 P3-5d).
+   *
+   * @param ids the job orders
+   * @return the existing orders' id and running number
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark(
+      o.id, o.displayId) FROM JobOrder o WHERE o.id IN :ids
+      """)
+  List<JobOrderEarmark> findEarmarks(@Param("ids") Collection<UUID> ids);
 }

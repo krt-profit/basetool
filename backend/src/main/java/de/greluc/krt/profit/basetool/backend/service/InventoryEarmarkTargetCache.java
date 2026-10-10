@@ -20,7 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
+import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
 import jakarta.persistence.EntityManager;
 import java.util.HashMap;
@@ -39,19 +41,20 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 /**
  * The Lager's per-transaction memo of its earmark targets (plan §7.5 P3-5d): the first miss loads
- * every mission the Lager rows of the persistence context are earmarked to in one read, so a page
- * of rows costs one lookup, not one per row (REQ-DATA-003).
+ * every mission or job order the Lager rows of the persistence context are earmarked to in one
+ * read, so a page of rows costs one lookup, not one per row (REQ-DATA-003).
  */
 @Component
 @RequiredArgsConstructor
 public class InventoryEarmarkTargetCache implements EarmarkTargets.Lookup {
 
   private final EarmarkTargets.Missions missions;
+  private final EarmarkTargets.JobOrders jobOrders;
   private final EntityManager entityManager;
 
   @Override
   public @Nullable MissionEarmark mission(@NotNull UUID missionId) {
-    Map<UUID, Optional<MissionEarmark>> memo = memo();
+    Map<UUID, Optional<MissionEarmark>> memo = memoObject().missions;
     if (!memo.containsKey(missionId)) {
       Set<UUID> wanted = new LinkedHashSet<>(earmarkedMissionsInContext());
       wanted.add(missionId);
@@ -62,6 +65,39 @@ public class InventoryEarmarkTargetCache implements EarmarkTargets.Lookup {
       }
     }
     return memo.get(missionId).orElse(null);
+  }
+
+  @Override
+  public @Nullable JobOrderEarmark jobOrder(@NotNull UUID jobOrderId) {
+    Map<UUID, Optional<JobOrderEarmark>> memo = memoObject().jobOrders;
+    if (!memo.containsKey(jobOrderId)) {
+      Set<UUID> wanted = new LinkedHashSet<>(earmarkedJobOrdersInContext());
+      wanted.add(jobOrderId);
+      wanted.removeAll(memo.keySet());
+      Map<UUID, JobOrderEarmark> found = jobOrders.jobOrders(wanted);
+      for (UUID id : wanted) {
+        memo.put(id, Optional.ofNullable(found.get(id)));
+      }
+    }
+    return memo.get(jobOrderId).orElse(null);
+  }
+
+  private Set<UUID> earmarkedJobOrdersInContext() {
+    Set<UUID> ids = new LinkedHashSet<>();
+    if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+      return ids;
+    }
+    for (Map.Entry<Object, ?> entry :
+        entityManager
+            .unwrap(SessionImplementor.class)
+            .getPersistenceContextInternal()
+            .reentrantSafeEntityEntries()) {
+      if (entry.getKey() instanceof InventoryJobOrderAllocation allocation
+          && allocation.getJobOrderId() != null) {
+        ids.add(allocation.getJobOrderId());
+      }
+    }
+    return ids;
   }
 
   private Set<UUID> earmarkedMissionsInContext() {
@@ -82,12 +118,12 @@ public class InventoryEarmarkTargetCache implements EarmarkTargets.Lookup {
     return ids;
   }
 
-  private Map<UUID, Optional<MissionEarmark>> memo() {
+  private Memo memoObject() {
     if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-      return new HashMap<>();
+      return new Memo();
     }
     if (TransactionSynchronizationManager.getResource(this) instanceof Memo bound) {
-      return bound.missions;
+      return bound;
     }
     Memo memo = new Memo();
     TransactionSynchronizationManager.bindResource(this, memo);
@@ -99,7 +135,7 @@ public class InventoryEarmarkTargetCache implements EarmarkTargets.Lookup {
                 InventoryEarmarkTargetCache.this);
           }
         });
-    return memo.missions;
+    return memo;
   }
 
   /** One transaction's memo. */
@@ -107,5 +143,8 @@ public class InventoryEarmarkTargetCache implements EarmarkTargets.Lookup {
 
     /** The looked-up missions by id, empty for an unknown one. */
     private final Map<UUID, Optional<MissionEarmark>> missions = new HashMap<>();
+
+    /** The looked-up job orders by id, empty for an unknown one. */
+    private final Map<UUID, Optional<JobOrderEarmark>> jobOrders = new HashMap<>();
   }
 }

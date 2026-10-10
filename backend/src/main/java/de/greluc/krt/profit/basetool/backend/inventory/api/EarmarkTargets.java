@@ -48,6 +48,19 @@ public final class EarmarkTargets {
     Map<UUID, MissionEarmark> missions(@NotNull Collection<UUID> ids);
   }
 
+  /** The job orders the Lager's stock is earmarked to; implemented by the job-order module. */
+  public interface JobOrders {
+
+    /**
+     * Looks the job orders up in one read.
+     *
+     * @param ids the job orders
+     * @return each existing job order by id; an unknown id is absent
+     */
+    @NotNull
+    Map<UUID, JobOrderEarmark> jobOrders(@NotNull Collection<UUID> ids);
+  }
+
   /** The Lager-side lookup of the earmark targets, memoised for the running transaction. */
   public interface Lookup {
 
@@ -60,5 +73,15 @@ public final class EarmarkTargets {
      */
     @Nullable
     MissionEarmark mission(@NotNull UUID missionId);
+
+    /**
+     * Returns a job order the Lager's stock is earmarked to; the first miss in a transaction loads
+     * every job order the loaded Lager rows are earmarked to in one read.
+     *
+     * @param jobOrderId the job order
+     * @return the job order, or {@code null} when it does not exist
+     */
+    @Nullable
+    JobOrderEarmark jobOrder(@NotNull UUID jobOrderId);
   }
 }

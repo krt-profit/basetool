@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
@@ -121,6 +122,7 @@ class InventoryItemServiceTest {
             locationRepository,
             new de.greluc.krt.profit.basetool.backend.mission.internal.MissionSaleIncome(
                 missionParticipantRepository, missionFinanceEntryRepository),
+            earmarkTargets,
             new MaterialExchangeStockOfferLookup(materialExchangeOfferRepository),
             offerRatchet,
             inventoryItemMapper,
@@ -139,8 +141,7 @@ class InventoryItemServiceTest {
             inventoryItemMapper,
             ownerScopeService,
             inventoryAccessPolicy,
-            new InventoryStockCommands(
-                null, null, null, null, null, inventoryAccessPolicy, null, null),
+            new InventoryStockCommands(null, null, null, null, null, inventoryAccessPolicy, null),
             jobOrderItemService,
             auditService,
             realAggregationService,
@@ -656,8 +657,7 @@ class InventoryItemServiceTest {
             inventoryItemMapper,
             ownerScopeService,
             inventoryAccessPolicy,
-            new InventoryStockCommands(
-                null, null, null, null, null, inventoryAccessPolicy, null, null),
+            new InventoryStockCommands(null, null, null, null, null, inventoryAccessPolicy, null),
             jobOrderItemService,
             auditService,
             realAggregationService,
@@ -999,7 +999,8 @@ class InventoryItemServiceTest {
     org.mockito.ArgumentCaptor<InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository).save(captor.capture());
-    assertSame(jobOrder, captor.getValue().getJobOrderAllocations().get(0).getJobOrder());
+    assertEquals(
+        jobOrder.getId(), captor.getValue().getJobOrderAllocations().get(0).getJobOrderId());
   }
 
   @Test
@@ -1388,7 +1389,8 @@ class InventoryItemServiceTest {
     org.mockito.ArgumentCaptor<InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository).save(captor.capture());
-    assertSame(itemOrder, captor.getValue().getJobOrderAllocations().get(0).getJobOrder());
+    assertEquals(
+        itemOrder.getId(), captor.getValue().getJobOrderAllocations().get(0).getJobOrderId());
     assertEquals(2.0, captor.getValue().getJobOrderAllocations().get(0).getAmount());
     verify(jobOrderItemService, never()).requiredMaterialIds(any(JobOrder.class));
   }
@@ -1914,7 +1916,7 @@ class InventoryItemServiceTest {
     item.setAmount(5.0);
     InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
     slice.setInventoryItem(item);
-    slice.setJobOrder(jobOrder);
+    slice.setJobOrderId(jobOrder.getId());
     slice.setAmount(3.0);
     slice.setDelivered(true);
     item.getJobOrderAllocations().add(slice);
@@ -1970,7 +1972,7 @@ class InventoryItemServiceTest {
     for (Object[] sliceSpec : slices) {
       InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
       slice.setInventoryItem(row);
-      slice.setJobOrder((JobOrder) sliceSpec[0]);
+      slice.setJobOrderId(((JobOrder) sliceSpec[0]).getId());
       slice.setAmount((Double) sliceSpec[1]);
       slice.setDelivered((Boolean) sliceSpec[2]);
       row.getJobOrderAllocations().add(slice);
@@ -2139,6 +2141,7 @@ class InventoryItemServiceTest {
     JobOrder order = new JobOrder();
     order.setId(orderId);
     order.setDisplayId(7);
+    when(earmarkTargets.jobOrder(order.getId())).thenReturn(new JobOrderEarmark(order.getId(), 7));
 
     InventoryItem item = new InventoryItem();
     item.setId(itemId);
@@ -2146,7 +2149,7 @@ class InventoryItemServiceTest {
     item.setUser(owner);
     InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
     slice.setInventoryItem(item);
-    slice.setJobOrder(order);
+    slice.setJobOrderId(order.getId());
     slice.setAmount(3.0);
     slice.setDelivered(false);
     item.getJobOrderAllocations().add(slice);
@@ -2201,6 +2204,7 @@ class InventoryItemServiceTest {
     JobOrder order = new JobOrder();
     order.setId(orderId);
     order.setDisplayId(9);
+    when(earmarkTargets.jobOrder(order.getId())).thenReturn(new JobOrderEarmark(order.getId(), 9));
 
     InventoryItem item = new InventoryItem();
     item.setId(itemId);
@@ -2208,7 +2212,7 @@ class InventoryItemServiceTest {
     item.setUser(owner);
     InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
     slice.setInventoryItem(item);
-    slice.setJobOrder(order);
+    slice.setJobOrderId(order.getId());
     slice.setAmount(3.0);
     slice.setDelivered(false);
     item.getJobOrderAllocations().add(slice);

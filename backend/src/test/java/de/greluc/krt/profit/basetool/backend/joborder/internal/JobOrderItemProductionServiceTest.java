@@ -124,9 +124,7 @@ class JobOrderItemProductionServiceTest {
             null,
             auditService,
             bookInPolicy,
-            offerRatchet,
-            de.greluc.krt.profit.basetool.backend.service.ReferenceResolvingEntityManager
-                .create()));
+            offerRatchet));
     orderId = UUID.randomUUID();
     lineId = UUID.randomUUID();
     inventoryId = UUID.randomUUID();
@@ -165,7 +163,7 @@ class JobOrderItemProductionServiceTest {
     inventoryItem.setMaterial(material);
     inventoryItem.setAmount(100.0);
     inventoryItem.setVersion(INVENTORY_VERSION);
-    InventoryAllocations.addJobOrder(inventoryItem, order, 100.0, false);
+    InventoryAllocations.addJobOrder(inventoryItem, order.getId(), 100.0, false);
 
     lenient().when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     lenient()
@@ -383,7 +381,7 @@ class JobOrderItemProductionServiceTest {
   void bookProduction_consumesFullStock_deletesEntry_stillAudits() {
     inventoryItem.setAmount(40.0);
     inventoryItem.getJobOrderAllocations().clear();
-    InventoryAllocations.addJobOrder(inventoryItem, order, 40.0, false);
+    InventoryAllocations.addJobOrder(inventoryItem, order.getId(), 40.0, false);
     JobOrderItemProductionCreateDto dto =
         new JobOrderItemProductionCreateDto(
             1,
@@ -525,7 +523,7 @@ class JobOrderItemProductionServiceTest {
     assertThat(stockRow.getAmount()).isEqualTo(2.0);
     assertThat(stockRow.getJobOrderAllocations()).hasSize(1);
     var slice = stockRow.getJobOrderAllocations().get(0);
-    assertThat(slice.getJobOrder().getId()).isEqualTo(order.getId());
+    assertThat(slice.getJobOrderId()).isEqualTo(order.getId());
     assertThat(slice.getAmount()).isEqualTo(2.0);
     assertThat(slice.getDelivered()).isFalse();
     verify(ownerScopeService).resolveOrgUnitForPickerOutputNullable(owner, orgUnitId);

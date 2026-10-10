@@ -45,7 +45,8 @@ import org.springframework.data.jpa.repository.Modifying;
  * Only the inventory module writes Lager rows (plan §7.5, P3-5c): every other module asks {@code
  * inventory.api.StockCommands}. A write is a mutating call on {@link InventoryItemRepository}
  * ({@code save*}, {@code delete*} or a {@code @Modifying} query), a setter of a Lager row or its
- * earmarks, or a mutator of {@link InventoryAllocations} or {@link AllocationReductions}.
+ * earmarks or a reach into its earmark collections, or a mutator of {@link InventoryAllocations} or
+ * {@link AllocationReductions}.
  *
  * <p>The rule is proven able to fail on {@link StockWriteFixtures}.
  */
@@ -72,6 +73,10 @@ class StockWriteOwnershipTest {
           InventoryJobOrderAllocation.class.getName(),
           InventoryMissionAllocation.class.getName());
 
+  /** The row's earmark collections, which hand out the mutable list itself. */
+  private static final Set<String> EARMARK_COLLECTIONS =
+      Set.of("getJobOrderAllocations", "getMissionAllocations");
+
   private static final Set<String> ALLOCATION_MUTATORS =
       Set.of("addJobOrder", "addMission", "reduceJobOrder", "reduceMission", "unionInto");
 
@@ -96,7 +101,8 @@ class StockWriteOwnershipTest {
             owner + ".saves",
             owner + ".setsTheAmount",
             owner + ".earmarks",
-            owner + ".releasesInBulk");
+            owner + ".releasesInBulk",
+            owner + ".drainsTheEarmarks");
   }
 
   private static Set<String> foreignWriters(JavaClasses classes) {
@@ -139,7 +145,7 @@ class StockWriteOwnershipTest {
               .orElse(false);
     }
     if (ROW_TYPES.contains(owner)) {
-      return name.startsWith("set");
+      return name.startsWith("set") || EARMARK_COLLECTIONS.contains(name);
     }
     if (owner.equals(InventoryAllocations.class.getName())) {
       return ALLOCATION_MUTATORS.contains(name);

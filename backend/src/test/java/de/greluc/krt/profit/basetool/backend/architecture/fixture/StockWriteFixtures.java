@@ -73,7 +73,7 @@ public final class StockWriteFixtures {
      * @param order the order
      */
     public void earmarks(InventoryItem item, JobOrder order) {
-      InventoryAllocations.addJobOrder(item, order, 1.0, false);
+      InventoryAllocations.addJobOrder(item, order.getId(), 1.0, false);
     }
 
     /**
@@ -83,6 +83,15 @@ public final class StockWriteFixtures {
      */
     public void releasesInBulk(UUID jobOrderId) {
       repository.deleteJobOrderAllocationsByJobOrder(jobOrderId);
+    }
+
+    /**
+     * Drops a Lager row's job-order earmarks through its collection.
+     *
+     * @param item the row
+     */
+    public void drainsTheEarmarks(InventoryItem item) {
+      item.getJobOrderAllocations().clear();
     }
 
     /**

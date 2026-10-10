@@ -22,8 +22,6 @@ package de.greluc.krt.profit.basetool.backend.inventory.api;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import jakarta.persistence.EntityManager;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -101,43 +99,21 @@ public final class InventoryAllocations {
    * duplicate-target guards.
    *
    * @param item the owning entry; never {@code null}
-   * @param order the earmarked job order; never {@code null}
+   * @param orderId the earmarked job order; never {@code null}
    * @param amount the SCU to earmark
    * @param delivered the initial delivered state
    * @return the created slice, already added to the entry
    */
   @NotNull
   public static InventoryJobOrderAllocation addJobOrder(
-      InventoryItem item, JobOrder order, double amount, boolean delivered) {
+      InventoryItem item, UUID orderId, double amount, boolean delivered) {
     InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
     slice.setInventoryItem(item);
-    slice.setJobOrder(order);
+    slice.setJobOrderId(orderId);
     slice.setAmount(amount);
     slice.setDelivered(delivered);
     item.getJobOrderAllocations().add(slice);
     return slice;
-  }
-
-  /**
-   * Earmarks part of a row to a job order known by id, through a reference the persistence context
-   * resolves; the caller's managed order is that same instance.
-   *
-   * @param item the row
-   * @param entityManager the persistence context
-   * @param orderId the order
-   * @param amount the earmarked amount
-   * @param delivered whether the slice counts as delivered
-   * @return the new slice
-   */
-  @NotNull
-  public static InventoryJobOrderAllocation addJobOrder(
-      InventoryItem item,
-      @NotNull EntityManager entityManager,
-      @NotNull UUID orderId,
-      double amount,
-      boolean delivered) {
-    return addJobOrder(
-        item, entityManager.getReference(JobOrder.class, orderId), amount, delivered);
   }
 
   /**
@@ -212,7 +188,7 @@ public final class InventoryAllocations {
    */
   public static void unionInto(InventoryItem survivor, InventoryItem victim) {
     for (InventoryJobOrderAllocation va : victim.getJobOrderAllocations()) {
-      UUID orderId = va.getJobOrder() != null ? va.getJobOrder().getId() : null;
+      UUID orderId = va.getJobOrderId();
       InventoryJobOrderAllocation existing = jobOrderSlice(survivor, orderId);
       if (existing != null) {
         existing.setAmount(existing.getAmount() + va.getAmount());
@@ -220,7 +196,7 @@ public final class InventoryAllocations {
             Boolean.TRUE.equals(existing.getDelivered()) || Boolean.TRUE.equals(va.getDelivered()));
       } else {
         addJobOrder(
-            survivor, va.getJobOrder(), va.getAmount(), Boolean.TRUE.equals(va.getDelivered()));
+            survivor, va.getJobOrderId(), va.getAmount(), Boolean.TRUE.equals(va.getDelivered()));
       }
     }
     for (InventoryMissionAllocation va : victim.getMissionAllocations()) {
@@ -248,7 +224,7 @@ public final class InventoryAllocations {
       return null;
     }
     return item.getJobOrderAllocations().stream()
-        .filter(a -> a.getJobOrder() != null && orderId.equals(a.getJobOrder().getId()))
+        .filter(a -> orderId.equals(a.getJobOrderId()))
         .findFirst()
         .orElse(null);
   }

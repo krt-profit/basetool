@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
@@ -44,7 +45,6 @@ import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
@@ -118,6 +118,7 @@ public class InventoryCheckoutService {
   private final UserRepository userRepository;
   private final LocationRepository locationRepository;
   private final StockSoldForTarget stockSoldForTarget;
+  private final EarmarkTargets.Lookup earmarkTargets;
   private final StockOfferLookup stockOfferLookup;
   private final StockChangeObserver stockChangeObserver;
   private final InventoryItemMapper inventoryItemMapper;
@@ -480,10 +481,12 @@ public class InventoryCheckoutService {
     for (Map.Entry<UUID, Double> reduction : orderReductions.entrySet()) {
       InventoryJobOrderAllocation slice =
           InventoryAllocations.jobOrderSlice(source, reduction.getKey());
-      if (slice != null && slice.getJobOrder() != null) {
-        JobOrder order = slice.getJobOrder();
+      if (slice != null && slice.getJobOrderId() != null) {
         InventoryAllocations.addJobOrder(
-            target, order, reduction.getValue(), Boolean.TRUE.equals(slice.getDelivered()));
+            target,
+            slice.getJobOrderId(),
+            reduction.getValue(),
+            Boolean.TRUE.equals(slice.getDelivered()));
       }
     }
     for (Map.Entry<UUID, Double> reduction : missionReductions.entrySet()) {
@@ -1290,10 +1293,7 @@ public class InventoryCheckoutService {
     InventoryJobOrderAllocation slice =
         Entities.require(
             item.getJobOrderAllocations().stream()
-                .filter(
-                    a ->
-                        a.getJobOrder() != null
-                            && request.jobOrderId().equals(a.getJobOrder().getId()))
+                .filter(a -> request.jobOrderId().equals(a.getJobOrderId()))
                 .findFirst(),
             "Job-order allocation not found for this inventory item");
     slice.setDelivered(request.delivered());
@@ -1304,7 +1304,11 @@ public class InventoryCheckoutService {
         InventoryAuditLabels.label(item),
         item.getUser().getId(),
         AuditDetails.of("delivered", request.delivered())
-            .with("jobOrder", "#" + slice.getJobOrder().getDisplayId()));
+            .with(
+                "jobOrder",
+                "#"
+                    + Objects.requireNonNull(earmarkTargets.jobOrder(slice.getJobOrderId()))
+                        .displayId()));
     return inventoryItemMapper
         .toDto(saved)
         .withVersion(InventoryAllocations.forcedNextVersion(saved));

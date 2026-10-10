@@ -87,7 +87,7 @@ class JobOrderHandoverServiceTest {
         service,
         "stockCommands",
         new InventoryStockCommands(
-            inventoryItemRepository, null, null, null, auditService, null, offerRatchet, null));
+            inventoryItemRepository, null, null, null, auditService, null, offerRatchet));
     orderId = UUID.randomUUID();
     inventoryId = UUID.randomUUID();
     materialId = UUID.randomUUID();
@@ -109,7 +109,8 @@ class JobOrderHandoverServiceTest {
     inventoryItem.setId(inventoryId);
     inventoryItem.setMaterial(material);
     inventoryItem.setAmount(10.0);
-    InventoryAllocations.addJobOrder(inventoryItem, order, inventoryItem.getAmount(), false);
+    InventoryAllocations.addJobOrder(
+        inventoryItem, order.getId(), inventoryItem.getAmount(), false);
   }
 
   @Test
@@ -231,8 +232,8 @@ class JobOrderHandoverServiceTest {
     siblingOrder.setId(UUID.randomUUID());
     inventoryItem.getJobOrderAllocations().clear();
     inventoryItem.setAmount(100.0);
-    InventoryAllocations.addJobOrder(inventoryItem, order, 20.0, false);
-    InventoryAllocations.addJobOrder(inventoryItem, siblingOrder, 70.0, false);
+    InventoryAllocations.addJobOrder(inventoryItem, order.getId(), 20.0, false);
+    InventoryAllocations.addJobOrder(inventoryItem, siblingOrder.getId(), 70.0, false);
 
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 50.0, null, null);
@@ -349,7 +350,8 @@ class JobOrderHandoverServiceTest {
     inventoryItem2.setId(inventoryId2);
     inventoryItem2.setMaterial(material2);
     inventoryItem2.setAmount(8.0);
-    InventoryAllocations.addJobOrder(inventoryItem2, order, inventoryItem2.getAmount(), false);
+    InventoryAllocations.addJobOrder(
+        inventoryItem2, order.getId(), inventoryItem2.getAmount(), false);
 
     JobOrderHandoverItemCreateDto itemDto1 =
         new JobOrderHandoverItemCreateDto(inventoryId, 5.0, null, null);
@@ -409,7 +411,8 @@ class JobOrderHandoverServiceTest {
     inventoryItem2.setId(inventoryId2);
     inventoryItem2.setMaterial(material2);
     inventoryItem2.setAmount(5.0);
-    InventoryAllocations.addJobOrder(inventoryItem2, order, inventoryItem2.getAmount(), false);
+    InventoryAllocations.addJobOrder(
+        inventoryItem2, order.getId(), inventoryItem2.getAmount(), false);
 
     JobOrderHandoverItemCreateDto itemDto1 =
         new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null, null);
@@ -484,7 +487,8 @@ class JobOrderHandoverServiceTest {
     JobOrder otherOrder = new JobOrder();
     otherOrder.setId(UUID.randomUUID());
     inventoryItem.getJobOrderAllocations().clear();
-    InventoryAllocations.addJobOrder(inventoryItem, otherOrder, inventoryItem.getAmount(), false);
+    InventoryAllocations.addJobOrder(
+        inventoryItem, otherOrder.getId(), inventoryItem.getAmount(), false);
 
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 5.0, null, null);
@@ -546,7 +550,7 @@ class JobOrderHandoverServiceTest {
     jobOrderMaterial.setAmount(4.0);
     inventoryItem.setAmount(4.0);
     inventoryItem.getJobOrderAllocations().clear();
-    InventoryAllocations.addJobOrder(inventoryItem, order, 4.0, false);
+    InventoryAllocations.addJobOrder(inventoryItem, order.getId(), 4.0, false);
 
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null, null);
@@ -649,7 +653,8 @@ class JobOrderHandoverServiceTest {
     inventoryItem2.setId(inventoryId2);
     inventoryItem2.setMaterial(material2);
     inventoryItem2.setAmount(8.0);
-    InventoryAllocations.addJobOrder(inventoryItem2, order, inventoryItem2.getAmount(), false);
+    InventoryAllocations.addJobOrder(
+        inventoryItem2, order.getId(), inventoryItem2.getAmount(), false);
 
     JobOrderHandoverItemCreateDto itemDto1 =
         new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null, null);
@@ -726,7 +731,7 @@ class JobOrderHandoverServiceTest {
     inventoryItem.setAmount(10.00003);
     jobOrderMaterial.setAmount(10.00003);
     inventoryItem.getJobOrderAllocations().clear();
-    InventoryAllocations.addJobOrder(inventoryItem, order, 10.00003, false);
+    InventoryAllocations.addJobOrder(inventoryItem, order.getId(), 10.00003, false);
 
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null, null);
@@ -764,7 +769,7 @@ class JobOrderHandoverServiceTest {
     inventoryItem.setAmount(10.0002);
     jobOrderMaterial.setAmount(50.0);
     inventoryItem.getJobOrderAllocations().clear();
-    InventoryAllocations.addJobOrder(inventoryItem, order, 10.0002, false);
+    InventoryAllocations.addJobOrder(inventoryItem, order.getId(), 10.0002, false);
 
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null, null);

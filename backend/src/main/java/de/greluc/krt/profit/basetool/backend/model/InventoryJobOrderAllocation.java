@@ -72,10 +72,8 @@ public class InventoryJobOrderAllocation extends AbstractEntity<UUID> {
   @ToString.Exclude
   private InventoryItem inventoryItem;
 
-  @ManyToOne(optional = false, fetch = FetchType.LAZY)
-  @JoinColumn(name = "job_order_id", nullable = false)
-  @ToString.Exclude
-  private JobOrder jobOrder;
+  @Column(name = "job_order_id", nullable = false)
+  private UUID jobOrderId;
 
   @Min(0)
   @Column(nullable = false)

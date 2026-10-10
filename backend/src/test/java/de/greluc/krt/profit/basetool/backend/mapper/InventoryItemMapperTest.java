@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -107,13 +108,22 @@ class InventoryItemMapperTest {
     item.setPersonal(false);
     item.setNote("Strict QC");
     item.setVersion(7L);
-    InventoryAllocations.addJobOrder(item, jobOrder, item.getAmount(), true);
+    InventoryAllocations.addJobOrder(item, jobOrder.getId(), item.getAmount(), true);
     InventoryAllocations.addMission(item, mission.getId(), item.getAmount());
     EarmarkTargets.Lookup targets =
-        id ->
-            id.equals(missionId)
+        new EarmarkTargets.Lookup() {
+          @Override
+          public MissionEarmark mission(UUID id) {
+            return id.equals(missionId)
                 ? new MissionEarmark(missionId, mission.getName(), mission.getPlannedStartTime())
                 : null;
+          }
+
+          @Override
+          public JobOrderEarmark jobOrder(UUID id) {
+            return id.equals(jobOrderId) ? new JobOrderEarmark(jobOrderId, 42) : null;
+          }
+        };
     ReflectionTestUtils.setField(mapper, "earmarkTargets", targets);
 
     InventoryItemDto dto = mapper.toDto(item);

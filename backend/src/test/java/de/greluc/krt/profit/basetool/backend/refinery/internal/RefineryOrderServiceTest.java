@@ -127,15 +127,7 @@ class RefineryOrderServiceTest {
         refineryOrderService,
         "stockCommands",
         new InventoryStockCommands(
-            inventoryItemRepository,
-            userRepository,
-            null,
-            null,
-            auditService,
-            bookInPolicy,
-            null,
-            de.greluc.krt.profit.basetool.backend.service.ReferenceResolvingEntityManager
-                .create()));
+            inventoryItemRepository, userRepository, null, null, auditService, bookInPolicy, null));
     owner = new User();
     owner.setId(OWNER_ID);
     owner.setUsername("alice");
