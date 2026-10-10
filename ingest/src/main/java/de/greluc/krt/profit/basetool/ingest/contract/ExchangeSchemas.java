@@ -175,7 +175,7 @@ public class ExchangeSchemas {
         if (properties != null && properties.isObject()) {
           for (Map.Entry<String, JsonNode> property : properties.properties()) {
             declared
-                .computeIfAbsent(property.getKey(), k -> new ArrayList<>())
+                .computeIfAbsent(property.getKey(), _ -> new ArrayList<>())
                 .add(new Located(branch.document(), property.getValue()));
           }
         }

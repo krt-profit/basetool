@@ -186,7 +186,7 @@ public final class QualityBucketAllocator {
       @NotNull UUID rowId,
       double amount) {
     byDemand.merge(key, amount, Double::sum);
-    byRow.computeIfAbsent(rowId, unused -> new LinkedHashMap<>()).merge(key, amount, Double::sum);
+    byRow.computeIfAbsent(rowId, _ -> new LinkedHashMap<>()).merge(key, amount, Double::sum);
   }
 
   /**

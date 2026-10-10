@@ -468,7 +468,7 @@ public class PersonalInventoryBlueprintsPageController {
     }
     try {
       return Instant.parse(iso.trim());
-    } catch (Exception e) {
+    } catch (Exception _) {
       log.debug("Ignoring unparseable acquiredAt '{}'", iso);
       return null;
     }

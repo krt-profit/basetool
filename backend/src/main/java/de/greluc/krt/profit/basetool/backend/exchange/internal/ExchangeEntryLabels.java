@@ -172,7 +172,7 @@ public class ExchangeEntryLabels {
     }
     try {
       return UUID.fromString(raw);
-    } catch (IllegalArgumentException ignored) {
+    } catch (IllegalArgumentException _) {
       return null;
     }
   }

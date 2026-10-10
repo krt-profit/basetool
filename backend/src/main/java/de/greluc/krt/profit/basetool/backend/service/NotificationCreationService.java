@@ -108,7 +108,7 @@ public class NotificationCreationService {
       NotificationSignal signal =
           new NotificationSignal(
               entry.getKey(), event.entityType(), event.entityId(), event.renderParams());
-      bySignal.computeIfAbsent(signal, key -> new HashSet<>()).addAll(entry.getValue());
+      bySignal.computeIfAbsent(signal, _ -> new HashSet<>()).addAll(entry.getValue());
     }
     return bySignal;
   }

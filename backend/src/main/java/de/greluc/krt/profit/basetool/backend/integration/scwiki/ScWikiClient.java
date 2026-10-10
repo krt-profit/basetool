@@ -460,7 +460,7 @@ public class ScWikiClient {
               .get()
               .uri(uri)
               .exchange(
-                  (clientRequest, response) -> {
+                  (_, response) -> {
                     int status = response.getStatusCode().value();
                     if (status == 404 || status == 304) {
                       return null;
@@ -514,7 +514,7 @@ public class ScWikiClient {
     }
     try {
       return request.exchangeForRequiredValue(
-          (clientRequest, response) -> {
+          (_, response) -> {
             int status = response.getStatusCode().value();
             if (status == 304) {
               log.debug(
@@ -585,7 +585,7 @@ public class ScWikiClient {
     long sleepMillis = Math.max(1L, 1000L / Math.max(1, rps));
     try {
       Thread.sleep(sleepMillis);
-    } catch (InterruptedException e) {
+    } catch (InterruptedException _) {
       Thread.currentThread().interrupt();
     }
   }

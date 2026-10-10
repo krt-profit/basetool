@@ -128,7 +128,7 @@ public class ExchangeMassChangeService {
             request.installationKey(),
             () ->
                 transaction.execute(
-                    status -> {
+                    _ -> {
                       ExchangeChangeResultDto applied = run(caller, request, false);
                       auditRecorder.record(
                           AuditEventType.EXCHANGE_MASS_CHANGE_CONFIRMED,

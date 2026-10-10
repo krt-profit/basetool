@@ -95,7 +95,7 @@ public final class HandleScrubber {
     Map<Character, List<Term>> buckets = new HashMap<>();
     for (Term term : this.terms) {
       for (char first : caseFoldings(term.text().charAt(0))) {
-        buckets.computeIfAbsent(first, k -> new ArrayList<>()).add(term);
+        buckets.computeIfAbsent(first, _ -> new ArrayList<>()).add(term);
       }
     }
     this.byFirstChar = Map.copyOf(buckets);

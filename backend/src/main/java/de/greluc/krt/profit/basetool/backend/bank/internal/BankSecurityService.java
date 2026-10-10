@@ -81,7 +81,7 @@ public class BankSecurityService {
    * @return {@code true} iff the caller may read the account
    */
   public boolean canSee(@NotNull UUID accountId, Authentication authentication) {
-    return hasCapability(accountId, authentication, g -> true);
+    return hasCapability(accountId, authentication, _ -> true);
   }
 
   /**

@@ -299,14 +299,14 @@ public class QualityTierService {
         .findByCode(dto.code())
         .filter(other -> !other.getId().equals(selfId))
         .ifPresent(
-            other -> {
+            _ -> {
               throw new DuplicateEntityException("Quality tier code already used: " + dto.code());
             });
     qualityTierRepository
         .findByMinQuality(dto.minQuality())
         .filter(other -> !other.getId().equals(selfId))
         .ifPresent(
-            other -> {
+            _ -> {
               throw new DuplicateEntityException(
                   "Quality tier floor already used: " + dto.minQuality());
             });

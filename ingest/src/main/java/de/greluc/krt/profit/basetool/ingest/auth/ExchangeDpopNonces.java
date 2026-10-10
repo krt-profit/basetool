@@ -96,7 +96,7 @@ public class ExchangeDpopNonces {
     byte[] presented;
     try {
       presented = DECODER.decode(nonce);
-    } catch (IllegalArgumentException ignored) {
+    } catch (IllegalArgumentException _) {
       return false;
     }
     if (presented.length <= WINDOW_BYTES) {
