@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.notification.internal;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.time.Duration;
 import org.hibernate.validator.constraints.time.DurationMin;
@@ -33,9 +35,12 @@ import org.springframework.validation.annotation.Validated;
  * @param enabled whether the scheduled task exists (default {@code true}, {@code false} under the
  *     {@code test} profile)
  * @param interval the pause between two runs; at least ten seconds, default {@code PT1M}
+ * @param maxEventsPerTick the most events all producers together publish per run, so a backlog
+ *     drains over several runs and never floods the notification executor; 1 to 150, default 100
  */
 @Validated
 @ConfigurationProperties("app.notifications.timed")
 public record NotificationTimedProperties(
     @DefaultValue("true") boolean enabled,
-    @DefaultValue("PT1M") @NotNull @DurationMin(seconds = 10) Duration interval) {}
+    @DefaultValue("PT1M") @NotNull @DurationMin(seconds = 10) Duration interval,
+    @DefaultValue("100") @Min(1) @Max(150) int maxEventsPerTick) {}
