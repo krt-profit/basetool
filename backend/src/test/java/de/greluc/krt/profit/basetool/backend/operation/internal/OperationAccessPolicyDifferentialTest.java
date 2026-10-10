@@ -39,7 +39,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.service.AccessGateService;
@@ -278,7 +277,6 @@ class OperationAccessPolicyDifferentialTest {
               mock(JobOrderHandoverRepository.class),
               mock(JobOrderItemHandoverRepository.class),
               mock(InventoryItemRepository.class),
-              mock(RefineryOrderRepository.class),
               mock(ShipRepository.class),
               memberships);
       OwnerScopeService ownerScopeService =

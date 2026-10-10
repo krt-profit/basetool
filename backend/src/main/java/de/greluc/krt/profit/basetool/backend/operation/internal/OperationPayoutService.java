@@ -483,7 +483,7 @@ public class OperationPayoutService {
         return DEFAULT_TRANSFER_FEE_RATE;
       }
       return parsed;
-    } catch (NumberFormatException e) {
+    } catch (NumberFormatException _) {
       log.warn(
           "System setting '{}'='{}' is not a valid decimal, falling back to default {}",
           TRANSFER_FEE_RATE_SETTING_KEY,

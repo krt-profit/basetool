@@ -139,7 +139,9 @@ public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, 
    */
   @Modifying
   @Query(
-      "UPDATE BankAuditEvent e SET e.actorHandle = :sentinel"
-          + " WHERE e.actorUserId = :userId AND e.actorHandle <> :sentinel")
+      """
+      UPDATE BankAuditEvent e SET e.actorHandle = :sentinel
+      WHERE e.actorUserId = :userId AND e.actorHandle <> :sentinel
+      """)
   int anonymiseActorHandle(@Param("userId") UUID userId, @Param("sentinel") String sentinel);
 }

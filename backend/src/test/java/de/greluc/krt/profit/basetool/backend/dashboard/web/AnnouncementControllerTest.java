@@ -88,9 +88,7 @@ class AnnouncementControllerTest {
   @Test
   void updateAnnouncement_forwardsContentAndVersionToService() {
     AnnouncementController.AnnouncementRequest req =
-        new AnnouncementController.AnnouncementRequest();
-    req.setContent("New content");
-    req.setVersion(3L);
+        new AnnouncementController.AnnouncementRequest("New content", 3L);
 
     Announcement updated = new Announcement();
     AnnouncementDto dto = new AnnouncementDto(UUID.randomUUID(), "New content", Instant.now(), 4L);
