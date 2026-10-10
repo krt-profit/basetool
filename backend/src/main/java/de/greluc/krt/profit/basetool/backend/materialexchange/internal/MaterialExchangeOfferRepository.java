@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -106,11 +107,11 @@ public interface MaterialExchangeOfferRepository
                  OR CASE WHEN o.offeredAmount IS NOT NULL THEN LEAST(o.offeredAmount, ii.amount) WHEN ii.id IS NOT NULL THEN LEAST(o.itemQuantity, ii.amount) ELSE o.itemQuantity END >= :minAmount)
           """)
   Page<MaterialExchangeOffer> findBoard(
-      @Param("viewerId") UUID viewerId,
+      @Param("viewerId") @Nullable UUID viewerId,
       @Param("onlyMine") boolean onlyMine,
-      @Param("query") String query,
+      @Param("query") @Nullable String query,
       @Param("minQuality") int minQuality,
-      @Param("minAmount") Double minAmount,
+      @Param("minAmount") @Nullable Double minAmount,
       @Param("sortKey") String sortKey,
       @Param("excludeStolen") boolean excludeStolen,
       Pageable pageable);
@@ -150,8 +151,10 @@ public interface MaterialExchangeOfferRepository
    * @return the subset of {@code inventoryItemIds} that have a matching offer, never {@code null}.
    */
   @Query(
-      "SELECT o.inventoryItem.id FROM MaterialExchangeOffer o "
-          + "WHERE o.status = :status AND o.inventoryItem.id IN :inventoryItemIds")
+      """
+      SELECT o.inventoryItem.id FROM MaterialExchangeOffer o
+      WHERE o.status = :status AND o.inventoryItem.id IN :inventoryItemIds
+      """)
   Set<UUID> findInventoryItemIdsWithStatus(
       @Param("status") MaterialExchangeOfferStatus status,
       @Param("inventoryItemIds") Collection<UUID> inventoryItemIds);
@@ -267,7 +270,7 @@ public interface MaterialExchangeOfferRepository
           + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE)
   List<OfferStock> findActiveStockOnNonPersonalRows(
       @Param("isAdminAllScope") boolean isAdminAllScope,
-      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**

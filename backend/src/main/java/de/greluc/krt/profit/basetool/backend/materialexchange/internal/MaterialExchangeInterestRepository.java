@@ -105,8 +105,10 @@ public interface MaterialExchangeInterestRepository
    * @return the ids of the offers the viewer is registered on, never {@code null}.
    */
   @Query(
-      "SELECT i.offer.id FROM MaterialExchangeInterest i "
-          + "WHERE i.interestedUser.id = :viewerId AND i.offer.id IN :offerIds")
+      """
+      SELECT i.offer.id FROM MaterialExchangeInterest i
+      WHERE i.interestedUser.id = :viewerId AND i.offer.id IN :offerIds
+      """)
   Set<UUID> findOfferIdsInterestedByViewer(
       @Param("viewerId") UUID viewerId, @Param("offerIds") Collection<UUID> offerIds);
 
