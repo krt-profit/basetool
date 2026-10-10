@@ -53,6 +53,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * Unit tests for {@code BankLedgerService#bookSplitDeposit} (REQ-BANK-043): distribution across
@@ -70,6 +71,7 @@ class BankLedgerSplitDepositTest {
   @Mock private BankAuditService bankAuditService;
   @Mock private BankTransferFeeService transferFeeService;
   @Mock private AuthHelperService authHelperService;
+  @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private UserRepository userRepository;
   @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
 
@@ -90,7 +92,8 @@ class BankLedgerSplitDepositTest {
             transactionRepository,
             postingRepository,
             holderPostingRepository,
-            authHelperService);
+            authHelperService,
+            eventPublisher);
     BankBookingGuards guards =
         new BankBookingGuards(accountRepository, postingRepository, authHelperService);
     bankLedgerService =

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.admin.api.events.HangarNotices;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
@@ -38,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronShipDetailDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronShipOverviewDto;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
@@ -54,6 +56,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
@@ -82,6 +85,8 @@ public class HangarService {
   private final EntityManager entityManager;
   private final OwnerScopeService ownerScopeService;
   private final AuditRecorder auditRecorder;
+  private final ApplicationEventPublisher eventPublisher;
+  private final UserService userService;
 
   /**
    * Returns the paged ship list in the caller's squadron scope; an admin without an active squadron
@@ -407,6 +412,9 @@ public class HangarService {
   @Transactional
   public void resetAllFittedStatus() {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    List<ShipRepository.OwnerShipCount> perOwner =
+        shipRepository.countFittedByOwnerScoped(
+            scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
     int reset =
         shipRepository.resetAllFittedScoped(
             scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
@@ -417,7 +425,72 @@ public class HangarService {
           null,
           null,
           AuditDetails.of("ships", reset).with("allUnits", scope.adminAllScope()));
+      ActorRef actor = userService.currentActor();
+      for (ShipRepository.OwnerShipCount owner : perOwner) {
+        eventPublisher.publishEvent(
+            HangarNotices.fittedReset(owner.getOwnerId(), owner.getShipCount(), actor));
+      }
     }
+  }
+
+  /**
+   * Adds a ship to a member's hangar on an admin's behalf and tells the member (REQ-HANGAR-008).
+   *
+   * @param memberId the hangar's owner
+   * @param dto the new ship
+   * @return the saved ship
+   */
+  @Transactional
+  public Ship addShipByAdmin(@NotNull UUID memberId, @NotNull ShipRequestDto dto) {
+    Ship ship = addShip(memberId, dto);
+    announceByAdmin(memberId, "ADDED", ship);
+    return ship;
+  }
+
+  /**
+   * Changes a ship of a member's hangar on an admin's behalf and tells the member (REQ-HANGAR-008).
+   *
+   * @param memberId the hangar's owner
+   * @param shipId the ship
+   * @param dto the new values
+   * @return the saved ship
+   */
+  @Transactional
+  public Ship updateShipByAdmin(
+      @NotNull UUID memberId, @NotNull UUID shipId, @NotNull ShipRequestDto dto) {
+    Ship ship = updateShip(memberId, shipId, dto);
+    announceByAdmin(memberId, "UPDATED", ship);
+    return ship;
+  }
+
+  /**
+   * Deletes a ship of a member's hangar on an admin's behalf and tells the member (REQ-HANGAR-008).
+   *
+   * @param memberId the hangar's owner
+   * @param shipId the ship
+   * @return how many mission units the ship was detached from
+   */
+  @Transactional
+  public int deleteShipByAdmin(@NotNull UUID memberId, @NotNull UUID shipId) {
+    Ship ship = shipRepository.findById(shipId).orElse(null);
+    int detached = deleteShip(memberId, shipId);
+    if (ship != null) {
+      announceByAdmin(memberId, "DELETED", ship);
+    }
+    return detached;
+  }
+
+  private void announceByAdmin(UUID memberId, String changeCode, Ship ship) {
+    ActorRef actor = userService.currentActor();
+    if (memberId.equals(actor.id())) {
+      return;
+    }
+    eventPublisher.publishEvent(
+        HangarNotices.hangarChanged(
+            memberId,
+            changeCode,
+            ship.getShipType() == null ? ActorRef.UNKNOWN_NAME : ship.getShipType().getName(),
+            actor));
   }
 
   /**

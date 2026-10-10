@@ -51,6 +51,7 @@ public class NotificationCreationService {
   private final RuleEvaluationService ruleEvaluationService;
   private final NotificationRepository notificationRepository;
   private final NotificationParamsCodec notificationParamsCodec;
+  private final NotificationMuteService notificationMuteService;
 
   /**
    * Deletes the notifications the event supersedes (REQ-NOTIF-018), then writes one notification
@@ -76,7 +77,7 @@ public class NotificationCreationService {
     }
 
     Map<NotificationType, Set<UUID>> recipientsByType =
-        ruleEvaluationService.resolveRecipients(event);
+        notificationMuteService.withoutMuted(ruleEvaluationService.resolveRecipients(event));
     if (recipientsByType.isEmpty()) {
       log.debug(
           "Event {} for entity {} resolved no recipients", event.eventType(), event.entityId());
@@ -137,7 +138,8 @@ public class NotificationCreationService {
                 noticeTypes, event.entityType(), event.entityId()));
     holders.retainAll(candidates);
 
-    Map<NotificationType, Set<UUID>> resolved = ruleEvaluationService.resolveRecipients(event);
+    Map<NotificationType, Set<UUID>> resolved =
+        notificationMuteService.withoutMuted(ruleEvaluationService.resolveRecipients(event));
     Set<UUID> entitled = new HashSet<>();
     resolved.values().forEach(entitled::addAll);
     entitled.retainAll(candidates);

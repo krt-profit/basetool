@@ -79,6 +79,7 @@ public class OperationService {
   private final OwnerScopeService ownerScopeService;
   private final AuthHelperService authHelperService;
   private final AuditRecorder auditRecorder;
+  private final OperationPayoutService operationPayoutService;
 
   /**
    * Returns paged operation list.
@@ -245,11 +246,16 @@ public class OperationService {
               + updateDto.status());
     }
 
+    final OperationStatus previousStatus = operation.getStatus();
     operation.setName(updateDto.name());
     operation.setDescription(updateDto.description());
     operation.setStatus(updateDto.status());
 
     Operation saved = operationRepository.saveAndFlush(operation);
+    if (previousStatus != OperationStatus.COMPLETED
+        && saved.getStatus() == OperationStatus.COMPLETED) {
+      operationPayoutService.announceCompletion(saved);
+    }
     auditRecorder.record(
         AuditEventType.OPERATION_UPDATED,
         operation.getId(),

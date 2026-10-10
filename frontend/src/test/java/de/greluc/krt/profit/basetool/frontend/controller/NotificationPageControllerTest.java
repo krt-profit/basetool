@@ -192,6 +192,121 @@ class NotificationPageControllerTest {
 
   /** A job-order notification links its order; without the order's id it links nothing. */
   @Test
+  void targetOf_missionAndOperationNoticesLinkTheirRecord() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/missions/" + id,
+        NotificationPageController.targetOf("MISSION_RESCHEDULED", "MISSION", id));
+    assertEquals(
+        "/missions/" + id, NotificationPageController.targetOf("MISSION_REMINDER", "MISSION", id));
+    assertEquals(
+        "/operations/" + id,
+        NotificationPageController.targetOf("OPERATION_COMPLETED", "OPERATION", id));
+    assertNull(NotificationPageController.targetOf("MISSION_RESCHEDULED", "MISSION", null));
+  }
+
+  @Test
+  void targetOf_aDeletedMissionHasNothingToLink() {
+    assertNull(
+        NotificationPageController.targetOf("MISSION_DELETED", "MISSION", UUID.randomUUID()));
+  }
+
+  @Test
+  void targetOf_everyOrderNoticeLinksTheOrderExceptADeletedOne() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/orders/" + id,
+        NotificationPageController.targetOf("JOB_ORDER_REASSIGNED", "JOB_ORDER", id));
+    assertEquals(
+        "/orders/" + id,
+        NotificationPageController.targetOf("JOB_ORDER_ASSIGNED", "JOB_ORDER", id));
+    assertEquals(
+        "/orders/" + id,
+        NotificationPageController.targetOf("JOB_ORDER_CLAIM_WITHDRAWN", "JOB_ORDER", id));
+    assertNull(NotificationPageController.targetOf("JOB_ORDER_FINISHED", "JOB_ORDER_DELETED", id));
+  }
+
+  @Test
+  void targetOf_refineryNoticesLinkTheOrder() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/refinery-orders/" + id,
+        NotificationPageController.targetOf("REFINERY_ORDER_READY", "REFINERY_ORDER", id));
+    assertEquals(
+        "/refinery-orders/" + id,
+        NotificationPageController.targetOf(
+            "REFINERY_ORDER_CHANGED_BY_OTHER", "REFINERY_ORDER", id));
+  }
+
+  @Test
+  void targetOf_marketAndStockNoticesLinkTheirPage() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/materialboerse",
+        NotificationPageController.targetOf(
+            "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_EXCHANGE_OFFER", id));
+    assertEquals(
+        "/materialboerse",
+        NotificationPageController.targetOf(
+            "MATERIAL_REQUEST_UNAVAILABLE", "MATERIAL_EXCHANGE_REQUEST", id));
+    assertEquals(
+        "/inventory/my",
+        NotificationPageController.targetOf("INVENTORY_BOOKED_OUT_BY_OTHER", "INVENTORY_ITEM", id));
+  }
+
+  @Test
+  void targetOf_bankNoticesLinkWhatTheirRecipientCanOpen() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/bank/requests",
+        NotificationPageController.targetOf(
+            "BANK_BOOKING_REQUEST_APPROVED", "BANK_BOOKING_REQUEST", id));
+    assertEquals(
+        "/bank/accounts/" + id,
+        NotificationPageController.targetOf("BANK_GRANT_CHANGED", "BANK_ACCOUNT_GRANT", id));
+    assertNull(NotificationPageController.targetOf("BANK_GRANT_REVOKED", "BANK_ACCOUNT_GRANT", id));
+    assertEquals(
+        "/bank/holders/" + id,
+        NotificationPageController.targetOf(
+            "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "BANK_HOLDER", id));
+  }
+
+  @Test
+  void targetOf_organisationNoticesHaveNoPageToLink() {
+    UUID id = UUID.randomUUID();
+    assertNull(NotificationPageController.targetOf("ORG_MEMBER_DEPARTED", "ORG_UNIT_MEMBER", id));
+    assertNull(
+        NotificationPageController.targetOf("ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_UNIT_MEMBER", id));
+  }
+
+  @Test
+  void targetOf_hangarAndBlueprintNoticesLinkTheirPage() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/hangar", NotificationPageController.targetOf("HANGAR_SHIP_ASSIGNED", "MISSION_UNIT", id));
+    assertEquals(
+        "/hangar", NotificationPageController.targetOf("HANGAR_CHANGED_BY_ADMIN", "HANGAR", id));
+    assertEquals(
+        "/personal-inventory/blueprints",
+        NotificationPageController.targetOf(
+            "BLUEPRINT_PURGED_BY_ADMIN", "PERSONAL_BLUEPRINTS", id));
+    assertEquals(
+        "/missions/" + id,
+        NotificationPageController.targetOf("HANGAR_SHIP_REMOVED_FROM_UNIT", "MISSION", id));
+  }
+
+  @Test
+  void targetOf_connectedApplicationNoticesLinkTheConnectedAppsPage() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/connected-apps",
+        NotificationPageController.targetOf("EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT", id));
+    assertEquals(
+        "/connected-apps",
+        NotificationPageController.targetOf("EXCHANGE_SWITCHED_OFF", "EXCHANGE_SWITCH", id));
+  }
+
+  @Test
   void targetOf_jobOrderLinksTheOrder() {
     UUID orderId = UUID.fromString("00000000-0000-0000-0000-000000000099");
 

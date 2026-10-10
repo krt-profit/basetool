@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankNotices;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
@@ -37,6 +38,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -66,6 +68,8 @@ public class BankGrantService {
   private final BankGrantMapper bankGrantMapper;
   private final BankAuditService bankAuditService;
   private final AuthHelperService authHelperService;
+  private final BankActorResolver actors;
+  private final ApplicationEventPublisher eventPublisher;
 
   /**
    * Lists grants for the matrix UI: per account, per employee, or all. Each row is marked inert
@@ -130,6 +134,7 @@ public class BankGrantService {
         null,
         grantee.getId(),
         flagString(saved));
+    announceGrant(saved, true);
     return bankGrantMapper.toDto(saved, true);
   }
 
@@ -163,6 +168,7 @@ public class BankGrantService {
         null,
         userId,
         before + " -> " + flagString(saved));
+    announceGrant(saved, false);
     return bankGrantMapper.toDto(saved, hasBankRole(saved.getUser()));
   }
 
@@ -180,6 +186,28 @@ public class BankGrantService {
     String flags = flagString(grant);
     grantRepository.delete(grant);
     bankAuditService.record(BankAuditEventType.GRANT_REVOKED, accountId, null, userId, flags);
+    eventPublisher.publishEvent(
+        BankNotices.grantRevoked(
+            accountId, grant.getAccount().getAccountNo(), userId, actors.current()));
+  }
+
+  /**
+   * Tells the grantee that their access to an account was granted or changed (REQ-BANK-058).
+   *
+   * @param grant the saved grant
+   * @param created whether the grant is new
+   */
+  private void announceGrant(@NotNull BankAccountGrant grant, boolean created) {
+    eventPublisher.publishEvent(
+        BankNotices.grantChanged(
+            grant.getAccount().getId(),
+            grant.getAccount().getAccountNo(),
+            grant.getUser().getId(),
+            created,
+            grant.isCanDeposit(),
+            grant.isCanWithdraw(),
+            grant.isCanTransfer(),
+            authHelperService.currentUserId().orElse(null)));
   }
 
   /**

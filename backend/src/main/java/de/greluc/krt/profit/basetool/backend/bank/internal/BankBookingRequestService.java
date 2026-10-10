@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestC
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestRejectedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestUpdatedEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankNotices;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
@@ -796,6 +797,20 @@ public class BankBookingRequestService {
         (granted ? "granted" : "revoked")
             + " owner approval for request "
             + shortId(request.getId()));
+    if (granted) {
+      eventPublisher.publishEvent(
+          BankNotices.approved(
+              request.getId(),
+              request.getAccount().getId(),
+              request.getRequestedBy(),
+              request.getType(),
+              request.getAmount(),
+              request.getAccount().getAccountNo(),
+              request.getOwnerApprovalGrantedByHandle(),
+              actor));
+    } else {
+      eventPublisher.publishEvent(BankNotices.approvalRevoked(request.getId()));
+    }
     return toDto(request);
   }
 
