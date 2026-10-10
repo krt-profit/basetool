@@ -23,10 +23,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankAccountResponsibleAssignedEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestNoticesReconciledEvent;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
@@ -35,6 +40,8 @@ import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.repository.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -42,11 +49,13 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * Unit tests for {@link OrgUnitBankResponsibilityService} (REQ-BANK-034): responsible-holder
@@ -60,6 +69,9 @@ class OrgUnitBankResponsibilityServiceTest {
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private BereichRepository bereichRepository;
   @Mock private BankAuditService bankAuditService;
+  @Mock private BankBookingRequestRepository bankBookingRequestRepository;
+  @Mock private AuthHelperService authHelperService;
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks private OrgUnitBankResponsibilityService service;
 
@@ -266,5 +278,115 @@ class OrgUnitBankResponsibilityServiceTest {
     service.recordResponsibleHolderChanges(Map.of(accountId, Set.of(leiter)));
 
     verifyNoInteractions(bankAuditService);
+  }
+
+  /**
+   * A pending request on the account.
+   *
+   * @param account the account
+   * @param approver the approver class it waits for, or {@code null} when it needs no approval
+   * @return the request
+   */
+  private static BankBookingRequest pendingRequest(
+      BankAccount account, BankRequestApprover approver) {
+    BankBookingRequest request = new BankBookingRequest();
+    request.setId(UUID.randomUUID());
+    request.setAccount(account);
+    request.setType(BankBookingRequestType.WITHDRAWAL);
+    request.setAmount(new BigDecimal("700"));
+    request.setStatus(BankBookingRequestStatus.PENDING);
+    request.setRequestedBy(UUID.randomUUID());
+    request.setRequesterHandle("requester");
+    request.setRequiresOwnerApproval(approver != null);
+    request.setRequiredApprover(approver);
+    return request;
+  }
+
+  @Test
+  void recordResponsibleHolderChanges_tellsTheNewHolderAndHandsTheOpenRequestsOver() {
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID actor = UUID.randomUUID();
+    UUID keptLeiter = UUID.randomUUID();
+    UUID oldLeiter = UUID.randomUUID();
+    UUID newLeiter = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
+            orgUnitId, MembershipRole.STAFFELLEITER))
+        .thenReturn(Set.of(keptLeiter, newLeiter));
+    BankBookingRequest awaitingHolder =
+        pendingRequest(account, BankRequestApprover.RESPONSIBLE_HOLDER);
+    BankBookingRequest awaitingManagement =
+        pendingRequest(account, BankRequestApprover.BANK_MANAGEMENT);
+    BankBookingRequest approved = pendingRequest(account, BankRequestApprover.RESPONSIBLE_HOLDER);
+    approved.setOwnerApprovalGranted(true);
+    when(bankBookingRequestRepository.findByAccountIdAndStatusOrderByCreatedAtAsc(
+            accountId, BankBookingRequestStatus.PENDING))
+        .thenReturn(List.of(awaitingHolder, awaitingManagement, approved));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(actor));
+
+    service.recordResponsibleHolderChanges(Map.of(accountId, Set.of(keptLeiter, oldLeiter)));
+
+    ArgumentCaptor<Object> events = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher, times(4)).publishEvent(events.capture());
+    assertThat(events.getAllValues())
+        .filteredOn(BankAccountResponsibleAssignedEvent.class::isInstance)
+        .containsExactly(
+            new BankAccountResponsibleAssignedEvent(accountId, newLeiter, "KB-0001", 1, actor));
+    assertThat(events.getAllValues())
+        .filteredOn(BankBookingRequestNoticesReconciledEvent.class::isInstance)
+        .map(BankBookingRequestNoticesReconciledEvent.class::cast)
+        .hasSize(3)
+        .allSatisfy(
+            event -> {
+              assertThat(event.reconcileRecipients())
+                  .containsExactlyInAnyOrder(newLeiter, oldLeiter);
+              assertThat(event.accountId()).isEqualTo(accountId);
+              assertThat(event.accountNo()).isEqualTo("KB-0001");
+            })
+        .extracting(BankBookingRequestNoticesReconciledEvent::requestId)
+        .containsExactly(awaitingHolder.getId(), awaitingManagement.getId(), approved.getId());
+  }
+
+  @Test
+  void recordResponsibleHolderChanges_publishesNothingWhenHolderSetUnchanged() {
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID leiter = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
+            orgUnitId, MembershipRole.STAFFELLEITER))
+        .thenReturn(Set.of(leiter));
+
+    service.recordResponsibleHolderChanges(Map.of(accountId, Set.of(leiter)));
+
+    verify(eventPublisher, never()).publishEvent(any(Object.class));
+  }
+
+  @Test
+  void recordResponsibleHolderChanges_aHolderOnlyLeavingTellsNobodyButReconcilesTheRequests() {
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID oldLeiter = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
+            orgUnitId, MembershipRole.STAFFELLEITER))
+        .thenReturn(Set.of());
+    BankBookingRequest open = pendingRequest(account, null);
+    when(bankBookingRequestRepository.findByAccountIdAndStatusOrderByCreatedAtAsc(
+            accountId, BankBookingRequestStatus.PENDING))
+        .thenReturn(List.of(open));
+
+    service.recordResponsibleHolderChanges(Map.of(accountId, Set.of(oldLeiter)));
+
+    ArgumentCaptor<Object> events = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher).publishEvent(events.capture());
+    assertThat(events.getValue())
+        .isInstanceOfSatisfying(
+            BankBookingRequestNoticesReconciledEvent.class,
+            event -> assertThat(event.reconcileRecipients()).containsExactly(oldLeiter));
   }
 }

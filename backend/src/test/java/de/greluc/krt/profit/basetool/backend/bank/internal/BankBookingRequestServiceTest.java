@@ -34,8 +34,10 @@ import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestC
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestConfirmedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestRejectedEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestUpdatedEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
@@ -585,7 +587,9 @@ class BankBookingRequestServiceTest {
     assertThat(event.getValue().accountId()).isEqualTo(accountId);
     assertThat(event.getValue().actorSub()).isEqualTo(requester);
     assertThat(event.getValue().resolvesNotificationTypes())
-        .containsExactly(NotificationType.BANK_BOOKING_REQUEST_CREATED);
+        .containsExactlyInAnyOrder(
+            NotificationType.BANK_BOOKING_REQUEST_CREATED,
+            NotificationType.BANK_BOOKING_REQUEST_UPDATED);
   }
 
   @Test
@@ -655,6 +659,20 @@ class BankBookingRequestServiceTest {
             eq(null),
             eq(requester),
             any());
+    ArgumentCaptor<BankBookingRequestUpdatedEvent> event =
+        ArgumentCaptor.forClass(BankBookingRequestUpdatedEvent.class);
+    verify(eventPublisher).publishEvent(event.capture());
+    assertThat(event.getValue().requestId()).isEqualTo(requestId);
+    assertThat(event.getValue().accountId()).isEqualTo(accountId);
+    assertThat(event.getValue().amount()).isEqualByComparingTo(new BigDecimal("900"));
+    assertThat(event.getValue().actorSub()).isEqualTo(requester);
+    assertThat(event.getValue().eventType())
+        .isEqualTo(NotificationEventType.BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER);
+    assertThat(event.getValue().resolvesNotificationTypes())
+        .containsExactlyInAnyOrder(
+            NotificationType.BANK_BOOKING_REQUEST_CREATED,
+            NotificationType.BANK_BOOKING_REQUEST_UPDATED);
+    assertThat(event.getValue().renderParams()).containsEntry("amount", "900");
   }
 
   /**
@@ -891,7 +909,9 @@ class BankBookingRequestServiceTest {
     assertThat(event.getValue().actorSub()).isEqualTo(decider);
     assertThat(event.getValue().contextAccountId()).isEqualTo(accountId);
     assertThat(event.getValue().resolvesNotificationTypes())
-        .containsExactly(NotificationType.BANK_BOOKING_REQUEST_CREATED);
+        .containsExactlyInAnyOrder(
+            NotificationType.BANK_BOOKING_REQUEST_CREATED,
+            NotificationType.BANK_BOOKING_REQUEST_UPDATED);
   }
 
   @Test
@@ -1173,7 +1193,9 @@ class BankBookingRequestServiceTest {
     assertThat(event.getValue().reason()).isEqualTo("duplicate");
     assertThat(event.getValue().contextAccountId()).isEqualTo(accountId);
     assertThat(event.getValue().resolvesNotificationTypes())
-        .containsExactly(NotificationType.BANK_BOOKING_REQUEST_CREATED);
+        .containsExactlyInAnyOrder(
+            NotificationType.BANK_BOOKING_REQUEST_CREATED,
+            NotificationType.BANK_BOOKING_REQUEST_UPDATED);
   }
 
   @Test

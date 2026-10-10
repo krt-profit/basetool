@@ -85,7 +85,7 @@ public class UserZoneArgumentResolver implements HandlerMethodArgumentResolver {
     }
     try {
       return ZoneId.of(raw.trim());
-    } catch (DateTimeException ex) {
+    } catch (DateTimeException _) {
       return null;
     }
   }

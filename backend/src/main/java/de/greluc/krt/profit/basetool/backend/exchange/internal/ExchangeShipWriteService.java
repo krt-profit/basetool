@@ -484,7 +484,7 @@ public class ExchangeShipWriteService {
             null);
         yield detached;
       }
-      case Skip ignored -> 0;
+      case Skip _ -> 0;
     };
   }
 
@@ -621,7 +621,7 @@ public class ExchangeShipWriteService {
   private static @Nullable UUID parse(@NotNull String raw) {
     try {
       return UUID.fromString(raw);
-    } catch (IllegalArgumentException ignored) {
+    } catch (IllegalArgumentException _) {
       return null;
     }
   }

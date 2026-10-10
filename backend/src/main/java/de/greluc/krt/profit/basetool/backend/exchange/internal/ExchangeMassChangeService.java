@@ -125,7 +125,7 @@ public class ExchangeMassChangeService {
             request.installationKey(),
             () ->
                 transaction.execute(
-                    status -> {
+                    _ -> {
                       ExchangeChangeResultDto applied =
                           run(caller, resourceOf(request), request, false);
                       auditRecorder.record(

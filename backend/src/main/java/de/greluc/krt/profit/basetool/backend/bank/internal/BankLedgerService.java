@@ -539,7 +539,7 @@ public class BankLedgerService {
             .distinct()
             .sorted()
             .collect(
-                Collectors.toMap(id -> id, writer::lockAccount, (a, b) -> a, LinkedHashMap::new));
+                Collectors.toMap(id -> id, writer::lockAccount, (a, _) -> a, LinkedHashMap::new));
     lockedAccounts.values().forEach(guards::requireActive);
 
     for (BankCounterLeg leg : accountLegs) {
