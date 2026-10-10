@@ -200,27 +200,6 @@ public class OwnerScopeService {
   }
 
   /**
-   * Delegates to {@link RequestScopeResolver#currentOwnLevelOversightScope()}: the non-cascaded
-   * own-level oversight scope backing the F2 bank booking-request gate.
-   *
-   * @return a never-null, non-cascaded scope vector of the caller's own-level oversight seats.
-   */
-  @NotNull
-  public ScopePredicate currentOwnLevelOversightScope() {
-    return requestScopeResolver.currentOwnLevelOversightScope();
-  }
-
-  /**
-   * Delegates to {@link RequestScopeResolver#currentUserHasAreaOrOlOversight()}: whether the caller
-   * holds Bereich- or OL-level oversight (reveals the cartel-wide special accounts, REQ-BANK-028).
-   *
-   * @return {@code true} iff the caller is an admin or holds a Bereich-/OL-level oversight seat.
-   */
-  public boolean currentUserHasAreaOrOlOversight() {
-    return requestScopeResolver.currentUserHasAreaOrOlOversight();
-  }
-
-  /**
    * Delegates to {@link RequestScopeResolver#currentUserIsOlMember()}: whether the caller holds an
    * {@code OL_MEMBER} seat.
    *
@@ -262,20 +241,6 @@ public class OwnerScopeService {
    */
   public boolean currentUserIsMemberOfOrgUnit(@NotNull UUID orgUnitId) {
     return requestScopeResolver.currentUserIsMemberOfOrgUnit(orgUnitId);
-  }
-
-  /**
-   * Delegates to {@link RequestScopeResolver#currentUserIsMemberOfAreaCascade(UUID)}: whether the
-   * caller is a member anywhere in the whole area cascade of the given Bereich — the
-   * Bereichsleitung itself or any of its child Staffeln / Spezialkommandos. Used by the org-unit
-   * bank seam to evaluate the {@code AREA_MEMBERS} view grant / approval-limit tier ("Mitglieder
-   * des Bereichs", REQ-BANK-048) on a Bereichskonto.
-   *
-   * @param bereichId the owning Bereich org unit; never {@code null}
-   * @return {@code true} iff the caller has any membership on the Bereich or one of its children
-   */
-  public boolean currentUserIsMemberOfAreaCascade(@NotNull UUID bereichId) {
-    return requestScopeResolver.currentUserIsMemberOfAreaCascade(bereichId);
   }
 
   /**

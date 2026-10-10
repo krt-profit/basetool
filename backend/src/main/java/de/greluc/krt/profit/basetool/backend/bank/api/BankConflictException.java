@@ -137,10 +137,9 @@ public final class BankConflictException extends DomainProblem {
       BankProblemCode.BANK_SPLIT_TOO_SMALL.code();
 
   /**
-   * Withdrawal/transfer (request or direct booking) leaving a {@link
-   * de.greluc.krt.profit.basetool.backend.model.BankAccountType#requiresDebitJustification()
-   * justification-mandating} account ({@code CARTEL}, {@code CARTEL_BANK}, {@code SPECIAL}) without
-   * a non-blank justification (Begr&uuml;ndung). REQ-BANK-045.
+   * Withdrawal/transfer (request or direct booking) leaving a justification-mandating account
+   * ({@code CARTEL}, {@code CARTEL_BANK}, {@code SPECIAL}) without a non-blank justification
+   * (Begr&uuml;ndung). REQ-BANK-045.
    */
   public static final String CODE_BANK_JUSTIFICATION_REQUIRED =
       BankProblemCode.BANK_JUSTIFICATION_REQUIRED.code();

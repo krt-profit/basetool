@@ -1517,7 +1517,6 @@ class OwnerScopeServiceTest {
 
       service.canAccessBlueprintOverview();
       service.currentOversightScope();
-      service.currentOwnLevelOversightScope();
 
       verify(orgUnitMembershipRepository, times(1)).findAllByIdUserId(MEMBER_USER_ID);
     }
@@ -2009,90 +2008,6 @@ class OwnerScopeServiceTest {
   }
 
   @Nested
-  class CurrentUserHasAreaOrOlOversightTests {
-
-    @Test
-    void admin_qualifies() {
-      when(authHelper.isAdmin()).thenReturn(true);
-
-      assertTrue(service.currentUserHasAreaOrOlOversight());
-    }
-
-    @Test
-    void officerWithoutAreaOrOlSeat_doesNotQualify() {
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
-
-      assertFalse(service.currentUserHasAreaOrOlOversight());
-    }
-
-    @Test
-    void skLead_doesNotQualify() {
-      OrgUnitMembership lead = skMembership(MEMBER_USER_ID, UUID.randomUUID());
-      lead.setRole(MembershipRole.SK_LEAD);
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID), lead));
-
-      assertFalse(service.currentUserHasAreaOrOlOversight());
-    }
-
-    @Test
-    void bereichsleiter_qualifies() {
-      OrgUnitMembership seat = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
-      seat.setRole(MembershipRole.BEREICHSLEITER);
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID)).thenReturn(List.of(seat));
-
-      assertTrue(service.currentUserHasAreaOrOlOversight());
-    }
-
-    @Test
-    void bereichskoordinator_qualifies() {
-      OrgUnitMembership seat = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
-      seat.setRole(MembershipRole.BEREICHSKOORDINATOR);
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID)).thenReturn(List.of(seat));
-
-      assertTrue(service.currentUserHasAreaOrOlOversight());
-    }
-
-    @Test
-    void olMember_qualifies() {
-      OrgUnitMembership seat = olMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID)).thenReturn(List.of(seat));
-
-      assertTrue(service.currentUserHasAreaOrOlOversight());
-    }
-
-    @Test
-    void flaglessBereichSeat_doesNotQualify() {
-      OrgUnitMembership flaglessBereich = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(flaglessBereich));
-
-      assertFalse(service.currentUserHasAreaOrOlOversight());
-    }
-
-    @Test
-    void anonymous_doesNotQualify() {
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.empty());
-
-      assertFalse(service.currentUserHasAreaOrOlOversight());
-    }
-  }
-
-  @Nested
   class CurrentOversightScopeTests {
 
     @Test
@@ -2237,103 +2152,6 @@ class OwnerScopeServiceTest {
 
       assertFalse(scope.adminAllScope());
       assertEquals(Set.of(bereichId, childStaffelId), scope.memberOrgUnitIds());
-    }
-  }
-
-  /**
-   * The own-level oversight scope names only the caller's own leadership seats and is not cascaded,
-   * unlike {@link OwnerScopeService#currentOversightScope()} (REQ-BANK-022).
-   */
-  @Nested
-  class CurrentOwnLevelOversightScopeTests {
-
-    @Test
-    void adminWithoutPin_allScope() {
-      when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
-
-      ScopePredicate scope = service.currentOwnLevelOversightScope();
-
-      assertTrue(scope.adminAllScope());
-    }
-
-    @Test
-    void officer_ownLevelIsTheirStaffel() {
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
-      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
-
-      ScopePredicate scope = service.currentOwnLevelOversightScope();
-
-      assertEquals(Set.of(SQUADRON_A_ID), scope.memberOrgUnitIds());
-    }
-
-    @Test
-    void skLead_ownLevelIsLedSk() {
-      UUID skId = UUID.randomUUID();
-      OrgUnitMembership lead = skMembership(MEMBER_USER_ID, skId);
-      lead.setRole(MembershipRole.SK_LEAD);
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID), lead));
-      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
-
-      ScopePredicate scope = service.currentOwnLevelOversightScope();
-
-      assertEquals(Set.of(skId), scope.memberOrgUnitIds());
-    }
-
-    @Test
-    void bereichLeader_ownLevelIsBereichOnly_notChildrenAndNeverCascades() {
-      UUID bereichId = UUID.randomUUID();
-      OrgUnitMembership bereichSeat = bereichMembershipRow(MEMBER_USER_ID, bereichId);
-      bereichSeat.setRole(MembershipRole.BEREICHSLEITER);
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(bereichSeat));
-      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
-
-      ScopePredicate scope = service.currentOwnLevelOversightScope();
-
-      assertEquals(Set.of(bereichId), scope.memberOrgUnitIds());
-      verify(orgUnitCascadeService, never()).cascadedOfficerReach(any());
-    }
-
-    @Test
-    void olMember_ownLevelIsOlSeatOnly() {
-      UUID olId = UUID.randomUUID();
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(olMembershipRow(MEMBER_USER_ID, olId)));
-      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
-
-      ScopePredicate scope = service.currentOwnLevelOversightScope();
-
-      assertEquals(Set.of(olId), scope.memberOrgUnitIds());
-    }
-
-    @Test
-    void plainMemberOrFlaglessBereichSeat_emptyOwnLevel() {
-      OrgUnitMembership flaglessBereich = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID), flaglessBereich));
-      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
-
-      ScopePredicate scope = service.currentOwnLevelOversightScope();
-
-      assertTrue(scope.memberOrgUnitIds().isEmpty());
     }
   }
 

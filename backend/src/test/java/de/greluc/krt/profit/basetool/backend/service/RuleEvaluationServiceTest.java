@@ -25,10 +25,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestConfirmedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderCreatedEvent;
-import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.NotificationRule;

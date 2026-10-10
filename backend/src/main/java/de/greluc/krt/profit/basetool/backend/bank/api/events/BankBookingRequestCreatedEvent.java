@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.api.events;
 
-import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
-import de.greluc.krt.profit.basetool.backend.util.BankAmounts;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -37,7 +37,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * (REQ-BANK-026).
  *
  * <p>The account id drives the {@code ACCOUNT_GRANT} selector. Carries only scalars, never the
- * managed {@link de.greluc.krt.profit.basetool.backend.model.BankBookingRequest}.
+ * managed {@code BankBookingRequest}.
  *
  * @param requestId the created request's id (also the notification's loose entity id)
  * @param accountId the target bank account id ({@code ACCOUNT_GRANT} selector input)
