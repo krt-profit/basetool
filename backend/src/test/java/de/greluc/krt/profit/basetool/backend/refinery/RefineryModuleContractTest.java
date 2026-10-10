@@ -126,7 +126,7 @@ class RefineryModuleContractTest {
   @Test
   void createUpdateAndCancelEachRecordTheirAuditEvent() throws Exception {
     JsonNode created = create();
-    UUID id = UUID.fromString(created.get("id").asText());
+    UUID id = UUID.fromString(created.get("id").asString());
     assertThat(events(id)).containsExactly("REFINERY_ORDER_CREATED");
 
     mockMvc
@@ -147,7 +147,7 @@ class RefineryModuleContractTest {
   @Test
   void aForeignMemberIsRefusedOnEveryPerOrderEntryPoint() throws Exception {
     JsonNode created = create();
-    String order = ORDERS + "/" + created.get("id").asText();
+    String order = ORDERS + "/" + created.get("id").asString();
     RequestPostProcessor caller = as(outsider, MEMBER);
 
     mockMvc.perform(get(order).with(caller)).andExpect(status().isForbidden());
@@ -171,7 +171,7 @@ class RefineryModuleContractTest {
   @Test
   void aForeignLogisticianIsRefusedOnEveryOnBehalfEntryPoint() throws Exception {
     JsonNode created = create();
-    String id = created.get("id").asText();
+    String id = created.get("id").asString();
     String user = ORDERS + "/users/" + owner.getId();
     RequestPostProcessor caller = as(outsider, MEMBER, LOGISTICIAN);
 
@@ -194,7 +194,7 @@ class RefineryModuleContractTest {
   void theOwnerReadsTheOrder() throws Exception {
     JsonNode created = create();
     mockMvc
-        .perform(get(ORDERS + "/" + created.get("id").asText()).with(as(owner, MEMBER)))
+        .perform(get(ORDERS + "/" + created.get("id").asString()).with(as(owner, MEMBER)))
         .andExpect(status().isOk());
   }
 
