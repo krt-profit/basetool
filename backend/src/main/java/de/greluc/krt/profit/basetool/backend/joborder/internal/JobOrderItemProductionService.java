@@ -26,11 +26,10 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
+import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
-import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.joborder.api.ProductionAllocationException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
@@ -50,9 +49,7 @@ import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.service.AllocationReductions;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
@@ -95,15 +92,13 @@ public class JobOrderItemProductionService {
 
   private final JobOrderRepository jobOrderRepository;
   private final InventoryItemRepository inventoryItemRepository;
-  private final StockChangeObserver stockChangeObserver;
+  private final StockCommands stockCommands;
   private final JobOrderItemService jobOrderItemService;
   private final AuditRecorder auditRecorder;
   private final UserService userService;
   private final UserRepository userRepository;
   private final LocationRepository locationRepository;
   private final OwnerScopeService ownerScopeService;
-  private final BookInPolicy bookInPolicy;
-  private final InventoryCheckoutService inventoryCheckoutService;
   private final AuthHelperService authHelperService;
 
   /**
@@ -270,18 +265,8 @@ public class JobOrderItemProductionService {
               depleted ? 0.0 : remainingAmount,
               depleted));
 
-      if (depleted) {
-        stockChangeObserver.beforeDelete(
-            List.of(inventoryItem.getId()), StockChangeReason.PRODUCTION);
-        inventoryItemRepository.delete(inventoryItem);
-      } else {
-        Map<UUID, Double> missionPlan =
-            AllocationReductions.resolveReductionPlan(inventoryItem, null, consumed, false);
-        InventoryAllocations.reduceJobOrder(inventoryItem, jobOrderId, consumed);
-        AllocationReductions.applyPlan(inventoryItem, missionPlan, false);
-        inventoryItem.setAmount(remainingAmount);
-        inventoryItemRepository.save(inventoryItem);
-      }
+      stockCommands.takeFromEarmarkedRow(
+          inventoryItem, jobOrderId, consumed, null, StockChangeReason.PRODUCTION);
     }
 
     line.setManufacturedAmount(line.getManufacturedAmount() + amount);
@@ -289,7 +274,7 @@ public class JobOrderItemProductionService {
 
     for (ConsumedItem ci : consumedItems) {
       if (!ci.depleted()) {
-        stockChangeObserver.lower(ci.itemId(), ci.remaining(), StockChangeReason.PRODUCTION);
+        stockCommands.lowered(ci.itemId(), ci.remaining(), StockChangeReason.PRODUCTION);
       }
       auditRecorder.record(
           AuditEventType.INVENTORY_CONSUMED_BY_PRODUCTION,
@@ -324,8 +309,8 @@ public class JobOrderItemProductionService {
 
   /**
    * Refuses a book-in into another member's inventory the caller may not write (REQ-INV-032,
-   * REQ-SEC-005): a foreign {@code ownerUserId} requires {@link BookInPolicy#mayBookInFor(UUID)},
-   * and a {@code personal} book-in for someone else is always refused.
+   * REQ-SEC-005): a foreign {@code ownerUserId} requires {@link StockCommands#requireBookIn}, and a
+   * {@code personal} book-in for someone else is always refused.
    *
    * <p>Checked on the requested id before any lookup; an absent {@code ownerUserId} means the
    * caller.
@@ -335,19 +320,12 @@ public class JobOrderItemProductionService {
    *     asks for a personal book-in on behalf of another member
    */
   private void assertMayBookInFor(@NotNull JobOrderItemProductionCreateDto.BookInDto bookIn) {
-    final UUID ownerUserId = bookIn.ownerUserId();
-    if (ownerUserId == null
-        || authHelperService.currentUserId().map(ownerUserId::equals).orElse(false)) {
-      return;
-    }
-    if (!bookInPolicy.mayBookInFor(ownerUserId)) {
-      throw new AccessDeniedException(
-          "You are not allowed to book produced stock in for this user");
-    }
-    if (Boolean.TRUE.equals(bookIn.personal())) {
-      throw new AccessDeniedException(
-          "You are not allowed to book produced stock into another user's personal inventory");
-    }
+    stockCommands.requireBookIn(
+        bookIn.ownerUserId(),
+        authHelperService.currentUserId().orElse(null),
+        false,
+        Boolean.TRUE.equals(bookIn.personal()),
+        BookInRule.production());
   }
 
   /**
@@ -355,8 +333,7 @@ public class JobOrderItemProductionService {
    *
    * <p>The owner defaults to the acting user and the owning org unit is resolved through {@link
    * OwnerScopeService#resolveOrgUnitForPickerOutputNullable}. Unless {@code personal}, the row is
-   * earmarked to the producing order; it is then merged via {@link
-   * InventoryCheckoutService#mergeStockIfRequested} and audited as {@code
+   * earmarked to the producing order; it is then merged via the Lager's merge and audited as {@code
    * INVENTORY_RECEIVED_FROM_PRODUCTION}.
    *
    * @param jobOrder the producing order, managed in the current transaction
@@ -396,26 +373,15 @@ public class JobOrderItemProductionService {
     final OrgUnit owningOrgUnit =
         ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, bookIn.owningOrgUnitId());
 
-    InventoryItem stockRow = new InventoryItem();
-    stockRow.setUser(owner);
-    stockRow.setOwningOrgUnit(owningOrgUnit);
-    stockRow.setGameItem(line.getGameItem());
-    stockRow.setLocation(location);
-    stockRow.setAmount((double) amount);
-    stockRow.setPersonal(personal);
-    if (allocateToOrder) {
-      InventoryAllocations.addJobOrder(stockRow, jobOrder, (double) amount, false);
-    }
-    InventoryItem saved = inventoryItemRepository.save(stockRow);
-    InventoryItem merged = inventoryCheckoutService.mergeStockIfRequested(saved, false);
-    auditRecorder.record(
-        AuditEventType.INVENTORY_RECEIVED_FROM_PRODUCTION,
-        merged.getId(),
-        InventoryAuditLabels.label(merged),
-        owner.getId(),
-        AuditDetails.of("jobOrder", "#" + jobOrder.getDisplayId())
-            .with("gameItemId", line.getGameItem().getId())
-            .with("amount", amount)
-            .with("locationId", location.getId()));
+    stockCommands.bookInFromProduction(
+        jobOrder.getId(),
+        jobOrder.getDisplayId(),
+        line.getGameItem(),
+        amount,
+        owner,
+        owningOrgUnit,
+        location,
+        personal,
+        allocateToOrder);
   }
 }

@@ -54,11 +54,7 @@ inventory -> joborder: InventoryJobOrderAllocation -> JobOrder
 inventory -> mission: AllocationReductions -> Mission
 inventory -> mission: InventoryAllocations -> Mission
 inventory -> mission: InventoryAuditLabels -> Mission
-inventory -> mission: InventoryCheckoutService -> FinanceType
 inventory -> mission: InventoryCheckoutService -> Mission
-inventory -> mission: InventoryCheckoutService -> MissionFinanceEntry
-inventory -> mission: InventoryCheckoutService -> MissionFinanceEntryRepository
-inventory -> mission: InventoryCheckoutService -> MissionParticipantRepository
 inventory -> mission: InventoryItemMapper -> Mission
 inventory -> mission: InventoryItemService -> Mission
 inventory -> mission: InventoryItemService -> MissionRepository

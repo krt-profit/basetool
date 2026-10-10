@@ -59,6 +59,7 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryCheckoutService;
+import de.greluc.krt.profit.basetool.backend.service.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
@@ -113,6 +114,19 @@ class JobOrderItemProductionServiceTest {
 
   @BeforeEach
   void setUp() {
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        service,
+        "stockCommands",
+        new InventoryStockCommands(
+            inventoryItemRepository,
+            userRepository,
+            inventoryCheckoutService,
+            null,
+            auditService,
+            bookInPolicy,
+            offerRatchet,
+            de.greluc.krt.profit.basetool.backend.service.ReferenceResolvingEntityManager
+                .create()));
     orderId = UUID.randomUUID();
     lineId = UUID.randomUUID();
     inventoryId = UUID.randomUUID();
@@ -511,7 +525,7 @@ class JobOrderItemProductionServiceTest {
     assertThat(stockRow.getAmount()).isEqualTo(2.0);
     assertThat(stockRow.getJobOrderAllocations()).hasSize(1);
     var slice = stockRow.getJobOrderAllocations().get(0);
-    assertThat(slice.getJobOrder()).isSameAs(order);
+    assertThat(slice.getJobOrder().getId()).isEqualTo(order.getId());
     assertThat(slice.getAmount()).isEqualTo(2.0);
     assertThat(slice.getDelivered()).isFalse();
     verify(ownerScopeService).resolveOrgUnitForPickerOutputNullable(owner, orgUnitId);

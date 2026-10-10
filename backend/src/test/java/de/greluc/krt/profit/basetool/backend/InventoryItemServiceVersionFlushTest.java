@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
+import de.greluc.krt.profit.basetool.backend.service.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import java.util.Optional;
 import java.util.UUID;
@@ -89,8 +90,8 @@ class InventoryItemServiceVersionFlushTest {
             inventoryItemRepository,
             userRepository,
             locationRepository,
-            missionFinanceEntryRepository,
-            missionParticipantRepository,
+            new de.greluc.krt.profit.basetool.backend.mission.internal.MissionSaleIncome(
+                missionParticipantRepository, missionFinanceEntryRepository),
             new MaterialExchangeStockOfferLookup(materialExchangeOfferRepository),
             offerRatchet,
             inventoryItemMapper,
@@ -109,6 +110,7 @@ class InventoryItemServiceVersionFlushTest {
             inventoryItemMapper,
             ownerScopeService,
             null,
+            new InventoryStockCommands(null, null, null, null, null, null, null, null),
             null,
             auditService,
             null,

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Android-App: die neueste veröffentlichte Version wird jetzt als 18 gemeldet.** Die App v0.5.0 (versionCode 18) ist veröffentlicht, das Backend meldete noch 17; Apps mit 17 sehen einen Update-Hinweis, werden aber nicht gesperrt (die Mindestversion bleibt 17).
+
 ## [v1.14.0](https://github.com/krt-profit/basetool/releases/tag/v1.14.0) - 2026-10-10
 
 ### Added
