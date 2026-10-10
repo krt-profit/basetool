@@ -436,18 +436,38 @@ public class AccessGateService {
       Function<T, User> owner,
       Function<T, OrgUnit> orgUnit,
       boolean edit) {
-    return row.map(
-            r -> {
-              User rowOwner = owner.apply(r);
-              OrgUnit rowOrgUnit = orgUnit.apply(r);
-              return isCurrentUserOwner(rowOwner)
-                  || (rowOrgUnit == null
-                      ? canAccessOwnerlessPersonalRow(rowOwner)
-                      : (edit
-                          ? canEditSquadron(rowOrgUnit.getId())
-                          : canSeeSquadron(rowOrgUnit.getId())));
-            })
-        .orElse(false);
+    return row.map(r -> permitsOwnedRow(owner.apply(r), orgUnit.apply(r), edit)).orElse(false);
+  }
+
+  /**
+   * Checks whether the caller may access a row with the given per-user owner and owning org unit:
+   * the owner escape (REQ-ORG-011), then the ownerless rule, then {@link #canSeeSquadron(UUID)} or,
+   * with {@code edit}, {@link #canEditSquadron(UUID)}.
+   *
+   * @param owner the row's per-user owner, or {@code null}
+   * @param orgUnit the row's owning org unit; {@code null} marks an ownerless row
+   * @param edit {@code true} for the edit check, {@code false} for the read check
+   * @return {@code true} iff the caller may access the row
+   */
+  public boolean permitsOwnedRow(@Nullable User owner, @Nullable OrgUnit orgUnit, boolean edit) {
+    return isCurrentUserOwner(owner)
+        || (orgUnit == null
+            ? canAccessOwnerlessPersonalRow(owner)
+            : (edit ? canEditSquadron(orgUnit.getId()) : canSeeSquadron(orgUnit.getId())));
+  }
+
+  /**
+   * Coarse pre-check for acting on another member's rows: admin, then self, then whether {@link
+   * #canSeeSquadron(UUID)} or, with {@code edit}, {@link #canEditSquadron(UUID)} accepts any of the
+   * member's memberships. It does not bound individual rows.
+   *
+   * @param targetUserId the member being acted upon; never {@code null}
+   * @param edit {@code true} for the write check, {@code false} for the read check
+   * @return {@code true} iff the caller shares at least one in-scope org unit with the member
+   */
+  public boolean canActOnTargetUser(@NotNull UUID targetUserId, boolean edit) {
+    return canActOnTargetUserScoped(
+        targetUserId, edit ? this::canEditSquadron : this::canSeeSquadron);
   }
 
   /**
