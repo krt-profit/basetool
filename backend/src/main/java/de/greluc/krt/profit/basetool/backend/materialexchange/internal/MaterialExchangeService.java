@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MarketNotices;
 import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MaterialExchangeInterestRegisteredEvent;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -469,6 +470,13 @@ public class MaterialExchangeService {
           offerLabel(offer),
           offer.getOwner() == null ? null : offer.getOwner().getId(),
           offerSubjectDetails(offer));
+      eventPublisher.publishEvent(
+          MarketNotices.offerUnavailable(
+              offer.getId(),
+              offerLabel(offer),
+              "WITHDRAWN",
+              interestRepository.findInterestedUserIdsByOfferId(offer.getId()),
+              viewerId));
     }
     return boardService.detailDto(offer, viewerId);
   }

@@ -23,6 +23,7 @@
       "admin::api",
       "audit::api",
       "catalogue::api",
+      "hangar::api",
       "identity::api",
       "inventory::api",
       "joborder::api",

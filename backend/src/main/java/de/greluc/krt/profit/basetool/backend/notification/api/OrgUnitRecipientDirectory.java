@@ -56,4 +56,13 @@ public interface OrgUnitRecipientDirectory {
    */
   @NotNull
   Set<UUID> missionManagersOf(@NotNull UUID orgUnitId);
+
+  /**
+   * The members who hold a leadership seat in an org unit, whatever their global roles.
+   *
+   * @param orgUnitId the org unit
+   * @return their user subs; never {@code null}, possibly empty
+   */
+  @NotNull
+  Set<UUID> leadershipOf(@NotNull UUID orgUnitId);
 }

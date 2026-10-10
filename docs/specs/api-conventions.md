@@ -95,6 +95,19 @@ stable machine-readable `code`, and a per-request `correlationId`; validation er
 Titles and details are localized via `MessageSource`. Extend `GlobalExceptionHandler` rather than
 throwing into the void; problem-type URIs come from `AppProblemProperties`, not hardcoded strings.
 
+**One advice, handlers grouped by family.** `GlobalExceptionHandler` is the only
+`@ControllerAdvice` for problems. Its handlers sit in a chain of abstract classes, one per family,
+each extending the one before: `ProblemSupport` (the `CODE_*` constants, the message lookup, the
+problem factory and the 4xx log line), `ConcurrencyProblemHandlers` (409: optimistic and pessimistic
+locks, data integrity), `SecurityProblemHandlers` (401, 403), `RequestProblemHandlers` (a malformed
+request: validation, an unreadable body, a missing value, media types, an upload over the limit, an
+unsupported method), `ApplicationProblemHandlers` (`AppException`, illegal argument and state, status
+exceptions, a missing resource, a failed outbound call) and, last, `GlobalExceptionHandler` itself
+with the catch-all. A new handler goes into the family it belongs to. Spring reads the whole chain
+as one advice, so there is one resolution order and one disclosure path; `GlobalExceptionHandlerMappingTest`
+pins which method answers which exception type, and every family logs under the
+`GlobalExceptionHandler` logger name. Never a second `@ControllerAdvice` per domain.
+
 **`GlobalExceptionHandler` must outrank Spring's own problem-details advice (ADR-0132).**
 `spring.mvc.problemdetails.enabled: true` makes Spring Boot register a competing
 `ProblemDetailsExceptionHandler` `@ControllerAdvice` at `@Order(0)`; an unordered advice sits at

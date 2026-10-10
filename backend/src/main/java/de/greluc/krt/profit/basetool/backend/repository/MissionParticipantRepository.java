@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -142,4 +143,28 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
       """)
   List<UUID> findMissionIdsSignedUpBy(
       @Param("userId") UUID userId, @Param("missionIds") Collection<UUID> missionIds);
+
+  /**
+   * Returns the registered members signed up for a mission; guest participants carry no user and
+   * are left out.
+   *
+   * @param missionId the mission
+   * @return the participants' user ids; never {@code null}, possibly empty
+   */
+  @Query(
+      "SELECT p.user.id FROM MissionParticipant p WHERE p.mission.id = :missionId"
+          + " AND p.user IS NOT NULL")
+  Set<UUID> findRegisteredUserIdsByMission(@Param("missionId") UUID missionId);
+
+  /**
+   * Returns the registered members signed up for a mission who have not checked in yet.
+   *
+   * @param missionId the mission
+   * @return the user ids of participants whose {@code startTime} is still unset; never {@code
+   *     null}, possibly empty
+   */
+  @Query(
+      "SELECT p.user.id FROM MissionParticipant p WHERE p.mission.id = :missionId"
+          + " AND p.user IS NOT NULL AND p.startTime IS NULL")
+  Set<UUID> findNotCheckedInUserIdsByMission(@Param("missionId") UUID missionId);
 }

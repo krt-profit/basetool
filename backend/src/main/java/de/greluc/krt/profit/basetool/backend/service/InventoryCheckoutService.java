@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeEffects;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
+import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryNotices;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredFromUserEvent;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredToUserEvent;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.TransferredLot;
@@ -60,6 +61,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
@@ -258,6 +260,13 @@ public class InventoryCheckoutService {
           offerReason != null ? offerReason : StockChangeReason.TRANSFER);
     }
     final StockChangeReason reason = offerReason != null ? offerReason : StockChangeReason.CHECKOUT;
+    final TransferredLot bookedOutLot =
+        new TransferredLot(
+            materialName,
+            dto.amount(),
+            requiresWholeUnits(item),
+            item.getQuality(),
+            item.getLocation() != null ? item.getLocation().getName() : null);
 
     Map<UUID, Double> orderReductions =
         AllocationReductions.resolveReductionPlan(
@@ -273,7 +282,7 @@ public class InventoryCheckoutService {
     AllocationReductions.applyPlan(item, missionReductions, false);
 
     if (remainingAmount <= QUANTITY_EPSILON) {
-      int removed = stockChangeObserver.beforeDelete(List.of(sourceId), reason);
+      final int removed = stockChangeObserver.beforeDelete(List.of(sourceId), reason);
       inventoryItemRepository.delete(item);
       recordBookOutTail(
           checkoutType,
@@ -284,6 +293,7 @@ public class InventoryCheckoutService {
           dto,
           0.0,
           financeEntryIds);
+      announceBookedOutByOther(checkoutType, sourceId, sourceOwnerId, currentUserId, bookedOutLot);
       return new BookOut(null, new StockChangeEffects(0, removed));
     } else {
       item.setAmount(remainingAmount);
@@ -301,6 +311,7 @@ public class InventoryCheckoutService {
           dto,
           remainingAmount,
           financeEntryIds);
+      announceBookedOutByOther(checkoutType, sourceId, sourceOwnerId, currentUserId, bookedOutLot);
       return new BookOut(inventoryItemMapper.toDto(saved), new StockChangeEffects(reduced, 0));
     }
   }
@@ -516,6 +527,34 @@ public class InventoryCheckoutService {
         InventoryAllocations.addMission(target, slice.getMission(), reduction.getValue());
       }
     }
+  }
+
+  /**
+   * Tells the owner of a row that somebody else discarded or sold part of it (REQ-INV-056). Nothing
+   * happens when the owner acted.
+   *
+   * @param type the resolved checkout type, {@code DISCARD} or {@code SELL}
+   * @param sourceId the booked-out row
+   * @param ownerId the row owner's id
+   * @param actorId the member who booked out
+   * @param lot the lot the action took
+   */
+  private void announceBookedOutByOther(
+      @NotNull CheckoutType type,
+      @NotNull UUID sourceId,
+      @NotNull UUID ownerId,
+      @NotNull UUID actorId,
+      @NotNull TransferredLot lot) {
+    if (ownerId.equals(actorId)) {
+      return;
+    }
+    eventPublisher.publishEvent(
+        InventoryNotices.bookedOutByOther(
+            ownerId,
+            sourceId,
+            new ActorRef(actorId, actorName(actorId, List.of())),
+            type == CheckoutType.SELL ? "SOLD" : "DISCARDED",
+            List.of(lot)));
   }
 
   /**

@@ -390,7 +390,7 @@ change takes effect from the next PR on),
 [`deploy-script.yml`](.github/workflows/deploy-script.yml) and
 [`keycloak-provisioner.yml`](.github/workflows/keycloak-provisioner.yml).
 [`cache-janitor.yml`](.github/workflows/cache-janitor.yml) is housekeeping,
-not a check: after each CodeQL run, daily and when a PR closes it deletes
+not a check: after each CodeQL run on `main`, daily and when a PR closes it deletes
 Actions caches nothing will read again — superseded CodeQL dependency caches,
 every Gradle cache on `main` but the newest `gradle-home-` entry per job family
 and the extracted bundles it was saved or restored with
@@ -961,7 +961,7 @@ because of real bugs that shipped. The short version:
   `@Transactional(propagation = MANDATORY)` that operates on the
   already-managed entity and relies on dirty-checking. Canonical
   example:
-  [`JobOrderService.completeJobOrderWithinTransaction`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/JobOrderService.java).
+  [`JobOrderService.completeJobOrderWithinTransaction`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/joborder/internal/JobOrderService.java).
 - **Pessimistic locking** for bulk reorders / priority shifts:
   `@Lock(LockModeType.PESSIMISTIC_WRITE)` (or atomic SQL).
 

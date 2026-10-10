@@ -96,22 +96,54 @@ public class NotificationPageController {
   private static final int PAGE_LIMIT = 50;
   private static final int DROPDOWN_LIMIT = 10;
 
-  /** Notification types whose subject is the job order their entity id names. */
-  private static final Set<String> JOB_ORDER_TYPES =
-      Set.of("JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER");
+  /** The detail page of the record a notification is about, by the notification's entity type. */
+  private static final Map<String, String> ENTITY_PAGES =
+      Map.of(
+          "MISSION",
+          "/missions/",
+          "OPERATION",
+          "/operations/",
+          "JOB_ORDER",
+          "/orders/",
+          "REFINERY_ORDER",
+          "/refinery-orders/",
+          "BANK_ACCOUNT_GRANT",
+          "/bank/accounts/",
+          "BANK_HOLDER",
+          "/bank/holders/");
+
+  /** The types whose record is gone, so the row has nothing to link to. */
+  private static final Set<String> UNLINKED_TYPES = Set.of("MISSION_DELETED", "BANK_GRANT_REVOKED");
 
   /** The page each notification type links to when its subject is a page rather than a record. */
   private static final Map<String, String> PAGE_TARGETS =
-      Map.of(
-          "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "/materialboerse",
-          "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "/materialboerse",
-          "EXCHANGE_INSTALLATION_CONNECTED", "/connected-apps",
-          "EXCHANGE_BULK_UNDO_APPLIED", "/connected-apps",
-          "INVENTORY_TRANSFERRED_TO_USER", "/inventory/my",
-          "INVENTORY_TRANSFERRED_FROM_USER", "/inventory/my",
-          "ACCOUNT_DELETION_REQUEST_DECLINED", "/profile",
-          "ACCOUNT_DELETION_REQUESTED", "/admin/deletion-requests",
-          "DISCORD_REGISTRATION_PENDING", "/admin/discord-registrations");
+      Map.ofEntries(
+          Map.entry("MATERIAL_EXCHANGE_INTEREST_REGISTERED", "/materialboerse"),
+          Map.entry("MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "/materialboerse"),
+          Map.entry("MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "/materialboerse"),
+          Map.entry("MATERIAL_REQUEST_UNAVAILABLE", "/materialboerse"),
+          Map.entry("EXCHANGE_INSTALLATION_CONNECTED", "/connected-apps"),
+          Map.entry("EXCHANGE_BULK_UNDO_APPLIED", "/connected-apps"),
+          Map.entry("INVENTORY_TRANSFERRED_TO_USER", "/inventory/my"),
+          Map.entry("INVENTORY_TRANSFERRED_FROM_USER", "/inventory/my"),
+          Map.entry("INVENTORY_BOOKED_OUT_BY_OTHER", "/inventory/my"),
+          Map.entry("BANK_BOOKING_REQUEST_APPROVED", "/bank/requests"),
+          Map.entry("EXCHANGE_CLIENT_SUSPENDED", "/connected-apps"),
+          Map.entry("EXCHANGE_CLIENT_ACTIVATED", "/connected-apps"),
+          Map.entry("EXCHANGE_CLIENT_UPDATE_REQUIRED", "/connected-apps"),
+          Map.entry("EXCHANGE_CLIENT_CAPABILITY_REMOVED", "/connected-apps"),
+          Map.entry("EXCHANGE_SWITCHED_OFF", "/connected-apps"),
+          Map.entry("HANGAR_SHIP_ASSIGNED", "/hangar"),
+          Map.entry("HANGAR_FITTED_RESET", "/hangar"),
+          Map.entry("HANGAR_CHANGED_BY_ADMIN", "/hangar"),
+          Map.entry("BLUEPRINT_CHANGED_BY_ADMIN", "/personal-inventory/blueprints"),
+          Map.entry("BLUEPRINT_PURGED_BY_ADMIN", "/personal-inventory/blueprints"),
+          Map.entry("ACCOUNT_DELETION_REQUEST_DECLINED", "/profile"),
+          Map.entry("ACCOUNT_DELETION_REQUESTED", "/admin/deletion-requests"),
+          Map.entry("DISCORD_REGISTRATION_PENDING", "/admin/discord-registrations"));
+
+  /** The suffix that marks a render parameter as a code with a localized word (REQ-NOTIF-028). */
+  private static final String CODE_SUFFIX = "Code";
 
   private static final DateTimeFormatter DISPLAY_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'UTC'").withZone(ZoneOffset.UTC);
@@ -442,13 +474,25 @@ public class NotificationPageController {
     if (type == null) {
       return null;
     }
-    if (JOB_ORDER_TYPES.contains(type)) {
-      return "JOB_ORDER".equals(entityType) && entityId != null ? "/orders/" + entityId : null;
+    String fixed = PAGE_TARGETS.get(type);
+    if (fixed != null || UNLINKED_TYPES.contains(type)) {
+      return fixed;
     }
-    return PAGE_TARGETS.get(type);
+    String prefix = entityType == null ? null : ENTITY_PAGES.get(entityType);
+    return prefix != null && entityId != null ? prefix + entityId : null;
   }
 
-  private String render(String type, Map<String, String> params, Locale locale) {
+  /**
+   * Renders a notification into the member's language: the type's template with every parameter
+   * filled in, a parameter named {@code <name>Code} also giving {@code {<name>}} its localized word
+   * (REQ-NOTIF-028).
+   *
+   * @param type the notification type
+   * @param params the stored render parameters, or {@code null}
+   * @param locale the member's locale
+   * @return the rendered text
+   */
+  String render(String type, Map<String, String> params, Locale locale) {
     String key = "notifications.type." + type;
     String template = messageSource.getMessage(key, null, key, locale);
     if (template == null || template.equals(key)) {
@@ -460,9 +504,25 @@ public class NotificationPageController {
         template =
             template.replace(
                 "{" + entry.getKey() + "}", entry.getValue() == null ? "" : entry.getValue());
+        if (isCodeParameter(entry.getKey()) && entry.getValue() != null) {
+          String name = entry.getKey().substring(0, entry.getKey().length() - CODE_SUFFIX.length());
+          String valueKey = "notifications.value." + name + "." + entry.getValue();
+          String word = messageSource.getMessage(valueKey, null, entry.getValue(), locale);
+          template = template.replace("{" + name + "}", word == null ? entry.getValue() : word);
+        }
       }
     }
     return template;
+  }
+
+  /**
+   * Whether a parameter carries a code that has a localized word, by its {@code Code} suffix.
+   *
+   * @param name the parameter name
+   * @return {@code true} for a name such as {@code changeCode}
+   */
+  private static boolean isCodeParameter(String name) {
+    return name.length() > CODE_SUFFIX.length() && name.endsWith(CODE_SUFFIX);
   }
 
   private long currentUnreadCount() {

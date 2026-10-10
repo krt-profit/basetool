@@ -27,8 +27,12 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountGrantId;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountGrantRepository;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankResponsibilityService;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeInstallationRecipientDirectory;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeInstallationRepository;
 import de.greluc.krt.profit.basetool.backend.model.OrgRelativeRole;
 import de.greluc.krt.profit.basetool.backend.model.Role;
+import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -59,6 +63,9 @@ class RecipientDirectoriesTest {
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private BankAccountGrantRepository bankAccountGrantRepository;
   @Mock private OrgUnitBankResponsibilityService orgUnitBankResponsibilityService;
+  @Mock private MissionParticipantRepository missionParticipantRepository;
+  @Mock private MissionRepository missionRepository;
+  @Mock private ExchangeInstallationRepository exchangeInstallationRepository;
 
   private UserRoleRecipientDirectory roles;
   private OrgUnitMembershipRecipientDirectory orgUnits;
@@ -72,7 +79,13 @@ class RecipientDirectoriesTest {
     accounts =
         new OrgUnitBankRecipientDirectory(
             bankAccountGrantRepository, orgUnitBankResponsibilityService);
-    resolution = new RecipientResolutionService(roles, orgUnits, accounts);
+    resolution =
+        new RecipientResolutionService(
+            roles,
+            orgUnits,
+            accounts,
+            new MissionRecipientDirectoryImpl(missionParticipantRepository, missionRepository),
+            new ExchangeInstallationRecipientDirectory(exchangeInstallationRepository));
   }
 
   @Test
@@ -112,6 +125,57 @@ class RecipientDirectoriesTest {
         .containsExactly(BOB);
     assertThat(resolution.resolveOrgRelative(OrgRelativeRole.MISSION_MANAGER, ORG_UNIT))
         .containsExactlyInAnyOrder(ALICE, BOB);
+  }
+
+  @Test
+  void orgunitResolvesEverySeatHolderAsUnitLeadership() {
+    when(orgUnitMembershipRepository.findLeadershipUserIdsByOrgUnit(ORG_UNIT))
+        .thenReturn(Set.of(ALICE, BOB));
+
+    assertThat(resolution.resolveOrgRelative(OrgRelativeRole.UNIT_LEADERSHIP, ORG_UNIT))
+        .containsExactlyInAnyOrder(ALICE, BOB);
+  }
+
+  @Test
+  void missionResolvesParticipantsAndTheNotCheckedInSubset() {
+    UUID mission = UUID.randomUUID();
+    when(missionParticipantRepository.findRegisteredUserIdsByMission(mission))
+        .thenReturn(Set.of(ALICE, BOB));
+    when(missionParticipantRepository.findNotCheckedInUserIdsByMission(mission))
+        .thenReturn(Set.of(BOB));
+
+    assertThat(resolution.resolveMissionParticipants(mission, false))
+        .containsExactlyInAnyOrder(ALICE, BOB);
+    assertThat(resolution.resolveMissionParticipants(mission, true)).containsExactly(BOB);
+  }
+
+  @Test
+  void missionLeadershipIsTheOwnerAndTheManagers() {
+    UUID mission = UUID.randomUUID();
+    when(missionRepository.findOwnerUserIdById(mission)).thenReturn(Optional.of(ALICE));
+    when(missionRepository.findManagerUserIdsById(mission)).thenReturn(Set.of(BOB));
+
+    assertThat(resolution.resolveMissionLeadership(mission)).containsExactlyInAnyOrder(ALICE, BOB);
+  }
+
+  @Test
+  void missionLeadershipOfAnOwnerlessMissionIsItsManagers() {
+    UUID mission = UUID.randomUUID();
+    when(missionRepository.findOwnerUserIdById(mission)).thenReturn(Optional.empty());
+    when(missionRepository.findManagerUserIdsById(mission)).thenReturn(Set.of(BOB));
+
+    assertThat(resolution.resolveMissionLeadership(mission)).containsExactly(BOB);
+  }
+
+  @Test
+  void exchangeResolvesTheHoldersOfOneClientOrOfAnyClient() {
+    UUID client = UUID.randomUUID();
+    when(exchangeInstallationRepository.findHolderUserIdsByClient(client))
+        .thenReturn(Set.of(ALICE));
+    when(exchangeInstallationRepository.findAllHolderUserIds()).thenReturn(Set.of(ALICE, BOB));
+
+    assertThat(resolution.resolveExchangeClientHolders(client)).containsExactly(ALICE);
+    assertThat(resolution.resolveExchangeClientHolders(null)).containsExactlyInAnyOrder(ALICE, BOB);
   }
 
   @Test

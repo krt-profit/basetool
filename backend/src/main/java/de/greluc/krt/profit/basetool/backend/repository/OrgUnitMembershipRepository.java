@@ -214,4 +214,31 @@ public interface OrgUnitMembershipRepository
       """)
   Set<UUID> findUserIdsByOrgUnitIdsAndRole(
       @Param("orgUnitIds") Collection<UUID> orgUnitIds, @Param("role") MembershipRole role);
+
+  /**
+   * Returns the members who hold a leadership seat in the given org unit, that is every member
+   * whose rank is not plain {@code MEMBER} ({@link MembershipRole#confersOwnLevelOversight()}).
+   * Backs {@code UNIT_LEADERSHIP}.
+   *
+   * @param orgUnitId the org unit
+   * @return the seat holders' user ids; never {@code null}, possibly empty
+   */
+  @Query(
+      """
+      SELECT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId = :orgUnitId AND m.role <>
+      de.greluc.krt.profit.basetool.backend.model.MembershipRole.MEMBER
+      """)
+  Set<UUID> findLeadershipUserIdsByOrgUnit(@Param("orgUnitId") UUID orgUnitId);
+
+  /**
+   * Whether a member holds any leadership seat: a squadron rank, a Bereich rank, an
+   * Organisationsleitung seat or an SK lead (REQ-ORG-029).
+   *
+   * @param userId the member
+   * @return {@code true} when at least one of their memberships is not a plain member
+   */
+  @Query(
+      "SELECT COUNT(m) > 0 FROM OrgUnitMembership m WHERE m.id.userId = :userId"
+          + " AND m.role <> de.greluc.krt.profit.basetool.backend.model.MembershipRole.MEMBER")
+  boolean existsLeadershipSeat(@Param("userId") UUID userId);
 }

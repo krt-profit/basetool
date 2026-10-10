@@ -24,11 +24,11 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
@@ -41,8 +41,9 @@ import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.RefineryYield;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.refinery.api.MissionParticipantRequiredException;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
@@ -56,19 +57,23 @@ import de.greluc.krt.profit.basetool.backend.service.CraftabilityYieldSource;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
+import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
@@ -93,12 +98,17 @@ public class RefineryOrderService implements CraftabilityYieldSource {
   private final MissionParticipantRepository missionParticipantRepository;
   private final RefiningMethodRepository refiningMethodRepository;
   private final MaterialRepository materialRepository;
-  private final InventoryItemRepository inventoryItemRepository;
   private final JobOrderRepository jobOrderRepository;
   private final JobOrderItemService jobOrderItemService;
   private final RefineryYieldRepository refineryYieldRepository;
   private final OwnerScopeService ownerScopeService;
+  private final StockCommands stockCommands;
   private final AuditRecorder auditRecorder;
+
+  /** Publishes the refinery notices after the commit (REQ-REFINERY-024). */
+  private final ApplicationEventPublisher eventPublisher;
+
+  private final UserService userService;
 
   /**
    * Owner-scoped paged list under the list filters (REQ-REFINERY-019).
@@ -478,8 +488,16 @@ public class RefineryOrderService implements CraftabilityYieldSource {
       order.setRefiningMethod(null);
     }
 
+    final Instant previousStart = order.getStartedAt();
+    final Long previousDuration = order.getDurationMinutes();
     order.setStartedAt(details.getStartedAt() != null ? details.getStartedAt() : Instant.now());
     order.setDurationMinutes(details.getDurationMinutes());
+    final boolean runTimeChanged =
+        !Objects.equals(previousStart, order.getStartedAt())
+            || !Objects.equals(previousDuration, order.getDurationMinutes());
+    if (runTimeChanged) {
+      order.setReadyNotifiedAt(null);
+    }
     order.setExpenses(zeroToNull(details.getExpenses()));
     order.setOtherExpenses(zeroToNull(details.getOtherExpenses()));
     order.setOreSales(zeroToNull(details.getOreSales()));
@@ -500,6 +518,13 @@ public class RefineryOrderService implements CraftabilityYieldSource {
     }
 
     RefineryOrder saved = refineryOrderRepository.save(order);
+    if (runTimeChanged
+        || saved.getStatus() == RefineryOrderStatus.COMPLETED
+        || saved.getStatus() == RefineryOrderStatus.CANCELED) {
+      eventPublisher.publishEvent(RefineryNotices.readyCleared(saved.getId()));
+    }
+    announceByOther(
+        saved, userId, saved.getStatus() == RefineryOrderStatus.CANCELED ? "CANCELED" : "UPDATED");
     auditRecorder.record(
         AuditEventType.REFINERY_ORDER_UPDATED,
         saved.getId(),
@@ -585,6 +610,8 @@ public class RefineryOrderService implements CraftabilityYieldSource {
     final RefineryOrderStatus previousStatus = order.getStatus();
     order.setStatus(RefineryOrderStatus.CANCELED);
     refineryOrderRepository.save(order);
+    eventPublisher.publishEvent(RefineryNotices.readyCleared(order.getId()));
+    announceByOther(order, userId, "CANCELED");
     auditRecorder.record(
         AuditEventType.REFINERY_ORDER_CANCELED,
         order.getId(),
@@ -627,6 +654,7 @@ public class RefineryOrderService implements CraftabilityYieldSource {
     }
 
     final RefineryOrderStatus previousStatus = order.getStatus();
+    final Set<UUID> bookedOnto = new LinkedHashSet<>();
 
     for (RefineryOrderStoreItemDto itemDto : dto.items()) {
       final Material mat =
@@ -643,16 +671,12 @@ public class RefineryOrderService implements CraftabilityYieldSource {
           itemDto.userId() != null
               ? itemDto.userId()
               : (order.getOwner() != null ? order.getOwner().getId() : null);
-      if (targetUserId != null
-          && !userId.equals(targetUserId)
-          && !ownerScopeService.canManageUserInventory(targetUserId)) {
-        throw new AccessDeniedException(
-            "Access denied: You are not allowed to store refinery output for other users");
-      }
-      if (targetUserId == null && !isLogistician) {
-        throw new AccessDeniedException(
-            "Access denied: You are not allowed to store refinery output for other users");
-      }
+      stockCommands.requireBookIn(
+          targetUserId,
+          userId,
+          isLogistician,
+          Boolean.TRUE.equals(itemDto.personal()),
+          BookInRule.refineryStore());
 
       User assignee;
       if (itemDto.userId() != null) {
@@ -685,35 +709,20 @@ public class RefineryOrderService implements CraftabilityYieldSource {
 
       String incomingNote = StringNormalization.trimToNull(itemDto.note());
 
-      InventoryItem item = new InventoryItem();
-      item.setUser(assignee);
-      item.setOwningOrgUnit(owningOrgUnit);
-      item.setMaterial(mat);
-      item.setLocation(loc);
-      item.setQuality(itemDto.quality());
-      item.setAmount(InventoryItem.roundToScuScale(itemDto.amount()));
-      item.setNote(incomingNote);
-      item.setPersonal(personal);
-      if (jobOrder != null) {
-        InventoryAllocations.addJobOrder(item, jobOrder, item.getAmount(), false);
-      }
-      if (!personal && order.getMission() != null) {
-        InventoryAllocations.addMission(item, order.getMission(), item.getAmount());
-      }
-
-      inventoryItemRepository.save(item);
-      auditRecorder.record(
-          AuditEventType.INVENTORY_RECEIVED_FROM_REFINERY,
-          item.getId(),
-          mat.getName() + " @ " + loc.getName(),
-          assignee.getId(),
-          AuditDetails.of("source", "REFINERY")
-              .with("refineryOrder", orderId)
-              .with("material", mat.getName())
-              .with("amount", item.getAmount())
-              .with("q", itemDto.quality())
-              .with("personal", personal)
-              .with("jobOrder", jobOrder != null ? "#" + jobOrder.getDisplayId() : "-"));
+      stockCommands.bookInFromRefinery(
+          orderId,
+          assignee,
+          owningOrgUnit,
+          mat,
+          loc,
+          itemDto.quality(),
+          itemDto.amount(),
+          incomingNote,
+          personal,
+          jobOrder != null ? jobOrder.getId() : null,
+          jobOrder != null ? jobOrder.getDisplayId() : null,
+          order.getMission() != null ? order.getMission().getId() : null);
+      bookedOnto.add(assignee.getId());
 
       updateGoodOutputQuantity(order, itemDto);
     }
@@ -721,6 +730,8 @@ public class RefineryOrderService implements CraftabilityYieldSource {
     order.setStatus(RefineryOrderStatus.COMPLETED);
     order.setStoredAt(Instant.now());
     refineryOrderRepository.save(order);
+    eventPublisher.publishEvent(RefineryNotices.readyCleared(order.getId()));
+    announceStored(order, userId, bookedOnto);
     auditRecorder.record(
         AuditEventType.REFINERY_ORDER_STORED,
         order.getId(),
@@ -747,6 +758,64 @@ public class RefineryOrderService implements CraftabilityYieldSource {
               + " is not required by job order "
               + jobOrder.getId()
               + "; an inventory item can only be linked to an order that needs its material.");
+    }
+  }
+
+  /**
+   * Tells the owner that somebody else changed or cancelled their order (REQ-REFINERY-024). Nothing
+   * happens when the owner acted.
+   *
+   * @param order the order
+   * @param actorId the acting member
+   * @param changeCode {@code UPDATED} or {@code CANCELED}
+   */
+  private void announceByOther(
+      @NotNull RefineryOrder order, @NotNull UUID actorId, @NotNull String changeCode) {
+    if (order.getOwner() == null || actorId.equals(order.getOwner().getId())) {
+      return;
+    }
+    eventPublisher.publishEvent(
+        RefineryNotices.changedByOther(
+            order.getId(),
+            order.getOwner().getId(),
+            order.getLocation() == null ? null : order.getLocation().getName(),
+            changeCode,
+            userService.currentActor()));
+  }
+
+  /**
+   * Tells the owner that somebody else stored their order, and every other member whose stock
+   * received a yield the acting member booked onto them (REQ-REFINERY-024).
+   *
+   * @param order the stored order
+   * @param actorId the acting member
+   * @param bookedOnto the members whose stock received a row
+   */
+  private void announceStored(
+      @NotNull RefineryOrder order, @NotNull UUID actorId, @NotNull Set<UUID> bookedOnto) {
+    UUID ownerId = order.getOwner() == null ? null : order.getOwner().getId();
+    String location = order.getLocation() == null ? null : order.getLocation().getName();
+    ActorRef actor = null;
+    if (ownerId != null && !actorId.equals(ownerId)) {
+      actor = userService.currentActor();
+      eventPublisher.publishEvent(
+          RefineryNotices.changedByOther(
+              order.getId(),
+              ownerId,
+              location,
+              bookedOnto.contains(ownerId) ? "STORED_TO_YOU" : "STORED",
+              actor));
+    }
+    for (UUID memberId : bookedOnto) {
+      if (memberId.equals(actorId) || memberId.equals(ownerId)) {
+        continue;
+      }
+      if (actor == null) {
+        actor = userService.currentActor();
+      }
+      eventPublisher.publishEvent(
+          RefineryNotices.changedByOther(
+              order.getId(), memberId, location, "STORED_TO_YOU", actor));
     }
   }
 
@@ -810,7 +879,7 @@ public class RefineryOrderService implements CraftabilityYieldSource {
       } else {
         rawNew = Math.round(amount);
       }
-      int clamped = (int) Math.max(1L, Math.min(rawNew, Integer.MAX_VALUE));
+      int clamped = Math.clamp(rawNew, 1, Integer.MAX_VALUE);
       good.setOutputQuantity(clamped);
     }
   }
@@ -824,7 +893,7 @@ public class RefineryOrderService implements CraftabilityYieldSource {
    * @return the good, or {@code null} when none matches
    */
   @Nullable
-  private RefineryGood findGood(RefineryOrder order, UUID materialId, Integer quality) {
+  private RefineryGood findGood(RefineryOrder order, UUID materialId, @Nullable Integer quality) {
     for (RefineryGood good : order.getGoods()) {
       if (good.getOutputMaterial() == null || good.getOutputMaterial().getId() == null) {
         continue;

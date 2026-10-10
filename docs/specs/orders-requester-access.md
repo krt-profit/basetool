@@ -73,7 +73,7 @@ side's owners. See [`orders-item-production.md`](orders-item-production.md) `REQ
   `JobOrderUpdatedByRequesterEvent`.
 
 **Enforced by:** `OwnerScopeServiceTest` (RequesterEscapeGateTests), `JobOrderServiceTest`
-(updateJobOrderAsRequester\_\*) · **Code:** `AccessGateService.canSeeJobOrderAsRequester` /
+(updateJobOrderAsRequester\_\*) · **Code:** `JobOrderAccessPolicy.canSeeJobOrderAsRequester` /
 `canEditJobOrderAsRequester` (via the private `isOrderRequesterRow` →
 `RequestScopeResolver.currentUserIsMemberOfOrgUnit`), `RequestScopeResolver`
 `currentDirectMembershipOrgUnitIds` / `canViewOwnJobOrders`,

@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Viewer-relative projection of a {@link
@@ -63,19 +64,19 @@ import java.util.UUID;
 public record MaterialExchangeOfferDto(
     UUID id,
     MaterialExchangeOfferKind kind,
-    MaterialReferenceDto material,
-    String itemName,
-    Integer itemQuantity,
+    @Nullable MaterialReferenceDto material,
+    @Nullable String itemName,
+    @Nullable Integer itemQuantity,
     UserReferenceDto owner,
     List<OrgUnitReferenceDto> ownerOrgUnits,
     boolean mine,
-    Integer quality,
-    Double amount,
-    Double availableAmount,
+    @Nullable Integer quality,
+    @Nullable Double amount,
+    @Nullable Double availableAmount,
     Instant releasedAt,
     String remark,
     int interestCount,
-    List<String> interestedHandles,
+    @Nullable List<String> interestedHandles,
     boolean viewerInterested,
     MaterialExchangeOfferStatus status,
     Long version,

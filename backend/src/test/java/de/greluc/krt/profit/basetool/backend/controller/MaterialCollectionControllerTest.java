@@ -22,10 +22,11 @@ package de.greluc.krt.profit.basetool.backend.controller;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderInventoryOwnerRedactor;
+import de.greluc.krt.profit.basetool.backend.joborder.web.MaterialCollectionController;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -42,7 +43,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class MaterialCollectionControllerTest {
 
   @Mock private InventoryItemService inventoryItemService;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
   @Mock private JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
 
   @InjectMocks private MaterialCollectionController controller;
@@ -67,7 +68,7 @@ class MaterialCollectionControllerTest {
     UUID jobOrderId = UUID.randomUUID();
     List<MaterialCollectionEntryDto> expected = List.of(sampleEntry());
     when(inventoryItemService.getMaterialCollection(jobOrderId)).thenReturn(expected);
-    when(ownerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(true);
+    when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(true);
 
     List<MaterialCollectionEntryDto> result = controller.getMaterialCollection(jobOrderId);
 
@@ -82,7 +83,7 @@ class MaterialCollectionControllerTest {
     List<MaterialCollectionEntryDto> raw = List.of(sampleEntry());
     List<MaterialCollectionEntryDto> redacted = List.of(sampleEntry());
     when(inventoryItemService.getMaterialCollection(jobOrderId)).thenReturn(raw);
-    when(ownerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(false);
+    when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(false);
     when(inventoryOwnerRedactor.redactMaterialCollection(raw)).thenReturn(redacted);
 
     List<MaterialCollectionEntryDto> result = controller.getMaterialCollection(jobOrderId);
@@ -95,7 +96,7 @@ class MaterialCollectionControllerTest {
   void getMaterialCollection_emptyResult_isReturnedAsIs() {
     UUID jobOrderId = UUID.randomUUID();
     when(inventoryItemService.getMaterialCollection(jobOrderId)).thenReturn(List.of());
-    when(ownerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(true);
+    when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(true);
 
     List<MaterialCollectionEntryDto> result = controller.getMaterialCollection(jobOrderId);
 

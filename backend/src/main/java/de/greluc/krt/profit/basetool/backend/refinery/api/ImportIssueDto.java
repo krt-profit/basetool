@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.refinery.api;
 
 import java.util.List;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One review finding on a refinery screenshot import draft.
@@ -36,8 +37,8 @@ import java.util.List;
  */
 public record ImportIssueDto(
     String field,
-    String rawValue,
+    @Nullable String rawValue,
     ImportIssueCode code,
     ImportIssueSeverity severity,
-    Double confidence,
-    List<ImportSuggestionDto> suggestions) {}
+    @Nullable Double confidence,
+    @Nullable List<ImportSuggestionDto> suggestions) {}

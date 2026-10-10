@@ -38,5 +38,11 @@ public enum OrgRelativeRole {
   LOGISTICIAN,
 
   /** Members flagged as Mission Manager of the context org unit. */
-  MISSION_MANAGER
+  MISSION_MANAGER,
+
+  /**
+   * Members whose rank confers a leadership seat in the context org unit (Staffelleiter,
+   * Bereichsleiter, …), independent of the global {@code OFFICER} role.
+   */
+  UNIT_LEADERSHIP
 }

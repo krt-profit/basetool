@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="card">
+    <div class="card card--inset" id="profile-notifications-card" data-testid="profile-notifications-card">
+        <div class="card-head">
+            <h2 class="card-title" th:text="#{profile.notifications.title}">Benachrichtigungen</h2>
+        </div>
+        <p class="acct-note">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg>
+            <span th:text="#{profile.notifications.hint}">Wähle, welche Benachrichtigungen du erhalten möchtest.</span>
+        </p>
+        <div class="alert alert-warning" role="alert" th:if="${notificationPrefsUnavailable}"
+             data-testid="profile-notifications-unavailable">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg>
+            <p th:text="#{profile.notifications.unavailable}">Deine Einstellungen konnten nicht geladen werden.</p>
+        </div>
+        <fieldset class="form-section" th:each="group : ${notificationPrefGroups}"
+                  th:attr="data-testid='profile-notifications-group-' + ${group.key}">
+            <legend class="form-section__head" th:text="#{'profile.notifications.group.' + ${group.key}}">Bereich</legend>
+            <div class="check-row" th:each="pref : ${group.items}">
+                <input type="checkbox" th:id="'notification-pref-' + ${pref.type}"
+                       th:checked="${!pref.muted}" th:disabled="${!pref.mutable}"
+                       th:attr="data-notification-type=${pref.type}, data-testid='notification-pref-' + ${pref.type}">
+                <div>
+                    <label th:for="'notification-pref-' + ${pref.type}"
+                           th:text="#{'profile.notifications.type.' + ${pref.type}}">Benachrichtigung</label>
+                    <p class="form-hint" th:if="${!pref.mutable}" th:text="#{profile.notifications.locked}">Kann nicht abbestellt werden.</p>
+                </div>
+            </div>
+        </fieldset>
+    </div>
+</div>
+</body>
+</html>

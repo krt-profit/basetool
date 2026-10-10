@@ -19,11 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.Notification;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationParamsCodec;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -51,6 +53,8 @@ public class NotificationCreationService {
   private final RuleEvaluationService ruleEvaluationService;
   private final NotificationRepository notificationRepository;
   private final NotificationParamsCodec notificationParamsCodec;
+  private final NotificationMuteService notificationMuteService;
+  private final MeterRegistry meterRegistry;
 
   /**
    * Deletes the notifications the event supersedes (REQ-NOTIF-018), then writes one notification
@@ -76,7 +80,7 @@ public class NotificationCreationService {
     }
 
     Map<NotificationType, Set<UUID>> recipientsByType =
-        ruleEvaluationService.resolveRecipients(event);
+        notificationMuteService.withoutMuted(ruleEvaluationService.resolveRecipients(event));
     if (recipientsByType.isEmpty()) {
       log.debug(
           "Event {} for entity {} resolved no recipients", event.eventType(), event.entityId());
@@ -99,6 +103,7 @@ public class NotificationCreationService {
       }
     }
     notificationRepository.saveAll(toCreate);
+    recordCreated(toCreate);
     log.info(
         "Created {} notification(s) for event {} entity {}",
         toCreate.size(),
@@ -111,6 +116,21 @@ public class NotificationCreationService {
       bySignal.computeIfAbsent(signal, _ -> new HashSet<>()).addAll(entry.getValue());
     }
     return bySignal;
+  }
+
+  private void recordCreated(@NotNull List<Notification> created) {
+    Map<NotificationType, Integer> byType = new LinkedHashMap<>();
+    for (Notification notification : created) {
+      byType.merge(notification.getType(), 1, Integer::sum);
+    }
+    byType.forEach(
+        (type, count) ->
+            meterRegistry
+                .counter(
+                    MetricNames.NOTIFICATION_CREATED,
+                    MetricNames.TAG_NOTIFICATION_TYPE,
+                    type.name())
+                .increment(count));
   }
 
   /**
@@ -137,7 +157,8 @@ public class NotificationCreationService {
                 noticeTypes, event.entityType(), event.entityId()));
     holders.retainAll(candidates);
 
-    Map<NotificationType, Set<UUID>> resolved = ruleEvaluationService.resolveRecipients(event);
+    Map<NotificationType, Set<UUID>> resolved =
+        notificationMuteService.withoutMuted(ruleEvaluationService.resolveRecipients(event));
     Set<UUID> entitled = new HashSet<>();
     resolved.values().forEach(entitled::addAll);
     entitled.retainAll(candidates);
@@ -187,6 +208,7 @@ public class NotificationCreationService {
     }
     if (!toCreate.isEmpty()) {
       notificationRepository.saveAll(toCreate);
+      recordCreated(toCreate);
       log.info(
           "Reconcile of {} {} created {} notification(s) on event {}",
           event.entityType(),
@@ -198,15 +220,29 @@ public class NotificationCreationService {
   }
 
   /**
-   * Deletes the notifications the event marks obsolete for its entity (REQ-NOTIF-018).
+   * Deletes the notifications the event marks obsolete for its entity: those of {@link
+   * NotificationEvent#resolvesNotificationTypes()} for everyone (REQ-NOTIF-018) and those of {@link
+   * NotificationEvent#resolvesNotificationTypesForRecipients()} for {@link
+   * NotificationEvent#supersedeRecipients()} only (REQ-NOTIF-025).
    *
    * @param event the fired event
    * @return the recipient subs whose stale notifications were removed; empty when none
    */
   @NotNull
   private Set<UUID> removeSupersededNotifications(@NotNull NotificationEvent event) {
+    if (event.entityType() == null || event.entityId() == null) {
+      return Set.of();
+    }
+    Set<UUID> affected = new HashSet<>();
+    affected.addAll(removeForEveryone(event));
+    affected.addAll(removeForRecipients(event));
+    return affected;
+  }
+
+  @NotNull
+  private Set<UUID> removeForEveryone(@NotNull NotificationEvent event) {
     Set<NotificationType> supersededTypes = event.resolvesNotificationTypes();
-    if (supersededTypes.isEmpty() || event.entityType() == null || event.entityId() == null) {
+    if (supersededTypes.isEmpty()) {
       return Set.of();
     }
     Set<UUID> affected =
@@ -223,6 +259,35 @@ public class NotificationCreationService {
         "Removed {} superseded notification(s) of {} for {} {} on event {}",
         deleted,
         supersededTypes,
+        event.entityType(),
+        event.entityId(),
+        event.eventType());
+    return affected;
+  }
+
+  @NotNull
+  private Set<UUID> removeForRecipients(@NotNull NotificationEvent event) {
+    Set<NotificationType> supersededTypes = event.resolvesNotificationTypesForRecipients();
+    Set<UUID> recipients = event.supersedeRecipients();
+    if (supersededTypes.isEmpty() || recipients.isEmpty()) {
+      return Set.of();
+    }
+    Set<UUID> affected =
+        new HashSet<>(
+            notificationRepository.findRecipientUserIdsByTypeInAndEntity(
+                supersededTypes, event.entityType(), event.entityId()));
+    affected.retainAll(recipients);
+    if (affected.isEmpty()) {
+      return Set.of();
+    }
+    int deleted =
+        notificationRepository.deleteByTypeInAndEntityForRecipients(
+            supersededTypes, event.entityType(), event.entityId(), affected);
+    log.info(
+        "Removed {} superseded notification(s) of {} for {} member(s) on {} {} on event {}",
+        deleted,
+        supersededTypes,
+        affected.size(),
         event.entityType(),
         event.entityId(),
         event.eventType());

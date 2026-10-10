@@ -25,14 +25,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.mission.internal.AddCrewRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.AddExternalParticipantRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
+import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateParticipantRequest;
 import de.greluc.krt.profit.basetool.backend.model.*;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.dto.AddCrewRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.AddExternalParticipantRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.UpdateParticipantRequest;
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.service.MissionService;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;

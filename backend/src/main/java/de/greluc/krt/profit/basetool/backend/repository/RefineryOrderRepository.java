@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -155,11 +156,13 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * @return one aggregate per mission with at least one refinery order; the sum may be {@code null}
    */
   @Query(
-      "select new de.greluc.krt.profit.basetool.backend.repository.RefineryMissionProfitAggregate("
-          + "r.mission.id,"
-          + " sum(coalesce(r.oreSales, 0.0) - coalesce(r.expenses, 0.0)"
-          + " - coalesce(r.otherExpenses, 0.0)))"
-          + " from RefineryOrder r where r.mission.id in :missionIds group by r.mission.id")
+      """
+      select new de.greluc.krt.profit.basetool.backend.repository.RefineryMissionProfitAggregate(
+      r.mission.id,
+      sum(coalesce(r.oreSales, 0.0) - coalesce(r.expenses, 0.0)
+      - coalesce(r.otherExpenses, 0.0)))
+      from RefineryOrder r where r.mission.id in :missionIds group by r.mission.id
+      """)
   List<RefineryMissionProfitAggregate> aggregateProfitByMissionIds(
       @Param("missionIds") List<UUID> missionIds);
 
@@ -319,4 +322,39 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   @Modifying
   @Query("UPDATE RefineryOrder r SET r.owner = :newUser WHERE r.owner = :oldUser")
   int updateOwner(@NotNull User oldUser, @NotNull User newUser);
+
+  /**
+   * Returns the ids of the open orders whose run ended in {@code (notBefore, now]} and that have
+   * not been announced yet (REQ-REFINERY-023).
+   *
+   * @param notBefore the earliest run end that is still announced, exclusive
+   * @param now the instant the run ends are compared with, inclusive
+   * @param limit the most ids to return
+   * @return the ids, oldest run end first; never {@code null}
+   */
+  @Query(
+      """
+      SELECT o.id FROM RefineryOrder o
+      WHERE o.status IN (de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus.OPEN,
+                         de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus.IN_PROGRESS)
+        AND o.storedAt IS NULL AND o.readyNotifiedAt IS NULL
+        AND o.endsAt IS NOT NULL AND o.endsAt > :notBefore AND o.endsAt <= :now
+      ORDER BY o.endsAt, o.id
+      """)
+  List<UUID> findReadyUnannouncedIds(
+      @Param("notBefore") Instant notBefore, @Param("now") Instant now, Limit limit);
+
+  /**
+   * Marks an order as announced, atomically, without touching its version: the one caller whose
+   * update changes a row is the one that announces it.
+   *
+   * @param id the order
+   * @param now the announcement time
+   * @return {@code 1} when this call marked the order, {@code 0} when it was marked already
+   */
+  @Modifying
+  @Query(
+      "UPDATE RefineryOrder o SET o.readyNotifiedAt = :now"
+          + " WHERE o.id = :id AND o.readyNotifiedAt IS NULL")
+  int markReadyNotified(@Param("id") UUID id, @Param("now") Instant now);
 }

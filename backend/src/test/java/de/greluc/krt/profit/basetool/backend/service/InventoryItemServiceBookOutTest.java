@@ -56,11 +56,13 @@ import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AllocationReductionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
@@ -1146,13 +1148,65 @@ class InventoryItemServiceBookOutTest {
     }
 
     @Test
-    void discard_announcesNothing() {
+    void ownersOwnDiscard_announcesNothing() {
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(newItem(10.0, 1L)));
+
+      service.bookOutInventoryItem(
+          ITEM_ID, newDto(4.0, null, null, CheckoutType.DISCARD, null, null, 1L), OWNER_ID, false);
+
+      verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void ownersOwnSale_announcesNothing() {
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(newItem(10.0, 1L)));
+
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newDto(4.0, null, null, CheckoutType.SELL, "Terminal", BigDecimal.TEN, 1L),
+          OWNER_ID,
+          false);
+
+      verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void anAdminsDiscardOfAnotherMembersRow_tellsTheOwnerWhatWasBookedOut() {
+      User carol = member(ADMIN_ID, "carol");
+      when(userRepository.findById(ADMIN_ID)).thenReturn(Optional.of(carol));
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(newItem(10.0, 1L)));
 
       service.bookOutInventoryItem(
           ITEM_ID, newDto(4.0, null, null, CheckoutType.DISCARD, null, null, 1L), ADMIN_ID, true);
 
-      verify(eventPublisher, never()).publishEvent(any(Object.class));
+      List<Object> events = publishedEvents();
+      assertEquals(1, events.size());
+      NoticeEvent notice = (NoticeEvent) events.getFirst();
+      assertEquals(NotificationEventType.INVENTORY_BOOKED_OUT_BY_OTHER, notice.eventType());
+      assertEquals(OWNER_ID, notice.contextRecipientUserId());
+      assertEquals(ADMIN_ID, notice.actorSub());
+      assertEquals("DISCARDED", notice.renderParams().get("actionCode"));
+      assertEquals("1", notice.renderParams().get("count"));
+      assertEquals("4 SCU Quantanium (Q500) in ARC-L1", notice.renderParams().get("lots"));
+    }
+
+    @Test
+    void anAdminsSaleOfAnotherMembersRow_namesTheSaleAndAlsoCoversADepletedRow() {
+      User carol = member(ADMIN_ID, "carol");
+      when(userRepository.findById(ADMIN_ID)).thenReturn(Optional.of(carol));
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(newItem(10.0, 1L)));
+
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newDto(10.0, null, null, CheckoutType.SELL, "Terminal", BigDecimal.TEN, 1L),
+          ADMIN_ID,
+          true);
+
+      List<Object> events = publishedEvents();
+      assertEquals(1, events.size());
+      NoticeEvent notice = (NoticeEvent) events.getFirst();
+      assertEquals("SOLD", notice.renderParams().get("actionCode"));
+      assertEquals("10 SCU Quantanium (Q500) in ARC-L1", notice.renderParams().get("lots"));
     }
   }
 

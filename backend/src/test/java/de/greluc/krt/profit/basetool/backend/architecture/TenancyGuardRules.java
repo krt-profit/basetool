@@ -25,6 +25,7 @@ import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.domain.JavaMethodReference;
+import de.greluc.krt.profit.basetool.backend.annotation.ObserverSpi;
 import de.greluc.krt.profit.basetool.backend.annotation.TenantScoped;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
@@ -346,9 +347,11 @@ final class TenancyGuardRules {
    *
    * <p>A controller is selected when one of its fields is a repository of such an entity or a class
    * that calls a mutating method ({@code save*}, {@code delete*} or a {@code @Modifying} query) on
-   * one. A selected handler passes when its effective {@code @PreAuthorize} is scope-gated ({@link
-   * SpelScopeGate}); when it is listed as service-gated and reaches a scope check from its body
-   * within {@value #MAX_DELEGATION_DEPTH} calls; or when it is listed as no tenant write.
+   * one, or calls an {@code @ObserverSpi} or a module's published command interface one of whose
+   * implementations does. A selected handler passes when its effective {@code @PreAuthorize} is
+   * scope-gated ({@link SpelScopeGate}); when it is listed as service-gated and reaches a scope
+   * check from its body within {@value #MAX_DELEGATION_DEPTH} calls; or when it is listed as no
+   * tenant write.
    *
    * @param classes the imported classes holding controllers, services and repositories
    * @param tenantData the tenant-data entities ({@link #tenantData(JavaClasses)})
@@ -475,7 +478,39 @@ final class TenancyGuardRules {
         }
       }
     }
+    Set<String> writingObservers = new HashSet<>();
+    for (JavaClass javaClass : classes) {
+      if (writers.contains(javaClass.getName())) {
+        for (JavaClass spi : javaClass.getAllRawInterfaces()) {
+          if (spi.isAnnotatedWith(ObserverSpi.class) || isCommandApi(spi)) {
+            writingObservers.add(spi.getName());
+          }
+        }
+      }
+    }
+    for (JavaClass javaClass : classes) {
+      if (javaClass.isInterface()) {
+        continue;
+      }
+      for (JavaMethodCall call : javaClass.getMethodCallsFromSelf()) {
+        if (writingObservers.contains(call.getTargetOwner().getName())) {
+          writers.add(javaClass.getName());
+          break;
+        }
+      }
+    }
     return writers;
+  }
+
+  /**
+   * Whether an interface is a module's published command API: a {@code …Commands} type in an {@code
+   * api} package (plan §5.3).
+   *
+   * @param type the interface
+   * @return {@code true} for a published command interface
+   */
+  private static boolean isCommandApi(JavaClass type) {
+    return type.getPackageName().endsWith(".api") && type.getSimpleName().endsWith("Commands");
   }
 
   private static boolean isMutating(JavaMethodCall call) {

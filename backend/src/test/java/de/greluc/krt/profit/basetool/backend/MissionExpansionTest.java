@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.backend;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.model.*;
 import de.greluc.krt.profit.basetool.backend.repository.*;
-import de.greluc.krt.profit.basetool.backend.service.MissionService;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -67,7 +67,7 @@ class MissionExpansionTest {
 
     Mission mission =
         missionService.createMission(
-            new de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest(
+            new de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest(
                 "Test Mission",
                 null,
                 null,

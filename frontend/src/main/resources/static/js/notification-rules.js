@@ -79,7 +79,15 @@
          * The selector kinds that take the account or the recipient from the event and have no
          * further field: the row shows the fromEvent hint and sends only its kind.
          */
-        const EVENT_DERIVED_KINDS = ['ACCOUNT_GRANT', 'EVENT_RECIPIENT', 'ACCOUNT_RESPONSIBLE'];
+        const EVENT_DERIVED_KINDS = [
+            'ACCOUNT_GRANT',
+            'EVENT_RECIPIENT',
+            'ACCOUNT_RESPONSIBLE',
+            'MISSION_PARTICIPANTS',
+            'MISSION_LEADERSHIP',
+            'EXCHANGE_CLIENT_HOLDERS',
+            'EVENT_RECIPIENTS',
+        ];
 
         /** The kind a new, empty selector row starts with. */
         const DEFAULT_KIND = 'ORG_RELATIVE_ROLE';

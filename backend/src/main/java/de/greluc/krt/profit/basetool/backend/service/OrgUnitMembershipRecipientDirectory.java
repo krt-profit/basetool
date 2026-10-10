@@ -69,4 +69,16 @@ public class OrgUnitMembershipRecipientDirectory implements OrgUnitRecipientDire
   public Set<UUID> missionManagersOf(@NotNull UUID orgUnitId) {
     return orgUnitMembershipRepository.findMissionManagerUserIdsByOrgUnit(orgUnitId);
   }
+
+  /**
+   * The members whose rank is a leadership seat of an org unit.
+   *
+   * @param orgUnitId the org unit
+   * @return their user subs; never {@code null}, possibly empty
+   */
+  @Override
+  @NotNull
+  public Set<UUID> leadershipOf(@NotNull UUID orgUnitId) {
+    return orgUnitMembershipRepository.findLeadershipUserIdsByOrgUnit(orgUnitId);
+  }
 }

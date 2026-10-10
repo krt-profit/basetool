@@ -109,6 +109,7 @@ val nullAwayPackages =
       "bank",
       "catalogue",
       "exchange",
+      "hangar",
       "identity",
       "inventory",
       "joborder",
@@ -123,7 +124,13 @@ val nullAwayPackages =
       "refinery",
       "scope",
     )
-    .joinToString(",") { "de.greluc.krt.profit.basetool.backend.$it.api" }
+    .map { "de.greluc.krt.profit.basetool.backend.$it.api" }
+    .plus(
+      listOf("joborder", "materialexchange", "mission", "refinery").map {
+        "de.greluc.krt.profit.basetool.backend.$it"
+      }
+    )
+    .joinToString(",")
 
 tasks.named<JavaCompile>("compileJava") {
   options.errorprone {
@@ -156,6 +163,7 @@ val contractBaselineRequired =
     .orElse(false)
 
 tasks.named<Test>("test") {
+  maxParallelForks = 2
   inputs
     .files(contractBaseline)
     .withPropertyName("contractBaseline")

@@ -63,5 +63,55 @@ public enum SelectorKind {
    * unit via {@code OrgUnitBankAccessService} (REQ-BANK-034). Reads no selector columns, like
    * {@link #ACCOUNT_GRANT}.
    */
-  ACCOUNT_RESPONSIBLE
+  ACCOUNT_RESPONSIBLE,
+
+  /**
+   * Resolves to the registered participants of the mission carried by the event ({@link
+   * NotificationEvent#contextMissionId()}), only those not yet checked in when {@link
+   * NotificationEvent#contextMissionOnlyNotCheckedIn()} says so. Reads no selector columns
+   * (REQ-NOTIF-024).
+   */
+  MISSION_PARTICIPANTS,
+
+  /**
+   * Resolves to the owner and the co-managers of the mission carried by the event ({@link
+   * NotificationEvent#contextMissionId()}). Reads no selector columns (REQ-NOTIF-024).
+   */
+  MISSION_LEADERSHIP,
+
+  /**
+   * Resolves to every member with a connected installation of the exchange client carried by the
+   * event ({@link NotificationEvent#contextExchangeClientId()}), or of any client when the event
+   * says so ({@link NotificationEvent#contextAllExchangeClients()}). Reads no selector columns
+   * (REQ-NOTIF-024).
+   */
+  EXCHANGE_CLIENT_HOLDERS,
+
+  /**
+   * Resolves to the set of affected users the event carries ({@link
+   * NotificationEvent#contextRecipientUserIds()}), for bulk actions that touch many members. Reads
+   * no selector columns (REQ-NOTIF-024).
+   */
+  EVENT_RECIPIENTS;
+
+  /**
+   * Whether this kind reads nothing from the selector row and takes its recipients from the event
+   * alone.
+   *
+   * @return {@code true} for every kind except {@link #SPECIFIC_USER}, {@link #ROLE} and {@link
+   *     #ORG_RELATIVE_ROLE}
+   */
+  public boolean readsOnlyTheEvent() {
+    return switch (this) {
+      case SPECIFIC_USER, ROLE, ORG_RELATIVE_ROLE -> false;
+      case ACCOUNT_GRANT,
+          EVENT_RECIPIENT,
+          ACCOUNT_RESPONSIBLE,
+          MISSION_PARTICIPANTS,
+          MISSION_LEADERSHIP,
+          EXCHANGE_CLIENT_HOLDERS,
+          EVENT_RECIPIENTS ->
+          true;
+    };
+  }
 }

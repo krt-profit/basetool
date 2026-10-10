@@ -128,7 +128,7 @@ answered as a decision rather than as a per-endpoint accident.
 
 ### 1.3 Data redaction among members (one level)
 
-Mission responses are cleaned up server-side in [`MissionController`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/MissionController.java),
+Mission responses are cleaned up server-side in [`MissionController`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/mission/web/MissionController.java),
 through [`MissionPeerRedactor`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/mission/internal/MissionPeerRedactor.java):
 
 - **Peer** (`cleanupMissionForPeer` / `cleanupParticipantForPeer` / `cleanupUnitForPeer` /
@@ -150,7 +150,7 @@ through [`MissionPeerRedactor`](backend/src/main/java/de/greluc/krt/profit/baset
 role-less callers, which additionally hid the description and each participant's payout preference
 and comment (ADR-0034), and refused internal and terminal missions outright. Its whole audience was
 people outside the organisation, and ADR-0159 removed that audience; the tier went with it. Which
-missions a member may see at all is decided upstream by `@ownerScopeService.canSeeMission` — own
+missions a member may see at all is decided upstream by `@missionAccessPolicy.canSeeMission` — own
 Staffel, or any non-internal mission organisation-wide — which is where the internal-mission rule
 always lived for members.
 
@@ -392,7 +392,7 @@ gets past the four public paths of §1. The tables carried an `Anonymous` column
 | Be logged in (`isAuthenticated()`)                                                 |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Own profile / `GET /me`, active OrgUnit context (`/me/active-org-unit`)            |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Own settings: description, payout preference, blueprint sharing, RSI handle (REQ-SEC-072), announcement read-marker, pickable org units, capabilities, the one-call layout read (`/users/me/**`, `/me/**` incl. `/me/layout`, `isAuthenticated()`) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Own notifications + SSE stream (`/notifications/**`), live-sync stream (`/live-sync/**`), registration status (`/users/me/registration-status`) (`isAuthenticated()`) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Own notifications + SSE stream + mute preferences (`/notifications/**`, `/api/v1/notifications/preferences`, `/profile/notification-preferences`), live-sync stream (`/live-sync/**`), registration status (`/users/me/registration-status`) (`isAuthenticated()`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Terms of Use status + consent (`/terms/status`, `POST /terms/acceptance`; consent refused for `ROLE_INGEST_GATEWAY`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Read user directory (`/users`, `/search`, `/search/references`, `/lookup`, `/{id}`, `/{id}/memberships`) — `hasAnyRole(ADMIN, OFFICER, KRT_MEMBER)`; peer-redacted below Logistician, and `/{id}` of a member of a foreign Staffel always peer-redacted for a non-admin; the `/references` picker searches return the peer field set only (REQ-API-012); `/lookup`, `/search-bank`, `/search-bank/references` and `/{id}/memberships` additionally admit bank staff |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 
@@ -523,7 +523,7 @@ Notes are visible to everyone who sees the job order.
 ¹ Only as owner of the respective order.
 ² The per-item `userId` names the receiving stock owner, so it is gated separately from the
 order-ownership check: naming anybody but yourself requires
-`@ownerScopeService.canManageUserInventory(<receiver>)` — admin, self, or a **shared editable org
+`canManageUserInventory(<receiver>)` of the inventory access policy — admin, self, or a **shared editable org
 unit** with that receiver — and any other value is refused with `403` (REQ-SEC-039). The Einbuchen
 path (`POST /api/v1/inventory`) and the `owner` override of `POST /api/v1/refinery-orders` carry the
 same gate. **Amended 2026-08-30:** all three previously accepted the flat `ROLE_LOGISTICIAN`, which
@@ -1136,7 +1136,7 @@ rendered menu, so it offers exactly the screens the „Navigation“ column gran
 
 | Screen (route)                                                                                                                       | Frontend gate                                                           | Navigation                                                                     |
 |:-------------------------------------------------------------------------------------------------------------------------------------|:------------------------------------------------------------------------|:-------------------------------------------------------------------------------|
-| Home, Notifications, Profile (`/`, `/notifications`, `/profile`, `/profile/deletion-request`, `/me/**`)                              | `isAuthenticated()` (`/` is public, §1)                                 | always                                                                         |
+| Home, Notifications, Profile (`/`, `/notifications`, `/profile`, `/profile/deletion-request`, `/profile/notification-preferences`, `/me/**`)                              | `isAuthenticated()` (`/` is public, §1)                                 | always                                                                         |
 | Missions, Operations (`/missions/**`, `/operations/**`), mission finance (`/missions/{id}/finance-entries`)                          | `isAuthenticated()`; mission delete `ADMIN`; operation create/edit/payout `MISSION_MANAGER`, delete `ADMIN`; frequency writes `MISSION_MANAGER` | always                                                                         |
 | Hangar, both tabs „Meine Schiffe" · „Org-Einheit" (`/hangar`, `/hangar/squadron`), Lager (`/inventory/**`), Raffinerie (`/refinery-orders/**`) | `isAuthenticated()`; Lager wipe `ADMIN`                                 | always                                                                         |
 | Materialbörse (`/materialboerse`)                                                                                                    | `hasRole('KRT_MEMBER')`                                                 | `KRT_MEMBER`                                                                   |

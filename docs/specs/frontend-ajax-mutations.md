@@ -1927,7 +1927,7 @@ and 1500 ms for a global one, full-jittered. Frames consumed from Redis bypass t
 — they were already accepted where they originated.
 
 **Authorization is the real read, not a proxy for it.** Each room's gate is the gate of the fetch it
-provokes (`ownerScopeService.canSeeMission`, `canSeeJobOrder`, `canViewJobOrders`, …), asked
+provokes (`missionAccessPolicy.canSeeMission`, `canSeeJobOrder`, `canViewJobOrders`, …), asked
 synchronously of the backend's own data. There is no fail-open branch, because unlike the frontend's
 authorizer there is no indeterminate verdict to resolve; a check that throws refuses the room.
 

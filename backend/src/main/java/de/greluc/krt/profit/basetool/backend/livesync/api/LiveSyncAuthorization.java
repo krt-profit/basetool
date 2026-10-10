@@ -30,13 +30,13 @@ public enum LiveSyncAuthorization {
   /** Any member; used for the global rooms whose page is gated by the member role. */
   MEMBER,
 
-  /** {@code ownerScopeService.canSeeMission(id)} — the gate of the Einsatz detail read. */
+  /** {@code missionAccessPolicy.canSeeMission(id)} — the gate of the Einsatz detail read. */
   MISSION,
 
   /** {@code operationAccessPolicy.canSeeOperation(id)} — the gate of the Operation detail read. */
   OPERATION,
 
-  /** {@code ownerScopeService.canSeeJobOrder(id)} — the gate of the Auftrag detail read. */
+  /** {@code jobOrderAccessPolicy.canSeeJobOrder(id)} — the gate of the Auftrag detail read. */
   JOB_ORDER,
 
   /**

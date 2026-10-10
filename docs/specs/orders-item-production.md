@@ -68,7 +68,7 @@ is delivered (`isFullyDelivered` — every line's `deliveredAmount ≥ amount`).
 **Booking.** A production run is booked through
 `POST /api/v1/orders/{id}/items/{itemId}/production`
 (`JobOrderItemProductionService.bookProduction`), gated `(hasRole('LOGISTICIAN') or
-hasRole('OFFICER') or hasRole('ADMIN')) and @ownerScopeService.canEditJobOrder(#id)` — the same
+hasRole('OFFICER') or hasRole('ADMIN')) and @jobOrderAccessPolicy.canEditJobOrder(#id)` — the same
 authorisation as the item handovers. The payload is `JobOrderItemProductionCreateDto` (`amount` ≥ 1,
 the line `version`, a `consumption` list of `JobOrderItemProductionConsumptionDto`, each naming an
 `inventoryItemId`, the `materialId` it holds, a positive `amount`, and the entry `version`, and an
@@ -400,7 +400,7 @@ page (REQ-ORDERS-031), the item sibling of the Materialsammlung.
 
 **Backend.** `GET /api/v1/orders/{id}/item-stock` (`JobOrderItemStockController`) returns the
 grouped shape (`JobOrderItemStockGroupDto` → `JobOrderItemStockEntryDto`), gated exactly like the
-sibling per-order stock reads: `isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id)`; an
+sibling per-order stock reads: `isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id)`; an
 unknown order is 404. The projection reuses the entity-graphed
 `InventoryItemRepository.findGameItemRowsByJobOrderIdOrdered` (owner/location display order kept
 inside each group) and reads each entry's this-order slice off the `@BatchSize`-batched allocation
@@ -469,7 +469,7 @@ responsible (processing) side**. Concretely: on a Spezialkommando-responsible (S
 squadron — but the fulfilling side's owner/Standort must not leak to the requesting side (owner
 decision 2026-07-17, ADR-0107).
 
-**Gate.** `OwnerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)` — identical to
+**Gate.** `JobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)` — identical to
 `canSeeJobOrderBlueprintOwners`: membership of the order's responsible org unit (or an admin with
 matching scope), **no SK-public escape**. For a squadron-responsible order it coincides with
 `canSeeJobOrder`, so the redaction only ever engages on the SK-public path; a `null` responsible unit
@@ -508,7 +508,7 @@ SK-member / requesting-side / admin / unknown), `JobOrderInventoryOwnerRedactorT
 redaction passes blank owner/location, keep the rest, null-safe), `JobOrderItemStockControllerTest`
 + `MaterialCollectionControllerTest` + `JobOrderControllerTest` (redaction wiring: unredacted when
 entitled, redactor output otherwise) · **Code:**
-`AccessGateService.canSeeJobOrderInventoryOwners` + `OwnerScopeService` facade,
+`JobOrderAccessPolicy.canSeeJobOrderInventoryOwners`,
 `JobOrderInventoryOwnerRedactor`, `JobOrderItemStockController` / `MaterialCollectionController` /
 `JobOrderController` (the two pickers), `orders-detail.html` + `material-collection.html` (`—`
 fallbacks) · **Issues:** — · **ADR:** [ADR-0107](../adr/0107-job-order-inventory-owner-redaction.md)
@@ -764,7 +764,7 @@ the handed-over items with their whole-unit quantities. It is the item counterpa
 handover protocol (`GET /api/v1/orders/{jobOrderId}/handovers/{handoverId}/report`).
 
 - `GET /api/v1/orders/{jobOrderId}/item-handovers/{handoverId}/report`, gated
-  `hasAnyRole(LOGISTICIAN, OFFICER, ADMIN) and @ownerScopeService.canSeeJobOrder(#jobOrderId)` —
+  `hasAnyRole(LOGISTICIAN, OFFICER, ADMIN) and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId)` —
   the same gate as the material report; answers `application/pdf` as an attachment
   (`uebergabeprotokoll-<orderId>.pdf`).
 - A handover id that belongs to a different order is a 404, never another order's document.

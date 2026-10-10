@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryCreateDto;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryUpdateDto;
 import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;

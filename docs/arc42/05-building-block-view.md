@@ -88,18 +88,23 @@ in the layer packages.
 The domain events live in their publisher's `<module>.api.events` package (plan §5.2, §5.3); there
 is no central `event` package. Every listener runs after commit (`@TransactionalEventListener`),
 so the reaction may happen later or fail on its own, and none records an audit row for the mutation
-that published the event (REQ-AUDIT-007). Eight modules publish today:
+that published the event (REQ-AUDIT-007). Thirteen modules publish today:
 
 | Package | Events |
 | --- | --- |
-| `notification.api.events` | `NotificationEvent`, the contract every notification-producing event implements, and the `OrgUnitRef` it carries |
+| `notification.api.events` | `NotificationEvent`, the contract every notification-producing event implements, the `OrgUnitRef` it carries, `NoticeEvent`, the plain event the newer producers build from their parts, and the `ActorRef` that names who acted |
 | `identity.api.events` | `DiscordRegistrationPendingEvent`, `DiscordRegistrationDecidedEvent`, `UserApprovalDecidedEvent`, `MemberDepartedEvent` (consumed by the exchange departure) |
 | `privacy.api.events` | the three `AccountDeletionRequest…Event`s (transitional module, plan §7.6) |
-| `bank.api.events` | `BankBookingRequestEvent` and its created, updated, confirmed, rejected, cancelled and notices-reconciled records; `BankAccountResponsibleAssignedEvent` |
-| `joborder.api.events` | `JobOrderCreatedEvent`, `JobOrderUpdatedByRequesterEvent`, `JobOrderClosedEvent` |
-| `materialexchange.api.events` | `MaterialExchangeInterestRegisteredEvent`, `MaterialRequestFulfillmentSignalledEvent` |
-| `exchange.api.events` | `ExchangeInstallationConnectedEvent`, `ExchangeBulkUndoAppliedEvent` |
-| `inventory.api.events` | `InventoryTransferredToUserEvent`, `InventoryTransferredFromUserEvent` and the `TransferredLot` they list (REQ-INV-055) |
+| `bank.api.events` | `BankBookingRequestEvent` and its created, updated, confirmed, rejected, cancelled and notices-reconciled records; `BankAccountResponsibleAssignedEvent`; and `BankNotices`, the factory of the approval, grant, direct-booking and holder notices (REQ-BANK-057…060) |
+| `joborder.api.events` | `JobOrderCreatedEvent`, `JobOrderUpdatedByRequesterEvent`, `JobOrderClosedEvent`, and `JobOrderNotices`, the factory of the reassigned, finished, assignee and withdrawn-claim notices (REQ-ORDERS-041…044) |
+| `materialexchange.api.events` | `MaterialExchangeInterestRegisteredEvent`, `MaterialRequestFulfillmentSignalledEvent`, and `MarketNotices`, the factory of the offer-gone and request-withdrawn notices (REQ-MARKET-021, -022) |
+| `exchange.api.events` | `ExchangeInstallationConnectedEvent`, `ExchangeBulkUndoAppliedEvent`, and `ExchangeNotices`, the factory of the suspended, activated, update-required, capability-removed and switched-off notices (REQ-XCH-040, -041) |
+| `mission.api.events` | `MissionNotices`, the factory of the mission notices: rescheduled, cancelled, deleted, reminder, started, checked in, participant added / removed / left, never ended, end recorded, responsibility assigned (REQ-MISSION-021…027), a unit's ship assigned or unassigned (REQ-HANGAR-005) |
+| `operation.api.events` | `OperationNotices`, the factory of the payout paid out / unmarked and operation completed notices (REQ-MISSION-028, -029) |
+| `inventory.api.events` | `InventoryTransferredToUserEvent`, `InventoryTransferredFromUserEvent` and the `TransferredLot` they list (REQ-INV-055), and `InventoryNotices`, the factory of the booked-out-by-somebody-else notice (REQ-INV-056) |
+| `orgunit.api.events` | `OrgNotices`, the factory of the leadership role-mismatch and member-departed notices (REQ-ORG-029, -030) |
+| `admin.api.events` | `HangarNotices`, the factory of the hangar and blueprint notices: a deleted ship dropping out of a mission, fitted marks reset, hangar or blueprints changed by an admin (REQ-HANGAR-006…008) |
+| `refinery.api.events` | `RefineryNotices`, the factory of the order-ready, order-ready-cleared and changed-by-somebody-else notices (REQ-REFINERY-023, -024) |
 
 An event either notifies, supersedes the notices of its entity (REQ-NOTIF-018), or reconciles one notice for named members (REQ-NOTIF-023, ADR-0244). The publishing services and the listeners still sit in `service`. `OrgUnitRef` stays with the
 notification contract rather than the kernel, because it carries the org-unit module's
@@ -123,9 +128,10 @@ window, the resilient Redis listener container and the shared rate-limit, role-s
 authorities-cache settings; `platform.internal`: the metric client list and the body limit);
 every other helper sits in `<module>.internal`, or in `<module>.api` when another module uses it
 (for example `inventory.api.InventoryAllocations`, `livesync.api.LiveSyncTopic`,
-`catalogue.api.QuantityTypeRounding`, `orgunit.api.StaffelMembershipResolver`). `mission` is the
-first module that publishes nothing yet: its section-version counters, peer redaction and
-viewer-access SPI are internal, and no other module may depend on it. The helpers stay
+`catalogue.api.QuantityTypeRounding`, `orgunit.api.StaffelMembershipResolver`). `mission`
+publishes one command (`MissionCommands`); its section-version counters and peer redaction are
+internal, and the mapper's viewer-access seam `MissionViewerAccess` sits beside `MissionMapper` in
+`mapper`. The helpers stay
 dependency leaves — they may use only each other, the entity model and the repositories
 (`ArchitectureTest.LEAF_HELPER_CLASSES`).
 
@@ -142,6 +148,8 @@ mappers no other module needs) and `<module>.web` (controllers and their REST DT
 | `bank` | `BankConflictException`, `BankProblemCode`, `BankAmounts`, `BankBookingRequestType`, the booking-request events | the Kartellbank (entities, ledger, booking requests, audit trail, PDF formats, ledger task) and the org-unit side behind `OrgUnitBankAccessService` | the eight Kartellbank controllers, `OrgUnitBankController` |
 | `materialexchange` | the two after-commit events | the offer and request entities, repositories and DTOs, the board services, `MaterialExchangeOfferRatchet` (the Lager's `StockChangeObserver`) and `MaterialExchangeStockOfferLookup` (its `StockOfferLookup`) | `MaterialExchangeController`, `MaterialRequestController` |
 | `refinery` | `RefineryDraftBuilder` (the exchange's refinery draft), the screenshot-extract and draft records, the problem codes | `RefineryOrderService` (also the blueprint craftability's `CraftabilityYieldSource`), `RefineryImportService`, `RefineryAccessPolicy`, the live-sync authorizer, the import settings and the store requests | `RefineryOrderController`, `RefineryImportController` |
+| `joborder` | the problem codes, `ProductionAllocationException`, `JobOrderAuditLabel`, the order events | the order, item, production, handover, claim (also the stock projection's `ClaimBucketSource`) and demand services, `JobOrderAccessPolicy` (also the Lager's `EarmarkTargetPolicy`), the live-sync authorizer, the integrity task, its own repositories and the request DTOs | `JobOrderController`, `MaterialClaimController`, `MaterialCollectionController`, `JobOrderItemStockController` |
+| `mission` | `MissionCommands` (`detachFromOperation`) | the mission, structure, participant, timeline and finance services, `MissionSecurityService`, `MissionAccessPolicy`, the viewer-access service, the section counters, the peer redaction, the hangar's `ShipDeletionObserver` and the catalogue's `JobTypeDesignationObserver` implementations, the live-sync authorizer, its own repositories and the request DTOs | `MissionController`, `MissionFinanceEntryController` |
 | `orgchart` | — (publishes nothing; orgunit reaches it through `orgunit.api.MembershipChangeObserver`) | `OrgChartPosition` and its repository and enums, `OrgChartService`, `OrgChartReadService`, `LeitungViewService`, `OrgChartPositionMapper`, the chart and Leitung DTOs | `OrgChartController`, `LeitungController` |
 | `promotion` | — (publishes nothing; the GDPR deletion calls `service.MemberEvaluationErasure`, which the module implements) | the entities, repositories, services, mappers and records, `PromotionAccessPolicy` | the six promotion controllers |
 

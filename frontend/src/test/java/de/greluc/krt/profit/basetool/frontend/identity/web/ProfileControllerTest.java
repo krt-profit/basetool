@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -82,7 +83,11 @@ class ProfileControllerTest {
 
   @BeforeEach
   void setUp() {
-    controller = new ProfileController(new IdentityBackendClient(backendApiClient), messageSource);
+    controller =
+        new ProfileController(
+            new IdentityBackendClient(backendApiClient),
+            new NotificationBackendClient(backendApiClient),
+            messageSource);
     ReflectionTestUtils.setField(controller, "issuerUri", "https://kc.example.com/realms/iri");
   }
 

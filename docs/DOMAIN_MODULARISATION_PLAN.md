@@ -78,7 +78,7 @@ refuses code that reaches past that API. It is the report of a whole-repository 
 | D-23 | **No soak before Phase 5** (decided 2026-10-04) | `exchange` and `bank` become Gradle modules right after Phases 2–4, without waiting for their package boundary to stay green for some releases; the Phase 0 guards and the frozen module baseline hold the boundary meanwhile (§7.7). |
 | D-24 | **One combined API cut** (decided 2026-10-04) | The REST waves of §7.9 land on `main` together and ship as one backend release with one app release that uses every new path, so members take one forced update instead of one per wave; the release-bound floor (D-11) rises with that release. |
 | D-25 | **The terms text stays** (decided 2026-10-04) | The terms keep their wording (they still mention guests and list five areas), because any change forces every member to consent again (ADR-0127); D1981-TERMS is closed as kept. |
-| D-26 | **Keycloak hardening steps 2, 11 and 12 are in scope** (decided 2026-10-04) | SMTP and forgotten password, OTP for admins, session windows (`docs/KEYCLOAK_HARDENING_RUNBOOK.md`); each realm write still needs the owner's yes per action. Production and repository-settings work (CI-SEC-16, OPS-SEC-08, the S-09 restore drill) is built in code and executed per approved action. |
+| D-26 | **Keycloak hardening steps 2, 11 and 12 are in scope** (decided 2026-10-04) | SMTP and forgotten password, OTP for admins, session windows (`docs/KEYCLOAK_HARDENING_RUNBOOK.md`); each realm write still needs the owner's yes per action. **Prepared 2026-10-10:** `scripts/harden-keycloak-realm.py` (REQ-SEC-082), its integration test on a throwaway Keycloak, and every owner-only step with command, expected output, rollback and approval in [`OWNER_STEPS_2026-10.md`](OWNER_STEPS_2026-10.md); nothing was executed against a host or realm. Production and repository-settings work (CI-SEC-16, OPS-SEC-08, the S-09 restore drill) is built in code and executed per approved action. |
 | D-27 | **The 29 ADRs accepted in #1981 are ratified** (decided 2026-10-04) | The owner confirms the status changes of the documentation audit; D1981-ADR is closed. |
 
 ## 3 Summary
@@ -1056,6 +1056,142 @@ as each pair is decoupled.
   fragment yet either. (2) No command API: no other module writes a refinery order. The
   store still creates Lager rows itself (write family 2 of the evidence appendix); that write
   becomes a call of the Lager's `StockCommands` with P3-5.
+- `joborder` — **done 2026-10-10.**
+  1. *Characterise*: `JobOrderModuleContractTest` pins that create, priority change, assignee add,
+     status change and delete each record their audit event in the command's transaction, and that
+     a member of another org unit is refused on every per-order read and write entry point (the
+     "403 per foreign entry point" of the risk table).
+  2. *Access policy out of the scope hub* (§5.4, ADR-0236): `JobOrderAccessPolicy` (bean
+     `jobOrderAccessPolicy`) holds `canSeeJobOrder` (id and entity), `canEditJobOrder`,
+     `canSeeJobOrderBlueprintOwners`, `canSeeJobOrderInventoryOwners`, `canSeeJobOrderAsRequester`
+     and `canEditJobOrderAsRequester`, on the kernel's `canViewJobOrders`, `canSeeSquadron`,
+     `canEditSquadron` and `currentUserIsMemberOfOrgUnit`; the queue capabilities
+     (`canViewJobOrders`, `canViewOwnJobOrders`) stay in the kernel, which identity and the
+     exchange ask too. The Lager's row flag for earmarked stock asks its own SPI
+     `inventory.api.EarmarkTargetPolicy` (`mayEditJobOrderEarmarks`), which the policy implements,
+     so the earmark target SPI of P3-5 starts here. The order, claim, item-stock and
+     material-collection endpoints, the order query and the live-sync room ask the policy; the
+     authorization matrix changed on exactly 28 lines, in expression text. The differential verdict
+     test compared old and new over 28 callers × 21 orders × 7 gates = 4116 verdicts before the old
+     methods went (proven able to fail by dropping the Spezialkommando escape) and keeps comparing
+     against a restatement on the kernel primitives. Baseline **92 → 87**
+     (`scope -> joborder` is gone).
+  3. *Inversion*: the order's stock projection asks `service.ClaimBucketSource` for the
+     Spezialkommando claim view, implemented by `MaterialClaimService`, so the claim service moves.
+  4. *Move*: the four controllers into `joborder.web`; the order, assignee, priority, item
+     production, handover, handover-report, blueprint-owner, integrity, demand and claim services,
+     the policy, the live-sync authorizer, the org-unit resolver, the integrity task, the item,
+     material and handover-item repositories and the request DTOs into `joborder.internal`.
+  The move leaves the baseline at **87**: the 18 edges still into the job order are the Lager's
+  (17, the earmark and its reads, P3-5) and the assignee redaction in identity (1).
+  **Corrections:** (1) `JobOrder` and its items, materials, handovers and claims, their
+  repositories, `JobOrderMapper`, `JobOrderHandoverMapper`, `JobOrderItemHandoverMapper`, the
+  response DTOs, `JobOrderItemService`, `JobOrderStockProjectionService`,
+  `JobOrderMaterialRequirementResolver` and `QualityBucketAllocator` stay in the layer packages:
+  the Lager's earmark (`InventoryJobOrderAllocation`) holds the job-order association, and the Lager, the refinery, the exchange's
+  demand board, the GDPR services and the business metrics read them, so a move closes a package
+  cycle. They move once the earmark becomes an id with P3-5. (2) No command API: no other module
+  writes a job order; the exchange only reads the demand. (3) The earmark caller rule of the risk
+  table (the ungated order-linked stock query callable only from joborder) is P3-5's: that query
+  is the Lager's and still has no module to be guarded from.
+- `mission` — **done 2026-10-10.**
+  1. *Characterise*: `MissionModuleContractTest` pins that create, step add, core patch, join and
+     delete each record their audit event in the command's transaction; that a member of another
+     org unit is refused on every per-mission read entry point of an internal mission (detail, the
+     three finance reads, join); and that a mission manager of another org unit is refused on the
+     write entry points of a public mission while still reading it.
+  2. *Access policy out of the scope hub* (§5.4, ADR-0236): `MissionAccessPolicy` (bean
+     `missionAccessPolicy`) holds `canSeeMission` (the parent-chain walk, the public escape, the
+     ownerless rule) and `canEditMission`, on the kernel's `canSeeSquadron`/`canEditSquadron` and
+     `isMemberOrAbove`. `MissionSecurityService` keeps the finer write gates (manage, owner change,
+     participant access, finance entries) and asks the policy for the edit scope. The seven read
+     gates, the live-sync room and those five checks switched; the authorization matrix changed
+     on exactly seven lines. The differential verdict test compared the policy, the live scope hub
+     and a restatement over 18 callers × 25 missions × 2 gates = 900 verdicts before the old
+     methods went (proven able to fail by stopping the parent walk at the mission itself) and
+     keeps comparing against the restatement. Baseline **87 → 85** (`scope -> mission` is gone).
+  3. *Inversions* (write families 8 and 9): `hangar.api.ShipDeletionObserver`, implemented by
+     `MissionUnitShipRelease` (the unit drops the ship and records `MISSION_UNIT_UPDATED`, as
+     before), and `catalogue.api.JobTypeDesignationObserver`, implemented by
+     `MissionLeadDesignationRelease` (the participants' lead flags are cleared with the same
+     query). `hangar` becomes a declared module with only its `api` package. Baseline **85 → 81**.
+  4. *Move*: the two controllers into `mission.web`; the mission, structure, participant,
+     timeline and finance services, the security service, the policy, the viewer-access service,
+     the participant-target resolver, the live-sync authorizer, the crew, frequency, objective,
+     step and unit repositories and the 30 request DTOs into `mission.internal`.
+  **Corrections:** (1) `Mission` and its children, `MissionRepository` with its authorization
+  fragment, the participant, finance-entry and ownership repositories, the finance aggregates,
+  `MissionMapper` and the response DTOs stay in the layer packages: the Lager (earmarks and the
+  sale entries, write family 7), the refinery, the operation's finance and payout services and the
+  GDPR services use them. They follow with P3-5 (`StockSoldForTarget`, the earmark id) and P3-8
+  (the `Mission.operation`, `Mission.refineryOrders` and `MissionUnit.ship` associations, the
+  `MissionFinanceContributor` and `OperationSummaryProvider` SPIs). (2) The mapper's viewer-access
+  seam `MissionViewerAccess` moves from `mission.internal` to `mapper`, beside `MissionMapper`,
+  because a `mapper -> mission` edge would close a package cycle with the moved services. (3) No
+  new command API: no other module writes a mission beyond `detachFromOperation`. (4) Peer
+  redaction (BE-SIMP-05) already lived in `mission.internal.MissionPeerRedactor`; the section
+  counters are kept verbatim (`@DynamicUpdate`, no ADR needed). (5) `TenancyGuardRules` counts a
+  caller of an `@ObserverSpi` whose implementation writes tenant data as a writer, so moving a
+  write behind an observer does not shrink what the guard checks.
+- `inventory` — in five parts, each its own pull request and releasable on its own (owner
+  decision 2026-10-10): **5a** the contract test and the access policy; **5b**
+  `inventory.api.StockCommands` with the ADR-0229 lot-lock protocol moved in, for the exchange's
+  stock write and undo; **5c** the job-order and refinery Lager writes through `StockCommands`,
+  with the APPSEC-01 book-in check once, before any lookup; **5d** the earmarks
+  (`InventoryJobOrderAllocation.jobOrder`, `InventoryMissionAllocation.mission`) and
+  `MaterialExchangeOffer.inventoryItem` as ids, and `StockSoldForTarget` for the sale entries
+  (write family 7), which also settles P3-13 by inversion instead of a rank swap; **5e** the move,
+  NullAway and the idioms.
+  - **5a — done 2026-10-10.** `InventoryModuleContractTest` pins that create, note update,
+    personal rebook and book-out each record their audit event in the command's transaction, and
+    that a logistician of another org unit is refused on every per-row write entry point (book-out,
+    personal rebook, note, org unit, stolen, delivered, the three allocation verbs), each with a
+    body that passes validation. `InventoryAccessPolicy` (bean `inventoryAccessPolicy`) holds
+    `canSeeInventoryItem` and `canEditInventoryItem` on the kernel's `permitsOwnedRow`, and
+    `canManageUserInventory` on `canActOnTargetUser`; it implements `inventory.api.BookInPolicy`
+    (`mayBookInFor`), which the job-order production and the refinery store ask instead of the
+    scope hub. The nine row-write gates switched (the authorization matrix changed on exactly
+    those nine lines), and so did the Lager row flag of `StockViewerAccessService` and the two
+    on-behalf checks of `InventoryItemService`. The differential verdict test compared the policy,
+    the live scope hub and a restatement over 9 callers × (7 rows × 2 gates + 5 target members)
+    = 171 verdicts before the old methods went (proven able to fail by dropping the owner from the
+    edit gate) and keeps comparing against the restatement. Baseline **81 → 79**
+    (`scope -> inventory` is gone). *Correction:* the read and edit scopes coincide over this
+    matrix, as for the refinery, so swapping the edit gate's scope for the read scope is not
+    caught; the owner escape and the ownerless rule are.
+  - **5b — done 2026-10-10.** `inventory.api.StockCommands` (`lockLots`, `lockLotRows`, `bookIn`,
+    `bookOutRow`, `markStolen`, all `MANDATORY`), implemented by `InventoryStockCommands`, holds
+    the ADR-0229 lot-lock protocol unchanged (key, prefix, ascending order, row-lock order) and the
+    exchange's Lager writes; `ExchangeStockWriteService` and `ExchangeUndoService` go through it
+    (ADR-0229 *Implementation of the amendment*). `InventoryStockCommandsTest` pins the key
+    derivation, the lock order and the book-in's `INVENTORY_ITEM_CREATED`; the four
+    `ExchangeStockWriteConcurrencyIntegrationTest` cases stay green. `TenancyGuardRules` counts a
+    caller of a published `…Commands` interface whose implementation writes tenant data as a
+    writer, as it does for observers; the connected-apps controller is selected through the undo
+    since, and its two installation handlers are listed as no tenant write. *Correction:* an
+    incremental compile after this change crashed Error Prone (`invalid end position` in
+    `UnnecessaryParentheses`/`ThreadJoinLoop` on a record of `ExchangeStockWriteService`); a full
+    recompile passes, so it is a stale end-position table of the incremental build, not a code
+    fault.
+  - **5c — done 2026-10-10.** The job order and the refinery write no Lager row any more:
+    `StockCommands` gains `takeFromEarmarkedRow` (the material handover and the production
+    consumption: delete a depleted row after its offers are told, else lower the order slice and
+    the mission slices), `consumeEarmarkedItems` (the item handover, oldest row first),
+    `lowered` (the observers' notice after the order is saved, in the old order),
+    `releaseJobOrderEarmarks` / `…MaterialEarmarks` / `…GameItemEarmarks` (the bulk earmark
+    releases, after the loop as before), `bookInFromProduction` and `bookInFromRefinery` (row,
+    earmarks, merge and audit verbatim; the job order and the mission go in by id, so
+    `StockCommands` names no foreign entity and the baseline gains no edge), all `MANDATORY`, and `requireBookIn`, the one book-in rule
+    the Einbuchen, the production and the refinery store share (APPSEC-01). The production still
+    checks before any lookup and the refinery store where it did. *Behaviour unchanged by owner
+    decision:* the refinery store keeps its two differences — a personal book-in for another
+    member passes the owner check alone, an ownerless order needs Logistician+ — as the named
+    `BookInRule.refineryStore()`, pinned by `InventoryStockCommandsTest` and noted in REQ-INV-032 and
+    REQ-SEC-005 until the owner decides. `StockWriteOwnershipTest` makes "only inventory writes
+    Lager rows" a gate (a `save*`/`delete*`/`@Modifying` call on the Lager repository, a row or
+    earmark setter, an earmark mutator), proven able to fail on a planted writer; the GDPR
+    orchestrator is its one listed exception until Phase 4. The job-order and refinery unit tests
+    run against a real `InventoryStockCommands` over their mocks, so they still verify the writes.
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
@@ -1245,11 +1381,11 @@ features only, no preview flags) stands; every proposal below uses final feature
 | **Unnamed variables `_`** — **done 2026-10-10** in `main` (225 sites: 114 catch, 110 lambda, 1 pattern; descriptive names kept; ADR-0214 amendment) (final since 22) for 107 unused lambda parameters, meaningless catch parameters and unused pattern components; empty catches too, with the ADR-0214 amendment and the Checkstyle `EmptyCatchBlock` pattern change this needs (decided, D-14); descriptive names stay where the name states intent; not in keycloak-spi (Java 21 bytecode) | The compiler forbids accidental use | About 260 edits in `main` | Compile and Checkstyle | S–M |
 | **`ScopedValue`** — **done 2026-10-10** (final in 25) for the backend's `ChangeSource.ON_BEHALF` `ThreadLocal`, which attributes exchange writes in the change feed; the frontend holders stay `ThreadLocal` (ADR-0223 decision 4) | A binding cannot leak into a reused thread | ADR-0223 amendment | `ChangeSourceTransactionManager` integration test | S |
 | **Records** — **done 2026-10-10** (`AnnouncementRequest`, `UserAttributesRequest`, `UserDescriptionRequest`, `ShipTypeMatcher.TokenView`; their frontend mirrors are now paired by `DtoMirrorConsistencyTest`) — for the last three `@Data` request classes and one hand-written carrier; defensive `List.copyOf` only for records that become cached, shared or module-API values; redaction DTOs keep their canonical constructors | Immutability where values cross a boundary | `List.copyOf` rejects `null` elements | Contract tests; `toString` ratchet (G-22) | S |
-| **Small idioms** — **done 2026-10-10** outside the job-order, refinery and Materialbörse code the Phase 3 moves touch (`Math.clamp` 9 sites, `getFirst()` 9, `Environment.matchesProfiles` 4, 27 `@Query` text blocks, 6 `isPresent() && get()` pairs as `Optional.filter`; a query that mixes literals with a constant or splits a token keeps its concatenation; `isPresent()` used as a plain boolean stays). *Correction:* of the 68 `isPresent()` calls only these few are followed by `get()`: `Math.clamp` for 11 constant bounds, `getFirst()` in frontend and ingest, `Environment.matchesProfiles`, `Optional` chains instead of `isPresent()`/`get()`, text blocks for the 47 concatenated `@Query` strings and test JSON; keep `trim()`/`strip()` and `Collections.unmodifiable*` where they are deliberate | Consistency with the 90 % that already uses the modern form | Diff churn — batch into files the refactor touches anyway | Compile, tests | S |
+| **Small idioms** — **done 2026-10-10**, the job-order, refinery and Materialbörse code with the job-order move (2 more `Math.clamp`, 9 more `@Query` text blocks; the two Materialbörse `max(0, min(offered, stock))` stay, because their bounds can cross); elsewhere (`Math.clamp` 9 sites, `getFirst()` 9, `Environment.matchesProfiles` 4, 27 `@Query` text blocks, 6 `isPresent() && get()` pairs as `Optional.filter`; a query that mixes literals with a constant or splits a token keeps its concatenation; `isPresent()` used as a plain boolean stays). *Correction:* of the 68 `isPresent()` calls only these few are followed by `get()`: `Math.clamp` for 11 constant bounds, `getFirst()` in frontend and ingest, `Environment.matchesProfiles`, `Optional` chains instead of `isPresent()`/`get()`, text blocks for the 47 concatenated `@Query` strings and test JSON; keep `trim()`/`strip()` and `Collections.unmodifiable*` where they are deliberate | Consistency with the 90 % that already uses the modern form | Diff churn — batch into files the refactor touches anyway | Compile, tests | S |
 | **Do not adopt** Markdown documentation comments (`///`, JEP 467): Checkstyle 14.3.0 does not treat them as Javadoc; gatherers: no loop here is clearer as one | — | — | — | — |
 | **ADR-0223 corrections** — **done 2026-10-10** (the corrections were recorded in the ADR on 2026-10-02; the missing gate is `scripts/check-final-java-only.py`, REQ-OPS-043): JDK 26 does add a final library feature (JEP 517, HTTP/3 for the HTTP client); JEP 510 (KDF) is final in 25; Checkstyle already enforces the module-import and compact-source bans in `main` (not in `test`/`e2e`); there are 42 `super(…)` calls, not 34; a `--enable-preview` gate is still missing | The decision record stays authoritative | — | Review | S |
 
-**Nullness** — **started 2026-10-10** (ADR-0237 *Implementation*: the backend's 18 module `api` packages are checked; seven annotations were wrong or missing). Error Prone 2.50.0 with NullAway 0.14.2 runs on JDK 25 and accepts the JetBrains
+**Nullness** — **started 2026-10-10** (ADR-0237 *Implementation*: the backend's 18 module `api` packages are checked; seven annotations were wrong or missing; the whole `joborder`, `refinery` and `materialexchange` modules followed with the job-order move, `mission` with its own). Error Prone 2.50.0 with NullAway 0.14.2 runs on JDK 25 and accepts the JetBrains
 annotations by simple name; Spring Framework builds itself with the same pair. Starting with the new
 module API packages, it would turn the annotations into a checked contract and close arc42 §11.4
 ("derived nullity annotations have no gate"). Cost: a compile-time dependency, about ten javac
@@ -1406,7 +1542,7 @@ Full tables, per finding with status, evidence and verdict:
   PR #1256, issues #1250–#1255 and PRs #1257–#1262. Every finding shipped and holds, all nine
   service splits included, with three gaps: `HangarPageModelLoader` was never built,
   `CachedCatalogListLoader` has one consumer, and the per-family split of `GlobalExceptionHandler`
-  is open. Its diagnosis — "the architecture is sound, the debt is size inside
+  was open (done 2026-10-10: a chain of family classes under the one advice). Its diagnosis — "the architecture is sound, the debt is size inside
   correct layers" — holds for layers and not for domains (files over 600 lines grew from 49 of 1,477
   to 53 of 2,044). **14 of its 15 rejected simplifications still hold** (Mission section counters,
   `…WithinTransaction` hops, the find-or-create retry, bulk updates after loops, no generic CRUD base,

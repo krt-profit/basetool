@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockEntryDto
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto;
 import java.util.List;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
@@ -46,8 +47,9 @@ public class JobOrderInventoryOwnerRedactor {
    * @return the groups with each nested {@link JobOrderItemStockEntryDto} owner/location nulled.
    */
   @Nullable
+  @Contract("null -> null; !null -> !null")
   public List<JobOrderItemStockGroupDto> redactItemStockGroups(
-      List<JobOrderItemStockGroupDto> groups) {
+      @Nullable List<JobOrderItemStockGroupDto> groups) {
     if (groups == null) {
       return null;
     }
@@ -91,8 +93,9 @@ public class JobOrderInventoryOwnerRedactor {
    * @return the entries with owner and location nulled
    */
   @Nullable
+  @Contract("null -> null; !null -> !null")
   public List<MaterialCollectionEntryDto> redactMaterialCollection(
-      List<MaterialCollectionEntryDto> entries) {
+      @Nullable List<MaterialCollectionEntryDto> entries) {
     if (entries == null) {
       return null;
     }
@@ -122,7 +125,8 @@ public class JobOrderInventoryOwnerRedactor {
    * @return the items with owner and location nulled
    */
   @Nullable
-  public List<InventoryItemDto> redactInventoryItems(List<InventoryItemDto> items) {
+  @Contract("null -> null; !null -> !null")
+  public List<InventoryItemDto> redactInventoryItems(@Nullable List<InventoryItemDto> items) {
     if (items == null) {
       return null;
     }

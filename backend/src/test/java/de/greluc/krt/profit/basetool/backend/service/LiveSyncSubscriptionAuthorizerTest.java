@@ -28,10 +28,14 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccessService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankLiveSyncTopicAuthorizer;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderLiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncAuthorization;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionLiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationLiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
@@ -57,9 +61,13 @@ class LiveSyncSubscriptionAuthorizerTest {
 
   @Mock private OwnerScopeService ownerScopeService;
 
+  @Mock private MissionAccessPolicy missionAccessPolicy;
+
   @Mock private OperationAccessPolicy operationAccessPolicy;
 
   @Mock private RefineryAccessPolicy refineryAccessPolicy;
+
+  @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
   @Mock private AuthHelperService authHelperService;
   @Mock private OrgUnitBankAccessService orgUnitBankAccessService;
 
@@ -76,9 +84,9 @@ class LiveSyncSubscriptionAuthorizerTest {
 
   private List<LiveSyncTopicAuthorizer> moduleAuthorizers() {
     return List.of(
-        new MissionLiveSyncTopicAuthorizer(ownerScopeService),
+        new MissionLiveSyncTopicAuthorizer(missionAccessPolicy),
         new OperationLiveSyncTopicAuthorizer(operationAccessPolicy),
-        new JobOrderLiveSyncTopicAuthorizer(ownerScopeService),
+        new JobOrderLiveSyncTopicAuthorizer(ownerScopeService, jobOrderAccessPolicy),
         new RefineryLiveSyncTopicAuthorizer(refineryAccessPolicy),
         new OrgUnitBankLiveSyncTopicAuthorizer(orgUnitBankAccessService));
   }
@@ -89,7 +97,7 @@ class LiveSyncSubscriptionAuthorizerTest {
     List<LiveSyncTopicAuthorizer> complete = moduleAuthorizers();
     List<LiveSyncTopicAuthorizer> missingBank = complete.subList(0, complete.size() - 1);
     List<LiveSyncTopicAuthorizer> twoMission = new ArrayList<>(complete);
-    twoMission.add(new MissionLiveSyncTopicAuthorizer(ownerScopeService));
+    twoMission.add(new MissionLiveSyncTopicAuthorizer(missionAccessPolicy));
     LiveSyncTopicAuthorizer claimsSelf =
         new LiveSyncTopicAuthorizer() {
           @Override
@@ -141,10 +149,10 @@ class LiveSyncSubscriptionAuthorizerTest {
   @Test
   @DisplayName("the Einsatz room asks exactly what the Einsatz read asks")
   void theMissionRoomUsesTheMissionScope() {
-    when(ownerScopeService.canSeeMission(RESOURCE)).thenReturn(true);
+    when(missionAccessPolicy.canSeeMission(RESOURCE)).thenReturn(true);
     assertThat(authorizer.maySubscribe(LiveSyncTopic.parse("mission:" + RESOURCE))).isTrue();
 
-    when(ownerScopeService.canSeeMission(RESOURCE)).thenReturn(false);
+    when(missionAccessPolicy.canSeeMission(RESOURCE)).thenReturn(false);
     assertThat(authorizer.maySubscribe(LiveSyncTopic.parse("mission:" + RESOURCE))).isFalse();
   }
 
@@ -152,7 +160,7 @@ class LiveSyncSubscriptionAuthorizerTest {
   @DisplayName("the Operation, Auftrag and Raffinerie-Order rooms each use their own scope")
   void perResourceRoomsUseTheirOwnScope() {
     when(operationAccessPolicy.canSeeOperation(RESOURCE)).thenReturn(true);
-    when(ownerScopeService.canSeeJobOrder(RESOURCE)).thenReturn(false);
+    when(jobOrderAccessPolicy.canSeeJobOrder(RESOURCE)).thenReturn(false);
     when(refineryAccessPolicy.canSeeRefineryOrder(RESOURCE)).thenReturn(true);
 
     assertThat(authorizer.maySubscribe(LiveSyncTopic.parse("operation:" + RESOURCE))).isTrue();
@@ -217,7 +225,7 @@ class LiveSyncSubscriptionAuthorizerTest {
   @Test
   @DisplayName("both verdicts are counted under the room's class")
   void verdictsAreCounted() {
-    when(ownerScopeService.canSeeMission(RESOURCE)).thenReturn(false);
+    when(missionAccessPolicy.canSeeMission(RESOURCE)).thenReturn(false);
 
     authorizer.maySubscribe(LiveSyncTopic.parse("materialboard"));
     authorizer.maySubscribe(LiveSyncTopic.parse("mission:" + RESOURCE));

@@ -30,9 +30,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.model.*;
 import de.greluc.krt.profit.basetool.backend.repository.*;
-import de.greluc.krt.profit.basetool.backend.service.MissionService;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -85,7 +85,7 @@ class MissionUnitManagementTest {
 
     mission =
         missionService.createMission(
-            new de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest(
+            new de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest(
                 "Test Mission Unit Mgmt",
                 null,
                 null,

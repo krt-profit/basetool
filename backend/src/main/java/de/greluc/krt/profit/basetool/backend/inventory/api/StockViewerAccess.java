@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.api;
 
-import de.greluc.krt.profit.basetool.backend.mission.internal.MissionViewerAccess;
+import de.greluc.krt.profit.basetool.backend.mapper.MissionViewerAccess;
 import java.util.UUID;
 
 /**

@@ -28,6 +28,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderGameItemNeedDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMaterialNeedDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryService;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderReferenceDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimService;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.QualityTierMapper;
@@ -40,11 +46,8 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedMaterialDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemNeedDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemStockRow;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialNeedDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
@@ -88,6 +91,7 @@ class JobOrderReferenceNeedsTest {
   @Mock private InventoryItemRepository inventoryItemRepository;
 
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
 
   @Mock private JobOrderMapper jobOrderMapper;
 
@@ -118,6 +122,7 @@ class JobOrderReferenceNeedsTest {
             null,
             inventoryItemRepository,
             ownerScopeService,
+            jobOrderAccessPolicy,
             jobOrderMapper,
             squadronMapper,
             jobOrderItemService,
@@ -125,7 +130,7 @@ class JobOrderReferenceNeedsTest {
             requirementResolver,
             null);
     when(ownerScopeService.canViewJobOrders()).thenReturn(true);
-    when(ownerScopeService.canSeeJobOrder(any(JobOrder.class))).thenReturn(true);
+    when(jobOrderAccessPolicy.canSeeJobOrder(any(JobOrder.class))).thenReturn(true);
     when(jobOrderItemService.requiredMaterialIds(any(JobOrder.class))).thenReturn(Set.of());
     when(jobOrderItemService.requiredGameItemIds(any(JobOrder.class))).thenReturn(Set.of());
   }

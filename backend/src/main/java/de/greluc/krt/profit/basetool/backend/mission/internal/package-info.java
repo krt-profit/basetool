@@ -18,7 +18,8 @@
  */
 
 /**
- * The mission module's internal helpers: the section version counters, the peer redaction and the
- * viewer-access SPI of the mission mapper (plan §5.2).
+ * The mission module's implementation: the mission, structure, participant, timeline and finance
+ * services, its access and security policies, the section version counters, the peer redaction, the
+ * observer implementations, its own repositories and the request DTOs (plan §5.2).
  */
 package de.greluc.krt.profit.basetool.backend.mission.internal;

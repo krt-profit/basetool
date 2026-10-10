@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemProductionCreateDto;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;

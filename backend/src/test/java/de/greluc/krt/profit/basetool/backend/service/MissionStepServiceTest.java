@@ -33,10 +33,11 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionStepRepository;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionTimelineService;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionStep;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionStepRepository;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;

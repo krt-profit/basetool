@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.HandoverReportPreviewRequestDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.HandoverReportPreviewRequestDto;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;

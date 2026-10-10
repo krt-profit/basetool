@@ -42,6 +42,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A single offer on the Materialbörse (REQ-MARKET-001): what a player offers, in which quality and
@@ -127,6 +128,7 @@ public class MaterialExchangeOffer extends AbstractEntity<UUID> {
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_org_unit_id")
+  @Nullable
   private OrgUnit owningOrgUnit;
 
   /**

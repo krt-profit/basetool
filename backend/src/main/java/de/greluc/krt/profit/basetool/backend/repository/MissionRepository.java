@@ -27,8 +27,10 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -362,4 +364,75 @@ public interface MissionRepository
   @EntityGraph(attributePaths = {"participants"})
   @Query("SELECT m FROM Mission m WHERE m.id = :id")
   Optional<Mission> findByIdForFullReplace(@Param("id") UUID id);
+
+  /**
+   * Returns the id of the member who owns a mission.
+   *
+   * @param id the mission
+   * @return the owner's user id, or empty for an ownerless mission
+   */
+  @Query("SELECT m.owner.id FROM Mission m WHERE m.id = :id AND m.owner IS NOT NULL")
+  Optional<UUID> findOwnerUserIdById(@Param("id") UUID id);
+
+  /**
+   * Returns the ids of the co-managers of a mission.
+   *
+   * @param id the mission
+   * @return the managers' user ids; never {@code null}, possibly empty
+   */
+  @Query("SELECT u.id FROM Mission m JOIN m.managers u WHERE m.id = :id")
+  Set<UUID> findManagerUserIdsById(@Param("id") UUID id);
+
+  /**
+   * Returns the planned missions that reach the 24-hour mark in the given window and have not been
+   * reminded of it yet (REQ-MISSION-022).
+   *
+   * @param from the earliest start time, inclusive
+   * @param to the latest start time, inclusive
+   * @return the missions; never {@code null}
+   */
+  @Query(
+      """
+      SELECT m FROM Mission m
+      WHERE m.status = 'PLANNED' AND m.reminder24hSentAt IS NULL
+        AND COALESCE(m.meetingTime, m.plannedStartTime) BETWEEN :from AND :to
+      """)
+  List<Mission> findDueForReminder24h(@Param("from") Instant from, @Param("to") Instant to);
+
+  /**
+   * Returns the planned missions that start within the given window and have not been reminded of
+   * it yet (REQ-MISSION-022).
+   *
+   * @param from the earliest start time, exclusive
+   * @param to the latest start time, inclusive
+   * @return the missions; never {@code null}
+   */
+  @Query(
+      """
+      SELECT m FROM Mission m
+      WHERE m.status = 'PLANNED' AND m.reminder1hSentAt IS NULL
+        AND COALESCE(m.meetingTime, m.plannedStartTime) > :from
+        AND COALESCE(m.meetingTime, m.plannedStartTime) <= :to
+      """)
+  List<Mission> findDueForReminder1h(@Param("from") Instant from, @Param("to") Instant to);
+
+  /**
+   * Returns the oldest active or completed missions whose planned end lies in {@code [notBefore,
+   * cutoff)} and that have no actual end time and no never-ended notice yet (REQ-MISSION-025).
+   *
+   * @param notBefore the earliest planned end that is still announced, inclusive
+   * @param cutoff the latest planned end that counts as overdue, exclusive
+   * @param limit the most missions to return
+   * @return the missions, oldest planned end first; never {@code null}
+   */
+  @Query(
+      """
+      SELECT m FROM Mission m
+      WHERE m.status IN ('ACTIVE', 'COMPLETED') AND m.actualEndTime IS NULL
+        AND m.neverEndedNotifiedAt IS NULL AND m.plannedEndTime IS NOT NULL
+        AND m.plannedEndTime >= :notBefore AND m.plannedEndTime < :cutoff
+      ORDER BY m.plannedEndTime, m.id
+      """)
+  List<Mission> findOverdueWithoutEnd(
+      @Param("notBefore") Instant notBefore, @Param("cutoff") Instant cutoff, Limit limit);
 }

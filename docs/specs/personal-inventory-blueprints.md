@@ -273,7 +273,7 @@ and a global sharer is counted once.
 **Code links:** [`UserService#updateUserShareBlueprintsGlobally`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/UserService.java),
 [`UserController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/UserController.java) (`/me/blueprint-sharing`),
 [`PersonalBlueprintOverviewService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/PersonalBlueprintOverviewService.java),
-[`JobOrderItemBlueprintOwnersService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/JobOrderItemBlueprintOwnersService.java),
+[`JobOrderItemBlueprintOwnersService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/joborder/internal/JobOrderItemBlueprintOwnersService.java),
 [`V163__add_share_blueprints_globally_to_user.sql`](../../backend/src/main/resources/db/migration/V163__add_share_blueprints_globally_to_user.sql).
 
 ### REQ-INV-048 — Craftability of own blueprints from "My Inventory" stock
