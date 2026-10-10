@@ -439,8 +439,10 @@ again with the same command, `${UCTL} restart frontend.service`.
 
 **Not cut yet** — the latest release on 2026-10-10 is v1.13.7. This step is the standard promotion
 ([`deployment.md` → *Promoting to production*](deployment.md#promoting-to-production)) with the
-checks this release needs. Read the new section of `CHANGELOG.md` for host steps before you start;
-a release that carries some gets its own runbook, as 1.11.0 and the exchange go-live did.
+checks this release needs. This release has its own runbook, with the exact pre-promotion reads, the
+backup step, the post-promotion verification and the rollback:
+[`RELEASE_1.14.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.14.0_PRODUCTION_RUNBOOK.md). Follow that, not this
+summary.
 
 1. **Cut it:** *Actions → Release · Prepare → Run workflow*, version `1.14.0`; merge the
    `chore(release): v1.14.0` PR. The publish job tags the merge commit and releases (needs step 1's
@@ -469,9 +471,14 @@ gh workflow run promote.yml -f version=1.14.0
    `DeployFailed` alert. Check the version chip in the web app and
    `https://profit-base.online/` answering 200.
 
-**Rollback:** `gh workflow run promote.yml -f version=1.13.7` (the previous release); the health
-gate already rolls a failed deploy back by itself and records the backoff. A rollback keeps the
-database: if 1.14.0 carried a migration, read its note in the changelog before rolling back.
+**Rollback — read this before you promote.** A code rollback (`gh workflow run promote.yml -f
+version=1.13.7`, or the health gate's automatic one) restores images, config and units, **not the
+database**, and 1.14.0 carries migrations that make it unusable: `V262`–`V264` set `quality_tier_id`
+`NOT NULL` on three job-order tables, so v1.13.7 cannot write job orders on that schema. **A rollback
+does not keep a usable database for this release.** Take a backup immediately before promoting
+(`systemctl start iri-backup.service`, a log ending without `FATAL`) and treat the rollback as *restore
+from that backup*, which loses every write since. Details and the failed-`V265` case:
+[`RELEASE_1.14.0_PRODUCTION_RUNBOOK.md` § 5](RELEASE_1.14.0_PRODUCTION_RUNBOOK.md#5-rollback-and-its-limits).
 
 ---
 

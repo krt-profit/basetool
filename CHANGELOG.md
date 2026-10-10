@@ -236,6 +236,13 @@
 
 ### Changed
 
+- **Nicht rückgängig zu machen: die Migrationen V261–V265.** `V262`–`V264` setzen `quality_tier_id` auf
+  `NOT NULL` (Auftragsmaterial, Auftrags-Artikelmaterial, Materialanspruch), `V264` löscht den alten
+  Unique-Index von `material_claim`, `V265` begrenzt jede Qualität per `CHECK` auf 0–1000 und bricht den
+  Backend-Start bei einem Wert außerhalb ab. Ein reiner Code-Rollback auf v1.13.7 ist danach nicht möglich
+  (Schreibzugriffe auf Aufträge schlagen fehl); der Rückweg ist die Wiederherstellung des Backups, das
+  unmittelbar vor der Beförderung gezogen wurde (`docs/RELEASE_1.14.0_PRODUCTION_RUNBOOK.md`).
+
 - **UEX und SC Wiki werden nur über externe Adressen angesprochen.** Der Abruf lehnt Namen ab, die auf
   interne, Loopback- oder Link-Local-Adressen auflösen, folgt keiner Weiterleitung und läuft höchstens
   vier (UEX) bzw. zwei (SC Wiki) Aufrufe gleichzeitig. Eine auf einen internen Host zeigende
@@ -365,10 +372,6 @@
   `api/contract-tiers.txt`); die Change-Set-`Op`s von Blueprint und Schiff sind erstmals richtig
   dokumentiert, und der Generator prüft das Dokument vor dem Schreiben (REQ-API-018).
 
-- **Fehlercodes: ein Register statt verstreuter Strings.** Alle 49 Problem-Codes des Backends stehen in
-  `CoreProblemCode` und in `problem-codes.txt`; `openapi.json` dokumentiert `code` mit seinen Werten,
-  `correlationId`, `fieldErrors` und 429 auf allen `/api/**`-Operationen (REQ-API-019).
-
 - **Fehlercodes: ein Register statt verstreuter Strings.** Alle 50 Problem-Codes des Backends stehen in
   `CoreProblemCode` und in `problem-codes.txt`; `openapi.json` dokumentiert `code` mit seinen Werten,
   `correlationId`, `fieldErrors` und 429 auf allen `/api/**`-Operationen (REQ-API-019).
@@ -377,7 +380,12 @@
   Die Freigabe ist eine aus dem Vertrag generierte nginx-Map statt Pfad- und Präfixregeln; alles andere
   beantwortet die Edge mit 404 (auch die bisherigen 405). `GET /api/v1/me/layout`, `POST /api/v1/job-types`
   und Pfade unter `/api/v1/me/` und `/api/v1/terms/`, die die App nicht aufruft, sind dort nicht mehr
-  erreichbar; die App selbst ändert sich nicht (REQ-API-021, REQ-OPS-042).
+  erreichbar; die App selbst ändert sich nicht (REQ-API-021, REQ-OPS-042). `HEAD` wird auf dem
+  öffentlichen API-Host nicht mehr durchgelassen.
+
+- **Mehr API-Antworten sind `private, no-store`.** Jede `/api`-Familie, die nicht ausdrücklich als
+  teilbar eingestuft ist, gilt als persönlich; darunter jetzt `/orders` (außer dem Artikelkatalog) und
+  `/exchange` (außer dem Katalog). Diese GETs tragen kein ETag und kein `304` mehr (REQ-SEC-031).
 
 ### Fixed
 
