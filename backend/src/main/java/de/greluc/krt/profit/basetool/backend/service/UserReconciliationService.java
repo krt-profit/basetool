@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.RolesChangedObserver;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationPendingEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.MemberDepartedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
@@ -96,6 +97,7 @@ public class UserReconciliationService {
   private final UserRegistrationService userRegistrationService;
   private final UserService userService;
   private final PartialRoleScopeProperties partialRoleScopeProperties;
+  private final List<RolesChangedObserver> rolesChangedObservers;
 
   /** Counts callsign collisions between a new subject and an existing account. */
   private final MeterRegistry meterRegistry;
@@ -178,6 +180,7 @@ public class UserReconciliationService {
               new MemberDepartedEvent(user.getId(), MemberDepartedEvent.REASON_ROLE_LOST));
         }
         user.setRoles(localRoles);
+        notifyRolesChanged(user, localRoles);
         changed = true;
       }
     } else if (!user.getRoles().equals(localRoles)) {
@@ -285,6 +288,7 @@ public class UserReconciliationService {
     }
     if (!user.getRoles().equals(localRoles)) {
       user.setRoles(localRoles);
+      notifyRolesChanged(user, localRoles);
       changed = true;
       roleChangedAccounts.incrementAndGet();
       log.debug(
@@ -383,6 +387,16 @@ public class UserReconciliationService {
             eventPublisher.publishEvent(
                 new MemberDepartedEvent(id, MemberDepartedEvent.REASON_REMOVED)));
     return flagged;
+  }
+
+  /**
+   * Tells the observers that a member's roles were replaced.
+   *
+   * @param user the member
+   * @param roles the roles the member holds now
+   */
+  private void notifyRolesChanged(@NotNull User user, @NotNull Set<Role> roles) {
+    rolesChangedObservers.forEach(observer -> observer.onRolesChanged(user.getId(), roles));
   }
 
   /**

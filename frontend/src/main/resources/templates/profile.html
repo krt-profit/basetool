@@ -53,6 +53,7 @@
                     <li><a href="#profile-section-rsi" th:text="#{profile.rsiHandle.label}">RSI-Handle</a></li>
                     <li><a href="#profile-section-payout" th:text="#{profile.section.payout}">Auszahlung</a></li>
                     <li><a href="#profile-section-blueprints" th:text="#{profile.section.blueprints}">Blaupausen</a></li>
+                    <li><a href="#profile-notifications-card" th:text="#{profile.notifications.title}">Benachrichtigungen</a></li>
                     <li><a href="#profile-security-card" th:text="#{profile.security.title}">Zugang &amp; Sicherheit</a></li>
                     <li><a href="#profile-export-card" th:text="#{profile.section.export}">Datenexport</a></li>
                     <li><a href="#profile-deletion-card" th:text="#{profile.deletion.title}">Konto löschen</a></li>
@@ -157,6 +158,10 @@
                     </div>
                 </div>
 
+                <div id="profile-notifications-host">
+                    <div th:replace="~{fragments/profile-notification-prefs :: card}"></div>
+                </div>
+
                 <div class="card card--inset" id="profile-security-card">
                     <div class="card-head">
                         <h2 class="card-title" th:text="#{profile.security.title}">Access &amp; Security</h2>
@@ -241,9 +246,11 @@
         conflictDetail: /*[[#{frontend.ajax.conflict.detail}]]*/ 'The data was changed in the meantime.',
         deletionRequested: /*[[#{profile.deletion.requested}]]*/ 'Deletion request submitted.',
         deletionWithdrawn: /*[[#{profile.deletion.withdrawn}]]*/ 'Deletion request withdrawn.',
-        deletionError: /*[[#{profile.deletion.error}]]*/ 'The deletion request could not be processed.'
+        deletionError: /*[[#{profile.deletion.error}]]*/ 'The deletion request could not be processed.',
+        notificationPrefsError: /*[[#{profile.notifications.error}]]*/ 'The setting could not be saved.'
     };
 </script>
 <script th:src="@{/js/profile.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/profile-notification-prefs.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

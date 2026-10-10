@@ -1312,8 +1312,8 @@ the boot run carries the last run's values over and re-reads only the reboot fla
   `basetool_scheduled_job_duration_seconds{task}` timer,
   `basetool_scheduled_job_last_success_timestamp_seconds{task}` gauge,
   `basetool_scheduled_job_enabled{task}` gauge and — for the jobs that
-  process a countable batch — `basetool_scheduled_job_items_total{task}` counter for the thirteen
-  wrapped jobs (`user_sync`, `notification_retention`, `default_blueprint_provisioning`,
+  process a countable batch — `basetool_scheduled_job_items_total{task}` counter for the fourteen
+  wrapped jobs (`user_sync`, `notification_retention`, `notification_timed`, `default_blueprint_provisioning`,
   `rejected_registration_retention`, `audit_retention`,
   `bank_ledger_integrity`, `job_order_integrity`, `uex_sync`, `scwiki_sync`, `business_metrics`,
   `exchange_registry_reconcile`, `exchange_change_retention`, `exchange_connection_retention`) via `TaskMetrics` (`record`
@@ -1555,6 +1555,16 @@ the boot run carries the last run's values over and re-reads only the reboot fla
   cannot double-count. Untagged because the callsign would be unbounded and PII (REQ-OBS-004);
   who it was is in the ROLE audit trail. Backs `AdminAccountAutoActivated` (any occurrence in
   24 h, warning; added 2026-09-17).
+- `basetool_notification_muted_total{notification_type}` counter (`NotificationMuteService`, bounded by
+  the notification types) counts the recipients the engine dropped because they muted the type
+  (REQ-NOTIF-027); a panel on `07-basetool-operations.json` charts it per type. Added with issue
+  #2414.
+- `basetool_notification_timed_produced_total{kind}` counter (`NotificationTimedRunner`, one series
+  per `TimedNoticeProducer`, bounded by the number of producers) counts the notices the one-minute
+  time-based producer raised (REQ-NOTIF-026). The producer is the `notification_timed` scheduled
+  job; `NotificationTimedStale` (> 15 min, warning) fires when it stops succeeding, and a panel
+  on `07-basetool-operations.json` charts the notices raised per hour by kind. Added with issue
+  #2414.
 - `basetool_notification_retention_deleted_total{kind}` counter (`read` / `unread`,
   `NotificationRetentionTask`) splits the inbox sweep's two windows, which its `items` total
   conflated. The halves are isolated from each other in the task, so one can be stuck while the

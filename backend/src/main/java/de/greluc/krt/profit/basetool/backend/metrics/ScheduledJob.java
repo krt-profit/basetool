@@ -41,6 +41,12 @@ public enum ScheduledJob {
   NOTIFICATION_RETENTION("notification_retention"),
 
   /**
+   * The one-minute producer of the time-based notices, such as mission reminders ({@code
+   * NotificationTimedTask}, REQ-NOTIF-026).
+   */
+  NOTIFICATION_TIMED("notification_timed"),
+
+  /**
    * The daily purge of registrations refused past the retention window ({@code
    * RejectedRegistrationRetentionTask}, REQ-SEC-057).
    */

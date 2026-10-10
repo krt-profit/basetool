@@ -118,6 +118,8 @@ final class EdgeAdmission {
       Map.of(
           "roleCode",
           new Shape("[A-Za-z0-9_-]{1,64}", List.of("LOGISTICIAN")),
+          "type",
+          new Shape("[A-Z][A-Z0-9_]{1,63}", List.of("JOB_ORDER_CREATED")),
           "key",
           new Shape(
               "(job_order\\.age_yellow_days|job_order\\.age_red_days)",

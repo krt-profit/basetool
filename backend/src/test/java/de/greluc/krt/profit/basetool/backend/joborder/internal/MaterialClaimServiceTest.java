@@ -61,6 +61,7 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.HashSet;
 import java.util.List;
@@ -107,6 +108,9 @@ class MaterialClaimServiceTest {
    * invokes the real within-transaction body.
    */
   @Mock private ObjectProvider<MaterialClaimService> self;
+
+  @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
+  @Mock private UserService userService;
 
   @InjectMocks private MaterialClaimService service;
 
@@ -694,6 +698,68 @@ class MaterialClaimServiceTest {
       service.withdrawAllForOrderWithinTransaction(order);
 
       verify(materialClaimRepository).deleteAll(claims);
+    }
+
+    private de.greluc.krt.profit.basetool.backend.model.User member(String name) {
+      de.greluc.krt.profit.basetool.backend.model.User member =
+          new de.greluc.krt.profit.basetool.backend.model.User();
+      member.setId(UUID.randomUUID());
+      member.setUsername(name);
+      return member;
+    }
+
+    @Test
+    void withdrawAllForOrder_tellsEachClaimantThatTheOrderWasDeEscalated() {
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
+      de.greluc.krt.profit.basetool.backend.model.User ada = member("ada");
+      MaterialClaim byAda = claim(order, GOOD, squadronA, 3.0);
+      byAda.setClaimedByUser(ada);
+      MaterialClaim anonymous = claim(order, GOOD, squadronB, 2.0);
+      when(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(ORDER_ID))
+          .thenReturn(List.of(byAda, anonymous));
+      when(userService.currentActor())
+          .thenReturn(
+              new de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef(
+                  UUID.randomUUID(), "Officer"));
+
+      service.withdrawAllForOrderWithinTransaction(order);
+
+      org.mockito.ArgumentCaptor<Object> captor = org.mockito.ArgumentCaptor.forClass(Object.class);
+      verify(eventPublisher).publishEvent(captor.capture());
+      var event =
+          (de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent)
+              captor.getValue();
+      assertEquals(
+          de.greluc.krt.profit.basetool.backend.model.NotificationEventType
+              .JOB_ORDER_CLAIM_WITHDRAWN,
+          event.eventType());
+      assertEquals(ada.getId(), event.contextRecipientUserId());
+      assertEquals("DE_ESCALATED", event.renderParams().get("reasonCode"));
+    }
+
+    @Test
+    void withdrawOrphanedClaims_tellsTheClaimantThatTheOrderWasChanged() {
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
+      MaterialClaim live = claim(order, GOOD, squadronA, 3.0);
+      MaterialClaim orphan = claim(order, NONE, squadronB, 2.0);
+      de.greluc.krt.profit.basetool.backend.model.User bob = member("bob");
+      orphan.setClaimedByUser(bob);
+      when(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(ORDER_ID))
+          .thenReturn(List.of(live, orphan));
+      when(userService.currentActor())
+          .thenReturn(
+              new de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef(
+                  UUID.randomUUID(), "Officer"));
+
+      service.withdrawOrphanedClaimsWithinTransaction(order);
+
+      org.mockito.ArgumentCaptor<Object> captor = org.mockito.ArgumentCaptor.forClass(Object.class);
+      verify(eventPublisher).publishEvent(captor.capture());
+      var event =
+          (de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent)
+              captor.getValue();
+      assertEquals(bob.getId(), event.contextRecipientUserId());
+      assertEquals("ORDER_CHANGED", event.renderParams().get("reasonCode"));
     }
 
     @Test

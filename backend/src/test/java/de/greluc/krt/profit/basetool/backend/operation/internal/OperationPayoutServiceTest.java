@@ -92,6 +92,8 @@ class OperationPayoutServiceTest {
    */
   @Mock private ObjectProvider<OperationPayoutService> self;
 
+  @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
   @InjectMocks private OperationPayoutService operationPayoutService;
 
   /**
@@ -1080,7 +1082,12 @@ class OperationPayoutServiceTest {
 
     @BeforeEach
     void delegateSelfToRealService() {
-      when(self.getObject()).thenReturn(operationPayoutService);
+      org.mockito.Mockito.lenient().when(self.getObject()).thenReturn(operationPayoutService);
+      org.mockito.Mockito.lenient()
+          .when(userService.currentActor())
+          .thenReturn(
+              new de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef(
+                  UUID.randomUUID(), "Officer Bob"));
     }
 
     @Test
@@ -1182,6 +1189,116 @@ class OperationPayoutServiceTest {
           previouslyAuditedBy,
           saved.getPaidOutByUser(),
           "paid_out_by_user must survive a toggle back to false");
+    }
+
+    private java.util.List<
+            de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent>
+        publishedEvents() {
+      ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+      org.mockito.Mockito.verify(eventPublisher, org.mockito.Mockito.atLeast(0))
+          .publishEvent(captor.capture());
+      return captor.getAllValues().stream()
+          .filter(
+              de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent.class
+                  ::isInstance)
+          .map(
+              de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent.class
+                  ::cast)
+          .toList();
+    }
+
+    @Test
+    void markingAPayoutPaidOutTellsTheParticipantAndClearsTheCompletionNoticeWhenItWasTheLast() {
+      User alice = newUser("alice");
+      String key = alice.getId().toString();
+      when(payoutStatusRepository.findByOperationIdAndParticipantKey(OPERATION_ID, key))
+          .thenReturn(Optional.empty());
+      stubOperationWithParticipant(alice);
+      OperationPayoutStatus saved = new OperationPayoutStatus();
+      saved.setParticipantKey(key);
+      saved.setPaidOut(true);
+      when(payoutStatusRepository.findByOperationId(OPERATION_ID)).thenReturn(List.of(saved));
+
+      operationPayoutService.setPayoutStatus(OPERATION_ID, key, true);
+
+      var events = publishedEvents();
+      assertEquals(1, events.size());
+      var event = events.get(0);
+      assertEquals(
+          de.greluc.krt.profit.basetool.backend.model.NotificationEventType.OPERATION_PAYOUT_MARKED,
+          event.eventType());
+      assertEquals(alice.getId(), event.contextRecipientUserId());
+      assertEquals("Officer Bob", event.renderParams().get("actor"));
+      assertTrue(
+          event
+              .resolvesNotificationTypes()
+              .contains(
+                  de.greluc.krt.profit.basetool.backend.model.NotificationType.OPERATION_COMPLETED),
+          "the last open payout clears the managers' completion notice");
+    }
+
+    @Test
+    void takingTheMarkBackClearsTheParticipantsPaidOutNotice() {
+      User alice = newUser("alice");
+      String key = alice.getId().toString();
+      OperationPayoutStatus existing = new OperationPayoutStatus();
+      existing.setParticipantKey(key);
+      existing.setPaidOut(true);
+      when(payoutStatusRepository.findByOperationIdAndParticipantKey(OPERATION_ID, key))
+          .thenReturn(Optional.of(existing));
+      stubOperationWithParticipant(alice);
+
+      operationPayoutService.setPayoutStatus(OPERATION_ID, key, false);
+
+      var events = publishedEvents();
+      assertEquals(1, events.size());
+      assertEquals(
+          de.greluc.krt.profit.basetool.backend.model.NotificationEventType
+              .OPERATION_PAYOUT_UNMARKED,
+          events.get(0).eventType());
+      assertEquals(java.util.Set.of(alice.getId()), events.get(0).supersedeRecipients());
+    }
+
+    @Test
+    void aMarkThatDidNotChangeNotifiesNobody() {
+      User alice = newUser("alice");
+      String key = alice.getId().toString();
+      OperationPayoutStatus existing = new OperationPayoutStatus();
+      existing.setParticipantKey(key);
+      existing.setPaidOut(true);
+      when(payoutStatusRepository.findByOperationIdAndParticipantKey(OPERATION_ID, key))
+          .thenReturn(Optional.of(existing));
+      stubOperationWithParticipant(alice);
+
+      operationPayoutService.setPayoutStatus(OPERATION_ID, key, true);
+
+      assertTrue(publishedEvents().isEmpty());
+    }
+
+    @Test
+    void completingAnOperationNamesTheOpenAmountAndTheUnfinishedMissions() {
+      User alice = newUser("alice");
+      Operation op = stubOperationWithParticipant(alice);
+      op.setName("Operation Nachtflug");
+      op.getMissions().iterator().next().setActualEndTime(null);
+
+      operationPayoutService.announceCompletion(op);
+
+      var events = publishedEvents();
+      assertEquals(1, events.size());
+      var event = events.get(0);
+      assertEquals(
+          de.greluc.krt.profit.basetool.backend.model.NotificationEventType
+              .OPERATION_COMPLETED_UNOWNED,
+          event.eventType(),
+          "an operation without an owning unit falls back to the officers");
+      assertEquals("Operation Nachtflug", event.renderParams().get("operation"));
+      assertEquals("0", event.renderParams().get("paid"));
+      assertEquals(
+          "0",
+          event.renderParams().get("count"),
+          "a participant of an unfinished mission has no payout yet");
+      assertEquals("1", event.renderParams().get("unfinished"));
     }
 
     @Test

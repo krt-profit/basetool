@@ -95,6 +95,7 @@ public class OrgUnitMembershipService {
   private final AuditRecorder auditRecorder;
   private final MembershipChangeObserver membershipChangeObserver;
   private final OrgUnitMembershipMapper orgUnitMembershipMapper;
+  private final OrgUnitSeatNotifier seatNotifier;
 
   /**
    * Lazily resolved seam that audits changes to the accounts' responsible holders around each
@@ -227,6 +228,8 @@ public class OrgUnitMembershipService {
         OrgUnitLabels.shorthandOrName(bereich),
         userId,
         firstGrant ? "role=" + saved.getRole() : "from=" + previousRole + " to=" + saved.getRole());
+    seatNotifier.seatChanged(
+        userId, unitName(OrgUnitLabels.shorthandOrName(bereich)), saved.getRole(), true, null);
     responsibleHolderTrackerProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
     return saved;
   }
@@ -254,6 +257,8 @@ public class OrgUnitMembershipService {
         orgUnitLabelById(bereichId),
         userId,
         AuditDetails.of("role", previousRole));
+    seatNotifier.seatChanged(
+        userId, unitName(orgUnitLabelById(bereichId)), previousRole, false, null);
     responsibleHolderTrackerProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
   }
 
@@ -304,6 +309,8 @@ public class OrgUnitMembershipService {
         OrgUnitLabels.shorthandOrName(ol),
         userId,
         "role=OL_MEMBER");
+    seatNotifier.seatChanged(
+        userId, unitName(OrgUnitLabels.shorthandOrName(ol)), MembershipRole.OL_MEMBER, true, null);
     responsibleHolderTrackerProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
     return saved;
   }
@@ -344,6 +351,8 @@ public class OrgUnitMembershipService {
         orgUnitLabelById(organisationsleitungId),
         userId,
         AuditDetails.of("role", previousRole));
+    seatNotifier.seatChanged(
+        userId, unitName(orgUnitLabelById(organisationsleitungId)), previousRole, false, null);
     responsibleHolderTrackerProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
   }
 
@@ -683,6 +692,12 @@ public class OrgUnitMembershipService {
         orgUnitLabelById(specialCommandId),
         userId,
         "role=SK_LEAD");
+    seatNotifier.seatChanged(
+        userId,
+        unitName(orgUnitLabelById(specialCommandId)),
+        MembershipRole.SK_LEAD,
+        request.isLead(),
+        null);
     responsibleHolderTrackerProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
     return saved;
   }
@@ -742,6 +757,7 @@ public class OrgUnitMembershipService {
         orgUnitLabelById(squadronId),
         userId,
         firstGrant ? "role=" + rank : "from=" + previousRole + " to=" + rank);
+    seatNotifier.seatChanged(userId, unitName(orgUnitLabelById(squadronId)), rank, true, null);
     responsibleHolderTrackerProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
     return saved;
   }
@@ -782,6 +798,8 @@ public class OrgUnitMembershipService {
         orgUnitLabelById(squadronId),
         userId,
         AuditDetails.of("role", previousRole));
+    seatNotifier.seatChanged(
+        userId, unitName(orgUnitLabelById(squadronId)), previousRole, false, null);
     responsibleHolderTrackerProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
     return saved;
   }
@@ -1090,6 +1108,10 @@ public class OrgUnitMembershipService {
    * @param orgUnitId the org unit id; never {@code null}.
    * @return the org unit's shorthand/name label, or {@code null} when it cannot be resolved.
    */
+  private static String unitName(@Nullable String label) {
+    return label == null ? "—" : label;
+  }
+
   private @Nullable String orgUnitLabelById(@NotNull UUID orgUnitId) {
     return orgUnitRepository.findById(orgUnitId).map(OrgUnitLabels::shorthandOrName).orElse(null);
   }
