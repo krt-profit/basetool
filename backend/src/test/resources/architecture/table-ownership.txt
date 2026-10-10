@@ -80,6 +80,7 @@ mission_step mission
 mission_unit mission
 moon catalogue
 notification notification
+notification_mute notification
 notification_rule notification
 notification_rule_selector notification
 operation operation

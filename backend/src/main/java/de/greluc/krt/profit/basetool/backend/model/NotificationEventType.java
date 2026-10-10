@@ -150,5 +150,133 @@ public enum NotificationEventType {
    * A member became a responsible holder of a bank account (REQ-BANK-034). Published once per new
    * holder; the default rule notifies them via the {@code EVENT_RECIPIENT} selector.
    */
-  BANK_ACCOUNT_RESPONSIBLE_ASSIGNED
+  BANK_ACCOUNT_RESPONSIBLE_ASSIGNED,
+
+  /**
+   * A mission's meeting time or planned start changed (REQ-MISSION-021). The default rule notifies
+   * the participants and clears the earlier reschedule and reminder notices.
+   */
+  MISSION_RESCHEDULED,
+
+  /**
+   * A mission was cancelled (REQ-MISSION-021). The default rule notifies the participants and
+   * clears the mission's reschedule, reminder and check-in notices.
+   */
+  MISSION_CANCELLED,
+
+  /**
+   * A mission was deleted (REQ-MISSION-021). Carries the participants as event-listed recipients
+   * because the mission is gone; clears the mission's other notices.
+   */
+  MISSION_DELETED,
+
+  /**
+   * A mission starts in 24 hours or in one hour (REQ-MISSION-022). Published once per participant
+   * by the time-based producer; the default rule notifies that participant.
+   */
+  MISSION_REMINDER_DUE,
+
+  /**
+   * A mission became active (REQ-MISSION-023). The default rule notifies the participants who have
+   * not checked in.
+   */
+  MISSION_STARTED,
+
+  /**
+   * A participant checked in (REQ-MISSION-023). Creates no notification; clears that participant's
+   * open check-in notice.
+   */
+  MISSION_CHECKED_IN,
+
+  /**
+   * Somebody else added a member to a mission (REQ-MISSION-024). The default rule notifies that
+   * member.
+   */
+  MISSION_PARTICIPANT_ADDED,
+
+  /**
+   * Somebody else removed a member from a mission (REQ-MISSION-024). The default rule notifies that
+   * member; the event clears their add, reminder and check-in notices.
+   */
+  MISSION_PARTICIPANT_REMOVED,
+
+  /**
+   * A participant left a mission they held a slot in or that starts soon (REQ-MISSION-027). The
+   * default rule notifies the mission's leadership.
+   */
+  MISSION_PARTICIPANT_LEFT,
+
+  /**
+   * A mission was completed without an end time, or ran past its planned end without one
+   * (REQ-MISSION-025). The default rule notifies the mission's leadership.
+   */
+  MISSION_NEVER_ENDED,
+
+  /**
+   * A mission got its actual end time (REQ-MISSION-025). Creates no notification; clears the
+   * mission's never-ended and check-in notices.
+   */
+  MISSION_END_RECORDED,
+
+  /**
+   * A member became the owner, a co-manager, the party lead or the responsible of a unit of a
+   * mission (REQ-MISSION-026). The default rule notifies that member.
+   */
+  MISSION_RESPONSIBILITY_ASSIGNED,
+
+  /**
+   * A participant's payout of an operation was marked paid out (REQ-MISSION-028). The default rule
+   * notifies that participant; when it was the last open payout the event clears the managers'
+   * completion notice.
+   */
+  OPERATION_PAYOUT_MARKED,
+
+  /**
+   * A participant's paid-out mark was taken back (REQ-MISSION-028). Creates no notification; clears
+   * that participant's paid-out notice.
+   */
+  OPERATION_PAYOUT_UNMARKED,
+
+  /**
+   * An operation of an organisational unit was completed (REQ-MISSION-029). The default rule
+   * notifies the unit's Einsatzmanager and officers.
+   */
+  OPERATION_COMPLETED,
+
+  /**
+   * An operation without an owning unit was completed (REQ-MISSION-029). The default rule notifies
+   * every officer.
+   */
+  OPERATION_COMPLETED_UNOWNED,
+
+  /**
+   * A job order moved to another responsible unit (REQ-ORDERS-041). The default rule notifies the
+   * officers, leads and logisticians of the new unit; the event clears the order's earlier creation
+   * notices.
+   */
+  JOB_ORDER_REASSIGNED,
+
+  /**
+   * A job order was completed, rejected or deleted (REQ-ORDERS-042). The default rule notifies the
+   * officers, leads and logisticians of the requesting unit.
+   */
+  JOB_ORDER_FINISHED,
+
+  /**
+   * Somebody assigned a member to a job order (REQ-ORDERS-043). The default rule notifies that
+   * member.
+   */
+  JOB_ORDER_ASSIGNEE_ADDED,
+
+  /**
+   * A member was removed from a job order's assignees (REQ-ORDERS-043). Creates no notification;
+   * clears that member's assignment notice.
+   */
+  JOB_ORDER_ASSIGNEE_REMOVED,
+
+  /**
+   * A material claim was withdrawn by an order edit or a de-escalation (REQ-ORDERS-044). The
+   * default rule notifies the member who made the claim.
+   */
+  JOB_ORDER_CLAIM_WITHDRAWN
 }

@@ -1,0 +1,59 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires - the timed-notice producer has never succeeded and the backend is past its window
+    interval: 1m
+    input_series:
+      - series: 'process_start_time_seconds{job="basetool-backend"}'
+        values: "0x40"
+      - series: 'basetool_scheduled_job_enabled{task="notification_timed"}'
+        values: "1x40"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: NotificationTimedStale
+        exp_alerts:
+          - exp_labels:
+              severity: "warning"
+              task: "notification_timed"
+            exp_annotations:
+              summary: "Time-based notices stale >15min"
+              description: "The one-minute producer of the time-based notices (mission reminders, refinery orders ready, missions never ended) has not completed successfully in over 15 minutes. Members are not told about what is due. Check the backend logs for the producer that failed, and whether another instance holds the advisory lock."
+
+  - name: silent - the producer is succeeding every minute
+    interval: 1m
+    input_series:
+      - series: 'process_start_time_seconds{job="basetool-backend"}'
+        values: "0x40"
+      - series: 'basetool_scheduled_job_enabled{task="notification_timed"}'
+        values: "1x40"
+      - series: 'basetool_scheduled_job_last_success_timestamp_seconds{task="notification_timed"}'
+        values: "0+60x40"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: NotificationTimedStale
+        exp_alerts: []
+
+  - name: silent - the backend only just restarted
+    interval: 1m
+    input_series:
+      - series: 'process_start_time_seconds{job="basetool-backend"}'
+        values: "60x40"
+      - series: 'basetool_scheduled_job_enabled{task="notification_timed"}'
+        values: "1x40"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: NotificationTimedStale
+        exp_alerts: []
+
+  - name: silent - the producer is switched off on purpose
+    interval: 1m
+    input_series:
+      - series: 'process_start_time_seconds{job="basetool-backend"}'
+        values: "0x40"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: NotificationTimedStale
+        exp_alerts: []

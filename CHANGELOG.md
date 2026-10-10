@@ -4,6 +4,26 @@
 
 ### Added
 
+- **Benachrichtigungen zu Aufträgen.** Wer einen Auftrag übernimmt, an den er übergeben wurde, erfährt es (Offiziere, Leads und Logistiker der neuen Einheit); die anfragende Einheit hört, wenn ihr Auftrag abgeschlossen, abgelehnt oder gelöscht wurde. Wer einem Auftrag zugewiesen wird, und wessen Materialzusage durch eine Änderung oder Rückstufung entfällt, wird benachrichtigt (REQ-ORDERS-041…044, Migration V274, #2414).
+
+- **Benachrichtigungen zu Einsätzen und Operationen.** Teilnehmer erfahren, wenn ein Einsatz verschoben,
+  abgesagt oder gelöscht wird, werden 24 Stunden und eine Stunde vorher erinnert und bekommen den offenen Check-in
+  gemeldet; wer von jemand anderem hinzugefügt oder entfernt wird, erfährt es ebenso wie neue Verantwortliche und die
+  Auszahlung einer Operation. Die Einsatzleitung hört, wenn ein Teilnehmer abspringt oder ein Einsatz nie beendet
+  wurde, Einsatzmanager und Offiziere, wenn eine Operation abgeschlossen und die Auszahlung fällig ist. Neue
+  Variable `APP_MISSIONS_NOTICES_OVERDUE_AFTER` (REQ-MISSION-021…029, Migrationen V272/V273, #2414).
+
+- **Benachrichtigungen abbestellen.** Unter Profil → Benachrichtigungen schaltest du jede Art von
+  Benachrichtigung einzeln ab; eine abbestellte Art landet weder im Posteingang noch in der App.
+  Die Löschantrags-Hinweise und die Warnung vor einer neuen Anwendungsverbindung bleiben immer
+  aktiv. Auch Teil des Datenexports (REQ-NOTIF-027, Migration V271, #2414).
+
+- **Zeitgesteuerte Benachrichtigungen (Grundlage).** Ein Dienst im Minutentakt kann künftig
+  Hinweise auslösen, hinter denen keine Nutzeraktion steht (Erinnerungen, abholbereite
+  Raffinerieaufträge); er läuft nur auf einer Instanz und meldet sich im Monitoring (Alarm
+  `NotificationTimedStale`). Neue Variablen `APP_NOTIFICATIONS_TIMED_ENABLED` und
+  `APP_NOTIFICATIONS_TIMED_INTERVAL` (REQ-NOTIF-026, #2414).
+
 - **Benachrichtigungsregeln erreichen Gruppen.** Der Regel-Editor bietet vier neue Empfängerarten
   (Einsatz-Teilnehmer, Einsatzleitung, Inhaber einer verbundenen Anwendung, Ereignis-Adressaten) und
   die Rolle „Einheitsleitung"; eine Nachricht lässt sich außerdem nur für einzelne Empfänger
