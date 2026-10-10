@@ -102,7 +102,7 @@ public final class MissionNotices {
 
   private static Map<String, String> params(String... keyValues) {
     Map<String, String> params = new LinkedHashMap<>();
-    for (int i = 0; i < keyValues.length; i += 2) {
+    for (int i = 0; i + 1 < keyValues.length; i += 2) {
       params.put(keyValues[i], keyValues[i + 1]);
     }
     return params;

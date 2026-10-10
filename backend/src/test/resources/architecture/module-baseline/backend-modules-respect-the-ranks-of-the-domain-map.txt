@@ -1,11 +1,7 @@
 blueprint -> inventory: BlueprintCraftabilityService -> InventoryItemService
 blueprint -> inventory: BlueprintCraftabilityService -> OwnedStockSlice
 catalogue -> hangar: LocationService -> ShipRepository
-catalogue -> mission: JobTypeService -> MissionParticipantRepository
 catalogue -> refinery: LocationService -> RefineryOrderRepository
-hangar -> mission: HangarService -> Mission
-hangar -> mission: HangarService -> MissionUnit
-hangar -> mission: HangarService -> MissionUnitRepository
 identity -> blueprint: UserReconciliationService -> DefaultBlueprintProvisioningService
 identity -> inventory: MeController -> InventoryProperties
 identity -> joborder: UserDtoRedaction -> JobOrderAssigneeDto
@@ -81,7 +77,3 @@ notification -> orgunit: OrgUnitRef -> OrgUnitKind
 orgunit -> inventory: OrgUnitMembershipService -> InventoryOrgUnitReconciler
 scope -> hangar: AccessGateService -> Ship
 scope -> hangar: AccessGateService -> ShipRepository
-scope -> inventory: AccessGateService -> InventoryItem
-scope -> inventory: AccessGateService -> InventoryItemRepository
-scope -> mission: AccessGateService -> Mission
-scope -> mission: AccessGateService -> MissionRepository

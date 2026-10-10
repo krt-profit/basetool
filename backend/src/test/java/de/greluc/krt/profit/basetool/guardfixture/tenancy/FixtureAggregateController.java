@@ -50,7 +50,7 @@ public class FixtureAggregateController {
    * @param id the aggregate id
    */
   @PutMapping("/{id}")
-  @PreAuthorize("isAuthenticated() or @ownerScopeService.canEditMission(#id)")
+  @PreAuthorize("isAuthenticated() or @ownerScopeService.canEditSquadron(#id)")
   public void openBranch(@PathVariable UUID id) {
     writer.touch(id);
   }
@@ -71,7 +71,7 @@ public class FixtureAggregateController {
    * @param id the aggregate id
    */
   @PatchMapping("/{id}")
-  @PreAuthorize("hasRole('OFFICER') and @ownerScopeService.canEditMission(#id)")
+  @PreAuthorize("hasRole('OFFICER') and @ownerScopeService.canEditSquadron(#id)")
   public void scopeGated(@PathVariable UUID id) {
     writer.touch(id);
   }
