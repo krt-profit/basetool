@@ -111,7 +111,7 @@ class JobOrderModuleContractTest {
   @Test
   void theOrderCommandsRecordTheirAuditEvents() throws Exception {
     JsonNode created = create();
-    UUID id = UUID.fromString(created.get("id").asText());
+    UUID id = UUID.fromString(created.get("id").asString());
     assertThat(events(id)).contains("JOB_ORDER_CREATED");
 
     mockMvc
@@ -146,7 +146,7 @@ class JobOrderModuleContractTest {
 
   @Test
   void aForeignMemberIsRefusedOnEveryPerOrderEntryPoint() throws Exception {
-    UUID id = UUID.fromString(create().get("id").asText());
+    UUID id = UUID.fromString(create().get("id").asString());
     String order = ORDERS + "/" + id;
     RequestPostProcessor reader = as(outsider, MEMBER);
     RequestPostProcessor writer = as(outsider, MEMBER, LOGISTICIAN);
@@ -178,7 +178,7 @@ class JobOrderModuleContractTest {
 
   @Test
   void aMemberOfTheResponsibleUnitReadsTheOrder() throws Exception {
-    UUID id = UUID.fromString(create().get("id").asText());
+    UUID id = UUID.fromString(create().get("id").asString());
     mockMvc.perform(get(ORDERS + "/" + id).with(as(insider, MEMBER))).andExpect(status().isOk());
   }
 
