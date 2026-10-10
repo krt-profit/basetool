@@ -231,7 +231,7 @@ public class MemberManagementController {
       }
 
       if (!model.containsAttribute("memberEditForm")) {
-        OrgUnitMembershipDto slot1 = staffelRows.size() > 0 ? staffelRows.get(0) : null;
+        OrgUnitMembershipDto slot1 = staffelRows.isEmpty() ? null : staffelRows.getFirst();
         OrgUnitMembershipDto slot2 = staffelRows.size() > 1 ? staffelRows.get(1) : null;
         model.addAttribute(
             "memberEditForm",

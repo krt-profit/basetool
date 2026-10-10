@@ -83,7 +83,7 @@ public class BlueprintProductService {
   @NotNull
   public List<BlueprintProductDto> searchProducts(
       @Nullable String query, int limit, @NotNull UUID ownerUserId) {
-    int cap = Math.max(1, Math.min(limit, MAX_LIMIT));
+    int cap = Math.clamp(limit, 1, MAX_LIMIT);
     String q = query == null ? "" : query.trim();
 
     List<ProductAccumulator> products = new ArrayList<>(buildProductMap(q).values());

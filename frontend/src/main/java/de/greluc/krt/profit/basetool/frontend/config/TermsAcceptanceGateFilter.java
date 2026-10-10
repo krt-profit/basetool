@@ -270,12 +270,7 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
    * @return {@code true} when the {@code test} profile is active
    */
   private boolean isTestProfile() {
-    for (String profile : environment.getActiveProfiles()) {
-      if ("test".equals(profile)) {
-        return true;
-      }
-    }
-    return false;
+    return environment.matchesProfiles("test");
   }
 
   /**

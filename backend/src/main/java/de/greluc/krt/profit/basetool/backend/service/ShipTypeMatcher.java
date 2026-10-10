@@ -178,11 +178,11 @@ public final class ShipTypeMatcher {
       @NotNull List<TokenView> tokenized, @NotNull Set<String> fvTokens) {
     ShipType found = null;
     for (TokenView tv : tokenized) {
-      if (tv.tokens.containsAll(fvTokens)) {
+      if (tv.tokens().containsAll(fvTokens)) {
         if (found != null) {
           return null;
         }
-        found = tv.shipType;
+        found = tv.shipType();
       }
     }
     return found;
@@ -200,7 +200,7 @@ public final class ShipTypeMatcher {
   private static boolean anyFvSubsetOfUex(
       @NotNull List<TokenView> tokenized, @NotNull Set<String> fvTokens) {
     for (TokenView tv : tokenized) {
-      if (tv.tokens.containsAll(fvTokens)) {
+      if (tv.tokens().containsAll(fvTokens)) {
         return true;
       }
     }
@@ -221,11 +221,11 @@ public final class ShipTypeMatcher {
       @NotNull List<TokenView> tokenized, @NotNull Set<String> fvTokens) {
     ShipType found = null;
     for (TokenView tv : tokenized) {
-      if (!tv.tokens.isEmpty() && fvTokens.containsAll(tv.tokens)) {
+      if (!tv.tokens().isEmpty() && fvTokens.containsAll(tv.tokens())) {
         if (found != null) {
           return null;
         }
-        found = tv.shipType;
+        found = tv.shipType();
       }
     }
     return found;
@@ -278,17 +278,11 @@ public final class ShipTypeMatcher {
   }
 
   /**
-   * Pairing of a {@code ShipType} with its tokenised alphanumeric form. Used by the Stage 3 / 4
-   * token-subset comparisons. Records are not used here because Lombok is overkill for a
-   * one-field-pair holder.
+   * Pairing of a {@code ShipType} with its tokenised alphanumeric form, for the Stage 3 / 4
+   * token-subset comparisons.
+   *
+   * @param shipType the ship type
+   * @param tokens its alphanumeric tokens
    */
-  private static final class TokenView {
-    private final ShipType shipType;
-    private final Set<String> tokens;
-
-    private TokenView(@NotNull ShipType shipType, @NotNull Set<String> tokens) {
-      this.shipType = shipType;
-      this.tokens = tokens;
-    }
-  }
+  private record TokenView(@NotNull ShipType shipType, @NotNull Set<String> tokens) {}
 }

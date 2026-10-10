@@ -353,7 +353,7 @@ public class PersonalInventoryPageController {
       @RequestParam(required = false) String q, @RequestParam(required = false) Integer limit) {
     try {
       String query = q == null ? "" : q;
-      int effectiveLimit = limit == null ? 25 : Math.min(2000, Math.max(1, limit));
+      int effectiveLimit = limit == null ? 25 : Math.clamp(limit, 1, 2000);
       List<UexLocationDto> result = personalInventoryClient.searchLocations(query, effectiveLimit);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {

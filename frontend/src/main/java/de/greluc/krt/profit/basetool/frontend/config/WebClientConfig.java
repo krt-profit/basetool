@@ -187,9 +187,8 @@ public class WebClientConfig {
         !streaming && httpProperties.backendProtocol() == AppHttpProperties.BackendProtocol.H2;
     try {
       SslContextBuilder builder = SslContextBuilder.forClient();
-      java.util.List<String> profiles = java.util.Arrays.asList(environment.getActiveProfiles());
       boolean pinnedTrust = false;
-      if (profiles.contains("dev") || profiles.contains("test")) {
+      if (environment.matchesProfiles("dev", "test")) {
         builder = builder.trustManager(InsecureTrustManagerFactory.INSTANCE);
         pinnedTrust = true;
       } else {
@@ -217,8 +216,7 @@ public class WebClientConfig {
       SslContext sslContext = builder.build();
       boolean disableHostnameVerification =
           pinnedTrust
-              && (profiles.contains("dev")
-                  || profiles.contains("test")
+              && (environment.matchesProfiles("dev", "test")
                   || !httpProperties.verifyBackendHostname());
 
       final reactor.netty.resources.ConnectionProvider provider;
