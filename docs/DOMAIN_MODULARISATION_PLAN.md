@@ -1265,7 +1265,7 @@ as each pair is decoupled.
     own `InventoryItemMapper`, `InventoryItemRepository` and services. Mission and job order
     could move because no layer class used their packages. **Tracked for Phase 4:** move the
     inventory into `inventory.web` / `inventory.internal` once those consumers have left the
-    layer packages, then NullAway covers it without a further change.
+    layer packages (P4-1, §7.6), then NullAway covers it without a further change.
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
@@ -1286,6 +1286,13 @@ Carried into this phase from Phase 2: `service.MemberEvaluationErasure` (promoti
 `personalinventory.api.PersonalInventoryErasure` are the interim erasure commands `UserDeletionService`
 calls; both are replaced by `UserErasureParticipant` implementations here, and
 `MemberEvaluationErasure` leaves the `service` package with that step (P2-3); `service.BankHandleSnapshots` (bank) goes the same way (P2-5).
+**P4-1 — move the inventory into `inventory.web` / `inventory.internal`** (carried from P3-5e,
+§7.5). It waits until the layer classes that consume `inventory.api` have left the layer packages:
+the GDPR orchestrator (`UserDeletionService`), identity's `MeController`, the org-unit membership
+service and repository (`InventoryOrgUnitReconciler`), the blueprint's craftability read (P3-7), the
+job order's `JobOrderStockProjectionService` and `JobOrderMapper`, and the earmark finders of
+`JobOrderRepository` and `MissionRepository`. The Lager's own controller, services, mapper and
+repository then move together; NullAway already covers the `inventory` tree.
 
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 
