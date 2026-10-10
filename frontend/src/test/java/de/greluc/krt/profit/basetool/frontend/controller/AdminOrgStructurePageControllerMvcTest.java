@@ -80,8 +80,7 @@ class AdminOrgStructurePageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void page_admin_emptyHierarchy_returns200() throws Exception {
-    when(backendApiClient.get(eq("/api/v1/org-hierarchy/org-units"), anyTypeRef()))
-        .thenReturn(List.of());
+    when(backendApiClient.get(eq("/api/v1/org-units"), anyTypeRef())).thenReturn(List.of());
 
     mockMvc.perform(get("/admin/org-structure")).andExpect(status().isOk());
   }
@@ -98,8 +97,7 @@ class AdminOrgStructurePageControllerMvcTest {
                 olId, "Organisationsleitung KRT", "OL", "ORGANISATIONSLEITUNG", null, null, 0L),
             new OrgUnitNodeDto(bereichId, "Bereich Profit", "PRF", "BEREICH", olId, "PROFIT", 0L),
             new OrgUnitNodeDto(staffelId, "Iridium", "IRI", "SQUADRON", bereichId, null, 0L));
-    when(backendApiClient.get(eq("/api/v1/org-hierarchy/org-units"), anyTypeRef()))
-        .thenReturn(nodes);
+    when(backendApiClient.get(eq("/api/v1/org-units"), anyTypeRef())).thenReturn(nodes);
 
     mockMvc
         .perform(get("/admin/org-structure"))
@@ -112,7 +110,7 @@ class AdminOrgStructurePageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void page_admin_unitsFragment_rendersOnlyTheUnitTable() throws Exception {
     UUID olId = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
-    when(backendApiClient.get(eq("/api/v1/org-hierarchy/org-units"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/org-units"), anyTypeRef()))
         .thenReturn(
             List.of(
                 new OrgUnitNodeDto(
@@ -138,8 +136,7 @@ class AdminOrgStructurePageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void page_admin_formsFragment_rendersOnlyTheCreateForms() throws Exception {
-    when(backendApiClient.get(eq("/api/v1/org-hierarchy/org-units"), anyTypeRef()))
-        .thenReturn(List.of());
+    when(backendApiClient.get(eq("/api/v1/org-units"), anyTypeRef())).thenReturn(List.of());
 
     mockMvc
         .perform(get("/admin/org-structure").param("fragment", "forms"))
@@ -154,8 +151,7 @@ class AdminOrgStructurePageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void page_admin_unknownFragment_fallsBackToTheFullPage() throws Exception {
-    when(backendApiClient.get(eq("/api/v1/org-hierarchy/org-units"), anyTypeRef()))
-        .thenReturn(List.of());
+    when(backendApiClient.get(eq("/api/v1/org-units"), anyTypeRef())).thenReturn(List.of());
 
     mockMvc
         .perform(get("/admin/org-structure").param("fragment", "bogus"))
@@ -174,7 +170,7 @@ class AdminOrgStructurePageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void page_admin_rendersTheListPattern() throws Exception {
     UUID olId = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
-    when(backendApiClient.get(eq("/api/v1/org-hierarchy/org-units"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/org-units"), anyTypeRef()))
         .thenReturn(
             List.of(
                 new OrgUnitNodeDto(
@@ -224,7 +220,7 @@ class AdminOrgStructurePageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void createBereich_ajax_admin_returns200() throws Exception {
-    when(backendApiClient.post(eq("/api/v1/org-hierarchy/bereiche"), any(), eq(BereichDto.class)))
+    when(backendApiClient.post(eq("/api/v1/org-units/bereiche"), any(), eq(BereichDto.class)))
         .thenReturn(
             new BereichDto(
                 UUID.fromString("00000000-0000-0000-0000-000000000001"),

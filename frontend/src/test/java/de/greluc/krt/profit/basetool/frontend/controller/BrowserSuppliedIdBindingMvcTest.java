@@ -73,7 +73,7 @@ class BrowserSuppliedIdBindingMvcTest {
         .perform(post("/announcement/read").param("id", CRAFTED).with(csrf()).with(oidcLogin()))
         .andExpect(status().isBadRequest());
 
-    assertNoBackendCallMentions("read-announcement");
+    assertNoBackendCallMentions("/announcements/");
   }
 
   @Test
@@ -87,7 +87,7 @@ class BrowserSuppliedIdBindingMvcTest {
                 .with(oidcLogin()))
         .andExpect(status().isBadRequest());
 
-    assertNoBackendCallMentions("read-announcement");
+    assertNoBackendCallMentions("/announcements/");
   }
 
   @Test

@@ -117,7 +117,7 @@ class ApiVhostAnonymousSurfaceTest {
   @Test
   @WithAnonymousUser
   void shouldRefuseAnonymousMembershipsWithUnauthorized() throws Exception {
-    mockMvc.perform(get("/api/v1/users/me/memberships")).andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/org-units/me/memberships")).andExpect(status().isUnauthorized());
   }
 
   /**
@@ -1018,18 +1018,20 @@ class ApiVhostAnonymousSurfaceTest {
   @Test
   @WithAnonymousUser
   void shouldRefuseAnonymousMemberPreferenceReadsAndWritesWithUnauthorized() throws Exception {
-    mockMvc.perform(get("/api/v1/users/me/payout-preference")).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/missions/me/payout-preference"))
+        .andExpect(status().isUnauthorized());
     mockMvc
         .perform(
-            put("/api/v1/users/me/payout-preference")
+            put("/api/v1/missions/me/payout-preference")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"preference\":\"PAYOUT\",\"version\":0}"))
         .andExpect(status().isUnauthorized());
-    mockMvc.perform(get("/api/v1/users/me/blueprint-sharing")).andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/blueprints/me/sharing")).andExpect(status().isUnauthorized());
     mockMvc
         .perform(
-            put("/api/v1/users/me/blueprint-sharing")
+            put("/api/v1/blueprints/me/sharing")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"shareBlueprintsGlobally\":true,\"version\":0}"))
@@ -1043,7 +1045,7 @@ class ApiVhostAnonymousSurfaceTest {
                 .content("{\"rsiHandle\":\"Some_Handle\",\"version\":0}"))
         .andExpect(status().isUnauthorized());
     mockMvc
-        .perform(put("/api/v1/users/me/read-announcement/" + ABSENT_OPERATION).with(csrf()))
+        .perform(put("/api/v1/announcements/" + ABSENT_OPERATION + "/read").with(csrf()))
         .andExpect(status().isUnauthorized());
   }
 

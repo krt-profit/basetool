@@ -52,7 +52,7 @@ import org.springframework.web.bind.annotation.RestController;
  * X-Active-Org-Unit-Id} header.
  */
 @RestController
-@RequestMapping("/api/v1/me")
+@RequestMapping("/api/v1")
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 public class MeController {
@@ -82,7 +82,7 @@ public class MeController {
    * @return current effective org-unit context; never {@code null}.
    */
   @NotNull
-  @GetMapping("/active-org-unit")
+  @GetMapping("/org-units/me/active")
   public ActiveOrgUnitResponse getActiveOrgUnit() {
     return activeOrgUnit();
   }
@@ -107,7 +107,7 @@ public class MeController {
    * @return the caller's UI capability flags; never {@code null}.
    */
   @NotNull
-  @GetMapping("/capabilities")
+  @GetMapping("/me/capabilities")
   @Operation(
       summary = "Per-principal UI capability flags (blueprint overview, job orders, bank staff).")
   public CapabilitiesResponse getCapabilities() {
@@ -143,7 +143,7 @@ public class MeController {
    * @return the pinnable options; never {@code null}, possibly empty for a membership-less
    *     non-admin.
    */
-  @GetMapping("/org-units")
+  @GetMapping("/org-units/me/switchable")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   @Operation(
@@ -183,14 +183,14 @@ public class MeController {
    * @return the caller's layout context; never {@code null}
    */
   @NotNull
-  @GetMapping("/layout")
+  @GetMapping("/me/layout")
   @Transactional(readOnly = true)
   @Operation(
       summary = "The caller's layout context in one read",
       description =
           "Active org unit, pinnable org units, capability flags and unread-notification count -"
-              + " the same answers as /me/active-org-unit, /me/org-units, /me/capabilities and"
-              + " /notifications/unread-count, in one read-only transaction.")
+              + " the same answers as /org-units/me/active, /org-units/me/switchable,"
+              + " /me/capabilities and /notifications/unread-count, in one read-only transaction.")
   @ApiResponses(
       value = {
         @ApiResponse(responseCode = "200", description = "The caller's layout context"),
@@ -205,7 +205,7 @@ public class MeController {
   }
 
   /**
-   * Response for {@code GET /api/v1/me/active-org-unit}: the resolved effective org-unit context
+   * Response for {@code GET /api/v1/org-units/me/active}: the resolved effective org-unit context
    * for the current request. {@code null} means the admin is viewing all OrgUnits (or the user has
    * no assigned home Staffel and no pinned context).
    *

@@ -124,6 +124,22 @@ public class KommandoGroupService {
   }
 
   /**
+   * Asserts that a Kommandogruppe belongs to the Staffel named in the request path.
+   *
+   * @param squadronId the Staffel from the path; never {@code null}.
+   * @param groupId the group from the path; never {@code null}.
+   * @throws NotFoundException if the group does not exist or belongs to another Staffel.
+   */
+  @Transactional(readOnly = true)
+  public void requireGroupOf(@NotNull UUID squadronId, @NotNull UUID groupId) {
+    KommandoGroup group =
+        Entities.require(kommandoGroupRepository.findById(groupId), "Kommandogruppe not found");
+    if (!group.getSquadron().getId().equals(squadronId)) {
+      throw new NotFoundException("Kommandogruppe not found");
+    }
+  }
+
+  /**
    * Renames and/or reorders a Kommandogruppe, checking the inbound {@code version}.
    *
    * @param groupId the group to update; never {@code null}.

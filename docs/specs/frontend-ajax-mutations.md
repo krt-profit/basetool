@@ -2049,8 +2049,8 @@ fall.
 **Acceptance**
 
 - [ ] An authenticated request to a `@RestController` in the `frontend` module triggers none of
-  `/api/v1/me/capabilities`, `/api/v1/notifications/unread-count`, `/api/v1/me/active-org-unit`,
-  `/api/v1/me/org-units` or the `CachedCatalog.SQUADRONS` page-walk.
+  `/api/v1/me/capabilities`, `/api/v1/notifications/unread-count`, `/api/v1/org-units/me/active`,
+  `/api/v1/org-units/me/switchable` or the `CachedCatalog.SQUADRONS` page-walk.
 - [ ] Every `@Controller` in the module carries `@UsesLayoutModel`; no `@RestController` carries it.
   Both halves are asserted, so the scoping can neither drift open nor close over a page.
 - [ ] View controllers are unaffected: pages still render with org-unit context, capability flags,

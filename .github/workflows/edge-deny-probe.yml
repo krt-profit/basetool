@@ -94,6 +94,7 @@ jobs:
             probe "$verb" "$path" "$code"
           done <<'PROBES'
           GET /api/v1/announcement 401
+          PUT /api/v1/announcements/00000000-0000-4000-8000-00000000cafe/read 401
           GET /api/v1/app/version-policy 200
           GET /api/v1/bank/accounts 401
           POST /api/v1/bank/accounts 401
@@ -116,6 +117,7 @@ jobs:
           GET /api/v1/bank/holders/00000000-0000-4000-8000-00000000cafe 401
           PATCH /api/v1/bank/holders/00000000-0000-4000-8000-00000000cafe 401
           GET /api/v1/bank/holders/00000000-0000-4000-8000-00000000cafe/transactions 401
+          GET /api/v1/bank/members/search 401
           GET /api/v1/bank/requests 401
           POST /api/v1/bank/requests/00000000-0000-4000-8000-00000000cafe/confirm 401
           POST /api/v1/bank/requests/00000000-0000-4000-8000-00000000cafe/reject 401
@@ -123,6 +125,8 @@ jobs:
           GET /api/v1/bank/transfer-fee-rate 401
           POST /api/v1/bank/transfers 401
           POST /api/v1/bank/withdrawals 401
+          GET /api/v1/blueprints/me/sharing 401
+          PUT /api/v1/blueprints/me/sharing 401
           GET /api/v1/blueprints/products/search 401
           POST /api/v1/finance-entries 401
           PUT /api/v1/finance-entries/00000000-0000-4000-8000-00000000cafe 401
@@ -185,10 +189,12 @@ jobs:
           GET /api/v1/materials/00000000-0000-4000-8000-00000000cafe 401
           GET /api/v1/materials/00000000-0000-4000-8000-00000000cafe/prices 401
           GET /api/v1/materials/00000000-0000-4000-8000-00000000cafe/terminals 401
-          GET /api/v1/me/active-org-unit 401
+          GET /api/v1/me/active-org-unit 410
           GET /api/v1/me/capabilities 401
-          GET /api/v1/me/org-units 401
+          GET /api/v1/me/org-units 410
           GET /api/v1/missions/lookup 401
+          GET /api/v1/missions/me/payout-preference 401
+          PUT /api/v1/missions/me/payout-preference 401
           GET /api/v1/missions/search 401
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe 401
           PATCH /api/v1/missions/00000000-0000-4000-8000-00000000cafe/core 401
@@ -294,6 +300,10 @@ jobs:
           POST /api/v1/org-units/bank/requests/00000000-0000-4000-8000-00000000cafe/owner-approval 401
           DELETE /api/v1/org-units/bank/requests/00000000-0000-4000-8000-00000000cafe/owner-approval 401
           GET /api/v1/org-units/bank/transfer-targets 401
+          GET /api/v1/org-units/me/active 401
+          GET /api/v1/org-units/me/memberships 401
+          GET /api/v1/org-units/me/switchable 401
+          GET /api/v1/org-units/members/00000000-0000-4000-8000-00000000cafe/memberships 401
           GET /api/v1/personal-blueprints 401
           POST /api/v1/personal-blueprints 401
           DELETE /api/v1/personal-blueprints 401
@@ -329,19 +339,20 @@ jobs:
           GET /api/v1/terms/status 401
           GET /api/v1/uex/locations/search 401
           GET /api/v1/users/me 401
-          GET /api/v1/users/me/blueprint-sharing 401
-          PUT /api/v1/users/me/blueprint-sharing 401
-          GET /api/v1/users/me/memberships 401
-          GET /api/v1/users/me/payout-preference 401
-          PUT /api/v1/users/me/payout-preference 401
-          PUT /api/v1/users/me/read-announcement/00000000-0000-4000-8000-00000000cafe 401
+          GET /api/v1/users/me/blueprint-sharing 410
+          PUT /api/v1/users/me/blueprint-sharing 410
+          GET /api/v1/users/me/memberships 410
+          GET /api/v1/users/me/payout-preference 410
+          PUT /api/v1/users/me/payout-preference 410
+          PUT /api/v1/users/me/read-announcement/00000000-0000-4000-8000-00000000cafe 410
           GET /api/v1/users/me/registration-status 401
           GET /api/v1/users/me/rsi-handle 401
           PUT /api/v1/users/me/rsi-handle 401
           GET /api/v1/users/search 401
-          GET /api/v1/users/search-bank 401
-          GET /api/v1/users/00000000-0000-4000-8000-00000000cafe/memberships 401
+          GET /api/v1/users/search-bank 410
+          GET /api/v1/users/00000000-0000-4000-8000-00000000cafe/memberships 410
           POST /api/v1/announcement 404
+          GET /api/v1/announcements/00000000-0000-4000-8000-00000000cafe/read 404
           POST /api/v1/app/version-policy 404
           PUT /api/v1/bank/accounts 404
           POST /api/v1/bank/accounts/00000000-0000-4000-8000-00000000cafe 404
@@ -358,6 +369,7 @@ jobs:
           GET /api/v1/bank/holders/transfer 404
           POST /api/v1/bank/holders/00000000-0000-4000-8000-00000000cafe 404
           POST /api/v1/bank/holders/00000000-0000-4000-8000-00000000cafe/transactions 404
+          POST /api/v1/bank/members/search 404
           POST /api/v1/bank/requests 404
           GET /api/v1/bank/requests/00000000-0000-4000-8000-00000000cafe/confirm 404
           GET /api/v1/bank/requests/00000000-0000-4000-8000-00000000cafe/reject 404
@@ -365,6 +377,7 @@ jobs:
           POST /api/v1/bank/transfer-fee-rate 404
           GET /api/v1/bank/transfers 404
           GET /api/v1/bank/withdrawals 404
+          POST /api/v1/blueprints/me/sharing 404
           POST /api/v1/blueprints/products/search 404
           GET /api/v1/finance-entries 404
           GET /api/v1/finance-entries/00000000-0000-4000-8000-00000000cafe 404
@@ -422,6 +435,7 @@ jobs:
           POST /api/v1/me/capabilities 404
           POST /api/v1/me/org-units 404
           POST /api/v1/missions/lookup 404
+          POST /api/v1/missions/me/payout-preference 404
           POST /api/v1/missions/search 404
           POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe 404
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/core 404
@@ -508,6 +522,10 @@ jobs:
           GET /api/v1/org-units/bank/requests/00000000-0000-4000-8000-00000000cafe/cancel 404
           GET /api/v1/org-units/bank/requests/00000000-0000-4000-8000-00000000cafe/owner-approval 404
           POST /api/v1/org-units/bank/transfer-targets 404
+          POST /api/v1/org-units/me/active 404
+          POST /api/v1/org-units/me/memberships 404
+          POST /api/v1/org-units/me/switchable 404
+          POST /api/v1/org-units/members/00000000-0000-4000-8000-00000000cafe/memberships 404
           PUT /api/v1/personal-blueprints 404
           GET /api/v1/personal-blueprints/batch 404
           POST /api/v1/personal-blueprints/craftability 404

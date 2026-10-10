@@ -88,7 +88,7 @@ class HangarBackendClientTest {
         "GET", "/api/v1/hangar/squadron-overview?page=1&size=10&search=Cutlass%20%26%20Co");
     backend.expect("GET", "/api/v1/hangar/squadron-overview?page=0&size=1");
     backend.expect("GET", "/api/v1/locations/home-locations");
-    backend.expect("GET", "/api/v1/users/me/pickable-org-units");
+    backend.expect("GET", "/api/v1/org-units/me/pickable");
   }
 
   @Test

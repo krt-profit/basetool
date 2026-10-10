@@ -46,7 +46,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Tests {@code GET /api/v1/users/me/memberships} (REQ-API-009).
+ * Tests {@code GET /api/v1/org-units/me/memberships} (REQ-API-009).
  *
  * <ul>
  *   <li>The user id comes only from the JWT subject.
@@ -97,7 +97,7 @@ class UserMeMembershipsTest {
   @DisplayName("the memberships resolved are the caller's own, taken from the JWT subject")
   void resolvesTheCallerFromTheToken() throws Exception {
     mockMvc
-        .perform(get("/api/v1/users/me/memberships").with(callerJwt("ROLE_KRT_MEMBER")))
+        .perform(get("/api/v1/org-units/me/memberships").with(callerJwt("ROLE_KRT_MEMBER")))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].orgUnitName").value("Staffel 1"));
 
@@ -109,7 +109,7 @@ class UserMeMembershipsTest {
   @DisplayName("an authenticated account with no roles is served, not refused")
   void aRolelessAccountIsServed() throws Exception {
     mockMvc
-        .perform(get("/api/v1/users/me/memberships").with(callerJwt()))
+        .perform(get("/api/v1/org-units/me/memberships").with(callerJwt()))
         .andExpect(status().isOk());
   }
 
@@ -118,7 +118,7 @@ class UserMeMembershipsTest {
   void allKindsSpansEveryKind() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/users/me/memberships")
+            get("/api/v1/org-units/me/memberships")
                 .param("allKinds", "true")
                 .with(callerJwt("ROLE_KRT_MEMBER")))
         .andExpect(status().isOk());
@@ -130,6 +130,6 @@ class UserMeMembershipsTest {
   @Test
   @DisplayName("an unauthenticated caller is refused")
   void anonymousIsRefused() throws Exception {
-    mockMvc.perform(get("/api/v1/users/me/memberships")).andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/org-units/me/memberships")).andExpect(status().isUnauthorized());
   }
 }

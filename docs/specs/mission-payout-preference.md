@@ -47,7 +47,7 @@ the new participant's `payoutPreference` is **seeded from the user's default**. 
 (`UpdateUserDefaultPayoutPreferenceTests`), `UserControllerTest` (`/me/payout-preference` GET/PUT),
 `UserPayoutPreferenceValidationTest` (`@Valid` → 400 on a missing preference/version),
 `ProfileControllerTest`. **Code:** `User.defaultPayoutPreference` (migration `V142`),
-`UserService#updateUserDefaultPayoutPreference`, `UserController` `/api/v1/users/me/payout-preference`,
+`UserService#updateUserDefaultPayoutPreference`, `UserController` `/api/v1/missions/me/payout-preference`,
 `MissionParticipantService#addParticipant` (reached through `MissionService#addParticipant`),
 `frontend/.../ProfileController` (`POST /profile/payout-preference`) + `templates/profile.html`.
 **Issues:** #469.

@@ -87,7 +87,7 @@ public class UserAccessControlTest {
   @Test
   void testSearchUsersForBank_Anonymous_Forbidden() throws Exception {
     mockMvc
-        .perform(get("/api/v1/users/search-bank").param("query", "test"))
+        .perform(get("/api/v1/bank/members/search").param("query", "test"))
         .andExpect(status().isUnauthorized());
   }
 
@@ -95,7 +95,7 @@ public class UserAccessControlTest {
   void testSearchUsersForBank_RoleLess_Forbidden() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/users/search-bank")
+            get("/api/v1/bank/members/search")
                 .param("query", "test")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_NO_ROLE"))))
         .andExpect(status().isForbidden());
@@ -105,7 +105,7 @@ public class UserAccessControlTest {
   void testSearchUsersForBank_Officer_Allowed() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/users/search-bank")
+            get("/api/v1/bank/members/search")
                 .param("query", "test")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
         .andExpect(status().isOk());
@@ -115,7 +115,7 @@ public class UserAccessControlTest {
   void testSearchUsersForBank_BankEmployee_Allowed() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/users/search-bank")
+            get("/api/v1/bank/members/search")
                 .param("query", "test")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE"))))
         .andExpect(status().isOk());

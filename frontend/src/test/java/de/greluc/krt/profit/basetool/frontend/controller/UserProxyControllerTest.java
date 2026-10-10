@@ -49,7 +49,7 @@ class UserProxyControllerTest {
 
   /** The URI template of the per-user membership lookup. */
   private static final String MEMBERSHIPS_URI =
-      "/api/v1/users/{userId}/memberships?allKinds={allKinds}";
+      "/api/v1/org-units/members/{userId}/memberships?allKinds={allKinds}";
 
   @Test
   void searchUsers_ShouldCallWebClient() {
@@ -132,7 +132,7 @@ class UserProxyControllerTest {
     PageResponse<UserReferenceDto> mockPageResponse =
         new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList());
     when(backendApiClient.get(
-            eq("/api/v1/users/search-bank/references?size=51&sort=username,asc&query={query}"),
+            eq("/api/v1/bank/members/search/references?size=51&sort=username,asc&query={query}"),
             anyTypeRef(),
             eq("query")))
         .thenReturn(mockPageResponse);
@@ -142,7 +142,7 @@ class UserProxyControllerTest {
     assertNotNull(result);
     verify(backendApiClient)
         .get(
-            eq("/api/v1/users/search-bank/references?size=51&sort=username,asc&query={query}"),
+            eq("/api/v1/bank/members/search/references?size=51&sort=username,asc&query={query}"),
             anyTypeRef(),
             eq("query"));
   }

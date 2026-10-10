@@ -232,6 +232,8 @@
 
 ### Changed
 
+- **REST-API, Welle 2 (Identität und Organisationseinheiten).** Mitgliedsbezogene Endpunkte wandern aus `/users` und `/me` zu ihrem Fachbereich (`/org-units/me/…`, `/blueprints/me/sharing`, `/missions/me/payout-preference`, `/announcements/{id}/read`, `/bank/members/search`); die Hierarchie liegt unter `/org-units`, die Leitungsansicht unter `/org-chart/leadership`, das Ändern und Löschen einer Kommandogruppe unter ihrer Staffel. Die alten App-Pfade antworten `410 APP_UPDATE_REQUIRED`; die App erscheint mit dem gemeinsamen API-Schnitt neu (versionCode 19).
+
 - **REST-API, Welle 1 (nur Web, keine App-Änderung).** Die Administrations-Endpunkte liegen jetzt je Fachbereich unter `/api/v1/<bereich>/admin/**` (z. B. `/users/admin`, `/catalog/admin`, `/connected-apps/admin`), die Rollen unter `/api/v1/roles`, die Benachrichtigungsregeln unter `/api/v1/notifications/admin/rules`; ein einziges ADMIN-Gate steht vor allen Fachregeln. Das Duplikat `PUT /admin/users/{id}/attributes` und die beiden Ping-Endpunkte entfallen. Teil des gemeinsamen API-Schnitts (REQ-API-023).
 
 - **UEX und SC Wiki werden nur über externe Adressen angesprochen.** Der Abruf lehnt Namen ab, die auf

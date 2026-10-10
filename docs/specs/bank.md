@@ -2051,7 +2051,7 @@ counterparty on its single header too.
 Design (owner-confirmed): the counterparty is a **tool user** (no free-text), selected from the
 shared `GET /api/v1/users/lookup` picker; its **org unit is picked at booking** from the user's own
 direct memberships across **all four kinds** (Staffel + SK + Bereich + OL —
-`GET /api/v1/users/{id}/memberships?allKinds=true`), auto-preselected when the user has exactly one,
+`GET /api/v1/org-units/members/{id}/memberships?allKinds=true`), auto-preselected when the user has exactly one,
 blank when none — membership is multi, so it must be chosen. Both fields are **optional**. The
 backend validates the chosen org unit is one of the counterparty's memberships (else 400) and
 snapshots its name via the `OrgUnitMembershipQueryService.listDirectMembershipOptions` seam (kind-safe, no

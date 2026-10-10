@@ -25,7 +25,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Frontend mirror of the backend membership-delta payload for {@code PATCH
- * /api/v1/users/{id}/memberships}: the desired Staffel set plus a list of SK changes.
+ * /api/v1/org-units/members/{id}/memberships}: the desired Staffel set plus a list of SK changes.
  *
  * @param staffeln desired complete Staffel membership set (0–2 entries), or {@code null} to leave
  *     the Staffel side untouched. A non-null list is reconciled by the backend against the current

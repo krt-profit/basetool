@@ -164,15 +164,14 @@ class ProfileBlueprintSharingInPlaceE2eTest {
 
   /**
    * Reads the test user's currently persisted global blueprint-sharing flag straight from the
-   * backend ({@code GET /api/v1/users/me/blueprint-sharing}, which returns {@code
+   * backend ({@code GET /api/v1/blueprints/me/sharing}, which returns {@code
    * shareBlueprintsGlobally} plus the user-row version), so the persistence assertion does not race
    * the client's in-place writeback.
    *
    * @return the persisted {@code shareBlueprintsGlobally} boolean
    */
   private static boolean persistedBlueprintSharing() {
-    String body =
-        new BackendSeeder().getBody(USERNAME, PASSWORD, "/api/v1/users/me/blueprint-sharing");
+    String body = new BackendSeeder().getBody(USERNAME, PASSWORD, "/api/v1/blueprints/me/sharing");
     return JsonParser.parseString(body)
         .getAsJsonObject()
         .get("shareBlueprintsGlobally")

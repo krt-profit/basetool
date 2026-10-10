@@ -23,7 +23,7 @@ import java.util.UUID;
 
 /**
  * Frontend mirror of the backend {@code OrgUnitMembershipOptionDto}: one option of the
- * owning-org-unit picker, as returned by {@code GET /api/v1/users/{id}/memberships}.
+ * owning-org-unit picker, as returned by {@code GET /api/v1/org-units/members/{id}/memberships}.
  *
  * @param orgUnitId Identifier of the org unit (used as the {@code <option value="...">}).
  * @param orgUnitName Visible name (used as the option label).

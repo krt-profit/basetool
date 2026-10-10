@@ -97,7 +97,7 @@ public class DashboardBackendClient {
    */
   @Nullable
   public List<UUID> myOrgUnitIds() {
-    return backendApiClient.get("/api/v1/users/me/org-unit-ids", UUID_LIST);
+    return backendApiClient.get("/api/v1/org-units/me/ids", UUID_LIST);
   }
 
   /**
@@ -116,7 +116,7 @@ public class DashboardBackendClient {
    * @param id the announcement
    */
   public void markAnnouncementRead(@NotNull UUID id) {
-    backendApiClient.put("/api/v1/users/me/read-announcement/{id}", null, Void.class, id);
+    backendApiClient.put("/api/v1/announcements/{id}/read", null, Void.class, id);
   }
 
   /**

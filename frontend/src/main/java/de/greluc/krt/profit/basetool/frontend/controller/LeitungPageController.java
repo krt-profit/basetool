@@ -405,33 +405,39 @@ public class LeitungPageController {
   /**
    * Renames / reorders a Kommandogruppe.
    *
+   * @param squadronId the Staffel the group belongs to.
    * @param groupId the group.
    * @param body the {@code {name, sortIndex, version}} payload.
    * @return 200 with the updated group, or the backend error status + body.
    */
-  @PutMapping("/kommando-groups/{groupId}/ajax")
+  @PutMapping("/squadrons/{squadronId}/kommando-groups/{groupId}/ajax")
   @ResponseBody
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public ResponseEntity<Object> updateKommandoGroup(
-      @PathVariable @NotNull UUID groupId, @RequestBody UpdateKommandoGroupRequest body) {
+      @PathVariable @NotNull UUID squadronId,
+      @PathVariable @NotNull UUID groupId,
+      @RequestBody UpdateKommandoGroupRequest body) {
     return proxy(
-        "Update Kommandogruppe failed", () -> leadershipClient.updateKommandoGroup(groupId, body));
+        "Update Kommandogruppe failed",
+        () -> leadershipClient.updateKommandoGroup(squadronId, groupId, body));
   }
 
   /**
    * Deletes a Kommandogruppe.
    *
+   * @param squadronId the Staffel the group belongs to.
    * @param groupId the group.
    * @return 200 on success, or the backend error status + body.
    */
-  @DeleteMapping("/kommando-groups/{groupId}/ajax")
+  @DeleteMapping("/squadrons/{squadronId}/kommando-groups/{groupId}/ajax")
   @ResponseBody
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
-  public ResponseEntity<Object> deleteKommandoGroup(@PathVariable @NotNull UUID groupId) {
+  public ResponseEntity<Object> deleteKommandoGroup(
+      @PathVariable @NotNull UUID squadronId, @PathVariable @NotNull UUID groupId) {
     return proxy(
         "Delete Kommandogruppe failed",
         () -> {
-          leadershipClient.deleteKommandoGroup(groupId);
+          leadershipClient.deleteKommandoGroup(squadronId, groupId);
           return null;
         });
   }

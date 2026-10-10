@@ -22,8 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.List;
 
 /**
- * Frontend mirror of the Leitung view from {@code GET /api/v1/leitung/view} (REQ-ROLE-004): the org
- * units the caller may appoint into, grouped by tier.
+ * Frontend mirror of the Leitung view from {@code GET /api/v1/org-chart/leadership} (REQ-ROLE-004):
+ * the org units the caller may appoint into, grouped by tier.
  *
  * @param admin whether the caller is an admin.
  * @param organisationsleitungen the OL(s) the caller may manage.

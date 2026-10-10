@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
  * Create payload for the singleton Organisationsleitung, relayed to the backend {@code POST
- * /api/v1/org-hierarchy/organisationsleitung} (REQ-ORG-014); a second create is rejected with 409.
+ * /api/v1/org-units/organisationsleitung} (REQ-ORG-014); a second create is rejected with 409.
  *
  * @param name the OL's display name; required, unique across all org units.
  * @param shorthand the OL's short tag; required.

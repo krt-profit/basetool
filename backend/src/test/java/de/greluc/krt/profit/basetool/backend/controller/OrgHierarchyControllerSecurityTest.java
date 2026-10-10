@@ -46,7 +46,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
-/** Verifies that the {@code /api/v1/org-hierarchy/**} endpoints admit ADMIN and forbid OFFICER. */
+/** Verifies that the {@code /api/v1/org-units/**} endpoints admit ADMIN and forbid OFFICER. */
 @SpringBootTest
 @Transactional
 class OrgHierarchyControllerSecurityTest {
@@ -64,7 +64,7 @@ class OrgHierarchyControllerSecurityTest {
   void listBereiche_forbiddenForOfficer() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/org-hierarchy/bereiche")
+            get("/api/v1/org-units/bereiche")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER")))
                 .accept(MediaType.APPLICATION_JSON))
         .andExpect(status().isForbidden());
@@ -74,7 +74,7 @@ class OrgHierarchyControllerSecurityTest {
   void listBereiche_allowedForAdmin() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/org-hierarchy/bereiche")
+            get("/api/v1/org-units/bereiche")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                 .accept(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk());
@@ -84,7 +84,7 @@ class OrgHierarchyControllerSecurityTest {
   void listOrgUnits_allowedForAdmin() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/org-hierarchy/org-units")
+            get("/api/v1/org-units")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                 .accept(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk());
@@ -94,7 +94,7 @@ class OrgHierarchyControllerSecurityTest {
   void createBereich_forbiddenForOfficer() throws Exception {
     mockMvc
         .perform(
-            post("/api/v1/org-hierarchy/bereiche")
+            post("/api/v1/org-units/bereiche")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"Profit\",\"shorthand\":\"PRF\"}"))
@@ -102,8 +102,8 @@ class OrgHierarchyControllerSecurityTest {
   }
 
   /**
-   * Supplies every {@code /api/v1/org-hierarchy/**} endpoint with a valid request, so only the
-   * {@code hasRole('ADMIN')} gate can reject it.
+   * Supplies every {@code /api/v1/org-units/**} endpoint with a valid request, so only the {@code
+   * hasRole('ADMIN')} gate can reject it.
    *
    * @return one request builder per endpoint.
    */
@@ -111,46 +111,43 @@ class OrgHierarchyControllerSecurityTest {
     UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
     return Stream.of(
         arguments(
-            Named.of(
-                "listOrgUnits",
-                get("/api/v1/org-hierarchy/org-units").accept(MediaType.APPLICATION_JSON))),
+            Named.of("listOrgUnits", get("/api/v1/org-units").accept(MediaType.APPLICATION_JSON))),
         arguments(
             Named.of(
                 "listOrganisationsleitung",
-                get("/api/v1/org-hierarchy/organisationsleitung")
-                    .accept(MediaType.APPLICATION_JSON))),
+                get("/api/v1/org-units/organisationsleitung").accept(MediaType.APPLICATION_JSON))),
         arguments(
             Named.of(
                 "createOrganisationsleitung",
-                post("/api/v1/org-hierarchy/organisationsleitung")
+                post("/api/v1/org-units/organisationsleitung")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"name\":\"Leitung\",\"shorthand\":\"OL\"}"))),
         arguments(
             Named.of(
                 "setParent",
-                patch("/api/v1/org-hierarchy/org-units/" + id + "/parent")
+                patch("/api/v1/org-units/" + id + "/parent")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"version\":0}"))),
         arguments(
             Named.of(
                 "addBereichLeader",
-                post("/api/v1/org-hierarchy/bereiche/" + id + "/members")
+                post("/api/v1/org-units/bereiche/" + id + "/members")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"userId\":\"" + id + "\",\"role\":\"LEITER\"}"))),
         arguments(
             Named.of(
                 "removeBereichLeader",
-                delete("/api/v1/org-hierarchy/bereiche/" + id + "/members/" + id))),
+                delete("/api/v1/org-units/bereiche/" + id + "/members/" + id))),
         arguments(
             Named.of(
                 "addOlMember",
-                post("/api/v1/org-hierarchy/organisationsleitung/" + id + "/members")
+                post("/api/v1/org-units/organisationsleitung/" + id + "/members")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"userId\":\"" + id + "\"}"))),
         arguments(
             Named.of(
                 "removeOlMember",
-                delete("/api/v1/org-hierarchy/organisationsleitung/" + id + "/members/" + id))));
+                delete("/api/v1/org-units/organisationsleitung/" + id + "/members/" + id))));
   }
 
   @ParameterizedTest(name = "{0} is forbidden for an OFFICER")

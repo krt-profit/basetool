@@ -66,6 +66,8 @@
 1 GET /api/v1/sync-reports /api/v1/catalog/admin/sync-reports T2 -
 1 GET /api/v1/system/ping - T2 -
 1 GET /api/v2/system/ping - T2 -
+2 DELETE /api/v1/kommando-groups/{groupId} /api/v1/squadrons/{squadronId}/kommando-groups/{groupId} T2 -
+2 PUT /api/v1/kommando-groups/{groupId} /api/v1/squadrons/{squadronId}/kommando-groups/{groupId} T2 -
 2 GET /api/v1/leitung/view /api/v1/org-chart/leadership T2 -
 2 GET /api/v1/me/active-org-unit /api/v1/org-units/me/active T1 app
 2 GET /api/v1/me/org-units /api/v1/org-units/me/switchable T1 app

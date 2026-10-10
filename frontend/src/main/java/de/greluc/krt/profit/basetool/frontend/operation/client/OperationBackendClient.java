@@ -121,7 +121,7 @@ public class OperationBackendClient {
    */
   @Nullable
   public List<OrgUnitMembershipOptionDto> pickableOrgUnits() {
-    return backendApiClient.get("/api/v1/users/me/pickable-org-units", PICKABLE_ORG_UNIT_LIST_TYPE);
+    return backendApiClient.get("/api/v1/org-units/me/pickable", PICKABLE_ORG_UNIT_LIST_TYPE);
   }
 
   /**

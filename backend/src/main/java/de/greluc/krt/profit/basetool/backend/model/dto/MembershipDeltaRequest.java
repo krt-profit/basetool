@@ -27,8 +27,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Payload of {@code PATCH /api/v1/users/{id}/memberships}, applying all Staffel and SK membership
- * changes of the admin member-edit page in one transaction.
+ * Payload of {@code PATCH /api/v1/org-units/members/{id}/memberships}, applying all Staffel and SK
+ * membership changes of the admin member-edit page in one transaction.
  *
  * @param staffeln the desired complete Staffel membership set (0–2 entries, REQ-ORG-017), which the
  *     backend reconciles against the current state; {@code null} leaves the Staffel side untouched.

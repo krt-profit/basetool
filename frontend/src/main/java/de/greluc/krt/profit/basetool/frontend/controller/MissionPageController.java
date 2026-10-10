@@ -553,7 +553,7 @@ public class MissionPageController {
    * form.
    *
    * @param principal authenticated OIDC user; the options are resolved via {@code
-   *     /api/v1/users/me/pickable-org-units}.
+   *     /api/v1/org-units/me/pickable}.
    * @return picker options, or an empty list when the lookup fails; never {@code null}.
    */
   private List<OrgUnitMembershipOptionDto> fetchCallerMembershipOptions(OidcUser principal) {

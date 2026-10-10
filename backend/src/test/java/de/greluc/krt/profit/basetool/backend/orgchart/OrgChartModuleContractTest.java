@@ -65,7 +65,7 @@ class OrgChartModuleContractTest {
 
   private static final String POSITIONS = CHART + "/positions/";
 
-  private static final String LEITUNG_VIEW = "/api/v1/leitung/view";
+  private static final String LEITUNG_VIEW = "/api/v1/org-chart/leadership";
 
   private static final String PROBLEM_JSON = "application/problem+json";
 

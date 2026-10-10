@@ -25,8 +25,8 @@ Der Nutzer speichert Angaben auf `/profile` oder öffnet seine Blaupausen; ein A
 ### Profil in place speichern
 
 1. **Beschreibung** (REQ-FE-001/-004): Reload-Marker setzen, die Beschreibung speichern; dann das `_csrf`-Meta-Tag der Seite verfälschen und erneut speichern.
-2. **Auszahlungs-Präferenz:** auf den Wert wechseln, auf dem das Formular gerade **nicht** steht, speichern (`POST /profile/payout-preference` → `PUT /api/v1/users/me/payout-preference`), dann ohne Reload zurückwechseln und erneut speichern.
-3. **Blaupausen-Freigabe** (REQ-INV-018): den Schalter umlegen und speichern (`POST /profile/blueprint-sharing` → `PUT /api/v1/users/me/blueprint-sharing`), dann ohne Reload zurücklegen und erneut speichern.
+2. **Auszahlungs-Präferenz:** auf den Wert wechseln, auf dem das Formular gerade **nicht** steht, speichern (`POST /profile/payout-preference` → `PUT /api/v1/missions/me/payout-preference`), dann ohne Reload zurückwechseln und erneut speichern.
+3. **Blaupausen-Freigabe** (REQ-INV-018): den Schalter umlegen und speichern (`POST /profile/blueprint-sharing` → `PUT /api/v1/blueprints/me/sharing`), dann ohne Reload zurücklegen und erneut speichern.
 
 ### Standard-Blaupausen (`DefaultBlueprintsE2eTest`, REQ-INV-016/-017)
 

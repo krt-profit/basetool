@@ -696,7 +696,7 @@ service layer via the active Staffel context
 | SK lifecycle (create/rename/delete/activate, `profit-eligible`) (`hasRole('ADMIN')`)                                                                                |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | **Read SK member list** & **manage members** (add/remove/flags) (`@specialCommandSecurityService.canManageMembers` — applies also to the plain `GET /{id}/members`) |   ❌    |  ❌   | ❌  |   ❌³    |   ✅   |
 | Appoint / clear the SK **lead** (`PATCH /special-commands/{id}/members/{uid}/lead`, `hasRole('ADMIN') or canAppointSkLead`)                                         |   ❌    |  ❌   | ❌  |   ❌⁴    |   ✅   |
-| Org structure: create Bereiche + the OL, set parent edges, list all org units (`/api/v1/org-hierarchy/**` reads + structure writes, `/admin/org-structure`, `hasRole('ADMIN')`) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Org structure: create Bereiche + the OL, set parent edges, list all org units (`/api/v1/org-units/**` reads + structure writes, `/admin/org-structure`, `hasRole('ADMIN')`) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Read the org chart (`GET /api/v1/org-chart`, `/org-chart`)                                                                                                          |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Edit the org chart — free-text holders and structure only; account seats mirror the ranks (`/api/v1/org-chart/positions/**`, `hasRole('ADMIN')`, REQ-ROLE-006) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
@@ -724,14 +724,14 @@ mirrored onto the org chart in the same transaction (REQ-ROLE-006).
 
 | Function (endpoint)                                                                                                   | Staffelleiter (own Staffel) | Bereichsleiter (own Bereich) | OL member | Admin |
 |:----------------------------------------------------------------------------------------------------------------------|:---------------------------:|:----------------------------:|:---------:|:-----:|
-| Open the Leitung page (`/organisation/leitung`, frontend `ADMIN_OR_OFFICER`; view `GET /api/v1/leitung/view`)       |             ✅¹              |              ✅¹              |    ✅¹     |   ✅   |
+| Open the Leitung page (`/organisation/leitung`, frontend `ADMIN_OR_OFFICER`; view `GET /api/v1/org-chart/leadership`)       |             ✅¹              |              ✅¹              |    ✅¹     |   ✅   |
 | Assign / clear Kommandoleiter, Stv., Ensign (`PUT`/`DELETE /api/v1/squadrons/{id}/ranks/{userId}`)                  |              ✅              |              ❌               |     ❌     |   ✅   |
 | Create / rename / delete a Kommandogruppe (≤ 4 per Staffel) (`/api/v1/squadrons/{id}/kommando-groups`, `/api/v1/kommando-groups/{id}`) |              ✅              |              ❌               |     ❌     |   ✅   |
 | Assign / clear the **Staffelleiter** of a child Staffel (same endpoints)                                            |              ❌              |              ✅               |     ❌     |   ✅   |
 | Appoint / clear the **SK lead** of a child SK (`PATCH /api/v1/special-commands/{id}/members/{uid}/lead`)           |              ❌              |              ✅               |     ❌     |   ✅   |
-| Add / remove Bereichskoordinator, Bereichsoperator (`POST`/`DELETE /api/v1/org-hierarchy/bereiche/{id}/members`)    |              ❌              |              ✅               |     ❌     |   ✅   |
+| Add / remove Bereichskoordinator, Bereichsoperator (`POST`/`DELETE /api/v1/org-units/bereiche/{id}/members`)    |              ❌              |              ✅               |     ❌     |   ✅   |
 | Add / remove a **Bereichsleiter** (same endpoints)                                                                  |              ❌              |              ❌               |    ✅²     |   ✅   |
-| Add / remove **OL members**; designate / vacate the **Grand Admiral** (`/api/v1/org-hierarchy/organisationsleitung/{id}/members`, `…/grand-admiral`) |              ❌              |              ❌               |     ❌     |   ✅   |
+| Add / remove **OL members**; designate / vacate the **Grand Admiral** (`/api/v1/org-units/organisationsleitung/{id}/members`, `…/grand-admiral`) |              ❌              |              ❌               |     ❌     |   ✅   |
 | Set, change or clear **one's own** rank on any of the endpoints above (`targetsAnotherUser`)                        |              ❌              |              ❌               |     ❌     |   ✅   |
 | See in the Leitung view                                                                                               |       own Staffel only       | own Bereich + its Staffeln and SKs |  every unit | every unit |
 
@@ -1100,7 +1100,7 @@ analogously to `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`:
    functional `MembershipRole` of §2.)
 4. **Logistician/Mission-Manager flags** are maintained by admins **per Staffel** on the
    member-edit page: the (up to two) Staffel slots, each with their own
-   flags, feed into the membership delta `PATCH /api/v1/users/{id}/memberships`
+   flags, feed into the membership delta `PATCH /api/v1/org-units/members/{id}/memberships`
    and are reconciled in a single transaction (REQ-ORG-017). The old toggle endpoints
    `UserController#patchLogistician` / `#patchMissionManager` and the member-list switches
    were removed. For an SK, the SK-Lead still sets the flags via `canManageMembers`.
