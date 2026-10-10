@@ -96,7 +96,9 @@ public interface GameItemPriceRepository extends JpaRepository<GameItemPrice, UU
    * @return one (parent id, terminal id, row id) row per matrix row
    */
   @Query(
-      "SELECT e.gameItem.id AS parentId, e.terminal.id AS terminalId, e.id AS id FROM GameItemPrice"
-          + " e")
+      """
+      SELECT e.gameItem.id AS parentId, e.terminal.id AS terminalId, e.id AS id FROM GameItemPrice
+      e
+      """)
   List<PairKeyRef> findPriceKeyRefs();
 }

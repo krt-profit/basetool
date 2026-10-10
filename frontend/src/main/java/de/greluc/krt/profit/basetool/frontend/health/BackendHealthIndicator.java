@@ -27,8 +27,6 @@ import java.security.KeyStore;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.TrustManager;
@@ -205,8 +203,7 @@ public class BackendHealthIndicator implements HealthIndicator {
    */
   static SSLContext backendTls(
       SslBundles sslBundles, @NotNull Environment environment, boolean verifyHostname) {
-    List<String> profiles = Arrays.asList(environment.getActiveProfiles());
-    if (profiles.contains("dev") || profiles.contains("test")) {
+    if (environment.matchesProfiles("dev", "test")) {
       return trustAllSslContext();
     }
     try {
@@ -223,7 +220,7 @@ public class BackendHealthIndicator implements HealthIndicator {
               : pinnedTrustSkippingHostname(tmf.getTrustManagers()),
           null);
       return context;
-    } catch (NoSuchSslBundleException ignored) {
+    } catch (NoSuchSslBundleException _) {
       log.warn(
           "No 'backend-trust' SSL bundle configured; the backend health probe falls back to a"
               + " trust-all TLS policy (matching WebClientConfig). Configure the 'backend-trust'"

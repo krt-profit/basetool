@@ -405,7 +405,7 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
 [`BlueprintModifierMath`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/BlueprintModifierMath.java),
 [`PersonalBlueprintController#craftability`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/PersonalBlueprintController.java),
 [`InventoryItemService#getOwnedStockSlices`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/InventoryItemService.java),
-[`RefineryOrderService#getOwnedOpenRefineryYieldSlices`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/RefineryOrderService.java),
+[`RefineryOrderService#pendingYieldSlices`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/refinery/internal/RefineryOrderService.java),
 [`BlueprintCraftabilityDto`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/model/dto/BlueprintCraftabilityDto.java),
 [`PersonalInventoryBlueprintsPageController#craftability`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/controller/PersonalInventoryBlueprintsPageController.java),
 [`personal-inventory-blueprints-recipe.js`](../../frontend/src/main/resources/static/js/personal-inventory-blueprints-recipe.js).

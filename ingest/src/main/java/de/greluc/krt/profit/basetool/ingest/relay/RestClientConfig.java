@@ -29,8 +29,6 @@ import java.security.KeyStore;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.TrustManager;
@@ -208,8 +206,7 @@ public class RestClientConfig {
    * @return {@code true} under {@code dev} or {@code test}
    */
   private boolean isDevOrTest() {
-    List<String> profiles = Arrays.asList(environment.getActiveProfiles());
-    return profiles.contains("dev") || profiles.contains("test");
+    return environment.matchesProfiles("dev", "test");
   }
 
   /**

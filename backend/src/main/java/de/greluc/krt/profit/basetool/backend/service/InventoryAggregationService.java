@@ -1013,7 +1013,7 @@ public class InventoryAggregationService {
       if (line.getGameItem() == null) {
         continue;
       }
-      int[] totals = lineTotals.computeIfAbsent(line.getGameItem().getId(), k -> new int[2]);
+      int[] totals = lineTotals.computeIfAbsent(line.getGameItem().getId(), _ -> new int[2]);
       totals[0] += line.getAmount() != null ? line.getAmount() : 0;
       totals[1] += line.getManufacturedAmount() != null ? line.getManufacturedAmount() : 0;
     }
@@ -1021,7 +1021,7 @@ public class InventoryAggregationService {
     Map<UUID, List<InventoryItem>> byGameItem = new LinkedHashMap<>();
     for (InventoryItem row :
         inventoryItemRepository.findGameItemRowsByJobOrderIdOrdered(jobOrderId)) {
-      byGameItem.computeIfAbsent(row.getGameItem().getId(), k -> new ArrayList<>()).add(row);
+      byGameItem.computeIfAbsent(row.getGameItem().getId(), _ -> new ArrayList<>()).add(row);
     }
 
     List<JobOrderItemStockGroupDto> groups = new ArrayList<>();

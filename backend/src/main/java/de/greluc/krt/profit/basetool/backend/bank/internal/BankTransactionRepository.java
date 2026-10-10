@@ -103,7 +103,9 @@ public interface BankTransactionRepository extends JpaRepository<BankTransaction
    */
   @Modifying
   @Query(
-      "UPDATE BankTransaction t SET t.counterpartyHandle = :sentinel"
-          + " WHERE t.counterpartyUserId = :userId AND t.counterpartyHandle <> :sentinel")
+      """
+      UPDATE BankTransaction t SET t.counterpartyHandle = :sentinel
+      WHERE t.counterpartyUserId = :userId AND t.counterpartyHandle <> :sentinel
+      """)
   int anonymiseCounterpartyHandle(@Param("userId") UUID userId, @Param("sentinel") String sentinel);
 }

@@ -109,7 +109,7 @@ public class OrgUnitCascadeService {
     }
     Set<UUID> reach =
         memo.computeIfAbsent(
-            membershipKey(memberships), key -> computeCascadedOfficerReach(memberships));
+            membershipKey(memberships), _ -> computeCascadedOfficerReach(memberships));
     return new LinkedHashSet<>(reach);
   }
 

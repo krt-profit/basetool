@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -49,7 +49,6 @@ import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.model.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
 import de.greluc.krt.profit.basetool.backend.refinery.api.MissionParticipantRequiredException;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
@@ -60,6 +59,10 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.service.AuditService;
+import de.greluc.krt.profit.basetool.backend.service.CraftabilityYieldSource;
+import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -1124,7 +1127,7 @@ class RefineryOrderServiceLifecycleTest {
               OWNER_ID, List.of(RefineryOrderStatus.OPEN, RefineryOrderStatus.IN_PROGRESS)))
           .thenReturn(List.of(order1, order2));
 
-      List<OwnedStockSlice> slices = service.getOwnedOpenRefineryYieldSlices(OWNER_ID);
+      List<CraftabilityYieldSource.YieldSlice> slices = service.pendingYieldSlices(OWNER_ID);
 
       assertEquals(2, slices.size(), "one slice per (material, quality) pair");
       assertEquals(
@@ -1160,10 +1163,10 @@ class RefineryOrderServiceLifecycleTest {
               OWNER_ID, List.of(RefineryOrderStatus.OPEN, RefineryOrderStatus.IN_PROGRESS)))
           .thenReturn(List.of(order, nullGoodsOrder));
 
-      List<OwnedStockSlice> slices = service.getOwnedOpenRefineryYieldSlices(OWNER_ID);
+      List<CraftabilityYieldSource.YieldSlice> slices = service.pendingYieldSlices(OWNER_ID);
 
       assertEquals(1, slices.size(), "only the fully-populated positive-SCU good yields a slice");
-      OwnedStockSlice only = slices.get(0);
+      CraftabilityYieldSource.YieldSlice only = slices.get(0);
       assertEquals(scuMaterialId, only.materialId());
       assertEquals(Integer.valueOf(100), only.quality());
       assertEquals(3.0d, only.totalScu(), 1e-9);
@@ -1184,8 +1187,9 @@ class RefineryOrderServiceLifecycleTest {
       return g;
     }
 
-    private Double totalScuFor(List<OwnedStockSlice> slices, UUID materialId, int quality) {
-      for (OwnedStockSlice slice : slices) {
+    private Double totalScuFor(
+        List<CraftabilityYieldSource.YieldSlice> slices, UUID materialId, int quality) {
+      for (CraftabilityYieldSource.YieldSlice slice : slices) {
         if (materialId.equals(slice.materialId())
             && Integer.valueOf(quality).equals(slice.quality())) {
           return slice.totalScu();

@@ -17,16 +17,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
-import java.util.UUID;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import java.util.List;
 
-/**
- * One ranked material candidate for a raw screen name the refinery screenshot import could not
- * match exactly.
- *
- * @param id id of the candidate {@code Material}
- * @param name display name of the candidate
- * @param score similarity in {@code [0.0, 1.0]}
- */
-public record ImportSuggestionDto(UUID id, String name, double score) {}
+/** Data transfer record carrying Refinery Order Store payload. */
+public record RefineryOrderStoreDto(@NotEmpty List<@Valid RefineryOrderStoreItemDto> items) {}

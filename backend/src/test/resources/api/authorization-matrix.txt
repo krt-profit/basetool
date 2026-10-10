@@ -478,14 +478,14 @@ POST /api/v1/refinery-orders/import-extract | RefineryImportController#importExt
 GET /api/v1/refinery-orders/locations/{locationId}/yields | RefineryOrderController#getYieldsForLocation | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/refinery-orders/mission/{missionId} | RefineryOrderController#getMissionRefineryOrders | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/refinery-orders/my-orders | RefineryOrderController#getMyRefineryOrders | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/refinery-orders/users/{userId} | RefineryOrderController#getUserRefineryOrders | pre=hasRole('LOGISTICIAN') and @ownerScopeService.canViewUserRefineryOrders(#userId) | url=anyRequest -> authenticated
-POST /api/v1/refinery-orders/users/{userId} | RefineryOrderController#createUserRefineryOrder | pre=hasRole('LOGISTICIAN') and @ownerScopeService.canManageUserRefineryOrders(#userId) | url=anyRequest -> authenticated
-DELETE /api/v1/refinery-orders/users/{userId}/{orderId} | RefineryOrderController#deleteUserRefineryOrder | pre=hasRole('LOGISTICIAN') and @ownerScopeService.canEditRefineryOrder(#orderId) | url=anyRequest -> authenticated
-PUT /api/v1/refinery-orders/users/{userId}/{orderId} | RefineryOrderController#updateUserRefineryOrder | pre=hasRole('LOGISTICIAN') and @ownerScopeService.canEditRefineryOrder(#orderId) | url=anyRequest -> authenticated
-DELETE /api/v1/refinery-orders/{id} | RefineryOrderController#deleteMyRefineryOrder | pre=isAuthenticated() and @ownerScopeService.canEditRefineryOrder(#id) | url=anyRequest -> authenticated
-GET /api/v1/refinery-orders/{id} | RefineryOrderController#getRefineryOrder | pre=isAuthenticated() and @ownerScopeService.canSeeRefineryOrder(#id) | url=anyRequest -> authenticated
-PUT /api/v1/refinery-orders/{id} | RefineryOrderController#updateMyRefineryOrder | pre=isAuthenticated() and @ownerScopeService.canEditRefineryOrder(#id) | url=anyRequest -> authenticated
-POST /api/v1/refinery-orders/{id}/store | RefineryOrderController#storeMyRefineryOrder | pre=isAuthenticated() and @ownerScopeService.canEditRefineryOrder(#id) | url=anyRequest -> authenticated
+GET /api/v1/refinery-orders/users/{userId} | RefineryOrderController#getUserRefineryOrders | pre=hasRole('LOGISTICIAN') and @refineryAccessPolicy.canViewUserRefineryOrders(#userId) | url=anyRequest -> authenticated
+POST /api/v1/refinery-orders/users/{userId} | RefineryOrderController#createUserRefineryOrder | pre=hasRole('LOGISTICIAN') and @refineryAccessPolicy.canManageUserRefineryOrders(#userId) | url=anyRequest -> authenticated
+DELETE /api/v1/refinery-orders/users/{userId}/{orderId} | RefineryOrderController#deleteUserRefineryOrder | pre=hasRole('LOGISTICIAN') and @refineryAccessPolicy.canEditRefineryOrder(#orderId) | url=anyRequest -> authenticated
+PUT /api/v1/refinery-orders/users/{userId}/{orderId} | RefineryOrderController#updateUserRefineryOrder | pre=hasRole('LOGISTICIAN') and @refineryAccessPolicy.canEditRefineryOrder(#orderId) | url=anyRequest -> authenticated
+DELETE /api/v1/refinery-orders/{id} | RefineryOrderController#deleteMyRefineryOrder | pre=isAuthenticated() and @refineryAccessPolicy.canEditRefineryOrder(#id) | url=anyRequest -> authenticated
+GET /api/v1/refinery-orders/{id} | RefineryOrderController#getRefineryOrder | pre=isAuthenticated() and @refineryAccessPolicy.canSeeRefineryOrder(#id) | url=anyRequest -> authenticated
+PUT /api/v1/refinery-orders/{id} | RefineryOrderController#updateMyRefineryOrder | pre=isAuthenticated() and @refineryAccessPolicy.canEditRefineryOrder(#id) | url=anyRequest -> authenticated
+POST /api/v1/refinery-orders/{id}/store | RefineryOrderController#storeMyRefineryOrder | pre=isAuthenticated() and @refineryAccessPolicy.canEditRefineryOrder(#id) | url=anyRequest -> authenticated
 GET /api/v1/refining-methods | RefiningMethodController#getAllRefiningMethods | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/refining-methods | RefiningMethodController#createRefiningMethod | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 DELETE /api/v1/refining-methods/{id} | RefiningMethodController#deleteRefiningMethod | pre=hasRole('ADMIN') | url=anyRequest -> authenticated

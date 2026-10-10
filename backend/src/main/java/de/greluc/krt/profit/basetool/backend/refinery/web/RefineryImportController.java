@@ -17,11 +17,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.refinery.web;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryImportDraftDto;
-import de.greluc.krt.profit.basetool.backend.service.RefineryImportService;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryImportDraftDto;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryImportService;
 import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

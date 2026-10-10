@@ -156,8 +156,10 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
    */
   @Modifying
   @Query(
-      "UPDATE AuditEvent e SET e.actorHandle = :sentinel"
-          + " WHERE e.actorUserId = :userId AND e.actorHandle <> :sentinel")
+      """
+      UPDATE AuditEvent e SET e.actorHandle = :sentinel
+      WHERE e.actorUserId = :userId AND e.actorHandle <> :sentinel
+      """)
   int anonymiseActorHandle(@Param("userId") UUID userId, @Param("sentinel") String sentinel);
 
   /**
@@ -173,7 +175,9 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
    */
   @Modifying
   @Query(
-      "UPDATE AuditEvent e SET e.subjectLabel = :sentinel"
-          + " WHERE lower(e.subjectLabel) = lower(:handle) AND e.subjectLabel <> :sentinel")
+      """
+      UPDATE AuditEvent e SET e.subjectLabel = :sentinel
+      WHERE lower(e.subjectLabel) = lower(:handle) AND e.subjectLabel <> :sentinel
+      """)
   int anonymiseSubjectLabel(@Param("handle") String handle, @Param("sentinel") String sentinel);
 }

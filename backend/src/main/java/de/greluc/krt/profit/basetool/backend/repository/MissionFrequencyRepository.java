@@ -47,13 +47,15 @@ public interface MissionFrequencyRepository extends JpaRepository<MissionFrequen
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query(
       value =
-          "INSERT INTO mission_frequency"
-              + " (id, mission_id, frequency_type_id, frequency_value, version, created_at,"
-              + " updated_at)"
-              + " VALUES (gen_random_uuid(), :missionId, :frequencyTypeId, :value, 0, now(), now())"
-              + " ON CONFLICT (mission_id, frequency_type_id) DO UPDATE"
-              + " SET frequency_value = EXCLUDED.frequency_value,"
-              + " version = mission_frequency.version + 1, updated_at = now()",
+          """
+          INSERT INTO mission_frequency
+          (id, mission_id, frequency_type_id, frequency_value, version, created_at,
+          updated_at)
+          VALUES (gen_random_uuid(), :missionId, :frequencyTypeId, :value, 0, now(), now())
+          ON CONFLICT (mission_id, frequency_type_id) DO UPDATE
+          SET frequency_value = EXCLUDED.frequency_value,
+          version = mission_frequency.version + 1, updated_at = now()
+          """,
       nativeQuery = true)
   void upsertTypedFrequency(
       @Param("missionId") UUID missionId,
