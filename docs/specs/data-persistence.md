@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-10.
 > **Owner area:** DB/DATA · **Migration conventions:** [`db/migration/README.md`](../../backend/src/main/resources/db/migration/README.md)
 
 # Data & persistence
@@ -28,6 +28,14 @@ everywhere — never `update` or `create`.** Full conventions (destructive-ops t
 rule, data-migration patterns, performance/locking, test caveats, pre-merge checklist) live
 in [`db/migration/README.md`](../../backend/src/main/resources/db/migration/README.md) — read
 it before adding a migration.
+
+**One schema, one Flyway location, one `V<n>` sequence.** The backend is the only module that
+migrates: `spring.flyway.locations` is `classpath:db/migration` in every profile, and the numbering
+is one global line across every domain, so a migration is never named for the module that owns its
+tables (that is REQ-DATA-020's map). A Gradle module extracted later (exchange, bank; plan §5.8)
+puts its migrations into that same location on the backend's class path, not into a location of its
+own, and the backend stays the application that runs Flyway. The CI job *Check migration version
+numbering* refuses a duplicate or out-of-order version.
 
 ### REQ-DATA-002 — Startup seeding
 
