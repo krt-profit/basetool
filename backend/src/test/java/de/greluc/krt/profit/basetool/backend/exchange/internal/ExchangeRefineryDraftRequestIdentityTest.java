@@ -24,8 +24,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.backend.api.CommittedOpenApi;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryDraftRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractOrderDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractOrderDto;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Valid;
 import jakarta.validation.Validator;

@@ -69,7 +69,7 @@ public class UexLocationController {
   })
   public List<UexLocationDto> search(
       @RequestParam(required = false) String q, @RequestParam(required = false) Integer limit) {
-    int effectiveLimit = limit == null ? DEFAULT_LIMIT : Math.min(MAX_LIMIT, Math.max(1, limit));
+    int effectiveLimit = limit == null ? DEFAULT_LIMIT : Math.clamp(limit, 1, MAX_LIMIT);
     return service.searchLocations(q, effectiveLimit);
   }
 }

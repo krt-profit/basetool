@@ -193,7 +193,7 @@ public class ExchangeLimitFilter extends OncePerRequestFilter {
       ExchangeQuotas.Counted counted = quotas.countWrite(context.clientId(), context.member());
       request.setAttribute(ExchangeQuotas.COUNTED, counted.key());
       count = counted.count();
-    } catch (ExchangeUnavailableException e) {
+    } catch (ExchangeUnavailableException _) {
       response.setHeader(HttpHeaders.RETRY_AFTER, UNAVAILABLE_RETRY_AFTER_SECONDS);
       refuse(
           context.clientId(),
@@ -237,7 +237,7 @@ public class ExchangeLimitFilter extends OncePerRequestFilter {
    */
   private @NotNull Bucket bucket(@NotNull String key, int capacity, @NotNull Duration period) {
     return buckets.computeIfAbsent(
-        key, k -> RateLimitBuckets.newBucket(capacity, capacity, period));
+        key, _ -> RateLimitBuckets.newBucket(capacity, capacity, period));
   }
 
   /**

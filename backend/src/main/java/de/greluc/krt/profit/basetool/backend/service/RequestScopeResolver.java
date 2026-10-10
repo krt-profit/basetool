@@ -528,7 +528,7 @@ public class RequestScopeResolver {
     }
     try {
       return Optional.of(UUID.fromString(raw.trim()));
-    } catch (IllegalArgumentException ex) {
+    } catch (IllegalArgumentException _) {
       return Optional.empty();
     }
   }

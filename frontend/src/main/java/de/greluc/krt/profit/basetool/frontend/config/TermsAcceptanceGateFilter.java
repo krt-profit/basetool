@@ -113,7 +113,7 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
     boolean mayProceed;
     try {
       mayProceed = isTestProfile() || !isAuthenticated() || hasAccepted(request);
-    } catch (ReauthenticationRequiredException e) {
+    } catch (ReauthenticationRequiredException _) {
       if (isWebSocketUpgrade(request)) {
         filterChain.doFilter(request, response);
         return;
@@ -270,12 +270,7 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
    * @return {@code true} when the {@code test} profile is active
    */
   private boolean isTestProfile() {
-    for (String profile : environment.getActiveProfiles()) {
-      if ("test".equals(profile)) {
-        return true;
-      }
-    }
-    return false;
+    return environment.matchesProfiles("test");
   }
 
   /**
@@ -301,7 +296,7 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
     try {
       TermsStatusDto status = backendApiClient.get(TERMS_STATUS_URI, TermsStatusDto.class);
       accepted = status == null || status.accepted();
-    } catch (BackendServiceException e) {
+    } catch (BackendServiceException _) {
       log.debug("Consent status unreadable; letting the request through (backend still enforces).");
       return true;
     }

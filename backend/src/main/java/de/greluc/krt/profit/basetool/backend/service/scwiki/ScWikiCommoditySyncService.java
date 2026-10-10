@@ -280,7 +280,7 @@ public class ScWikiCommoditySyncService {
       if (canon == null || canon.isBlank()) {
         continue;
       }
-      index.computeIfAbsent(canon, k -> new ArrayList<>()).add(material);
+      index.computeIfAbsent(canon, _ -> new ArrayList<>()).add(material);
     }
     return index;
   }

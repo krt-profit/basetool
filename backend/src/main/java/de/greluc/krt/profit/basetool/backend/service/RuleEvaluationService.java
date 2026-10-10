@@ -74,9 +74,7 @@ public class RuleEvaluationService {
         recipients.remove(event.actorSub());
       }
       if (!recipients.isEmpty()) {
-        byType
-            .computeIfAbsent(rule.getNotificationType(), key -> new HashSet<>())
-            .addAll(recipients);
+        byType.computeIfAbsent(rule.getNotificationType(), _ -> new HashSet<>()).addAll(recipients);
       }
     }
     return byType;

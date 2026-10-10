@@ -276,7 +276,7 @@ public class JobOrderQueryService {
         continue;
       }
       index
-          .computeIfAbsent(row.jobOrderId(), unused -> new HashMap<>())
+          .computeIfAbsent(row.jobOrderId(), _ -> new HashMap<>())
           .merge(row.gameItemId(), row.amount() == null ? 0.0 : row.amount(), Double::sum);
     }
     return index;
@@ -302,7 +302,7 @@ public class JobOrderQueryService {
       if (line.getGameItem() == null) {
         continue;
       }
-      int[] totals = lineTotals.computeIfAbsent(line.getGameItem().getId(), key -> new int[2]);
+      int[] totals = lineTotals.computeIfAbsent(line.getGameItem().getId(), _ -> new int[2]);
       totals[0] += line.getAmount() != null ? line.getAmount() : 0;
       totals[1] += line.getDeliveredAmount() != null ? line.getDeliveredAmount() : 0;
     }
