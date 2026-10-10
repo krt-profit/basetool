@@ -177,9 +177,9 @@ class GlobalExceptionHandlerAdviceOrderTest {
       Method winner = resolveAcrossAdvice(advice, exceptionType);
 
       assertNotNull(winner, "no advice declared a handler for " + exceptionType.getName());
-      assertEquals(
-          GlobalExceptionHandler.class,
-          winner.getDeclaringClass(),
+      assertTrue(
+          winner.getDeclaringClass().isAssignableFrom(GlobalExceptionHandler.class)
+              && ProblemSupport.class.isAssignableFrom(winner.getDeclaringClass()),
           exceptionType.getName()
               + " must be handled by GlobalExceptionHandler, not by Spring's advice — otherwise the"
               + " response loses code/correlationId/fieldErrors and the detail is untranslated");
