@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.i18n;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
-import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.PickerSearch;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;

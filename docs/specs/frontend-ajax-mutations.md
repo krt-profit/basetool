@@ -1779,7 +1779,7 @@ account roster preloaded; the grants filter seeds only the selected account) · 
 `krt-bank-account-search.js` (the `remote-bank-accounts` `krtComboboxRemoteSources` entry +
 `window.krtBankAccountMeta`), `krt-searchable-select.js` (the marker→`remoteSource` lookup, reused),
 `static/js/bank.js` (attribute-delegated source/filter handlers, metadata-map justification),
-`controller/BankProxyController#searchAccounts`, `templates/fragments/bank-movement-modal.html`,
+`bank/web/BankProxyController#searchAccounts`, `templates/fragments/bank-movement-modal.html`,
 `templates/bank-grants.html`, `fragments/head.html` (script load order) · **ADR:** ADR-0053, ADR-0089,
 ADR-0106 · **Issues:** —
 
@@ -2069,7 +2069,7 @@ fall.
 **Enforced by:** `LayoutModelScopeMvcTest` (no layout backend read on a `@RestController`; one call
 for the unread-count poll; one layout read per rendered page), `LayoutContextLoaderTest` (memo,
 fail-closed, the handler test), `ArchitectureTest` (both halves of the `@UsesLayoutModel` marker
-rule; the body-handler ratchet) · **Code:** `config/UsesLayoutModel`, `config/LayoutContextLoader`
+rule; the body-handler ratchet) · **Code:** `kernel/layout/UsesLayoutModel`, `kernel/layout/LayoutContextLoader`
 and the five `@ControllerAdvice(annotations = UsesLayoutModel.class)` layout advices · **ADR:**
 ADR-0165
 
@@ -2316,9 +2316,13 @@ therefore derived from the compiled code, and the list must equal it:
 - [x] A prefix such as `…frontend.`, `…frontend.mission.`, `de.greluc.` or `java.` is reported as too
   broad; since 2026-10-04 so is any application prefix, `…frontend.model.` included, and a wildcard
   or non-frontend `SESSION_BOUND_TYPES` entry.
+- [x] Since the per-domain move (REQ-FE-032, 2026-10-10) the 21 names are the classes in their
+  domain packages; a flash map a session stored under a pre-move name is dropped as one unreadable
+  attribute without reaching the allow-list, and the same value under the current name reads back.
 
-**Enforced by:** `SessionBoundTypeClosureTest`, `SessionTypeAllowListBreadthTest` · **Code:**
-`config/SessionTypeAllowList`, `config/RedisSessionConfig` · **Related:** REQ-SEC-067 · **ADR:**
+**Enforced by:** `SessionBoundTypeClosureTest`, `SessionTypeAllowListBreadthTest`,
+`FaultTolerantSessionSerializerTest` · **Code:**
+`kernel/session/SessionTypeAllowList`, `kernel/session/RedisSessionConfig` · **Related:** REQ-SEC-067 · **ADR:**
 ADR-0206
 
 ### REQ-FE-028 — Every frontend call to the backend names an operation the backend has
@@ -2389,7 +2393,7 @@ the breaker, the error mapping.
 - **Controllers call their domain's typed client** (plan F3, since 2026-10-05). Each domain has a
   `<Domain>BackendClient` in `frontend.<domain>.client`, a `@Service` over `BackendApiClient` that
   owns the domain's backend paths, passes runtime values as URI-template variables and returns
-  typed records; only the kernel packages (`service`, `config`, `websocket`) and these clients
+  typed records; only the kernel packages (`kernel.backend`, `kernel.layout`, `kernel.security`; before F4 `service`, `config`, `websocket`) and these clients
   call `BackendApiClient`. A typed client takes no `java.net.URI` or `UriBuilderFactory` and
   carries no cache annotation. A client sends and returns records, never an untyped `Map`, with
   two exceptions by design: the org-unit bank path-only writes, whose backend endpoint binds no
@@ -2435,8 +2439,8 @@ the breaker, the error mapping.
 **Enforced by:** `TypedBackendClientTest`, `WebClientConfinementTest`,
 `ArchitectureTest#noControllerHoldsARawWebClient`,
 `WebClientBackendSeamTest`, `BackendOriginGuardTest`, `BackendErrorMapperTest` · **Code:**
-`config/WebClientConfig`, `config/BackendOriginGuard`, `service/BackendApiClient`,
-`service/BackendErrorMapper`, `service/BackendSideChannels` · **Related:** REQ-SEC-012,
+`kernel/backend/WebClientConfig`, `kernel/backend/BackendOriginGuard`, `kernel/backend/BackendApiClient`,
+`kernel/backend/BackendErrorMapper`, `kernel/backend/BackendSideChannels` · **Related:** REQ-SEC-012,
 REQ-FE-028, REQ-SEC-051, ADR-0032
 
 ### REQ-FE-030 — A parallel page section relays the same request context as the page
@@ -2465,8 +2469,47 @@ call from such a section carries exactly what a call from the request thread car
 - [x] A thread-local accessor registered by a test, unknown to the loader, reaches the worker.
 - [x] With an empty registry the propagation tests fail.
 
-**Enforced by:** `ParallelPageLoaderTest` · **Code:** `service/ParallelPageLoader`,
-`config/ReactorContextPropagationConfig` · **Related:** REQ-OBS-002, REQ-OBS-009
+**Enforced by:** `ParallelPageLoaderTest` · **Code:** `kernel/backend/ParallelPageLoader`,
+`kernel/backend/ReactorContextPropagationConfig` · **Related:** REQ-OBS-002, REQ-OBS-009
+
+### REQ-FE-032 — The frontend's Java code is packaged by domain
+
+Since 2026-10-10 (plan §5.9, F4) a domain's frontend code lives in its own package tree:
+`frontend.<domain>.web` holds its controllers, view rows and view helpers, `frontend.<domain>.model`
+its DTO mirrors, forms and view models, `frontend.<domain>.client` its typed backend client
+(REQ-FE-029). The kernel lives in eight packages: `kernel.backend`, `kernel.security`,
+`kernel.session`, `kernel.layout`, `kernel.web`, `kernel.livesync`, `kernel.observability` and
+`kernel.model` (`PageResponse`, `PayoutPreference`, the handoff types, `BackendEnumAsString`, the
+marker below and the reference DTOs several domains share).
+
+- **Every main class lives in one of those packages** (the application class alone in the base
+  package), every controller in a `<domain>.web` package; no class returns to a retired layer
+  package (`controller`, `config`, `service`, `support`, `model.dto`, …).
+- **The kernel reaches into no domain beyond a frozen list** that may only shrink: a new kernel
+  dependency on a domain type fails the build, and so does an entry whose reach is gone (plan §5.1,
+  the kernel is rank 0).
+- **Every hand-written DTO of the backend seam carries `@DtoMirror`**, and the DTO contract tests
+  (`FrontendDtoContractTest`, `DtoOpenApiContractTest`, `GeneratedDtoAgreementTest`,
+  `DtoMirrorConsistencyTest`) select their types by that marker, nested types included, instead of
+  by a package. A marked type lives in a model package, and a `*Dto`, `*Request` or `*Response`
+  type of a model package carries the marker, so a new mirror cannot slip past the contract tests.
+- A move changes no route, gate, static path or bean name: the route/gate snapshot (REQ-FE-025)
+  stays byte-identical, a template's `T(…)` reference follows its class (REQ-FE-026), and the exact
+  session list (REQ-FE-027) names the moved types by their new names.
+
+**Acceptance**
+
+- [x] 693 main and 379 test classes moved; the route/gate snapshot, `BackendCallExistenceTest` and
+  the URI-template guards unchanged and green (2026-10-10).
+- [x] The four DTO contract tests failed on the move while keyed on `model.dto` and pass keyed on
+  `@DtoMirror` with unchanged floors (389 marked types).
+- [x] A planted controller and a planted marked record outside their packages, an unmarked `*Dto`
+  in a model package, a class outside every known package and a planted kernel reach into a domain
+  are each reported; the kernel's ten remaining reaches are the frozen list.
+
+**Enforced by:** `DomainPackageLayoutTest`, `KernelDomainReachTest`, `TypedBackendClientTest`,
+`DtoMirrorScan` · **Code:** `kernel/model/DtoMirror` · **Related:** REQ-FE-027, REQ-FE-029,
+REQ-OPS-038
 
 ## Out of scope
 

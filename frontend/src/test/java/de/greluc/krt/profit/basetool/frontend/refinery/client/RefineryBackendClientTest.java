@@ -21,11 +21,11 @@ package de.greluc.krt.profit.basetool.frontend.refinery.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderStatus;
-import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderStoreDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderStoreItemDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStatus;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreItemDto;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;

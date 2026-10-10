@@ -14,7 +14,7 @@
     <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.mission_planning', titleText=#{operations.title},
         count=${operationsPage != null ? operationsPage.totalElements() : null}, countId='operations-count', countFor='operations-results', actions=~{::operations-actions})}">
         <th:block th:ref="operations-actions">
-            <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)"
+            <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).MISSION_MANAGER)"
                     type="button" class="btn btn--cta" data-testid="page-head-primary" th:text="#{operation.create}"
                     data-trigger="open-modal-display" data-modal-id="create-operation-modal">Create New</button>
         </th:block>
@@ -93,7 +93,7 @@
                             <span th:if="${op.createdAt == null}">&mdash;</span>
                         </td>
                         <td class="cell-actions">
-                            <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" type="button"
+                            <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" type="button"
                                     class="btn btn-quiet-danger btn-icon" th:title="#{general.delete}" th:aria-label="#{general.delete}"
                                     th:data-id="${op.id}" data-trigger="operations-open-delete"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                             <svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>

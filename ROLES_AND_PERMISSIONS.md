@@ -10,7 +10,7 @@
 > delegate to), the URL matrix in
 > [`backend/.../config/SecurityConfig.java`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/SecurityConfig.java)
 > and
-> [`frontend/.../config/SecurityConfig.java`](frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/SecurityConfig.java),
+> [`frontend/.../kernel/security/SecurityConfig.java`](frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/security/SecurityConfig.java),
 > the role seeds in
 > [`DataInitializer`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/DataInitializer.java)
 > and the authority converter
@@ -1132,7 +1132,7 @@ the public surface (REQ-FE-025, `RouteGateSnapshotTest`, whose committed snapsho
 gate). The table names the **frontend** gate of each screen and how the
 navigation (`fragments/sidebar.html`) shows it; what the screen then *contains* is decided by the
 backend gates of §3. The quick access (`Ctrl`/`⌘` + `K`, REQ-UI-026) reads its pages from that
-rendered menu, so it offers exactly the screens the „Navigation“ column grants and nothing more. Page controllers live under `frontend/.../controller/`.
+rendered menu, so it offers exactly the screens the „Navigation“ column grants and nothing more. Page controllers live under `frontend/.../<domain>/web/`.
 
 | Screen (route)                                                                                                                       | Frontend gate                                                           | Navigation                                                                     |
 |:-------------------------------------------------------------------------------------------------------------------------------------|:------------------------------------------------------------------------|:-------------------------------------------------------------------------------|

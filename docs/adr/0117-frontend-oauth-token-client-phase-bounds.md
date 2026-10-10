@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-22
 - **Deciders:** @greluc
-- **Related:** ADR-0115 (dedicated `frontend-oauth-pool`) · `frontend/.../config/WebClientConfig.java`
+- **Related:** ADR-0115 (dedicated `frontend-oauth-pool`) · `frontend/.../kernel/backend/WebClientConfig.java`
   (`oauthTokenRestClient()`) · REQ-SEC-012 (refresh-token rotation / reuse detection) · the
   2026-07-22 Keycloak-backchannel incident
 

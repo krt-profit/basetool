@@ -76,7 +76,7 @@
         <th:block th:replace="~{fragments/bank-movement-modal :: movementModal('bank-movement-modal', 'accountBody', ${acct.id()}, false, ${acct.type() == 'CARTEL' or acct.type() == 'CARTEL_BANK' or acct.type() == 'SPECIAL'}, ${caps.canDeposit()}, ${caps.canWithdraw()}, ${caps.canTransfer()})}"></th:block>
     </th:block>
 
-    <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)">
+    <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).BANK_MANAGEMENT)">
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-reverse-modal', titleKey='bank.modal.reverse.title', variant='krt-modal--danger', body=~{::bank-reverse-modal-body})}">
         <th:block th:ref="bank-reverse-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="accountBody"

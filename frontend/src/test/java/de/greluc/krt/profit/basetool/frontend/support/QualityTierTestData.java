@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.support;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.QualityTierDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.QualityTierDto;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;

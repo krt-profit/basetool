@@ -402,7 +402,7 @@ redirects here with the bank tab preselected.
   backend as a query parameter and survives paging.
 
 **Enforced by:** `AdminAuditLogPageControllerTest`, `AuditLogE2eTest` · **Code:**
-`controller/AdminAuditLogPageController`, `templates/admin/audit-log.html`, `static/js/audit-log.js`
+`audit/web/AdminAuditLogPageController`, `templates/admin/audit-log.html`, `static/js/audit-log.js`
 
 ### REQ-AUDIT-003 — Per-area period export (PDF + JSON)
 
@@ -434,7 +434,7 @@ forwarding (defense-in-depth).
 
 **Enforced by:** `AuditReportServiceTest`, `BankAuditReportServiceTest`, `AuditAdminControllerSecurityTest`
 · **Code:** `service/AuditReportService`, `bank/internal/BankAuditReportService`,
-`service/pdf/AuditLogPdfFormat`, `controller/AuditReportProxyController`
+`service/pdf/AuditLogPdfFormat`, `audit/web/AuditReportProxyController`
 
 ### REQ-AUDIT-004 — Admin retention purge (delete entries older than a cutoff)
 
@@ -570,7 +570,7 @@ than a feature, so the viewer offers the identical list everywhere.
 `AdminAuditLogModalRenderMvcTest`, `ApiClientMetricsFilterTest`, `AuditLogE2eTest` · **Code:**
 `platform/api/ClientAttribution`, `service/AuditService#record`, `bank/internal/BankAuditService#record`,
 `model/AuditEvent#clientId`, `bank/internal/BankAuditEvent#clientId`, `controller/AuditAdminController`,
-`bank/web/BankAdminController`, `controller/AdminAuditLogPageController`,
+`bank/web/BankAdminController`, `audit/web/AdminAuditLogPageController`,
 `db/migration/V237`, `db/migration/V238` · **Decision:**
 [ADR-0152](../adr/0152-the-audit-row-records-which-client-a-mutation-came-through.md),
 [ADR-0153](../adr/0153-the-bank-trail-records-the-client-through-the-same-seam.md) ·

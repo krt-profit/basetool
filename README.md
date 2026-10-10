@@ -305,7 +305,7 @@ If you only need the stack to *start* (health checks, a UI smoke test that does 
 ### Project structure
 
 - **`backend`** — REST API only. Layered `controller` → `service` → `repository` → `model`, with `dto` records, MapStruct `mapper`s, `config`, `integration` (UEX), `task` (scheduled jobs), `filter`/`interceptor`.
-- **`frontend`** — Thymeleaf UI. `service.BackendApiClient` is the single seam to the backend; Redis holds persistent session state.
+- **`frontend`** — Thymeleaf UI. `kernel.backend.BackendApiClient` is the single seam to the backend; Redis holds persistent session state.
 - **`ingest`** — internet-facing gateway (approved exchange clients, the SC Extractor included → basetool); owns no database, relays to the backend internally. The exchange API (`/exchange/v1`, `REQ-XCH-*`) is a published contract for clients approved one by one, not an open integration API — the interface is **restricted to approved clients** (`REQ-XCH-002`), and unapproved callers are refused `403 CLIENT_NOT_ALLOWED`.
 - **`keycloak-spi`** — Keycloak provider JAR: the Discord identity provider, the guild/role login gate, the `basetool-exchange` admin extension that ends one client inside shared sessions (ADR-0226) and the `krt-freemarker` login forms that show the device code on the consent page (ADR-0228).
 - **`keycloak-theme/krt-theme`** — custom Keycloak login + account UI theme.

@@ -11,7 +11,7 @@
     <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.members', titleText=#{members.title},
         count=${usersPage != null ? usersPage.totalElements() : null}, countId='members-count', countFor='members-results', actions=~{::members-actions})}">
         <th:block th:ref="members-actions">
-            <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+            <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                 <th:block th:replace="~{fragments/components :: overflowMenu(id='members-more', items=~{::members-more-items})}">
                     <th:block th:ref="members-more-items">
                         <button type="button" class="overflow-menu__item" role="menuitem" data-trigger="members-sync"
@@ -87,14 +87,14 @@
                             <span th:unless="${user.inKeycloak}" class="status-pill status-rejected" th:text="#{members.not_in_keycloak}">Nicht in Keycloak</span>
                         </td>
                         <td class="cell-actions">
-                            <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                            <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
                                     type="button"
                                     class="btn btn-ghost btn-icon"
                                     th:data-user-id="${user.id}"
                                     th:data-user-version="${user.version}"
                                     data-trigger="members-consolidate"
                                     th:title="#{members.consolidate.hint}" th:aria-label="#{members.consolidate}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-users"/></svg></button>
-                            <button th:if="${!user.inKeycloak}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                            <button th:if="${!user.inKeycloak}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
                                     type="button"
                                     class="btn btn-quiet-danger btn-icon"
                                     th:data-user-id="${user.id}"
@@ -115,7 +115,7 @@
         </th:block>
     </div>
 
-    <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+    <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
         <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='consolidate-modal', titleKey='members.consolidate.modal.title', variant='krt-modal--wide', body=~{::consolidate-modal-body})}">
             <th:block th:ref="consolidate-modal-body">
                 <div class="krt-modal-body">

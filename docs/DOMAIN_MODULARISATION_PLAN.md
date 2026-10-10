@@ -201,7 +201,8 @@ reference DTOs).
   `…frontend.model.` (production enforces it since 2026-09-25; replaced by the exact list on
   2026-10-04, F2); 172 `T(…support.Roles)` references in
   22 templates resolve only at render time; three DTO contract tests are keyed on the `model.dto`
-  package; the authorization gate test checks classes, not handlers.
+  package (four, keyed on the `@DtoMirror` marker since F4, 2026-10-10); the authorization gate
+  test checks classes, not handlers.
 - **Assets.** 100 scripts, 64 stylesheets and 120 templates map onto the domains (19 core + 81 domain
   scripts in 21 domains). The coupling mechanism is the classic shared global scope: 523 top-level
   names in 50 non-IIFE files.
@@ -440,6 +441,7 @@ de.greluc.krt.profit.basetool.frontend
 ├── kernel.web           GlobalExceptionHandler, BackendErrorResponses, RelayParams, binding
 ├── kernel.livesync      websocket relay, presence
 ├── kernel.model         PageResponse, reference DTOs, PayoutPreference, handoff types
+├── kernel.observability logging, tracing and metric infrastructure (added with F4)
 ├── shell                landing, legal pages, manifest, client-error beacon
 └── <domain>.web | .client | .model   controllers and view assemblers; the typed client; mirrors and forms
 ```
@@ -1089,7 +1091,7 @@ domain stays a package.
 | F1 — **done 2026-10-04** | Kernel extraction: `BackendErrorMapper` (a sealed outcome type with a pattern switch), template overloads for write verbs, the eleven bypassing controllers moved onto the kernel, the `WebClient` confinement rule at zero |
 | F2 — **done 2026-10-04** | Exact session allow-list in its own release (D-10): `SessionTypeAllowList.SESSION_BOUND_TYPES`, 21 exact names; the `…frontend.model.` prefix is gone, `SessionBoundTypeClosureTest` holds the list equal to the derived set in both directions. Corrections: the list lives in the security class, not in the G-16 golden file (`session-bound-types.txt` is deleted, so `-PupdateSnapshots` can no longer widen the allow-list); the admitted application classes fall from 325 to 21, not "about 20" of "about eleven" forms — the 21 are 10 flashed forms and DTOs with their nested types and enums |
 | F3 — **done 2026-10-05** | Typed client per domain, small domains first (audit, notification, settings, dashboard, exchange, orgchart), then the large four; untyped `Map` relays typed in the same step |
-| F4 | Package-by-domain move in one pull request; route/gate snapshot byte-identical |
+| F4 — **done 2026-10-10** | Package-by-domain move in one pull request; route/gate snapshot byte-identical. Released only after a release carrying F2 is in production (D-10) |
 | F5 | Templates and assets per domain (§8.2), with the page chrome as one layout fragment |
 
 *F1 as built (2026-10-04).* `service.BackendErrorMapper` classifies every failed call into one case
@@ -1162,6 +1164,49 @@ import's file part goes out as `application/json` for a `.json` file although th
 `application/octet-stream` — unchanged by the move, now pinned. The next step for the clients is
 F4 (the controllers move next to them) and, per domain with its REST cut, the HTTP interface of
 §5.9.
+
+*F4 as built (2026-10-10).* The layer packages are gone, by script, in one pull request. 546
+domain classes left `controller`, `view`, `model`, `model.dto`, `model.form` and `oss` for
+`frontend.<domain>.web` (controllers, view rows, view helpers such as `BankRunningBalance`) and
+`frontend.<domain>.model` (mirrors, forms, view models); 147 kernel classes left `config`,
+`service`, `websocket`, `support`, `logging`, `exception`, `health`, `metrics`, `validation`, `view`
+and `model` for the kernel packages of §5.9 — `kernel.backend`, `kernel.security`,
+`kernel.session`, `kernel.layout`, `kernel.web`, `kernel.livesync`, `kernel.model` — plus
+`kernel.observability`; 379 tests followed their classes, and a test of several domains' pages
+went to the test-only package `frontend.web`. `shell` took the legal and manifest controllers,
+`ScLink`, the licence report and `AndroidAppLinkProperties`; `AuditDomains` went to `audit.model`
+and `GrafanaLinkProperties` to `exchange.web`, domain code that had sat in the kernel.
+`kernel.model` holds `PageResponse`, `PayoutPreference`, `HandoffKind`, `StagedHandoff`,
+`BackendEnumAsString`, the new marker `DtoMirror` and ten reference DTOs several domains share. The
+route/gate snapshot, `BackendCallExistenceTest`, the URI-template guards, the static paths and every
+bean name are unchanged; the 177 `T(…Roles)` references of 23 templates name
+`kernel.security.Roles`, and `SESSION_BOUND_TYPES` names the 21 session-bound types (all domain
+types) by their new names. The four DTO contract tests went red on the move, keyed on `model.dto`
+as they were, and now select by `@DtoMirror` (`DtoMirrorScan`) with unchanged floors.
+`DomainPackageLayoutTest` keeps every main class in a kernel package of §5.9 or a domain's `web`,
+`model` or `client` package, controllers in `<domain>.web`, marked types in a model package and
+every `*Dto`/`*Request`/`*Response` of a model package marked; `TypedBackendClientTest` admits
+`kernel.backend`, `kernel.layout` and `kernel.security` only (before: all of `config`, `service`
+and `websocket`); `KernelDomainReachTest` freezes the kernel's reaches into domain packages in a
+list that may only shrink — each rule proven against a planted violation (REQ-FE-032).
+BE-SIMP-10's frontend half ran in the same pull request: 410 inline fully qualified names in `main`
+became imports, eight stay (the JetBrains `@NotNull` beside an imported Jakarta one).
+Corrections: §5.9 has no kernel package for logging, tracing and metrics, so `kernel.observability`
+was added beside the seven it draws. The kernel reached into domains in twelve places, not eleven
+(`QualityTierCatalog` reads `catalogue.model.QualityTierDto` since the quality tiers landed); two
+were the active-org-unit session key read from `orgunit.web.MeFrontendController`, which moved into
+`kernel.web.ActiveSquadronContext` (same attribute name). The other ten are frozen rather than
+inverted: §5.1 makes the kernel rank 0 and closed to domain meaning, and the backend handles such
+edges the same way, a shrink-only baseline inverted one by one (the layout's
+`OrgUnitMembershipOptionDto`/`SquadronDto`, the gates' `UserDto`/`RegistrationStatusDto`/`TermsStatusDto`,
+`TermsDocumentDto`, `QualityTierDto`). The contract tests keyed on `model.dto` were four, not three
+(`DtoMirrorConsistencyTest` read the folder). Not every reference DTO moved to the kernel:
+`JobOrderReferenceDto` embeds the order's need lists and stays in `joborder.model`. FQN shortening
+ran after the move in its own commit, not before it as `previous-audits.md` planned, because the
+move script had to rewrite those names anyway. A session written by the release before F4 holds the
+old class names in its flash maps; they resolve to no class, so the value fails at type resolution
+before the allow-list is consulted — dropped on `basetool_session_value_dropped_total`, not refused
+on `basetool_session_type_refused_total` — once per session, never the login (deployment.md).
 
 ### 7.9 REST API track
 

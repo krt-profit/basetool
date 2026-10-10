@@ -197,7 +197,7 @@
                                 <td>
                                     <div class="hangar-tree__type">
                                         <span class="hangar-tree__toggle-slot"
-                                              ><button sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)"
+                                              ><button sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER)"
                                                        th:if="${hasDetails}" type="button" class="btn-icon hangar-tree__toggle"
                                                        aria-expanded="false" data-testid="squadron-owners-toggle"
                                                        th:attr="aria-controls=${groupId},aria-label=#{hangar.squadron.owners.toggle(${item.shipType.name})},title=#{hangar.squadron.owners.toggle(${item.shipType.name})}"
@@ -218,7 +218,7 @@
                                 </td>
                             </tr>
                         </tbody>
-                        <tbody sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)"
+                        <tbody sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER)"
                                th:if="${hasDetails}" class="hangar-tree__owners" th:id="${groupId}" hidden>
                             <tr th:each="detail : ${item.details}" class="hangar-tree__owner" data-testid="squadron-owner-row">
                                 <td><span class="hangar-tree__owner-name" th:text="${detail.ownerName}">greluc</span></td>

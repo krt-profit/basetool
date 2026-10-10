@@ -68,7 +68,7 @@
                             </td>
                             <td th:attr="data-label=#{admin.material.type}">
                                 <span class="nowrap" th:text="${mat?.type != null ? #messages.msg('material.type.' + mat.type) : '-'}">Type</span>
-                                <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" class="stack gap-1 admin-material-toggles">
+                                <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" class="stack gap-1 admin-material-toggles">
                                     <label class="admin-material-toggle">
                                         <input type="checkbox" name="isManualRawMaterial" data-update-type="MANUAL_RAW" th:checked="${mat.isManualRawMaterial == true}" data-trigger="admin-materials-update" />
                                         <span th:text="#{admin.material.manual_raw}">Manuelles Rohmaterial</span>
@@ -99,12 +99,12 @@
                             </td>
                             <td th:attr="data-label=#{admin.material.refined}">
                                 <th:block th:if="${mat?.type == 'RAW' or mat?.isManualRawMaterial == true}">
-                                    <select sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" name="refinedMaterialId" data-update-type="REFINED" data-trigger="admin-materials-update" class="w-full"
+                                    <select sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" name="refinedMaterialId" data-update-type="REFINED" data-trigger="admin-materials-update" class="w-full"
                                             th:attr="aria-label=#{admin.material.refined}">
                                         <option value="" th:text="#{general.please_select}">Bitte wählen...</option>
                                         <option th:each="rm : ${refinedMaterials}" th:value="${rm.id}" th:text="${rm.name}" th:selected="${mat.refinedMaterial != null and mat.refinedMaterial.id == rm.id}">Refined Material</option>
                                     </select>
-                                    <span sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:text="${mat.refinedMaterial != null ? mat.refinedMaterial.name : '-'}">-</span>
+                                    <span sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:text="${mat.refinedMaterial != null ? mat.refinedMaterial.name : '-'}">-</span>
                                 </th:block>
                                 <th:block th:if="${mat?.type != 'RAW' and mat?.isManualRawMaterial != true}">
                                     <span>-</span>

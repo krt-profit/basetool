@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.frontend.contract;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
-import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncTopicClass;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncTopicClass;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;

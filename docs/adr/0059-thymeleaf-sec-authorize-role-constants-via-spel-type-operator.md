@@ -9,7 +9,7 @@
 ## Context
 
 S3 (#909, PR #931) centralised every role/permission string literal into `support.Roles` /
-`support.Permissions` (backend) and `frontend.support.Roles`, migrating all 266 literal-role
+`support.Permissions` (backend) and `frontend.kernel.security.Roles`, migrating all 266 literal-role
 `@PreAuthorize` sites via compile-time-constant string splicing. Two call-site shapes were
 explicitly left out of that PR as "materially different, larger changes":
 
@@ -32,7 +32,7 @@ design decision. Item 2 is the one that needed this ADR: a genuine architectural
 attribute value**, e.g.:
 
 ```html
-<div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+<div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
 ```
 
 instead of the previous:
@@ -65,7 +65,7 @@ attribute values found in the templates — no template was touched beyond that 
   introduced — the fix is exactly as deep as the problem, not a bandaid layered on top of the
   existing rendering pipeline.
 - **Negative / trade-offs:** the fully-qualified class name is verbose inline
-  (`T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN` vs. the previous `'ADMIN'`),
+  (`T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN` vs. the previous `'ADMIN'`),
   and `StandardEvaluationContext`'s `T()` operator is deliberately unrestricted — a template author
   could in principle reference an arbitrary type. This is an accepted trade-off: the same
   unrestricted evaluation context already backs every `@PreAuthorize` expression in the codebase,

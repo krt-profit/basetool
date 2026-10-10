@@ -47,7 +47,7 @@ fixed the manifest and left the mechanism untouched.
 ## Decision
 
 **The layout model becomes opt-in.** A new marker annotation,
-`de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel`, is applied alongside `@Controller`
+`de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel`, is applied alongside `@Controller`
 on all 61 view controllers, and the five layout advices declare
 `@ControllerAdvice(annotations = UsesLayoutModel.class)`.
 

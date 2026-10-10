@@ -198,7 +198,11 @@
   interne, Loopback- oder Link-Local-Adressen auflösen, folgt keiner Weiterleitung und läuft höchstens
   vier (UEX) bzw. zwei (SC Wiki) Aufrufe gleichzeitig. Eine auf einen internen Host zeigende
   `app.uex`- oder `app.scwiki`-URL funktioniert damit nicht mehr (REQ-SEC-081).
-
+- **Frontend-Code nach Fachbereichen gepackt (Betrieb).** Controller, DTOs und Formulare liegen in
+  `frontend.<bereich>.web` / `.model`, der Kern in `frontend.kernel.*`; die Logger-Kategorien aller
+  Frontend-Klassen ändern sich. Nur nach
+  einem Release mit der exakten Session-Liste (F2) ausrollen: eine noch offene Weiterleitung verliert
+  beim Deploy einmalig ihre Flash-Werte, die Anmeldung bleibt (REQ-FE-032, `deployment.md`).
 - **Auswahlfelder nach abgelaufener Sitzung führen zur Anmeldung.** Ist die Sitzung abgelaufen, zeigt
   eine Mitglieder-, Material- oder Kontosuche nicht mehr stumm „keine Treffer", sondern leitet zur
   Anmeldung weiter; dasselbe gilt für alle anderen nachgeladenen Listen und Downloads. Alle Lesezugriffe

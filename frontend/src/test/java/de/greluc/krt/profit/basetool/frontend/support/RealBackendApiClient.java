@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.support;
 
 import static org.mockito.ArgumentMatchers.any;
 
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.mockito.Mockito;

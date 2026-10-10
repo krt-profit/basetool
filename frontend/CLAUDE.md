@@ -264,11 +264,36 @@ debt rather than anything TS 7 introduced.
   repo — `{@code …}`, `{@link …}`, `@param name {shape}` — are parsed as type syntax and are hard
   errors. Convert them when you opt a file in.
 
+## Package layout (REQ-FE-032, plan §5.9)
+
+The Java code is packaged by domain: a new controller, view row or view helper goes into
+`frontend.<domain>.web`, a DTO mirror, form or view model into `frontend.<domain>.model`, the
+domain's backend calls into `frontend.<domain>.client`. Cross-cutting code goes into the kernel
+package of its concern — `kernel.backend` (the backend seam, relays, caches), `kernel.security`,
+`kernel.session`, `kernel.layout`, `kernel.web` (error handling, binding, request contexts, template
+beans), `kernel.livesync`, `kernel.observability`, `kernel.model` (shared types and the reference
+DTOs several domains share). Nothing else exists: `DomainPackageLayoutTest` fails on a main class
+outside these packages.
+
+- **The kernel takes nothing domain-specific and reaches into no domain.** Its remaining reaches
+  are frozen in `KernelDomainReachTest` and may only shrink: a new one fails the build. Invert it
+  instead — move the shared type into `kernel.model`, or let the domain supply the value.
+- **Every DTO of the backend seam carries `@DtoMirror`** (`frontend.kernel.model.DtoMirror`): the DTO
+  contract tests find mirrors by it, not by package. A `*Dto`, `*Request` or `*Response` type in a
+  model package without it fails the build; anything else without it is invisible to those tests.
+- **A flashed form or DTO keeps its exact name in `SessionTypeAllowList.SESSION_BOUND_TYPES`**:
+  moving or renaming one changes the name its session values carry, so the entry moves in the same
+  change (`SessionBoundTypeClosureTest`), and sessions written before the release drop that one
+  flash attribute once (`docs/deployment.md` → *The per-domain package move*).
+- Bean names are the simple class names or explicit (`moneyFormat`, `relativeDays`, `handles`,
+  `markdown`). Templates name one class by its package, `T(…kernel.security.Roles)`;
+  `TemplateTypeReferenceTest` fails when it moves without them.
+
 ## Backend calls: resilience & context propagation
 
 - **WebClient** is centrally configured (base URL, default headers, connect/read/write timeouts) in `WebClientConfig`, and **nowhere else** (REQ-FE-029, `WebClientConfinementTest`): only `WebClientConfig` builds a client, and only the backend kernel holds one: `BackendApiClient`, and `BackendSideChannels` for the notification SSE relay and the live-sync probe, the two calls that deliberately skip the resilience pass. A controller calls the backend only through its domain's typed client — `<Domain>BackendClient` in `frontend.<domain>.client`, a thin `@Service` over `BackendApiClient` that owns the domain's paths and returns typed records, never a `Map` (plan F3, `TypedBackendClientTest`); a new backend call is a method there (`execute(…)` for an unusual shape), and a catalogue eviction goes through `CatalogueCacheEviction`. Every failure is mapped once, by `BackendErrorMapper`'s exhaustive switch over its sealed `Outcome`. A runtime value goes into a backend URI as a template variable of the verb's template overload (`post("/api/v1/x/{id}", body, T.class, id)`), never by concatenation, for every verb (REQ-SEC-051, `WriteUriTemplateTest`, `ReadUriTemplateTest`); a value with reserved characters (an `Instant`) stays a `UriComponentsBuilder.queryParam` and only the path variable is left in the template (`fromPath("/api/v1/x/{id}").queryParam(…).encode().build().toUriString()`), so the bytes sent do not change. Each typed client's requests are pinned in a `*BackendClientTest` over `BackendClientHarness` (MockWebServer). Paths are relative `/api/…`: every backend client refuses any origin but `app.backend-url`'s in its first filter, before the OAuth2 filter attaches the bearer — a test that wants a client to reach a local server sets the backend URL to that server instead of passing an absolute URI. A future HTTP-interface client is created over the `webClient` bean and takes no `URI`, `UriBuilderFactory` or `@CookieValue` parameter, names no absolute URL and carries no `@Cacheable`.
 - **Resilience4j** wraps every call through `webClient` and `termsDocumentClient` (Timeout, Retry, CircuitBreaker, Bulkhead); the SSE relay's `sseWebClient` and the live-sync probe's `liveSyncAuthWebClient` deliberately carry none. State transitions are logged via `ResilienceEventLogger` so `SERVICE_UNAVAILABLE` / `BACKEND_TIMEOUT` always have a matching log line.
-- **Reactor context propagation is mandatory for any new `ThreadLocal` you want to see inside `WebClient` exchange filters.** `WebClient.exchange()` runs on a Reactor-Netty worker thread, not the servlet thread; classic `ThreadLocal` values are not copied across threads. Register a `ThreadLocalAccessor` on `ContextRegistry.getInstance()` in [`ReactorContextPropagationConfig`](src/main/java/de/greluc/krt/profit/basetool/frontend/config/ReactorContextPropagationConfig.java) (which also enables `Hooks.enableAutomaticContextPropagation()` at startup). The existing accessors cover `ActiveSquadronContext` (active-OrgUnit pin → `X-Active-Org-Unit-Id` outbound header), `CorrelationContext` (correlation id propagation), Spring's `LocaleContextHolder` (user locale) and `ClientIpContext`. Forgetting the accessor means the holder is invisible on the worker thread and the outbound call silently drops whatever it carried. Register it inside `ReactorContextPropagationConfig#registerRelayAccessors`: `ParallelPageLoader` restores a `ContextSnapshot` of the same registry on its virtual threads, so the accessor reaches parallel page sections with no change to the loader (REQ-FE-030). Never hand-copy a holder in the loader again — that is how the locale went missing there.
+- **Reactor context propagation is mandatory for any new `ThreadLocal` you want to see inside `WebClient` exchange filters.** `WebClient.exchange()` runs on a Reactor-Netty worker thread, not the servlet thread; classic `ThreadLocal` values are not copied across threads. Register a `ThreadLocalAccessor` on `ContextRegistry.getInstance()` in [`ReactorContextPropagationConfig`](src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/backend/ReactorContextPropagationConfig.java) (which also enables `Hooks.enableAutomaticContextPropagation()` at startup). The existing accessors cover `ActiveSquadronContext` (active-OrgUnit pin → `X-Active-Org-Unit-Id` outbound header), `CorrelationContext` (correlation id propagation), Spring's `LocaleContextHolder` (user locale) and `ClientIpContext`. Forgetting the accessor means the holder is invisible on the worker thread and the outbound call silently drops whatever it carried. Register it inside `ReactorContextPropagationConfig#registerRelayAccessors`: `ParallelPageLoader` restores a `ContextSnapshot` of the same registry on its virtual threads, so the accessor reaches parallel page sections with no change to the loader (REQ-FE-030). Never hand-copy a holder in the loader again — that is how the locale went missing there.
 - Use `MockWebServer` / WireMock to test error paths.
 
 ## Concurrency — the frontend half

@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.architecture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;

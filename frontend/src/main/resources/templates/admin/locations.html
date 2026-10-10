@@ -49,14 +49,14 @@
                         <td th:text="${loc.description}">Desc</td>
                         <td class="cell-actions">
                             <div class="cluster gap-2">
-                                <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" method="post" th:action="@{/admin/locations/{id}/toggle-visibility(id=${loc.id})}" class="m-0" data-location-toggle="visibility">
+                                <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" method="post" th:action="@{/admin/locations/{id}/toggle-visibility(id=${loc.id})}" class="m-0" data-location-toggle="visibility">
                                     <input type="hidden" name="hidden" th:value="${!loc.hidden}">
                                     <button type="submit" class="btn btn-ghost btn-xs"
                                             th:data-label-on="#{admin.location.visibility.show}"
                                             th:data-label-off="#{admin.location.visibility.hide}"
                                             th:text="${loc.hidden} ? #{admin.location.visibility.show} : #{admin.location.visibility.hide}">Toggle</button>
                                 </form>
-                                <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" method="post" th:action="@{/admin/locations/{id}/toggle-home-location(id=${loc.id})}" class="m-0" data-location-toggle="home">
+                                <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" method="post" th:action="@{/admin/locations/{id}/toggle-home-location(id=${loc.id})}" class="m-0" data-location-toggle="home">
                                     <input type="hidden" name="homeLocation" th:value="${!loc.homeLocation}">
                                     <button type="submit" class="btn btn-ghost btn-xs"
                                             th:data-label-on="#{admin.location.home.unmark}"

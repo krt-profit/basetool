@@ -1,0 +1,112 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.bank.web;
+
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankDashboardAccountDto;
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankDashboardDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
+import org.hamcrest.Matchers;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+/**
+ * Pins the dashboard's direct-booking movement modal (REQ-BANK-017/-023): it renders only when
+ * {@code canBook}, derived by {@link BankPageController} from the dashboard's active accounts.
+ */
+@SpringBootTest
+class BankDashboardMovementModalMvcTest {
+
+  @Autowired private WebApplicationContext context;
+
+  private MockMvc mockMvc;
+
+  @MockitoBean private BackendApiClient backendApiClient;
+
+  @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
+
+  @BeforeEach
+  void setup() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+  }
+
+  /** A dashboard card of the given status so the grid renders and canBook can be exercised. */
+  private BankDashboardAccountDto card(String status) {
+    return new BankDashboardAccountDto(
+        UUID.randomUUID(),
+        "KB-0001",
+        "Staffel IRIDIUM",
+        "ORG_UNIT",
+        status,
+        new BigDecimal("1000"),
+        BigDecimal.ZERO,
+        List.of(),
+        null,
+        null,
+        null);
+  }
+
+  @Test
+  @WithMockUser(roles = "BANK_EMPLOYEE")
+  void dashboard_noBookableAccount_omitsMovementModal() throws Exception {
+    when(backendApiClient.get(eq("/api/v1/bank/dashboard"), eq(BankDashboardDto.class)))
+        .thenReturn(new BankDashboardDto(true, List.of(card("CLOSED")), null));
+
+    mockMvc
+        .perform(get("/bank"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("id=\"bank-movement-modal\""))))
+        .andExpect(content().string(Matchers.not(Matchers.containsString("bank-movement-open"))));
+  }
+
+  @Test
+  @WithMockUser(roles = "BANK_EMPLOYEE")
+  void dashboard_withBookableAccount_rendersMovementModal() throws Exception {
+    when(backendApiClient.get(eq("/api/v1/bank/dashboard"), eq(BankDashboardDto.class)))
+        .thenReturn(new BankDashboardDto(true, List.of(card("ACTIVE")), null));
+
+    mockMvc
+        .perform(get("/bank"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("id=\"bank-movement-modal\"")))
+        .andExpect(content().string(Matchers.containsString("bank-movement-open")))
+        .andExpect(
+            content()
+                .string(Matchers.containsString("data-krt-combobox=\"remote-bank-accounts\"")));
+  }
+}

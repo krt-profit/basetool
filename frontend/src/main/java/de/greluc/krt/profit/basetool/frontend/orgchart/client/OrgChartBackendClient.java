@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgchart.client;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartPositionCreateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartPositionDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartPositionUpdateRequest;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartDto;
+import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartPositionCreateRequest;
+import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartPositionDto;
+import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartPositionUpdateRequest;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;

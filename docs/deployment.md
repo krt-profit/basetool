@@ -1064,6 +1064,43 @@ return nothing. A hit names a class: if it is one of ours, add it to `SESSION_BO
 is the previous frontend image, or `APP_SESSION_TYPE_ALLOW_LIST=report` as above — a production
 write, so it waits for the owner's yes.
 
+#### The per-domain package move (F4)
+
+**Order: the F4 release ships only after a release carrying the exact list (F2, #2407) is in
+production** (owner decision D-10). F4 moves every session-bound form and DTO into its domain's
+package (`…frontend.model.form.ShipForm` is now `…frontend.hangar.model.ShipForm`), and
+`SESSION_BOUND_TYPES` names the new classes. It changes no configuration and needs no step beyond
+the ordinary frontend deploy.
+
+**Sessions written by the previous release** still name the old classes in their stored flash maps.
+The only application classes a session ever holds are flashed forms and DTOs (the closure test
+derives that set), so the one attribute concerned is Spring's flash-map list. Its old type ids
+resolve to no class, so the read fails before the allow-list is consulted: `FaultTolerantSessionSerializer`
+drops that attribute, `SessionAttributeDiagnosticMapper` logs it once with the old class as
+`typeId`, and it is removed on the same request (REQ-SEC-050). The security context and the
+authorized clients are Spring Security and JDK types, so **no member is signed out and login is
+unaffected**; the worst case is one pending redirect's flash values (a toast or a re-shown form) for
+a member who was mid-redirect during the deploy (`FaultTolerantSessionSerializerTest` replays such a
+value).
+
+**Watch for an hour after the deploy** (read-only): `SessionTypeOutsideAllowList` stays silent — an
+old name never reaches the allow-list — and `SessionValueDropsSustained` may show a small burst that
+decays, which is that backlog being repaired. A drop that names a class outside `…frontend.model.`,
+`…frontend.model.dto.` and `…frontend.model.form.`, or a rate that does not fall to zero, is not this
+move:
+
+```text
+sum by (cause) (increase(basetool_session_value_dropped_total[1h]))
+{app="frontend"} |= "Dropped an unreadable session value"
+```
+
+The move also renames the logger category of every frontend class but `FrontendApplication`: a
+domain class moves to its domain package (`…frontend.controller.ClientErrorReportController` is now
+`…frontend.shell.web.ClientErrorReportController`), a kernel class to its `kernel.*` package
+(`…frontend.config.SessionTypeAllowList` is now `…frontend.kernel.session.SessionTypeAllowList`).
+A level raised through `/actuator/loggers` before the deploy does not carry over; the log lines
+the alerts and runbooks search for keep their wording, so no Loki query changes.
+
 ### Trusted Types: report, then enforce
 
 The frontend sends the Trusted Types directives `require-trusted-types-for 'script'; trusted-types
@@ -1085,7 +1122,7 @@ sum(increase(basetool_client_error_total{kind="csp_violation"}[7d])) > 0
 ```
 
 A hit is a violation, not necessarily a Trusted Types one. To name it, raise
-`de.greluc.krt.profit.basetool.frontend.controller.ClientErrorReportController` to DEBUG through
+`de.greluc.krt.profit.basetool.frontend.shell.web.ClientErrorReportController` to DEBUG through
 `/actuator/loggers` (REQ-OBS-016; a production write as well) and read `{app="frontend"} |= "Client
 error reported [kind=csp_violation"`: a Trusted Types sink shows as `message=require-trusted-types-for
 Element innerHTML` (the directive and the sink, never the markup), an unlisted policy as

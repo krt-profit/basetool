@@ -23,7 +23,8 @@ twice, and the second one can be forgotten.
 **Mitigated, not solved.** `FrontendDtoContractTest` diffs the mirrors against `openapi.json`, and
 `GeneratedDtoAgreementTest` compares them field by field against the models generated from the same
 document, and `DtoMirrorConsistencyTest` pairs every mirror with its backend record wherever it
-lives in the backend source tree (REQ-OPS-038). Nothing in `main` imports a generated type yet — replacing the mirrors is a separate epic,
+lives in the backend source tree (REQ-OPS-038); all of them select the mirrors by their
+`@DtoMirror` marker, not by a package (REQ-FE-032). Nothing in `main` imports a generated type yet — replacing the mirrors is a separate epic,
 and until it happens the duplication is real.
 
 ## 11.3 The knowledge base cannot be gated by this repository's CI
@@ -376,3 +377,8 @@ scope gate), then `exchange` and the bank as packages (2026-10-10), which enter 
 boundary before their Gradle extraction. Phase 3 began with `materialexchange` (2026-10-10), the
 Lager reaching it only through its own `StockChangeObserver` and `StockOfferLookup`, then `refinery`
 with the second module access policy; the baseline is at 92 class edges.
+The frontend is packaged by domain since 2026-10-10 (plan F4, REQ-FE-032): its controllers, mirrors
+and forms live in `<domain>.web` and `<domain>.model` beside the typed clients, the kernel in the
+eight `kernel.*` packages. The cross-domain references between domains are page composition and no
+frontend rule bounds them yet; the kernel's ten reaches into `orgunit`, `identity` and `catalogue`
+(§5.3) are frozen by `KernelDomainReachTest` and may only shrink.

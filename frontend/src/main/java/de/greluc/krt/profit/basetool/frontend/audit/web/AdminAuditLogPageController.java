@@ -1,0 +1,592 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.audit.web;
+
+import de.greluc.krt.profit.basetool.frontend.audit.client.AuditBackendClient;
+import de.greluc.krt.profit.basetool.frontend.audit.model.AuditDomains;
+import de.greluc.krt.profit.basetool.frontend.audit.model.AuditEventDto;
+import de.greluc.krt.profit.basetool.frontend.audit.model.AuditRowView;
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankAuditEventDto;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.RelayParams;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.util.UriComponentsBuilder;
+
+/**
+ * Controller for the admin-only unified audit-log page ({@code /admin/audit-log}, REQ-AUDIT-001,
+ * ADR-0037), with one tab for the bank trail and one per generic audit area. Both row shapes are
+ * adapted to {@link AuditRowView}.
+ */
+@Controller
+@UsesLayoutModel
+@RequiredArgsConstructor
+@Slf4j
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+public class AdminAuditLogPageController {
+
+  /** Audit-log page size; the table is dense and read-only, so a large page is fine. */
+  private static final int AUDIT_PAGE_SIZE = 50;
+
+  /** The bank tab is the default landing tab (the old {@code /admin/bank-audit} redirects here). */
+  private static final String DEFAULT_DOMAIN = "BANK";
+
+  /**
+   * The tabs, in display order — shared with {@code AuditReportProxyController} through {@link
+   * AuditDomains} so the page and its export/purge proxy cannot disagree about which tabs exist.
+   */
+  private static final List<String> DOMAINS = AuditDomains.ALL;
+
+  /** Message-bundle key prefix for the bank event-type labels (their own namespace). */
+  private static final String BANK_EVENT_PREFIX = "admin.bank.audit.event.";
+
+  /** Message-bundle key prefix for the generic-area event-type labels. */
+  private static final String GENERIC_EVENT_PREFIX = "admin.audit.event.";
+
+  /**
+   * The first-party client values the audit filter offers (REQ-AUDIT-005), in filter order; the
+   * exchange registry's clients follow them, then {@link #TRAILING_CLIENT_IDS}.
+   */
+  private static final List<String> CLIENT_IDS = List.of("basetool-frontend", "basetool-android");
+
+  /** The catch-all client values that close the filter list. */
+  private static final List<String> TRAILING_CLIENT_IDS = List.of("other", "none");
+
+  /** The event types offered in the per-tab filter dropdown, by domain (in a sensible order). */
+  private static final Map<String, List<String>> EVENT_TYPES_BY_DOMAIN =
+      Map.ofEntries(
+          Map.entry(
+              "BANK",
+              List.of(
+                  "ACCOUNT_CREATED",
+                  "ACCOUNT_RENAMED",
+                  "ACCOUNT_CLOSED",
+                  "ACCOUNT_REOPENED",
+                  "ACCOUNT_RESPONSIBLE_CHANGED",
+                  "HOLDER_REGISTERED",
+                  "HOLDER_DEACTIVATED",
+                  "HOLDER_REACTIVATED",
+                  "GRANT_CREATED",
+                  "GRANT_UPDATED",
+                  "GRANT_REVOKED",
+                  "DEPOSIT_BOOKED",
+                  "DEPOSIT_SPLIT_BOOKED",
+                  "WITHDRAWAL_BOOKED",
+                  "TRANSFER_BOOKED",
+                  "HOLDER_TRANSFER",
+                  "HOLDER_REBOOKED",
+                  "TRANSACTION_REVERSED",
+                  "WIPE_RESET_EXECUTED",
+                  "STATEMENT_EXPORTED",
+                  "MANAGEMENT_REPORT_EXPORTED",
+                  "BOOKING_REQUEST_CREATED",
+                  "BOOKING_REQUEST_CONFIRMED",
+                  "BOOKING_REQUEST_REJECTED",
+                  "BOOKING_REQUEST_CANCELLED",
+                  "BOOKING_REQUEST_UPDATED",
+                  "AUDIT_LOG_EXPORTED",
+                  "AUDIT_LOG_PURGED",
+                  "BALANCE_TARGET_SET",
+                  "BALANCE_TARGET_CLEARED",
+                  "BALANCE_VISIBILITY_GRANTED",
+                  "BALANCE_VISIBILITY_REVOKED",
+                  "APPROVAL_LIMIT_SET",
+                  "APPROVAL_LIMIT_CLEARED",
+                  "BOOKING_REQUEST_OWNER_APPROVAL_GRANTED",
+                  "BOOKING_REQUEST_OWNER_APPROVAL_REVOKED",
+                  "BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED",
+                  "CARTEL_APPROVAL_TIERS_SET",
+                  "CARTEL_APPROVAL_TIERS_CLEARED",
+                  "HANDLE_SNAPSHOTS_ANONYMISED")),
+          Map.entry(
+              "INVENTORY",
+              List.of(
+                  "INVENTORY_ITEM_CREATED",
+                  "INVENTORY_ITEM_UPDATED",
+                  "INVENTORY_ITEM_MERGED",
+                  "INVENTORY_ITEM_NOTE_UPDATED",
+                  "INVENTORY_ALLOCATION_ADDED",
+                  "INVENTORY_ALLOCATION_CHANGED",
+                  "INVENTORY_ALLOCATION_REMOVED",
+                  "INVENTORY_ITEM_CONSUMED",
+                  "INVENTORY_ITEM_TRANSFERRED",
+                  "INVENTORY_ITEM_SOLD",
+                  "INVENTORY_ITEM_DEPERSONALIZED",
+                  "INVENTORY_ITEM_PERSONALIZED",
+                  "INVENTORY_ITEM_DELIVERY_TOGGLED",
+                  "INVENTORY_BULK_CHECKED_OUT",
+                  "INVENTORY_BULK_REBOOKED",
+                  "INVENTORY_WIPED",
+                  "INVENTORY_RECEIVED_FROM_REFINERY",
+                  "INVENTORY_RECEIVED_FROM_PRODUCTION",
+                  "INVENTORY_HANDED_OVER",
+                  "INVENTORY_CONSUMED_BY_PRODUCTION",
+                  "INVENTORY_ORG_RESTAMPED",
+                  "INVENTORY_ORG_UNIT_CHANGED",
+                  "INVENTORY_BULK_ORG_UNIT_CHANGED",
+                  "INVENTORY_STOLEN_MARKED",
+                  "INVENTORY_STOLEN_UNMARKED",
+                  "INVENTORY_BULK_STOLEN_CHANGED",
+                  "INVENTORY_OWNER_REASSIGNED",
+                  "INVENTORY_PURGED_ON_USER_DELETION",
+                  "INVENTORY_AUDIT_EXPORTED",
+                  "INVENTORY_AUDIT_PURGED")),
+          Map.entry(
+              "JOB_ORDER",
+              List.of(
+                  "JOB_ORDER_CREATED",
+                  "JOB_ORDER_ITEM_CREATED",
+                  "JOB_ORDER_UPDATED",
+                  "JOB_ORDER_ITEM_UPDATED",
+                  "JOB_ORDER_STATUS_CHANGED",
+                  "JOB_ORDER_PRIORITY_CHANGED",
+                  "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED",
+                  "JOB_ORDER_DELETED",
+                  "JOB_ORDER_COMPLETED",
+                  "JOB_ORDER_REASSIGNED",
+                  "JOB_ORDER_ASSIGNEE_ADDED",
+                  "JOB_ORDER_ASSIGNEE_REMOVED",
+                  "JOB_ORDER_ASSIGNEE_NOTE_SET",
+                  "JOB_ORDER_ASSIGNEE_NOTE_CLEARED",
+                  "JOB_ORDER_MATERIAL_UNLINKED",
+                  "JOB_ORDER_INVENTORY_UNLINKED",
+                  "JOB_ORDER_HANDOVER_CREATED",
+                  "JOB_ORDER_ITEM_HANDOVER_CREATED",
+                  "JOB_ORDER_PRODUCTION_BOOKED",
+                  "JOB_ORDER_CLAIM_UPSERTED",
+                  "JOB_ORDER_CLAIM_WITHDRAWN",
+                  "QUALITY_TIER_CREATED",
+                  "QUALITY_TIER_UPDATED",
+                  "QUALITY_TIER_DEACTIVATED",
+                  "QUALITY_TIER_DELETED",
+                  "JOB_ORDER_AUDIT_EXPORTED",
+                  "JOB_ORDER_AUDIT_PURGED")),
+          Map.entry(
+              "REFINERY",
+              List.of(
+                  "REFINERY_ORDER_CREATED",
+                  "REFINERY_ORDER_UPDATED",
+                  "REFINERY_ORDER_CANCELED",
+                  "REFINERY_ORDER_STORED",
+                  "REFINERY_METHOD_CREATED",
+                  "REFINERY_METHOD_UPDATED",
+                  "REFINERY_METHOD_DELETED",
+                  "REFINERY_METHODS_SYNCED",
+                  "REFINERY_YIELDS_SYNCED",
+                  "REFINERY_ORDERS_REASSIGNED",
+                  "REFINERY_AUDIT_EXPORTED",
+                  "REFINERY_AUDIT_PURGED")),
+          Map.entry(
+              "PERSONAL_INVENTORY",
+              List.of(
+                  "PERSONAL_INVENTORY_CREATED",
+                  "PERSONAL_INVENTORY_UPDATED",
+                  "PERSONAL_INVENTORY_DELETED",
+                  "PERSONAL_DATA_PURGED_ON_USER_DELETION",
+                  "PERSONAL_INVENTORY_AUDIT_EXPORTED",
+                  "PERSONAL_INVENTORY_AUDIT_PURGED")),
+          Map.entry(
+              "MISSION",
+              List.of(
+                  "MISSION_CREATED",
+                  "MISSION_UPDATED",
+                  "MISSION_DELETED",
+                  "MISSION_PARTICIPANT_ADDED",
+                  "MISSION_PARTICIPANT_REMOVED",
+                  "MISSION_PARTICIPANT_UPDATED",
+                  "MISSION_PARTICIPANT_CHECKED_IN",
+                  "MISSION_PARTICIPANT_CHECKED_OUT",
+                  "MISSION_UNIT_ADDED",
+                  "MISSION_UNIT_UPDATED",
+                  "MISSION_UNIT_REMOVED",
+                  "MISSION_CREW_ADDED",
+                  "MISSION_CREW_UPDATED",
+                  "MISSION_CREW_REMOVED",
+                  "MISSION_FREQUENCY_CHANGED",
+                  "MISSION_FREQUENCY_REMOVED",
+                  "MISSION_OWNER_CHANGED",
+                  "MISSION_OWNING_ORG_UNIT_CHANGED",
+                  "MISSION_PARTY_LEAD_CHANGED",
+                  "MISSION_MANAGER_ADDED",
+                  "MISSION_MANAGER_REMOVED",
+                  "MISSION_FINANCE_ENTRY_CREATED",
+                  "MISSION_FINANCE_ENTRY_UPDATED",
+                  "MISSION_FINANCE_ENTRY_DELETED",
+                  "MISSION_STEP_ADDED",
+                  "MISSION_STEP_UPDATED",
+                  "MISSION_STEP_REMOVED",
+                  "MISSION_STEP_REORDERED",
+                  "MISSION_STEP_DONE_CHANGED",
+                  "MISSION_OBJECTIVE_ADDED",
+                  "MISSION_OBJECTIVE_UPDATED",
+                  "MISSION_OBJECTIVE_REMOVED",
+                  "MISSION_OBJECTIVE_REORDERED",
+                  "MISSION_AUDIT_EXPORTED",
+                  "MISSION_AUDIT_PURGED")),
+          Map.entry(
+              "OPERATION",
+              List.of(
+                  "OPERATION_CREATED",
+                  "OPERATION_UPDATED",
+                  "OPERATION_DELETED",
+                  "OPERATION_PAYOUT_TOGGLED",
+                  "OPERATION_AUDIT_EXPORTED",
+                  "OPERATION_AUDIT_PURGED")),
+          Map.entry(
+              "ROLE",
+              List.of(
+                  "MEMBERSHIP_GRANTED",
+                  "MEMBERSHIP_REVOKED",
+                  "ROLE_GRANTED",
+                  "ROLE_CHANGED",
+                  "ROLE_REVOKED",
+                  "CAPABILITY_FLAGS_CHANGED",
+                  "ROLE_PERMISSIONS_CHANGED",
+                  "KOMMANDO_GROUP_CREATED",
+                  "KOMMANDO_GROUP_UPDATED",
+                  "KOMMANDO_GROUP_DELETED",
+                  "USER_DELETED",
+                  "USER_MERGED",
+                  "ACCOUNT_DELETION_REQUESTED",
+                  "ACCOUNT_DELETION_REQUEST_WITHDRAWN",
+                  "ACCOUNT_DELETION_REQUEST_DECLINED",
+                  "ACCOUNT_DELETION_REQUEST_EXECUTED",
+                  "ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED",
+                  "HANDLE_SNAPSHOTS_ANONYMISED",
+                  "PERSONAL_DATA_EXPORTED",
+                  "PERSON_SEARCH_PERFORMED",
+                  "ROLE_AUDIT_EXPORTED",
+                  "ROLE_AUDIT_PURGED")),
+          Map.entry(
+              "PROMOTION",
+              List.of(
+                  "PROMOTION_TOPIC_CREATED",
+                  "PROMOTION_TOPIC_UPDATED",
+                  "PROMOTION_TOPIC_DELETED",
+                  "PROMOTION_CATEGORY_CREATED",
+                  "PROMOTION_CATEGORY_UPDATED",
+                  "PROMOTION_CATEGORY_DELETED",
+                  "PROMOTION_LEVEL_CONTENT_CREATED",
+                  "PROMOTION_LEVEL_CONTENT_UPDATED",
+                  "PROMOTION_LEVEL_CONTENT_DELETED",
+                  "PROMOTION_RANK_REQUIREMENT_CREATED",
+                  "PROMOTION_RANK_REQUIREMENT_UPDATED",
+                  "PROMOTION_RANK_REQUIREMENT_DELETED",
+                  "PROMOTION_EVALUATION_CREATED",
+                  "PROMOTION_EVALUATION_UPDATED",
+                  "PROMOTION_EVALUATION_DELETED",
+                  "PROMOTION_AUDIT_EXPORTED",
+                  "PROMOTION_AUDIT_PURGED")),
+          Map.entry(
+              "MARKET",
+              List.of(
+                  "MARKET_OFFER_RELEASED",
+                  "MARKET_OFFER_DEACTIVATED",
+                  "MARKET_OFFER_REDUCED",
+                  "MARKET_OFFER_REMOVED",
+                  "MARKET_REMARK_UPDATED",
+                  "MARKET_INTEREST_REGISTERED",
+                  "MARKET_INTEREST_WITHDRAWN",
+                  "MARKET_REQUEST_CREATED",
+                  "MARKET_REQUEST_UPDATED",
+                  "MARKET_REQUEST_DEACTIVATED",
+                  "MARKET_REQUEST_INTEREST_SIGNALLED",
+                  "MARKET_REQUEST_INTEREST_WITHDRAWN",
+                  "MARKET_AUDIT_EXPORTED",
+                  "MARKET_AUDIT_PURGED")),
+          Map.entry(
+              "HANGAR",
+              List.of(
+                  "HANGAR_SHIP_CREATED",
+                  "HANGAR_SHIP_UPDATED",
+                  "HANGAR_SHIP_DELETED",
+                  "HANGAR_EMPTIED",
+                  "HANGAR_IMPORTED",
+                  "HANGAR_FITTED_RESET",
+                  "HANGAR_HOME_LOCATION_SET",
+                  "HANGAR_AUDIT_EXPORTED",
+                  "HANGAR_AUDIT_PURGED")),
+          Map.entry(
+              "BLUEPRINT",
+              List.of(
+                  "BLUEPRINT_ADDED",
+                  "BLUEPRINT_BATCH_ADDED",
+                  "BLUEPRINT_UPDATED",
+                  "BLUEPRINT_REMOVED",
+                  "BLUEPRINT_ALL_REMOVED",
+                  "BLUEPRINT_IMPORTED",
+                  "BLUEPRINT_SHARING_CHANGED",
+                  "BLUEPRINT_PURGED_ALL_USERS",
+                  "BLUEPRINT_DEFAULT_ADDED",
+                  "BLUEPRINT_DEFAULT_REMOVED",
+                  "BLUEPRINT_DEFAULTS_GRANTED",
+                  "BLUEPRINT_AUDIT_EXPORTED",
+                  "BLUEPRINT_AUDIT_PURGED")),
+          Map.entry(
+              "CONNECTED_APPS",
+              List.of(
+                  "EXCHANGE_CLIENT_CREATED",
+                  "EXCHANGE_CLIENT_UPDATED",
+                  "EXCHANGE_CLIENT_SUSPENDED",
+                  "EXCHANGE_CLIENT_ACTIVATED",
+                  "EXCHANGE_SWITCH_CHANGED",
+                  "EXCHANGE_CLIENT_DISCONNECTED",
+                  "EXCHANGE_INSTALLATION_DISCONNECTED",
+                  "EXCHANGE_MEMBER_DEPARTED",
+                  "EXCHANGE_CHANGES_UNDONE",
+                  "EXCHANGE_MASS_CHANGE_CONFIRMED",
+                  "EXCHANGE_BULK_UNDO_STARTED",
+                  "EXCHANGE_BULK_UNDO_FINISHED",
+                  "EXCHANGE_CONNECTIONS_PURGED",
+                  "CONNECTED_APPS_AUDIT_EXPORTED",
+                  "CONNECTED_APPS_AUDIT_PURGED")));
+
+  /** Reads the audit trails and the exchange registry. */
+  private final AuditBackendClient auditClient;
+
+  /**
+   * Renders the paged, filterable audit-log view for one tab. Filters are bound to typed values or
+   * checked against the offered options before entering the backend URI (REQ-SEC-051); unknown
+   * values mean no filter.
+   *
+   * @param domain the selected tab (one of {@link #DOMAINS}); defaults to and falls back to {@code
+   *     BANK}
+   * @param from period start filter, or absent
+   * @param to period end filter, or absent
+   * @param actorUserId actor filter (the actor's Keycloak {@code sub}), or absent
+   * @param eventType event-type filter; ignored unless it is one of the active tab's own types
+   * @param clientId originating-client filter; ignored unless the filter offers it
+   * @param page zero-based page index
+   * @param fragment {@code "results"} to render only the results fragment; otherwise the full page
+   * @param model Thymeleaf model
+   * @return the {@code admin/audit-log} view name, or its {@code auditResults} fragment selector
+   */
+  @NotNull
+  @GetMapping("/admin/audit-log")
+  public String auditLog(
+      @RequestParam(required = false) String domain,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          Instant from,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          Instant to,
+      @RequestParam(required = false) UUID actorUserId,
+      @RequestParam(required = false) String eventType,
+      @RequestParam(required = false) String clientId,
+      @RequestParam(required = false, defaultValue = "0") int page,
+      @RequestParam(required = false) String fragment,
+      Model model) {
+    String activeDomain = domain != null && DOMAINS.contains(domain) ? domain : DEFAULT_DOMAIN;
+    boolean isBank = "BANK".equals(activeDomain);
+    final String eventKeyPrefix = isBank ? BANK_EVENT_PREFIX : GENERIC_EVENT_PREFIX;
+    final String activeEventType =
+        RelayParams.oneOfOrNull(
+            eventType, EVENT_TYPES_BY_DOMAIN.getOrDefault(activeDomain, List.of()));
+    Map<String, String> exchangeClientNames = exchangeClientNames();
+    List<String> clientIds = new ArrayList<>(CLIENT_IDS);
+    clientIds.addAll(exchangeClientNames.keySet());
+    clientIds.addAll(TRAILING_CLIENT_IDS);
+    final String activeClientId = RelayParams.oneOfOrNull(clientId, clientIds);
+
+    AuditBackendClient.Filter filter =
+        new AuditBackendClient.Filter(
+            Math.max(page, 0),
+            AUDIT_PAGE_SIZE,
+            from,
+            to,
+            actorUserId,
+            activeEventType,
+            activeClientId);
+
+    PageResponse<AuditRowView> events = null;
+    try {
+      events =
+          isBank
+              ? adaptBank(auditClient.bankEvents(filter), eventKeyPrefix)
+              : adaptGeneric(auditClient.areaEvents(activeDomain, filter), eventKeyPrefix);
+    } catch (BackendServiceException e) {
+      log.debug("Failed to load audit log for domain {}", activeDomain, e);
+      model.addAttribute("error", "admin.audit.error.load");
+    } catch (Exception e) {
+      log.error("Failed to load audit log for domain {}", activeDomain, e);
+      model.addAttribute("error", "admin.audit.error.load");
+    }
+
+    model.addAttribute("activeDomain", activeDomain);
+    model.addAttribute("domains", DOMAINS);
+    model.addAttribute("events", events);
+    model.addAttribute("eventTypes", EVENT_TYPES_BY_DOMAIN.getOrDefault(activeDomain, List.of()));
+    model.addAttribute("eventKeyPrefix", eventKeyPrefix);
+    model.addAttribute("filterFrom", from);
+    model.addAttribute("filterTo", to);
+    model.addAttribute("filterActorUserId", actorUserId);
+    model.addAttribute("filterEventType", activeEventType);
+    model.addAttribute("clientIds", clientIds);
+    model.addAttribute("clientNames", exchangeClientNames);
+    model.addAttribute("filterClientId", activeClientId);
+    model.addAttribute(
+        "paginationBaseUrl",
+        buildBaseUrl(activeDomain, from, to, actorUserId, activeEventType, activeClientId));
+    model.addAttribute("exportEndpoint", "/api/proxy/audit/" + activeDomain + "/export");
+    model.addAttribute("purgeEndpoint", "/api/proxy/audit/" + activeDomain);
+    if (fragment != null && "results".equalsIgnoreCase(fragment)) {
+      return "admin/audit-log :: auditResults";
+    }
+    return "admin/audit-log";
+  }
+
+  /**
+   * Adapts a page of bank audit rows into the uniform view model (subject = account number).
+   *
+   * @param page the bank audit page, or {@code null}
+   * @param prefix the bank event-label key prefix
+   * @return the adapted page, or {@code null} when the source was {@code null}
+   */
+  @Nullable
+  private static PageResponse<AuditRowView> adaptBank(
+      PageResponse<BankAuditEventDto> page, String prefix) {
+    if (page == null) {
+      return null;
+    }
+    List<AuditRowView> rows =
+        page.content().stream()
+            .map(
+                e ->
+                    new AuditRowView(
+                        e.occurredAt(),
+                        e.actorHandle(),
+                        prefix + e.eventType(),
+                        e.accountNo() != null ? e.accountNo() : "—",
+                        e.details(),
+                        e.clientId()))
+            .toList();
+    return new PageResponse<>(
+        rows, page.page(), page.size(), page.totalElements(), page.totalPages(), page.sort());
+  }
+
+  /**
+   * Adapts a page of generic audit rows into the uniform view model (subject = subject label).
+   *
+   * @param page the generic audit page, or {@code null}
+   * @param prefix the generic event-label key prefix
+   * @return the adapted page, or {@code null} when the source was {@code null}
+   */
+  @Nullable
+  private static PageResponse<AuditRowView> adaptGeneric(
+      PageResponse<AuditEventDto> page, String prefix) {
+    if (page == null) {
+      return null;
+    }
+    List<AuditRowView> rows =
+        page.content().stream()
+            .map(
+                e ->
+                    new AuditRowView(
+                        e.occurredAt(),
+                        e.actorHandle(),
+                        prefix + e.eventType(),
+                        e.subjectLabel() != null ? e.subjectLabel() : "—",
+                        e.details(),
+                        e.clientId()))
+            .toList();
+    return new PageResponse<>(
+        rows, page.page(), page.size(), page.totalElements(), page.totalPages(), page.sort());
+  }
+
+  /**
+   * Appends a query parameter to the pagination URL when the value is present and non-blank.
+   *
+   * @param uri the builder
+   * @param name the parameter name
+   * @param value the value, or {@code null}/blank to skip; a non-{@code String} (an {@link
+   *     Instant}, a {@link UUID}) is rendered by the builder through {@code toString()}
+   */
+  private static void appendIfPresent(UriComponentsBuilder uri, String name, Object value) {
+    if (value == null || (value instanceof String s && s.isBlank())) {
+      return;
+    }
+    uri.queryParam(name, value);
+  }
+
+  /**
+   * Builds the pagination base URL preserving the active tab + filters so paging keeps both.
+   *
+   * @param domain the active tab
+   * @param from period start filter, or {@code null}
+   * @param to period end filter, or {@code null}
+   * @param actorUserId actor filter, or {@code null}
+   * @param eventType event-type filter, or {@code null}
+   * @param clientId originating-client filter, or {@code null}
+   * @return the base URL with the domain + filter query parameters (no page/size)
+   */
+  private static String buildBaseUrl(
+      String domain,
+      Instant from,
+      Instant to,
+      UUID actorUserId,
+      String eventType,
+      String clientId) {
+    UriComponentsBuilder base =
+        UriComponentsBuilder.fromPath("/admin/audit-log").queryParam("domain", domain);
+    appendIfPresent(base, "from", from);
+    appendIfPresent(base, "to", to);
+    appendIfPresent(base, "actorUserId", actorUserId);
+    appendIfPresent(base, "eventType", eventType);
+    appendIfPresent(base, "clientId", clientId);
+    return base.toUriString();
+  }
+
+  /**
+   * Reads the exchange registry's clients, so the filter offers them and both the filter and the
+   * rows show their product names (REQ-XCH-010); an unreachable registry offers none.
+   *
+   * @return display names by client id, ordered by client id
+   */
+  @NotNull
+  private Map<String, String> exchangeClientNames() {
+    Map<String, String> names = new TreeMap<>();
+    try {
+      List<ExchangeClientDto> clients = auditClient.exchangeClients();
+      if (clients != null) {
+        clients.forEach(c -> names.put(c.clientId(), c.displayName()));
+      }
+    } catch (Exception e) {
+      log.debug("Could not load the exchange registry for the audit client filter", e);
+    }
+    return names;
+  }
+}

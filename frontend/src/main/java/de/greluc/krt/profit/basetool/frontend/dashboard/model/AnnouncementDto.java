@@ -1,0 +1,35 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.dashboard.model;
+
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import java.time.Instant;
+import java.util.UUID;
+
+/**
+ * The shared dashboard announcement as the backend returns it.
+ *
+ * @param id the announcement id
+ * @param content the Markdown text, possibly blank on the admin view
+ * @param updatedAt when it was last saved
+ * @param version the optimistic-lock version
+ */
+@DtoMirror
+public record AnnouncementDto(UUID id, String content, Instant updatedAt, Long version) {}
