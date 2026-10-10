@@ -198,15 +198,29 @@ public class NotificationCreationService {
   }
 
   /**
-   * Deletes the notifications the event marks obsolete for its entity (REQ-NOTIF-018).
+   * Deletes the notifications the event marks obsolete for its entity: those of {@link
+   * NotificationEvent#resolvesNotificationTypes()} for everyone (REQ-NOTIF-018) and those of {@link
+   * NotificationEvent#resolvesNotificationTypesForRecipients()} for {@link
+   * NotificationEvent#supersedeRecipients()} only (REQ-NOTIF-025).
    *
    * @param event the fired event
    * @return the recipient subs whose stale notifications were removed; empty when none
    */
   @NotNull
   private Set<UUID> removeSupersededNotifications(@NotNull NotificationEvent event) {
+    if (event.entityType() == null || event.entityId() == null) {
+      return Set.of();
+    }
+    Set<UUID> affected = new HashSet<>();
+    affected.addAll(removeForEveryone(event));
+    affected.addAll(removeForRecipients(event));
+    return affected;
+  }
+
+  @NotNull
+  private Set<UUID> removeForEveryone(@NotNull NotificationEvent event) {
     Set<NotificationType> supersededTypes = event.resolvesNotificationTypes();
-    if (supersededTypes.isEmpty() || event.entityType() == null || event.entityId() == null) {
+    if (supersededTypes.isEmpty()) {
       return Set.of();
     }
     Set<UUID> affected =
@@ -223,6 +237,35 @@ public class NotificationCreationService {
         "Removed {} superseded notification(s) of {} for {} {} on event {}",
         deleted,
         supersededTypes,
+        event.entityType(),
+        event.entityId(),
+        event.eventType());
+    return affected;
+  }
+
+  @NotNull
+  private Set<UUID> removeForRecipients(@NotNull NotificationEvent event) {
+    Set<NotificationType> supersededTypes = event.resolvesNotificationTypesForRecipients();
+    Set<UUID> recipients = event.supersedeRecipients();
+    if (supersededTypes.isEmpty() || recipients.isEmpty()) {
+      return Set.of();
+    }
+    Set<UUID> affected =
+        new HashSet<>(
+            notificationRepository.findRecipientUserIdsByTypeInAndEntity(
+                supersededTypes, event.entityType(), event.entityId()));
+    affected.retainAll(recipients);
+    if (affected.isEmpty()) {
+      return Set.of();
+    }
+    int deleted =
+        notificationRepository.deleteByTypeInAndEntityForRecipients(
+            supersededTypes, event.entityType(), event.entityId(), affected);
+    log.info(
+        "Removed {} superseded notification(s) of {} for {} member(s) on {} {} on event {}",
+        deleted,
+        supersededTypes,
+        affected.size(),
         event.entityType(),
         event.entityId(),
         event.eventType());

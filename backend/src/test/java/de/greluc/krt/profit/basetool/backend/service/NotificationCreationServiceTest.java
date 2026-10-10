@@ -297,6 +297,91 @@ class NotificationCreationServiceTest {
         .containsExactly(newHolder);
   }
 
+  @Test
+  void perRecipientSupersedeClearsTheNoticeOfTheNamedMemberOnly() {
+    UUID entity = UUID.fromString("00000000-0000-0000-0000-00000000d001");
+    StubNotificationEvent event =
+        StubNotificationEvent.builder()
+            .resolvesNotificationTypesForRecipients(Set.of(NotificationType.JOB_ORDER_CREATED))
+            .supersedeRecipients(Set.of(A))
+            .build();
+    when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
+            Set.of(NotificationType.JOB_ORDER_CREATED), "STUB", entity))
+        .thenReturn(List.of(A, B));
+    when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
+
+    Map<NotificationSignal, Set<UUID>> result = service.createFromEvent(event);
+
+    verify(notificationRepository)
+        .deleteByTypeInAndEntityForRecipients(
+            Set.of(NotificationType.JOB_ORDER_CREATED), "STUB", entity, Set.of(A));
+    verify(notificationRepository, never()).deleteByTypeInAndEntity(any(), any(), any());
+    assertThat(result).containsOnlyKeys(NotificationSignal.refreshOnly());
+    assertThat(flatten(result)).containsExactly(A);
+  }
+
+  @Test
+  void perRecipientSupersedeDoesNothingWhenTheNamedMemberHoldsNoNotice() {
+    UUID entity = UUID.fromString("00000000-0000-0000-0000-00000000d001");
+    StubNotificationEvent event =
+        StubNotificationEvent.builder()
+            .resolvesNotificationTypesForRecipients(Set.of(NotificationType.JOB_ORDER_CREATED))
+            .supersedeRecipients(Set.of(A))
+            .build();
+    when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
+            Set.of(NotificationType.JOB_ORDER_CREATED), "STUB", entity))
+        .thenReturn(List.of(B));
+    when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
+
+    Set<UUID> affected = flatten(service.createFromEvent(event));
+
+    assertThat(affected).isEmpty();
+    verify(notificationRepository, never())
+        .deleteByTypeInAndEntityForRecipients(any(), any(), any(), any());
+  }
+
+  @Test
+  void perRecipientSupersedeIsIgnoredWithoutNamedMembers() {
+    StubNotificationEvent event =
+        StubNotificationEvent.builder()
+            .resolvesNotificationTypesForRecipients(Set.of(NotificationType.JOB_ORDER_CREATED))
+            .build();
+    when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
+
+    service.createFromEvent(event);
+
+    verify(notificationRepository, never())
+        .findRecipientUserIdsByTypeInAndEntity(any(), any(), any());
+  }
+
+  @Test
+  void perRecipientAndPerEntitySupersedeCanRunInOneEvent() {
+    UUID entity = UUID.fromString("00000000-0000-0000-0000-00000000d001");
+    StubNotificationEvent event =
+        StubNotificationEvent.builder()
+            .resolvesNotificationTypes(Set.of(NotificationType.JOB_ORDER_UPDATED_BY_REQUESTER))
+            .resolvesNotificationTypesForRecipients(Set.of(NotificationType.JOB_ORDER_CREATED))
+            .supersedeRecipients(Set.of(A))
+            .build();
+    when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
+            Set.of(NotificationType.JOB_ORDER_UPDATED_BY_REQUESTER), "STUB", entity))
+        .thenReturn(List.of(B));
+    when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
+            Set.of(NotificationType.JOB_ORDER_CREATED), "STUB", entity))
+        .thenReturn(List.of(A, B));
+    when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
+
+    Set<UUID> affected = flatten(service.createFromEvent(event));
+
+    assertThat(affected).containsExactlyInAnyOrder(A, B);
+    verify(notificationRepository)
+        .deleteByTypeInAndEntity(
+            Set.of(NotificationType.JOB_ORDER_UPDATED_BY_REQUESTER), "STUB", entity);
+    verify(notificationRepository)
+        .deleteByTypeInAndEntityForRecipients(
+            Set.of(NotificationType.JOB_ORDER_CREATED), "STUB", entity, Set.of(A));
+  }
+
   /**
    * Unions every recipient reached by the call, regardless of signal.
    *
