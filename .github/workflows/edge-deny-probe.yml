@@ -128,9 +128,9 @@ jobs:
           GET /api/v1/blueprints/me/sharing 401
           PUT /api/v1/blueprints/me/sharing 401
           GET /api/v1/blueprints/products/search 401
-          POST /api/v1/missions/{missionId}/finance-entries 401
-          PUT /api/v1/finance-entries/00000000-0000-4000-8000-00000000cafe 401
-          DELETE /api/v1/finance-entries/00000000-0000-4000-8000-00000000cafe 401
+          POST /api/v1/finance-entries 410
+          PUT /api/v1/finance-entries/00000000-0000-4000-8000-00000000cafe 410
+          DELETE /api/v1/finance-entries/00000000-0000-4000-8000-00000000cafe 410
           POST /api/v1/hangar/import/fleetview 401
           GET /api/v1/hangar/my-ships 401
           POST /api/v1/hangar/ships 401
@@ -192,44 +192,73 @@ jobs:
           GET /api/v1/me/active-org-unit 410
           GET /api/v1/me/capabilities 401
           GET /api/v1/me/org-units 410
+          GET /api/v1/missions 401
           GET /api/v1/missions/lookup 401
           GET /api/v1/missions/me/payout-preference 401
           PUT /api/v1/missions/me/payout-preference 401
-          GET /api/v1/missions 401
+          GET /api/v1/missions/search 410
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe 401
           PATCH /api/v1/missions/00000000-0000-4000-8000-00000000cafe/core 401
           PATCH /api/v1/missions/00000000-0000-4000-8000-00000000cafe/flags 401
           POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/frequencies/custom 401
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/frequencies/custom/slim 410
           DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/frequencies/00000000-0000-4000-8000-00000000cafe 401
+          DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/frequencies/00000000-0000-4000-8000-00000000cafe/slim 410
           POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/join 401
           POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/managers/00000000-0000-4000-8000-00000000cafe 401
           DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/managers/00000000-0000-4000-8000-00000000cafe 401
-          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives/reorder 401
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/managers/00000000-0000-4000-8000-00000000cafe/slim 410
+          DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/managers/00000000-0000-4000-8000-00000000cafe/slim 410
           POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives 401
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives/reorder 401
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives/reorder/slim 410
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives/slim 410
           PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives/00000000-0000-4000-8000-00000000cafe 401
           DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives/00000000-0000-4000-8000-00000000cafe 401
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives/00000000-0000-4000-8000-00000000cafe/slim 410
+          DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives/00000000-0000-4000-8000-00000000cafe/slim 410
           POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/by-id 401
-          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/check-in 401
-          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/check-out 401
-          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/payout-preference 401
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/by-id/slim 410
           PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe 401
           DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe 401
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/check-in 401
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/check-in/slim 410
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/check-out 401
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/check-out/slim 410
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/payout-preference 401
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/payout-preference/slim 410
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/slim 410
+          DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/slim 410
           PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/party-lead 401
           PATCH /api/v1/missions/00000000-0000-4000-8000-00000000cafe/schedule 401
-          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/reorder 401
           POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps 401
-          PATCH /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/00000000-0000-4000-8000-00000000cafe/done 401
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/reorder 401
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/reorder/slim 410
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/slim 410
           PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/00000000-0000-4000-8000-00000000cafe 401
           DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/00000000-0000-4000-8000-00000000cafe 401
+          PATCH /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/00000000-0000-4000-8000-00000000cafe/done 401
+          PATCH /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/00000000-0000-4000-8000-00000000cafe/done/slim 410
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/00000000-0000-4000-8000-00000000cafe/slim 410
+          DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/00000000-0000-4000-8000-00000000cafe/slim 410
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/unit-ship-options 401
           POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units 401
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/slim 410
           POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe/crew 401
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe/crew/slim 410
           PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe/crew/00000000-0000-4000-8000-00000000cafe 401
           DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe/crew/00000000-0000-4000-8000-00000000cafe 401
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe/crew/00000000-0000-4000-8000-00000000cafe/slim 410
+          DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe/crew/00000000-0000-4000-8000-00000000cafe/slim 410
           PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe 401
           DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe 401
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe/slim 410
+          DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe/slim 410
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/finance-entries 401
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/finance-entries 401
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/finance-entries/summary 401
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/finance-entries/00000000-0000-4000-8000-00000000cafe 401
+          DELETE /api/v1/missions/00000000-0000-4000-8000-00000000cafe/finance-entries/00000000-0000-4000-8000-00000000cafe 401
           GET /api/v1/notifications 401
           GET /api/v1/notifications/preferences 401
           PUT /api/v1/notifications/preferences/JOB_ORDER_CREATED 401
@@ -379,7 +408,7 @@ jobs:
           GET /api/v1/bank/withdrawals 404
           POST /api/v1/blueprints/me/sharing 404
           POST /api/v1/blueprints/products/search 404
-          GET /api/v1/missions/{missionId}/finance-entries 404
+          GET /api/v1/finance-entries 404
           GET /api/v1/finance-entries/00000000-0000-4000-8000-00000000cafe 404
           GET /api/v1/hangar/import/fleetview 404
           POST /api/v1/hangar/my-ships 404
@@ -434,37 +463,58 @@ jobs:
           POST /api/v1/me/active-org-unit 404
           POST /api/v1/me/capabilities 404
           POST /api/v1/me/org-units 404
+          POST /api/v1/missions 404
           POST /api/v1/missions/lookup 404
           POST /api/v1/missions/me/payout-preference 404
-          POST /api/v1/missions 404
+          POST /api/v1/missions/search 404
           POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe 404
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/core 404
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/flags 404
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/frequencies/custom 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/frequencies/custom/slim 404
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/frequencies/00000000-0000-4000-8000-00000000cafe 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/frequencies/00000000-0000-4000-8000-00000000cafe/slim 404
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/join 404
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/managers/00000000-0000-4000-8000-00000000cafe 404
-          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives/reorder 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/managers/00000000-0000-4000-8000-00000000cafe/slim 404
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives/reorder 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives/reorder/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives/slim 404
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives/00000000-0000-4000-8000-00000000cafe 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/objectives/00000000-0000-4000-8000-00000000cafe/slim 404
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/by-id 404
-          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/check-in 404
-          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/check-out 404
-          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/payout-preference 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/by-id/slim 404
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/check-in 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/check-in/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/check-out 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/check-out/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/payout-preference 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/payout-preference/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/00000000-0000-4000-8000-00000000cafe/slim 404
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/party-lead 404
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/schedule 404
-          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/reorder 404
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps 404
-          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/00000000-0000-4000-8000-00000000cafe/done 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/reorder 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/reorder/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/slim 404
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/00000000-0000-4000-8000-00000000cafe 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/00000000-0000-4000-8000-00000000cafe/done 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/00000000-0000-4000-8000-00000000cafe/done/slim 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/steps/00000000-0000-4000-8000-00000000cafe/slim 404
           POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/unit-ship-options 404
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/slim 404
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe/crew 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe/crew/slim 404
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe/crew/00000000-0000-4000-8000-00000000cafe 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe/crew/00000000-0000-4000-8000-00000000cafe/slim 404
           GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe 404
-          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/finance-entries 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/units/00000000-0000-4000-8000-00000000cafe/slim 404
+          PUT /api/v1/missions/00000000-0000-4000-8000-00000000cafe/finance-entries 404
           POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/finance-entries/summary 404
+          GET /api/v1/missions/00000000-0000-4000-8000-00000000cafe/finance-entries/00000000-0000-4000-8000-00000000cafe 404
           POST /api/v1/notifications 404
           POST /api/v1/notifications/preferences 404
           GET /api/v1/notifications/preferences/JOB_ORDER_CREATED 404
@@ -572,8 +622,6 @@ jobs:
           GET /api/v1/exchange/me/blueprints 404
           GET /api/v1/connected-apps 404
           GET /api/v1/definitely-not-allow-listed 404
-          GET /api/v1/missions 404
-          POST /api/v1/missions 404
           POST /api/v1/users 404
           POST /api/v1/operations/ 404
           POST /api/v1/Operations 404
@@ -583,7 +631,7 @@ jobs:
           PUT /api/v1/orders/requested 404
           POST /api/v1/refinery-orders/import-extract 404
           POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants 404
-          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants 404
+          POST /api/v1/missions/00000000-0000-4000-8000-00000000cafe/participants/slim 404
           GET /api/v1/hangar/admin/users/00000000-0000-4000-8000-00000000cafe/ships 404
           GET /api/v1/bank/accounts/00000000-0000-4000-8000-00000000cafe/balance-series 404
           GET /api/v1/bank/admin/audit 404

@@ -171,7 +171,7 @@ class BackendCallExistenceTest {
             "PUT /api/v1/missions/{}/owner/{}",
             "GET /api/v1/missions/{}/crew",
             "GET /api/v1/missions/{}/steps",
-            "GET /api/v1/missions",
+            "GET /api/v1/missions/search",
             "GET /api/v1/retired/{}",
             "DELETE /api/v1/missions/{}",
             "POST /api/v1/missions/{}/report",

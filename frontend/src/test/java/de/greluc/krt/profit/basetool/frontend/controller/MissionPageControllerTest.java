@@ -151,7 +151,7 @@ class MissionPageControllerTest {
 
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
-        .post(eq("/api/v1/missions/{id}/participants/add"), any(), eq(Void.class), eq(id));
+        .post(eq("/api/v1/missions/{id}/participants"), any(), eq(Void.class), eq(id));
   }
 
   @Test
@@ -221,7 +221,7 @@ class MissionPageControllerTest {
 
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
-        .post(eq("/api/v1/missions/{id}/participants/add"), any(), eq(Void.class), eq(id));
+        .post(eq("/api/v1/missions/{id}/participants"), any(), eq(Void.class), eq(id));
   }
 
   @Test

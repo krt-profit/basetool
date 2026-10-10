@@ -56,7 +56,7 @@ import org.springframework.stereotype.Component;
 class SecurityExpressionRulesTest {
 
   /** Declared security expressions on 2026-10-02; fewer means the scan lost its subject. */
-  private static final int EXPRESSION_FLOOR = 441;
+  private static final int EXPRESSION_FLOOR = 439;
 
   /**
    * Bean references per security bean. A count below its floor means a gate lost a bean check; a
@@ -67,15 +67,15 @@ class SecurityExpressionRulesTest {
           Map.entry("ownerScopeService", 6),
           Map.entry("operationAccessPolicy", 8),
           Map.entry("refineryAccessPolicy", 8),
-          Map.entry("missionSecurityService", 40),
-          Map.entry("authHelperService", 17),
+          Map.entry("missionSecurityService", 39),
+          Map.entry("authHelperService", 15),
           Map.entry("exchangeGate", 14),
           Map.entry("orgRoleManagementSecurityService", 13),
           Map.entry("bankSecurityService", 10),
           Map.entry("specialCommandSecurityService", 5),
           Map.entry("connectedAppsGate", 1),
           Map.entry("jobOrderAccessPolicy", 29),
-          Map.entry("missionAccessPolicy", 7),
+          Map.entry("missionAccessPolicy", 6),
           Map.entry("inventoryAccessPolicy", 9));
 
   /**

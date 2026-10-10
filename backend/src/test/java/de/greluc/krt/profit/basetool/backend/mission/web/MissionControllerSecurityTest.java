@@ -81,11 +81,7 @@ class MissionControllerSecurityTest {
 
     mockMvc
         .perform(
-            put(
-                    "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim",
-                    missionId,
-                    unitId,
-                    crewId)
+            put("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}", missionId, unitId, crewId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"jobTypeIds\": [\"" + UUID.randomUUID() + "\"]}")
                 .with(
@@ -107,11 +103,7 @@ class MissionControllerSecurityTest {
 
     mockMvc
         .perform(
-            put(
-                    "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim",
-                    missionId,
-                    unitId,
-                    crewId)
+            put("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}", missionId, unitId, crewId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"jobTypeIds\": [\"" + UUID.randomUUID() + "\"]}")
                 .with(
@@ -134,11 +126,7 @@ class MissionControllerSecurityTest {
 
     mockMvc
         .perform(
-            put(
-                    "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim",
-                    missionId,
-                    unitId,
-                    crewId)
+            put("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}", missionId, unitId, crewId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"jobTypeIds\": [\"" + UUID.randomUUID() + "\"]}")
                 .with(jwt().authorities(Collections.emptyList())))

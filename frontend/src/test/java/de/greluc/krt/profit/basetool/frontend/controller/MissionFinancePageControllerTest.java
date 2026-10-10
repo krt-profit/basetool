@@ -125,7 +125,8 @@ class MissionFinancePageControllerTest {
           .post(
               eq("/api/v1/missions/{missionId}/finance-entries"),
               bodyCaptor.capture(),
-              eq(Void.class));
+              eq(Void.class),
+              eq(MISSION_ID));
       assertEquals(
           new MissionFinanceEntryCreateDto(
               MISSION_ID,
@@ -147,7 +148,7 @@ class MissionFinancePageControllerTest {
 
       controller.addFinanceEntry(MISSION_ID, form, br, model, redirectAttributes, null);
 
-      verify(backendApiClient).post(anyString(), any(), eq(Void.class));
+      verify(backendApiClient).post(anyString(), any(), eq(Void.class), eq(MISSION_ID));
     }
 
     @Test
@@ -158,7 +159,7 @@ class MissionFinancePageControllerTest {
       when(br.hasErrors()).thenReturn(false);
       doThrow(new RuntimeException("backend down"))
           .when(backendApiClient)
-          .post(anyString(), any(), any());
+          .post(anyString(), any(), any(), any(Object[].class));
 
       String view =
           controller.addFinanceEntry(MISSION_ID, form, br, model, redirectAttributes, principal);
@@ -211,9 +212,10 @@ class MissionFinancePageControllerTest {
       ArgumentCaptor<MissionFinanceEntryUpdateDto> bodyCaptor = ArgumentCaptor.captor();
       verify(backendApiClient)
           .put(
-              eq("/api/v1/finance-entries/{entryId}"),
+              eq("/api/v1/missions/{missionId}/finance-entries/{entryId}"),
               bodyCaptor.capture(),
               eq(Void.class),
+              eq(MISSION_ID),
               eq(ENTRY_ID));
       assertEquals(
           new MissionFinanceEntryUpdateDto(
@@ -253,7 +255,12 @@ class MissionFinancePageControllerTest {
           controller.deleteFinanceEntry(MISSION_ID, ENTRY_ID, principal, redirectAttributes);
 
       assertEquals("redirect:/missions/" + MISSION_ID, view);
-      verify(backendApiClient).delete("/api/v1/finance-entries/{entryId}", Void.class, ENTRY_ID);
+      verify(backendApiClient)
+          .delete(
+              "/api/v1/missions/{missionId}/finance-entries/{entryId}",
+              Void.class,
+              MISSION_ID,
+              ENTRY_ID);
       assertEquals(
           "notification.success.delete",
           redirectAttributes.getFlashAttributes().get("successToast"));
@@ -289,7 +296,8 @@ class MissionFinancePageControllerTest {
       when(backendApiClient.post(
               eq("/api/v1/missions/{missionId}/finance-entries"),
               any(),
-              eq(MissionFinanceEntryDto.class)))
+              eq(MissionFinanceEntryDto.class),
+              eq(MISSION_ID)))
           .thenReturn(created);
 
       ResponseEntity<Object> resp = controller.addFinanceEntryAjax(MISSION_ID, body, principal);
@@ -301,7 +309,8 @@ class MissionFinancePageControllerTest {
               "/api/v1/missions/{missionId}/finance-entries",
               new MissionFinanceEntryCreateDto(
                   MISSION_ID, participantId, null, FinanceType.INCOME, new BigDecimal("250")),
-              MissionFinanceEntryDto.class);
+              MissionFinanceEntryDto.class,
+              MISSION_ID);
     }
 
     @Test
@@ -309,9 +318,10 @@ class MissionFinancePageControllerTest {
       MissionFinanceEntryUpdateDto body =
           new MissionFinanceEntryUpdateDto(null, null, new BigDecimal("99"), 3L);
       when(backendApiClient.put(
-              eq("/api/v1/finance-entries/{entryId}"),
+              eq("/api/v1/missions/{missionId}/finance-entries/{entryId}"),
               any(),
               eq(MissionFinanceEntryDto.class),
+              eq(MISSION_ID),
               eq(ENTRY_ID)))
           .thenReturn(new MissionFinanceEntryDto(ENTRY_ID, MISSION_ID, null, null, null, null, 4L));
 
@@ -320,9 +330,10 @@ class MissionFinancePageControllerTest {
       assertEquals(200, resp.getStatusCode().value());
       verify(backendApiClient)
           .put(
-              eq("/api/v1/finance-entries/{entryId}"),
+              eq("/api/v1/missions/{missionId}/finance-entries/{entryId}"),
               eq(body),
               eq(MissionFinanceEntryDto.class),
+              eq(MISSION_ID),
               eq(ENTRY_ID));
     }
 
@@ -331,7 +342,12 @@ class MissionFinancePageControllerTest {
       ResponseEntity<Object> resp = controller.deleteFinanceEntryAjax(MISSION_ID, ENTRY_ID);
 
       assertEquals(204, resp.getStatusCode().value());
-      verify(backendApiClient).delete("/api/v1/finance-entries/{entryId}", Void.class, ENTRY_ID);
+      verify(backendApiClient)
+          .delete(
+              "/api/v1/missions/{missionId}/finance-entries/{entryId}",
+              Void.class,
+              MISSION_ID,
+              ENTRY_ID);
     }
   }
 

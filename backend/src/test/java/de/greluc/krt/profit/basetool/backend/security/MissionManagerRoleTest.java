@@ -29,14 +29,12 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.CustomJwtGrantedAuthoritiesConverter;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -110,56 +108,18 @@ class MissionManagerRoleTest {
     missionRepository.save(mission);
   }
 
-  private String createMissionJson() throws Exception {
-    MissionDto dto =
-        new MissionDto(
-            mission.getId(),
-            "Updated Name",
-            null,
-            null,
-            "PLANNED",
-            null,
-            mission.getPlannedStartTime(),
-            null,
-            null,
-            null,
-            false,
-            Collections.emptySet(),
-            Collections.emptyList(),
-            Collections.emptyList(),
-            null,
-            null,
-            Collections.emptySet(),
-            false,
-            false,
-            0L,
-            0L,
-            0L,
-            0L,
-            0,
-            0,
-            null,
-            null,
-            null,
-            null,
-            0L,
-            Collections.emptyList(),
-            0L,
-            Collections.emptyList(),
-            0L,
-            null,
-            null);
-    return objectMapper.writeValueAsString(dto);
+  private String coreJson() {
+    return "{\"name\":\"Updated Name\",\"version\":0}";
   }
 
   @Test
   void ownerShouldBeAbleToUpdateMission() throws Exception {
     mockMvc
         .perform(
-            put("/api/v1/missions/" + mission.getId())
+            patch("/api/v1/missions/" + mission.getId() + "/core")
                 .with(jwt().jwt(builder -> builder.subject(owner.getId().toString())))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(createMissionJson()))
+                .content(coreJson()))
         .andExpect(status().isOk());
   }
 
@@ -167,7 +127,7 @@ class MissionManagerRoleTest {
   void missionManagerShouldBeAbleToUpdateMission() throws Exception {
     mockMvc
         .perform(
-            put("/api/v1/missions/" + mission.getId())
+            patch("/api/v1/missions/" + mission.getId() + "/core")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(managerMember.getId().toString()))
@@ -175,7 +135,7 @@ class MissionManagerRoleTest {
                             new org.springframework.security.core.authority.SimpleGrantedAuthority(
                                 "ROLE_MISSION_MANAGER")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(createMissionJson()))
+                .content(coreJson()))
         .andExpect(status().isOk());
   }
 
@@ -183,10 +143,10 @@ class MissionManagerRoleTest {
   void otherMemberShouldNotBeAbleToUpdateMission() throws Exception {
     mockMvc
         .perform(
-            put("/api/v1/missions/" + mission.getId())
+            patch("/api/v1/missions/" + mission.getId() + "/core")
                 .with(jwt().jwt(builder -> builder.subject(otherMember.getId().toString())))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(createMissionJson()))
+                .content(coreJson()))
         .andExpect(status().isForbidden());
   }
 
@@ -197,10 +157,10 @@ class MissionManagerRoleTest {
 
     mockMvc
         .perform(
-            put("/api/v1/missions/" + mission.getId())
+            patch("/api/v1/missions/" + mission.getId() + "/core")
                 .with(jwt().jwt(builder -> builder.subject(otherMember.getId().toString())))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(createMissionJson()))
+                .content(coreJson()))
         .andExpect(status().isOk());
   }
 
@@ -208,14 +168,14 @@ class MissionManagerRoleTest {
   void adminShouldBeAbleToUpdateMission() throws Exception {
     mockMvc
         .perform(
-            put("/api/v1/missions/" + mission.getId())
+            patch("/api/v1/missions/" + mission.getId() + "/core")
                 .with(
                     jwt()
                         .authorities(
                             new org.springframework.security.core.authority.SimpleGrantedAuthority(
                                 "ROLE_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(createMissionJson()))
+                .content(coreJson()))
         .andExpect(status().isOk());
   }
 

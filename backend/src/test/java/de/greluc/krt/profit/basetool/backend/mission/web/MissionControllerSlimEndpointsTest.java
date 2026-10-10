@@ -266,7 +266,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            put("/api/v1/missions/{id}/frequencies/custom/{fid}/slim", missionId, frequencyId)
+            put("/api/v1/missions/{id}/frequencies/custom/{fid}", missionId, frequencyId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"Recon 2\",\"value\":42.10,\"version\":0}")
                 .with(jwt().authorities(officer())))
@@ -522,7 +522,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            put("/api/v1/missions/{id}/participants/{pid}/slim", missionId, participantId)
+            put("/api/v1/missions/{id}/participants/{pid}", missionId, participantId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"version\":0,\"guestName\":\"Anon-Guest\",\"comment\":\"edited\"}")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
@@ -540,7 +540,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            delete("/api/v1/missions/{id}/participants/{pid}/slim", missionId, participantId)
+            delete("/api/v1/missions/{id}/participants/{pid}", missionId, participantId)
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isNoContent());
   }
@@ -689,26 +689,6 @@ class MissionControllerSlimEndpointsTest {
         "empty form + authenticated caller -> self-enroll with caller's id");
   }
 
-  @Test
-  void addParticipantPublic_ambiguousName_isConflict() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    User a = new User();
-    a.setId(UUID.randomUUID());
-    a.setUsername("alex");
-    User b = new User();
-    b.setId(UUID.randomUUID());
-    b.setUsername("alex");
-    when(userService.findMatchesByExactName("alex")).thenReturn(java.util.List.of(a, b));
-
-    mockMvc
-        .perform(
-            post("/api/v1/missions/{id}/participants/add", missionId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"guestName\":\"alex\"}")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
-        .andExpect(status().isConflict());
-  }
-
   /**
    * Builds a mission whose participant set already contains an OTHER registered user (Bob, email
    * populated) plus the newly-added guest entry. Reflects the response shape both endpoints
@@ -786,64 +766,6 @@ class MissionControllerSlimEndpointsTest {
         mockMvc
             .perform(
                 post("/api/v1/missions/{id}/participants", missionId)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"guestName\":\"Anon-Guest\"}")
-                    .with(jwt().jwt(j -> j.subject(callerId.toString())).authorities(officer())))
-            .andExpect(status().isOk())
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-
-    org.junit.jupiter.api.Assertions.assertTrue(
-        body.contains("bob.callsign"), "participant callsign stays visible on the roster");
-    org.junit.jupiter.api.Assertions.assertFalse(
-        body.contains("bob@example.invalid"),
-        "authenticated officer must NOT receive the participant's email");
-  }
-
-  @Test
-  void addParticipantPublic_member_redactsOtherParticipantsPii() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    UUID otherUserId = UUID.randomUUID();
-    UUID guestParticipantId = UUID.randomUUID();
-
-    when(missionService.addParticipant(any(), any(), any(), any(), any(), any(), any()))
-        .thenReturn(missionWithOtherUserAndGuest(otherUserId, guestParticipantId));
-
-    String body =
-        mockMvc
-            .perform(
-                post("/api/v1/missions/{id}/participants/add", missionId)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"guestName\":\"Anon-Guest\"}")
-                    .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
-            .andExpect(status().isOk())
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-
-    org.junit.jupiter.api.Assertions.assertTrue(
-        body.contains("bob.callsign"), "the callsign is what a peer identifies people by");
-    org.junit.jupiter.api.Assertions.assertFalse(
-        body.contains("bob@example.invalid"), "a peer must never receive a participant e-mail");
-  }
-
-  @Test
-  void addParticipantPublic_authenticatedOfficer_stripsParticipantEmail() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    UUID callerId = UUID.randomUUID();
-    UUID otherUserId = UUID.randomUUID();
-    UUID guestParticipantId = UUID.randomUUID();
-
-    when(userService.getUserIdFromJwt(any())).thenReturn(callerId);
-    when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(true);
-    when(missionService.addParticipant(any(), any(), any(), any(), any(), any(), any()))
-        .thenReturn(missionWithOtherUserAndGuest(otherUserId, guestParticipantId));
-
-    String body =
-        mockMvc
-            .perform(
-                post("/api/v1/missions/{id}/participants/add", missionId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"guestName\":\"Anon-Guest\"}")
                     .with(jwt().jwt(j -> j.subject(callerId.toString())).authorities(officer())))

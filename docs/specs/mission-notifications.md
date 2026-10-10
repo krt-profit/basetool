@@ -17,9 +17,9 @@ Each can be muted by the member (REQ-NOTIF-027).
 
 ### REQ-MISSION-021 — A moved, cancelled or deleted Einsatz tells its participants
 
-`MissionService#updateScheduleSection` and `#updateMission` publish `MISSION_RESCHEDULED` when the
+`MissionService#updateScheduleSection` publishes `MISSION_RESCHEDULED` when the
 meeting time or the planned start **actually changes** (old → new time of the one that moved);
-`#updateCoreSection` and `#updateMission` publish `MISSION_CANCELLED` on the transition to
+`#updateCoreSection` publishes `MISSION_CANCELLED` on the transition to
 `CANCELLED`; `#deleteMission` publishes `MISSION_DELETED`, listing the participants captured before
 the delete (`EVENT_RECIPIENTS`), because the mission is gone. The default rules notify the mission's
 participants (`MISSION_PARTICIPANTS`) and exclude the actor. Only the latest change stays: a reschedule

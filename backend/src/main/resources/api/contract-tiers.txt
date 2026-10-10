@@ -46,9 +46,6 @@ T1 GET /api/v1/bank/transfer-fee-rate
 T1 POST /api/v1/bank/transfers
 T1 POST /api/v1/bank/withdrawals
 T1 GET /api/v1/blueprints/products/search
-T1 POST /api/v1/missions/{missionId}/finance-entries
-T1 DELETE /api/v1/finance-entries/{entryId}
-T1 PUT /api/v1/finance-entries/{entryId}
 T1 POST /api/v1/hangar/import/fleetview
 T1 GET /api/v1/hangar/my-ships
 T1 DELETE /api/v1/hangar/ships
@@ -142,8 +139,11 @@ T1 DELETE /api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}
 T1 PUT /api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}
 T1 DELETE /api/v1/missions/{id}/units/{unitId}
 T1 PUT /api/v1/missions/{id}/units/{unitId}
+T1 POST /api/v1/missions/{missionId}/finance-entries
 T1 GET /api/v1/missions/{missionId}/finance-entries
 T1 GET /api/v1/missions/{missionId}/finance-entries/summary
+T1 DELETE /api/v1/missions/{missionId}/finance-entries/{entryId}
+T1 PUT /api/v1/missions/{missionId}/finance-entries/{entryId}
 T1 GET /api/v1/notifications
 T1 GET /api/v1/notifications/preferences
 T1 PUT /api/v1/notifications/preferences/{type}

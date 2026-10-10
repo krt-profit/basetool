@@ -276,17 +276,17 @@ class MissionBackendClientTest {
             + "\"startTime\":\"2026-09-01T10:15:30Z\",\"endTime\":null,\"orgUnitIds\":null,"
             + "\"payoutPreference\":\"PAYOUT\",\"version\":4}";
     String participant = M + "/participants/" + OTHER;
-    backend.expect("POST", M + "/participants/add", addJson);
-    backend.expect("PUT", participant + "/slim", updateJson);
-    backend.expect("DELETE", participant + "/slim");
-    backend.expect("POST", participant + "/check-in/slim", null);
-    backend.expect("POST", M + "/participants/slim", addJson);
-    backend.expect("PUT", participant + "/slim", updateJson);
-    backend.expect("POST", participant + "/check-out/slim", null);
-    backend.expect("DELETE", participant + "/slim");
-    backend.expect("POST", participant + "/check-in/slim", null);
-    backend.expect("POST", participant + "/check-out/slim", null);
-    backend.expect("PUT", participant + "/payout-preference/slim", "{\"preference\":null}");
+    backend.expect("POST", M + "/participants", addJson);
+    backend.expect("PUT", participant, updateJson);
+    backend.expect("DELETE", participant);
+    backend.expect("POST", participant + "/check-in", null);
+    backend.expect("POST", M + "/participants", addJson);
+    backend.expect("PUT", participant, updateJson);
+    backend.expect("POST", participant + "/check-out", null);
+    backend.expect("DELETE", participant);
+    backend.expect("POST", participant + "/check-in", null);
+    backend.expect("POST", participant + "/check-out", null);
+    backend.expect("PUT", participant + "/payout-preference", "{\"preference\":null}");
   }
 
   @Test
@@ -332,8 +332,8 @@ class MissionBackendClientTest {
             + "\",\"version\":4,\"meetingPoint\":null}");
     backend.expect("PATCH", M + "/flags", "{\"isInternal\":true,\"version\":4}");
     backend.expect("DELETE", M);
-    backend.expect("POST", M + "/managers/" + OTHER + "/slim", null);
-    backend.expect("DELETE", M + "/managers/" + OTHER + "/slim");
+    backend.expect("POST", M + "/managers/" + OTHER, null);
+    backend.expect("DELETE", M + "/managers/" + OTHER);
     backend.expect(
         "POST",
         "/api/v1/missions",
@@ -387,16 +387,16 @@ class MissionBackendClientTest {
     String crewJson = "{\"participantId\":\"" + THIRD + "\",\"jobTypeIds\":[\"" + OTHER + "\"]}";
     String crewUpdateJson = "{\"jobTypeIds\":[],\"version\":null}";
     String unit = M + "/units/" + OTHER;
-    backend.expect("POST", M + "/units/slim", addJson);
-    backend.expect("POST", M + "/units/slim", addJson);
-    backend.expect("PUT", unit + "/slim", updateJson);
-    backend.expect("PUT", unit + "/slim", updateJson);
-    backend.expect("DELETE", unit + "/slim");
-    backend.expect("POST", unit + "/crew/slim", crewJson);
-    backend.expect("POST", unit + "/crew/slim", crewJson);
-    backend.expect("PUT", unit + "/crew/" + THIRD + "/slim", crewUpdateJson);
-    backend.expect("PUT", unit + "/crew/" + THIRD + "/slim", crewUpdateJson);
-    backend.expect("DELETE", unit + "/crew/" + THIRD + "/slim");
+    backend.expect("POST", M + "/units", addJson);
+    backend.expect("POST", M + "/units", addJson);
+    backend.expect("PUT", unit, updateJson);
+    backend.expect("PUT", unit, updateJson);
+    backend.expect("DELETE", unit);
+    backend.expect("POST", unit + "/crew", crewJson);
+    backend.expect("POST", unit + "/crew", crewJson);
+    backend.expect("PUT", unit + "/crew/" + THIRD, crewUpdateJson);
+    backend.expect("PUT", unit + "/crew/" + THIRD, crewUpdateJson);
+    backend.expect("DELETE", unit + "/crew/" + THIRD);
   }
 
   @Test
@@ -430,39 +430,37 @@ class MissionBackendClientTest {
     client.reorderObjectives(ID, new ReorderMissionObjectivesRequest(List.of(THIRD), 4L));
 
     String frequencyJson = "{\"frequencyTypeId\":\"" + OTHER + "\",\"value\":123.45}";
-    backend.expect("POST", M + "/frequencies/slim", frequencyJson);
-    backend.expect("POST", M + "/frequencies/slim", frequencyJson);
-    backend.expect("DELETE", M + "/frequencies/" + OTHER + "/slim");
-    backend.expect("POST", M + "/frequencies/custom/slim", "{\"name\":\"Ops\",\"value\":101.10}");
+    backend.expect("POST", M + "/frequencies", frequencyJson);
+    backend.expect("POST", M + "/frequencies", frequencyJson);
+    backend.expect("DELETE", M + "/frequencies/" + OTHER);
+    backend.expect("POST", M + "/frequencies/custom", "{\"name\":\"Ops\",\"value\":101.10}");
     backend.expect(
         "PUT",
-        M + "/frequencies/custom/" + OTHER + "/slim",
+        M + "/frequencies/custom/" + OTHER,
         "{\"name\":\"Ops\",\"value\":101.10,\"version\":4}");
-    backend.expect(
-        "POST", M + "/steps/slim", "{\"title\":\"Brief\",\"meta\":null,\"stepsVersion\":4}");
+    backend.expect("POST", M + "/steps", "{\"title\":\"Brief\",\"meta\":null,\"stepsVersion\":4}");
     backend.expect(
         "PUT",
-        M + "/steps/" + OTHER + "/slim",
+        M + "/steps/" + OTHER,
         "{\"title\":\"Brief\",\"meta\":\"19:00\",\"stepsVersion\":4}");
-    backend.expect("DELETE", M + "/steps/" + OTHER + "/slim?stepsVersion=7");
+    backend.expect("DELETE", M + "/steps/" + OTHER + "?stepsVersion=7");
     backend.expect(
         "PUT",
-        M + "/steps/reorder/slim",
+        M + "/steps/reorder",
         "{\"stepIds\":[\"" + OTHER + "\",\"" + THIRD + "\"],\"stepsVersion\":4}");
-    backend.expect(
-        "PATCH", M + "/steps/" + OTHER + "/done/slim", "{\"done\":true,\"stepsVersion\":4}");
+    backend.expect("PATCH", M + "/steps/" + OTHER + "/done", "{\"done\":true,\"stepsVersion\":4}");
     backend.expect(
         "POST",
-        M + "/objectives/slim",
+        M + "/objectives",
         "{\"title\":\"Win\",\"kind\":\"PRIMARY\",\"objectivesVersion\":4}");
     backend.expect(
         "PUT",
-        M + "/objectives/" + OTHER + "/slim",
+        M + "/objectives/" + OTHER,
         "{\"title\":\"Win\",\"kind\":\"PRIMARY\",\"objectivesVersion\":5}");
-    backend.expect("DELETE", M + "/objectives/" + OTHER + "/slim?objectivesVersion=8");
+    backend.expect("DELETE", M + "/objectives/" + OTHER + "?objectivesVersion=8");
     backend.expect(
         "PUT",
-        M + "/objectives/reorder/slim",
+        M + "/objectives/reorder",
         "{\"objectiveIds\":[\"" + THIRD + "\"],\"objectivesVersion\":4}");
   }
 

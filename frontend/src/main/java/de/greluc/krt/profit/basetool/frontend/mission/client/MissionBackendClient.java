@@ -645,7 +645,7 @@ public class MissionBackendClient {
    */
   public void addManager(@NotNull UUID missionId, @NotNull UUID userId) {
     backendApiClient.post(
-        "/api/v1/missions/{missionUuid}/managers/{userUuid}/slim",
+        "/api/v1/missions/{missionUuid}/managers/{userUuid}",
         null,
         String.class,
         missionId,
@@ -660,7 +660,7 @@ public class MissionBackendClient {
    */
   public void removeManager(@NotNull UUID missionId, @NotNull UUID userId) {
     backendApiClient.delete(
-        "/api/v1/missions/{missionUuid}/managers/{userUuid}/slim", Void.class, missionId, userId);
+        "/api/v1/missions/{missionUuid}/managers/{userUuid}", Void.class, missionId, userId);
   }
 
   /**
@@ -732,7 +732,7 @@ public class MissionBackendClient {
    */
   public void addCrew(@NotNull UUID id, @NotNull UUID unitId, @NotNull AddCrewRequest request) {
     backendApiClient.post(
-        "/api/v1/missions/{id}/units/{unitId}/crew/slim", request, Void.class, id, unitId);
+        "/api/v1/missions/{id}/units/{unitId}/crew", request, Void.class, id, unitId);
   }
 
   /**
@@ -748,7 +748,7 @@ public class MissionBackendClient {
       @NotNull UUID id, @NotNull UUID unitId, @NotNull AddCrewRequest request) {
     return listOf(
         backendApiClient.post(
-            "/api/v1/missions/{id}/units/{unitId}/crew/slim",
+            "/api/v1/missions/{id}/units/{unitId}/crew",
             request,
             MissionCrewDto[].class,
             id,
@@ -769,7 +769,7 @@ public class MissionBackendClient {
       @NotNull UUID crewId,
       @NotNull UpdateCrewRequest request) {
     backendApiClient.put(
-        "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim",
+        "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}",
         request,
         Void.class,
         id,
@@ -793,7 +793,7 @@ public class MissionBackendClient {
       @NotNull UUID crewId,
       @NotNull UpdateCrewRequest request) {
     return backendApiClient.put(
-        "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim",
+        "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}",
         request,
         MissionCrewDto.class,
         id,
@@ -810,7 +810,7 @@ public class MissionBackendClient {
    */
   public void deleteCrew(@NotNull UUID id, @NotNull UUID unitId, @NotNull UUID crewId) {
     backendApiClient.delete(
-        "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim", Void.class, id, unitId, crewId);
+        "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}", Void.class, id, unitId, crewId);
   }
 
   /**

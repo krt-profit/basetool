@@ -1265,7 +1265,7 @@ class MissionPageControllerMvcTest {
     UUID userId = UUID.randomUUID();
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/{missionUuid}/managers/{userUuid}/slim"),
+            eq("/api/v1/missions/{missionUuid}/managers/{userUuid}"),
             eq(null),
             eq(String.class),
             eq(missionId),
@@ -1623,7 +1623,7 @@ class MissionPageControllerMvcTest {
     };
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/{id}/units/{unitId}/crew/slim"),
+            eq("/api/v1/missions/{id}/units/{unitId}/crew"),
             eq(new AddCrewRequest(participantId, List.of())),
             eq(MissionCrewDto[].class),
             eq(missionId),
@@ -1648,7 +1648,7 @@ class MissionPageControllerMvcTest {
     UUID unitId = UUID.randomUUID();
     UUID crewId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim"),
+            eq("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}"),
             any(),
             eq(MissionCrewDto.class),
             eq(missionId),
@@ -1675,7 +1675,7 @@ class MissionPageControllerMvcTest {
     UUID unitId = UUID.randomUUID();
     UUID crewId = UUID.randomUUID();
     when(backendApiClient.delete(
-            eq("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim"),
+            eq("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}"),
             eq(Void.class),
             eq(missionId),
             eq(unitId),

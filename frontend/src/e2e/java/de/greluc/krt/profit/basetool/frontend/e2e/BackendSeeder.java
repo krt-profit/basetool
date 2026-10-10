@@ -1591,7 +1591,7 @@ public final class BackendSeeder {
 
   /**
    * Adds an external participant with no account to a mission via {@code POST
-   * /api/v1/missions/{id}/participants/add}.
+   * /api/v1/missions/{id}/participants}.
    *
    * @param username the Keycloak username of the mission's creator
    * @param password the Keycloak password
@@ -1604,7 +1604,7 @@ public final class BackendSeeder {
     return seedEntity(
         username,
         password,
-        "/api/v1/missions/" + missionId + "/participants/add",
+        "/api/v1/missions/" + missionId + "/participants",
         "{\"guestName\":\"" + externalName + "\"}");
   }
 
@@ -1623,7 +1623,7 @@ public final class BackendSeeder {
     postBody(
         username,
         password,
-        "/api/v1/missions/" + missionId + "/participants/slim",
+        "/api/v1/missions/" + missionId + "/participants",
         "{\"userId\":\"" + userId + "\"}");
     return missionId;
   }
@@ -1640,14 +1640,14 @@ public final class BackendSeeder {
    * @param missionId the mission to add the unit to
    * @param name the unit's display name (its single mandatory field)
    * @param responsibleUserId the {@code app_user} id pinned as the unit's responsible person
-   * @return the mission id, unchanged — the slim endpoint answers with the unit list
+   * @return the mission id, unchanged — the endpoint answers with the unit list
    */
   public String addUnitWithResponsible(
       String username, String password, String missionId, String name, String responsibleUserId) {
     postBody(
         username,
         password,
-        "/api/v1/missions/" + missionId + "/units/slim",
+        "/api/v1/missions/" + missionId + "/units",
         "{\"name\":\"" + name + "\",\"responsibleUserId\":\"" + responsibleUserId + "\"}");
     return missionId;
   }

@@ -1197,7 +1197,7 @@ with the token. **Migration:** V177, undone by `V239`. **Security audit:** findi
 
 > **Renumbered 2026-09-22:** this requirement was `REQ-SEC-019` until 2026-09-22; that id also named the Discord-link indicator in member management in [`discord-integration.md`](discord-integration.md), which keeps it.
 
-`MissionFinanceEntry` edit/delete (`PUT`/`DELETE /api/v1/finance-entries/{entryId}`) gates on
+`MissionFinanceEntry` edit/delete (`PUT`/`DELETE /api/v1/missions/{missionId}/finance-entries/{entryId}`) gates on
 `MissionSecurityService.canEditFinanceEntry`. `ROLE_OFFICER` is a flat, cross-squadron realm
 authority, so — like every other mission write (`canManageMission`, `canManageManagers`,
 `canChangeOwner`, hardened under audit AUTHZ-1) — an officer may edit/delete a finance entry only when
@@ -2042,7 +2042,7 @@ family decides, so a sub-family can differ from its parent.
 | `/api/v1/bank/**`, `/api/v1/org-units/bank/**` | bank ledgers, balances and holder handles |
 | `/api/v1/users/**`, `/api/v1/me/**` | member records, the caller's own context |
 | `/api/v1/notifications/**` | one member's feed, including the SSE stream, and the recipient rules, whose selector can name an individual member |
-| `/api/v1/finance-entries/**`, `/api/v1/missions/*/finance-entries/**`, `/api/v1/operations/**` | ledgers and payouts |
+| `/api/v1/missions/*/finance-entries/**`, `/api/v1/operations/**` | ledgers and payouts |
 | `/api/v1/personal-inventory/**`, `/api/v1/personal-blueprints/**`, `/api/v1/inventory/**`, `/api/v1/hangar/**`, `/api/v1/refinery-orders/**` | holdings and profit figures |
 | `/api/v1/promotion/**` | evaluations of named members |
 | `/api/v1/roles/**`, `/api/v1/catalog/admin/**`, `/api/v1/blueprints/admin/**` | the administration of roles, of the catalogue (imports, quality tiers, sync reports) and of the default blueprints; the other administration trees sit under `users`, `terms`, `personal-*`, `hangar`, `notifications` and `connected-apps`, which are `no-store` already |

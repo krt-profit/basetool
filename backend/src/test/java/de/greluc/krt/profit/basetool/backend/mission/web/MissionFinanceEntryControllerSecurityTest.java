@@ -143,7 +143,7 @@ class MissionFinanceEntryControllerSecurityTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{missionId}/finance-entries")
+            post("/api/v1/missions/{missionId}/finance-entries", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     "{\"missionId\":\""
@@ -163,7 +163,7 @@ class MissionFinanceEntryControllerSecurityTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{missionId}/finance-entries")
+            post("/api/v1/missions/{missionId}/finance-entries", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     "{\"missionId\":\""
@@ -186,7 +186,7 @@ class MissionFinanceEntryControllerSecurityTest {
     String body =
         mockMvc
             .perform(
-                post("/api/v1/missions/{missionId}/finance-entries")
+                post("/api/v1/missions/{missionId}/finance-entries", missionId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
                         "{\"missionId\":\""
@@ -215,7 +215,7 @@ class MissionFinanceEntryControllerSecurityTest {
     String body =
         mockMvc
             .perform(
-                post("/api/v1/missions/{missionId}/finance-entries")
+                post("/api/v1/missions/{missionId}/finance-entries", missionId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
                         "{\"missionId\":\""
@@ -246,7 +246,7 @@ class MissionFinanceEntryControllerSecurityTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{missionId}/finance-entries")
+            post("/api/v1/missions/{missionId}/finance-entries", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     "{\"missionId\":\""
@@ -268,7 +268,7 @@ class MissionFinanceEntryControllerSecurityTest {
     String oversizedNote = "a".repeat(2001);
     mockMvc
         .perform(
-            post("/api/v1/missions/{missionId}/finance-entries")
+            post("/api/v1/missions/{missionId}/finance-entries", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     "{\"missionId\":\""
@@ -291,7 +291,7 @@ class MissionFinanceEntryControllerSecurityTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{missionId}/finance-entries")
+            post("/api/v1/missions/{missionId}/finance-entries", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     "{\"missionId\":\""

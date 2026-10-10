@@ -175,7 +175,7 @@ class NoStoreApiScopesTest {
         .as(
             "the number of no-store families. Raise it here when you add one, and add the path to"
                 + " sensitiveFamiliesMatch in the same change")
-        .isEqualTo(33);
+        .isEqualTo(32);
     assertThat(NoStoreApiScopes.revalidateFamilies()).hasSize(28);
   }
 }

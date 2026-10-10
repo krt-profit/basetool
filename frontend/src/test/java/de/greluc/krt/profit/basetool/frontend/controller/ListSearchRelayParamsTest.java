@@ -105,7 +105,7 @@ class ListSearchRelayParamsTest {
     verify(mockedBackend)
         .get(
             eq(
-                "/api/v1/missions?query={query}&start={start}&end={end}"
+                "/api/v1/missions?q={q}&start={start}&end={end}"
                     + "&sort=plannedStartTime,desc&status=PLANNED&status=ACTIVE&"),
             anyTypeRef(),
             eq(HOSTILE_TERM),
@@ -181,7 +181,7 @@ class ListSearchRelayParamsTest {
         .andExpect(status().isOk());
 
     HttpUrl url = receivedUrl();
-    assertEquals(List.of(HOSTILE_TERM), url.queryParameterValues("query"));
+    assertEquals(List.of(HOSTILE_TERM), url.queryParameterValues("q"));
     assertEquals(List.of(START), url.queryParameterValues("start"));
     assertTrue(
         url.queryParameterValues("size").isEmpty(),

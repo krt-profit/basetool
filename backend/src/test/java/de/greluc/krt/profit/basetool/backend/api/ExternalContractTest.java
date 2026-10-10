@@ -358,11 +358,12 @@ class ExternalContractTest {
               Set.of("id", "missionId", "participant", "type", "amount", "note", "version"),
               Set.of("amount", "missionId", "participantId", "type")),
           new ContractOperation(
-              "/api/v1/finance-entries/{entryId}",
+              "/api/v1/missions/{missionId}/finance-entries/{entryId}",
               "put",
               Set.of("id", "missionId", "participant", "type", "amount", "note", "version"),
               Set.of("amount", "type", "version")),
-          new ContractOperation("/api/v1/finance-entries/{entryId}", "delete", Set.of()),
+          new ContractOperation(
+              "/api/v1/missions/{missionId}/finance-entries/{entryId}", "delete", Set.of()),
           new ContractOperation(
               "/api/v1/operations/{id}/payouts/paid-out",
               "put",

@@ -163,11 +163,7 @@ class MissionValidationTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/"
-                    + mission.getId()
-                    + "/units/"
-                    + missionShip.getId()
-                    + "/crew/slim")
+            post("/api/v1/missions/" + mission.getId() + "/units/" + missionShip.getId() + "/crew")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
@@ -188,8 +184,7 @@ class MissionValidationTest {
             put("/api/v1/missions/"
                     + mission.getId()
                     + "/participants/"
-                    + getParticipantId(officerUser)
-                    + "/slim")
+                    + getParticipantId(officerUser))
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
@@ -210,8 +205,7 @@ class MissionValidationTest {
             put("/api/v1/missions/"
                     + mission.getId()
                     + "/participants/"
-                    + getParticipantId(officerUser)
-                    + "/slim")
+                    + getParticipantId(officerUser))
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
@@ -228,7 +222,7 @@ class MissionValidationTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/" + mission.getId() + "/participants/add")
+            post("/api/v1/missions/" + mission.getId() + "/participants")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isForbidden());
@@ -247,7 +241,7 @@ class MissionValidationTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/" + mission.getId() + "/participants/add")
+            post("/api/v1/missions/" + mission.getId() + "/participants")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isOk());
@@ -273,7 +267,7 @@ class MissionValidationTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/" + mission.getId() + "/participants/add")
+            post("/api/v1/missions/" + mission.getId() + "/participants")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(caller.getId().toString()))
@@ -314,7 +308,7 @@ class MissionValidationTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/" + mission.getId() + "/participants/add")
+            post("/api/v1/missions/" + mission.getId() + "/participants")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(caller.getId().toString()))
@@ -355,7 +349,7 @@ class MissionValidationTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/" + mission.getId() + "/participants/add")
+            post("/api/v1/missions/" + mission.getId() + "/participants")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(caller.getId().toString()))

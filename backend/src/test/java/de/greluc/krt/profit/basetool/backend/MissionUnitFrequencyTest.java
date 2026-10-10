@@ -110,7 +110,7 @@ class MissionUnitFrequencyTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/" + mission.getId() + "/units/slim")
+            post("/api/v1/missions/" + mission.getId() + "/units")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
@@ -136,7 +136,7 @@ class MissionUnitFrequencyTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/" + mission.getId() + "/units/slim")
+            post("/api/v1/missions/" + mission.getId() + "/units")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
@@ -161,7 +161,7 @@ class MissionUnitFrequencyTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/" + mission.getId() + "/units/slim")
+            post("/api/v1/missions/" + mission.getId() + "/units")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
@@ -186,7 +186,7 @@ class MissionUnitFrequencyTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/" + mission.getId() + "/units/slim")
+            post("/api/v1/missions/" + mission.getId() + "/units")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
