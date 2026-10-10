@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfileBlueprintSharingForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfileDescriptionForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfilePayoutPreferenceForm;
+import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.time.LocalDate;
@@ -82,7 +83,11 @@ class ProfileControllerTest {
 
   @BeforeEach
   void setUp() {
-    controller = new ProfileController(new IdentityBackendClient(backendApiClient), messageSource);
+    controller =
+        new ProfileController(
+            new IdentityBackendClient(backendApiClient),
+            new NotificationBackendClient(backendApiClient),
+            messageSource);
     ReflectionTestUtils.setField(controller, "issuerUri", "https://kc.example.com/realms/iri");
   }
 

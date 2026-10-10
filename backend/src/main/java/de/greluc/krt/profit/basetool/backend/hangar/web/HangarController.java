@@ -262,7 +262,7 @@ public class HangarController {
   @Transactional
   public ShipDto addUserShip(
       @PathVariable @NotNull UUID userId, @RequestBody @Valid ShipRequestDto shipRequest) {
-    return shipMapper.toDto(hangarService.addShip(userId, shipRequest));
+    return shipMapper.toDto(hangarService.addShipByAdmin(userId, shipRequest));
   }
 
   /** Admin-only: updates a target user's ship. */
@@ -273,7 +273,7 @@ public class HangarController {
       @PathVariable @NotNull UUID userId,
       @PathVariable @NotNull UUID shipId,
       @RequestBody @Valid @NotNull ShipRequestDto shipRequest) {
-    return shipMapper.toDto(hangarService.updateShip(userId, shipId, shipRequest));
+    return shipMapper.toDto(hangarService.updateShipByAdmin(userId, shipId, shipRequest));
   }
 
   /** Admin-only: deletes a target user's ship. */
@@ -281,7 +281,7 @@ public class HangarController {
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteUserShip(
       @PathVariable @NotNull UUID userId, @PathVariable @NotNull UUID shipId) {
-    hangarService.deleteShip(userId, shipId);
+    hangarService.deleteShipByAdmin(userId, shipId);
   }
 
   /**

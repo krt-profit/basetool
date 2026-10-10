@@ -121,4 +121,16 @@ public interface MaterialExchangeRequestInterestRepository
    */
   @Modifying
   long deleteByRequestIdAndInterestedUserId(UUID requestId, UUID interestedUserId);
+
+  /**
+   * Returns the members who signalled they can supply one request, to tell them it was withdrawn
+   * (REQ-MARKET-022).
+   *
+   * @param requestId the request
+   * @return the members' ids, never {@code null}
+   */
+  @Query(
+      "SELECT i.interestedUser.id FROM MaterialExchangeRequestInterest i"
+          + " WHERE i.request.id = :requestId")
+  Set<UUID> findInterestedUserIdsByRequestId(@Param("requestId") UUID requestId);
 }

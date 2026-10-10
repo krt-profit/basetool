@@ -66,6 +66,8 @@ app:
   notifications:
     retention:
       enabled: false
+    timed:
+      enabled: false
   default-blueprints:
     provisioning:
       enabled: false
