@@ -21,13 +21,13 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthoritiesCacheProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -99,7 +99,7 @@ public class CustomJwtGrantedAuthoritiesConverter
   private static final Set<String> PER_TOKEN_CLAIMS = Set.of("iat", "exp", "nbf", "jti");
 
   private final UserReconciliationService userReconciliationService;
-  private final IngestGatewayProperties ingestGatewayProperties;
+  private final ClientDirectory clientDirectory;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final OrgUnitCascadeService orgUnitCascadeService;
 
@@ -117,7 +117,7 @@ public class CustomJwtGrantedAuthoritiesConverter
    *
    * @param userReconciliationService creates or updates the local {@code app_user} row on a cache
    *     miss
-   * @param ingestGatewayProperties the machine-identity allowlist (ADR-0129)
+   * @param clientDirectory answers whether the token's client is an ingest gateway (ADR-0129)
    * @param orgUnitMembershipRepository reads the memberships behind the officer authorities
    * @param orgUnitCascadeService expands a leadership membership down the org-unit tree
    * @param authoritiesCacheProperties supplies the cache TTL
@@ -126,13 +126,13 @@ public class CustomJwtGrantedAuthoritiesConverter
    */
   public CustomJwtGrantedAuthoritiesConverter(
       @NonNull UserReconciliationService userReconciliationService,
-      @NonNull IngestGatewayProperties ingestGatewayProperties,
+      @NonNull ClientDirectory clientDirectory,
       @NonNull OrgUnitMembershipRepository orgUnitMembershipRepository,
       @NonNull OrgUnitCascadeService orgUnitCascadeService,
       @NonNull AuthoritiesCacheProperties authoritiesCacheProperties,
       @NonNull MeterRegistry meterRegistry) {
     this.userReconciliationService = userReconciliationService;
-    this.ingestGatewayProperties = ingestGatewayProperties;
+    this.clientDirectory = clientDirectory;
     this.orgUnitMembershipRepository = orgUnitMembershipRepository;
     this.orgUnitCascadeService = orgUnitCascadeService;
     this.authoritiesCache =
@@ -266,7 +266,7 @@ public class CustomJwtGrantedAuthoritiesConverter
    * @return the freshly assembled authorities
    */
   private Collection<GrantedAuthority> assembleAuthorities(@NonNull Jwt jwt) {
-    if (ingestGatewayProperties.isGatewayClient(jwt.getClaimAsString("azp"))) {
+    if (clientDirectory.isGatewayClient(jwt.getClaimAsString("azp"))) {
       return List.of(new SimpleGrantedAuthority(GATEWAY_AUTHORITY));
     }
     ObjectOptimisticLockingFailureException lastLockingFailure = null;

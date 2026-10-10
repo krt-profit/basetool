@@ -207,7 +207,8 @@ Every `<module>.web` and `<module>.internal` package is internal to its module.
 A domain whose services return its REST DTOs keeps those DTOs in `<module>.internal`, beside the
 services, so `web` depends on `internal` and never the other way: the layers inside a module stay
 acyclic (ADR-0047) until the module API returns its own records (plan §5.2). `orgchart`, `admin`,
-`personalinventory` and `promotion` are laid out this way.
+`personalinventory`, `promotion` and `exchange` are laid out this way; the exchange's frozen relay
+wire records sit in `exchange.internal.dto`.
 
 **Acceptance**
 

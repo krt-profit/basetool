@@ -35,8 +35,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintCreateRe
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintRecipeResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintUpdateRequest;
-import de.greluc.krt.profit.basetool.backend.model.projection.ExchangeClientDisplayName;
-import de.greluc.krt.profit.basetool.backend.repository.ExchangeClientRepository;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
@@ -44,7 +43,6 @@ import de.greluc.krt.profit.basetool.logging.LogSafe;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -88,7 +86,7 @@ public class PersonalBlueprintService {
   private final GameItemRepository gameItemRepository;
   private final DefaultBlueprintKeyService defaultBlueprintKeyService;
   private final AuditRecorder auditRecorder;
-  private final ExchangeClientRepository exchangeClientRepository;
+  private final ClientDirectory clientDirectory;
 
   /**
    * Owner-scoped paged list of owned blueprints, optionally filtered by a case-insensitive product
@@ -507,12 +505,7 @@ public class PersonalBlueprintService {
     if (clientIds.isEmpty()) {
       return Map.of();
     }
-    Map<String, String> names = new HashMap<>();
-    for (ExchangeClientDisplayName row :
-        exchangeClientRepository.findDisplayNamesByClientIdIn(clientIds)) {
-      names.put(row.clientId(), row.displayName());
-    }
-    return names;
+    return clientDirectory.displayNames(clientIds);
   }
 
   /**

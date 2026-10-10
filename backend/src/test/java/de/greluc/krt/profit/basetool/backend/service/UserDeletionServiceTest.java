@@ -25,9 +25,12 @@ import static org.mockito.Mockito.*;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientDirectory;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.personalinventory.api.PersonalInventoryErasure;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -45,6 +48,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
@@ -92,8 +96,9 @@ class UserDeletionServiceTest {
    * exercise the member path (ADR-0129).
    */
   @Spy
-  private final IngestGatewayProperties ingestGatewayProperties =
-      new IngestGatewayProperties(gatewayClientIds);
+  private final ClientDirectory clientDirectory =
+      new ExchangeClientDirectory(
+          new IngestGatewayProperties(gatewayClientIds), Mockito.mock(KnownExchangeClients.class));
 
   @InjectMocks private UserDeletionService userDeletionService;
 

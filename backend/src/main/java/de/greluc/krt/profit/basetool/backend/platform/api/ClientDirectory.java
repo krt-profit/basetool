@@ -19,12 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.platform.api;
 
+import java.util.Collection;
+import java.util.Map;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The client ids that {@link ClientAttribution} keeps verbatim beyond its own configured clients:
- * the ingest gateways and the registered exchange clients (plan §5.3), implemented by the exchange
- * module.
+ * What the platform and the lower modules may ask of the exchange's client registry: the ingest
+ * gateways, the registered exchange clients and their display names (plan §5.3), implemented by the
+ * exchange module.
  */
 public interface ClientDirectory {
 
@@ -45,4 +48,21 @@ public interface ClientDirectory {
    * @return {@code true} when the registry holds the client
    */
   boolean isRegisteredClient(@Nullable String clientId);
+
+  /**
+   * Checks whether a Keycloak username is the service account of a configured ingest gateway.
+   *
+   * @param username the username Keycloak reports for an account, may be {@code null}
+   * @return {@code true} when the name is a configured gateway client's service-account name
+   */
+  boolean isGatewayServiceAccount(@Nullable String username);
+
+  /**
+   * Returns the display names of the registered exchange clients among the given client ids.
+   *
+   * @param clientIds the client ids to look up
+   * @return display name by client id; an id that is not registered is absent
+   */
+  @NotNull
+  Map<String, String> displayNames(@NotNull Collection<String> clientIds);
 }
