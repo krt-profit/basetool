@@ -95,6 +95,10 @@ public class RuleEvaluationService {
       case ACCOUNT_GRANT -> resolveAccountGrant(event);
       case ACCOUNT_RESPONSIBLE -> resolveAccountResponsible(event);
       case EVENT_RECIPIENT -> resolveEventRecipient(event);
+      case EVENT_RECIPIENTS -> Set.copyOf(event.contextRecipientUserIds());
+      case MISSION_PARTICIPANTS -> resolveMissionParticipants(event);
+      case MISSION_LEADERSHIP -> resolveMissionLeadership(event);
+      case EXCHANGE_CLIENT_HOLDERS -> resolveExchangeClientHolders(event);
     };
   }
 
@@ -120,6 +124,44 @@ public class RuleEvaluationService {
       return Set.of();
     }
     return recipientResolutionService.resolveAccountResponsibleHolders(accountId);
+  }
+
+  @NotNull
+  private Set<UUID> resolveMissionParticipants(@NotNull NotificationEvent event) {
+    UUID missionId = event.contextMissionId();
+    if (missionId == null) {
+      log.debug(
+          "Event {} carries no mission; MISSION_PARTICIPANTS selector resolves to nobody",
+          event.eventType());
+      return Set.of();
+    }
+    return recipientResolutionService.resolveMissionParticipants(
+        missionId, event.contextMissionOnlyNotCheckedIn());
+  }
+
+  @NotNull
+  private Set<UUID> resolveMissionLeadership(@NotNull NotificationEvent event) {
+    UUID missionId = event.contextMissionId();
+    if (missionId == null) {
+      log.debug(
+          "Event {} carries no mission; MISSION_LEADERSHIP selector resolves to nobody",
+          event.eventType());
+      return Set.of();
+    }
+    return recipientResolutionService.resolveMissionLeadership(missionId);
+  }
+
+  @NotNull
+  private Set<UUID> resolveExchangeClientHolders(@NotNull NotificationEvent event) {
+    UUID clientId = event.contextExchangeClientId();
+    if (clientId == null && !event.contextAllExchangeClients()) {
+      log.debug(
+          "Event {} carries no exchange client; EXCHANGE_CLIENT_HOLDERS selector resolves to"
+              + " nobody",
+          event.eventType());
+      return Set.of();
+    }
+    return recipientResolutionService.resolveExchangeClientHolders(clientId);
   }
 
   @NotNull

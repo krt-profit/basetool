@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -222,4 +223,23 @@ public interface ExchangeInstallationRepository extends JpaRepository<ExchangeIn
      */
     Instant getLastSeenAt();
   }
+
+  /**
+   * Returns the members holding a connected, non-revoked installation of one client.
+   *
+   * @param clientId the registry client's id
+   * @return the holders' user ids; never {@code null}, possibly empty
+   */
+  @Query(
+      "SELECT DISTINCT i.user.id FROM ExchangeInstallation i WHERE i.client.id = :clientId"
+          + " AND i.revokedAt IS NULL")
+  Set<UUID> findHolderUserIdsByClient(@Param("clientId") UUID clientId);
+
+  /**
+   * Returns the members holding a connected, non-revoked installation of any client.
+   *
+   * @return the holders' user ids; never {@code null}, possibly empty
+   */
+  @Query("SELECT DISTINCT i.user.id FROM ExchangeInstallation i WHERE i.revokedAt IS NULL")
+  Set<UUID> findAllHolderUserIds();
 }

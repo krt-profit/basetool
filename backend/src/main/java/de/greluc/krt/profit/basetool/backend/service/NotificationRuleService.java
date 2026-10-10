@@ -152,7 +152,7 @@ public class NotificationRuleService {
       @NotNull NotificationRule rule, @NotNull NotificationRuleWriteRequest request) {
     for (NotificationRuleSelectorWriteRequest selectorRequest : request.selectors()) {
       String resolvedRoleCode = validateSelector(selectorRequest);
-      if (readsOnlyTheEvent(selectorRequest.kind())) {
+      if (selectorRequest.kind().readsOnlyTheEvent()) {
         rule.addSelector(NotificationRuleSelector.builder().kind(selectorRequest.kind()).build());
         continue;
       }
@@ -202,24 +202,16 @@ public class NotificationRuleService {
               "ORG_RELATIVE_ROLE selector requires orgRelativeRole and contextRole");
         }
       }
-      case ACCOUNT_GRANT, EVENT_RECIPIENT, ACCOUNT_RESPONSIBLE -> {}
+      case ACCOUNT_GRANT,
+          EVENT_RECIPIENT,
+          ACCOUNT_RESPONSIBLE,
+          MISSION_PARTICIPANTS,
+          MISSION_LEADERSHIP,
+          EXCHANGE_CLIENT_HOLDERS,
+          EVENT_RECIPIENTS -> {}
       case null -> throw new NullPointerException("selector kind");
     }
     return null;
-  }
-
-  /**
-   * Tells whether a selector kind resolves its recipients purely from the event and reads no
-   * selector columns.
-   *
-   * @param kind the selector kind
-   * @return {@code true} for {@code ACCOUNT_GRANT}, {@code EVENT_RECIPIENT} and {@code
-   *     ACCOUNT_RESPONSIBLE}
-   */
-  private static boolean readsOnlyTheEvent(@NotNull SelectorKind kind) {
-    return kind == SelectorKind.ACCOUNT_GRANT
-        || kind == SelectorKind.EVENT_RECIPIENT
-        || kind == SelectorKind.ACCOUNT_RESPONSIBLE;
   }
 
   @NotNull

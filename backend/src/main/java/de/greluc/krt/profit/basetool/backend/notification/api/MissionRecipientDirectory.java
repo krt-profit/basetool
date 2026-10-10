@@ -24,45 +24,29 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Resolves the per-membership appointments of an org unit as notification recipients.
+ * Resolves the people around one mission as notification recipients.
  *
- * <p>Owned by the notification module and implemented by the orgunit module.
+ * <p>Owned by the notification module and implemented by the mission module.
  */
-public interface OrgUnitRecipientDirectory {
+public interface MissionRecipientDirectory {
 
   /**
-   * The members flagged as Lead of an org unit.
+   * The registered members signed up for a mission; guest participants have no inbox and are left
+   * out.
    *
-   * @param orgUnitId the org unit
+   * @param missionId the mission
+   * @param onlyNotCheckedIn {@code true} to keep only participants who have not checked in
    * @return their user subs; never {@code null}, possibly empty
    */
   @NotNull
-  Set<UUID> leadsOf(@NotNull UUID orgUnitId);
+  Set<UUID> participantsOf(@NotNull UUID missionId, boolean onlyNotCheckedIn);
 
   /**
-   * The members flagged as Logistician of an org unit.
+   * The mission's owner and its co-managers.
    *
-   * @param orgUnitId the org unit
+   * @param missionId the mission
    * @return their user subs; never {@code null}, possibly empty
    */
   @NotNull
-  Set<UUID> logisticiansOf(@NotNull UUID orgUnitId);
-
-  /**
-   * The members flagged as Mission Manager of an org unit.
-   *
-   * @param orgUnitId the org unit
-   * @return their user subs; never {@code null}, possibly empty
-   */
-  @NotNull
-  Set<UUID> missionManagersOf(@NotNull UUID orgUnitId);
-
-  /**
-   * The members who hold a leadership seat in an org unit, whatever their global roles.
-   *
-   * @param orgUnitId the org unit
-   * @return their user subs; never {@code null}, possibly empty
-   */
-  @NotNull
-  Set<UUID> leadershipOf(@NotNull UUID orgUnitId);
+  Set<UUID> leadershipOf(@NotNull UUID missionId);
 }

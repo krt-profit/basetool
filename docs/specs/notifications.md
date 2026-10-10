@@ -190,10 +190,13 @@ carries, REQ-BANK-034 — resolved by `OrgUnitBankResponsibilityService` so the 
 org-unit-blind). The last three were added for the bank booking-request use case
 (ADR-0022/REQ-NOTIF-011, REQ-BANK-026) and read no selector columns — the account / recipient comes
 from the event.
+Four group kinds were added for the wider notifications of issue #2414 and read no selector
+column either: `MISSION_PARTICIPANTS`, `MISSION_LEADERSHIP`, `EXCHANGE_CLIENT_HOLDERS` and
+`EVENT_RECIPIENTS` (REQ-NOTIF-024), and `ORG_RELATIVE_ROLE` gained the role `UNIT_LEADERSHIP`.
 A rule's `exclude_actor` flag drops the triggering user. The selector `kind` is an open enum so a
 future `GROUP` selector slots in without reworking the engine. Rules are created, edited, enabled /
 disabled and deleted at runtime via an admin-only API — **every** rule, including the seeded ones:
-all six selector kinds are accepted on create and update. The three event-derived kinds are stored
+every selector kind is accepted on create and update. The event-derived kinds are stored
 with every selector column `null`, whatever the request carried. (Until 2026-09-22 the service
 refused those three as "seed-only", so no seeded bank, Materialbörse or account-deletion rule could be
 saved from the editor — not even to disable it.)
@@ -204,7 +207,7 @@ saved from the editor — not even to disable it.)
 - [x] Admin CRUD at `/api/v1/notification-rules` is gated on `hasRole('ADMIN')`.
 - [x] The engine unions a rule's selectors, applies `exclude_actor`, and de-duplicates
   recipients.
-- [x] All six selector kinds are admin-manageable; a seeded rule round-trips through the editor
+- [x] Every selector kind is admin-manageable; a seeded rule round-trips through the editor
   unchanged.
 
 Admins manage rules through a dedicated admin page (list + create/edit form with a dynamic
@@ -840,6 +843,71 @@ them, and the bank staff keep theirs untouched.
 `bank/api/events/BankBookingRequestNoticesReconciledEvent` · **Decision:**
 [ADR-0244](../adr/0244-a-notification-event-can-reconcile-a-notice-for-named-members.md) ·
 **Issues:** #2413
+
+### REQ-NOTIF-024 — Group recipients and unit leadership
+
+An event-derived rule can reach a **group** the event's entity defines, not only one person. Four
+selector kinds read no selector column; the event carries what they need and each is offered in
+the rule editor like the others:
+
+| Kind | Resolves to | The event carries |
+| --- | --- | --- |
+| `MISSION_PARTICIPANTS` | the registered participants of the mission — guests have no inbox and are left out; only those not checked in when the event says so | `contextMissionId()`, `contextMissionOnlyNotCheckedIn()` |
+| `MISSION_LEADERSHIP` | the mission's owner and its co-managers | `contextMissionId()` |
+| `EXCHANGE_CLIENT_HOLDERS` | every member with a non-revoked installation of the client; of any client when the event is exchange-wide | `contextExchangeClientId()` or `contextAllExchangeClients()` |
+| `EVENT_RECIPIENTS` | the set of affected users the event lists (bulk actions) | `contextRecipientUserIds()` |
+
+`OrgRelativeRole.UNIT_LEADERSHIP` resolves to the members whose rank confers oversight of the context
+org unit (`MembershipRole#confersOwnLevelOversight()`: Staffelleiter, Bereichsleiter, …), whether or not
+they hold the global `OFFICER` role.
+
+An event that carries nothing a kind needs resolves to nobody for that kind. The plain
+`excludeActor` rule and the de-duplication apply to the new kinds exactly as to the old ones, and
+every existing rule keeps working unchanged. The notification module reaches the mission and exchange
+data only through its SPIs `MissionRecipientDirectory` and `ExchangeRecipientDirectory`.
+
+**Acceptance**
+
+- [x] Each new kind resolves through the event's context and drops the actor when the rule says so.
+- [x] A mission or exchange event without its context resolves to nobody.
+- [x] `UNIT_LEADERSHIP` reaches every seat holder of the unit and no plain member.
+- [x] The rule editor offers every new kind and the new role, under a localized label, and stores a
+  group kind with every selector column `null`.
+
+**Enforced by:** `RuleEvaluationServiceTest`, `RecipientDirectoriesTest`,
+`NotificationRecipientQueriesIntegrationTest`, `NotificationRuleServiceTest`,
+`AdminNotificationRuleOptionListsTest` · **Code:** `model/SelectorKind`, `model/OrgRelativeRole`,
+`notification/api/events/NotificationEvent`, `notification/api/MissionRecipientDirectory`,
+`notification/api/ExchangeRecipientDirectory`, `service/RuleEvaluationService`,
+`service/RecipientResolutionService` · **Decision:**
+[ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md) ·
+**Issues:** #2414
+
+### REQ-NOTIF-025 — Supersede for named recipients
+
+Superseding (REQ-NOTIF-018) deletes the notices of its types for **everyone**. Some notices must
+disappear for one member only — the „check-in open" notice of the participant who checked in, the
+„added to a mission" notice of the participant who was removed again.
+
+An event may therefore name the notice types and the members: `resolvesNotificationTypesForRecipients()`
+and `supersedeRecipients()`. When both are non-empty the engine deletes the notices of those types
+about the event's entity for those members only (`NotificationRepository#deleteByTypeInAndEntityForRecipients`),
+before it creates anything, and pushes a refresh-only signal to them. Every other member's notice
+stays. With either set empty nothing is deleted. An event may combine this with the per-entity
+`resolvesNotificationTypes()`.
+
+**Acceptance**
+
+- [x] Only the named members' notices of the named types are deleted; a notice of another member
+  survives.
+- [x] A named member who holds no such notice causes no delete and no push.
+- [x] The per-entity and the per-recipient supersede can run in one event.
+
+**Enforced by:** `NotificationCreationServiceTest` (`perRecipientSupersede…`) · **Code:**
+`notification/api/events/NotificationEvent#supersedeRecipients`,
+`service/NotificationCreationService#removeForRecipients` · **Decision:**
+[ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md) ·
+**Issues:** #2414
 
 ## Out of scope (v1)
 

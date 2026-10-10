@@ -112,8 +112,8 @@ public class AdminNotificationRulePageController {
           "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED");
 
   /**
-   * {@code SelectorKind} codes, labelled via {@code admin.notificationRules.selector.kind}. The
-   * last three read no selector field — the account or recipient comes from the event.
+   * {@code SelectorKind} codes, labelled via {@code admin.notificationRules.selector.kind}. All but
+   * the first three read no selector field — the recipients come from the event.
    */
   static final List<String> SELECTOR_KINDS =
       List.of(
@@ -122,14 +122,18 @@ public class AdminNotificationRulePageController {
           "ORG_RELATIVE_ROLE",
           "ACCOUNT_GRANT",
           "EVENT_RECIPIENT",
-          "ACCOUNT_RESPONSIBLE");
+          "ACCOUNT_RESPONSIBLE",
+          "MISSION_PARTICIPANTS",
+          "MISSION_LEADERSHIP",
+          "EXCHANGE_CLIENT_HOLDERS",
+          "EVENT_RECIPIENTS");
 
   /**
    * {@code OrgRelativeRole} codes, labelled via {@code
    * admin.notificationRules.selector.orgRelativeRole}.
    */
   static final List<String> ORG_RELATIVE_ROLES =
-      List.of("OFFICER", "LEAD", "LOGISTICIAN", "MISSION_MANAGER");
+      List.of("OFFICER", "LEAD", "LOGISTICIAN", "MISSION_MANAGER", "UNIT_LEADERSHIP");
 
   /**
    * {@code NotificationContextRole} codes, labelled via {@code

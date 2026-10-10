@@ -4,6 +4,11 @@
 
 ### Added
 
+- **Benachrichtigungsregeln erreichen Gruppen.** Der Regel-Editor bietet vier neue Empfängerarten
+  (Einsatz-Teilnehmer, Einsatzleitung, Inhaber einer verbundenen Anwendung, Ereignis-Adressaten) und
+  die Rolle „Einheitsleitung"; eine Nachricht lässt sich außerdem nur für einzelne Empfänger
+  wegräumen (REQ-NOTIF-024/-025, #2414).
+
 - **Benachrichtigungen räumen auf und folgen Änderungen.** Entschiedene Registrierungen und
   abgeschlossene, abgelehnte oder gelöschte Aufträge verschwinden aus allen Posteingängen. Ein
   geänderter Buchungsantrag ersetzt die alte Nachricht durch eine mit dem neuen Betrag. Neue

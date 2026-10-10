@@ -88,6 +88,62 @@ public interface NotificationEvent {
   }
 
   /**
+   * The set of affected users this event carries, for {@code EVENT_RECIPIENTS} selector resolution
+   * — bulk actions that touch many members, such as the owners of reset ships or the interested
+   * members of a withdrawn offer. Distinct from {@link #contextRecipientUserId()}, which names one.
+   *
+   * @return the directed recipients' subs; never {@code null}, empty by default
+   */
+  @NotNull
+  @Unmodifiable
+  default Set<UUID> contextRecipientUserIds() {
+    return Set.of();
+  }
+
+  /**
+   * The mission this event concerns, for {@code MISSION_PARTICIPANTS} and {@code
+   * MISSION_LEADERSHIP} selector resolution. {@code null} for events that concern no mission — the
+   * default.
+   *
+   * @return the context mission id, or {@code null}
+   */
+  @Nullable
+  default UUID contextMissionId() {
+    return null;
+  }
+
+  /**
+   * Whether {@code MISSION_PARTICIPANTS} narrows to the participants who have not checked in yet.
+   *
+   * @return {@code true} to reach only participants without a check-in; {@code false} by default
+   */
+  default boolean contextMissionOnlyNotCheckedIn() {
+    return false;
+  }
+
+  /**
+   * The registry client this event concerns, for {@code EXCHANGE_CLIENT_HOLDERS} selector
+   * resolution. {@code null} for events that concern no single client — the default.
+   *
+   * @return the context exchange client id, or {@code null}
+   */
+  @Nullable
+  default UUID contextExchangeClientId() {
+    return null;
+  }
+
+  /**
+   * Whether {@code EXCHANGE_CLIENT_HOLDERS} reaches the holders of every client rather than one,
+   * for an event that concerns the exchange as a whole. Ignored when {@link
+   * #contextExchangeClientId()} is set.
+   *
+   * @return {@code true} to reach the holders of any client; {@code false} by default
+   */
+  default boolean contextAllExchangeClients() {
+    return false;
+  }
+
+  /**
    * Loose type tag of the originating aggregate stored on each notification for deep-linking.
    *
    * @return the entity type tag (e.g. {@code JOB_ORDER})
@@ -137,6 +193,35 @@ public interface NotificationEvent {
   @NotNull
   @Unmodifiable
   default Set<UUID> reconcileRecipients() {
+    return Set.of();
+  }
+
+  /**
+   * Notification types this event marks obsolete for {@link #supersedeRecipients()} only
+   * (REQ-NOTIF-025).
+   *
+   * <p>Where {@link #resolvesNotificationTypes()} clears a notice for everybody, this clears it for
+   * the named members and leaves everybody else's untouched — for example the open check-in notice
+   * of the one participant who checked in. Ignored while {@link #supersedeRecipients()} is empty.
+   * Default: none.
+   *
+   * @return the types superseded for the named members; never {@code null}, possibly empty
+   */
+  @NotNull
+  @Unmodifiable
+  default Set<NotificationType> resolvesNotificationTypesForRecipients() {
+    return Set.of();
+  }
+
+  /**
+   * The members whose notices of {@link #resolvesNotificationTypesForRecipients()} about this
+   * event's entity are removed (REQ-NOTIF-025). Default: none.
+   *
+   * @return the members whose notices are superseded; never {@code null}, possibly empty
+   */
+  @NotNull
+  @Unmodifiable
+  default Set<UUID> supersedeRecipients() {
     return Set.of();
   }
 }
