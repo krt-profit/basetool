@@ -1099,7 +1099,7 @@ public class OrgUnitBankAccessService {
             }
             case ALL_MEMBERS -> ownerScopeService.currentUserIsMemberOfOrgUnit(owningOrgUnitId);
             case AREA_MEMBERS -> callerIsMemberOfAreaCascade(owningOrgUnitId);
-            case USER -> userId.isPresent() && userId.get().equals(grant.getGranteeUserId());
+            case USER -> userId.filter(id -> id.equals(grant.getGranteeUserId())).isPresent();
             case GLOBAL_ROLE -> false;
           };
       if (match) {
@@ -1124,7 +1124,7 @@ public class OrgUnitBankAccessService {
             case GLOBAL_ROLE ->
                 authHelperService.hasReachableRole(Roles.authority(grant.getRoleCode()));
             case ALL_MEMBERS -> authHelperService.isMemberOrAbove();
-            case USER -> userId.isPresent() && userId.get().equals(grant.getGranteeUserId());
+            case USER -> userId.filter(id -> id.equals(grant.getGranteeUserId())).isPresent();
             case MEMBERSHIP_ROLE, AREA_MEMBERS -> false;
           };
       if (match) {
@@ -1342,8 +1342,7 @@ public class OrgUnitBankAccessService {
     Optional<UUID> userId = authHelperService.currentUserId();
     for (BankAccountApprovalLimit limit : limits) {
       if (limit.getGranteeKind() == BankAccountViewGranteeKind.USER
-          && userId.isPresent()
-          && userId.get().equals(limit.getGranteeUserId())) {
+          && userId.filter(id -> id.equals(limit.getGranteeUserId())).isPresent()) {
         return limit.getLimitAmount();
       }
     }
@@ -1614,7 +1613,7 @@ public class OrgUnitBankAccessService {
     }
     try {
       return MembershipRole.valueOf(code);
-    } catch (IllegalArgumentException ex) {
+    } catch (IllegalArgumentException _) {
       return null;
     }
   }

@@ -211,7 +211,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     long tightestRemaining = Long.MAX_VALUE;
     for (BucketSlot slot : slots) {
       Bucket bucket =
-          bucketCache.get(clientKey.key() + "|" + slot.key(), k -> createNewBucket(slot));
+          bucketCache.get(clientKey.key() + "|" + slot.key(), _ -> createNewBucket(slot));
       ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
       meterRegistry
           .counter(MetricNames.RATELIMIT_REQUESTS, MetricNames.TAG_BUCKET, bucketLabel(slot.key()))

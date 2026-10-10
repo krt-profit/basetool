@@ -45,8 +45,10 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
    * @return {@code true} iff at least one participant references the org unit.
    */
   @Query(
-      "SELECT COUNT(mp) > 0 FROM MissionParticipant mp JOIN mp.orgUnits ou WHERE ou.id ="
-          + " :orgUnitId")
+      """
+      SELECT COUNT(mp) > 0 FROM MissionParticipant mp JOIN mp.orgUnits ou WHERE ou.id =
+      :orgUnitId
+      """)
   boolean existsByOrgUnitId(@Param("orgUnitId") UUID orgUnitId);
 
   /**
@@ -85,8 +87,10 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
    */
   @Modifying
   @Query(
-      "UPDATE MissionParticipant p SET p.missionLeadParticipant = false "
-          + "WHERE p.plannedMissionJobType.id = :jobTypeId AND p.missionLeadParticipant = true")
+      """
+      UPDATE MissionParticipant p SET p.missionLeadParticipant = false
+      WHERE p.plannedMissionJobType.id = :jobTypeId AND p.missionLeadParticipant = true
+      """)
   int clearMissionLeadFlagForJobType(@Param("jobTypeId") UUID jobTypeId);
 
   /**
@@ -102,9 +106,11 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
    */
   @Modifying(flushAutomatically = true)
   @Query(
-      "UPDATE MissionParticipant p SET p.endTime = :end, p.version = p.version + 1 "
-          + "WHERE p.mission.id = :missionId AND p.startTime IS NOT NULL "
-          + "AND (p.endTime IS NULL OR p.endTime > :end)")
+      """
+      UPDATE MissionParticipant p SET p.endTime = :end, p.version = p.version + 1
+      WHERE p.mission.id = :missionId AND p.startTime IS NOT NULL
+      AND (p.endTime IS NULL OR p.endTime > :end)
+      """)
   int clampCheckedInEndTimes(@Param("missionId") UUID missionId, @Param("end") Instant end);
 
   /**

@@ -134,7 +134,7 @@ public class BankManagePageController {
   private BankAccountDto fetchCartelAccount() {
     try {
       PageResponse<BankAccountDto> page = bankClient.cartelAccountPage();
-      return page == null || page.content().isEmpty() ? null : page.content().get(0);
+      return page == null || page.content().isEmpty() ? null : page.content().getFirst();
     } catch (RuntimeException e) {
       log.debug("Could not resolve the CARTEL account for the KRT-Freigaben tab", e);
       return null;

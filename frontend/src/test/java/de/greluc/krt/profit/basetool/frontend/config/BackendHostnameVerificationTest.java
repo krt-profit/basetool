@@ -139,7 +139,7 @@ class BackendHostnameVerificationTest {
     UserLocaleRelayFilter locale = mock(UserLocaleRelayFilter.class);
     when(locale.relayUserLocale()).thenReturn(passthrough);
     Environment environment = mock(Environment.class);
-    when(environment.getActiveProfiles()).thenReturn(new String[] {"prod"});
+    when(environment.matchesProfiles("dev", "test")).thenReturn(false);
 
     return new WebClientConfig(
             new AppBackendProperties("https://localhost:" + server.getPort()),

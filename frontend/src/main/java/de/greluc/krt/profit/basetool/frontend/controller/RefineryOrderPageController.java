@@ -748,7 +748,7 @@ public class RefineryOrderPageController {
                     java.math.RoundingMode rm;
                     try {
                       rm = java.math.RoundingMode.valueOf(roundingMode);
-                    } catch (Exception e) {
+                    } catch (Exception _) {
                       rm = java.math.RoundingMode.HALF_UP;
                     }
                     amount =
@@ -1141,7 +1141,7 @@ public class RefineryOrderPageController {
     try {
       SystemSettingDto setting = java.util.Objects.requireNonNull(refineryClient.roundingMode());
       return setting.value();
-    } catch (Exception e) {
+    } catch (Exception _) {
       log.warn("Failed to fetch refinery rounding mode, using default UP");
       return "UP";
     }
@@ -1155,7 +1155,7 @@ public class RefineryOrderPageController {
     }
     try {
       return CurrentUser.userId(principal);
-    } catch (Exception e) {
+    } catch (Exception _) {
       try {
         UserDto me = refineryClient.currentUser();
         return me != null ? me.id() : null;

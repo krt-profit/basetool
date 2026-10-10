@@ -81,7 +81,7 @@ public final class ActiveSquadronContext {
     if (raw instanceof String s && !s.isBlank()) {
       try {
         return UUID.fromString(s.trim());
-      } catch (IllegalArgumentException ignored) {
+      } catch (IllegalArgumentException _) {
         return null;
       }
     }

@@ -187,7 +187,7 @@ public class ExchangeFeedReader {
                 (ExchangeInstallation i) ->
                     i.getClient().getClientId() + "|" + i.getKeyThumbprint(),
                 i -> i.getId().toString(),
-                (a, b) -> a));
+                (a, _) -> a));
   }
 
   /**
