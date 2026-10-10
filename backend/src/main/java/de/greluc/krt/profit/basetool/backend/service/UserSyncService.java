@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncFollowUp;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -54,7 +55,7 @@ public class UserSyncService {
 
   private final KeycloakService keycloakService;
   private final UserReconciliationService userReconciliationService;
-  private final BankHolderReconciliationService bankHolderReconciliationService;
+  private final UserSyncFollowUp userSyncFollowUp;
 
   /** Records {@link MetricNames#USER_SYNC_FAILURES} for per-user reconciliation failures. */
   private final MeterRegistry meterRegistry;
@@ -108,7 +109,7 @@ public class UserSyncService {
     log.info("User sync finished. Synced {} users.", count);
 
     try {
-      bankHolderReconciliationService.reconcileAll();
+      userSyncFollowUp.reconcileAll();
     } catch (Exception e) {
       log.error("Bank holder reconcile failed; will retry on the next sync run.", e);
     }

@@ -23,22 +23,23 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationDecidedEvent;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.ResponsibleHolderTracker;
+import de.greluc.krt.profit.basetool.backend.personalinventory.api.PersonalInventoryErasure;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MemberEvaluationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRuleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.repository.PersonalInventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
@@ -72,13 +73,6 @@ import org.springframework.web.client.RestClientException;
 public class UserDeletionService {
 
   /**
-   * Keycloak's generated username for a client's service account: {@code service-account-<id>}.
-   * Shared with the gauge that has to exclude such a row, so the two cannot spell it differently.
-   */
-  private static final String SERVICE_ACCOUNT_PREFIX =
-      IngestGatewayProperties.SERVICE_ACCOUNT_PREFIX;
-
-  /**
    * I18n key of the 400 detail for deleting an account that still exists in Keycloak — by the
    * stored flag or by the live probe; the caller is told the same either way.
    */
@@ -106,10 +100,10 @@ public class UserDeletionService {
     WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER
   }
 
-  private final IngestGatewayProperties ingestGatewayProperties;
+  private final ClientDirectory clientDirectory;
   private final UserRepository userRepository;
   private final InventoryItemRepository inventoryItemRepository;
-  private final MaterialExchangeOfferRatchet offerRatchet;
+  private final StockChangeObserver stockChangeObserver;
   private final ShipRepository shipRepository;
   private final RefineryOrderRepository refineryOrderRepository;
   private final MissionRepository missionRepository;
@@ -125,12 +119,12 @@ public class UserDeletionService {
    * delete (REQ-DATA-008), but {@link #deleteUser(UUID)} deletes them explicitly to count the rows
    * for the audit event.
    */
-  private final PersonalInventoryItemRepository personalInventoryItemRepository;
+  private final PersonalInventoryErasure personalInventoryErasure;
 
   private final PersonalBlueprintRepository personalBlueprintRepository;
   private final NotificationRepository notificationRepository;
   private final NotificationRuleRepository notificationRuleRepository;
-  private final MemberEvaluationRepository memberEvaluationRepository;
+  private final MemberEvaluationErasure memberEvaluationErasure;
 
   /**
    * The authoritative answer to "is this account really gone from Keycloak?". Consulted by {@link
@@ -143,8 +137,7 @@ public class UserDeletionService {
    * Lazily resolved audit seam for bank responsible-holder changes, used by {@link
    * #deleteUser(UUID)} when the deleted user led an org unit (REQ-BANK-034).
    */
-  private final ObjectProvider<OrgUnitBankResponsibilityService>
-      orgUnitBankResponsibilityServiceProvider;
+  private final ObjectProvider<ResponsibleHolderTracker> responsibleHolderTrackerProvider;
 
   /**
    * The identity seam. Consulted only for the fallback admin in {@link #deleteUser(UUID)} (the
@@ -242,15 +235,15 @@ public class UserDeletionService {
                             () ->
                                 new IllegalStateException("No admin user found to reassign data")));
 
-    offerRatchet.beforeUserPurge(userId);
+    stockChangeObserver.beforeUserPurge(userId);
     int inventoryDeleted = inventoryItemRepository.deleteByUserId(userId);
     int shipsDeleted = shipRepository.deleteByOwnerId(userId);
 
-    int personalInventoryDeleted = personalInventoryItemRepository.deleteByOwnerUserId(userId);
+    int personalInventoryDeleted = personalInventoryErasure.deleteAllItemsOf(userId);
     int blueprintsDeleted = personalBlueprintRepository.deleteAllByOwnerUserId(userId);
     int notificationsDeleted = notificationRepository.deleteAllForRecipient(userId);
     int ruleSelectorsDeleted = notificationRuleRepository.deleteSelectorsByUserId(userId);
-    int evaluationsDeleted = memberEvaluationRepository.deleteAllByUserId(userId);
+    int evaluationsDeleted = memberEvaluationErasure.deleteAllEvaluationsOf(userId);
 
     missionRepository.updateOwner(user, admin);
 
@@ -306,9 +299,7 @@ public class UserDeletionService {
     userRepository.clearApprovedBy(userId);
 
     final Map<UUID, Set<UUID>> responsibleBefore =
-        orgUnitBankResponsibilityServiceProvider
-            .getObject()
-            .snapshotResponsibleHoldersForUser(userId);
+        responsibleHolderTrackerProvider.getObject().snapshotResponsibleHoldersForUser(userId);
 
     auditRecorder.record(
         AuditEventType.USER_DELETED,
@@ -326,9 +317,7 @@ public class UserDeletionService {
 
     userRepository.delete(user);
     userRepository.flush();
-    orgUnitBankResponsibilityServiceProvider
-        .getObject()
-        .recordResponsibleHolderChanges(responsibleBefore);
+    responsibleHolderTrackerProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
     log.info(
         "User {} deleted: purged {} inventory rows, {} ships, {} personal inventory, {} blueprints,"
             + " {} notifications, {} rule selectors, {} evaluations; missions and refinery orders"
@@ -364,13 +353,7 @@ public class UserDeletionService {
       log.warn("Could not determine whether the row is a gateway service account; refusing");
       return false;
     }
-    boolean isMachine =
-        username
-            .filter(
-                name ->
-                    ingestGatewayProperties.clientIds().stream()
-                        .anyMatch(clientId -> name.equals(SERVICE_ACCOUNT_PREFIX + clientId)))
-            .isPresent();
+    boolean isMachine = username.filter(clientDirectory::isGatewayServiceAccount).isPresent();
     if (isMachine) {
       log.warn(
           "Deleting the stray app_user row of a configured ingest gateway's service account; "

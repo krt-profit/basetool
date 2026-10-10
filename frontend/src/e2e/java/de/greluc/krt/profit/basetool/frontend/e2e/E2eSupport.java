@@ -29,6 +29,7 @@ import com.microsoft.playwright.PlaywrightException;
 import com.microsoft.playwright.Request;
 import com.microsoft.playwright.Response;
 import com.microsoft.playwright.TimeoutError;
+import com.microsoft.playwright.options.Cookie;
 import com.microsoft.playwright.options.LoadState;
 import com.microsoft.playwright.options.WaitUntilState;
 import java.io.IOException;
@@ -474,7 +475,8 @@ final class E2eSupport {
 
   /**
    * Navigates to {@code url}, retrying up to {@link #NAVIGATE_MAX_ATTEMPTS} times on a transient
-   * abort ({@link #isTransientNavigationAbort}) or a timeout.
+   * abort ({@link #isTransientNavigationAbort}) or a timeout, with the context's cookie jar put
+   * back when the failed attempt wiped it ({@link #restoreLostCookieJar}).
    *
    * @param page the page to navigate
    * @param url the absolute URL to load
@@ -485,7 +487,7 @@ final class E2eSupport {
   static Response navigate(Page page, String url) {
     Page.NavigateOptions options = new Page.NavigateOptions().setTimeout(NAVIGATE_TIMEOUT_MILLIS);
     for (int attempt = 1; attempt < NAVIGATE_MAX_ATTEMPTS; attempt++) {
-      int cookiesBefore = page.context().cookies().size();
+      List<Cookie> cookiesBefore = page.context().cookies();
       long started = System.nanoTime();
       try {
         return page.navigate(url, options);
@@ -506,13 +508,7 @@ final class E2eSupport {
             (System.nanoTime() - started) / 1_000_000,
             abortSummary(abort.getMessage()));
       }
-      int cookiesAfter = page.context().cookies().size();
-      if (cookiesBefore > 0 && cookiesAfter == 0) {
-        System.out.printf(
-            "[E2E][navigate] the browser context lost all %d cookies during attempt %d/%d to %s;"
-                + " the retry runs without a session%n",
-            cookiesBefore, attempt, NAVIGATE_MAX_ATTEMPTS, url);
-      }
+      restoreLostCookieJar(page.context(), cookiesBefore, attempt, url);
       page.waitForTimeout(NAVIGATE_RETRY_BACKOFF_MILLIS);
       try {
         page.waitForLoadState(
@@ -525,6 +521,29 @@ final class E2eSupport {
       }
     }
     return page.navigate(url, options);
+  }
+
+  /**
+   * Puts back the cookie jar a failed navigation attempt wiped from the whole context, so the retry
+   * runs with the session the server still holds.
+   *
+   * <p>A no-op unless the context held cookies before the attempt and holds none after it.
+   *
+   * @param context the browser context of the navigating page
+   * @param cookiesBefore the context's cookies before the attempt
+   * @param attempt the 1-based number of the failed attempt
+   * @param url the URL the attempt targeted
+   */
+  static void restoreLostCookieJar(
+      BrowserContext context, List<Cookie> cookiesBefore, int attempt, String url) {
+    if (cookiesBefore.isEmpty() || !context.cookies().isEmpty()) {
+      return;
+    }
+    context.addCookies(cookiesBefore);
+    System.out.printf(
+        "[E2E][navigate] the browser context lost all %d cookies during attempt %d/%d to %s;"
+            + " restored them for the retry%n",
+        cookiesBefore.size(), attempt, NAVIGATE_MAX_ATTEMPTS, url);
   }
 
   /**

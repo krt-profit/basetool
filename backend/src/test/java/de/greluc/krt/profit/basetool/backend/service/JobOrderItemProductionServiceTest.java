@@ -36,6 +36,8 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.joborder.api.ProductionAllocationException;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -83,7 +85,7 @@ class JobOrderItemProductionServiceTest {
 
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
-  @Mock private MaterialExchangeOfferRatchet offerRatchet;
+  @Mock private StockChangeObserver offerRatchet;
   @Mock private JobOrderItemService jobOrderItemService;
   @Mock private AuditService auditService;
   @Mock private UserService userService;
@@ -377,8 +379,7 @@ class JobOrderItemProductionServiceTest {
     assertThat(line.getManufacturedAmount()).isEqualTo(1);
     verify(inventoryItemRepository).delete(inventoryItem);
     verify(inventoryItemRepository, never()).save(inventoryItem);
-    verify(offerRatchet)
-        .beforeDelete(List.of(inventoryId), MaterialExchangeOfferRatchet.Reason.PRODUCTION);
+    verify(offerRatchet).beforeDelete(List.of(inventoryId), StockChangeReason.PRODUCTION);
     verify(offerRatchet, never()).lower(any(), anyDouble(), any());
     verify(auditService, times(1))
         .record(eq(AuditEventType.INVENTORY_CONSUMED_BY_PRODUCTION), any(), any(), any(), any());

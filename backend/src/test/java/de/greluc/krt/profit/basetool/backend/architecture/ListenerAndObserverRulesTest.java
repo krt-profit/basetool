@@ -33,10 +33,10 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.backend.annotation.ObserverSpi;
 import de.greluc.krt.profit.basetool.backend.architecture.fixture.ListenerAndObserverFixtures;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAuditService;
 import de.greluc.krt.profit.basetool.backend.kernel.RequestMemo;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.BankAuditService;
 import de.greluc.krt.profit.basetool.backend.service.RequestScopeResolver;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -116,7 +116,7 @@ class ListenerAndObserverRulesTest {
    */
   static final Map<String, String> AUDITING_LISTENERS =
       Map.of(
-          "de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeDepartureService"
+          "de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeDepartureService"
               + ".onDeparture",
           "Audits the departure work it performs itself (Keycloak consent and session removal,"
               + " revocations) in its own REQUIRES_NEW transaction after the roster sync"

@@ -41,7 +41,7 @@ import lombok.Setter;
 
 /**
  * A crafting blueprint one user ({@link #ownerUserId}) has unlocked in-game; part of the Personal
- * Inventory area alongside {@link PersonalInventoryItem}.
+ * Inventory area alongside {@code PersonalInventoryItem}.
  *
  * <p>Ownership is per product, not per recipe: identity is the normalized {@link #productKey},
  * unique per owner; {@link #productName} keeps the display spelling and {@link #outputItem}

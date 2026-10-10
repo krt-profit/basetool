@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
@@ -73,7 +74,7 @@ class InventoryCheckoutServiceAuditTest {
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private OwnerScopeService ownerScopeService;
-  @Mock private MaterialExchangeOfferRatchet offerRatchet;
+  @Mock private StockChangeObserver offerRatchet;
   @Mock private AuditService auditService;
 
   @Mock private ApplicationEventPublisher eventPublisher;
@@ -147,7 +148,9 @@ class InventoryCheckoutServiceAuditTest {
 
     assertEquals(42, removed);
     InOrder order = inOrder(offerRatchet, inventoryItemRepository);
-    order.verify(offerRatchet).beforeWipe(scope);
+    order
+        .verify(offerRatchet)
+        .beforeWipe(scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
     order.verify(inventoryItemRepository).deleteAllNonPersonal(true, null, Set.of());
     ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
     verify(auditService)

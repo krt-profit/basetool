@@ -68,10 +68,15 @@ class TermsAcceptanceQueryDataTest {
   /**
    * Seeds four users covering every branch of the overview: one who accepted the version in force,
    * one who never accepted, one who accepted only a superseded wording, and one whose Keycloak
-   * login is gone and who must therefore not appear at all.
+   * login is gone and who must therefore not appear at all. Users other test classes committed to
+   * the shared database are first marked as gone, inside this test's rolled-back transaction, so
+   * the overview sees only the four.
    */
   @BeforeEach
   void seed() {
+    entityManager
+        .createQuery("UPDATE User u SET u.inKeycloak = false WHERE u.inKeycloak = true")
+        .executeUpdate();
     acceptedUserId = persistUser("accepted-user", "Accepted", true);
     pendingUserId = persistUser("pending-user", "Pending", true);
     staleAcceptanceUserId = persistUser("stale-user", "Stale", true);

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend;
 
+import static com.tngtech.archunit.base.DescribedPredicate.not;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.fields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
@@ -52,38 +53,38 @@ import com.tngtech.archunit.library.dependencies.SliceIdentifier;
 import de.greluc.krt.profit.basetool.backend.admin.web.AppVersionPolicyController;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.audit.internal.AuditRetentionProperties;
-import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
-import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCancelledEvent;
-import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestConfirmedEvent;
-import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCreatedEvent;
-import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestEvent;
-import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestRejectedEvent;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAuditService;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankHolderPostingRepository;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankPostingRepository;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankTransactionRepository;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccessService;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccountDetailDto;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccountSettingsDto;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankApprovalLimitService;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankBalanceDto;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankLiveSyncTopicAuthorizer;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankRecipientDirectory;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankResponsibilityService;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankViewUserDto;
+import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibilityService;
+import de.greluc.krt.profit.basetool.backend.bank.web.OrgUnitBankController;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.CachedEntityGraphs;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexValues;
-import de.greluc.krt.profit.basetool.backend.config.ActingMemberFilter;
-import de.greluc.krt.profit.basetool.backend.controller.BankAccountController;
-import de.greluc.krt.profit.basetool.backend.controller.BankAdminController;
-import de.greluc.krt.profit.basetool.backend.controller.BankBookingController;
-import de.greluc.krt.profit.basetool.backend.controller.BankDashboardController;
-import de.greluc.krt.profit.basetool.backend.controller.BankExportController;
-import de.greluc.krt.profit.basetool.backend.controller.BankGrantController;
-import de.greluc.krt.profit.basetool.backend.controller.BankHolderController;
-import de.greluc.krt.profit.basetool.backend.controller.BankRequestController;
 import de.greluc.krt.profit.basetool.backend.controller.BasetoolErrorController;
 import de.greluc.krt.profit.basetool.backend.controller.DiscordAccountExistenceController;
-import de.greluc.krt.profit.basetool.backend.controller.OrgUnitBankController;
 import de.greluc.krt.profit.basetool.backend.controller.TermsDocumentController;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ActingMemberAuthorities;
-import de.greluc.krt.profit.basetool.backend.exchange.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ActingMemberFilter;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ChangeSource;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ChangeSourceProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ConnectedAppsProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientDirectory;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeConnectionRetentionProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeGate;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeMirrorProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
 import de.greluc.krt.profit.basetool.backend.identity.api.TermsConsentCheck;
@@ -109,10 +110,6 @@ import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncAuthorization;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.livesync.internal.LiveSyncFanoutProperties;
-import de.greluc.krt.profit.basetool.backend.mapper.BankAccountMapper;
-import de.greluc.krt.profit.basetool.backend.mapper.BankAuditEventMapper;
-import de.greluc.krt.profit.basetool.backend.mapper.BankGrantMapper;
-import de.greluc.krt.profit.basetool.backend.mapper.BankHolderMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.CentralMapperConfig;
 import de.greluc.krt.profit.basetool.backend.mapper.OrgUnitMembershipMapper;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeQueryParams;
@@ -120,85 +117,14 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.MissionPeerRedacto
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionViewerAccess;
 import de.greluc.krt.profit.basetool.backend.model.AbstractEntity;
-import de.greluc.krt.profit.basetool.backend.model.BankAccount;
-import de.greluc.krt.profit.basetool.backend.model.BankAccountApprovalLimit;
-import de.greluc.krt.profit.basetool.backend.model.BankAccountGrant;
-import de.greluc.krt.profit.basetool.backend.model.BankAccountGrantId;
-import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
-import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
-import de.greluc.krt.profit.basetool.backend.model.BankAccountViewGrant;
-import de.greluc.krt.profit.basetool.backend.model.BankAccountViewGranteeKind;
-import de.greluc.krt.profit.basetool.backend.model.BankAuditEvent;
-import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
-import de.greluc.krt.profit.basetool.backend.model.BankBookingRequest;
-import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestStatus;
-import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
-import de.greluc.krt.profit.basetool.backend.model.BankHolder;
-import de.greluc.krt.profit.basetool.backend.model.BankHolderPosting;
-import de.greluc.krt.profit.basetool.backend.model.BankPosting;
-import de.greluc.krt.profit.basetool.backend.model.BankRequestApprover;
-import de.greluc.krt.profit.basetool.backend.model.BankTransaction;
-import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountDetailDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountRefDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankApprovalLimitUserDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankApprovalLimitsDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankAuditEventDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankBalancePointDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankBalanceSeriesDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingOutcomeDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankCapabilitiesDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankDashboardAccountDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankDashboardDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankDashboardTotalsDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankGrantDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankHolderBookingDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankHolderDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankTransactionDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankTransferFeeRateDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BankWipeResetResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitBankAccountDetailDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitBankAccountSettingsDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitBankBalanceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitBankViewUserDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.BankAccountLifecycleRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.BankDepositRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.BankHolderTransferRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.BankTransferRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.BankWithdrawalRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.CancelBankBookingRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.ConfirmBankBookingRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankAccountRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankBookingRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankGrantRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.RegisterBankHolderRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.RejectBankBookingRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.RenameBankAccountRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.ReverseBankTransactionRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.SetBankApprovalLimitRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.SetBankBalanceTargetRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateBankBookingRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateBankGrantRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateBankHolderRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionRequest;
-import de.greluc.krt.profit.basetool.backend.model.projection.BankAccountBalance;
-import de.greluc.krt.profit.basetool.backend.model.projection.BankBookingRow;
-import de.greluc.krt.profit.basetool.backend.model.projection.BankCounterLeg;
-import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderBalance;
-import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderBookingRow;
-import de.greluc.krt.profit.basetool.backend.model.projection.BankHolderLeg;
-import de.greluc.krt.profit.basetool.backend.model.projection.BankPostingSlice;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationFanoutProperties;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationParamsCodec;
@@ -206,6 +132,7 @@ import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationR
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.orgunit.internal.OrgUnitLabels;
+import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthoritiesCacheProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientAttribution;
@@ -222,39 +149,12 @@ import de.greluc.krt.profit.basetool.backend.privacy.internal.DataExportSections
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleErasureCoverage;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleSpellings;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.PersonSearchTargets;
-import de.greluc.krt.profit.basetool.backend.repository.BankAccountApprovalLimitRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankAccountGrantRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankAccountViewGrantRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankAuditEventRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository;
+import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ScopeSpecifications;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.BankAccountService;
-import de.greluc.krt.profit.basetool.backend.service.BankApprovalLimitService;
-import de.greluc.krt.profit.basetool.backend.service.BankAuditReportService;
-import de.greluc.krt.profit.basetool.backend.service.BankAuditService;
-import de.greluc.krt.profit.basetool.backend.service.BankBalanceSeriesCalculator;
-import de.greluc.krt.profit.basetool.backend.service.BankBookingGuards;
-import de.greluc.krt.profit.basetool.backend.service.BankBookingRequestService;
-import de.greluc.krt.profit.basetool.backend.service.BankDashboardService;
-import de.greluc.krt.profit.basetool.backend.service.BankGrantService;
-import de.greluc.krt.profit.basetool.backend.service.BankHolderReconciliationService;
-import de.greluc.krt.profit.basetool.backend.service.BankHolderService;
-import de.greluc.krt.profit.basetool.backend.service.BankLedgerIntegrityService;
-import de.greluc.krt.profit.basetool.backend.service.BankLedgerService;
-import de.greluc.krt.profit.basetool.backend.service.BankManagementReportService;
-import de.greluc.krt.profit.basetool.backend.service.BankPostingWriter;
-import de.greluc.krt.profit.basetool.backend.service.BankSecurityService;
-import de.greluc.krt.profit.basetool.backend.service.BankStatementReportService;
-import de.greluc.krt.profit.basetool.backend.service.BankTransferFeeService;
-import de.greluc.krt.profit.basetool.backend.service.BankTrendCalculator;
+import de.greluc.krt.profit.basetool.backend.service.BankHandleSnapshots;
 import de.greluc.krt.profit.basetool.backend.service.HangarService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryAggregationService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryCheckoutService;
@@ -265,21 +165,10 @@ import de.greluc.krt.profit.basetool.backend.service.MaterialClaimService;
 import de.greluc.krt.profit.basetool.backend.service.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.service.MissionService;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitBankAccessService;
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitBankApprovalLimitService;
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitBankLiveSyncTopicAuthorizer;
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitBankRecipientDirectory;
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitBankResponsibilityService;
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitBankVisibilityService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.PersonalBlueprintOverviewService;
 import de.greluc.krt.profit.basetool.backend.service.RefineryOrderService;
-import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeGate;
-import de.greluc.krt.profit.basetool.backend.service.pdf.BankBalanceChart;
-import de.greluc.krt.profit.basetool.backend.service.pdf.BankPdfFormat;
-import de.greluc.krt.profit.basetool.backend.task.BankLedgerIntegrityTask;
-import de.greluc.krt.profit.basetool.backend.util.BankAmounts;
 import de.greluc.krt.profit.basetool.backend.validation.DtoConstraints;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.Entity;
@@ -522,129 +411,40 @@ class ArchitectureTest {
   /** Classes of the exchange domain: a package segment named {@code exchange}. */
   static final DescribedPredicate<JavaClass> EXCHANGE_DOMAIN = inDomain("exchange");
 
+  /** The class-level path prefix of the frozen exchange relay surface (REQ-XCH-036). */
+  static final String EXCHANGE_RELAY_PREFIX = "/api/v1/exchange/";
+
   /**
-   * The bank's own classes (REQ-BANK-008, REQ-BANK-019), named by class literal until the bank has
-   * a module package; {@link #BANK_DOMAIN} adds that package.
+   * The exchange relay controllers: web controllers whose class-level mapping lies under {@link
+   * #EXCHANGE_RELAY_PREFIX}, whichever package holds them.
    */
-  static final Set<Class<?>> BANK_CLASSES =
-      Set.of(
-          BankAccountController.class,
-          BankAdminController.class,
-          BankBookingController.class,
-          BankDashboardController.class,
-          BankExportController.class,
-          BankGrantController.class,
-          BankHolderController.class,
-          BankRequestController.class,
-          BankBookingRequestCancelledEvent.class,
-          BankBookingRequestConfirmedEvent.class,
-          BankBookingRequestCreatedEvent.class,
-          BankBookingRequestEvent.class,
-          BankBookingRequestRejectedEvent.class,
-          BankConflictException.class,
-          BankAccountMapper.class,
-          BankAuditEventMapper.class,
-          BankGrantMapper.class,
-          BankHolderMapper.class,
-          BankAccount.class,
-          BankAccountApprovalLimit.class,
-          BankAccountGrant.class,
-          BankAccountGrantId.class,
-          BankAccountStatus.class,
-          BankAccountType.class,
-          BankAccountViewGrant.class,
-          BankAccountViewGranteeKind.class,
-          BankAuditEvent.class,
-          BankAuditEventType.class,
-          BankBookingRequest.class,
-          BankBookingRequestStatus.class,
-          BankBookingRequestType.class,
-          BankHolder.class,
-          BankHolderPosting.class,
-          BankPosting.class,
-          BankRequestApprover.class,
-          BankTransaction.class,
-          BankTransactionType.class,
-          BankAccountDetailDto.class,
-          BankAccountDto.class,
-          BankAccountRefDto.class,
-          BankApprovalLimitUserDto.class,
-          BankApprovalLimitsDto.class,
-          BankAuditEventDto.class,
-          BankBalancePointDto.class,
-          BankBalanceSeriesDto.class,
-          BankBookingDto.class,
-          BankBookingOutcomeDto.class,
-          BankBookingRequestDto.class,
-          BankCapabilitiesDto.class,
-          BankDashboardAccountDto.class,
-          BankDashboardDto.class,
-          BankDashboardTotalsDto.class,
-          BankGrantDto.class,
-          BankHolderBookingDto.class,
-          BankHolderDto.class,
-          BankTransactionDto.class,
-          BankTransferFeeRateDto.class,
-          BankWipeResetResultDto.class,
-          BankAccountLifecycleRequest.class,
-          BankDepositRequest.class,
-          BankHolderTransferRequest.class,
-          BankTransferRequest.class,
-          BankWithdrawalRequest.class,
-          CancelBankBookingRequest.class,
-          ConfirmBankBookingRequest.class,
-          CreateBankAccountRequest.class,
-          CreateBankBookingRequest.class,
-          CreateBankGrantRequest.class,
-          RegisterBankHolderRequest.class,
-          RejectBankBookingRequest.class,
-          RenameBankAccountRequest.class,
-          ReverseBankTransactionRequest.class,
-          SetBankApprovalLimitRequest.class,
-          SetBankBalanceTargetRequest.class,
-          UpdateBankBookingRequest.class,
-          UpdateBankGrantRequest.class,
-          UpdateBankHolderRequest.class,
-          BankAccountBalance.class,
-          BankBookingRow.class,
-          BankCounterLeg.class,
-          BankHolderBalance.class,
-          BankHolderBookingRow.class,
-          BankHolderLeg.class,
-          BankPostingSlice.class,
-          BankAccountApprovalLimitRepository.class,
-          BankAccountGrantRepository.class,
-          BankAccountRepository.class,
-          BankAccountViewGrantRepository.class,
-          BankAuditEventRepository.class,
-          BankBookingRequestRepository.class,
-          BankHolderPostingRepository.class,
-          BankHolderRepository.class,
-          BankPostingRepository.class,
-          BankTransactionRepository.class,
-          BankAccountService.class,
-          BankApprovalLimitService.class,
-          BankAuditReportService.class,
-          BankAuditService.class,
-          BankBalanceSeriesCalculator.class,
-          BankBookingGuards.class,
-          BankBookingRequestService.class,
-          BankDashboardService.class,
-          BankGrantService.class,
-          BankHolderReconciliationService.class,
-          BankHolderService.class,
-          BankLedgerIntegrityService.class,
-          BankLedgerService.class,
-          BankManagementReportService.class,
-          BankPostingWriter.class,
-          BankSecurityService.class,
-          BankStatementReportService.class,
-          BankTransferFeeService.class,
-          BankTrendCalculator.class,
-          BankBalanceChart.class,
-          BankPdfFormat.class,
-          BankLedgerIntegrityTask.class,
-          BankAmounts.class);
+  static final DescribedPredicate<JavaClass> EXCHANGE_RELAY_CONTROLLERS =
+      DescribedPredicate.describe(
+          "exchange relay controllers (class mapping under " + EXCHANGE_RELAY_PREFIX + ")",
+          c ->
+              WEB_CONTROLLERS.test(c)
+                  && c.tryGetAnnotationOfType(RequestMapping.class)
+                      .map(
+                          mapping ->
+                              Stream.concat(
+                                      Arrays.stream(mapping.value()), Arrays.stream(mapping.path()))
+                                  .anyMatch(path -> path.startsWith(EXCHANGE_RELAY_PREFIX)))
+                      .orElse(false));
+
+  /**
+   * The exchange's non-web code: every class of the exchange domain except its controllers, so a
+   * helper that leaves the service package tree stays selected.
+   */
+  static final DescribedPredicate<JavaClass> EXCHANGE_NON_WEB =
+      EXCHANGE_DOMAIN
+          .and(DescribedPredicate.not(CONTROLLER_CODE))
+          .as("exchange-domain classes other than its controllers");
+
+  /**
+   * The bank-module classes that live outside the bank package (REQ-BANK-008, REQ-BANK-019): the
+   * GDPR handle-anonymisation SPI beside its caller, until the participants of plan §7.6.
+   */
+  static final Set<Class<?>> BANK_CLASSES = Set.of(BankHandleSnapshots.class);
 
   /**
    * The org-unit side of the bank: classes that carry "Bank" in their name but belong to org-unit
@@ -665,13 +465,21 @@ class ArchitectureTest {
           OrgUnitBankVisibilityService.class);
 
   /**
-   * The bank domain: the {@code bank} module package, the classes of {@link #BANK_CLASSES}, the
-   * classes nested in them and the implementations MapStruct generates for the bank mappers.
+   * The bank domain: the {@code bank} module package tree without the {@link #ORG_UNIT_BANK_SIDE},
+   * plus the classes of {@link #BANK_CLASSES} and the classes nested in either.
    */
-  static final DescribedPredicate<JavaClass> BANK_DOMAIN =
-      inDomain("bank")
-          .or(nestedInAnyOf("the registered bank classes", BANK_CLASSES))
-          .or(generatedImplementationsOf(BANK_CLASSES));
+  static final DescribedPredicate<JavaClass> BANK_DOMAIN = bankDomain(ROOT_PACKAGE);
+
+  /**
+   * The bank's non-web code: every class of the bank module package tree except its controllers, so
+   * a helper that leaves the service package tree stays selected.
+   */
+  static final DescribedPredicate<JavaClass> BANK_NON_WEB =
+      DescribedPredicate.<JavaClass>describe(
+              "are in the bank module package tree",
+              c -> isInPackageTree(c.getPackageName(), ROOT_PACKAGE + ".bank"))
+          .and(DescribedPredicate.not(CONTROLLER_CODE))
+          .as("bank-module classes other than its controllers");
 
   /**
    * The names of today's top-level backend packages: in {@link #layerModuleOf} a top-level package
@@ -857,13 +665,19 @@ class ArchitectureTest {
 
   @Test
   void serviceLayerShouldNotReachIntoSecurityContext() {
-    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 272);
+    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 495);
     serviceLayerShouldNotReachIntoSecurityContextRule(serviceSelection()).check(CLASSES);
   }
 
   static DescribedPredicate<JavaClass> serviceSelection() {
-    return SERVICE_CODE.and(
-        DescribedPredicate.not(JavaClass.Predicates.equivalentTo(AuthHelperService.class)));
+    return SERVICE_CODE
+        .or(
+            EXCHANGE_NON_WEB.and(
+                DescribedPredicate.not(
+                    JavaClass.Predicates.belongToAnyOf(
+                        ActingMemberFilter.class, ChangeSource.class))))
+        .or(BANK_NON_WEB)
+        .and(DescribedPredicate.not(JavaClass.Predicates.equivalentTo(AuthHelperService.class)));
   }
 
   static ArchRule serviceLayerShouldNotReachIntoSecurityContextRule(
@@ -1166,8 +980,7 @@ class ArchitectureTest {
 
   @Test
   void everyExchangeControllerMethodCarriesTheExchangeGate() {
-    DescribedPredicate<JavaMethod> selection =
-        publicMethodsOf(CONTROLLER_CODE.and(EXCHANGE_DOMAIN));
+    DescribedPredicate<JavaMethod> selection = publicMethodsOf(EXCHANGE_RELAY_CONTROLLERS);
     assertMethodFloor("everyExchangeControllerMethodCarriesTheExchangeGate", selection, 14);
     everyExchangeControllerMethodCarriesTheExchangeGateRule(selection).check(CLASSES);
   }
@@ -1193,7 +1006,7 @@ class ArchitectureTest {
 
   @Test
   void exchangeControllersCallExchangeServicesOnly() {
-    DescribedPredicate<JavaClass> selection = CONTROLLER_CODE.and(EXCHANGE_DOMAIN);
+    DescribedPredicate<JavaClass> selection = EXCHANGE_RELAY_CONTROLLERS;
     assertClassFloor("exchangeControllersCallExchangeServicesOnly", selection, 8);
     exchangeControllersCallExchangeServicesOnlyRule(selection).check(CLASSES);
   }
@@ -1235,8 +1048,8 @@ class ArchitectureTest {
 
   @Test
   void exchangeServicesNeverUseAdminGatesOrTheAdminScope() {
-    DescribedPredicate<JavaClass> selection = SERVICE_CODE.and(EXCHANGE_DOMAIN);
-    assertClassFloor("exchangeServicesNeverUseAdminGatesOrTheAdminScope", selection, 52);
+    DescribedPredicate<JavaClass> selection = EXCHANGE_NON_WEB;
+    assertClassFloor("exchangeServicesNeverUseAdminGatesOrTheAdminScope", selection, 160);
     exchangeServicesNeverUseAdminGatesRule(selection, OwnerScopeService.class).check(CLASSES);
   }
 
@@ -1477,13 +1290,15 @@ class ArchitectureTest {
   @Test
   void mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional() {
     assertClassFloor(
-        "mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional", SERVICE_CODE, 273);
+        "mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional",
+        SERVICE_CODE.or(EXCHANGE_NON_WEB).or(BANK_NON_WEB),
+        498);
     mutatingServiceMethodsInReadOnlyClassesRule().check(CLASSES);
   }
 
   static ArchRule mutatingServiceMethodsInReadOnlyClassesRule() {
     return classes()
-        .that(SERVICE_CODE)
+        .that(SERVICE_CODE.or(EXCHANGE_NON_WEB).or(BANK_NON_WEB))
         .should(declareTransactionalForMutatingMethodsWhenClassIsReadOnly())
         .because(
             "A class-level @Transactional(readOnly = true) silently propagates to every "
@@ -1824,7 +1639,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 576);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 420);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 
@@ -1903,7 +1718,7 @@ class ArchitectureTest {
 
   static ArchRule bankClassesMustStaySeasonAndProfitIndependentRule(String rootPackage) {
     return noClasses()
-        .that(BANK_DOMAIN)
+        .that(bankDomain(rootPackage))
         .should()
         .dependOnClassesThat(profitFlowTypes(rootPackage))
         .because(
@@ -1918,12 +1733,13 @@ class ArchitectureTest {
   @Test
   void bankClassesMustNotConsultOrgUnitScope() {
     assertClassFloor("bankClassesMustNotConsultOrgUnitScope", BANK_DOMAIN, 121);
-    bankClassesMustNotConsultOrgUnitScopeRule(OwnerScopeService.class).check(CLASSES);
+    bankClassesMustNotConsultOrgUnitScopeRule(OwnerScopeService.class, ROOT_PACKAGE).check(CLASSES);
   }
 
-  static ArchRule bankClassesMustNotConsultOrgUnitScopeRule(Class<?> ownerScope) {
+  static ArchRule bankClassesMustNotConsultOrgUnitScopeRule(
+      Class<?> ownerScope, String rootPackage) {
     return noClasses()
-        .that(BANK_DOMAIN)
+        .that(bankDomain(rootPackage))
         .should()
         .dependOnClassesThat()
         .belongToAnyOf(ownerScope)
@@ -2150,6 +1966,25 @@ class ArchitectureTest {
     return DescribedPredicate.describe(
         "are " + name + " (the package tree of " + anchor.getSimpleName() + ")",
         c -> isInPackageTree(c.getPackageName(), anchorPackage));
+  }
+
+  /**
+   * The bank domain below a root package: the {@code bank} package tree without the {@link
+   * #ORG_UNIT_BANK_SIDE}, plus the classes of {@link #BANK_CLASSES} and the classes nested in
+   * either; generated mapper implementations lie in the package tree.
+   *
+   * @param rootPackage the root package whose {@code bank} package is the bank module
+   * @return the predicate
+   */
+  static DescribedPredicate<JavaClass> bankDomain(String rootPackage) {
+    String bankPackage = rootPackage + ".bank";
+    DescribedPredicate<JavaClass> bankModule =
+        DescribedPredicate.describe(
+            "are in the bank module package tree",
+            c -> isInPackageTree(c.getPackageName(), bankPackage));
+    return bankModule
+        .and(not(nestedInAnyOf("the org-unit side of the bank", ORG_UNIT_BANK_SIDE)))
+        .or(nestedInAnyOf("the registered bank classes", BANK_CLASSES));
   }
 
   /**

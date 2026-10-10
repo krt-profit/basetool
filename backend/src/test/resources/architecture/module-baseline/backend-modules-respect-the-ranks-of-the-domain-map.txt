@@ -1,7 +1,3 @@
-blueprint -> exchange: BlueprintUploadPreviewService -> ExchangeBlueprintDraftDto
-blueprint -> exchange: BlueprintUploadPreviewService -> ExchangeDraftService
-blueprint -> exchange: PersonalBlueprintService -> ExchangeClientDisplayName
-blueprint -> exchange: PersonalBlueprintService -> ExchangeClientRepository
 blueprint -> inventory: BlueprintCraftabilityService -> InventoryItemService
 blueprint -> inventory: BlueprintCraftabilityService -> OwnedStockSlice
 blueprint -> refinery: BlueprintCraftabilityService -> RefineryOrderService
@@ -11,7 +7,6 @@ catalogue -> refinery: LocationService -> RefineryOrderRepository
 hangar -> mission: HangarService -> Mission
 hangar -> mission: HangarService -> MissionUnit
 hangar -> mission: HangarService -> MissionUnitRepository
-identity -> bank: UserSyncService -> BankHolderReconciliationService
 identity -> blueprint: UserReconciliationService -> DefaultBlueprintProvisioningService
 identity -> inventory: MeController -> InventoryProperties
 identity -> joborder: UserDtoRedaction -> JobOrderAssigneeDto
@@ -61,11 +56,6 @@ inventory -> joborder: InventoryItemService -> JobOrderItemService
 inventory -> joborder: InventoryItemService -> JobOrderItemStockGroupDto
 inventory -> joborder: InventoryItemService -> JobOrderRepository
 inventory -> joborder: InventoryJobOrderAllocation -> JobOrder
-inventory -> materialexchange: InventoryCheckoutService -> MaterialExchangeOfferRatchet
-inventory -> materialexchange: InventoryCheckoutService -> MaterialExchangeOfferRepository
-inventory -> materialexchange: InventoryStolenMarkService -> MaterialExchangeOffer
-inventory -> materialexchange: InventoryStolenMarkService -> MaterialExchangeOfferRepository
-inventory -> materialexchange: InventoryStolenMarkService -> MaterialExchangeOfferStatus
 inventory -> mission: AllocationReductions -> Mission
 inventory -> mission: InventoryAllocations -> Mission
 inventory -> mission: InventoryAuditLabels -> Mission
@@ -89,9 +79,7 @@ mission -> refinery: MissionFinanceEntryService -> RefineryOrderRepository
 mission -> refinery: MissionFinanceSummaryDto -> RefineryOrderDto
 mission -> refinery: MissionService -> RefineryOrder
 notification -> orgunit: OrgUnitRef -> OrgUnitKind
-orgunit -> bank: OrgUnitMembershipService -> OrgUnitBankResponsibilityService
 orgunit -> inventory: OrgUnitMembershipService -> InventoryOrgUnitReconciler
-scope -> exchange: CustomJwtGrantedAuthoritiesConverter -> IngestGatewayProperties
 scope -> hangar: AccessGateService -> Ship
 scope -> hangar: AccessGateService -> ShipRepository
 scope -> inventory: AccessGateService -> InventoryItem

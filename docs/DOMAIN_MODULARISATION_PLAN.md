@@ -888,6 +888,102 @@ their "must stay green" period here (D-01).
   still widen together is now tested end to end instead. (3) The detach command removes the
   foreign write, not the `mission -> operation` edges: those are the association and the DTO
   embedding of (1), and leave with P3-8 and the `OperationSummaryProvider` SPI.
+- `promotion` — **done 2026-10-05** (P2-3), the second module, after `operation`, to take its access
+  policy out of the scope hub. `PromotionAccessPolicy` (bean `promotionAccessPolicy`, `promotion.internal`) owns
+  the per-Staffel feature flag, the read gate and the feature assertion; the three methods left
+  `OwnerScopeService` and `RequestScopeResolver`. The generic Staffel gates the promotion services
+  also use (`currentSquadronId`, `canSeeSquadron`, `canEditSquadron`, `hasAmbiguousStaffelContext`)
+  stay in the scope kernel, because other modules use them. No SpEL referenced the moved methods,
+  so the authorization matrix did not change. The differential verdict test
+  (`PromotionAccessPolicyVerdictTest`, 17 cases) ran the policy and the hub side by side over the
+  rows of §5.4 that apply to this gate and now keeps the recorded verdicts; the per-row escapes of
+  §5.4 do not apply, because the per-row checks are the unchanged kernel `canSeeSquadron` /
+  `canEditSquadron`. Controllers moved to `promotion.web`, everything else to `promotion.internal`.
+  The GDPR deletion reaches the module through `MemberEvaluationErasure` (`MANDATORY`), which sits
+  in the `service` package beside `UserDeletionService`, assigned to `promotion` by a `class` rule.
+  **Correction to §5.2:** a module cannot publish a type in `<module>.api` while the caller sits in
+  a layer package the module itself depends on — `service → promotion.api` plus `promotion →
+  service` closes a top-level package cycle; the type is carried into Phase 4 and replaced by the GDPR
+  participant SPIs of §7.6.
+  With that, `promotion` publishes nothing. The move removes no baseline edge (108).
+- `personalinventory` — **done 2026-10-05** (P2-4). Mein Inventar moved out of the layer
+  packages: the member, admin and UEX location-picker controllers into `personalinventory.web`, the
+  item entity, the location-type enum, the repository, the service, the mapper and the records into
+  `personalinventory.internal`. The module never consulted the scope hub — its gate is the owner
+  (`@CurrentUserId`) and the role annotations — so no access policy moved. Its one inbound edge,
+  the GDPR deletion's bulk delete, goes through `personalinventory.api.PersonalInventoryErasure`
+  (`MANDATORY`), which the module publishes as its `api`; unlike promotion the module depends on
+  nothing in `service`, so no package cycle forces the type out of its module. It is carried into
+  Phase 4 like `MemberEvaluationErasure` (§7.6). Every declared module of a higher rank allows
+  `personalinventory::api`. The move removes no baseline edge (108).
+- `exchange` (as a package) — **done 2026-10-10.** Its "must stay green" period starts here
+  (D-01); Phase 5 extracts it next (D-23).
+  1. *Characterise*: the relay contract was already pinned (G-18 wire contract and golden answers,
+     `ExchangeRelaySeamParityTest`, the relay OpenAPI document, the authorization matrix);
+     `BlueprintUploadPreviewServiceTest` was added for the one exchange path a lower module used.
+  2. *Inversions* (5 baseline edges, **108 → 103**; the `blueprint -> exchange` and
+     `scope -> exchange` pairs are gone): the blueprint upload preview hands the envelope to the
+     blueprint-owned SPI `service.BlueprintEnvelopeReader` (implemented by
+     `ExchangeBlueprintEnvelopeReader`, same binding, validation and draft resolution in the
+     caller's transaction); `PersonalBlueprintService`, `CustomJwtGrantedAuthoritiesConverter` and
+     `UserDeletionService` ask `platform.api.ClientDirectory` (`displayNames`, `isGatewayClient`,
+     `isGatewayServiceAccount`); the display-name projection is nested in
+     `ExchangeClientRepository` (the P1-4 pattern).
+  3. *Move*: 152 classes. `exchange.web` holds the eleven controllers, `exchange.internal.dto` the
+     34 relay wire records, `exchange.internal` everything else — including `ActingMemberFilter`,
+     `SandboxProfileGuard` (its `spring.factories` entry follows), the change-source transaction
+     manager and its configuration from `config`, and `DatabaseActingMemberAuthorities`.
+  No access policy left the scope hub: the exchange has none there. Its gates are its own
+  (`exchangeGate`, `connectedAppsGate`); the one scope-hub call, `canViewJobOrders` in
+  `ExchangeDemandService`, is the job-order gate the exchange asks as a caller.
+  **Corrections:** (1) the move needed two more inversions than the eleven inbound edges show,
+  because once the exchange depends on the service layer any `config -> exchange` edge closes a
+  `config -> exchange -> service -> config` package cycle: `SecurityConfig` takes the filter from
+  the new SPI `platform.api.ActingMemberFilterProvider` (same constructor arguments, same place
+  in the chain, the approval filter anchored on the filter's runtime class), `ActingMemberHeader`
+  moved to `platform.api` (the metrics filter reads the client header) and `KeycloakSyncProperties`
+  to `identity.api` (`FirstPartyClientIds` reads it). (2) The exchange's ArchUnit rules were keyed
+  on the package segment `exchange` and on the service package tree; both would have changed
+  meaning. The relay-controller rules now select controllers mapped under `/api/v1/exchange/`
+  (still 8 classes, 14 methods), the reduced-authority rule every non-web exchange class
+  (52 → 160), and the service-layer `SecurityContextHolder` and read-only-transaction rules also
+  select the exchange's non-web classes, so the 28 helpers that left the service package tree stay
+  checked. (3) §5.2's `web` cannot hold the relay DTOs, as with the org chart; they sit in
+  `internal.dto`, which keeps the `exchangeDtosStayInTheExchangeLayer` selection (34) unchanged.
+- `bank` as a package — **done 2026-10-10** (P2-5). All 126 bank classes of the layer packages moved:
+  the nine controllers (eight Kartellbank, `OrgUnitBankController`) into `bank.web`, everything else
+  — entities, repositories, services, mappers, records, the PDF formats, the ledger-integrity task
+  and the org-unit side behind `OrgUnitBankAccessService` — into `bank.internal`; `BankAmounts` and
+  `BankBookingRequestType` joined `bank.api`, because the published events and
+  `BankConflictException` carry them. Three steps, each green on its own:
+  1. *Access out of the scope hub* (§5.4): the bank's gates were already the bank's —
+     `bankSecurityService` for the Kartellbank and the `OrgUnitBankAccessService` seam for the org-unit
+     side. What the hub still held for the bank left it: the `AREA_MEMBERS` cascade
+     (`currentUserIsMemberOfAreaCascade`, REQ-BANK-048) is decided in the seam from the kernel's direct
+     memberships; `OrgUnitBankAreaCascadeDifferentialTest` compared it with the hub method over 480
+     verdicts (authenticated or anonymous, admin or not, unpinned or pinned, eight membership sets,
+     five target units) and keeps a verbatim copy; dropping the child-unit clause fails it.
+     `currentOwnLevelOversightScope` (REQ-BANK-022) and `currentUserHasAreaOrOlOversight`
+     (REQ-BANK-028) had no production caller left after REQ-BANK-039 and REQ-BANK-037 and were
+     removed. `AccessGateService` held no bank gate. No SpEL changed.
+  2. *Inversions* (§5.3): `OrgUnitMembershipService` and `UserDeletionService` snapshot and record
+     the responsible holders through `orgunit.api.ResponsibleHolderTracker`; `UserSyncService` runs
+     the holder reconciliation through `identity.api.UserSyncFollowUp`; the GDPR handle anonymisation
+     reaches the bank tables and the bank audit marker through `BankHandleSnapshots` (`MANDATORY`).
+     The module baseline shrank by `identity -> bank` and `orgunit -> bank`, **103 → 101** (re-derived after the exchange move).
+  3. *Move*, with the seam rules re-keyed to the module (§5.4): `BANK_DOMAIN` is the `bank`
+     package tree minus `ORG_UNIT_BANK_SIDE` (class literals), plus `BANK_CLASSES`, which now names
+     only the bank types outside the package; the bridge set is still exactly
+     `OrgUnitBankAccessService`. Like `EXCHANGE_NON_WEB`, `BANK_NON_WEB` keeps the bank's
+     non-controller classes in the security-context and read-only-transaction rules after they left
+     the `service` tree (floors 495 and 498). `BankAuditService`, `bank_audit_event`, the lock order
+     and the money arithmetic are untouched.
+  **Corrections:** (1) §5.4 expected bank gates in `OwnerScopeService`/`AccessGateService`; there was
+  one membership query and two dead methods. (2) Like `MemberEvaluationErasure`,
+  `BankHandleSnapshots` cannot sit in `bank.api` while its caller lives in the `service` package the
+  bank depends on; it stays there, registered in `BANK_CLASSES` and assigned by a `class` rule, and
+  is carried into Phase 4 with the GDPR participants (§7.6). (3) `BusinessMetricsCollector` (`app`)
+  still reads the booking-request repository directly; it leaves with the per-module gauges of §5.1.
 
 ### 7.5 Phase 3 — the business core
 
@@ -896,6 +992,33 @@ wave: `materialexchange` (the offer ratchet as `StockChangeObserver`), `refinery
 `mission`, `inventory` (`StockCommands`, the earmark target SPI, the lot-lock protocol of ADR-0229
 moved into inventory), `hangar`, `blueprint`. The eight business associations become id references
 as each pair is decoupled.
+
+- `materialexchange` — **done 2026-10-10.**
+  1. *Characterise*: the ratchet's audit rows were pinned (`MaterialExchangeOfferRatchetDataTest`,
+     `ExchangeStockWriteControllerTest`); `MaterialExchangeStockLinksDataTest` adds the two other
+     reads the Lager made of the Materialbörse — the stolen-split floor and the merge refusal.
+  2. *Observer SPI* (§5.3, write family 3): `inventory.api.StockChangeObserver` (`@ObserverSpi`:
+     `lower`, `beforeDelete`, `beforeWipe`, `beforeUserPurge`), implemented unchanged by
+     `MaterialExchangeOfferRatchet` (every method `MANDATORY`, same clamps, same
+     `MARKET_OFFER_REDUCED`/`REMOVED` rows before the cascading delete); the reason codes and the
+     effects record moved with it as `StockChangeReason` and `StockChangeEffects` (codes
+     unchanged). A second inventory-owned SPI, `StockOfferLookup` (`isOffered`,
+     `activeOfferedAmount`), answers the two reads. The Lager, the three job-order handover and
+     production services, the exchange's stock writes and the account deletion use only these.
+     Baseline **103 → 98** (the `inventory -> materialexchange` pair is gone).
+  3. *Move*: the two controllers into `materialexchange.web`, the 8 entities and enums, 13 DTOs,
+     4 repositories, 5 services and the lookup into `materialexchange.internal`.
+  No access policy left the scope hub: the boards are gated by `hasRole('KRT_MEMBER')` and decide
+  ownership inside their services; their only scope-hub call is `currentOrgUnit` for stamping.
+  No command API is published yet: no other module writes an offer or a request. **Corrections:**
+  (1) `beforeWipe` takes the three scope components instead of `ScopePredicate`, which lives in
+  the `service` package, so `inventory.api` depends on no layer package; `beforeUserPurge` stays on
+  the stock observer rather than a GDPR participant until §7.6 introduces those. (2)
+  `MaterialExchangeOffer.inventoryItem` stays an association for now: converting it rewrites the
+  fetch plan of eight queries and two entity graphs, and nothing needs the id until `InventoryItem`
+  leaves `model` with the inventory move (P3-5), where it belongs. (3)
+  `ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE` is public, because the offer board's JPQL
+  splices it from another package.
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
@@ -912,6 +1035,10 @@ as each pair is decoupled.
 run `MANDATORY` inside the orchestrator's one transaction, and the deletion and anonymisation audit
 rows stay in the orchestrator — and `catalogue`, whose caches switch to read models. Identity's REST
 surface sheds the six domains it hosts today.
+Carried into this phase from Phase 2: `service.MemberEvaluationErasure` (promotion) and
+`personalinventory.api.PersonalInventoryErasure` are the interim erasure commands `UserDeletionService`
+calls; both are replaced by `UserErasureParticipant` implementations here, and
+`MemberEvaluationErasure` leaves the `service` package with that step (P2-3); `service.BankHandleSnapshots` (bank) goes the same way (P2-5).
 
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 
@@ -1031,8 +1158,8 @@ features only, no preview flags) stands; every proposal below uses final feature
 
 | Proposal | Pros | Cons and risks | Guard | Effort |
 | --- | --- | --- | --- | --- |
-| **Exhaustive enum switches.** Checkstyle's `MissingSwitchDefault` forces a `default` into all 20 switch statements; on nine of them every constant is already covered, so the `default` hides the next constant. Write them as switch expressions or with `case null ->`, which javac 25 checks for exhaustiveness and Checkstyle 14.3.0 accepts (probed). Policy: no `default` on a switch over a project enum unless it handles a deliberate subset (decided, D-15) | A new `BankAccountType`, `OrgUnitKind` or `SelectorKind` breaks the build at every decision site instead of shipping a 400, an exception or a silent no-op | `case null ->` is an unfamiliar idiom | The compiler; existing service tests | S |
-| **Enum predicates instead of `==` chains.** `OrgUnitKind` is compared 43 times in 19 files; add behaviour on the enum as `switch (this)` without `default` (precedent `OperationStatus.canTransitionTo`), with a `values()` test per predicate; the same for `FinanceType` in payout arithmetic | Tenancy rules stated once, as the kernel's API | Each site's current fail-open or fail-closed behaviour must be kept exactly — one predicate per rule, never two rules merged | Access-gate and scope tests | M |
+| **Exhaustive enum switches** — **done 2026-10-10** (nine dead `default` arms became `case null`; the deliberate subsets keep theirs; ADR-0238 *Implementation*). *Correction:* the 20 statements of the audit are 51 `default` arms across `main` today, nine of them dead. Checkstyle's `MissingSwitchDefault` forces a `default` into all 20 switch statements; on nine of them every constant is already covered, so the `default` hides the next constant. Write them as switch expressions or with `case null ->`, which javac 25 checks for exhaustiveness and Checkstyle 14.3.0 accepts (probed). Policy: no `default` on a switch over a project enum unless it handles a deliberate subset (decided, D-15) | A new `BankAccountType`, `OrgUnitKind` or `SelectorKind` breaks the build at every decision site instead of shipping a 400, an exception or a silent no-op | `case null ->` is an unfamiliar idiom | The compiler; existing service tests | S |
+| **Enum predicates instead of `==` chains** — **done 2026-10-10** for the multi-constant rules: `OrgUnitKind.isTenantUnit()` (three sites) and `FinanceType.signed` (payout totals). *Correction:* of the 43 `OrgUnitKind` comparisons only three are chains; the rest compare one constant, which a predicate would only rename. `OrgUnitKind` is compared 43 times in 19 files; add behaviour on the enum as `switch (this)` without `default` (precedent `OperationStatus.canTransitionTo`), with a `values()` test per predicate; the same for `FinanceType` in payout arithmetic | Tenancy rules stated once, as the kernel's API | Each site's current fail-open or fail-closed behaviour must be kept exactly — one predicate per rule, never two rules merged | Access-gate and scope tests | M |
 | **Sealed types where they are legal.** Exhaustive `switch` over the exchange's private sealed `Planned` types (two are read with `if/else` without `else`, so a new variant is silently dropped); name the last constant instead of `default` in three exchange switches; the exchange's resource and operation vocabulary as one enum mapped at the boundary (the mass-change capability is chosen from a string with `default -> HANGAR_WRITE` today, which Bean Validation happens to shield) | No silently dropped external write; no path can default to a capability | Must keep the external contract byte-identical | Exchange contract tests; a test that an unknown value never reaches the capability choice | S |
 | **Never seal across packages or entities.** Sealed hierarchies stay inside one package (class-path rule) and never cover JPA entities (a Hibernate proxy cannot subclass a sealed class) | Avoids a refactor dead end | — | javac | — |
 | **Unnamed variables `_`** (final since 22) for 107 unused lambda parameters, meaningless catch parameters and unused pattern components; empty catches too, with the ADR-0214 amendment and the Checkstyle `EmptyCatchBlock` pattern change this needs (decided, D-14); descriptive names stay where the name states intent; not in keycloak-spi (Java 21 bytecode) | The compiler forbids accidental use | About 260 edits in `main` | Compile and Checkstyle | S–M |

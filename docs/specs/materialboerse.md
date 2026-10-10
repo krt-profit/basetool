@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-10.
 > **Owner area:** MARKET · **Related ADRs:** [ADR-0082](../adr/0082-materialboerse-offer-model.md),
 > [ADR-0086](../adr/0086-materialboerse-partial-offer-amount.md),
 > [ADR-0087](../adr/0087-materialboerse-item-offers.md),
@@ -158,7 +158,8 @@ via an atomic conditional update (`ACTIVE` offers only; only when the stored val
 is **kind-aware** (REQ-MARKET-014, ADR-0108): a **material** offer clamps its `offeredAmount`
 (`MaterialExchangeOfferRepository.clampOfferedAmountToStock`), a **stock-backed item** offer clamps its
 whole-unit `itemQuantity` (`clampItemQuantityToStock`). Every decrement site runs both through one
-component, `MaterialExchangeOfferRatchet#lower`: the book-out / transfer / rebooking sites in
+component, `MaterialExchangeOfferRatchet#lower`, which the decrement sites reach only through the
+Lager's observer SPI `inventory.api.StockChangeObserver` (plan §5.3): the book-out / transfer / rebooking sites in
 `InventoryCheckoutService`, a **material** handover (`JobOrderHandoverService`), an **item** delivery
 (`JobOrderItemHandoverService`, REQ-ORDERS-030), booking production against an item order
 (`JobOrderItemProductionService`, REQ-ORDERS-025), and a connected application's stock write
@@ -196,7 +197,8 @@ the new stock (book-out, transfer, rebooking, handover / item delivery, producti
 `MARKET_OFFER_REMOVED`, on every path above, with the path's `reason`.
 
 **Enforced by:** `MaterialExchangeOfferClampDataTest`, `MaterialExchangeOfferRatchetTest`,
-`MaterialExchangeOfferRatchetDataTest`, `InventoryItemServiceBookOutTest` · **Code:**
+`MaterialExchangeOfferRatchetDataTest`, `MaterialExchangeStockLinksDataTest`,
+`InventoryItemServiceBookOutTest` · **Code:** `StockChangeObserver`, `StockOfferLookup`,
 `MaterialExchangeOfferRatchet`, `MaterialExchangeOfferRepository#clampOfferedAmountToStock` /
 `#clampItemQuantityToStock`, `InventoryCheckoutService#bookOutInventoryItem` / `#rebookPersonal` /
 `#bulkCheckout` / `#bulkRebook` / `#deleteAllGlobalInventory` / transfer path,

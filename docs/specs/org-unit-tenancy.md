@@ -199,7 +199,7 @@ said the lead toggle was ADMIN-only, and the member page was admin-only in the f
 lead's right existed in the API alone. **Promotion-system maintenance** is
 re-opened to OFFICER under an org-unit-scope gate (`canEditSquadron(topic.owningSquadron.id)`).
 Admins can toggle the promotion subsystem per Squadron
-(`PATCH /api/v1/squadrons/{id}/promotion-enabled`); `OwnerScopeService.isPromotionFeatureEnabledForCurrentScope()`
+(`PATCH /api/v1/squadrons/{id}/promotion-enabled`); `PromotionAccessPolicy.isFeatureEnabledForCurrentScope()`
 short-circuits promotion services when OFF. **SKs can never participate in promotion** —
 enforced at DB (V97 CHECK + V101 trigger `guard_promotion_topic_owner_kind`), app
 (`SpecialCommand` entity), and type layer (ArchUnit
@@ -211,7 +211,7 @@ enforced at DB (V97 CHECK + V101 trigger `guard_promotion_topic_owner_kind`), ap
 > **Promotion does NOT cascade (Phase 3 / #696):** the cascade mints the flat `ROLE_LOGISTICIAN` /
 > `ROLE_MISSION_MANAGER` (mirroring the SK-lead precedent), **not** `ROLE_OFFICER`, and a non-admin
 > Bereichsleitung/OL member holds no Staffel membership (REQ-ORG-017), so `currentSquadronId()` is empty
-> → `hasPromotionReadAccess()` is `false` and the OFFICER-gated promotion-topic write paths reject them.
+> → `PromotionAccessPolicy.hasReadAccess()` is `false` and the OFFICER-gated promotion-topic write paths reject them.
 > Promotion therefore stays **squadron-OFFICER-only** (consistent with "promotion stays Squadron-only");
 > Bereich/OL never own promotion data and SKs stay permanently excluded. This fail-closed boundary is
 > deliberate — widening promotion maintenance to Bereichsleitung is out of scope and would need an
@@ -418,7 +418,8 @@ expanded set, so lists and per-row gates widen together (ADR-0026).
 > bank's read/write split: the balance **view** and the blueprint-availability overview cascade down
 > (`cascadedOfficerReach`), while bank booking **requests** use the separate, non-cascading
 > `currentOwnLevelOversightScope()` (REQ-BANK-027). *(Updated 2026-09-22: this note used to describe
-> the oversight scope as not yet cascaded.)*
+> the oversight scope as not yet cascaded. Corrected 2026-10-10: REQ-BANK-039 replaced the own-level
+> request scope with the view gate, and the unused method left the scope hub.)*
 
 Hard invariants:
 

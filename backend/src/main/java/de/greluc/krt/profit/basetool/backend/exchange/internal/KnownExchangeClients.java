@@ -19,11 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
-import de.greluc.krt.profit.basetool.backend.repository.ExchangeClientRepository;
 import java.time.Duration;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
@@ -66,6 +69,22 @@ public class KnownExchangeClients {
   /** Drops the cached ids, so the next lookup reads the registry. */
   public void invalidate() {
     loaded = false;
+  }
+
+  /**
+   * Reads the display names of the registered clients among the given ids, uncached, in one query.
+   *
+   * @param clientIds the client ids to look up
+   * @return display name by client id; an id no registry row carries is absent
+   */
+  @NotNull
+  public Map<String, String> displayNames(@NotNull Collection<String> clientIds) {
+    Map<String, String> names = new HashMap<>();
+    for (ExchangeClientRepository.ExchangeClientDisplayName row :
+        clientRepository.findDisplayNamesByClientIdIn(clientIds)) {
+      names.put(row.clientId(), row.displayName());
+    }
+    return names;
   }
 
   /**
