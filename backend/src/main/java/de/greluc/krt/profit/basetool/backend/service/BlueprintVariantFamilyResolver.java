@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintFamilies;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -35,7 +36,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class BlueprintVariantFamilyResolver {
+public class BlueprintVariantFamilyResolver implements BlueprintFamilies {
 
   /**
    * Prefix marking an <em>atomic</em> (magazine) family key. Begins with a leading space, which a
@@ -103,6 +104,7 @@ public class BlueprintVariantFamilyResolver {
    * @param countWithVariants whether cosmetic variants fold into one family
    * @return the match key; never {@code null}, empty for a blank name
    */
+  @Override
   @NotNull
   public String matchKey(@Nullable String name, boolean countWithVariants) {
     return countWithVariants ? familyKey(name) : normalizer.normalize(name);
@@ -115,6 +117,7 @@ public class BlueprintVariantFamilyResolver {
    * @param name a blueprint product name; may be {@code null}
    * @return {@code true} if the name is detected as an ammo container
    */
+  @Override
   public boolean isMagazine(@Nullable String name) {
     return isMagazineNormalized(normalizer.normalize(name));
   }

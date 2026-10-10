@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintFamilies;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeDemandItemDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeDemandMaterialDto;
@@ -39,7 +40,6 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintVariantFamilyResolver;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialRequirementResolver;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
@@ -96,7 +96,7 @@ public class ExchangeDemandService {
   private final InventoryItemRepository inventoryRepository;
   private final MaterialRepository materialRepository;
   private final PersonalBlueprintRepository blueprintRepository;
-  private final BlueprintVariantFamilyResolver familyResolver;
+  private final BlueprintFamilies familyResolver;
 
   /** The web's job-order gate, evaluated for the acting member. */
   private final OwnerScopeService ownerScopeService;
