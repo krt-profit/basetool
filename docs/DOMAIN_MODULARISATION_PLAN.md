@@ -951,6 +951,40 @@ their "must stay green" period here (D-01).
   select the exchange's non-web classes, so the 28 helpers that left the service package tree stay
   checked. (3) §5.2's `web` cannot hold the relay DTOs, as with the org chart; they sit in
   `internal.dto`, which keeps the `exchangeDtosStayInTheExchangeLayer` selection (34) unchanged.
+- `bank` as a package — **done 2026-10-10** (P2-5). All 126 bank classes of the layer packages moved:
+  the nine controllers (eight Kartellbank, `OrgUnitBankController`) into `bank.web`, everything else
+  — entities, repositories, services, mappers, records, the PDF formats, the ledger-integrity task
+  and the org-unit side behind `OrgUnitBankAccessService` — into `bank.internal`; `BankAmounts` and
+  `BankBookingRequestType` joined `bank.api`, because the published events and
+  `BankConflictException` carry them. Three steps, each green on its own:
+  1. *Access out of the scope hub* (§5.4): the bank's gates were already the bank's —
+     `bankSecurityService` for the Kartellbank and the `OrgUnitBankAccessService` seam for the org-unit
+     side. What the hub still held for the bank left it: the `AREA_MEMBERS` cascade
+     (`currentUserIsMemberOfAreaCascade`, REQ-BANK-048) is decided in the seam from the kernel's direct
+     memberships; `OrgUnitBankAreaCascadeDifferentialTest` compared it with the hub method over 480
+     verdicts (authenticated or anonymous, admin or not, unpinned or pinned, eight membership sets,
+     five target units) and keeps a verbatim copy; dropping the child-unit clause fails it.
+     `currentOwnLevelOversightScope` (REQ-BANK-022) and `currentUserHasAreaOrOlOversight`
+     (REQ-BANK-028) had no production caller left after REQ-BANK-039 and REQ-BANK-037 and were
+     removed. `AccessGateService` held no bank gate. No SpEL changed.
+  2. *Inversions* (§5.3): `OrgUnitMembershipService` and `UserDeletionService` snapshot and record
+     the responsible holders through `orgunit.api.ResponsibleHolderTracker`; `UserSyncService` runs
+     the holder reconciliation through `identity.api.UserSyncFollowUp`; the GDPR handle anonymisation
+     reaches the bank tables and the bank audit marker through `BankHandleSnapshots` (`MANDATORY`).
+     The module baseline shrank by `identity -> bank` and `orgunit -> bank`, **103 → 101** (re-derived after the exchange move).
+  3. *Move*, with the seam rules re-keyed to the module (§5.4): `BANK_DOMAIN` is the `bank`
+     package tree minus `ORG_UNIT_BANK_SIDE` (class literals), plus `BANK_CLASSES`, which now names
+     only the bank types outside the package; the bridge set is still exactly
+     `OrgUnitBankAccessService`. Like `EXCHANGE_NON_WEB`, `BANK_NON_WEB` keeps the bank's
+     non-controller classes in the security-context and read-only-transaction rules after they left
+     the `service` tree (floors 495 and 498). `BankAuditService`, `bank_audit_event`, the lock order
+     and the money arithmetic are untouched.
+  **Corrections:** (1) §5.4 expected bank gates in `OwnerScopeService`/`AccessGateService`; there was
+  one membership query and two dead methods. (2) Like `MemberEvaluationErasure`,
+  `BankHandleSnapshots` cannot sit in `bank.api` while its caller lives in the `service` package the
+  bank depends on; it stays there, registered in `BANK_CLASSES` and assigned by a `class` rule, and
+  is carried into Phase 4 with the GDPR participants (§7.6). (3) `BusinessMetricsCollector` (`app`)
+  still reads the booking-request repository directly; it leaves with the per-module gauges of §5.1.
 
 ### 7.5 Phase 3 — the business core
 
@@ -978,7 +1012,7 @@ surface sheds the six domains it hosts today.
 Carried into this phase from Phase 2: `service.MemberEvaluationErasure` (promotion) and
 `personalinventory.api.PersonalInventoryErasure` are the interim erasure commands `UserDeletionService`
 calls; both are replaced by `UserErasureParticipant` implementations here, and
-`MemberEvaluationErasure` leaves the `service` package with that step (P2-3).
+`MemberEvaluationErasure` leaves the `service` package with that step (P2-3); `service.BankHandleSnapshots` (bank) goes the same way (P2-5).
 
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 

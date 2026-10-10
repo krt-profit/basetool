@@ -5099,9 +5099,9 @@ it.
 **Enforced by:** `HandleAnonymisationServiceTest`, `HandleErasureCoverageTest` · **Code:**
 `service/HandleAnonymisationService`, `kernel/HandleAnonymisation`, `privacy/internal/HandleErasureCoverage`,
 `repository/AuditEventRepository#anonymiseActorHandle`,
-`repository/BankAuditEventRepository#anonymiseActorHandle`,
-`repository/BankTransactionRepository#anonymiseCounterpartyHandle`,
-`repository/BankBookingRequestRepository#anonymiseHandles`,
+`bank/internal/BankAuditEventRepository#anonymiseActorHandle`,
+`bank/internal/BankTransactionRepository#anonymiseCounterpartyHandle`,
+`bank/internal/BankBookingRequestRepository#anonymiseHandles`,
 `repository/JobOrderHandoverRepository#anonymiseRecipientHandle`,
 `repository/JobOrderItemHandoverRepository#anonymiseRecipientHandle`,
 `frontend/support/HandleDisplay` · **Decision:**

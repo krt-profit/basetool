@@ -525,7 +525,7 @@ admin-editable at runtime.
 `bank/api/events/BankBookingRequest{Created,Confirmed,Rejected}Event`,
 `service/RecipientResolutionService#resolveAccountGrantHolders`,
 `service/RuleEvaluationService#resolveEventRecipient`,
-`service/OrgUnitBankResponsibilityService#resolveResponsibleHolderUserIds`,
+`bank/internal/OrgUnitBankResponsibilityService#resolveResponsibleHolderUserIds`,
 `model/SelectorKind#{ACCOUNT_GRANT,EVENT_RECIPIENT,ACCOUNT_RESPONSIBLE}`,
 `model/NotificationEventType`, `model/NotificationType`,
 `db/migration/V160__seed_bank_booking_request_notification_rule.sql`,
@@ -667,7 +667,7 @@ request is closed.
 `bank/api/events/BankBookingRequest{Confirmed,Rejected,Cancelled}Event`,
 `service/NotificationCreationService#removeSupersededNotifications`,
 `repository/NotificationRepository#{findRecipientUserIdsByTypeInAndEntity,deleteByTypeInAndEntity}`,
-`service/BankBookingRequestService#cancelOwn`, `privacy/api/events/AccountDeletionRequest{Declined,Resolved}Event`,
+`bank/internal/BankBookingRequestService#cancelOwn`, `privacy/api/events/AccountDeletionRequest{Declined,Resolved}Event`,
 `model/NotificationEventType` · **Decision:**
 [ADR-0096](../adr/0096-notification-supersede-on-lifecycle-close.md) · **Issues:** #1252
 

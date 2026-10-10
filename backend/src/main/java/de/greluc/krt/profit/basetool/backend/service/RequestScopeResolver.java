@@ -401,42 +401,6 @@ public class RequestScopeResolver {
   }
 
   /**
-   * Non-cascading own-level oversight scope, used for org-unit bank booking requests
-   * (REQ-BANK-022): the officer's Staffel, the SKs an SK lead leads, the Bereichsleitung's Bereich
-   * and the OL member's Organisationsleitung, never units below them. Admins get {@link
-   * #currentScopePredicate()}.
-   *
-   * <p>A pin applies only when it names one of the caller's own-level seats.
-   *
-   * @return a never-null, non-cascaded scope vector of the caller's own-level oversight seats.
-   */
-  @NotNull
-  public ScopePredicate currentOwnLevelOversightScope() {
-    if (authHelper.isAdmin()) {
-      return currentScopePredicate();
-    }
-    Set<UUID> ownLevelOrgUnitIds = new LinkedHashSet<>();
-    List<OrgUnitMembership> memberships = currentCallerMemberships();
-    if (authHelper.hasReachableRole(Roles.authority(Roles.OFFICER))) {
-      for (OrgUnitMembership m : memberships) {
-        if (m.getKind() == OrgUnitKind.SQUADRON) {
-          ownLevelOrgUnitIds.add(m.getId().getOrgUnitId());
-        }
-      }
-    }
-    for (OrgUnitMembership m : memberships) {
-      if (isOversightSeat(m)) {
-        ownLevelOrgUnitIds.add(m.getId().getOrgUnitId());
-      }
-    }
-    Optional<UUID> pinned = readActiveSquadronFromHeader();
-    if (pinned.isPresent() && ownLevelOrgUnitIds.contains(pinned.get())) {
-      return new ScopePredicate(false, pinned.get(), Set.of());
-    }
-    return new ScopePredicate(false, null, ownLevelOrgUnitIds);
-  }
-
-  /**
    * Whether the membership carries a functional rank ({@link
    * MembershipRole#confersOwnLevelOversight()}) and therefore oversight over its own org unit.
    *
@@ -445,20 +409,6 @@ public class RequestScopeResolver {
    */
   private static boolean isOversightSeat(@NotNull OrgUnitMembership m) {
     return m.getRole().confersOwnLevelOversight();
-  }
-
-  /**
-   * Whether the caller holds a Bereich- or OL-level seat ({@link MembershipRole#isAreaOrOl()}),
-   * which reveals the cartel-wide special accounts on the org-unit bank page (REQ-BANK-028).
-   * Excludes officers and SK leads; admins always qualify.
-   *
-   * @return {@code true} iff the caller is an admin or holds a Bereich-/OL-level oversight seat.
-   */
-  public boolean currentUserHasAreaOrOlOversight() {
-    if (authHelper.isAdmin()) {
-      return true;
-    }
-    return currentCallerMemberships().stream().anyMatch(RequestScopeResolver::isAreaOrOlSeat);
   }
 
   /**
@@ -517,23 +467,6 @@ public class RequestScopeResolver {
   public boolean currentUserIsMemberOfOrgUnit(@NotNull UUID orgUnitId) {
     return currentCallerMemberships().stream()
         .anyMatch(m -> m.getId().getOrgUnitId().equals(orgUnitId));
-  }
-
-  /**
-   * Whether the caller is a member of the given Bereich or of any of its child Staffeln and
-   * Spezialkommandos (REQ-BANK-048).
-   *
-   * @param bereichId the owning Bereich org unit; never {@code null}
-   * @return {@code true} iff the caller has any membership on the Bereich or one of its children
-   */
-  public boolean currentUserIsMemberOfAreaCascade(@NotNull UUID bereichId) {
-    List<UUID> childIds = orgUnitRepository.findChildOrgUnitIds(bereichId);
-    return currentCallerMemberships().stream()
-        .anyMatch(
-            m -> {
-              UUID ou = m.getId().getOrgUnitId();
-              return ou.equals(bereichId) || childIds.contains(ou);
-            });
   }
 
   /**

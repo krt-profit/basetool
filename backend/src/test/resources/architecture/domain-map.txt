@@ -106,9 +106,6 @@ class SseSendFailureCause platform SSE failure tag shared by notification and li
 class RedisJsonFanout platform Redis pub/sub transport shared by notification and live sync
 class KrtPdfSupport platform shared PDF design layer
 class AuditLogPdfFormat audit audit PDF format
-class BankBalanceChart bank bank PDF chart
-class BankPdfFormat bank bank PDF format
-class BankAmounts bank bank amount formatting
 class CentralMapperConfig platform MapStruct shared config
 class PageResponse kernel paging envelope used by every list endpoint
 class AbstractEntity kernel JPA base class of every entity
@@ -165,8 +162,8 @@ class JobOrderAllocationDto inventory job-order slice of an inventory entry (REQ
 class BlueprintEnvelopeReader blueprint upload-preview envelope SPI, implemented by the exchange (plan 5.3)
 class BlueprintPackTags blueprint log-name clean-up used only by BlueprintImportService
 class BasetoolErrorController platform container error dispatch as RFC 7807
-class CounterpartySnapshot bank bank counterparty snapshot (REQ-BANK-044)
 class MemberEvaluationErasure promotion GDPR erasure command; in service until 7.6, a promotion package would close a service-promotion package cycle
+class BankHandleSnapshots bank GDPR handle anonymisation of the bank tables; in service until 7.6, a bank package would close a service-bank package cycle
 
 package dto catalogue external feed DTO packages of the UEX, SC Wiki and P4K imports
 package integration catalogue outbound catalogue clients
@@ -194,8 +191,6 @@ package operation operation the operation module's package tree (plan 5.2)
 package promotion promotion the promotion module's package tree (plan 5.2)
 package personalinventory personalinventory the personal-inventory module's package tree (plan 5.2)
 
-name ^OrgUnitBank bank
-name ^(Bank|CreateBank|CancelBank|ConfirmBank|RegisterBank|RejectBank|RenameBank|ReverseBank|SetBank|UpdateBank|SetCartel|OrgUnitBalanceTarget) bank
 name ^(MaterialExchange|MaterialRequest|MaterialItemRequest) materialexchange
 name ^(MaterialClaim|ClaimBucket|ClaimDto|CreateClaim|MaterialDemand) joborder
 name ^(JobOrder|CreateJobOrder|UpdateJobOrder|HandoverReport) joborder
