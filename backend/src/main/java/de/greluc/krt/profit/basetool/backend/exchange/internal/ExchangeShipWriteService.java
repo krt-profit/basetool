@@ -213,7 +213,8 @@ public class ExchangeShipWriteService {
             case ExchangeShipChangeSet.LINK -> planLink(caller, op, links, touched);
             case ExchangeShipChangeSet.UPSERT ->
                 planUpsert(caller, op, types.get(i), links, touched);
-            default -> planRemove(caller, op, touched);
+            case ExchangeShipChangeSet.REMOVE -> planRemove(caller, op, touched);
+            default -> throw new IllegalArgumentException("Unknown ship operation: " + op.op());
           };
       plan.add(planned);
     }
@@ -551,7 +552,7 @@ public class ExchangeShipWriteService {
           switch (result.status()) {
             case RESOLVED -> new ShipTypeMatch(UUID.fromString(result.ref().bt()), null, null);
             case AMBIGUOUS -> new ShipTypeMatch(null, AMBIGUOUS, AMBIGUOUS_REASON);
-            default -> new ShipTypeMatch(null, UNMATCHED, UNMATCHED_REASON);
+            case UNMATCHED -> new ShipTypeMatch(null, UNMATCHED, UNMATCHED_REASON);
           });
     }
     return byIndex;
