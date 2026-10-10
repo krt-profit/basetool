@@ -222,7 +222,7 @@ class HangarIntegrationTest {
     String response =
         mockMvc
             .perform(
-                post("/api/v1/hangar/users/" + user1.getId() + "/ships")
+                post("/api/v1/hangar/admin/users/" + user1.getId() + "/ships")
                     .with(
                         jwt()
                             .jwt(builder -> builder.subject(adminUser.getId().toString()))
@@ -248,7 +248,7 @@ class HangarIntegrationTest {
             "Admin Updated", fighter.getId(), "LTI", null, false, savedShip.version(), null);
     mockMvc
         .perform(
-            put("/api/v1/hangar/users/" + user1.getId() + "/ships/" + savedShip.id())
+            put("/api/v1/hangar/admin/users/" + user1.getId() + "/ships/" + savedShip.id())
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(adminUser.getId().toString()))
@@ -268,7 +268,7 @@ class HangarIntegrationTest {
 
     mockMvc
         .perform(
-            delete("/api/v1/hangar/users/" + user1.getId() + "/ships/" + savedShip.id())
+            delete("/api/v1/hangar/admin/users/" + user1.getId() + "/ships/" + savedShip.id())
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(adminUser.getId().toString()))

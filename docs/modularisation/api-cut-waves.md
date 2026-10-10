@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | Documented operations / paths | 572 / 440 | **567 / 434** (`openapi.json`) |
 | Tiers | — | **T0 4, T1 244, T2 319** (`x-contract-tier`) |
-| Operations the cut touches | 161 (74 app-frozen) | **188 (77 app-called)**: 182 path moves and deletions plus 6 operations that change a shape (§ 5), among them the 2 optional kommando-group writes that this cut leaves out (Q-8); the 4 quality-tier admin operations of ADR-0241, the 14 exchange-administration operations (D-12) and the 2 sync-report operations are inside the 182 |
+| Operations the cut touches | 161 (74 app-frozen) | **188 (77 app-called)**: 182 path moves and deletions plus 6 operations that change a shape (§ 5), among them the 2 kommando-group writes of wave 2 (Q-8); the 4 quality-tier admin operations of ADR-0241, the 14 exchange-administration operations (D-12) and the 2 sync-report operations are inside the 182 |
 | Machinery | planned | **built**: G-01 … G-08 and G-23 guards, the generated edge map (REQ-API-021), the ledger `declared-breaks.txt` (empty), `retired-operations.txt` (empty, answers `410 APP_UPDATE_REQUIRED`), the release-bound floor (REQ-API-020; `application.yml` 17 / 17), the app call lists (`app-calls/18.txt` = app v0.5.0, `unreleased.txt` = 245 calls) |
 | App | v0.3.1 | **v0.5.0 (versionCode 18)** published 2026-10-03, with the policy re-read on resume (basetool-android#209, merged); the next build is **19** |
 | Backend layout | layer packages | controllers live in `<module>/web` for 13 modules (e.g. `mission/web/MissionController`, `bank/web/…`); the rest still in `controller` |
@@ -85,8 +85,8 @@ app v0.5.0 (`app-calls/18.txt`). The order is the appendix order, risk and app i
 
 Reconciliation with the inventory (wave 1: 50 + 14 exchange + 4 quality tier = 68; waves 2 to 6:
 30/9, 36/29, 30/24, 7/3, 17/12): the inventory's 188 operations are the 182 map lines plus six
-operations that change a shape and not a path (§ 5): the two optional kommando-group writes (wave 2,
-not in this cut), the balance-target write (wave 4) and the typed settings read and the two
+operations that change a shape and not a path (§ 5): the two kommando-group writes (wave 2,
+web-only, Q-8), the balance-target write (wave 4) and the typed settings read and the two
 refinery writes (wave 6). Its 77 app-called operations are the 74 above plus the balance-target
 write, the settings read and the refinery create. Wave 6 differs by one app-called operation from
 the inventory's 12 (map 9 plus settings and refinery create = 11); the wave 6 pull request settles
@@ -299,7 +299,7 @@ and their tests go. **App-called (9):** `MaterialBoardRepository` 7, `Announceme
 
 ## 5 Shape changes the map does not carry
 
-Seven items change a request, a response or a gate instead of a path. Three of them touch the app
+Nine items change a request, a response or a gate instead of a path. Three of them touch the app
 and are part of the same forced update; they are listed because the map is a list of paths.
 
 | # | Wave | Item | App | Decision |
@@ -311,6 +311,8 @@ and are part of the same forced update; they are listed because the map is a lis
 | S-5 | 3 | finance gate reads the mission from the path | none | none |
 | S-6 | 5 | one `GameItemReferenceDto` instead of two | `JobOrderRepository` | field union reviewed in the wave |
 | S-7 | 2 | payout and sharing columns move into their owners | none | later, no path change (D-17) |
+| S-8 | 2 | `PUT`/`DELETE /kommando-groups/{groupId}` move under `/squadrons/{squadronId}/kommando-groups/{groupId}`; the gate follows the squadron in the path | none (web-only) | in the cut (Q-8) |
+| S-9 | 6 | `POST /material-exchange/items/{inventoryItemId}/deactivate` becomes `POST /material-exchange/offers/deactivate?inventoryItemId=` | none (web-only) | in the cut (Q-8) |
 
 S-4 needs the exchange's refinery draft route to bind its own request DTO first (G-18), or the
 frozen external behaviour changes with it.
@@ -340,19 +342,26 @@ frozen external behaviour changes with it.
 6. **Rehearsal.** Before the production promotion the whole sequence is rehearsed on the testing
    host (old app → 410 wall → new app works); that is an owner-executed step (§ 7, Q-9).
 
-## 7 Decisions for the owner
+## 7 Decisions
+
+Taken by the coordinator on 2026-10-10 (covered by D-03 and D-18):
+
+| # | Decision |
+| --- | --- |
+| Q-1 | The draft pull request stays open; wave pull requests merge into `claude/api-cut` after the local gates are green and reported. |
+| Q-6 | `GET /missions` takes `q`; the app's `query` parameter is renamed (ledger line with the field). |
+| Q-7 | Cache classes as D-18: member data stays no-store; the catalogue reads (`/game-items`, refinery yields) and admin catalogue reads revalidate or, for admin trees, are no-store as REQ-API-023 states. |
+| Q-8 | No deferral: the optional web-only items (kommando-group writes under the squadron in wave 2, `deactivate` as a collection action in wave 6) are part of the cut. |
+
+Open, with the owner (the Android repository is not touched until Q-3 to Q-5 are answered):
 
 | # | Question | Recommendation |
 | --- | --- | --- |
-| Q-1 | CI for `claude/api-cut`: the draft PR into `main` carries CI for the branch; wave PRs target the branch and are merged into it after the local gates are green and reported (proposal: I merge them, as with the modularisation PRs). May the draft PR stay open for weeks? | yes |
-| Q-2 | Release name and floor: app 19 (version name proposal 0.6.0), floor and latest 19. Also: `latest-version-code` is 17 although 18 is published; raise it to 18 now on its own? | yes to 19; raise to 18 only if the in-app update prompt should already point to 0.5.0 |
-| Q-3 | App branch: `claude/api-cut` in `basetool-android`, one PR per repository class (§ 8), nothing on its `main` until the backend is ready; who may merge there? | same rule as here |
-| Q-4 | `POST /hangar/import/fleetview` is called by the app today (T1). The new app drops the fleetview import and keeps the ship import; confirm the feature goes. | confirm |
-| Q-5 | Shape changes with an app touch: S-2 balance-target `PUT`, S-3 typed settings, S-4 refinery request records. In this cut (one forced update) or later (another one)? | in this cut |
-| Q-6 | `GET /missions?q=` renames the app's `query` parameter; keep the old name to spare the app a change? | rename (principle P5) |
-| Q-7 | Cache classes (D-18): member data stays no-store; `/game-items` and `refinery-yields` revalidate; admin catalogue reads revalidate. | as listed |
-| Q-8 | Optional items outside the cut (web-only, no app): kommando-group writes under the squadron, `POST /material-exchange/items/{id}/deactivate` as a collection action. | defer to a web-only follow-up wave |
-| Q-9 | Rehearsal on the testing host and the production promotion order (owner-executed steps; nothing runs against any host from this work). | rehearse first |
+| Q-2 | Release name and floor: app 19 (proposal 0.6.0), floor and latest 19; `latest-version-code` is 17 although 18 is published. | yes to 19 |
+| Q-3 | App branch `claude/api-cut` in `basetool-android`, one PR per repository class, nothing on its `main` until the backend is ready; who may merge there? | same rule as here |
+| Q-4 | `POST /hangar/import/fleetview` is called by the app today (T1); the new app drops it and keeps the ship import. | confirm |
+| Q-5 | Shape changes that touch the app (S-2, S-3, S-4): in this cut or later? | in this cut |
+| Q-9 | Rehearsal of the forced update on the testing host (owner-executed). | rehearse first |
 
 ## 8 Work split for the app (basetool-android)
 

@@ -92,7 +92,7 @@ class AdminPersonalBlueprintsControllerTest {
   @Test
   void addSelected_relaysToAdminBatchEndpointForTargetUser() {
     when(backendApiClient.post(
-            eq("/api/v1/admin/personal-blueprints/{userSub}/batch"),
+            eq("/api/v1/personal-blueprints/admin/{userSub}/batch"),
             any(PersonalBlueprintBatchCreateRequest.class),
             eq(PersonalBlueprintBatchResultDto.class),
             eq(TARGET)))
@@ -112,7 +112,7 @@ class AdminPersonalBlueprintsControllerTest {
 
     assertEquals("redirect:/admin/personal-blueprints?userSub=" + TARGET, view);
     verify(backendApiClient)
-        .put(eq("/api/v1/admin/personal-blueprints/items/{id}"), any(), any(), eq(id));
+        .put(eq("/api/v1/personal-blueprints/admin/items/{id}"), any(), any(), eq(id));
     assertEquals(
         "personalInventory.blueprints.toast.noteUpdated",
         flash.getFlashAttributes().get("successToast"));
@@ -127,13 +127,13 @@ class AdminPersonalBlueprintsControllerTest {
 
     assertEquals("redirect:/admin/personal-blueprints?userSub=" + TARGET, view);
     verify(backendApiClient)
-        .delete(eq("/api/v1/admin/personal-blueprints/items/{id}"), eq(Void.class), eq(id));
+        .delete(eq("/api/v1/personal-blueprints/admin/items/{id}"), eq(Void.class), eq(id));
   }
 
   @Test
   void deleteAllUsers_relaysToAdminPurgeEndpointAndRedirects() {
     when(backendApiClient.delete(
-            eq("/api/v1/admin/personal-blueprints"),
+            eq("/api/v1/personal-blueprints/admin"),
             eq(PersonalBlueprintBulkDeleteResultDto.class)))
         .thenReturn(new PersonalBlueprintBulkDeleteResultDto(3));
     RedirectAttributesModelMap flash = new RedirectAttributesModelMap();
@@ -143,7 +143,7 @@ class AdminPersonalBlueprintsControllerTest {
     assertEquals("redirect:/admin/personal-blueprints", view);
     verify(backendApiClient)
         .delete(
-            eq("/api/v1/admin/personal-blueprints"),
+            eq("/api/v1/personal-blueprints/admin"),
             eq(PersonalBlueprintBulkDeleteResultDto.class));
     assertEquals(
         "admin.personalInventory.blueprints.purge.toast.done",
@@ -153,7 +153,7 @@ class AdminPersonalBlueprintsControllerTest {
   @Test
   void deleteAllUsersAjax_relaysToAdminPurgeEndpointAndReturnsCount() {
     when(backendApiClient.delete(
-            eq("/api/v1/admin/personal-blueprints"),
+            eq("/api/v1/personal-blueprints/admin"),
             eq(PersonalBlueprintBulkDeleteResultDto.class)))
         .thenReturn(new PersonalBlueprintBulkDeleteResultDto(8));
 
@@ -186,7 +186,7 @@ class AdminPersonalBlueprintsControllerTest {
     assertNotNull(preview);
     assertEquals(0, preview.total());
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
-    assertEquals("/api/v1/admin/personal-blueprints/" + TARGET + "/import/preview", req.getPath());
+    assertEquals("/api/v1/personal-blueprints/admin/" + TARGET + "/import/preview", req.getPath());
   }
 
   @Test
@@ -212,7 +212,7 @@ class AdminPersonalBlueprintsControllerTest {
   @Test
   void applyImport_relaysToAdminApplyEndpoint() {
     when(backendApiClient.post(
-            eq("/api/v1/admin/personal-blueprints/{userSub}/import/apply"),
+            eq("/api/v1/personal-blueprints/admin/{userSub}/import/apply"),
             any(),
             eq(BlueprintImportResultDto.class),
             eq(TARGET)))

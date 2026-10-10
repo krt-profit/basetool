@@ -60,7 +60,7 @@ import org.springframework.web.context.WebApplicationContext;
 @Transactional
 class AdminExchangeClientUsageTest {
 
-  private static final String USAGE = "/api/v1/admin/exchange-clients/usage";
+  private static final String USAGE = "/api/v1/connected-apps/admin/clients/usage";
   private static final Instant NOW = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 
   @Autowired private WebApplicationContext context;

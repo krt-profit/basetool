@@ -54,8 +54,8 @@ import org.springframework.ui.Model;
 class AdminDeletionRequestsPageControllerTest {
 
   private static final UUID REQUEST_ID = UUID.fromString("00000000-0000-0000-0000-0000000000aa");
-  private static final String DECLINE_URI = "/api/v1/admin/deletion-requests/{id}/decline";
-  private static final String EXECUTE_URI = "/api/v1/admin/deletion-requests/{id}/execute";
+  private static final String DECLINE_URI = "/api/v1/users/admin/deletion-requests/{id}/decline";
+  private static final String EXECUTE_URI = "/api/v1/users/admin/deletion-requests/{id}/execute";
 
   @Test
   void decline_withoutTheNoteKey_is400AndNoBackendCall() {

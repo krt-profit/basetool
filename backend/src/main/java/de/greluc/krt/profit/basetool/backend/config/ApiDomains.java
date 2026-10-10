@@ -135,7 +135,6 @@ public final class ApiDomains {
           Map.entry("SquadronRoleController", "orgunit"),
           Map.entry("StarSystemController", "catalogue"),
           Map.entry("SyncReportController", "catalogue"),
-          Map.entry("SystemController", "admin-system"),
           Map.entry("SystemSettingController", "admin-system"),
           Map.entry("TerminalController", "catalogue"),
           Map.entry("TermsController", "identity"),

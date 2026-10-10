@@ -2041,18 +2041,17 @@ family decides, so a sub-family can differ from its parent.
 | --- | --- |
 | `/api/v1/bank/**`, `/api/v1/org-units/bank/**` | bank ledgers, balances and holder handles |
 | `/api/v1/users/**`, `/api/v1/me/**` | member records, the caller's own context |
-| `/api/v1/notifications/**` | one member's feed, including the SSE stream |
+| `/api/v1/notifications/**` | one member's feed, including the SSE stream, and the recipient rules, whose selector can name an individual member |
 | `/api/v1/finance-entries/**`, `/api/v1/missions/*/finance-entries/**`, `/api/v1/operations/**` | ledgers and payouts |
 | `/api/v1/personal-inventory/**`, `/api/v1/personal-blueprints/**`, `/api/v1/inventory/**`, `/api/v1/hangar/**`, `/api/v1/refinery-orders/**` | holdings and profit figures |
 | `/api/v1/promotion/**` | evaluations of named members |
-| `/api/v1/admin/**` | **new** — person search, registrations, exports, deletion requests, a member's holdings |
+| `/api/v1/roles/**`, `/api/v1/catalog/admin/**`, `/api/v1/blueprints/admin/**` | the administration of roles, of the catalogue (imports, quality tiers, sync reports) and of the default blueprints; the other administration trees sit under `users`, `terms`, `personal-*`, `hangar`, `notifications` and `connected-apps`, which are `no-store` already |
 | `/api/v1/audit/**` | **new** — who did what, by actor |
 | `/api/v1/connected-apps/**` | **new** — the member's installations and their activity |
 | `/api/v1/exchange/**` | **new** — the acting member's stock, ships, blueprints and installation |
 | `/api/v1/leitung/**` | **new** — the units the caller leads, their rosters and the caller's permissions |
 | `/api/v1/live-sync/**` | **new** — the stream names the topics accepted for this caller |
 | `/api/v1/material-exchange/**`, `/api/v1/material-requests/**` | **new** — viewer-specific `mine` / `viewerInterested`, interested handles, and the member's own releasable stock |
-| `/api/v1/notification-rules/**` | **new** — a selector can name an individual member |
 | `/api/v1/orders/**` | **new** — assignee and requester handles, claims, handovers, blueprint owners, viewer `canEdit` |
 | `/api/v1/org-chart/**` | **new** — named position holders and viewer-specific `canAdd…` flags |
 | `/api/v1/special-commands/*/members/**`, `/api/v1/squadrons/*/members/**` | **new** — member rosters |
@@ -2062,7 +2061,7 @@ Revalidatable: `announcement`, `app`, `blueprints`, `cities`, `frequency-types`,
 `kommando-groups`, `locations`, `manufacturers`, `material-categories`,
 `material-external-aliases`, `materials`, `missions`, `org-hierarchy`, `org-units`, `outposts`,
 `pois`, `quality-tiers`, `refining-methods`, `settings`, `ship-types`, `space-stations`, `special-commands`,
-`squadrons`, `star-systems`, `sync-reports`, `system` (v1 and v2), `terminals`, `uex`, and three
+`squadrons`, `star-systems`, `terminals`, `uex`, and three
 catalogue sub-families inside a `no-store` parent: `/api/v1/exchange/catalog/**`,
 `/api/v1/orders/item-catalog/**` and `/api/v1/terms/document`.
 
@@ -3270,7 +3269,7 @@ always *wrong*, only unsafe because nobody chose it. Left without a remedy, a me
 with two accounts has their data stranded on the one they can no longer reach, and the admin has
 nothing to do about it.
 
-`UserAccountMergeService`, reached at `POST /api/v1/admin/registrations/{id}/merge` (ADMIN only),
+`UserAccountMergeService`, reached at `POST /api/v1/users/admin/registrations/{id}/merge` (ADMIN only),
 is that remedy. The registration in the path is the account that **survives**; the body names the
 older account to empty.
 

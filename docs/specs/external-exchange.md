@@ -236,7 +236,7 @@ reserved: it joins the exchange as a registry client of its own at the go-live.
   `ExchangeGateTest`, `ExchangeCatalogControllerTest`; gateway `ExchangeRelayTest`,
   `ExchangeControllerTest`.*
 - [x] Each client shows its connected members and last activity, counted over live installations
-  only (`GET /api/v1/admin/exchange-clients/usage`: not revoked, and not seen last before the
+  only (`GET /api/v1/connected-apps/admin/clients/usage`: not revoked, and not seen last before the
   member disconnected the client); the error rate per client is linked in Grafana
   (`APP_GRAFANA_OPERATIONS_DASHBOARD_URL`, owner decision 2026-09-27). *`AdminExchangeClientUsageTest`,
   `AdminExchangeClientsPageControllerMvcTest`.*
@@ -1964,14 +1964,14 @@ it changed, and is audited and instrumented. Re-activating the client stays a se
   `exchange-clients` live-sync room, and then the run's progress and end (REQ-FE-015).
   *`LiveSyncSectionMapParityTest`, `LiveSyncTopicTest`, `LiveSyncTopicRegistryParityTest`.*
 
-**The scope.** `POST /api/v1/admin/exchange-clients/{id}/undo {since, installationId?, resource?}`
+**The scope.** `POST /api/v1/connected-apps/admin/clients/{id}/undo {since, installationId?, resource?}`
 (`ADMIN`, answers `202` with the run) undoes the client's journal entries recorded at or after
 `since`, clamped to the configured retention (`app.exchange.change-retention.max-age`), that are not
 undone yet; `resource` is `BLUEPRINT`, `STOCK` or `SHIP`, `installationId` one installation of that
 client. A `since` in the future is `400`. `…/undo/preview` answers the members and entries in scope
 and whether the client is still active, writing nothing; `…/undo/installations?since=` lists the
 client's installations with writes in the span (member name, last seen, disconnected, count — never
-the member-given label), at most 500, for choosing one. `GET /api/v1/admin/exchange-undo-runs` lists
+the member-given label), at most 500, for choosing one. `GET /api/v1/connected-apps/admin/undo-runs` lists
 the last twenty runs, `…/{runId}` one run with its first 200 skipped entries, failed members first.
 
 **The run.** Starting checks that no run of the client is `RUNNING` (also a partial unique index),

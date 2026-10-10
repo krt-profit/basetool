@@ -37,8 +37,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * Admin-only page controller for {@code /admin/quality-tiers}: renders the quality-tier catalogue
- * from {@code /api/v1/admin/quality-tiers} (REQ-ORDERS-036). The writes are relayed by {@link
- * AdminQualityTiersRelayController}.
+ * from {@code /api/v1/catalog/admin/quality-tiers} (REQ-ORDERS-036). The writes are relayed by
+ * {@link AdminQualityTiersRelayController}.
  */
 @Controller
 @UsesLayoutModel

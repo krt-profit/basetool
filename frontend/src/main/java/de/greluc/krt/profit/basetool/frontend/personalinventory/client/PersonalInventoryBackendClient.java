@@ -178,7 +178,7 @@ public class PersonalInventoryBackendClient {
   public PageResponse<PersonalInventoryItemDto> memberItemPage(
       @NotNull UUID userSub, @NotNull ItemQuery query) {
     UriComponentsBuilder builder =
-        UriComponentsBuilder.fromPath("/api/v1/admin/personal-inventory/{userSub}");
+        UriComponentsBuilder.fromPath("/api/v1/personal-inventory/admin/{userSub}");
     if (query.page() != null) {
       builder.queryParam("page", query.page());
     }
@@ -207,7 +207,7 @@ public class PersonalInventoryBackendClient {
   public PersonalInventoryItemDto createForMember(
       @NotNull UUID userSub, @NotNull PersonalInventoryItemCreateRequest request) {
     return backendApiClient.post(
-        "/api/v1/admin/personal-inventory/{userSub}",
+        "/api/v1/personal-inventory/admin/{userSub}",
         request,
         PersonalInventoryItemDto.class,
         userSub);
@@ -224,7 +224,7 @@ public class PersonalInventoryBackendClient {
   public PersonalInventoryItemDto updateForMember(
       @NotNull UUID id, @NotNull PersonalInventoryItemUpdateRequest request) {
     return backendApiClient.put(
-        "/api/v1/admin/personal-inventory/items/{id}", request, PersonalInventoryItemDto.class, id);
+        "/api/v1/personal-inventory/admin/items/{id}", request, PersonalInventoryItemDto.class, id);
   }
 
   /**
@@ -233,6 +233,6 @@ public class PersonalInventoryBackendClient {
    * @param id the item
    */
   public void deleteForMember(@NotNull UUID id) {
-    backendApiClient.delete("/api/v1/admin/personal-inventory/items/{id}", Void.class, id);
+    backendApiClient.delete("/api/v1/personal-inventory/admin/items/{id}", Void.class, id);
   }
 }

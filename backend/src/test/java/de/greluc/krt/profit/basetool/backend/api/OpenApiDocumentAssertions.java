@@ -54,7 +54,7 @@ public final class OpenApiDocumentAssertions {
    */
   public static final Map<String, Integer> DOMAIN_FLOOR =
       Map.ofEntries(
-          Map.entry("admin-system", 6),
+          Map.entry("admin-system", 4),
           Map.entry("audit", 4),
           Map.entry("bank", 65),
           Map.entry("blueprint", 25),
@@ -62,7 +62,7 @@ public final class OpenApiDocumentAssertions {
           Map.entry("dashboard", 4),
           Map.entry("exchange", 21),
           Map.entry("hangar", 15),
-          Map.entry("identity", 58),
+          Map.entry("identity", 57),
           Map.entry("inventory", 28),
           Map.entry("joborder", 39),
           Map.entry("leadership", 1),

@@ -52,7 +52,7 @@ import org.springframework.web.bind.annotation.RestController;
  * (REQ-XCH-034).
  */
 @RestController
-@RequestMapping("/api/v1/admin")
+@RequestMapping("/api/v1/connected-apps/admin")
 @RequiredArgsConstructor
 @PreAuthorize(Roles.HAS_ROLE_ADMIN)
 @Tag(name = "Admin — Exchange bulk undo", description = "Undo one client's writes for all members")
@@ -68,7 +68,7 @@ public class AdminExchangeBulkUndoController {
    * @return the members and entries in scope
    */
   @NotNull
-  @PostMapping("/exchange-clients/{id}/undo/preview")
+  @PostMapping("/clients/{id}/undo/preview")
   @Operation(
       summary = "Preview a bulk undo",
       description = "Counts the members and journal entries in scope; writes nothing.")
@@ -90,7 +90,7 @@ public class AdminExchangeBulkUndoController {
    * @return the started run
    */
   @NotNull
-  @PostMapping("/exchange-clients/{id}/undo")
+  @PostMapping("/clients/{id}/undo")
   @Operation(
       summary = "Start a bulk undo",
       description =
@@ -121,7 +121,7 @@ public class AdminExchangeBulkUndoController {
    * @return the installations, most writes first, without their labels
    */
   @NotNull
-  @GetMapping("/exchange-clients/{id}/undo/installations")
+  @GetMapping("/clients/{id}/undo/installations")
   @Operation(summary = "Installations a bulk undo could reach")
   @ApiResponse(responseCode = "200", description = "At most 500 installations")
   @ApiResponse(responseCode = "404", description = "No such client")
@@ -136,7 +136,7 @@ public class AdminExchangeBulkUndoController {
    * @return at most twenty runs, newest first
    */
   @NotNull
-  @GetMapping("/exchange-undo-runs")
+  @GetMapping("/undo-runs")
   @Operation(summary = "Recent bulk undo runs")
   @ApiResponse(responseCode = "200", description = "At most twenty runs")
   public ResponseEntity<List<ExchangeBulkUndoRunDto>> runs() {
@@ -150,7 +150,7 @@ public class AdminExchangeBulkUndoController {
    * @return the run and its first skipped entries
    */
   @NotNull
-  @GetMapping("/exchange-undo-runs/{runId}")
+  @GetMapping("/undo-runs/{runId}")
   @Operation(summary = "A bulk undo run and what it left alone")
   @ApiResponse(responseCode = "200", description = "The run")
   @ApiResponse(responseCode = "404", description = "No such run")

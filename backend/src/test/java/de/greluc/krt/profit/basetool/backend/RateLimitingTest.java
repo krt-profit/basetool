@@ -67,7 +67,7 @@ class RateLimitingTest {
   void adminRoles_ShouldBeRateLimited_AfterQuota() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/admin/roles")
+            get("/api/v1/roles")
                 .with(
                     jwt()
                         .authorities(
@@ -85,7 +85,7 @@ class RateLimitingTest {
 
     mockMvc
         .perform(
-            get("/api/v1/admin/roles")
+            get("/api/v1/roles")
                 .with(
                     jwt()
                         .authorities(
@@ -104,7 +104,7 @@ class RateLimitingTest {
 
     mockMvc
         .perform(
-            get("/api/v1/admin/roles")
+            get("/api/v1/roles")
                 .with(
                     jwt()
                         .authorities(

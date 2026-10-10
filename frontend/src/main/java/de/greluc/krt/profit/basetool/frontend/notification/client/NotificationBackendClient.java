@@ -49,7 +49,7 @@ public class NotificationBackendClient {
   private static final String NOTIFICATIONS = "/api/v1/notifications";
 
   /** The backend's rule endpoints. */
-  private static final String RULES = "/api/v1/notification-rules";
+  private static final String RULES = "/api/v1/notifications/admin/rules";
 
   private static final ParameterizedTypeReference<List<NotificationDto>> NOTIFICATION_LIST =
       new ParameterizedTypeReference<>() {};
