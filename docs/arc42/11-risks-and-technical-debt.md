@@ -135,6 +135,17 @@ Three guards stand against it, and their division of labour is the point:
 **Remove this entry** if podman ever gains a way to pin the forwarder's source address explicitly;
 until then the risk is bounded, named and watched, which is the most this layer allows.
 
+## 11.5d The host scripts can be older than the release — mitigated 2026-10-11
+
+The operational scripts reach a host only through the Ansible role, so a host can apply a release with
+older scripts than it was built with. That is how the v1.14.0 promotion failed on 2026-10-10. Since
+ADR-0247 the config bundle carries the scripts' hashes and `deploy.sh` compares them (§7.5,
+`REQ-OPS-045`). Two gaps remain, both accepted: **a host whose `deploy.sh` lacks the check cannot
+police itself** — its first install comes through the role, and until then the mandatory comparison in
+`docs/deployment.md` and the absent-metric alert `HostScriptsCheckStale` are the protection; and
+**the role's units, drop-ins, logrotate and tmpfiles files outside `/var/iri/code/scripts` are not
+hashed**. Extending `scripts/host-scripts.list` with their installed paths closes the second.
+
 ## 11.6 Open follow-ups from the cutover
 
 - **The retired Docker host is shut down, not decommissioned.** It is kept only as the way back

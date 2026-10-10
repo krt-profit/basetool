@@ -165,7 +165,13 @@ Note before promoting: the alerts firing in Grafana → Alerting; `prometheus_ts
 100 today). The nightly *Edge Deny Probe* has been red since 2026-10-04 because the live edge answers 401 / 405
 where the new map expects 404; it turns green after the deploy.
 
-### 2.6 Optional: the host scripts
+### 2.6 The host scripts (was "optional"; mandatory since 2026-10-10)
+
+> [!warning] This step was optional, and skipping it took production down on 2026-10-10
+> The host's `deploy.sh` and `backup.sh` were the pre-fix copies, the edge started after the apps and the
+> promotion failed. The comparison is now a mandatory step of every promotion, with the exact commands:
+> [`deployment.md` → Before a promotion: the host scripts](deployment.md#before-a-promotion-the-host-scripts)
+> (ADR-0247). The text below is the original, kept as it was.
 
 `deploy.sh` and the other scripts reach the host only through the Ansible role, not the config bundle. This
 release changes `scripts/deploy.sh` (the mixed-release grace). To see whether the host's copy is current:

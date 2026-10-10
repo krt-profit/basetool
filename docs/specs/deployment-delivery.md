@@ -2819,6 +2819,64 @@ plus the pull request before the merge instead.
 [ADR-0246](../adr/0246-pull-requests-merge-through-a-merge-queue-not-the-strict-up-to-date-policy.md) ·
 **Related:** REQ-OPS-027
 
+### REQ-OPS-045 — The host scripts that apply a release are the ones it was built with, and a drift is visible
+
+The operational scripts reach a host only through the Ansible role, never the config bundle
+(REQ-OPS-001, ADR-0188). A host can therefore run older scripts than the release it applies, and
+until 2026-10-10 nothing said so: v1.14.0 was applied by a `deploy.sh` that still started the edge
+after the apps, and the promotion failed.
+
+- **The release carries the hashes.** `scripts/host-scripts.list` names every file the role installs
+  under `/var/iri/code/scripts`. The config image ships `/config/host-scripts.sha256`
+  (`<sha256>  <path>` per file, `sha256sum -c` format), generated from the commit by
+  `scripts/host-scripts-manifest.sh generate` in the `build-config` job, and the job fails when the
+  file is missing or empty. A repo self-test keeps the list equal to what the role installs.
+- **The host compares on every tick.** `deploy.sh` keeps the deployed release's manifest as
+  `/var/iri/code/host-scripts.sha256` (delivered and rolled back with the config tree) and hashes the
+  listed files in its own directory against it on every tick that stages no bundle (a staging tick
+  compares the incoming manifest instead). It logs one
+  `host scripts:` line per differing or missing file and writes `host-scripts.prom`:
+  `basetool_host_scripts_drift{file,kind}` (`differs` | `missing`, one series per drifting file, none
+  when in sync) and `basetool_host_scripts_check_timestamp_seconds`. A release without a manifest, or a
+  malformed one, is logged and the file is removed; it is never a failure.
+- **Alerts.** `HostScriptDrift` (warning, 1 h) names the file and its kind; `HostScriptsCheckStale`
+  (warning, 12 h or absent) says no tick has compared. A host whose `deploy.sh` predates the check
+  writes nothing, so its absent metric is the alert.
+- **The host refuses what its apply path cannot apply.** On a config-changing tick, after the bundle is
+  staged and before anything on the host changes, `deploy.sh` compares the incoming manifest. When
+  `deploy.sh`, `lib/common.sh`, `lib/container-runtime.sh` or `render-env-d.py` differ or are missing it
+  exits 1 with a `HOST SCRIPTS:` FATAL that names them and the role command, stamps a failed deploy, and
+  records no backoff and no marker, so the first tick after the role run applies the release. Other
+  stale scripts only warn. `--force` and `IRI_REQUIRE_CURRENT_SCRIPTS=false` bypass it, loudly.
+- **The comparison before a promotion is mandatory** (`docs/deployment.md` → *Before a promotion: the
+  host scripts*): every file under `/var/iri/code/scripts` against the tag, byte-exact, and a mismatch
+  blocks the promotion until `--tags deploy,scripts` has been run from that tag (an owner-approved
+  production write).
+- **Bootstrap.** A host whose `deploy.sh` lacks this check cannot guard itself; its first install comes
+  through the role, and the mandatory step is the protection until then (ADR-0247).
+
+**Acceptance**
+
+- [x] `deploy.test.sh`: a tick at target reports a match, warns and exports a differing and a missing
+  file, and logs and clears the metric for a release without a manifest or with a malformed one.
+- [x] `deploy.test.sh`: a stale apply-path script refuses the release before any change, records no
+  backoff, and the next tick applies it once fixed; `--force` and the break-glass apply; a stale
+  non-apply script warns and applies; the manifest is applied with the config tree and put back by a
+  rollback.
+- [x] `host-scripts-manifest.test.sh`: the list equals what the role installs, the apply path is a
+  subset of it and covers what `deploy.sh` sources, `generate` is byte-exact from a revision and
+  `sha256sum -c` accepts it, the config image and the release workflow ship it.
+- [x] `monitoring/prometheus/tests/host_scripts_drift_test.yml` covers both alerts, including the absent
+  metric.
+
+**Enforced by:** `scripts/deploy.sh` (`check_host_scripts_applied`, `assert_host_scripts_current_or_die`) ·
+`scripts/host-scripts-manifest.sh` · `scripts/host-scripts.list` · `docker/config/Dockerfile` ·
+`.github/workflows/release-images.yml` · `monitoring/prometheus/alerts/ops-automation.yml` ·
+`scripts/deploy.test.sh`, `scripts/host-scripts-manifest.test.sh` · **Decision:**
+[ADR-0247](../adr/0247-a-release-carries-the-hashes-of-the-host-scripts-and-the-host-checks-them.md) ·
+**Runbook:** `docs/deployment.md` → *Before a promotion: the host scripts* · **Related:** REQ-OPS-001,
+REQ-OPS-007, REQ-OPS-036, REQ-OBS-014
+
 ## Open questions
 
 - Deepening the infra health gate beyond `redis-cli ping` / `pg_isready` (which do not

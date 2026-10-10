@@ -360,6 +360,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bash scripts/host-updates-metrics.test.sh
 
+      - name: host-scripts-selftest / Self-test the host script manifest and its parity with the role
+        if: ${{ !cancelled() }}
+        run: bash scripts/host-scripts-manifest.test.sh
+
       - name: container-runtime-selftest / Self-test the container-runtime seam
         if: ${{ !cancelled() }}
         run: bash scripts/container-runtime.test.sh

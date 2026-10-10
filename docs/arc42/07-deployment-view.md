@@ -326,7 +326,11 @@ ancestor that has images (ADR-0137/ADR-0210 amendments, 2026-09-23).
 
 `deploy.sh` and the host's own `iri-*` units are **not** part of the config bundle: a bundle cannot
 rewrite the thing that applies bundles, so they arrive with the Ansible role. The Quadlet units do
-ride the bundle. Provider JARs are barred from the config bundle and get their own promotable,
+ride the bundle. What the bundle *does* carry about those scripts is their hashes
+(`host-scripts.sha256`, generated from the commit): every tick compares the host's copies with the
+deployed release's, exports `basetool_host_scripts_drift`, and a release whose apply-path scripts
+(`deploy.sh`, `lib/*`, `render-env-d.py`) differ from the host's is refused before anything changes
+(`REQ-OPS-045`, ADR-0247). Provider JARs are barred from the config bundle and get their own promotable,
 signed artifact (ADR-0055). The SPI's compile version and the Keycloak image it is loaded by are
 pinned in different files — the catalog's `keycloak`, and the compose file, the Quadlet unit and the
 sandbox Dockerfile — and `repo-lint.yml` (`keycloak-version`) fails when they name different

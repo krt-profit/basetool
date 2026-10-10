@@ -42,7 +42,7 @@ them that recurs lives here.
   [`scripts/cgroup-container-metrics.py`](../scripts/cgroup-container-metrics.py) — the replacement
   for cAdvisor) and `iri-cert-expiry.timer` (daily 03:40,
   [`scripts/cert-expiry-metrics.py`](../scripts/cert-expiry-metrics.py)). `deploy.sh`, `backup.sh`,
-  `restore-drill.sh` and `container-cleanup.sh` write their own textfile metrics there too.
+  `restore-drill.sh` and `container-cleanup.sh` write their own textfile metrics there too; `deploy.sh` also writes `host-scripts.prom` (`basetool_host_scripts_drift`, REQ-OPS-045).
 
 **How the two halves reach each other.** Container-to-host: Prometheus reaches the three host
 services through `AddHost=node-exporter|alloy|podman-exporter:host-gateway`, and the backend,
@@ -371,6 +371,8 @@ section above.
 | **BackupStaleOrMissing** | No successful backup for 26h, or the metric is absent. `{app="ops-backup"} \|~ "FATAL\|WARN"` carries the abort reason; an empty stream means the unit never fired (`systemctl list-timers iri-backup.timer`). See [`docs/backup.md`](../docs/backup.md). If the log shows `403 Forbidden` from rclone, the store's edge has blocked the host — see *The store's edge blocks the host* there. |
 | **BackupRetentionNotApplied** | The repository holds more snapshots than `IRI_KEEP_DAILY + IRI_KEEP_WEEKLY + IRI_KEEP_MONTHLY`, so `restic forget` is not removing what it should and every run reads more from the store. `{app="ops-backup"} \|~ "retention\|snapshots kept"`; `backup.sh --dry-run` lists the snapshots and their paths. |
 | **RestoreDrillStaleOrMissing / RestoreDrillArtifactNotRestorable** | No successful drill for 8 days (one weekly drill missed; 35 days until 2026-09-22), or one artifact did not restore. `{app="ops-restore-drill"} \|~ "FATAL\|WARN"`, filtered on the artifact from the alert label. A non-restorable artifact means backups are unverified — fix before relying on them. See the restore-drill section below. |
+| **HostScriptDrift** | A script the role installs under `/var/iri/code/scripts` is not the deployed release's (`differs`) or is absent (`missing`); the `file` label names it. `{app="ops-deploy"} \|~ "host scripts:"` lists them. Scripts reach a host only through the role: run it from the release's tag with `--tags deploy,scripts` ([`docs/deployment.md`](../docs/deployment.md) → *Before a promotion: the host scripts*). A stale `deploy.sh`, `lib/` or `render-env-d.py` also makes the next release be refused (`HOST SCRIPTS:`, `DeployFailed`). |
+| **HostScriptsCheckStale** | No tick compared the host scripts with a release manifest for 12h, or the metric is absent — on a host with a deployed release that means its `deploy.sh` predates the check and is stale. Run the role from the release's tag. Also absent while the deployed release carries no `host-scripts.sha256`, and stale while the deploy timer is stopped. |
 | **ContainerCleanupStaleOrMissing** | The weekly cleanup job is overdue. `{app="ops-cleanup"}` over 10d shows the last run; an empty stream means the timer never fired. |
 | **PrometheusTsdbApproachingCap** | Prometheus TSDB nearing the 40GB / 180d cap. Verify retention and disk; investigate label cardinality if growth is abnormal. |
 | **AlertmanagerNotificationsFailing** | Alertmanager cannot deliver. Check its log (`{app="mon-alertmanager"}`) and the receiver config; this alert itself routes to Discord because e-mail may be what is broken. |

@@ -3328,6 +3328,252 @@ scenario_podman_missing_per_service_keystore_refuses
 scenario_podman_missing_edge_trust_anchor_refuses
 scenario_podman_runs_podman_from_root_dir
 
+HS_FILES=(deploy.sh lib/common.sh lib/container-runtime.sh render-env-d.py restore-drill.sh)
+
+seed_host_scripts() {
+  local dir="$1" rel
+  for rel in "${HS_FILES[@]}"; do
+    mkdir -p "$(dirname "${dir}/${rel}")"
+    printf 'host copy of %s\n' "${rel}" > "${dir}/${rel}"
+  done
+}
+
+write_script_manifest() {
+  local dir="$1" out="$2" rel digest
+  : > "${out}"
+  for rel in "${HS_FILES[@]}"; do
+    digest="$(sha256sum < "${dir}/${rel}")"
+    printf '%s  %s\n' "${digest%% *}" "${rel}" >> "${out}"
+  done
+}
+
+assert_host_scripts_metric() {
+  local needle="$1" desc="$2"
+  if grep -qF -- "${needle}" "${T_STATE_DIR}/textfile/host-scripts.prom" 2>/dev/null; then
+    record 1 "${desc}"
+  else
+    record 0 "${desc} (host-scripts.prom lacks '${needle}')"
+  fi
+}
+
+assert_no_host_scripts_metric() {
+  local needle="$1" desc="$2"
+  if ! grep -qF -- "${needle}" "${T_STATE_DIR}/textfile/host-scripts.prom" 2>/dev/null; then
+    record 1 "${desc}"
+  else
+    record 0 "${desc} (host-scripts.prom unexpectedly has '${needle}')"
+  fi
+}
+
+host_scripts_release_fixture() {
+  HS_DIR="${1}/host-scripts"
+  HS_BUNDLE="${1}/bundle"
+  seed_host_scripts "${HS_DIR}"
+  seed_live_config_tree "${T_COMPOSE_DIR}"
+  write_mirror_bundle "${HS_BUNDLE}"
+  write_script_manifest "${HS_DIR}" "${HS_BUNDLE}/host-scripts.sha256"
+  write_marker "${MARKER}"
+  mapfile -t HS_FAKE < <(converged_env)
+}
+
+scenario_host_scripts_matching_manifest_is_reported_on_a_noop() {
+  echo "Scenario: a tick at target compares the host scripts with the deployed release's manifest"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  seed_host_scripts "${tmp}/host-scripts"
+  write_script_manifest "${tmp}/host-scripts" "${T_COMPOSE_DIR}/host-scripts.sha256"
+  write_marker "${MARKER}"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" "IRI_HOST_SCRIPTS_DIR=${tmp}/host-scripts" || rc=$?
+  assert_exit 0 "$rc" "a converged stack with current scripts exits 0"
+  assert_contains "host scripts: all 5 match the manifest of the deployed release" "the match is logged"
+  assert_host_scripts_metric "basetool_host_scripts_check_timestamp_seconds " "the check stamps its liveness"
+  assert_no_host_scripts_metric "basetool_host_scripts_drift{" "no drift series is written"
+  rm -rf "${tmp}"
+}
+
+scenario_host_scripts_drift_between_promotions_warns_and_is_exported() {
+  echo "Scenario: a script that differs or is missing is a WARN and a labelled series, never a refusal at target"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  seed_host_scripts "${tmp}/host-scripts"
+  write_script_manifest "${tmp}/host-scripts" "${T_COMPOSE_DIR}/host-scripts.sha256"
+  echo "edited on the host" >> "${tmp}/host-scripts/deploy.sh"
+  rm -f "${tmp}/host-scripts/lib/common.sh"
+  write_marker "${MARKER}"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" "IRI_HOST_SCRIPTS_DIR=${tmp}/host-scripts" || rc=$?
+  assert_exit 0 "$rc" "drift between promotions does not fail the tick"
+  assert_contains "host scripts: WARN deploy.sh differs from the manifest of the deployed release" "the differing file is named"
+  assert_contains "host scripts: WARN lib/common.sh is missing" "the missing file is named"
+  assert_contains "ansible-playbook site.yml --tags deploy,scripts" "the log says how to fix it"
+  assert_host_scripts_metric 'basetool_host_scripts_drift{file="deploy.sh",kind="differs"} 1' "the differing file is exported"
+  assert_host_scripts_metric 'basetool_host_scripts_drift{file="lib/common.sh",kind="missing"} 1' "the missing file is exported"
+  assert_no_host_scripts_metric 'file="restore-drill.sh"' "a file that matches is not exported"
+  rm -rf "${tmp}"
+}
+
+scenario_host_scripts_without_a_manifest_say_so_and_export_nothing() {
+  echo "Scenario: a deployed release without a manifest is logged, and a stale series is removed"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  seed_host_scripts "${tmp}/host-scripts"
+  mkdir -p "${T_STATE_DIR}/textfile"
+  echo 'basetool_host_scripts_check_timestamp_seconds 1' > "${T_STATE_DIR}/textfile/host-scripts.prom"
+  write_marker "${MARKER}"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" "IRI_HOST_SCRIPTS_DIR=${tmp}/host-scripts" || rc=$?
+  assert_exit 0 "$rc" "a release without a manifest still no-ops"
+  assert_contains "carries no host-scripts.sha256" "the missing reference is logged"
+  if [[ -e "${T_STATE_DIR}/textfile/host-scripts.prom" ]]; then
+    record 0 "the stale host-scripts.prom is removed"
+  else
+    record 1 "the stale host-scripts.prom is removed"
+  fi
+  printf 'not a manifest\n' > "${T_COMPOSE_DIR}/host-scripts.sha256"
+  rc=0
+  run_deploy -- "${fake[@]}" "IRI_HOST_SCRIPTS_DIR=${tmp}/host-scripts" || rc=$?
+  assert_exit 0 "$rc" "a malformed manifest does not fail the tick"
+  assert_contains "is empty or malformed" "the malformed manifest is logged"
+  rm -rf "${tmp}"
+}
+
+scenario_host_scripts_stale_apply_path_refuses_the_release_and_the_fix_applies_it() {
+  echo "Scenario: a stale deploy.sh refuses a release before anything changes, with no backoff, and the next tick applies it once fixed"
+  local tmp rc=0 target
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_rsync_stub
+  host_scripts_release_fixture "${tmp}"
+  cp "${HS_DIR}/deploy.sh" "${tmp}/deploy.sh.good"
+  echo "an older order" >> "${HS_DIR}/deploy.sh"
+  run_deploy -- "${HS_FAKE[@]}" "IRI_HOST_SCRIPTS_DIR=${HS_DIR}" \
+    "FAKE_CONFIG_BUNDLE=${HS_BUNDLE}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
+  assert_exit 1 "$rc" "the release is refused"
+  assert_contains "HOST SCRIPTS: [deploy.sh]" "the refusal names the apply-path script"
+  assert_contains "--tags deploy,scripts" "the refusal names the fix"
+  assert_failure_metric "the refusal is a failed deploy"
+  assert_host_scripts_metric 'basetool_host_scripts_drift{file="deploy.sh",kind="differs"} 1' "the drift is exported against the release"
+  assert_no_apply "nothing is started or restarted"
+  assert_file_says "${T_COMPOSE_DIR}/docker/edge/nginx.conf" "OLD edge" "the live config tree is untouched"
+  if [[ -e "${T_STATE_DIR}/failed.digests" ]]; then
+    record 0 "the refusal records no backoff"
+  else
+    record 1 "the refusal records no backoff"
+  fi
+  cp "${tmp}/deploy.sh.good" "${HS_DIR}/deploy.sh"
+  rc=0
+  run_deploy -- "${HS_FAKE[@]}" "IRI_HOST_SCRIPTS_DIR=${HS_DIR}" \
+    "FAKE_CONFIG_BUNDLE=${HS_BUNDLE}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
+  assert_exit 0 "$rc" "once the script is installed the very next tick applies the release"
+  assert_file_says "${T_COMPOSE_DIR}/docker/edge/nginx.conf" "NEW edge" "the release's config tree is applied"
+  target="$(cat "${HS_BUNDLE}/host-scripts.sha256")"
+  if [[ "$(cat "${T_COMPOSE_DIR}/host-scripts.sha256" 2>/dev/null)" == "${target}" ]]; then
+    record 1 "the release's manifest is applied beside the compose file"
+  else
+    record 0 "the release's manifest is applied beside the compose file"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_host_scripts_stale_apply_path_can_be_forced_or_switched_off() {
+  echo "Scenario: --force and IRI_REQUIRE_CURRENT_SCRIPTS=false are the two ways past the host-scripts gate"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_rsync_stub
+  host_scripts_release_fixture "${tmp}"
+  echo "an older order" >> "${HS_DIR}/lib/container-runtime.sh"
+  run_deploy --force -- "${HS_FAKE[@]}" "IRI_HOST_SCRIPTS_DIR=${HS_DIR}" \
+    "FAKE_CONFIG_BUNDLE=${HS_BUNDLE}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
+  assert_exit 0 "$rc" "--force applies past the gate"
+  assert_contains "--force given, applying anyway" "the bypass is logged"
+  rm -rf "${tmp}"
+
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_rsync_stub
+  host_scripts_release_fixture "${tmp}"
+  echo "an older order" >> "${HS_DIR}/render-env-d.py"
+  rc=0
+  run_deploy -- "${HS_FAKE[@]}" "IRI_HOST_SCRIPTS_DIR=${HS_DIR}" "IRI_REQUIRE_CURRENT_SCRIPTS=false" \
+    "FAKE_CONFIG_BUNDLE=${HS_BUNDLE}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
+  assert_exit 0 "$rc" "the break-glass applies past the gate"
+  assert_contains "host-scripts gate DISABLED" "the bypass is logged"
+  rm -rf "${tmp}"
+}
+
+scenario_host_scripts_stale_non_apply_script_warns_but_applies() {
+  echo "Scenario: a stale script that does not apply the release is a WARN, not a refusal"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_rsync_stub
+  host_scripts_release_fixture "${tmp}"
+  echo "an older version" >> "${HS_DIR}/restore-drill.sh"
+  run_deploy -- "${HS_FAKE[@]}" "IRI_HOST_SCRIPTS_DIR=${HS_DIR}" \
+    "FAKE_CONFIG_BUNDLE=${HS_BUNDLE}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
+  assert_exit 0 "$rc" "the release is applied"
+  assert_contains "host scripts: WARN restore-drill.sh differs from the manifest of the release being applied" "the drift is logged"
+  assert_host_scripts_metric 'basetool_host_scripts_drift{file="restore-drill.sh",kind="differs"} 1' "the drift is exported"
+  rm -rf "${tmp}"
+}
+
+scenario_host_scripts_bundle_without_a_manifest_applies_and_drops_the_old_one() {
+  echo "Scenario: a bundle without a manifest applies, and the previous release's manifest is not kept"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_rsync_stub
+  host_scripts_release_fixture "${tmp}"
+  rm -f "${HS_BUNDLE}/host-scripts.sha256"
+  echo "stale manifest of the previous release" > "${T_COMPOSE_DIR}/host-scripts.sha256"
+  run_deploy -- "${HS_FAKE[@]}" "IRI_HOST_SCRIPTS_DIR=${HS_DIR}" \
+    "FAKE_CONFIG_BUNDLE=${HS_BUNDLE}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
+  assert_exit 0 "$rc" "the release is applied"
+  assert_contains "the config bundle carries no host-scripts.sha256" "the missing reference is logged"
+  if [[ -e "${T_COMPOSE_DIR}/host-scripts.sha256" ]]; then
+    record 0 "the previous release's manifest is removed"
+  else
+    record 1 "the previous release's manifest is removed"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_host_scripts_manifest_follows_a_rollback() {
+  echo "Scenario: a rolled-back release puts the previous release's manifest back"
+  local tmp rc=0 previous
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_rsync_stub
+  host_scripts_release_fixture "${tmp}"
+  previous="$(sed 's/^[0-9a-f]\{4\}/0000/' "${HS_BUNDLE}/host-scripts.sha256")"
+  printf '%s\n' "${previous}" > "${T_COMPOSE_DIR}/host-scripts.sha256"
+  echo "services: {}" > "${T_STATE_DIR}/current-digest-pin.yml"
+  run_deploy -- "${HS_FAKE[@]}" "IRI_HOST_SCRIPTS_DIR=${HS_DIR}" \
+    "FAKE_CONFIG_BUNDLE=${HS_BUNDLE}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" "FAKE_UP_RC=1" || rc=$?
+  assert_exit 1 "$rc" "the failing release exits non-zero"
+  assert_contains "health check failed" "the release fails its health gate"
+  if [[ "$(cat "${T_COMPOSE_DIR}/host-scripts.sha256" 2>/dev/null)" == "${previous}" ]]; then
+    record 1 "the previous manifest is back"
+  else
+    record 0 "the previous manifest is back"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_host_scripts_matching_manifest_is_reported_on_a_noop
+scenario_host_scripts_drift_between_promotions_warns_and_is_exported
+scenario_host_scripts_without_a_manifest_say_so_and_export_nothing
+scenario_host_scripts_stale_apply_path_refuses_the_release_and_the_fix_applies_it
+scenario_host_scripts_stale_apply_path_can_be_forced_or_switched_off
+scenario_host_scripts_stale_non_apply_script_warns_but_applies
+scenario_host_scripts_bundle_without_a_manifest_applies_and_drops_the_old_one
+scenario_host_scripts_manifest_follows_a_rollback
+
 echo
 if [[ "$tests_failed" -eq 0 ]]; then
   echo "All ${tests_run} deploy.sh tests passed."
