@@ -19,28 +19,27 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
-import java.math.BigDecimal;
-import org.jetbrains.annotations.NotNull;
+import static org.assertj.core.api.Assertions.assertThat;
 
-/** Whether a mission finance entry adds to or takes from the mission's total. */
-public enum FinanceType {
-  /** Money earned; adds to the total. */
-  INCOME,
-  /** Money spent; takes from the total. */
-  EXPENSE;
+import java.util.Arrays;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
 
-  /**
-   * The entry's contribution to a mission or operation total: the amount for income, its negation
-   * for an expense.
-   *
-   * @param amount the entry's amount
-   * @return the signed contribution
-   */
-  @NotNull
-  public BigDecimal signed(@NotNull BigDecimal amount) {
-    return switch (this) {
-      case INCOME -> amount;
-      case EXPENSE -> amount.negate();
-    };
+/** Pins every {@link OrgUnitKind} predicate over all constants (ADR-0238). */
+class OrgUnitKindTest {
+
+  @Test
+  void onlyStaffelnAndSpezialkommandosAreTenantUnits() {
+    Map<OrgUnitKind, Boolean> expected =
+        Map.of(
+            OrgUnitKind.SQUADRON, true,
+            OrgUnitKind.SPECIAL_COMMAND, true,
+            OrgUnitKind.BEREICH, false,
+            OrgUnitKind.ORGANISATIONSLEITUNG, false);
+
+    assertThat(expected).containsOnlyKeys(Arrays.asList(OrgUnitKind.values()));
+    for (OrgUnitKind kind : OrgUnitKind.values()) {
+      assertThat(kind.isTenantUnit()).as(kind.name()).isEqualTo(expected.get(kind));
+    }
   }
 }

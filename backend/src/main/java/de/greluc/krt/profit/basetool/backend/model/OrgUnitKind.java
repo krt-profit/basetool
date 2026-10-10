@@ -50,5 +50,18 @@ public enum OrgUnitKind {
    * The Organisationsleitung tenant at the top of the hierarchy (REQ-ORG-014), mapped to {@link
    * Organisationsleitung}; has no parent and never carries promotion.
    */
-  ORGANISATIONSLEITUNG
+  ORGANISATIONSLEITUNG;
+
+  /**
+   * Whether this kind is a tenant unit that members join and that owns tenant data: a Staffel or a
+   * Spezialkommando, not the Bereich or Organisationsleitung stacked above them (REQ-ORG-014).
+   *
+   * @return {@code true} for {@link #SQUADRON} and {@link #SPECIAL_COMMAND}
+   */
+  public boolean isTenantUnit() {
+    return switch (this) {
+      case SQUADRON, SPECIAL_COMMAND -> true;
+      case BEREICH, ORGANISATIONSLEITUNG -> false;
+    };
+  }
 }
