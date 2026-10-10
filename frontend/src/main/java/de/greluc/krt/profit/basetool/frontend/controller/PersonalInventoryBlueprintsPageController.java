@@ -167,7 +167,7 @@ public class PersonalInventoryBlueprintsPageController {
       @RequestParam(required = false) String q, @RequestParam(required = false) Integer limit) {
     try {
       String query = q == null ? "" : q;
-      int effectiveLimit = limit == null ? 25 : Math.min(200, Math.max(1, limit));
+      int effectiveLimit = limit == null ? 25 : Math.clamp(limit, 1, 200);
       List<BlueprintProductDto> result = blueprintClient.searchProducts(query, effectiveLimit);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {

@@ -225,7 +225,7 @@ public class ExchangeRegistryMirrorSync {
                 ExchangeRegistrySnapshot truth = load();
                 clientGauges.update(truth);
                 Optional<ExchangeRegistrySnapshot> mirrored = mirror.read();
-                if (mirrored.isPresent() && mirrored.get().equals(truth)) {
+                if (mirrored.filter(value -> value.equals(truth)).isPresent()) {
                   return false;
                 }
                 mirror.write(truth, settingsRepository.nextRevision());

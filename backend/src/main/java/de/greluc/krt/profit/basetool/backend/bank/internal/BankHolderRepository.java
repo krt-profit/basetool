@@ -92,7 +92,9 @@ public interface BankHolderRepository extends JpaRepository<BankHolder, UUID> {
    */
   @Modifying
   @Query(
-      "UPDATE BankHolder h SET h.handle = :sentinel"
-          + " WHERE h.user.id = :userId AND h.handle <> :sentinel")
+      """
+      UPDATE BankHolder h SET h.handle = :sentinel
+      WHERE h.user.id = :userId AND h.handle <> :sentinel
+      """)
   int anonymiseHandle(@Param("userId") UUID userId, @Param("sentinel") String sentinel);
 }
