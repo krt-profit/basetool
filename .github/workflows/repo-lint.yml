@@ -464,9 +464,21 @@ jobs:
         env:
           PROM_IMAGE: ${{ steps.prom-image.outputs.image }}
         run: |
-          docker run --rm --entrypoint sh \
-            -v "$PWD/monitoring/prometheus:/work" -w /work \
-            "$PROM_IMAGE" -c 'promtool test rules tests/*_test.yml'
+          set -euo pipefail
+          out="$(mktemp -d)"
+          export PROM_IMAGE out
+          cd monitoring/prometheus
+          printf '%s\n' tests/*_test.yml | xargs -P "$(nproc)" -I{} sh -c '
+            file="$1"
+            log="$out/$(basename "$file").log"
+            if docker run --rm --entrypoint sh -v "$PWD:/work" -w /work \
+                "$PROM_IMAGE" -c "promtool test rules $file" >"$log" 2>&1; then
+              cat "$log"
+            else
+              cat "$log"
+              echo "::error file=monitoring/prometheus/$file::promtool test rules failed"
+              exit 1
+            fi' _ {}
 
       - name: monitoring-configs / Self-test the monitoring config checker
         if: ${{ !cancelled() }}
