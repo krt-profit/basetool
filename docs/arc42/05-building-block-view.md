@@ -185,30 +185,33 @@ The platform modules reach the domains only through SPIs they own and the domain
 
 The frontend is packaged by domain (plan §5.9, F4, REQ-FE-032): each of the 21 domains of the
 evidence table plus `shell` (landing, legal pages, manifest, client-error beacon, licence report)
-has up to three packages, and the kernel keeps its own.
+has up to three packages, and the kernel has eight. `DomainPackageLayoutTest` fails on a main class
+anywhere else.
 
 | Package | What lives there |
 | --- | --- |
-| `<domain>.web` | The domain's Thymeleaf page and fragment endpoints, AJAX mutation endpoints that return fragments, and its view shaping (`MissionDetailModelBuilder`, `BankDashboardViewAssembler`, view rows such as `RefineryListRow`); `DomainPackageLayoutTest` keeps every controller here |
+| `<domain>.web` | The domain's Thymeleaf page and fragment endpoints, AJAX mutation endpoints that return fragments, and its view shaping (`MissionDetailModelBuilder`, `BankDashboardViewAssembler`, view rows such as `RefineryListRow`); every controller lives here |
 | `<domain>.model` | The domain's hand-mirrored DTO records, marked `@DtoMirror` so the DTO contract tests find them wherever they live, its form objects and view models |
 | `<domain>.client` | One typed backend client per domain (`AuditBackendClient`, `NotificationBackendClient`, …): a thin `@Service` over `BackendApiClient` that owns its domain's backend paths, passes every runtime value as a URI-template variable and returns typed records; a controller reaches the backend only through its domain's client (plan F3, `TypedBackendClientTest`) |
-| `model` | The kernel model: `PageResponse`, `PayoutPreference`, the ingest handoff types, `BackendEnumAsString`, `DtoMirror` and the reference DTOs several domains share (`UserReferenceDto`, `SquadronReferenceDto`, `MaterialReferenceDto`, …) |
-| `service` | The backend kernel — `BackendApiClient` with its catalogue cache and URI-template verbs for every verb, `BackendErrorMapper` (the one mapping of a failed call, a sealed `Outcome`), `BackendSideChannels` (the SSE relay and the live-sync probe), `CatalogueCacheEviction` (the evictions a controller triggers after an admin write) — plus `ParallelPageLoader`, the ingest handoff, live-sync presence, Markdown rendering |
-| `view` | The template beans `moneyFormat` and `relativeDays` |
-| `websocket` | `/ws/sync`, the handler and the Redis fanout |
-| `config` | WebClient, Resilience4j, Redis session, Reactor context propagation, security, the layout model |
-| `support` / `validation` / `exception` / `health` / `logging` / `metrics` | Shared helpers (`Roles` among them) and the usual Spring surface |
+| `kernel.backend` | The backend seam — `BackendApiClient` with its catalogue cache and URI-template verbs for every verb, `BackendErrorMapper` (the one mapping of a failed call, a sealed `Outcome`), `BackendSideChannels` (the SSE relay and the live-sync probe), `CatalogueCacheEviction`, `WebClientConfig` with Resilience4j, the outbound relays (org unit, client IP, locale, logging), Reactor context propagation, `ParallelPageLoader`, the ingest handoff |
+| `kernel.security` | `SecurityConfig`, the access gates (role sync, terms gate), `Roles`, CSP, Trusted Types and security headers, the login and logout handlers, the monitoring and management port security |
+| `kernel.session` | `RedisSessionConfig`, `SessionTypeAllowList`, the fault-tolerant serializer and same-request repair, session metrics and cookie settings |
+| `kernel.layout` | `UsesLayoutModel`, `LayoutContextLoader` and the layout advices |
+| `kernel.web` | `GlobalExceptionHandler`, `BackendErrorResponses`, `RelayParams`, binding and string normalisation, the request contexts (correlation id, client IP, active org unit), MVC and locale configuration, the template beans `moneyFormat`, `relativeDays`, `markdown` and `handles` |
+| `kernel.livesync` | `/ws/sync`, the handler, the Redis fanout and presence |
+| `kernel.observability` | Request logging, log masking, the startup banner, metric names, tracing and observation filters |
+| `kernel.model` | `PageResponse`, `PayoutPreference`, the ingest handoff types, `BackendEnumAsString`, `DtoMirror` and the reference DTOs several domains share (`UserReferenceDto`, `SquadronReferenceDto`, `MaterialReferenceDto`, …) |
 
-The kernel still reaches into three domains in twelve places: the layout advices and loader read
-`orgunit.model` (`SquadronDto`, `OrgUnitMembershipOptionDto`) and the active-org-unit session key
-of `orgunit.web.MeFrontendController`, the access gates read `identity.model` (`UserDto`,
+The kernel still reaches into three domains in ten places, frozen by `KernelDomainReachTest` in a
+list that may only shrink (§11.9): the layout advices and loader read `orgunit.model`
+(`SquadronDto`, `OrgUnitMembershipOptionDto`), the access gates read `identity.model` (`UserDto`,
 `RegistrationStatusDto`, `TermsStatusDto`), `BackendApiClient` reads `TermsDocumentDto` and
 `QualityTierCatalog` reads `catalogue.model.QualityTierDto`.
 
 *Corrected 2026-09-29:* this table called `BackendApiClient` "the single seam" (see §4.1), placed
 view-shaping services in `service` and view models in `view`; the view shaping lived in
-`controller`, and `view` held one class. *Updated 2026-10-10:* the layer packages `controller`,
-`model.dto`, `model.form` and `oss` are gone (plan F4).
+`controller`, and `view` held one class. *Updated 2026-10-10:* every layer package is gone (plan
+F4).
 
 **One trap lives here and is worth naming in an architecture document**, because it is invisible
 from the code that suffers from it: `WebClient.exchange()` runs on a Reactor-Netty worker thread,

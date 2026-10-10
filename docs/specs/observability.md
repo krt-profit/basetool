@@ -3083,7 +3083,7 @@ series (`job` / `instance` / `reason` / `name` / `path` / `health_type` / `compo
 or free-text values.
 
 **Enforced by:** `AlertedMeterPresenceTest` (dead-alert guard: a meter an alert rule names must be
-registered) · `frontend/.../config/Resilience4jMetricsConfig` (publishes the three meters Boot 4
+registered) · `frontend/.../kernel/backend/Resilience4jMetricsConfig` (publishes the three meters Boot 4
 silently stopped publishing) · `ingest/.../observability/Resilience4jMetricsConfig` (the gateway's breaker
 and bulkhead meters, which had no series at all until then; `Resilience4jMetricsConfigTest`) · `monitoring/prometheus/alerts/meta.yml` (`meta-self-health` + `meta-log-pipeline`
 groups, incl. `MonitoringReconcileDisabled`) · `monitoring/prometheus/alerts/infrastructure.yml`
@@ -3145,7 +3145,7 @@ the backend genuinely uses Spring Data web paging and keeps the auto-config.
 (`@SpringBootApplication(exclude = … DataWebAutoConfiguration.class)`) ·
 `frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/FrontendApplicationTests.java`
 (asserts the resolver is absent from the live chain) ·
-`frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/OrgUnitContextAdvice.java`
+`frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/layout/OrgUnitContextAdvice.java`
 (the single-fetch `@ModelAttribute` cross-injection the exclusion protects).
 
 ### REQ-OBS-016 — Log levels are changeable at runtime

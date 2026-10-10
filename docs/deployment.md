@@ -1094,9 +1094,12 @@ sum by (cause) (increase(basetool_session_value_dropped_total[1h]))
 {app="frontend"} |= "Dropped an unreadable session value"
 ```
 
-The move also renames the logger categories of the moved classes (for example
-`…frontend.controller.ClientErrorReportController` is now `…frontend.shell.web.ClientErrorReportController`);
-a level raised through `/actuator/loggers` before the deploy does not carry over.
+The move also renames the logger category of every frontend class but `FrontendApplication`: a
+domain class moves to its domain package (`…frontend.controller.ClientErrorReportController` is now
+`…frontend.shell.web.ClientErrorReportController`), a kernel class to its `kernel.*` package
+(`…frontend.config.SessionTypeAllowList` is now `…frontend.kernel.session.SessionTypeAllowList`).
+A level raised through `/actuator/loggers` before the deploy does not carry over; the log lines
+the alerts and runbooks search for keep their wording, so no Loki query changes.
 
 ### Trusted Types: report, then enforce
 

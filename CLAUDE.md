@@ -266,7 +266,7 @@ for anything that writes, a recipe is documentation and never permission.
 ### Module split
 
 - **`backend`** — REST API only. Layered: `controller` → `service` → `repository` → `model` (JPA entities), with `dto` records and MapStruct `mapper`s.
-- **`frontend`** — Thymeleaf server-rendered UI that calls the backend via WebClient. No business logic of its own; `service.BackendApiClient` is the single seam. Persistent state across frontend restarts goes in Redis (Spring Session).
+- **`frontend`** — Thymeleaf server-rendered UI that calls the backend via WebClient. No business logic of its own; `kernel.backend.BackendApiClient` is the single seam. Persistent state across frontend restarts goes in Redis (Spring Session).
 - **`ingest`** — the internet-facing gateway the desktop SC extractor posts to; owns no database and relays to the backend over the internal network ([`docs/specs/desktop-ingest.md`](docs/specs/desktop-ingest.md), `REQ-INGEST-*`).
 - **`keycloak-spi`** — Keycloak provider JAR (Discord federation + the first-login membership gate); a plain library compiled against the Keycloak SPIs, emitting Java-21 bytecode, logging through `@JBossLog`.
 - **`keycloak-theme`** — the Keycloak login/account theme (FreeMarker, not a Gradle module).

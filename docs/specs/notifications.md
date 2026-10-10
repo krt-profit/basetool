@@ -168,7 +168,7 @@ go stale). This is **in-app only** — OS / browser push notifications are out o
   clear-read without a full reload.
 
 **Enforced by:** `MessageBundleConsistencyTest`, frontend lint gate · **Code:**
-`fragments/sidebar.html`, `static/js/notifications.js`, frontend `config/LayoutMiscAdvice`
+`fragments/sidebar.html`, `static/js/notifications.js`, frontend `kernel/layout/LayoutMiscAdvice`
 
 ### REQ-NOTIF-007 — Data-driven recipient rule engine
 
@@ -478,8 +478,8 @@ events + clean timeout completion), `DisconnectedClientHandlingTest`,
 `service/NotificationStreamService`, `service/NotificationFanout` / `RedisNotificationFanout` /
 `LocalNotificationFanout`, `notification/internal/NotificationFanoutProperties`,
 `controller/NotificationController#stream`, frontend
-`notification/web/NotificationPageController#stream`, `service/BackendSideChannels#notificationStream`,
-`config/WebClientConfig#sseWebClient`,
+`notification/web/NotificationPageController#stream`, `kernel/backend/BackendSideChannels#notificationStream`,
+`kernel/backend/WebClientConfig#sseWebClient`,
 `exception/GlobalExceptionHandler#handleDisconnectedClient`, `static/js/notifications.js`
 
 ### REQ-NOTIF-011 — UC2/UC3: notify on the bank booking-request lifecycle

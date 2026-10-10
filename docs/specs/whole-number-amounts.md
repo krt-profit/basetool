@@ -70,8 +70,8 @@ amount.
 `MissionFinanceEntryE2eTest` (e2e create→view: add a finance entry, reopen the detail page, assert
 200 + the rendered `data-amount`). **Code:** `backend/.../model/dto/MissionFinanceEntry{Create,Update}Dto`
 (`@WholeNumber`, `@DecimalMin`, `@DecimalMax`), `frontend/.../mission/model/MissionFinanceEntryForm`
-(`@WholeNumber`), `backend/.../validation/WholeNumber` + `frontend/.../validation/WholeNumber`,
-`frontend/.../view/MoneyFormat`, `templates/mission-detail.html`, `templates/operation-detail.html`.
+(`@WholeNumber`), `backend/.../validation/WholeNumber` + `frontend/.../kernel/web/WholeNumber`,
+`frontend/.../kernel/web/MoneyFormat`, `templates/mission-detail.html`, `templates/operation-detail.html`.
 **Issues:** PR #465.
 
 ### REQ-ORDERS-001 — Item-order piece counts: positive whole numbers

@@ -76,7 +76,7 @@ unchanged. Bean-method-only expressions (`@ownerScopeService.canEdit*`, `isAuthe
 bean-method call in the same string (e.g. `hasRole('" + Roles.LOGISTICIAN + "') and
 @ownerScopeService.canEditJobOrder(#id)`).
 
-On the frontend, `frontend.support.Roles` mirrors the backend's bare role codes (the frontend cannot
+On the frontend, `frontend.kernel.security.Roles` mirrors the backend's bare role codes (the frontend cannot
 depend on the backend's Java classes — separate Gradle module, bearer-token relay only — so the
 values are intentionally duplicated and must stay byte-identical). `FrontendAuthHelperService` and
 every frontend `@PreAuthorize` with a literal role are migrated the same way.
@@ -93,9 +93,9 @@ every frontend `@PreAuthorize` with a literal role are migrated the same way.
   in `OrgUnitBankAccessService`, which became `Roles.authority(grant.getRoleCode())`). Same shape
   as the `@PreAuthorize` sweep, without the annotation compile-time-constant constraint.
 - **Thymeleaf `sec:authorize="hasRole('X')"` template attributes** (134 occurrences across 27
-  templates at time of migration) are migrated to reference `frontend.support.Roles` via the SpEL
+  templates at time of migration) are migrated to reference `frontend.kernel.security.Roles` via the SpEL
   `T()` type-reference operator, e.g. `hasRole('ADMIN')` →
-  `hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)`. `sec:authorize`
+  `hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)`. `sec:authorize`
   evaluates through the same unrestricted `StandardEvaluationContext` as `@PreAuthorize` (verified
   against the resolved `thymeleaf-extras-springsecurity6` / `spring-security-web` sources), so no
   new Thymeleaf expression-utility object or model binding was needed — see
@@ -118,7 +118,7 @@ every frontend `@PreAuthorize` with a literal role are migrated the same way.
   `BankHolderReconciliationService` and `RecipientResolutionService`. Finally, the ~35 sites sharing
   the identical `hasAnyRole('ADMIN','OFFICER')` splice across the promotion/rank/evaluation surface
   now reference one pre-built compile-time-constant expression, `Roles.ADMIN_OR_OFFICER` /
-  `frontend.support.Roles.ADMIN_OR_OFFICER`, instead of repeating the splice per call site.
+  `frontend.kernel.security.Roles.ADMIN_OR_OFFICER`, instead of repeating the splice per call site.
 
 ### REQ-SEC-074 — Who may call an operation is pinned in one reviewed file
 
@@ -1906,7 +1906,7 @@ decoded path.
 > This requirement used to name two more deliberate exceptions: `BackendRoleSyncFilter`
 > (waiting-page redirect exemptions, static-asset skip) and `TermsAcceptanceGateFilter`
 > (consent-page redirect exemptions), on the ground that decoding an exemption list only *widens*
-> it. Two things undid that. Both filters now read one list, `frontend/config/PublicPaths`
+> it. Two things undid that. Both filters now read one list, `frontend/kernel/security/PublicPaths`
 > (REQ-SEC-052), so the exception no longer described where the code was; and the widening argument
 > proved too coarse to be right.
 >
@@ -2723,7 +2723,7 @@ replaces rather than appends breaks every installed copy for the length of the r
 
 **Code:** `frontend/…/shell/web/AssetLinksController.java`,
 `frontend/…/shell/web/AppLinkController.java`,
-`frontend/…/config/AndroidAppLinkProperties.java`, `SecurityConfig` (anonymous matchers),
+`frontend/…/shell/web/AndroidAppLinkProperties.java`, `SecurityConfig` (anonymous matchers),
 `frontend/…/templates/app-link-help.html`.
 **Test:** `AssetLinksControllerTest` — asserts the three response conditions through the real
 security chain, and that the digests are an array. `AppLinkControllerTest` — the fallback's redirect,
@@ -3952,7 +3952,7 @@ a method gate.
 > shipped exactly that way: `permitAll` here, exempt in neither gate, so a signed-in member was
 > answered with the consent page and each hit paid a `/api/v1/users/me` round trip.
 >
-> The exemption therefore lives in **one** place, `frontend/config/PublicPaths`, which both gates
+> The exemption therefore lives in **one** place, `frontend/kernel/security/PublicPaths`, which both gates
 > read: `isStaticAsset` (the asset trees, the favicon, `/sm/`, `*.map`), `isPublicDocument`
 > (`/robots.txt`, `/.well-known/assetlinks.json`, `/manifest.webmanifest`), `isAuthInfrastructure`
 > (login, logout, OAuth, error, actuator) and `isLegalPage` (`/impressum`, `/privacy`, `/terms` — the
@@ -4044,8 +4044,8 @@ REQ-FE-025) ·
 `HomeControllerMvcTest#anonymousRootRendersTheLandingPageWithoutDataOrSession` ·
 `SecurityConfigStaticAssetPermitAllTest` · `ManagementPortIsolationTest` ·
 `ApiVhostAnonymousSurfaceTest` and the nightly `edge-deny-probe.yml` (the same statuses from outside
-the host) · **Code:** `backend/…/config/SecurityConfig`, `frontend/…/config/SecurityConfig`,
-`frontend/…/dashboard/web/HomeController`, `frontend/…/config/SafeCsrfAdvice`,
+the host) · **Code:** `backend/…/config/SecurityConfig`, `frontend/…/kernel/security/SecurityConfig`,
+`frontend/…/dashboard/web/HomeController`, `frontend/…/kernel/layout/SafeCsrfAdvice`,
 `templates/landing.html` · **ADR:**
 [ADR-0159](../adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md)
 
@@ -4161,7 +4161,7 @@ stays as defence in depth, so a later path move cannot drop the gate silently.
 **Code:** `CustomJwtGrantedAuthoritiesConverter#assembleFor`, `Roles.NO_ROLE_MARKER`,
 `PendingApprovalAccessFilter`, `MetricNames.NO_ROLE_REFUSED_SUBJECTS`, `UserReconciliationService`,
 `KeycloakService#fetchDefaultRoleGrants`,
-`NotificationRuleService#validateSelector`, `frontend/…/config/BackendRoleSyncFilter`,
+`NotificationRuleService#validateSelector`, `frontend/…/kernel/security/BackendRoleSyncFilter`,
 `V239__drop_guest_role_and_guest_edit_token.sql` · **ADR:**
 [ADR-0159](../adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md)
 
@@ -5104,7 +5104,7 @@ it.
 `bank/internal/BankBookingRequestRepository#anonymiseHandles`,
 `repository/JobOrderHandoverRepository#anonymiseRecipientHandle`,
 `repository/JobOrderItemHandoverRepository#anonymiseRecipientHandle`,
-`frontend/support/HandleDisplay` · **Decision:**
+`frontend/kernel/web/HandleDisplay` · **Decision:**
 [ADR-0183](../adr/0183-a-granted-erasure-anonymises-the-handle-snapshots-in-place.md)
 
 ### REQ-SEC-064 — Every response carries the security-header policy of its module
@@ -5170,8 +5170,8 @@ this requirement first. An inline script is only ever a data bootstrap (REQ-FE-0
 **Enforced by:** `SecurityHeadersTest` (frontend and backend),
 `TrustedTypesModeTest`, the Trusted Types collector of `DialogA11yE2eTest`, ingest
 `SecurityConfigTest`, the `blackbox-hsts*` probes behind `EdgeHstsHeaderMissing` · **Code:**
-`frontend/…/config/SecurityHeaders`, `frontend/…/config/TrustedTypesMode`,
-`frontend/…/config/TrustedTypesModeMetric`, `frontend/…/config/CspNonceFilter`, the `headers(...)` blocks of the backend and ingest
+`frontend/…/kernel/security/SecurityHeaders`, `frontend/…/kernel/security/TrustedTypesMode`,
+`frontend/…/kernel/security/TrustedTypesModeMetric`, `frontend/…/kernel/security/CspNonceFilter`, the `headers(...)` blocks of the backend and ingest
 `SecurityConfig`, `docker/edge/conf.d/00-maps.conf` · **ADR:**
 [ADR-0093](../adr/0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md),
 [ADR-0239](../adr/0239-the-browser-baseline-is-baseline-2025-and-trusted-types-follow.md)

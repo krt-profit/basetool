@@ -374,7 +374,7 @@ with its own access policy (`promotionAccessPolicy`), `personalinventory` withou
 scope gate), then `exchange` and the bank as packages (2026-10-10), which enter their "must stay green"
 boundary before their Gradle extraction; the baseline is at 101 class edges.
 The frontend is packaged by domain since 2026-10-10 (plan F4, REQ-FE-032): its controllers, mirrors
-and forms live in `<domain>.web` and `<domain>.model` beside the typed clients, the shared reference
-DTOs in the kernel model. The cross-domain references that remain are page composition, twelve of
-them from the kernel into `orgunit`, `identity` and `catalogue` (§5.3), and no frontend rule bounds
-them yet.
+and forms live in `<domain>.web` and `<domain>.model` beside the typed clients, the kernel in the
+eight `kernel.*` packages. The cross-domain references between domains are page composition and no
+frontend rule bounds them yet; the kernel's ten reaches into `orgunit`, `identity` and `catalogue`
+(§5.3) are frozen by `KernelDomainReachTest` and may only shrink.

@@ -10,7 +10,7 @@
 > delegate to), the URL matrix in
 > [`backend/.../config/SecurityConfig.java`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/SecurityConfig.java)
 > and
-> [`frontend/.../config/SecurityConfig.java`](frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/SecurityConfig.java),
+> [`frontend/.../kernel/security/SecurityConfig.java`](frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/security/SecurityConfig.java),
 > the role seeds in
 > [`DataInitializer`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/DataInitializer.java)
 > and the authority converter
