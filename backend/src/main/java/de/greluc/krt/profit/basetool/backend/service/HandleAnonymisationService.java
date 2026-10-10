@@ -23,12 +23,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
-import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankAuditEventRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
@@ -59,15 +54,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class HandleAnonymisationService {
 
   private final AuditEventRepository auditEventRepository;
-  private final BankAuditEventRepository bankAuditEventRepository;
-  private final BankTransactionRepository bankTransactionRepository;
-  private final BankBookingRequestRepository bankBookingRequestRepository;
-  private final BankHolderRepository bankHolderRepository;
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   private final JobOrderRepository jobOrderRepository;
   private final AuditRecorder auditRecorder;
-  private final BankAuditService bankAuditService;
+  private final BankHandleSnapshots bankHandleSnapshots;
 
   /**
    * Exactly the columns this service rewrites, as {@code table.column}; read by {@code
@@ -146,10 +137,11 @@ public class HandleAnonymisationService {
     Set<String> names = usableSpellings(spellings);
 
     int activityAudit = auditEventRepository.anonymiseActorHandle(userId, sentinel);
-    int bankAudit = bankAuditEventRepository.anonymiseActorHandle(userId, sentinel);
-    int bankTransactions = bankTransactionRepository.anonymiseCounterpartyHandle(userId, sentinel);
-    int bookingRequests = bankBookingRequestRepository.anonymiseHandles(userId, sentinel);
-    int bankHolders = bankHolderRepository.anonymiseHandle(userId, sentinel);
+    BankHandleSnapshots.Counts bank = bankHandleSnapshots.anonymiseHandles(userId, sentinel);
+    int bankAudit = bank.bankAudit();
+    int bankTransactions = bank.bankTransactions();
+    int bookingRequests = bank.bookingRequests();
+    int bankHolders = bank.bankHolders();
 
     int jobOrders = 0;
     int materialHandovers = 0;
@@ -187,15 +179,7 @@ public class HandleAnonymisationService {
             .with("itemHandovers", itemHandovers)
             .with("spellings", names.size()));
 
-    bankAuditService.record(
-        BankAuditEventType.HANDLE_SNAPSHOTS_ANONYMISED,
-        null,
-        null,
-        userId,
-        AuditDetails.of("bankAudit", bankAudit)
-            .with("bankTransactions", bankTransactions)
-            .with("bookingRequests", bookingRequests)
-            .with("bankHolders", bankHolders));
+    bankHandleSnapshots.recordAnonymised(userId, bank);
 
     log.info(
         "Anonymised handle snapshots for user {}: {} row(s) across {} column(s), {} spelling(s)",
