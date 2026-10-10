@@ -1,8 +1,5 @@
-blueprint -> inventory: BlueprintCraftabilityService -> InventoryItemService
-blueprint -> inventory: BlueprintCraftabilityService -> OwnedStockSlice
 catalogue -> hangar: LocationService -> ShipRepository
 catalogue -> refinery: LocationService -> RefineryOrderRepository
-identity -> blueprint: UserReconciliationService -> DefaultBlueprintProvisioningService
 identity -> inventory: MeController -> InventoryProperties
 identity -> joborder: UserDtoRedaction -> JobOrderAssigneeDto
 identity -> orgunit: MeController -> OrgUnitMembershipOptionDto

@@ -39,6 +39,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.backend.identity.api.MemberCreatedObserver;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationPendingEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.MemberDepartedEvent;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
@@ -93,7 +94,7 @@ class UserReconciliationServiceTest {
 
   @Mock private UserRepository userRepository;
   @Mock private RoleRepository roleRepository;
-  @Mock private DefaultBlueprintProvisioningService defaultBlueprintProvisioningService;
+  @Mock private MemberCreatedObserver memberCreatedObserver;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private UserApprovalEventRepository userApprovalEventRepository;
   @Mock private UserService userService;
@@ -131,7 +132,7 @@ class UserReconciliationServiceTest {
         new UserReconciliationService(
             userRepository,
             roleRepository,
-            defaultBlueprintProvisioningService,
+            memberCreatedObserver,
             eventPublisher,
             userRegistrationService,
             userService,
@@ -202,7 +203,7 @@ class UserReconciliationServiceTest {
       assertEquals("alice@example.com", result.getEmail());
       assertTrue(result.getRoles().isEmpty());
       verify(userRepository, times(1)).save(any(User.class));
-      verify(defaultBlueprintProvisioningService).grantDefaultsToUser(USER_ID);
+      verify(memberCreatedObserver).afterMemberCreated(USER_ID);
     }
 
     /**
@@ -332,7 +333,7 @@ class UserReconciliationServiceTest {
 
       assertSame(existing, result);
       verify(userRepository, never()).save(any(User.class));
-      verify(defaultBlueprintProvisioningService, never()).grantDefaultsToUser(any());
+      verify(memberCreatedObserver, never()).afterMemberCreated(any());
     }
 
     @Test

@@ -25,6 +25,7 @@
     allowedDependencies = {
       "admin::api",
       "audit::api",
+      "blueprint::api",
       "bank::api",
       "catalogue::api",
       "exchange::api",

@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.refinery.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.CraftabilitySlice;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.CraftabilityYieldSource;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
@@ -51,7 +53,6 @@ import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryYieldRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.service.CraftabilityYieldSource;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
@@ -178,7 +179,7 @@ public class RefineryOrderService implements CraftabilityYieldSource {
    */
   @Override
   @NotNull
-  public List<YieldSlice> pendingYieldSlices(@NotNull UUID userId) {
+  public List<CraftabilitySlice> pendingYieldSlices(@NotNull UUID userId) {
     List<RefineryOrder> orders =
         refineryOrderRepository.findOwnedWithGoodsByStatusIn(
             userId, List.of(RefineryOrderStatus.OPEN, RefineryOrderStatus.IN_PROGRESS));
@@ -204,11 +205,11 @@ public class RefineryOrderService implements CraftabilityYieldSource {
             .merge(good.getQuality(), scu, Double::sum);
       }
     }
-    List<YieldSlice> slices = new ArrayList<>();
+    List<CraftabilitySlice> slices = new ArrayList<>();
     pooled.forEach(
         (materialId, byQuality) ->
             byQuality.forEach(
-                (quality, scu) -> slices.add(new YieldSlice(materialId, quality, scu))));
+                (quality, scu) -> slices.add(new CraftabilitySlice(materialId, quality, scu))));
     return slices;
   }
 

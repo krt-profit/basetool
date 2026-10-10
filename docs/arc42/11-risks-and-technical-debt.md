@@ -382,4 +382,5 @@ the inventory followed in five parts (its access policy out of the scope hub, it
 the job-order and refinery Lager writes through them, its business associations as ids, and the end
 of its job-order edges); its move into module packages waits for Phase 4, because layer classes
 still consume its API; then `hangar` with the sixth module access policy and its ship
-commands. The baseline is at 48 class edges.
+commands; and the blueprint's first part, which ended its `blueprint -> inventory` and
+`identity -> blueprint` edges. The baseline is at 45 class edges.
