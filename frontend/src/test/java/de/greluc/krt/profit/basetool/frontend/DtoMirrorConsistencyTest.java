@@ -74,6 +74,7 @@ class DtoMirrorConsistencyTest {
           entry("NotificationCountResponse", "NotificationUnreadCountDto"),
           entry("PersonSearchResultDto", "PersonSearchResult"),
           entry("PersonalBlueprintBatchResultDto", "PersonalBlueprintBatchResult"),
+          entry("UserAttributesUpdateDto", "UserAttributesRequest"),
           entry("PersonalBlueprintBulkDeleteResultDto", "PersonalBlueprintBulkDeleteResult"),
           entry("PersonalBlueprintDto", "PersonalBlueprintResponse"),
           entry("PersonalBlueprintRecipeDto", "PersonalBlueprintRecipeResponse"),
@@ -88,12 +89,6 @@ class DtoMirrorConsistencyTest {
   /** Frontend records that deliberately have no backend record twin, each with its reason. */
   private static final Map<String, String> UNPAIRED_BY_DESIGN =
       Map.ofEntries(
-          entry(
-              "AnnouncementRequest",
-              "body of AnnouncementController.AnnouncementRequest, a class rather than a record"),
-          entry(
-              "UserDescriptionRequest",
-              "body of UserController.UserDescriptionRequest, a class rather than a record"),
           entry("AuditRowView", "page view model merged from BankAuditEventDto and AuditEventDto"),
           entry("BereichCreateRequest", "write subset of BereichDto; the backend assigns the rest"),
           entry("DefaultBlueprintAddResultDto", "toast outcome the frontend counts itself"),
@@ -110,10 +105,7 @@ class DtoMirrorConsistencyTest {
           entry(
               "OrganisationsleitungCreateRequest",
               "write subset of OrganisationsleitungDto; the backend assigns the rest"),
-          entry("StagedHandoff", "mirror of the ingest gateway's Redis value, not of the backend"),
-          entry(
-              "UserAttributesUpdateDto",
-              "body of UserController.UserAttributesRequest, a class rather than a record"));
+          entry("StagedHandoff", "mirror of the ingest gateway's Redis value, not of the backend"));
 
   /**
    * Per-DTO whitelist of backend-only record components the frontend deliberately does not mirror.

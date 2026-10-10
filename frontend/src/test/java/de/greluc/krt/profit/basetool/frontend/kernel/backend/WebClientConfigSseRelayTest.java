@@ -66,7 +66,7 @@ class WebClientConfigSseRelayTest {
     when(locale.relayUserLocale()).thenReturn(passthrough);
 
     Environment environment = mock(Environment.class);
-    when(environment.getActiveProfiles()).thenReturn(new String[] {"test"});
+    when(environment.matchesProfiles("dev", "test")).thenReturn(true);
 
     WebClientConfig config =
         new WebClientConfig(

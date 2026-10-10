@@ -43,7 +43,6 @@ import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import java.security.KeyStore;
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -189,9 +188,8 @@ public class WebClientConfig {
         !streaming && httpProperties.backendProtocol() == AppHttpProperties.BackendProtocol.H2;
     try {
       SslContextBuilder builder = SslContextBuilder.forClient();
-      List<String> profiles = Arrays.asList(environment.getActiveProfiles());
       boolean pinnedTrust = false;
-      if (profiles.contains("dev") || profiles.contains("test")) {
+      if (environment.matchesProfiles("dev", "test")) {
         builder = builder.trustManager(InsecureTrustManagerFactory.INSTANCE);
         pinnedTrust = true;
       } else {
@@ -219,8 +217,7 @@ public class WebClientConfig {
       SslContext sslContext = builder.build();
       boolean disableHostnameVerification =
           pinnedTrust
-              && (profiles.contains("dev")
-                  || profiles.contains("test")
+              && (environment.matchesProfiles("dev", "test")
                   || !httpProperties.verifyBackendHostname());
 
       final ConnectionProvider provider;

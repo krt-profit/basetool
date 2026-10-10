@@ -83,7 +83,7 @@ public class ExchangeEntryLabels {
             (entry.getEntityKey().startsWith("m:") ? materialOf : itemOf).put(entry.getId(), id);
           }
         }
-        default -> {
+        case SHIP -> {
           UUID type = uuid(text(state, "shipType"));
           if (type != null) {
             shipTypeOf.put(entry.getId(), type);
@@ -94,6 +94,7 @@ public class ExchangeEntryLabels {
             }
           }
         }
+        case null -> throw new NullPointerException("resource");
       }
     }
     Map<UUID, String> materials = new HashMap<>();

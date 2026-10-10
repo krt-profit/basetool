@@ -53,6 +53,7 @@ public interface NotificationEvent {
    *
    * @return the actor sub, or {@code null}
    */
+  @Nullable
   UUID actorSub();
 
   /**

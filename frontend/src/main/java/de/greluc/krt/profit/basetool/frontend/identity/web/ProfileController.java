@@ -619,7 +619,7 @@ public class ProfileController {
   private Object getSingleClaim(@NotNull OidcUser principal, String claim) {
     Object value = principal.getAttribute(claim);
     if (value instanceof List<?> list && !list.isEmpty()) {
-      return list.get(0);
+      return list.getFirst();
     }
     return value;
   }

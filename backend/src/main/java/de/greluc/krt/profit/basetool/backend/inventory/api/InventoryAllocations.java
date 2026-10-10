@@ -220,7 +220,8 @@ public final class InventoryAllocations {
    * @return the matching slice, or {@code null} when none
    */
   @Nullable
-  public static InventoryJobOrderAllocation jobOrderSlice(InventoryItem item, UUID orderId) {
+  public static InventoryJobOrderAllocation jobOrderSlice(
+      InventoryItem item, @Nullable UUID orderId) {
     if (orderId == null) {
       return null;
     }
@@ -238,7 +239,8 @@ public final class InventoryAllocations {
    * @return the matching slice, or {@code null} when none
    */
   @Nullable
-  public static InventoryMissionAllocation missionSlice(InventoryItem item, UUID missionId) {
+  public static InventoryMissionAllocation missionSlice(
+      InventoryItem item, @Nullable UUID missionId) {
     if (missionId == null) {
       return null;
     }

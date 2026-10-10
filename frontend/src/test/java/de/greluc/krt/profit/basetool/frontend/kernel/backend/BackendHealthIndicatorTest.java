@@ -181,7 +181,7 @@ class BackendHealthIndicatorTest {
         .thenThrow(
             new NoSuchSslBundleException("backend-trust", "not configured for this profile"));
     Environment environment = mock(Environment.class);
-    when(environment.getActiveProfiles()).thenReturn(new String[] {"prod"});
+    when(environment.matchesProfiles("dev", "test")).thenReturn(false);
 
     BackendHealthIndicator indicator =
         new BackendHealthIndicator(backendUrl, sslBundles, environment, false);

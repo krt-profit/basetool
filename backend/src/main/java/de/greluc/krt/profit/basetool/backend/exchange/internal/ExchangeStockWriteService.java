@@ -216,20 +216,23 @@ public class ExchangeStockWriteService {
     List<ExchangeChangeResultDto.OpResult> results = new ArrayList<>();
     for (int i = 0; i < plan.size(); i++) {
       String opId = changeSet.ops().get(i).opId();
-      if (plan.get(i) instanceof Change change) {
-        if (!changeSet.dryRun()) {
-          execute(caller, batch, change, moves, flipped, offers);
-          counter(caller, APPLIED).increment();
+      switch (plan.get(i)) {
+        case Change change -> {
+          if (!changeSet.dryRun()) {
+            execute(caller, batch, change, moves, flipped, offers);
+            counter(caller, APPLIED).increment();
+          }
+          applied++;
         }
-        applied++;
-      } else if (plan.get(i) instanceof Skip skip) {
-        if (UNCHANGED.equals(skip.result())) {
-          unchanged++;
+        case Skip skip -> {
+          if (UNCHANGED.equals(skip.result())) {
+            unchanged++;
+          }
+          if (!changeSet.dryRun()) {
+            counter(caller, skip.result()).increment();
+          }
+          results.add(new ExchangeChangeResultDto.OpResult(i, opId, skip.result(), skip.reason()));
         }
-        if (!changeSet.dryRun()) {
-          counter(caller, skip.result()).increment();
-        }
-        results.add(new ExchangeChangeResultDto.OpResult(i, opId, skip.result(), skip.reason()));
       }
     }
     if (!changeSet.dryRun() && applied > 0) {

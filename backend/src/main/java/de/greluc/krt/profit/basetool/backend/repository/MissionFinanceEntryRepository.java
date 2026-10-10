@@ -50,16 +50,18 @@ public interface MissionFinanceEntryRepository extends JpaRepository<MissionFina
    * @return per-type sum/count aggregate; sums may be {@code null}, counts are 0 when none
    */
   @Query(
-      "select new de.greluc.krt.profit.basetool.backend.repository.FinanceEntryAggregate("
-          + "sum(case when e.type ="
-          + " de.greluc.krt.profit.basetool.backend.model.FinanceType.INCOME then e.amount end),"
-          + " count(case when e.type ="
-          + " de.greluc.krt.profit.basetool.backend.model.FinanceType.INCOME then 1 end),"
-          + " sum(case when e.type ="
-          + " de.greluc.krt.profit.basetool.backend.model.FinanceType.EXPENSE then e.amount end),"
-          + " count(case when e.type ="
-          + " de.greluc.krt.profit.basetool.backend.model.FinanceType.EXPENSE then 1 end))"
-          + " from MissionFinanceEntry e where e.mission.id = :missionId")
+      """
+      select new de.greluc.krt.profit.basetool.backend.repository.FinanceEntryAggregate(
+      sum(case when e.type =
+      de.greluc.krt.profit.basetool.backend.model.FinanceType.INCOME then e.amount end),
+      count(case when e.type =
+      de.greluc.krt.profit.basetool.backend.model.FinanceType.INCOME then 1 end),
+      sum(case when e.type =
+      de.greluc.krt.profit.basetool.backend.model.FinanceType.EXPENSE then e.amount end),
+      count(case when e.type =
+      de.greluc.krt.profit.basetool.backend.model.FinanceType.EXPENSE then 1 end))
+      from MissionFinanceEntry e where e.mission.id = :missionId
+      """)
   FinanceEntryAggregate aggregateFinanceByMission(@Param("missionId") UUID missionId);
 
   /**
@@ -72,13 +74,15 @@ public interface MissionFinanceEntryRepository extends JpaRepository<MissionFina
    * @return one aggregate per mission that has at least one entry; sums may be {@code null}
    */
   @Query(
-      "select new de.greluc.krt.profit.basetool.backend.repository.MissionFinanceGroupAggregate("
-          + "e.mission.id,"
-          + " sum(case when e.type ="
-          + " de.greluc.krt.profit.basetool.backend.model.FinanceType.INCOME then e.amount end),"
-          + " sum(case when e.type ="
-          + " de.greluc.krt.profit.basetool.backend.model.FinanceType.EXPENSE then e.amount end))"
-          + " from MissionFinanceEntry e where e.mission.id in :missionIds group by e.mission.id")
+      """
+      select new de.greluc.krt.profit.basetool.backend.repository.MissionFinanceGroupAggregate(
+      e.mission.id,
+      sum(case when e.type =
+      de.greluc.krt.profit.basetool.backend.model.FinanceType.INCOME then e.amount end),
+      sum(case when e.type =
+      de.greluc.krt.profit.basetool.backend.model.FinanceType.EXPENSE then e.amount end))
+      from MissionFinanceEntry e where e.mission.id in :missionIds group by e.mission.id
+      """)
   List<MissionFinanceGroupAggregate> aggregateFinanceByMissionIds(
       @Param("missionIds") List<UUID> missionIds);
 

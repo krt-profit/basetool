@@ -96,7 +96,7 @@ class BackendHealthIndicatorHostnameTest {
       when(bundles.getBundle("backend-trust"))
           .thenReturn(SslBundle.of(SslStoreBundle.of(null, null, truststore)));
       Environment environment = mock(Environment.class);
-      when(environment.getActiveProfiles()).thenReturn(new String[] {"prod"});
+      when(environment.matchesProfiles("dev", "test")).thenReturn(false);
 
       return new BackendHealthIndicator(
               "https://localhost:" + server.getPort(), bundles, environment, verifyHostname)

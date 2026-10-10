@@ -111,12 +111,14 @@ public interface MissionRepository
    * @return the mission (at most one element), with its unit graph initialised
    */
   @Query(
-      "SELECT m FROM Mission m LEFT JOIN FETCH m.assignedUnits u"
-          + " LEFT JOIN FETCH u.shipType ust LEFT JOIN FETCH ust.manufacturer"
-          + " LEFT JOIN FETCH u.ship s LEFT JOIN FETCH s.shipType sst"
-          + " LEFT JOIN FETCH sst.manufacturer LEFT JOIN FETCH s.location"
-          + " LEFT JOIN FETCH s.owner LEFT JOIN FETCH u.responsibleUser"
-          + " WHERE m.id = :id")
+      """
+      SELECT m FROM Mission m LEFT JOIN FETCH m.assignedUnits u
+      LEFT JOIN FETCH u.shipType ust LEFT JOIN FETCH ust.manufacturer
+      LEFT JOIN FETCH u.ship s LEFT JOIN FETCH s.shipType sst
+      LEFT JOIN FETCH sst.manufacturer LEFT JOIN FETCH s.location
+      LEFT JOIN FETCH s.owner LEFT JOIN FETCH u.responsibleUser
+      WHERE m.id = :id
+      """)
   List<Mission> fetchAssignedUnitGraph(@Param("id") UUID id);
 
   /**
@@ -245,8 +247,10 @@ public interface MissionRepository
    */
   @Modifying
   @Query(
-      "UPDATE Mission m SET m.coreVersion = m.coreVersion + 1 WHERE m.id = :id"
-          + " AND m.coreVersion = :expected")
+      """
+      UPDATE Mission m SET m.coreVersion = m.coreVersion + 1 WHERE m.id = :id
+      AND m.coreVersion = :expected
+      """)
   int bumpCoreVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
 
   /**
@@ -259,8 +263,10 @@ public interface MissionRepository
    */
   @Modifying
   @Query(
-      "UPDATE Mission m SET m.scheduleVersion = m.scheduleVersion + 1 WHERE m.id = :id"
-          + " AND m.scheduleVersion = :expected")
+      """
+      UPDATE Mission m SET m.scheduleVersion = m.scheduleVersion + 1 WHERE m.id = :id
+      AND m.scheduleVersion = :expected
+      """)
   int bumpScheduleVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
 
   /**
@@ -273,8 +279,10 @@ public interface MissionRepository
    */
   @Modifying
   @Query(
-      "UPDATE Mission m SET m.flagsVersion = m.flagsVersion + 1 WHERE m.id = :id"
-          + " AND m.flagsVersion = :expected")
+      """
+      UPDATE Mission m SET m.flagsVersion = m.flagsVersion + 1 WHERE m.id = :id
+      AND m.flagsVersion = :expected
+      """)
   int bumpFlagsVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
 
   /**
@@ -287,8 +295,10 @@ public interface MissionRepository
    */
   @Modifying
   @Query(
-      "UPDATE Mission m SET m.partyLeadVersion = m.partyLeadVersion + 1 WHERE m.id = :id"
-          + " AND m.partyLeadVersion = :expected")
+      """
+      UPDATE Mission m SET m.partyLeadVersion = m.partyLeadVersion + 1 WHERE m.id = :id
+      AND m.partyLeadVersion = :expected
+      """)
   int bumpPartyLeadVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
 
   /**
@@ -301,8 +311,10 @@ public interface MissionRepository
    */
   @Modifying
   @Query(
-      "UPDATE Mission m SET m.stepsVersion = m.stepsVersion + 1 WHERE m.id = :id"
-          + " AND m.stepsVersion = :expected")
+      """
+      UPDATE Mission m SET m.stepsVersion = m.stepsVersion + 1 WHERE m.id = :id
+      AND m.stepsVersion = :expected
+      """)
   int bumpStepsVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
 
   /**
@@ -315,8 +327,10 @@ public interface MissionRepository
    */
   @Modifying
   @Query(
-      "UPDATE Mission m SET m.objectivesVersion = m.objectivesVersion + 1 WHERE m.id = :id"
-          + " AND m.objectivesVersion = :expected")
+      """
+      UPDATE Mission m SET m.objectivesVersion = m.objectivesVersion + 1 WHERE m.id = :id
+      AND m.objectivesVersion = :expected
+      """)
   int bumpObjectivesVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
 
   /**
@@ -329,8 +343,10 @@ public interface MissionRepository
    */
   @Modifying
   @Query(
-      "UPDATE Mission m SET m.owningOrgUnitVersion = m.owningOrgUnitVersion + 1 WHERE m.id = :id"
-          + " AND m.owningOrgUnitVersion = :expected")
+      """
+      UPDATE Mission m SET m.owningOrgUnitVersion = m.owningOrgUnitVersion + 1 WHERE m.id = :id
+      AND m.owningOrgUnitVersion = :expected
+      """)
   int bumpOwningOrgUnitVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
 
   /**
