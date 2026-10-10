@@ -191,7 +191,6 @@ package operation operation the operation module's package tree (plan 5.2)
 package promotion promotion the promotion module's package tree (plan 5.2)
 package personalinventory personalinventory the personal-inventory module's package tree (plan 5.2)
 
-name ^(MaterialExchange|MaterialRequest|MaterialItemRequest) materialexchange
 name ^(MaterialClaim|ClaimBucket|ClaimDto|CreateClaim|MaterialDemand) joborder
 name ^(JobOrder|CreateJobOrder|UpdateJobOrder|HandoverReport) joborder
 name ^(Inventory|BulkCheckout|BulkRebook|BulkStolenMark|BulkOrgUnitChange|AggregatedInventory|GroupedInventory|AllocationReduction|StockViewerAccess|OwnedStockSlice) inventory

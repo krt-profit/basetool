@@ -29,18 +29,16 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer;
-import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkStolenMarkRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkStolenMarkResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemStolenMarkDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -69,7 +67,7 @@ public class InventoryStolenMarkService {
   private static final double QUANTITY_EPSILON = 1e-9;
 
   private final InventoryItemRepository inventoryItemRepository;
-  private final MaterialExchangeOfferRepository materialExchangeOfferRepository;
+  private final StockOfferLookup stockOfferLookup;
   private final InventoryCheckoutService inventoryCheckoutService;
   private final InventoryItemMapper inventoryItemMapper;
   private final InventoryProperties inventoryProperties;
@@ -229,7 +227,7 @@ public class InventoryStolenMarkService {
       throw new BadRequestException("error.inventory.stolen.wholeUnits");
     }
     double remaining = InventoryItem.roundToScuScale(rowAmount - amount);
-    double offered = offeredAmount(item.getId());
+    double offered = stockOfferLookup.activeOfferedAmount(item.getId());
     if (remaining + QUANTITY_EPSILON < offered) {
       throw new BusinessConflictException("error.inventory.stolen.belowOffer");
     }
@@ -259,34 +257,6 @@ public class InventoryStolenMarkService {
         callerId,
         AuditDetails.of("amount", amount).with("split", true).with("newRow", savedPart.getId()));
     return inventoryCheckoutService.mergeStockIfRequested(savedPart, false);
-  }
-
-  /**
-   * Returns how much of a row an active Materialbörse offer promises: its SCU for a material offer,
-   * its whole units for an item offer, {@code 0} without an active offer.
-   *
-   * @param itemId the Lager row
-   * @return the offered amount
-   */
-  private double offeredAmount(@NotNull UUID itemId) {
-    return materialExchangeOfferRepository
-        .findByInventoryItemIdAndStatus(itemId, MaterialExchangeOfferStatus.ACTIVE)
-        .map(InventoryStolenMarkService::offered)
-        .orElse(0.0);
-  }
-
-  /**
-   * Reads the promised amount of one offer.
-   *
-   * @param offer the active offer
-   * @return its SCU for a material offer, its units for an item offer, {@code 0} when neither is
-   *     set
-   */
-  private static double offered(@NotNull MaterialExchangeOffer offer) {
-    if (offer.getOfferedAmount() != null) {
-      return offer.getOfferedAmount();
-    }
-    return offer.getItemQuantity() != null ? offer.getItemQuantity() : 0.0;
   }
 
   /**

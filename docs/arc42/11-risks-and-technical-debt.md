@@ -373,4 +373,6 @@ and `admin` are the first domains moved whole into their module packages. `opera
 with the first access policy out of the scope hub and the first mission command. `promotion` moved
 with its own access policy (`promotionAccessPolicy`), `personalinventory` without one (it had no
 scope gate), then `exchange` and the bank as packages (2026-10-10), which enter their "must stay green"
-boundary before their Gradle extraction; the baseline is at 101 class edges.
+boundary before their Gradle extraction. Phase 3 began with `materialexchange` (2026-10-10), the
+Lager reaching it only through its own `StockChangeObserver` and `StockOfferLookup`; the baseline is
+at 96 class edges.

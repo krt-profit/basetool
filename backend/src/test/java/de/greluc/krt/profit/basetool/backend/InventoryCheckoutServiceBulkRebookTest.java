@@ -35,6 +35,9 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredToUserEvent;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.TransferredLot;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
@@ -51,13 +54,11 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookResultDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryCheckoutService;
-import de.greluc.krt.profit.basetool.backend.service.MaterialExchangeOfferRatchet;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import java.util.List;
 import java.util.Optional;
@@ -85,10 +86,10 @@ class InventoryCheckoutServiceBulkRebookTest {
   @Mock private LocationRepository locationRepository;
   @Mock private MissionFinanceEntryRepository missionFinanceEntryRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
-  @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
+  @Mock private StockOfferLookup stockOfferLookup;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private OwnerScopeService ownerScopeService;
-  @Mock private MaterialExchangeOfferRatchet offerRatchet;
+  @Mock private StockChangeObserver offerRatchet;
   @Mock private AuditService auditService;
 
   @Mock private ApplicationEventPublisher eventPublisher;
@@ -170,10 +171,8 @@ class InventoryCheckoutServiceBulkRebookTest {
     verify(inventoryItemRepository).save(saved.capture());
     assertEquals(there.getId(), saved.getValue().getLocation().getId());
     assertEquals(12.0, saved.getValue().getAmount(), 1e-9, "the whole quantity moves");
-    verify(offerRatchet)
-        .beforeDelete(List.of(moving.getId()), MaterialExchangeOfferRatchet.Reason.REBOOK);
-    verify(offerRatchet, never())
-        .beforeDelete(List.of(already.getId()), MaterialExchangeOfferRatchet.Reason.REBOOK);
+    verify(offerRatchet).beforeDelete(List.of(moving.getId()), StockChangeReason.REBOOK);
+    verify(offerRatchet, never()).beforeDelete(List.of(already.getId()), StockChangeReason.REBOOK);
     verify(inventoryItemRepository).delete(moving);
     verify(inventoryItemRepository, never()).delete(already);
   }
