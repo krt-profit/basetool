@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;

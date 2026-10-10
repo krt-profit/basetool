@@ -137,6 +137,7 @@ mappers no other module needs) and `<module>.web` (controllers and their REST DT
 | --- | --- | --- | --- |
 | `dashboard` | — (publishes nothing) | `Announcement`, `AnnouncementRepository`, `AnnouncementService` | `AnnouncementController`, `AnnouncementDto`, `AnnouncementMapper` |
 | `admin` | `SystemSettings` (setting read, system flag write) | `SystemSetting`, its repository, `SystemSettingService`, `SystemSettingMapper`, the setting records, `AndroidClientProperties`, `AndroidVersionPolicyReport` | `SystemSettingController`, `AppVersionPolicyController`, `SystemController`, `AppVersionPolicyDto`, `PingResponse` |
+| `exchange` | `ActingMemberAuthorities`, `IngestGatewayProperties`, the problem codes and the two events | the relay services, gates, mirrors and feed readers, the 14 entities and 10 repositories, `ActingMemberFilter`, the change-source transaction manager, the sandbox guard, the retention tasks; the relay wire records in `internal.dto` | the eight relay controllers under `/api/v1/exchange`, the registry and bulk-undo administration, `ConnectedAppsController` |
 | `personalinventory` | `PersonalInventoryErasure` (the GDPR deletion's bulk delete) | `PersonalInventoryItem`, `PersonalInventoryLocationType`, the repository, `PersonalInventoryItemService`, the mapper and records, `UexLocationDto` | `PersonalInventoryController`, `AdminPersonalInventoryController`, `UexLocationController` |
 | `orgchart` | — (publishes nothing; orgunit reaches it through `orgunit.api.MembershipChangeObserver`) | `OrgChartPosition` and its repository and enums, `OrgChartService`, `OrgChartReadService`, `LeitungViewService`, `OrgChartPositionMapper`, the chart and Leitung DTOs | `OrgChartController`, `LeitungController` |
 | `promotion` | — (publishes nothing; the GDPR deletion calls `service.MemberEvaluationErasure`, which the module implements) | the entities, repositories, services, mappers and records, `PromotionAccessPolicy` | the six promotion controllers |
@@ -145,6 +146,14 @@ mappers no other module needs) and `<module>.web` (controllers and their REST DT
 chart's DTOs stay in `internal`, because its services return them: a moved domain's `web` depends on
 its `internal`, never the reverse ([`module-boundaries.md`](../specs/module-boundaries.md),
 REQ-MOD-006).
+
+The exchange is the first module whose lower neighbours had to stop naming it: the security
+configuration takes the acting-member filter from `platform.api.ActingMemberFilterProvider`, the
+blueprint upload preview hands the exchange envelope to `service.BlueprintEnvelopeReader`, and the
+token converter, the account deletion and the blueprint source names ask
+`platform.api.ClientDirectory`; all three SPIs are implemented in `exchange.internal`. The relay
+headers are platform vocabulary (`platform.api.ActingMemberHeader`). The relay surface itself is
+frozen (D-05): `exchange-relay.openapi.json` and the wire records did not change.
 
 `operation` followed: `OperationController` in `operation.web`; the operation, finance and payout
 services, the payout-status entity and repository, the finance and payout DTOs and
@@ -286,7 +295,7 @@ decisions in ADR-0216 … ADR-0221 and ADR-0224 … ADR-0228.
 | ingest | `ExchangeIdempotencyFilter` | `Idempotency-Key` on every write, answers cached per client, member and key |
 | ingest | `web.ExchangeController`, `ExchangeSchemas`, `ExchangeRelay` | Schema check of request and answer, relay under the gateway's service identity naming member, client, capabilities and installation; staging of drafts and of a held mass change (`HandoffKind.MASS_CHANGE`) for the browser |
 | backend | Registry (`ExchangeRegistryService`, `AdminExchangeRegistryController`, `ExchangeRegistryMirrorSync`, `ExchangeRegistryReconcileTask`) | `exchange_client` and the switch, `ADMIN` only; the Redis mirror written restrictive-first, reconciled every 60 s |
-| backend | `config.ActingMemberFilter`, `ExchangeGate`, `ExchangeInstallationService`, `ExchangeConnectionRetentionTask` | The acting member's reduced authentication, `@exchangeGate` re-checking every capability, installations, revocations and departures; disconnected installations and revocations deleted after 90 days (REQ-XCH-035) |
+| backend | `exchange.internal.ActingMemberFilter`, `ExchangeGate`, `ExchangeInstallationService`, `ExchangeConnectionRetentionTask` | The acting member's reduced authentication, `@exchangeGate` re-checking every capability, installations, revocations and departures; disconnected installations and revocations deleted after 90 days (REQ-XCH-035) |
 | backend | Change feed (`V252`, `ChangeSourceTransactionManager`, `ExchangeFeedReader`) | Trigger-written key log with the writer, tombstones, cursors, the 90-day retention (ADR-0224) |
 | backend | Journal (`V253`, `ExchangeJournalService`) | Every written entry before and after, 90 days |
 | backend | Write services for blueprints, stock and ships (ship links `V254`) | Plan a change set, ask `ExchangeMassChangeGuard`, write, journal each entry; `ExchangeLiveSync` after commit. Ships and blueprints are written through the hangar's and the blueprint domain's own services; stock takes the Lager's lot locks through `InventoryItemRepository` and books out through the Lager's book-out, but books in by creating the `InventoryItem` row and its audit event itself |

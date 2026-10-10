@@ -369,8 +369,10 @@ Phase 1 has begun: `audit.api`, `kernel`, `orgunit.api`/`orgunit.web` and the pu
 `platform` module and the modules' `api`/`internal` packages, and the frozen module baseline has
 shrunk from 138 to 110 class edges. Phase 2 has begun (2026-10-05): `dashboard`, `orgchart`
 and `admin` are the first domains moved whole into their module packages. `operation` followed
-with the first access policy out of the scope hub and the first mission command; the baseline is
-at 108 class edges. `promotion` moved with its own access policy (`promotionAccessPolicy`). `personalinventory` moved without one; it had no scope gate.
+with the first access policy out of the scope hub and the first mission command. `promotion` moved
+with its own access policy (`promotionAccessPolicy`), `personalinventory` without one (it had no
+scope gate), then `exchange` (2026-10-10), which enters its "must stay green" boundary before its
+Gradle extraction; the baseline is at 103 class edges.
 The frontend is packaged by domain since 2026-10-10 (plan F4, REQ-FE-032): its controllers, mirrors
 and forms live in `<domain>.web` and `<domain>.model` beside the typed clients, the shared reference
 DTOs in the kernel model. The cross-domain references that remain are page composition, twelve of
