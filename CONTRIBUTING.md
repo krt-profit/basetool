@@ -961,7 +961,7 @@ because of real bugs that shipped. The short version:
   `@Transactional(propagation = MANDATORY)` that operates on the
   already-managed entity and relies on dirty-checking. Canonical
   example:
-  [`JobOrderService.completeJobOrderWithinTransaction`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/JobOrderService.java).
+  [`JobOrderService.completeJobOrderWithinTransaction`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/joborder/internal/JobOrderService.java).
 - **Pessimistic locking** for bulk reorders / priority shifts:
   `@Lock(LockModeType.PESSIMISTIC_WRITE)` (or atomic SQL).
 

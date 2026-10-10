@@ -84,10 +84,9 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    * requirements the active-order lookup reads, ordered by ascending {@code priority} (nulls last),
    * then descending {@code displayId}.
    *
-   * <p>Fetches exactly what {@link
-   * de.greluc.krt.profit.basetool.backend.service.JobOrderQueryService#findAllActiveReference()}
-   * reads, each order exactly once (REQ-ORDERS-018). Handovers are not fetched, since they would
-   * multiply the SQL rows.
+   * <p>Fetches exactly what {@code JobOrderQueryService#findAllActiveReference()} reads, each order
+   * exactly once (REQ-ORDERS-018). Handovers are not fetched, since they would multiply the SQL
+   * rows.
    */
   @EntityGraph(
       attributePaths = {
@@ -127,8 +126,10 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
         "responsibleOrgUnit"
       })
   @Query(
-      "SELECT o FROM JobOrder o WHERE o.responsibleOrgUnit.id IN :orgUnitIds"
-          + " AND o.status IN :statuses ORDER BY o.displayId ASC")
+      """
+      SELECT o FROM JobOrder o WHERE o.responsibleOrgUnit.id IN :orgUnitIds
+      AND o.status IN :statuses ORDER BY o.displayId ASC
+      """)
   List<JobOrder> findOpenForExchangeDemand(
       @Param("statuses") Collection<JobOrderStatus> statuses,
       @Param("orgUnitIds") Collection<UUID> orgUnitIds);
@@ -229,8 +230,10 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    */
   @EntityGraph(attributePaths = {"responsibleOrgUnit", "requestingOrgUnit"})
   @Query(
-      "SELECT o FROM JobOrder o WHERE o.requestingOrgUnit.id IN :requesterOrgUnitIds AND o.status"
-          + " IN :statuses")
+      """
+      SELECT o FROM JobOrder o WHERE o.requestingOrgUnit.id IN :requesterOrgUnitIds
+      AND o.status IN :statuses
+      """)
   Page<JobOrder> findRequestedOrders(
       @Param("statuses") List<JobOrderStatus> statuses,
       @Param("requesterOrgUnitIds") Collection<UUID> requesterOrgUnitIds,
@@ -308,7 +311,9 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    */
   @Modifying
   @Query(
-      "UPDATE JobOrder o SET o.handle = :sentinel"
-          + " WHERE lower(o.handle) = lower(:handle) AND o.handle <> :sentinel")
+      """
+      UPDATE JobOrder o SET o.handle = :sentinel
+      WHERE lower(o.handle) = lower(:handle) AND o.handle <> :sentinel
+      """)
   int anonymiseHandle(@Param("handle") String handle, @Param("sentinel") String sentinel);
 }

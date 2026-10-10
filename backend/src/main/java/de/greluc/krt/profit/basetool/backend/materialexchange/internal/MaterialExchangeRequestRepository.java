@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -97,11 +98,11 @@ public interface MaterialExchangeRequestRepository
                  OR CASE WHEN r.requestedAmount IS NOT NULL THEN r.requestedAmount ELSE r.itemQuantity END >= :minAmount)
           """)
   Page<MaterialExchangeRequest> findBoard(
-      @Param("viewerId") UUID viewerId,
+      @Param("viewerId") @Nullable UUID viewerId,
       @Param("onlyMine") boolean onlyMine,
-      @Param("query") String query,
+      @Param("query") @Nullable String query,
       @Param("minQuality") int minQuality,
-      @Param("minAmount") Double minAmount,
+      @Param("minAmount") @Nullable Double minAmount,
       @Param("sortKey") String sortKey,
       Pageable pageable);
 

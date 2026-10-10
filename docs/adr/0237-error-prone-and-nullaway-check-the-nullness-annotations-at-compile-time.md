@@ -76,3 +76,12 @@ simple name; Spring Framework builds itself with the same pair.
   the compile as well.
 - The configuration cache stays clean; `gradle/verification-metadata.xml` is regenerated with the
   ADR-0208 command. Nothing reaches a runtime classpath.
+- **Widened (2026-10-10)** to the whole `joborder`, `refinery` and `materialexchange` modules
+  (`api`, `web` and `internal`), the first three Phase 3 modules. Their first run reported 49
+  findings, nearly all a missing `@Nullable`: record components the services fill with `null`
+  (among them six components of the two published job-order events and three of the refinery's
+  `ImportIssueDto`), parameters that take `null`, the board queries' optional filters, and the
+  offer's and the request's owning org unit. The owner redactor's three methods carry
+  `@Contract("null -> null; !null -> !null")`, two map reads the code guarantees present are
+  wrapped in `Objects.requireNonNull`, and the blueprint-owner fold skips a missing product name
+  before it builds a family, as its empty match key already did.

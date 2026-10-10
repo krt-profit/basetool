@@ -104,8 +104,10 @@ public interface MaterialExchangeRequestInterestRepository
    * @return the ids of the requests the viewer has signalled on, never {@code null}.
    */
   @Query(
-      "SELECT i.request.id FROM MaterialExchangeRequestInterest i "
-          + "WHERE i.interestedUser.id = :viewerId AND i.request.id IN :requestIds")
+      """
+      SELECT i.request.id FROM MaterialExchangeRequestInterest i
+      WHERE i.interestedUser.id = :viewerId AND i.request.id IN :requestIds
+      """)
   Set<UUID> findRequestIdsInterestedByViewer(
       @Param("viewerId") UUID viewerId, @Param("requestIds") Collection<UUID> requestIds);
 
