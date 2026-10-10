@@ -29,6 +29,8 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.RefiningMethodDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.refinery.client.RefineryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.ImportIssueCode;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.ImportIssueDto;
@@ -39,8 +41,6 @@ import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryImportDraft
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderForm;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStatus;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Collections;

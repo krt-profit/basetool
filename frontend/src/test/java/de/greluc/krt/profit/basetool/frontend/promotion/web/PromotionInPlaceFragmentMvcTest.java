@@ -33,13 +33,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionCategoryDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionEligibilityDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionLevelContentDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionTopicDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.RankRequirementDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;

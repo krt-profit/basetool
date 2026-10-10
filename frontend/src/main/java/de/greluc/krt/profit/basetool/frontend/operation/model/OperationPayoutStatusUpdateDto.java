@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.operation.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Frontend mirror of the backend write payload for the operation payout-status toggle. Carries the

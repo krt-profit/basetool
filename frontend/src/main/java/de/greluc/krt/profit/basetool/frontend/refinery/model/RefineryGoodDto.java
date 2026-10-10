@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.refinery.model;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.util.UUID;

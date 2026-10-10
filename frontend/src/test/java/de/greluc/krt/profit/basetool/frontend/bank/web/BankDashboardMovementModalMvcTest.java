@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankDashboardAccountDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankDashboardDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;

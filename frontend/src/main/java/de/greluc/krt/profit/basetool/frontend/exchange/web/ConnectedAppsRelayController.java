@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.exchange.client.ExchangeBackendClient;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeUndoRequestDto;

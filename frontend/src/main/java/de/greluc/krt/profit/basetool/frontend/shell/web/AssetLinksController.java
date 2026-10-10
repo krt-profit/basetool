@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.shell.web;
 
-import de.greluc.krt.profit.basetool.frontend.config.AndroidAppLinkProperties;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;

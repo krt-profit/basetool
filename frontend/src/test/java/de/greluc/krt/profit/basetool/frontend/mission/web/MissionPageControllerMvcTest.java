@@ -44,6 +44,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.JobTypeDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.AddCrewRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.AddCustomFrequencyRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.AddExternalParticipantRequest;
@@ -57,12 +63,6 @@ import de.greluc.krt.profit.basetool.frontend.mission.model.MissionParticipantDt
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionUnitDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.UpdateCustomFrequencyRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.UpdateMissionOwnerRequest;
-import de.greluc.krt.profit.basetool.frontend.model.LocationReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -286,8 +286,8 @@ class MissionPageControllerMvcTest {
   private MissionDto missionWithSteps(
       UUID missionId,
       java.util.List<de.greluc.krt.profit.basetool.frontend.mission.model.MissionStepDto> steps) {
-    de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto manager =
-        new de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto(
+    de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto manager =
+        new de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto(
             UUID.randomUUID(), "manager", null, "Test Manager", 0);
     return new MissionDto(
         missionId,
@@ -353,8 +353,8 @@ class MissionPageControllerMvcTest {
    * @return a minimal mission fixture with the given description
    */
   private MissionDto minimalMission(UUID missionId, String description) {
-    de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto manager =
-        new de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto(
+    de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto manager =
+        new de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto(
             UUID.randomUUID(), "manager", null, "Test Manager", 0);
     return new MissionDto(
         missionId,
@@ -432,8 +432,8 @@ class MissionPageControllerMvcTest {
       java.util.Set<de.greluc.krt.profit.basetool.frontend.mission.model.MissionParticipantDto>
           participants,
       java.util.List<de.greluc.krt.profit.basetool.frontend.mission.model.MissionUnitDto> units) {
-    de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto manager =
-        new de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto(
+    de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto manager =
+        new de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto(
             UUID.randomUUID(), "manager", null, "Test Manager", 0);
     return new MissionDto(
         missionId,
@@ -494,7 +494,7 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
+            de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference.PAYOUT,
             1L);
     de.greluc.krt.profit.basetool.frontend.mission.model.MissionCrewDto realCrew =
         new de.greluc.krt.profit.basetool.frontend.mission.model.MissionCrewDto(
@@ -563,7 +563,7 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
+            de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference.PAYOUT,
             1L);
     de.greluc.krt.profit.basetool.frontend.mission.model.MissionUnitDto unit =
         new de.greluc.krt.profit.basetool.frontend.mission.model.MissionUnitDto(
@@ -643,7 +643,7 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
+            de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference.PAYOUT,
             1L);
 
     MissionDto mission =
@@ -715,7 +715,7 @@ class MissionPageControllerMvcTest {
             null,
             checkIn,
             checkOut,
-            de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
+            de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference.PAYOUT,
             1L);
 
     MissionDto mission =
@@ -888,7 +888,7 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
+            de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference.PAYOUT,
             1L);
     de.greluc.krt.profit.basetool.frontend.mission.model.MissionParticipantDto p2 =
         new de.greluc.krt.profit.basetool.frontend.mission.model.MissionParticipantDto(
@@ -901,7 +901,7 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
+            de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference.PAYOUT,
             1L);
     de.greluc.krt.profit.basetool.frontend.mission.model.MissionParticipantDto p3 =
         new de.greluc.krt.profit.basetool.frontend.mission.model.MissionParticipantDto(
@@ -914,7 +914,7 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
+            de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference.PAYOUT,
             1L);
 
     MissionDto mission =
@@ -1000,7 +1000,7 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.put(
             eq("/api/v1/missions/{id}/owner"), any(), eq(Void.class), eq(missionId)))
         .thenThrow(
-            new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+            new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
                 "Conflict",
                 null,
                 409,
@@ -1231,7 +1231,7 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.patch(
             eq("/api/v1/missions/{id}/schedule"), any(), eq(Void.class), eq(missionId)))
         .thenThrow(
-            new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+            new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
                 "Conflict", null, 409));
 
     String body = "{\"field\":\"actualEndTime\",\"value\":\"2026-04-20T13:00:00Z\",\"version\":1}";
@@ -1271,7 +1271,7 @@ class MissionPageControllerMvcTest {
             eq(missionId),
             eq(userId)))
         .thenThrow(
-            new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+            new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
                 "Error", null, 400));
 
     mockMvc
@@ -1322,7 +1322,7 @@ class MissionPageControllerMvcTest {
             eq(MissionFrequencyDto[].class),
             eq(missionId)))
         .thenThrow(
-            new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+            new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
                 "Conflict", null, 409));
 
     String body = "{\"frequencyTypeId\":\"" + freqTypeId + "\",\"value\":123.45}";
@@ -1422,7 +1422,7 @@ class MissionPageControllerMvcTest {
             eq(missionId),
             eq(freqId)))
         .thenThrow(
-            new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+            new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
                 "Conflict", null, 409));
 
     String body = "{\"name\":\"Recon\",\"value\":42.10,\"version\":0}";
@@ -1474,7 +1474,7 @@ class MissionPageControllerMvcTest {
             eq(missionId),
             eq(unitId)))
         .thenThrow(
-            new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+            new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
                 "Conflict", null, 409));
 
     String body = "{\"name\":\"Alpha\",\"highValueUnit\":false}";
@@ -1540,7 +1540,7 @@ class MissionPageControllerMvcTest {
             eq(missionId),
             eq(participantId)))
         .thenThrow(
-            new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+            new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
                 "Conflict", null, 409));
 
     String body = "{\"version\":1,\"comment\":\"test\"}";
@@ -1606,7 +1606,7 @@ class MissionPageControllerMvcTest {
             eq(missionId),
             eq(participantId)))
         .thenThrow(
-            new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+            new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
                 "Conflict", null, 409));
 
     mockMvc
@@ -1659,7 +1659,7 @@ class MissionPageControllerMvcTest {
             eq(unitId),
             eq(crewId)))
         .thenThrow(
-            new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+            new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
                 "Conflict", null, 409));
 
     String body = "{\"jobTypeIds\":[]}";
@@ -1731,7 +1731,7 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
+            de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference.PAYOUT,
             1L);
 
     MissionDto mission =
@@ -1773,8 +1773,8 @@ class MissionPageControllerMvcTest {
             null,
             null);
 
-    de.greluc.krt.profit.basetool.frontend.model.PageResponse<Object> emptyPage =
-        new de.greluc.krt.profit.basetool.frontend.model.PageResponse<>(
+    de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<Object> emptyPage =
+        new de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<>(
             Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
     when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
@@ -1843,7 +1843,7 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
+            de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference.PAYOUT,
             1L);
 
     MissionDto mission =
@@ -1885,8 +1885,8 @@ class MissionPageControllerMvcTest {
             null,
             null);
 
-    de.greluc.krt.profit.basetool.frontend.model.PageResponse<Object> emptyPage2 =
-        new de.greluc.krt.profit.basetool.frontend.model.PageResponse<>(
+    de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<Object> emptyPage2 =
+        new de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<>(
             Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
     when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
@@ -1941,7 +1941,7 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.get(
             eq("/api/v1/missions/{id}/participants/unassigned"), anyTypeRef(), eq(missionId)))
         .thenThrow(
-            new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+            new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
                 "Not Found", null, 404));
 
     mockMvc
@@ -2010,7 +2010,7 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
+            de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference.PAYOUT,
             1L);
 
     de.greluc.krt.profit.basetool.frontend.catalogue.model.ShipTypeDto shipType =
@@ -2062,8 +2062,8 @@ class MissionPageControllerMvcTest {
             null,
             null);
 
-    de.greluc.krt.profit.basetool.frontend.model.PageResponse<Object> emptyPage =
-        new de.greluc.krt.profit.basetool.frontend.model.PageResponse<>(
+    de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<Object> emptyPage =
+        new de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<>(
             Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
@@ -2156,7 +2156,7 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
+            de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference.PAYOUT,
             1L);
 
     de.greluc.krt.profit.basetool.frontend.catalogue.model.ShipTypeDto shipType =
@@ -2224,8 +2224,8 @@ class MissionPageControllerMvcTest {
             null,
             null);
 
-    de.greluc.krt.profit.basetool.frontend.model.PageResponse<Object> emptyPage =
-        new de.greluc.krt.profit.basetool.frontend.model.PageResponse<>(
+    de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<Object> emptyPage =
+        new de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<>(
             Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
@@ -2339,19 +2339,20 @@ class MissionPageControllerMvcTest {
             null,
             null);
 
-    de.greluc.krt.profit.basetool.frontend.model.PageResponse<Object> emptyPage =
-        new de.greluc.krt.profit.basetool.frontend.model.PageResponse<>(
+    de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<Object> emptyPage =
+        new de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<>(
             Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
-    de.greluc.krt.profit.basetool.frontend.model.PageResponse<FrequencyTypeDto> freqTypesPage =
-        new de.greluc.krt.profit.basetool.frontend.model.PageResponse<>(
-            List.of(
-                new FrequencyTypeDto(befehlTypeId, "Befehl", null, true, 0, 0L),
-                new FrequencyTypeDto(notfallTypeId, "Notfall", null, true, 1, 0L)),
-            0,
-            2,
-            2,
-            1,
-            Collections.emptyList());
+    de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<FrequencyTypeDto>
+        freqTypesPage =
+            new de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<>(
+                List.of(
+                    new FrequencyTypeDto(befehlTypeId, "Befehl", null, true, 0, 0L),
+                    new FrequencyTypeDto(notfallTypeId, "Notfall", null, true, 1, 0L)),
+                0,
+                2,
+                2,
+                1,
+                Collections.emptyList());
 
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
@@ -2445,8 +2446,8 @@ class MissionPageControllerMvcTest {
             null,
             null);
 
-    de.greluc.krt.profit.basetool.frontend.model.PageResponse<Object> emptyPage =
-        new de.greluc.krt.profit.basetool.frontend.model.PageResponse<>(
+    de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<Object> emptyPage =
+        new de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<>(
             Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
@@ -2501,10 +2502,10 @@ class MissionPageControllerMvcTest {
             de.greluc.krt.profit.basetool.frontend.mission.model.FinanceType.INCOME,
             new java.math.BigDecimal("1234.5"),
             1L);
-    de.greluc.krt.profit.basetool.frontend.model.PageResponse<
+    de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<
             de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceEntryDto>
         financesPage =
-            new de.greluc.krt.profit.basetool.frontend.model.PageResponse<>(
+            new de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<>(
                 List.of(entry), 0, 1, 1, 1, Collections.emptyList());
 
     MissionDto mission =
@@ -2546,8 +2547,8 @@ class MissionPageControllerMvcTest {
             null,
             null);
 
-    de.greluc.krt.profit.basetool.frontend.model.PageResponse<Object> emptyPage =
-        new de.greluc.krt.profit.basetool.frontend.model.PageResponse<>(
+    de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<Object> emptyPage =
+        new de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<>(
             Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
@@ -2618,7 +2619,7 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
-            de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
+            de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference.PAYOUT,
             1L);
 
     de.greluc.krt.profit.basetool.frontend.catalogue.model.JobTypeDto gunner =
@@ -2674,8 +2675,8 @@ class MissionPageControllerMvcTest {
         .thenReturn(mission);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
-    de.greluc.krt.profit.basetool.frontend.model.PageResponse<JobTypeDto> crewJobTypesPage =
-        new de.greluc.krt.profit.basetool.frontend.model.PageResponse<>(
+    de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<JobTypeDto> crewJobTypesPage =
+        new de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<>(
             List.of(
                 new JobTypeDto(jobTypeId, "Gunner", null, "CREW", null, true, false, false, 0L)),
             0,
@@ -3228,7 +3229,7 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.put(
             eq("/api/v1/missions/{id}/party-lead"), any(), eq(Void.class), eq(missionId)))
         .thenThrow(
-            new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+            new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
                 "Conflict", null, 409));
 
     String body = "{\"guestName\":\"Ambiguous\",\"version\":0}";

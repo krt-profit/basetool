@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * How many users still owe Terms-of-Use consent, as {@code GET /api/v1/admin/terms/pending-count}

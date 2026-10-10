@@ -19,9 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.operation.client;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationDto;
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationFinanceSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationForm;
@@ -29,7 +30,6 @@ import de.greluc.krt.profit.basetool.frontend.operation.model.OperationPayoutSta
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationPayoutStatusUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationPayoutSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;

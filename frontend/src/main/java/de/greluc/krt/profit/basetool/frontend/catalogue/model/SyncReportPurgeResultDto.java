@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Frontend mirror of the backend {@code SyncReportPurgeResultDto}, the result of the "delete

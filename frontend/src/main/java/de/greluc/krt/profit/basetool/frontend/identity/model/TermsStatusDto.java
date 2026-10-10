@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Frontend mirror of the backend's Terms-of-Use consent status (REQ-SEC-028).

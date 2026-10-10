@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.shell.web;
 
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Controller;

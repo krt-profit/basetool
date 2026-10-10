@@ -19,22 +19,22 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.FrequencyTypeForm;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.JobTypeDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.JobTypeForm;
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages.CompleteCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
-import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
-import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
-import de.greluc.krt.profit.basetool.frontend.support.CatalogPages.CompleteCatalog;
-import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Comparator;

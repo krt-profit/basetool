@@ -34,10 +34,10 @@ import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendC
 import de.greluc.krt.profit.basetool.frontend.blueprint.web.AdminBlueprintsPageController;
 import de.greluc.krt.profit.basetool.frontend.blueprint.web.AdminDefaultBlueprintsPageController;
 import de.greluc.krt.profit.basetool.frontend.blueprint.web.PersonalInventoryBlueprintsPageController;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.client.PersonalInventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.web.PersonalInventoryPageController;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;

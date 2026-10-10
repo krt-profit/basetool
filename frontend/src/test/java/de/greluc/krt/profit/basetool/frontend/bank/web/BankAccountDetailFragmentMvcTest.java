@@ -33,8 +33,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBalancePointDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingDto;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;

@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Write payload for changing a grant's capability flags (REQ-BANK-009).

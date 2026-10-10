@@ -33,6 +33,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.leadership.client.LeadershipBackendClient;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.AddBereichLeaderRequest;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.AssignSquadronRankRequest;
@@ -50,8 +52,6 @@ import de.greluc.krt.profit.basetool.frontend.orgchart.model.SquadronChartDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;

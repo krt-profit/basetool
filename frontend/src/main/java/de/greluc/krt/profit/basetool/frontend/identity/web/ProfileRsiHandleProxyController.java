@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyRsiHandleRequest;

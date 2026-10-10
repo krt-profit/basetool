@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
-import de.greluc.krt.profit.basetool.frontend.model.LocationReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 
 /**
  * Frontend mirror of one Lager display stack: inventory rows sharing owner, location, quality,

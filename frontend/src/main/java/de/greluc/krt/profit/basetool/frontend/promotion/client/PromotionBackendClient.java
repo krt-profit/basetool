@@ -20,7 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.promotion.client;
 
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.MemberEvaluationDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.MemberEvaluationUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionCategoryDto;
@@ -32,7 +33,6 @@ import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionTopicDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionTopicWriteRequest;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.RankRequirementDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.RankRequirementWriteRequest;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

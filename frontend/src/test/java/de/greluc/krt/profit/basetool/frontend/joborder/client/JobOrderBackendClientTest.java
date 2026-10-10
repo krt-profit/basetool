@@ -37,7 +37,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandove
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderStatusDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;

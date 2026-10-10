@@ -32,7 +32,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
-import de.greluc.krt.profit.basetool.frontend.config.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.AggregatedMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ClaimDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderBlueprintOwnerDto;
@@ -44,12 +43,13 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandove
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderRequiredBlueprintDto;
-import de.greluc.krt.profit.basetool.frontend.model.BlueprintReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.GameItemReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import de.greluc.krt.profit.basetool.frontend.support.QualityTierTestData;
 import java.time.Instant;
@@ -1100,7 +1100,7 @@ class JobOrderItemDetailRenderTest {
   private static de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto
       itemStockGroup(UUID entryId, UUID gameItemId) {
     return new de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto(
-        new de.greluc.krt.profit.basetool.frontend.model.InventoryGameItemReferenceDto(
+        new de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto(
             gameItemId, "Cirrus Optic Scope", "Behring", "WEAPON_ATTACHMENT"),
         3,
         1,
@@ -1163,7 +1163,7 @@ class JobOrderItemDetailRenderTest {
     UUID gameItemId = UUID.randomUUID();
     de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto redacted =
         new de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto(
-            new de.greluc.krt.profit.basetool.frontend.model.InventoryGameItemReferenceDto(
+            new de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto(
                 gameItemId, "Cirrus Optic Scope", "Behring", "WEAPON_ATTACHMENT"),
             3,
             1,

@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgunit.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Body of the backend Logistiker / Einsatzmanager flag patch on an org-unit membership.

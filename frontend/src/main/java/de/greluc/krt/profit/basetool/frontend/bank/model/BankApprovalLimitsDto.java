@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;

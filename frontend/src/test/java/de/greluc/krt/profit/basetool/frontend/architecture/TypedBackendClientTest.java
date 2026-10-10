@@ -29,7 +29,7 @@ import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.frontend.architecture.fixture.MisplacedBackendClient;
 import de.greluc.krt.profit.basetool.frontend.architecture.fixture.RogueBackendController;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -71,7 +71,7 @@ class TypedBackendClientTest {
 
   /** The backend kernel packages, which may call {@link BackendApiClient} directly. */
   private static final Set<String> KERNEL_PACKAGES =
-      Set.of(BASE + ".service", BASE + ".config", BASE + ".websocket");
+      Set.of(BASE + ".kernel.backend", BASE + ".kernel.layout", BASE + ".kernel.security");
 
   /** The typed clients when the rule was introduced; fewer means the selection broke. */
   private static final int CLIENT_FLOOR = 21;

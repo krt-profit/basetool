@@ -22,11 +22,11 @@
                        th:text="#{orgUnit.switcher.label}">Active OrgUnit</label>
                 <select id="squadron-switcher-select" name="orgUnitId" class="squadron-switcher-select">
                     <option value=""
-                            sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                            sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
                             th:selected="${activeSquadronId == null}"
                             th:text="#{orgUnit.switcher.all}">All org units</option>
                     <option value=""
-                            sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                            sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
                             th:selected="${activeSquadronId == null}"
                             th:text="#{orgUnit.switcher.allMine}">All my org units</option>
                     <option th:each="ou : ${availableOrgUnits}"
@@ -48,7 +48,7 @@
         <div class="nav-list" id="nav-list">
             <th:block sec:authorize="isAuthenticated()">
                 <div class="nav-admin-bar" hidden
-                     sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                     sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                     <button type="button" class="nav-admin-back" data-testid="nav-admin-back">
                         <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"></use></svg>
                         <span th:text="#{nav.admin.back}">Hauptmenü</span>
@@ -92,7 +92,7 @@
                             <a th:href="@{/hangar}" class="nav-link" data-testid="nav-hangar" th:text="#{nav.hangar}">Hangar</a>
                             <a th:href="@{/inventory}" class="nav-link" th:text="#{nav.inventory}">Lager</a>
                             <a th:href="@{/materialboerse}" class="nav-link" data-testid="nav-materialboerse"
-                               sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER)"
+                               sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).KRT_MEMBER)"
                                th:text="#{nav.materialboerse}">Materialbörse</a>
                             <a th:href="@{/refinery-orders}" class="nav-link" data-testid="nav-refinery" th:text="#{nav.refinery}">Raffinerie</a>
                             <a th:href="@{/orders}" class="nav-link" th:if="${canViewJobOrders}" data-testid="nav-orders" th:text="#{nav.orders}">Aufträge</a>
@@ -126,8 +126,8 @@
                         </button>
                         <div class="nav-group-links" id="nav-group-organisation">
                             <a th:href="@{/org-chart}" class="nav-link" data-testid="nav-org-chart" th:text="#{nav.orgChart}">Organigramm</a>
-                            <a th:href="@{/organisation/leitung}" class="nav-link" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)" data-testid="nav-leitung" th:text="#{nav.leitung}">Leitung</a>
-                            <a th:href="@{/org-unit-bank}" class="nav-link" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER)" data-testid="nav-org-unit-bank" th:text="#{nav.bank.myOrgUnit}">Org-Einheits-Bank</a>
+                            <a th:href="@{/organisation/leitung}" class="nav-link" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER)" data-testid="nav-leitung" th:text="#{nav.leitung}">Leitung</a>
+                            <a th:href="@{/org-unit-bank}" class="nav-link" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).MISSION_MANAGER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).KRT_MEMBER)" data-testid="nav-org-unit-bank" th:text="#{nav.bank.myOrgUnit}">Org-Einheits-Bank</a>
                         </div>
                     </section>
                     <section class="nav-group" data-group-key="promotion" data-nav-icon="user-plus"
@@ -141,13 +141,13 @@
                         <div class="nav-group-links" id="nav-group-promotion">
                             <a th:href="@{/promotion/overview}" class="nav-link" th:text="#{nav.promotion.overview}">Beförderungssystem</a>
                             <a th:href="@{/promotion/my-evaluations}" class="nav-link" th:text="#{nav.promotion.my_evaluations}">Meine Bewertungen</a>
-                            <a th:href="@{/promotion/manage}" class="nav-link" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)" th:text="#{nav.promotion.manage}">Bewertungsverwaltung</a>
-                            <a th:href="@{/promotion/admin/topics}" class="nav-link" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)" th:text="#{nav.promotion.admin_topics}">Themenbereiche</a>
-                            <a th:href="@{/promotion/admin/rank-requirements}" class="nav-link" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)" th:text="#{nav.promotion.admin_ranks}">Rangvoraussetzungen</a>
+                            <a th:href="@{/promotion/manage}" class="nav-link" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER)" th:text="#{nav.promotion.manage}">Bewertungsverwaltung</a>
+                            <a th:href="@{/promotion/admin/topics}" class="nav-link" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER)" th:text="#{nav.promotion.admin_topics}">Themenbereiche</a>
+                            <a th:href="@{/promotion/admin/rank-requirements}" class="nav-link" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER)" th:text="#{nav.promotion.admin_ranks}">Rangvoraussetzungen</a>
                         </div>
                     </section>
                     <section class="nav-group" data-group-key="bank" data-nav-icon="bank-in"
-                             sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_EMPLOYEE)"
+                             sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).BANK_EMPLOYEE)"
                              th:data-nav-group="#{nav.section.bank}">
                         <button type="button" class="nav-group-head" aria-expanded="true" aria-controls="nav-group-bank">
                             <svg class="krt-icon nav-group-icon" aria-hidden="true"><use href="#krt-icon-bank-in"></use></svg>
@@ -158,7 +158,7 @@
                         <div class="nav-group-links" id="nav-group-bank">
                             <a th:href="@{/bank}" class="nav-link" data-testid="nav-bank" th:text="#{nav.bank.dashboard}">Bank-Dashboard</a>
                             <a th:href="@{/bank/manage}" class="nav-link" data-testid="nav-bank-manage" th:text="#{nav.bank.manage}">Bankverwaltung</a>
-                            <a th:href="@{/bank/grants}" class="nav-link" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)" data-testid="nav-bank-grants" th:text="#{nav.bank.grants}">Berechtigungen</a>
+                            <a th:href="@{/bank/grants}" class="nav-link" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).BANK_MANAGEMENT)" data-testid="nav-bank-grants" th:text="#{nav.bank.grants}">Berechtigungen</a>
                             <a th:href="@{/bank/requests}" class="nav-link" data-testid="nav-bank-requests" th:text="#{nav.bank.requests}">Anträge</a>
                         </div>
                     </section>
@@ -191,7 +191,7 @@
                     </section>
                 </div>
                 <div class="nav-mode nav-mode-admin" data-nav-mode="admin"
-                     sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                     sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                     <section class="nav-group" data-group-key="admin-members" data-nav-icon="users"
                              th:data-nav-group="|#{nav.admin.crumb} · #{nav.admin.group.members}|">
                         <button type="button" class="nav-group-head" aria-expanded="true" aria-controls="nav-group-admin-members">
@@ -294,7 +294,7 @@
         </div>
         <div class="nav-foot">
             <button type="button" class="nav-admin-entry" data-testid="nav-admin-toggle"
-                    sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                    sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                 <svg class="krt-icon nav-admin-entry-icon" aria-hidden="true"><use href="#krt-icon-gear"></use></svg>
                 <span class="nav-admin-entry-label" th:text="#{nav.administration}">Administration</span>
                 <svg class="krt-icon nav-admin-entry-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"></use></svg>
@@ -317,7 +317,7 @@
                     <span class="nav-user-text">
                         <span class="nav-user-name" sec:authentication="name">greluc</span>
                         <span class="nav-user-meta">
-                            <th:block th:if="${activeOrgUnit != null}"><span th:text="${activeOrgUnit.orgUnitName()}">IRIDIUM</span> · </th:block><span sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:text="#{nav.user.role.admin}">Admin</span><span sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN) and hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)" th:text="#{nav.user.role.officer}">Offizier</span><span sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)" th:text="#{nav.user.role.member}">Mitglied</span>
+                            <th:block th:if="${activeOrgUnit != null}"><span th:text="${activeOrgUnit.orgUnitName()}">IRIDIUM</span> · </th:block><span sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:text="#{nav.user.role.admin}">Admin</span><span sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN) and hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER)" th:text="#{nav.user.role.officer}">Offizier</span><span sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER)" th:text="#{nav.user.role.member}">Mitglied</span>
                         </span>
                     </span>
                     <svg class="krt-icon nav-user-chevron" aria-hidden="true"><use href="#krt-icon-chevron-up"></use></svg>

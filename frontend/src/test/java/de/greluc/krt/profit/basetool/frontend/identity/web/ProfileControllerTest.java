@@ -34,10 +34,10 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.ProfileDescriptionF
 import de.greluc.krt.profit.basetool.frontend.identity.model.ProfilePayoutPreferenceForm;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDescriptionRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
-import de.greluc.krt.profit.basetool.frontend.model.PayoutPreference;
-import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;

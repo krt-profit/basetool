@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Frontend mirror of the backend {@code JobOrderRequiredBlueprintDto}: one required variant family

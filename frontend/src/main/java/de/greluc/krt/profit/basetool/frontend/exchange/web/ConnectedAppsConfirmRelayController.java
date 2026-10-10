@@ -19,13 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.exchange.client.ExchangeBackendClient;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ConnectedAppMassChangeRequestDto;
-import de.greluc.krt.profit.basetool.frontend.model.HandoffKind;
-import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
-import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.IngestHandoffService;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.HandoffKind;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
 import jakarta.servlet.http.HttpSession;
 import java.time.Clock;
 import java.time.Duration;

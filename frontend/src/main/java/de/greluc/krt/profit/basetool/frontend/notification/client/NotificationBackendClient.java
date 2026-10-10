@@ -19,13 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.notification.client;
 
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationBulkResultDto;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationCountResponse;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationDto;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationRuleDto;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationRuleWriteRequest;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

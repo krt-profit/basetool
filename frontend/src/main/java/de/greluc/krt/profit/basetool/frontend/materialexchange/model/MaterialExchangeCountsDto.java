@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.materialexchange.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Frontend view of the Materialbörse tab counts (all active offers / the caller's own),

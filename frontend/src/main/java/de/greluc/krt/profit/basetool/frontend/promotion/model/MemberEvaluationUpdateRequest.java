@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.promotion.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Body of the backend upsert of a member's evaluation in one category.

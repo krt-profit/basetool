@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.web;
 
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.identity.model.PendingCountDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.TermsAcceptanceStatusDto;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;

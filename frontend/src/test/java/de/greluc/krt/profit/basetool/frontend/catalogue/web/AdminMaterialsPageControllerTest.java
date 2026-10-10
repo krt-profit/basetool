@@ -30,11 +30,11 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendC
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialCreateAjaxRequest;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialUpdateAjaxRequest;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
-import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;

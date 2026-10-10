@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.settings.client;
 
-import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import de.greluc.krt.profit.basetool.frontend.settings.client.SettingsBackendClient.SystemSetting;
 import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingUpdateDto;
 import org.junit.jupiter.api.AfterEach;

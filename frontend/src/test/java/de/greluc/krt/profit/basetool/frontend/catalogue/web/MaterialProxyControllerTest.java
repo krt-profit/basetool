@@ -27,7 +27,7 @@ import static org.mockito.Mockito.*;
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialSellingTerminalDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ProfitCalculationDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;

@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Frontend mirror of the caller's booking capabilities on one bank account (REQ-BANK-009); decides

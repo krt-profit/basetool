@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

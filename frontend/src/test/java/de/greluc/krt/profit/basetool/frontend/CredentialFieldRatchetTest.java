@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
 class CredentialFieldRatchetTest {
 
   private static final Set<String> REVIEWED_REDACTING_TYPES =
-      Set.of("de.greluc.krt.profit.basetool.frontend.config.MonitoringScrapeProperties");
+      Set.of("de.greluc.krt.profit.basetool.frontend.kernel.security.MonitoringScrapeProperties");
 
   @Test
   void everyCredentialBearingTypeIsReviewedAndRedacts() {

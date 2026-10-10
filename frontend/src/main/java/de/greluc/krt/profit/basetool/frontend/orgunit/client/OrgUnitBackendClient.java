@@ -19,7 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgunit.client;
 
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.BereichCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.BereichDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipFlagsPatchRequest;
@@ -34,7 +35,6 @@ import de.greluc.krt.profit.basetool.frontend.orgunit.model.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SpecialCommandProfitEligibleToggleRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronProfitEligibleToggleRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronPromotionToggleRequest;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

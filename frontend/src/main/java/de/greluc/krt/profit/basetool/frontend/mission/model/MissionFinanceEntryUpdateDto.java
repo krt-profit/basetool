@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.math.BigDecimal;
 
 /** Data transfer record carrying Mission Finance Entry Update payload. */

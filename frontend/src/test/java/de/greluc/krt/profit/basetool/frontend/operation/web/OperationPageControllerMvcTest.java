@@ -43,20 +43,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.frontend.mission.model.FinanceType;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationDto;
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationFinanceSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationMissionFinanceDto;
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationPayoutDto;
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationPayoutStatusDto;
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationPayoutSummaryDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;

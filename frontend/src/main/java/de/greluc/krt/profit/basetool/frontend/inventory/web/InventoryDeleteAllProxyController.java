@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.withBackendStatus;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.withBackendStatus;
 
 import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
-import de.greluc.krt.profit.basetool.frontend.support.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;

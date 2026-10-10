@@ -19,21 +19,21 @@
 
 package de.greluc.krt.profit.basetool.frontend.notification.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.propagateBackendError;
 
-import de.greluc.krt.profit.basetool.frontend.config.TermsAcceptanceGateFilter;
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
-import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendSideChannels;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.observability.MetricNames;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.TermsAcceptanceGateFilter;
 import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationBulkResultDto;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationCountResponse;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationDto;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationPageSliceDto;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationViewDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.service.BackendSideChannels;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;

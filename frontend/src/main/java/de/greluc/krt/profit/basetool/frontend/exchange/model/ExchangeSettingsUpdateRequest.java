@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Turns the global exchange switch on or off (REQ-XCH-003).

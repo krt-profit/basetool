@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgunit.web;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronProfitEligibleToggleRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronPromotionToggleRequest;
-import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
-import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
-import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;

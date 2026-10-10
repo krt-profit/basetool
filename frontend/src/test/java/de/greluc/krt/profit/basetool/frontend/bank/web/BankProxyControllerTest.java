@@ -41,9 +41,9 @@ import de.greluc.krt.profit.basetool.frontend.bank.model.RenameBankAccountReques
 import de.greluc.krt.profit.basetool.frontend.bank.model.ReverseBankTransactionRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.UpdateBankGrantRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.UpdateBankHolderRequest;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.PickerSearch;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.leadership.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.AddBereichLeaderRequest;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.AddOlMemberRequest;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.AssignSquadronRankRequest;
@@ -33,7 +34,6 @@ import de.greluc.krt.profit.basetool.frontend.leadership.model.UpdateKommandoGro
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

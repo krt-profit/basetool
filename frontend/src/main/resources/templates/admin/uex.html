@@ -87,7 +87,7 @@
                                 &middot; <strong th:text="${cityNode.terminals.size()}">0</strong> <span th:text="#{admin.uex.summary.terminals}">Terminals</span>
                             </span>
                         </span>
-                        <div class="uex-parent-controls" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                        <div class="uex-parent-controls" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                             <form method="post" th:action="@{/admin/uex-data/cities/{id}/loading-dock(id=${cityNode.city.id})}" class="uex-button-form m-0">
                                 <input type="hidden" name="action" value="uex">
                                 <button type="submit" class="btn" th:classappend="${!cityNode.city.hasLoadingDockOverridden} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.uex}">UEX</button>
@@ -148,7 +148,7 @@
                                 &middot; <strong th:text="${stationNode.terminals.size()}">0</strong> <span th:text="#{admin.uex.summary.terminals}">Terminals</span>
                             </span>
                         </span>
-                        <div class="uex-parent-controls" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                        <div class="uex-parent-controls" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                             <form method="post" th:action="@{/admin/uex-data/space-stations/{id}/loading-dock(id=${stationNode.station.id})}" class="uex-button-form m-0">
                                 <input type="hidden" name="action" value="uex">
                                 <button type="submit" class="btn" th:classappend="${!stationNode.station.hasLoadingDockOverridden} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.uex}">UEX</button>
@@ -209,7 +209,7 @@
                                 <td><span class="cell-title" th:text="${outpost.name}">Name</span></td>
                                 <td th:attr="data-label=#{admin.uex_locations.planet}" th:text="${outpost.planetName}">Planet</td>
                                 <td th:attr="data-label=#{admin.uex.flag.column.loadingDock}">
-                                    <div class="flex-gap-xs" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                                    <div class="flex-gap-xs" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                                         <form method="post" th:action="@{/admin/uex-data/outposts/{id}/loading-dock(id=${outpost.id})}" class="m-0">
                                             <input type="hidden" name="action" value="uex">
                                             <button type="submit" class="btn" th:classappend="${!outpost.hasLoadingDockOverridden} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.uex}">UEX</button>
@@ -250,7 +250,7 @@
                                 <td><span class="cell-title" th:text="${poi.name}">Name</span></td>
                                 <td th:attr="data-label=#{admin.uex_locations.planet}" th:text="${poi.planetName}">Planet</td>
                                 <td th:attr="data-label=#{admin.uex.flag.column.loadingDock}">
-                                    <div class="flex-gap-xs" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                                    <div class="flex-gap-xs" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                                         <form method="post" th:action="@{/admin/uex-data/pois/{id}/loading-dock(id=${poi.id})}" class="m-0">
                                             <input type="hidden" name="action" value="uex">
                                             <button type="submit" class="btn" th:classappend="${!poi.hasLoadingDockOverridden} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.uex}">UEX</button>

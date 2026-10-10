@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.withBackendStatus;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.withBackendStatus;
 
 import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.bank.model.CancelBankBookingRequest;
@@ -27,7 +27,7 @@ import de.greluc.krt.profit.basetool.frontend.bank.model.CreateBankBookingReques
 import de.greluc.krt.profit.basetool.frontend.bank.model.OrgUnitBalanceTargetRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.SetBankApprovalLimitRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.UpdateBankBookingRequest;
-import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.RelayParams;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;

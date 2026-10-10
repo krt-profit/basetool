@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.hangar.model;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ShipTypeDto;
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.util.List;
 
 /** Data transfer record carrying Squadron Ship Overview payload. */

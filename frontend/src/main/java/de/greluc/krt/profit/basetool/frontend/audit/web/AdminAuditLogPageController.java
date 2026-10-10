@@ -20,16 +20,16 @@
 package de.greluc.krt.profit.basetool.frontend.audit.web;
 
 import de.greluc.krt.profit.basetool.frontend.audit.client.AuditBackendClient;
+import de.greluc.krt.profit.basetool.frontend.audit.model.AuditDomains;
 import de.greluc.krt.profit.basetool.frontend.audit.model.AuditEventDto;
 import de.greluc.krt.profit.basetool.frontend.audit.model.AuditRowView;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankAuditEventDto;
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientDto;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.support.AuditDomains;
-import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
-import de.greluc.krt.profit.basetool.frontend.support.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.RelayParams;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;

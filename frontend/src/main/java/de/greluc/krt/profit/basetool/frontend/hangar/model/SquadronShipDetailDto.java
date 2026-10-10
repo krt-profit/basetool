@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.hangar.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /** Data transfer record carrying Squadron Ship Detail payload. */
 @DtoMirror

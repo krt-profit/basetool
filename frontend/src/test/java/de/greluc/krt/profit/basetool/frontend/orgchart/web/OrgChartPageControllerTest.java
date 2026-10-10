@@ -31,14 +31,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.AreaLeadershipDto;
 import de.greluc.krt.profit.basetool.frontend.orgchart.client.OrgChartBackendClient;
 import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartDto;
 import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartPositionCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartPositionDto;
 import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartPositionUpdateRequest;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;

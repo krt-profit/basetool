@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Result of a bank-staff direct withdrawal or transfer; exactly one field is set (REQ-BANK-047).

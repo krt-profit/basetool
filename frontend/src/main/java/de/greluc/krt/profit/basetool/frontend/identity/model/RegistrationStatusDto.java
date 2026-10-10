@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * The calling user's own approval status, read once per session to route a {@code PENDING}/{@code

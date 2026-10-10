@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.materialexchange.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Outbound mirror of the backend {@code MaterialExchangeOfferUpdateRequest}: the editable quantity

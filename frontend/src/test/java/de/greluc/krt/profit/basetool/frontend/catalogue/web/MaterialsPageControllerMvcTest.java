@@ -35,9 +35,9 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialMatrixItem
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialPriceOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.TerminalDto;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.math.BigDecimal;
 import java.time.Duration;

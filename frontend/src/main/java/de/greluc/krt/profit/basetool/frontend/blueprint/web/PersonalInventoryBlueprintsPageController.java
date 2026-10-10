@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintCraftabilityDto;
@@ -30,12 +30,12 @@ import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintB
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintDto;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintRecipeDto;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintUpdateRequest;
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.StringNormalization;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
-import de.greluc.krt.profit.basetool.frontend.support.StringNormalization;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
 import java.time.Instant;
 import java.util.ArrayList;

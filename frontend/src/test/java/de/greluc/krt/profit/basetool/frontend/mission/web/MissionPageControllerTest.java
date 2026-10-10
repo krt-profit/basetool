@@ -26,14 +26,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionForm;
 import de.greluc.krt.profit.basetool.frontend.mission.model.ParticipantForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
-import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
-import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
-import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus;
 import java.util.Collections;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -171,7 +171,7 @@ class MissionPageControllerTest {
 
     when(backendApiClient.post(anyString(), any(), eq(Void.class), any(Object[].class)))
         .thenThrow(
-            new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+            new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
                 "ambiguous", null, 409));
 
     String view =
@@ -268,7 +268,7 @@ class MissionPageControllerTest {
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class), any(Object[].class)))
         .thenThrow(
-            new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+            new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
                 "conflict", null, 409));
 
     String view = controller.setPartyLead(id, null, "Shared Alias", 0L, redirectAttributes);
@@ -433,7 +433,7 @@ class MissionPageControllerTest {
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
     when(backendApiClient.get(uriCaptor.capture(), anyTypeRef()))
         .thenReturn(
-            new de.greluc.krt.profit.basetool.frontend.model.PageResponse<>(
+            new de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<>(
                 Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList()));
 
     controller.listMissions(null, null, null, null, true, null, null, null, null, model, user);
@@ -462,7 +462,7 @@ class MissionPageControllerTest {
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
     when(backendApiClient.get(uriCaptor.capture(), anyTypeRef()))
         .thenReturn(
-            new de.greluc.krt.profit.basetool.frontend.model.PageResponse<>(
+            new de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<>(
                 Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList()));
 
     controller.listMissions(
@@ -488,7 +488,7 @@ class MissionPageControllerTest {
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
     when(backendApiClient.get(uriCaptor.capture(), anyTypeRef()))
         .thenReturn(
-            new de.greluc.krt.profit.basetool.frontend.model.PageResponse<>(
+            new de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<>(
                 Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList()));
 
     controller.listMissions(
@@ -617,7 +617,7 @@ class MissionPageControllerTest {
         .thenReturn(mission);
     when(backendApiClient.get(eq("/api/v1/missions/" + id + "/units?size=1000"), anyTypeRef()))
         .thenReturn(
-            new de.greluc.krt.profit.basetool.frontend.model.PageResponse<>(
+            new de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<>(
                 Collections.emptyList(), 0, 10, 0, 0, Collections.emptyList()));
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -701,7 +701,7 @@ class MissionPageControllerTest {
     when(backendApiClient.get(
             eq("/api/v1/missions/{id}/finance-entries?size={size}"), anyTypeRef(), eq(id), eq(200)))
         .thenReturn(
-            new de.greluc.krt.profit.basetool.frontend.model.PageResponse<>(
+            new de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<>(
                 Collections.emptyList(), 0, 200, 0, 0, Collections.emptyList()));
     when(backendApiClient.get(eq("/api/v1/refinery-orders/mission/{id}"), anyTypeRef(), eq(id)))
         .thenReturn(Collections.emptyList());

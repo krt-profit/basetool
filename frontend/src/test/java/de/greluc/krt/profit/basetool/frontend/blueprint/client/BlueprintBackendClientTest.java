@@ -26,7 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintImportRes
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.DefaultBlueprintCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintBatchCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintUpdateRequest;
-import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;

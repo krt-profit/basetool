@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.exchange.client.ExchangeBackendClient;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoRequest;
@@ -27,7 +27,7 @@ import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientCreat
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientStatusRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeSettingsUpdateRequest;
-import de.greluc.krt.profit.basetool.frontend.support.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

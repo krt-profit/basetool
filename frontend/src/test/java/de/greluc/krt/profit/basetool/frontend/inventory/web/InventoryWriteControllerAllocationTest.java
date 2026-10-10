@@ -29,8 +29,8 @@ import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendC
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryAllocationDimension;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryAllocationWriteDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

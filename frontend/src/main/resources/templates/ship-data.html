@@ -12,7 +12,7 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+    <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
         <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{nav.hangar_data}, actions=~{::ship-data-actions})}">
             <th:block th:ref="ship-data-actions">
                 <th:block th:replace="~{fragments/components :: overflowMenu(id='ship-data-menu', items=~{::ship-data-menu-items})}">
@@ -25,7 +25,7 @@
             </th:block>
         </th:block>
     </th:block>
-    <th:block sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+    <th:block sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
         <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{nav.hangar_data})}"></th:block>
     </th:block>
 
@@ -61,7 +61,7 @@
                         <tr>
                             <th th:text="#{ship.shiptype.name}">Name</th>
                             <th th:text="#{ship.shiptype.description}">Beschreibung</th>
-                            <th class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:text="#{general.action}">Aktion</th>
+                            <th class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:text="#{general.action}">Aktion</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -71,7 +71,7 @@
                                 <span class="cell-sub" th:if="${st.manufacturer != null}" th:text="${st.manufacturer.abbreviation}">Hersteller</span>
                             </td>
                             <td th:attr="data-label=#{ship.shiptype.description}" th:text="${st.description}">Desc</td>
-                            <td class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                            <td class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                                 <form th:action="@{/ship-data/ship-types/{id}/visibility(id=${st.id})}" method="post"
                                       class="js-visibility-toggle m-0"
                                       th:data-label-show="#{info.show}" th:data-label-hide="#{info.hide}">
@@ -115,7 +115,7 @@
                         <tr>
                             <th th:text="#{ship.manufacturer.name}">Name</th>
                             <th th:text="#{ship.manufacturer.description}">Beschreibung</th>
-                            <th class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:text="#{general.action}">Aktion</th>
+                            <th class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:text="#{general.action}">Aktion</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -125,7 +125,7 @@
                                 <span class="cell-sub" th:text="${m.abbreviation}">Kürzel</span>
                             </td>
                             <td th:attr="data-label=#{ship.manufacturer.description}" th:text="${m.description}">Desc</td>
-                            <td class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                            <td class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                                 <form th:action="@{/ship-data/manufacturers/{id}/visibility(id=${m.id})}" method="post"
                                       class="js-visibility-toggle m-0"
                                       th:data-label-show="#{info.show}" th:data-label-hide="#{info.hide}">
@@ -144,7 +144,7 @@
     </section>
 </main>
 
-<div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+<div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='reset-fitted-confirm-modal', titleKey='hangar.ship.reset_fitted.confirm.title', variant='krt-modal--danger', closeTrigger='ship-close-modal', body=~{::reset-fitted-confirm-modal-body})}">
         <th:block th:ref="reset-fitted-confirm-modal-body">
             <div class="krt-modal-body">

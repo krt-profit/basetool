@@ -21,13 +21,13 @@ package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.QualityTierDto;
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandGroupDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandRowDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.service.QualityTierCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;

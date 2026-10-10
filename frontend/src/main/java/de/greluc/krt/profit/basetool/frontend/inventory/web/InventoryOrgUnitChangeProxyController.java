@@ -19,14 +19,14 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.propagateBackendError;
 
 import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.BulkOrgUnitChangeRequest;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.BulkOrgUnitChangeResultDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemOrgUnitChangeDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;

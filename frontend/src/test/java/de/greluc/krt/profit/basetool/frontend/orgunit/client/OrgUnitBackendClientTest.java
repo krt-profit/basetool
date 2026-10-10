@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.orgunit.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.BereichCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.BereichDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipFlagsPatchRequest;
@@ -35,7 +36,6 @@ import de.greluc.krt.profit.basetool.frontend.orgunit.model.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SpecialCommandProfitEligibleToggleRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronProfitEligibleToggleRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronPromotionToggleRequest;
-import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;

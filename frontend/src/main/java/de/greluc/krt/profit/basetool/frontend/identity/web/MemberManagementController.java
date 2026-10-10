@@ -19,26 +19,26 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.propagateBackendError;
 
 import de.greluc.krt.profit.basetool.frontend.bank.model.ConsolidateAccountRequest;
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MemberEditForm;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserAttributesUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserRsiHandleResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserSyncResultDto;
-import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorLogging;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipDeltaResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.support.Roles;
-import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -437,7 +437,7 @@ public class MemberManagementController {
 
   /**
    * Logs a backend AJAX failure and relays it as {@code application/problem+json} via {@link
-   * de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses}.
+   * de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses}.
    *
    * @param logMessage context for the warn log line
    * @param e the backend service exception carrying the relayed status, problem code and detail

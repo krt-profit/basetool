@@ -34,8 +34,8 @@ import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintProductDt
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintBatchCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintBatchResultDto;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintRecipeDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;

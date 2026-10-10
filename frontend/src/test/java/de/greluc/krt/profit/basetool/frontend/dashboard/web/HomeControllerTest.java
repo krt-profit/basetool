@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.frontend.dashboard.client.DashboardBackendClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import jakarta.servlet.http.HttpSession;
 import java.util.Collections;
 import org.junit.jupiter.api.Test;

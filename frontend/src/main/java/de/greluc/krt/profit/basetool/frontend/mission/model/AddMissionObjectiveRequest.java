@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Write payload for appending a goal to a mission.

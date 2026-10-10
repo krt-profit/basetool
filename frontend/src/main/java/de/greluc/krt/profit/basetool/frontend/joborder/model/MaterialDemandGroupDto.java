@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
-import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import java.util.List;
 
 /**

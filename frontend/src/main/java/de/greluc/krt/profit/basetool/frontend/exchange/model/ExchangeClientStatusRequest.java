@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Suspends or activates an exchange client (REQ-XCH-003).

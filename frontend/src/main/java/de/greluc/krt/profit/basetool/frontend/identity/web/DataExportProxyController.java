@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.withBackendStatus;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.withBackendStatus;
 
-import de.greluc.krt.profit.basetool.frontend.config.AppHttpProperties;
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
-import de.greluc.krt.profit.basetool.frontend.support.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.AppHttpProperties;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;

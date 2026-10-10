@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Create or update payload of a quality tier, relayed to {@code /api/v1/admin/quality-tiers}

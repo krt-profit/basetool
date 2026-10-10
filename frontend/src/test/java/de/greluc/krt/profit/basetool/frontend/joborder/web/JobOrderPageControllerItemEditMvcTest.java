@@ -38,12 +38,12 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderItemR
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverDto;
-import de.greluc.krt.profit.basetool.frontend.model.BlueprintReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.GameItemReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;

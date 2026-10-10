@@ -23,8 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.io.IOException;
 import java.lang.reflect.RecordComponent;
 import java.nio.file.Files;

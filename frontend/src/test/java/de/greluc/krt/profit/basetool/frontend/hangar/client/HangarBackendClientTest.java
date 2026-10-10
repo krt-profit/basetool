@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.FleetviewImportResponseDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SetHomeLocationRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipRequestDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;

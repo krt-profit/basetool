@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.audit.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.withBackendStatus;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.withBackendStatus;
 
 import de.greluc.krt.profit.basetool.frontend.audit.client.AuditBackendClient;
-import de.greluc.krt.profit.basetool.frontend.support.AuditDomains;
+import de.greluc.krt.profit.basetool.frontend.audit.model.AuditDomains;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;

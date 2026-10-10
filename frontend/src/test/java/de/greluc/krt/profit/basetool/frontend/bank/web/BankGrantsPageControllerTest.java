@@ -37,7 +37,7 @@ import de.greluc.krt.profit.basetool.frontend.bank.model.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankApprovalLimitsDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankCapabilitiesDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankGrantDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;

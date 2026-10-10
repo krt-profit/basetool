@@ -27,10 +27,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
+import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus;
-import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncTopicClass;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;

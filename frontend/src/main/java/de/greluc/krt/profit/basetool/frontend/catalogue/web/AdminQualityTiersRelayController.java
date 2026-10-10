@@ -19,15 +19,15 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.QualityTierDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.QualityTierWriteDto;
-import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
-import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
-import de.greluc.krt.profit.basetool.frontend.support.Roles;
-import de.greluc.krt.profit.basetool.frontend.support.StringNormalization;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.StringNormalization;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

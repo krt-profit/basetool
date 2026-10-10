@@ -19,13 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.web;
 
-import de.greluc.krt.profit.basetool.frontend.config.GrafanaLinkProperties;
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.exchange.client.ExchangeBackendClient;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoRunDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientUsageDto;
-import de.greluc.krt.profit.basetool.frontend.support.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

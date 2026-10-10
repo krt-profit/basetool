@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
-import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationDto;
 import java.time.Instant;
 import java.util.List;

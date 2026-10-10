@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.personalinventory.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Outbound write DTO for creating a personal inventory entry. Validation is enforced on the

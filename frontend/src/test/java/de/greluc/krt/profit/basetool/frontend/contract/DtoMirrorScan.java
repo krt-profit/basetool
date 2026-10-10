@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.contract;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;

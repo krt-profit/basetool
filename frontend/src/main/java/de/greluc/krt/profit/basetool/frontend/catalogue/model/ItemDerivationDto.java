@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.BlueprintReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.util.List;
 
 /**

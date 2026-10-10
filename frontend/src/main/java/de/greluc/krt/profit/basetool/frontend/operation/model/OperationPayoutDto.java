@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.operation.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
-import de.greluc.krt.profit.basetool.frontend.model.PayoutPreference;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference;
 import java.math.BigDecimal;
 import java.time.Instant;
 

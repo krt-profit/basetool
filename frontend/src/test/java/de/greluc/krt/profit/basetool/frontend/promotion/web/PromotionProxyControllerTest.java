@@ -29,6 +29,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.promotion.client.PromotionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.MemberEvaluationDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.MemberEvaluationUpdateRequest;
@@ -40,7 +41,6 @@ import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionTopicDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionTopicWriteRequest;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.RankRequirementDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.RankRequirementWriteRequest;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

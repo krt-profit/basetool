@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintImportApplyRequest;
@@ -30,13 +30,13 @@ import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintB
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintBulkDeleteResultDto;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintDto;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintUpdateRequest;
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
-import de.greluc.krt.profit.basetool.frontend.support.Roles;
-import de.greluc.krt.profit.basetool.frontend.support.StringNormalization;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.RelayParams;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.StringNormalization;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;

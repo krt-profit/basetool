@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.TerminalDto;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import java.time.Duration;
 import java.time.Instant;
 import org.jetbrains.annotations.Contract;

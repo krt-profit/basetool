@@ -30,10 +30,10 @@
         </div>
         <div class="page-actions">
             <button th:if="${(isLogistician or requesterView) and !isItemOrder}" type="button" class="btn btn-ghost" data-trigger="open-modal-display" data-modal-id="edit-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{orders.detail.edit}">Bearbeiten</span></button>
-            <a sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)"
+            <a sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN)"
                th:if="${isItemOrder and (order.itemHandovers == null or order.itemHandovers.isEmpty())}"
                th:href="@{/orders/{id}/items/edit(id=${order.id})}" class="btn btn-ghost"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{orders.detail.edit.items}">Items bearbeiten</span></a>
-            <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+            <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                 <th:block th:replace="~{fragments/components :: overflowMenu(id='order-menu', items=~{::order-menu-items})}">
                     <th:block th:ref="order-menu-items">
                         <form id="delete-order-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/delete(id=${order.id})}" method="post" class="m-0">
@@ -98,7 +98,7 @@
                 <span class="annotation-text" th:text="${order.comment}">Kommentar</span>
             </div>
 
-            <div class="od-status-row" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)">
+            <div class="od-status-row" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN)">
                 <label class="od-status-row-label" for="status-select" th:text="#{orders.index.status}">Status</label>
                 <select id="status-select"
                         name="status"
@@ -532,7 +532,7 @@
                         data-trigger="oa-add-me" th:data-user-id="${currentUserId}"
                         th:text="#{orders.detail.assignees.addMe}">Mich eintragen</button>
 
-                <div class="cluster gap-2 od-assignee-add" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)">
+                <div class="cluster gap-2 od-assignee-add" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN)">
                     <select class="od-assignee-select" id="assignee-add-select" data-krt-combobox="remote-users" th:aria-label="#{orders.detail.assignees.addUser}">
                         <option value="" disabled selected th:text="#{orders.detail.assignees.selectUser}">-- Nutzer wählen --</option>
                     </select>
@@ -669,7 +669,7 @@
         <section th:if="${order.type != 'ITEM'}" id="pane-handovers" class="tab-pane" role="tabpanel" aria-labelledby="tab-handovers">
         <div id="order-handovers-results" th:unless="${requesterView}"><th:block th:fragment="materialHandoverSection">
         <span hidden data-od-tab-count="handovers" th:text="${order.handovers != null ? order.handovers.size() : 0}">0</span>
-        <div class="od-pane-actions" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+        <div class="od-pane-actions" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
             <button type="button" class="btn btn--cta" data-testid="order-handover-open" data-trigger="od-open-handover"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clipboard-check"/></svg> <span th:text="#{orders.detail.handover.record}">Übergabe erfassen</span></button>
             <a th:href="@{/orders/{id}/material-collection(id=${order.id})}" class="btn btn-ghost"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-list"/></svg> <span th:text="#{orders.detail.materialCollection}">Materialsammelübersicht</span></a>
         </div>
@@ -683,7 +683,7 @@
                     <th th:text="#{orders.detail.handover.recipient}">Empfänger</th>
                     <th th:text="#{orders.detail.handover.squadron}">Staffel</th>
                     <th th:text="#{orders.detail.handover.items}">Materialien</th>
-                    <th class="cell-actions" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"><span class="visually-hidden" th:text="#{general.actions}">Aktionen</span></th>
+                    <th class="cell-actions" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"><span class="visually-hidden" th:text="#{general.actions}">Aktionen</span></th>
                 </tr>
                 </thead>
                 <tbody>
@@ -703,7 +703,7 @@
                             </li>
                         </ul>
                     </td>
-                    <td class="cell-actions" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                    <td class="cell-actions" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                         <button type="button"
                                 class="btn btn-ghost btn-icon"
                                 th:data-order-id="${order.id}"
@@ -723,12 +723,12 @@
         <section th:if="${order.type == 'ITEM'}" id="pane-item-handovers" class="tab-pane" role="tabpanel" aria-labelledby="tab-item-handovers">
         <div id="order-item-handovers-results" th:unless="${requesterView}"><th:block th:fragment="itemHandoverSection">
         <span hidden data-od-tab-count="item-handovers" th:text="${order.itemHandovers != null ? order.itemHandovers.size() : 0}">0</span>
-        <div class="od-pane-actions" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+        <div class="od-pane-actions" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
             <button th:if="${hasOutstandingItemLines}" type="button" class="btn btn--cta" data-testid="item-handover-open" data-trigger="open-modal-display" data-modal-id="item-handover-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clipboard-check"/></svg> <span th:text="#{orders.detail.handover.record}">Übergabe erfassen</span></button>
             <a th:href="@{/orders/{id}/item-collection(id=${order.id})}" class="btn btn-ghost"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-list"/></svg> <span th:text="#{orders.detail.itemCollection}">Itemsammelübersicht</span></a>
         </div>
-        <p sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${!hasOutstandingItemLines and !isFullyDelivered}" class="alert alert-info od-pane-alert" data-testid="item-handover-none-manufactured" th:text="#{orders.detail.itemHandover.produceFirst}">Es sind keine hergestellten Items zur Übergabe vorhanden. Erfasse zuerst die Herstellung im Reiter „Items".</p>
-        <p sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${!hasOutstandingItemLines and isFullyDelivered}" class="alert alert-info od-pane-alert" data-testid="item-handover-all-delivered" th:text="#{orders.detail.itemHandover.allDelivered}">Alle Items wurden vollständig übergeben.</p>
+        <p sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:if="${!hasOutstandingItemLines and !isFullyDelivered}" class="alert alert-info od-pane-alert" data-testid="item-handover-none-manufactured" th:text="#{orders.detail.itemHandover.produceFirst}">Es sind keine hergestellten Items zur Übergabe vorhanden. Erfasse zuerst die Herstellung im Reiter „Items".</p>
+        <p sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:if="${!hasOutstandingItemLines and isFullyDelivered}" class="alert alert-info od-pane-alert" data-testid="item-handover-all-delivered" th:text="#{orders.detail.itemHandover.allDelivered}">Alle Items wurden vollständig übergeben.</p>
 
         <th:block th:if="${order.itemHandovers == null or order.itemHandovers.isEmpty()}"><th:block th:replace="~{fragments/components :: emptyState(titleKey='orders.detail.handovers.empty.title', textKey='orders.detail.handovers.empty.text')}"></th:block></th:block>
         <div th:unless="${order.itemHandovers == null or order.itemHandovers.isEmpty()}" class="table-responsive">
@@ -738,7 +738,7 @@
                     <th th:text="#{orders.detail.handover.time}">Zeitpunkt</th>
                     <th th:text="#{orders.detail.handover.recipient}">Empfänger</th>
                     <th th:text="#{orders.detail.handover.items}">Items</th>
-                    <th class="cell-actions" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"><span class="visually-hidden" th:text="#{general.actions}">Aktionen</span></th>
+                    <th class="cell-actions" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"><span class="visually-hidden" th:text="#{general.actions}">Aktionen</span></th>
                 </tr>
                 </thead>
                 <tbody>
@@ -753,7 +753,7 @@
                             </li>
                         </ul>
                     </td>
-                    <td class="cell-actions" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                    <td class="cell-actions" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                         <button type="button"
                                 class="btn btn-ghost btn-icon"
                                 th:data-order-id="${order.id}"
@@ -916,7 +916,7 @@
     </th:block>
 </th:block>
 
-<th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+<th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='claim-modal', titleKey='orders.claim.modal.title.add', titleId='claim-modal-title', body=~{::claim-modal-body})}">
     <th:block th:ref="claim-modal-body">
         <div class="krt-modal-body">
@@ -971,7 +971,7 @@
 </th:block>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
-<th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+<th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='handover-modal', titleKey='orders.detail.handover.record', variant='krt-modal--wide', body=~{::handover-modal-body})}">
     <th:block th:ref="handover-modal-body">
         <form data-testid="order-handover-form" id="handover-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/handovers(id=${order.id})}" method="post" th:object="${handoverForm}" class="krt-form">
@@ -1019,7 +1019,7 @@
 </th:block>
 </th:block>
 
-<th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${order.type == 'ITEM' and hasOutstandingItemLines}">
+<th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:if="${order.type == 'ITEM' and hasOutstandingItemLines}">
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='item-handover-modal', titleKey='orders.detail.handover.record', variant='krt-modal--wide', body=~{::item-handover-modal-body})}">
     <th:block th:ref="item-handover-modal-body">
         <form data-testid="item-handover-form" id="item-handover-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/item-handovers(id=${order.id})}" method="post" th:object="${itemHandoverForm}" class="krt-form">
@@ -1073,7 +1073,7 @@
 </th:block>
 </th:block>
 
-<th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${order.type == 'ITEM' and isLogistician}">
+<th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:if="${order.type == 'ITEM' and isLogistician}">
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='production-modal', titleKey='orders.detail.production.record', variant='krt-modal--xwide', titleId='production-modal-title', body=~{::production-modal-body})}">
     <th:block th:ref="production-modal-body">
         <div class="krt-modal-body">

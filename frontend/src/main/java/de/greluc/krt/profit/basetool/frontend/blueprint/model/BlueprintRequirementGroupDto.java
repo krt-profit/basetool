@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.util.List;
 
 /** Frontend mirror of the backend blueprint requirement-group DTO (a build slot + its stats). */

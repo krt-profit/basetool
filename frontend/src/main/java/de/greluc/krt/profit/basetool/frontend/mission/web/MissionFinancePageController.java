@@ -19,16 +19,16 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorLogging;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceEntryCreateDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceEntryForm;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceEntryUpdateDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

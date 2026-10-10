@@ -25,9 +25,9 @@ import static org.mockito.Mockito.mock;
 
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.AssigneeNoteRequest;
-import de.greluc.krt.profit.basetool.frontend.support.MutationResponseHelper;
+import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.MutationResponseHelper;
 import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;

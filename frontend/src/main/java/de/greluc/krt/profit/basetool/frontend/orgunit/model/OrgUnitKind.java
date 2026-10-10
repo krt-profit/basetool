@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgunit.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Frontend mirror of the backend {@code OrgUnitKind}: the four kinds of {@code org_unit} rows.

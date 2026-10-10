@@ -31,14 +31,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.mission.model.FinanceType;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceEntryCreateDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceEntryForm;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceEntryUpdateDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;

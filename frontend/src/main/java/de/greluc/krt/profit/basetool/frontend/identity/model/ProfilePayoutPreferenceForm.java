@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.PayoutPreference;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference;
 
 /**
  * Form-binding object for the profile-level default payout preference selector.

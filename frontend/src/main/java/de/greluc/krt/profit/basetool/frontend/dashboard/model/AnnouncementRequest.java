@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * The body of {@code PUT /api/v1/announcement}.

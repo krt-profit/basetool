@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Frontend mirror of the backend allocation-dimension discriminator (Variante C, REQ-INV-027):

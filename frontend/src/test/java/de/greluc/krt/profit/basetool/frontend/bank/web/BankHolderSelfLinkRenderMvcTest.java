@@ -58,7 +58,7 @@ class BankHolderSelfLinkRenderMvcTest {
   private MockMvc mockMvc;
 
   @MockitoBean
-  private de.greluc.krt.profit.basetool.frontend.service.BackendApiClient backendApiClient;
+  private de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient backendApiClient;
 
   @MockitoBean
   private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository

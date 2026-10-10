@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.leadership.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Body of the backend Kommandogruppe create call.

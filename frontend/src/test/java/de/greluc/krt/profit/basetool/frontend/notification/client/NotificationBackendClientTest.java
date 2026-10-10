@@ -21,8 +21,8 @@ package de.greluc.krt.profit.basetool.frontend.notification.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationRuleWriteRequest;
-import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;

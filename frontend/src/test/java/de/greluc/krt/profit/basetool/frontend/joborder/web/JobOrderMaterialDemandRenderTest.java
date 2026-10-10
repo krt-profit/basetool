@@ -33,9 +33,9 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandGroup
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandOrderShareDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandRowDto;
-import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.support.QualityTierTestData;
 import java.util.Collections;
 import java.util.HashMap;

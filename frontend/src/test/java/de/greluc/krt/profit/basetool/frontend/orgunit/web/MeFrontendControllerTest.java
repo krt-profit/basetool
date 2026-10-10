@@ -27,7 +27,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -131,7 +132,7 @@ class MeFrontendControllerTest {
         .andExpect(redirectedUrl("/missions"));
     assertEquals(
         orgUnitId.toString(),
-        session.getAttribute(MeFrontendController.ACTIVE_ORG_UNIT_SESSION_KEY));
+        session.getAttribute(ActiveSquadronContext.ACTIVE_ORG_UNIT_SESSION_KEY));
 
     mockMvc
         .perform(
@@ -141,7 +142,7 @@ class MeFrontendControllerTest {
                 .param("_referer", "/missions")
                 .with(csrf()))
         .andExpect(redirectedUrl("/missions"));
-    assertNull(session.getAttribute(MeFrontendController.ACTIVE_ORG_UNIT_SESSION_KEY));
+    assertNull(session.getAttribute(ActiveSquadronContext.ACTIVE_ORG_UNIT_SESSION_KEY));
   }
 
   @Test

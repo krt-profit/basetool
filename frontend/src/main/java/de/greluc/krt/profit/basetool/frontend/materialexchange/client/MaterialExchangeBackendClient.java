@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.frontend.materialexchange.client;
 
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintProductDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeCountsDto;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeItemReleaseRequest;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeOfferDto;
@@ -31,8 +33,6 @@ import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialIte
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialRequestCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialRequestDto;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialRequestUpdateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

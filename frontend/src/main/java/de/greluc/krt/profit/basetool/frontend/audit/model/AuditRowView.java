@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.audit.model;
 
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankAuditEventDto;
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.time.Instant;
 import org.jetbrains.annotations.Nullable;
 

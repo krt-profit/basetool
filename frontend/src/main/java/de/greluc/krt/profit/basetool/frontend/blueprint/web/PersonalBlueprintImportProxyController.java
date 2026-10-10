@@ -24,10 +24,10 @@ import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintImportApp
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintImportPreviewDto;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintImportResolutionDto;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintImportResultDto;
-import de.greluc.krt.profit.basetool.frontend.model.HandoffKind;
-import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
-import de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses;
-import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.IngestHandoffService;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.HandoffKind;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses;
 import java.io.IOException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

@@ -37,15 +37,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.OrgUnitReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeCountsDto;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialRequestCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialRequestDto;
-import de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.OrgUnitReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

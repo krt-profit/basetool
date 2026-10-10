@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.leadership.client;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.AddBereichLeaderRequest;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.AddOlMemberRequest;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.AssignSquadronRankRequest;
@@ -32,7 +33,6 @@ import de.greluc.krt.profit.basetool.frontend.leadership.model.UpdateKommandoGro
 import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

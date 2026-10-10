@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
-import de.greluc.krt.profit.basetool.frontend.model.LocationReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;

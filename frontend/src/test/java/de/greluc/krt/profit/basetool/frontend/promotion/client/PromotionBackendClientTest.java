@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.promotion.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.MemberEvaluationDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.MemberEvaluationUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionCategoryWriteRequest;
@@ -28,7 +29,6 @@ import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionLevelCont
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionTopicDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionTopicWriteRequest;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.RankRequirementWriteRequest;
-import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;

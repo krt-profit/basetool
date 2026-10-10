@@ -35,7 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemOrgUn
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemStolenMarkDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateDeliveredRequest;
-import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;

@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.frontend.materialexchange.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
-import de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.OrgUnitReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.OrgUnitReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

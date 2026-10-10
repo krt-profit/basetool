@@ -19,13 +19,18 @@
 
 package de.greluc.krt.profit.basetool.frontend.operation.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorLogging;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.MarkdownRenderer;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.RelayParams;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.operation.client.OperationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationDto;
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationFinanceSummaryDto;
@@ -36,11 +41,6 @@ import de.greluc.krt.profit.basetool.frontend.operation.model.OperationPayoutSta
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationPayoutStatusUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationPayoutSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.service.MarkdownRenderer;
-import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
-import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
-import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashMap;

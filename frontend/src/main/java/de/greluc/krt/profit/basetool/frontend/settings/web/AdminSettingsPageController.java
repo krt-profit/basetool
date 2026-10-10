@@ -19,20 +19,20 @@
 
 package de.greluc.krt.profit.basetool.frontend.settings.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.propagateBackendError;
 
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages.CompleteCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.settings.client.SettingsBackendClient;
 import de.greluc.krt.profit.basetool.frontend.settings.client.SettingsBackendClient.SystemSetting;
 import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingDto;
 import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingUpdateDto;
-import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
-import de.greluc.krt.profit.basetool.frontend.support.CatalogPages.CompleteCatalog;
-import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Comparator;

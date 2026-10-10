@@ -45,7 +45,7 @@ class LiveSyncTopicRegistryParityTest {
 
   /** Path of the frontend registry, relative to the repository root. */
   private static final String FRONTEND_REGISTRY =
-      "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/websocket/LiveSyncTopicClass.java";
+      "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/livesync/LiveSyncTopicClass.java";
 
   /** An enum constant's name and the start of its argument list. */
   private static final Pattern CONSTANT = Pattern.compile("(?m)^ {2}([A-Z][A-Z0-9_]*)\\s*\\(");

@@ -143,7 +143,7 @@
                 <th class="num" th:text="#{bank.booking.balanceAfter}">Saldo nach Buchung</th>
                 <th:block th:if="${staff}">
                     <th class="cell-actions"
-                        sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)"><span
+                        sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).BANK_MANAGEMENT)"><span
                             class="visually-hidden" th:text="#{bank.request.col.actions}">Aktionen</span></th>
                 </th:block>
             </tr>
@@ -189,7 +189,7 @@
                     th:text="${after != null} ? ${#numbers.formatInteger(@moneyFormat.round(after), 1, 'POINT')} : '&ndash;'">3.148.200</td>
                 <th:block th:if="${staff}">
                     <td class="cell-actions"
-                        sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)">
+                        sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).BANK_MANAGEMENT)">
                         <button type="button" class="btn btn-ghost btn-xs bank-reverse-btn"
                                 th:if="${(b.type() == 'DEPOSIT' or b.type() == 'WITHDRAWAL' or b.type() == 'TRANSFER') and b.reversedTransactionId() == null}"
                                 data-trigger="open-modal-display" data-modal-id="bank-reverse-modal"

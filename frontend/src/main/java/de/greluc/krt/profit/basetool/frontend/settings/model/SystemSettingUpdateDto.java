@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.settings.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /** Data transfer record carrying System Setting Update payload. */
 @DtoMirror

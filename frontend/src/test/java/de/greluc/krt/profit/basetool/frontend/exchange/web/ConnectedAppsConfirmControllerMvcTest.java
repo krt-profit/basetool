@@ -41,9 +41,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ConnectedAppMassChangeRequestDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ConnectedAppMassChangeResultDto;
-import de.greluc.krt.profit.basetool.frontend.model.HandoffKind;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.IngestHandoffService;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.HandoffKind;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;

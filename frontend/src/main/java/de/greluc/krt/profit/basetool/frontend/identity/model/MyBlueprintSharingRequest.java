@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * The member's global blueprint-sharing flag as {@code PUT /api/v1/users/me/blueprint-sharing}

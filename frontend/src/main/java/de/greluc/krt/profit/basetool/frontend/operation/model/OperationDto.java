@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.operation.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
-import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import java.time.Instant;
 import java.util.UUID;
 

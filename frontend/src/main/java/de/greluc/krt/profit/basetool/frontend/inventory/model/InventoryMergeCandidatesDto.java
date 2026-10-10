@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Backend answer of the Einbuchen merge probe (REQ-INV-026), relayed to the form's script.

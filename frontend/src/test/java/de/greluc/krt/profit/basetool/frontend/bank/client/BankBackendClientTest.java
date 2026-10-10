@@ -45,7 +45,7 @@ import de.greluc.krt.profit.basetool.frontend.bank.model.SetCartelApprovalTiersR
 import de.greluc.krt.profit.basetool.frontend.bank.model.UpdateBankBookingRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.UpdateBankGrantRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.UpdateBankHolderRequest;
-import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;

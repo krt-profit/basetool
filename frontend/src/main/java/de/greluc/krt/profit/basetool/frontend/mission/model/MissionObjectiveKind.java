@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Frontend mirror of the backend's {@code MissionObjectiveKind} — the classification of a mission

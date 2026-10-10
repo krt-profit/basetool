@@ -33,8 +33,8 @@ import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintImportRes
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintBatchCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintBatchResultDto;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintBulkDeleteResultDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.nio.charset.StandardCharsets;
 import java.util.List;

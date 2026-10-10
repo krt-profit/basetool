@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBalancePointDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingDto;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;

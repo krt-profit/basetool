@@ -30,7 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.MyBlueprintSharingR
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyPayoutPreferenceResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyRsiHandleResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.regex.Pattern;

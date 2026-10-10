@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.refinery.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 

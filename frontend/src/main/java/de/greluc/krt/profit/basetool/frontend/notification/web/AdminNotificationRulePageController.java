@@ -19,13 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.notification.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationRuleDto;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationRuleWriteRequest;
-import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import java.util.UUID;

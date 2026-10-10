@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgchart.model;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.AreaLeadershipDto;
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**

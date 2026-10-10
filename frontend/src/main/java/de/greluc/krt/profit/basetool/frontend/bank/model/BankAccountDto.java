@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
-import de.greluc.krt.profit.basetool.frontend.model.OrgUnitReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.OrgUnitReferenceDto;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;

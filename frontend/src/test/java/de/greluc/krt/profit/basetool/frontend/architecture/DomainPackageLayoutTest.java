@@ -26,7 +26,7 @@ import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.frontend.architecture.fixture.model.UnmarkedMirrorDto;
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -37,9 +37,10 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Keeps the frontend packaged by domain (plan §5.9, F4): every controller lives in a {@code
- * <domain>.web} package, every {@link DtoMirror} type in a {@code <domain>.model} package or the
- * kernel {@code model}, every {@code *Dto}, {@code *Request} or {@code *Response} type of a model
+ * Keeps the frontend packaged by domain (plan §5.9, F4): every main class lives in a kernel package
+ * of §5.9 or a domain's {@code web}, {@code model} or {@code client} package, every controller in a
+ * {@code <domain>.web} package, every {@link DtoMirror} type in a {@code <domain>.model} package or
+ * {@code kernel.model}, every {@code *Dto}, {@code *Request} or {@code *Response} type of a model
  * package carries the marker the DTO contract tests select by, and no class returns to a retired
  * layer package. Each rule is proven against a planted violation.
  */
@@ -52,23 +53,54 @@ class DomainPackageLayoutTest {
           .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
           .importPackages(BASE);
 
-  /** A domain's web package: {@code <base>.<domain>.web}. */
+  /** A domain's web package: {@code <base>.<domain>.web}, never the kernel's. */
   private static final Pattern WEB_PACKAGE =
-      Pattern.compile(Pattern.quote(BASE) + "\\.[a-z]+\\.web");
+      Pattern.compile(Pattern.quote(BASE) + "\\.(?!kernel\\.)[a-z]+\\.web");
 
-  /** A model package: the kernel {@code <base>.model} or {@code <base>.<domain>.model}. */
+  /** A model package: the kernel's {@code <base>.kernel.model} or {@code <base>.<domain>.model}. */
   private static final Pattern MODEL_PACKAGE =
-      Pattern.compile(Pattern.quote(BASE) + "(\\.[a-z]+)?\\.model");
+      Pattern.compile(Pattern.quote(BASE) + "\\.[a-z]+\\.model");
+
+  /**
+   * Every package a main class may live in: a kernel package of plan §5.9, a domain's {@code web},
+   * {@code model} or {@code client} package, or the base package for the application class alone.
+   */
+  private static final Pattern KNOWN_PACKAGE =
+      Pattern.compile(
+          Pattern.quote(BASE)
+              + "\\.(kernel\\.(backend|security|session|layout|web|livesync|model|observability)"
+              + "|(?!kernel\\.)[a-z]+\\.(web|model|client))");
+
+  /** The one class of the base package. */
+  private static final String APPLICATION_CLASS = BASE + ".FrontendApplication";
 
   /** A name the contract tests expect to be a marked DTO. */
   private static final Pattern DTO_NAME = Pattern.compile(".*(Dto|Request|Response)");
 
-  /** The layer packages the move emptied. */
+  /** The layer packages the moves emptied. */
   private static final Set<String> RETIRED_PACKAGES =
-      Set.of(BASE + ".controller", BASE + ".model.dto", BASE + ".model.form", BASE + ".oss");
+      Set.of(
+          BASE + ".controller",
+          BASE + ".model",
+          BASE + ".model.dto",
+          BASE + ".model.form",
+          BASE + ".oss",
+          BASE + ".config",
+          BASE + ".service",
+          BASE + ".websocket",
+          BASE + ".support",
+          BASE + ".logging",
+          BASE + ".exception",
+          BASE + ".health",
+          BASE + ".metrics",
+          BASE + ".validation",
+          BASE + ".view");
 
   /** Controllers when the rule was introduced; fewer means the selection broke. */
   private static final int CONTROLLER_FLOOR = 100;
+
+  /** Top-level kernel classes when the rule was introduced; fewer means the selection broke. */
+  private static final int KERNEL_FLOOR = 144;
 
   /** {@link DtoMirror} types when the rule was introduced; fewer means the selection broke. */
   private static final int MIRROR_FLOOR = 389;
@@ -115,18 +147,58 @@ class DomainPackageLayoutTest {
   }
 
   @Test
+  void everyClassLivesInAKernelOrDomainPackage() {
+    Set<String> unknown = classesOutsideKnownPackages(MAIN.stream().toList());
+
+    assertThat(
+            MAIN.stream()
+                .filter(c -> c.getEnclosingClass().isEmpty())
+                .filter(c -> c.getPackageName().startsWith(BASE + ".kernel."))
+                .toList())
+        .as("selection floor: the kernel classes")
+        .hasSizeGreaterThanOrEqualTo(KERNEL_FLOOR);
+    assertThat(unknown)
+        .as("main classes outside the kernel packages of plan §5.9 and the domain packages")
+        .isEmpty();
+  }
+
+  @Test
   void theRulesCatchPlantedViolations() {
     JavaClasses planted =
         new ClassFileImporter()
             .importClasses(PlantedController.class, PlantedMirror.class, UnmarkedMirrorDto.class);
     List<JavaClass> all = planted.stream().toList();
 
+    assertThat(classesOutsideKnownPackages(all))
+        .containsExactlyInAnyOrder(
+            DomainPackageLayoutTest.class.getName(), UnmarkedMirrorDto.class.getName());
     assertThat(misplacedControllers(controllers(all)))
         .containsExactly(PlantedController.class.getName());
     assertThat(
             misplacedMirrors(all.stream().filter(c -> c.isAnnotatedWith(DtoMirror.class)).toList()))
         .containsExactly(PlantedMirror.class.getName());
     assertThat(unmarkedDtos(all)).containsExactly(UnmarkedMirrorDto.class.getName());
+  }
+
+  /**
+   * Finds the top-level classes outside every known package.
+   *
+   * @param classes the classes to search
+   * @return their names, sorted
+   */
+  static Set<String> classesOutsideKnownPackages(Collection<JavaClass> classes) {
+    Set<String> found = new TreeSet<>();
+    for (JavaClass type : classes) {
+      JavaClass top = type;
+      while (top.getEnclosingClass().isPresent()) {
+        top = top.getEnclosingClass().get();
+      }
+      if (!top.getName().equals(APPLICATION_CLASS)
+          && !KNOWN_PACKAGE.matcher(top.getPackageName()).matches()) {
+        found.add(top.getName());
+      }
+    }
+    return found;
   }
 
   /**

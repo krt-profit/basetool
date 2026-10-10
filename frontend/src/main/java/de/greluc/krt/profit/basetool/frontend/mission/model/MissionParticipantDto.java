@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.frontend.mission.model;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.JobTypeDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
-import de.greluc.krt.profit.basetool.frontend.model.OrgUnitReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.PayoutPreference;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.OrgUnitReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;

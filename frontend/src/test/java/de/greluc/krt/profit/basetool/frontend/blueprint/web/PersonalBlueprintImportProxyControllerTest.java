@@ -36,10 +36,10 @@ import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintImportPre
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintImportResolutionDto;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintImportResultDto;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintImportStatus;
-import de.greluc.krt.profit.basetool.frontend.model.HandoffKind;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.IngestHandoffService;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.HandoffKind;
 import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.nio.charset.StandardCharsets;
 import java.util.List;

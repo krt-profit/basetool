@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.web;
 
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.exchange.client.ExchangeBackendClient;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ConnectedAppDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ConnectedInstallationDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;

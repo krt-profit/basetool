@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
 import java.math.BigDecimal;
 import java.util.List;

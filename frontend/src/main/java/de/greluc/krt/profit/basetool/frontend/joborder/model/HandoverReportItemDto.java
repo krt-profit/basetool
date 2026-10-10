@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * One material line of a handover report preview.

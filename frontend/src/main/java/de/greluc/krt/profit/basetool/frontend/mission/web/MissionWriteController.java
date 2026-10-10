@@ -19,11 +19,14 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorLogging;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.mission.model.AddCrewRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.AddCustomFrequencyRequest;
@@ -61,9 +64,6 @@ import de.greluc.krt.profit.basetool.frontend.mission.model.UpdateParticipantReq
 import de.greluc.krt.profit.basetool.frontend.mission.model.UpdatePayoutPreferenceRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.UpdateUnitRequest;
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.support.Roles;
-import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;

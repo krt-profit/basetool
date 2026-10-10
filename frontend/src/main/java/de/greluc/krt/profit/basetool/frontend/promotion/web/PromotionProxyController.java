@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.promotion.web;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.promotion.client.PromotionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.MemberEvaluationDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.MemberEvaluationUpdateRequest;
@@ -30,7 +31,6 @@ import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionTopicDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.PromotionTopicWriteRequest;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.RankRequirementDto;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.RankRequirementWriteRequest;
-import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;

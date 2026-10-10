@@ -20,13 +20,13 @@
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderAllocationDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionAllocationDto;
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
-import de.greluc.krt.profit.basetool.frontend.model.InventoryGameItemReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.LocationReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintProductDto;
@@ -27,9 +27,9 @@ import de.greluc.krt.profit.basetool.frontend.blueprint.model.DefaultBlueprintAd
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.DefaultBlueprintAddSelectionRequest;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.DefaultBlueprintCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.DefaultBlueprintDto;
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.support.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
 import java.util.ArrayList;
 import java.util.Collections;

@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.identity.model.PersonSearchHitDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.PersonSearchResultDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import java.util.List;
 import java.util.Locale;
 import org.jetbrains.annotations.NotNull;

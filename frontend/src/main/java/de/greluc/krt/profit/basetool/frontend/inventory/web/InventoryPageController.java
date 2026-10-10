@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.web;
 
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.AggregatedInventoryDto;
@@ -31,17 +30,18 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryStackDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderGameItemNeedDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialNeedDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.InventoryGameItemReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.LocationReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.MissionReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.MissionReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.PickerSearch;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
-import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
-import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
-import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;

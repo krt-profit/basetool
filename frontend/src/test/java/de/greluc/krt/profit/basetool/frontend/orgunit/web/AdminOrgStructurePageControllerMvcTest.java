@@ -35,12 +35,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CacheDomain;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.BereichDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitNodeDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitParentResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrganisationsleitungDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;

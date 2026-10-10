@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,7 +42,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 /**
  * Tests {@link CsrfTokenController} against the real {@link
- * de.greluc.krt.profit.basetool.frontend.config.SecurityConfig} filter chain (REQ-FE-004,
+ * de.greluc.krt.profit.basetool.frontend.kernel.security.SecurityConfig} filter chain (REQ-FE-004,
  * REQ-SEC-010): an authenticated session receives the CSRF header name and token, an anonymous
  * caller receives none.
  */
@@ -80,8 +80,8 @@ class CsrfTokenControllerMvcTest {
 
   /**
    * An anonymous GET /csrf is answered by {@link
-   * de.greluc.krt.profit.basetool.frontend.config.SsoReAuthenticationEntryPoint} and receives no
-   * token; the test asserts only "not 200".
+   * de.greluc.krt.profit.basetool.frontend.kernel.security.SsoReAuthenticationEntryPoint} and
+   * receives no token; the test asserts only "not 200".
    */
   @Test
   @WithAnonymousUser

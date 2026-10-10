@@ -81,7 +81,7 @@ class MissionFrontendSecurityTest {
     when(responseSpec.bodyToMono(anyTypeRef()))
         .thenReturn(
             Mono.just(
-                new de.greluc.krt.profit.basetool.frontend.model.PageResponse<>(
+                new de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse<>(
                     Collections.emptyList(), 0, 20, 0, 0, Collections.emptyList())));
   }
 

@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
-import de.greluc.krt.profit.basetool.frontend.model.InventoryGameItemReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
 
 /**
  * Frontend mirror of the backend {@code AggregatedInventoryDto}: one Lager overview row per catalog

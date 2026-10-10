@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.audit.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import java.time.Instant;
 import java.util.UUID;
 import okhttp3.mockwebserver.RecordedRequest;

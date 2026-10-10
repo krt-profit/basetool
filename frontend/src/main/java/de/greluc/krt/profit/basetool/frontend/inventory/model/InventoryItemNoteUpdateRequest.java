@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.jetbrains.annotations.Nullable;

@@ -19,7 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.materialexchange.web;
 
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.client.MaterialExchangeBackendClient;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.client.MaterialExchangeBackendClient.BoardFilter;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeCountsDto;
@@ -31,9 +34,6 @@ import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialIte
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialRequestCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialRequestDto;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialRequestUpdateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

@@ -19,7 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgunit.web;
 
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.util.UUID;
@@ -46,12 +47,6 @@ import org.springframework.web.servlet.view.RedirectView;
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 public class MeFrontendController {
-
-  /**
-   * Frontend session attribute holding the caller's active OrgUnit id, relayed to the backend as
-   * {@code X-Active-Org-Unit-Id}.
-   */
-  public static final String ACTIVE_ORG_UNIT_SESSION_KEY = "iridium.activeOrgUnitId";
 
   /**
    * Sets the caller's active OrgUnit, or clears it for a blank id, and redirects back.
@@ -99,8 +94,8 @@ public class MeFrontendController {
   }
 
   /**
-   * Stores or clears the active OrgUnit in {@link #ACTIVE_ORG_UNIT_SESSION_KEY} and adds the
-   * matching flash toast.
+   * Stores or clears the active OrgUnit in {@link
+   * ActiveSquadronContext#ACTIVE_ORG_UNIT_SESSION_KEY} and adds the matching flash toast.
    *
    * @param orgUnitId the OrgUnit id to activate, {@code null} to clear.
    * @param referer optional redirect target, validated by {@link #safeRedirectTarget(String)}.
@@ -116,10 +111,10 @@ public class MeFrontendController {
       RedirectAttributes redirectAttributes) {
     HttpSession session = request.getSession(true);
     if (orgUnitId == null) {
-      session.removeAttribute(ACTIVE_ORG_UNIT_SESSION_KEY);
+      session.removeAttribute(ActiveSquadronContext.ACTIVE_ORG_UNIT_SESSION_KEY);
       redirectAttributes.addFlashAttribute("toastSuccess", "orgUnit.switcher.cleared");
     } else {
-      session.setAttribute(ACTIVE_ORG_UNIT_SESSION_KEY, orgUnitId.toString());
+      session.setAttribute(ActiveSquadronContext.ACTIVE_ORG_UNIT_SESSION_KEY, orgUnitId.toString());
       redirectAttributes.addFlashAttribute("toastSuccess", "orgUnit.switcher.activated");
     }
     return new RedirectView(safeRedirectTarget(referer));

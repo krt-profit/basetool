@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.frontend.operation.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationForm;
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationPayoutStatusUpdateDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
 import java.net.URI;
 import java.time.Instant;
 import java.util.UUID;

@@ -37,12 +37,12 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemNoteU
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryStackDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateDeliveredRequest;
-import de.greluc.krt.profit.basetool.frontend.model.InventoryGameItemReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.LocationReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -771,8 +771,8 @@ class InventoryPageControllerTest {
   void updateInventoryItemNote_shouldPropagate409FromBackendServiceException() {
     UUID id = UUID.randomUUID();
     InventoryItemNoteUpdateRequest request = new InventoryItemNoteUpdateRequest("hello", 1L);
-    de.greluc.krt.profit.basetool.frontend.service.BackendServiceException ex =
-        new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+    de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException ex =
+        new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
             "Backend service returned error: 409 CONFLICT", null, 409);
     when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class), any(Object[].class)))
         .thenThrow(ex);
@@ -787,8 +787,8 @@ class InventoryPageControllerTest {
   void updateInventoryItemNote_shouldPropagate403FromBackendServiceException() {
     UUID id = UUID.randomUUID();
     InventoryItemNoteUpdateRequest request = new InventoryItemNoteUpdateRequest("hello", 1L);
-    de.greluc.krt.profit.basetool.frontend.service.BackendServiceException ex =
-        new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+    de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException ex =
+        new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
             "Backend service returned error: 403 FORBIDDEN", null, 403);
     when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class), any(Object[].class)))
         .thenThrow(ex);
@@ -902,8 +902,8 @@ class InventoryPageControllerTest {
             null,
             null,
             null);
-    de.greluc.krt.profit.basetool.frontend.service.BackendServiceException ex =
-        new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+    de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException ex =
+        new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
             "Backend returned 409 [OPTIMISTIC_LOCK]",
             null,
             409,
@@ -969,8 +969,8 @@ class InventoryPageControllerTest {
   void updateDelivered_conflict_propagatesProblemJsonWithCode() {
     UUID id = UUID.randomUUID();
     UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, UUID.randomUUID(), 1L);
-    de.greluc.krt.profit.basetool.frontend.service.BackendServiceException ex =
-        new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+    de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException ex =
+        new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
             "Backend returned 409 [OPTIMISTIC_LOCK]",
             null,
             409,
@@ -1042,8 +1042,8 @@ class InventoryPageControllerTest {
   void rebookPersonalInventoryItem_conflict_propagatesProblemJson() {
     UUID id = UUID.randomUUID();
     InventoryItemPersonalRebookDto dto = new InventoryItemPersonalRebookDto(5.0, 1L, null, null);
-    de.greluc.krt.profit.basetool.frontend.service.BackendServiceException ex =
-        new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+    de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException ex =
+        new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
             "Backend returned 409 [OPTIMISTIC_LOCK]",
             null,
             409,

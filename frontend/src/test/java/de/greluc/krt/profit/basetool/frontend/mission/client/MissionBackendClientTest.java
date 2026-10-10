@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.mission.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import de.greluc.krt.profit.basetool.frontend.mission.model.AddCrewRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.AddCustomFrequencyRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.AddExternalParticipantRequest;
@@ -48,7 +49,6 @@ import de.greluc.krt.profit.basetool.frontend.mission.model.UpdateMissionStepReq
 import de.greluc.krt.profit.basetool.frontend.mission.model.UpdateParticipantRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.UpdatePayoutPreferenceRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.UpdateUnitRequest;
-import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Instant;

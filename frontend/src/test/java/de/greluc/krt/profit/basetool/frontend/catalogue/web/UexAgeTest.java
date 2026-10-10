@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.TerminalDto;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;

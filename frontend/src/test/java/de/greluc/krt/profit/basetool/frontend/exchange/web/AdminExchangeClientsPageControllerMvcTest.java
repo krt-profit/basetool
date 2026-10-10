@@ -49,8 +49,8 @@ import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientStatu
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientUsageDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeSettingsDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeSettingsUpdateRequest;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;

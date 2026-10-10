@@ -36,15 +36,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.ImportIssueCode;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.ImportIssueDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.ImportIssueSeverity;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.ImportSuggestionDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodForm;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -255,7 +255,7 @@ class RefineryOrderCreateImportRenderTest {
   /**
    * Verifies that the create page still renders {@code 200} with an empty {@code seedUserNames} map
    * and populated {@code materials} when the owner-name lookup fails during the parallel catalog
-   * fetch via {@link de.greluc.krt.profit.basetool.frontend.service .ParallelPageLoader}.
+   * fetch via {@link de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader}.
    */
   @Test
   void createPage_WhenOwnerSeedLookupFails_StillRendersWithEmptyMap() throws Exception {

@@ -19,17 +19,17 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgunit.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.BereichCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitNodeDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitParentUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrganisationsleitungCreateRequest;
-import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
-import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
-import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;

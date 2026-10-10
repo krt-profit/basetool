@@ -27,6 +27,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.KommandoGroupDto;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.LeitungMemberDto;
 import de.greluc.krt.profit.basetool.frontend.leadership.model.LeitungUnitDto;
@@ -37,7 +38,6 @@ import de.greluc.krt.profit.basetool.frontend.orgchart.model.SpecialCommandChart
 import de.greluc.krt.profit.basetool.frontend.orgchart.model.SquadronChartDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;

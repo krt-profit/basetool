@@ -19,7 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.refinery.web;
 
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.refinery.client.RefineryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.ImportIssueDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodDto;
@@ -28,7 +29,6 @@ import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryImportDraft
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderForm;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStatus;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -223,8 +223,8 @@ public class RefineryImportProxyController {
    * Groups the findings anchored to a form row ({@code goods[<draftIndex>].<sub>}) by that index.
    *
    * <p>Keys are strings because the Redis session serializer ({@link
-   * de.greluc.krt.profit.basetool.frontend.config.RedisSessionConfig}) stringifies flashed map keys
-   * (REQ-REFINERY-015).
+   * de.greluc.krt.profit.basetool.frontend.kernel.session.RedisSessionConfig}) stringifies flashed
+   * map keys (REQ-REFINERY-015).
    *
    * @param issues all draft findings; may be {@code null}
    * @return row findings keyed by the decimal goods index, in encounter order

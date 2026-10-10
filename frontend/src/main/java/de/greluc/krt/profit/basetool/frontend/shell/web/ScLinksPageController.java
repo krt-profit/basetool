@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.shell.web;
 
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.shell.model.ScLinkCategory;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;

@@ -28,11 +28,11 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.JobTypeDto;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
-import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.ui.ConcurrentModel;
@@ -149,7 +149,7 @@ class AdminMissionDataPageControllerTest {
     Model model = new ConcurrentModel();
 
     int reportedPages =
-        de.greluc.krt.profit.basetool.frontend.support.CatalogPages.MAX_CATALOG_PAGES + 1;
+        de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages.MAX_CATALOG_PAGES + 1;
     PageResponse<Object> endlessPage =
         new PageResponse<>(
             List.of(jobType("Row")), 0, 1000, reportedPages, reportedPages, List.of());

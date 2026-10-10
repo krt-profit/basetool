@@ -28,7 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientStatu
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeSettingsUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeUndoRequestDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

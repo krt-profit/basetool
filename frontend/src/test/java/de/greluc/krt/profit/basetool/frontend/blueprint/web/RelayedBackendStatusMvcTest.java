@@ -44,8 +44,6 @@ import de.greluc.krt.profit.basetool.frontend.bank.web.OrgUnitBankProxyControlle
 import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.web.AdminP4kImportPageController;
-import de.greluc.krt.profit.basetool.frontend.config.AppHttpProperties;
-import de.greluc.krt.profit.basetool.frontend.exception.GlobalExceptionHandler;
 import de.greluc.krt.profit.basetool.frontend.hangar.client.HangarBackendClient;
 import de.greluc.krt.profit.basetool.frontend.hangar.web.HangarDeleteAllProxyController;
 import de.greluc.krt.profit.basetool.frontend.hangar.web.HangarImportProxyController;
@@ -55,9 +53,11 @@ import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendC
 import de.greluc.krt.profit.basetool.frontend.inventory.web.InventoryDeleteAllProxyController;
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.web.JobOrderHandoverReportProxyController;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
-import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.AppHttpProperties;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.IngestHandoffService;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.GlobalExceptionHandler;
 import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;

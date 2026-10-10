@@ -34,8 +34,8 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.RejectRegistrationR
 import de.greluc.krt.profit.basetool.frontend.identity.model.ReopenRegistrationRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserAttributesUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDescriptionRequest;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipDeltaRequest;
-import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;

@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.operation.model;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import de.greluc.krt.profit.basetool.frontend.model.PayoutPreference;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;

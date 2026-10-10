@@ -43,8 +43,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 /**
  * Verifies that no backend connector of {@link
- * de.greluc.krt.profit.basetool.frontend.config.WebClientConfig} sends {@code Accept-Encoding}, so
- * the backend never compresses its responses (BE-PERF-14, ADR-0161).
+ * de.greluc.krt.profit.basetool.frontend.kernel.backend.WebClientConfig} sends {@code
+ * Accept-Encoding}, so the backend never compresses its responses (BE-PERF-14, ADR-0161).
  */
 @SpringBootTest
 @TestPropertySource(

@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.hangar.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.withBackendStatus;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.withBackendStatus;
 
 import de.greluc.krt.profit.basetool.frontend.hangar.client.HangarBackendClient;
 import lombok.RequiredArgsConstructor;

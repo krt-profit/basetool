@@ -47,18 +47,18 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderAllocationD
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderGameItemNeedDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialNeedDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.PickerSearch;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionAllocationDto;
-import de.greluc.krt.profit.basetool.frontend.model.InventoryGameItemReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.LocationReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.frontend.orgunit.web.MeFrontendController;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
-import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
 import jakarta.servlet.http.Cookie;
 import java.time.Instant;
 import java.util.Collections;
@@ -1233,7 +1233,7 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(
             get("/inventory/input")
-                .sessionAttr(MeFrontendController.ACTIVE_ORG_UNIT_SESSION_KEY, sk.toString()))
+                .sessionAttr(ActiveSquadronContext.ACTIVE_ORG_UNIT_SESSION_KEY, sk.toString()))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("selected=\"selected\">Bergbau</option>")))
         .andExpect(content().string(not(containsString("selected=\"selected\">IRIDIUM"))))

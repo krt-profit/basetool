@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
-import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * The member's own RSI handle as {@code PUT /api/v1/users/me/rsi-handle} takes it (REQ-SEC-072).

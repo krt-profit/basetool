@@ -40,11 +40,11 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.MemberEditForm;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserAttributesUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserRsiHandleResponse;
-import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipDeltaResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -62,7 +62,7 @@ class MemberManagementControllerTest {
 
   private BackendApiClient backendApiClient;
   private org.springframework.context.MessageSource messageSource;
-  private de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus liveSyncLocalBus;
+  private de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus liveSyncLocalBus;
   private MemberManagementController controller;
   private RedirectAttributes redirectAttributes;
 
@@ -71,7 +71,7 @@ class MemberManagementControllerTest {
     backendApiClient = mock(BackendApiClient.class);
     messageSource = mock(org.springframework.context.MessageSource.class);
     liveSyncLocalBus =
-        mock(de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus.class);
+        mock(de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus.class);
     controller =
         new MemberManagementController(
             new IdentityBackendClient(backendApiClient), messageSource, liveSyncLocalBus);
@@ -722,7 +722,7 @@ class MemberManagementControllerTest {
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
       doThrow(
-              new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+              new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
                   "conflict", null, 409, "OPTIMISTIC_LOCK", null, List.of(), "Stale data"))
           .when(backendApiClient)
           .put(eq("/api/v1/users/{id}/attributes"), any(), eq(Void.class), eq(id));
@@ -750,7 +750,7 @@ class MemberManagementControllerTest {
     void deleteMemberAjax_backendFailure_relaysStatusAndCode() {
       UUID id = UUID.randomUUID();
       doThrow(
-              new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+              new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
                   "nope", null, 409, "ENTITY_IN_USE", null, List.of(), "Still in Keycloak"))
           .when(backendApiClient)
           .delete("/api/v1/users/{id}", Void.class, id);
@@ -785,7 +785,7 @@ class MemberManagementControllerTest {
               any(),
               eq(de.greluc.krt.profit.basetool.frontend.identity.model.UserSyncResultDto.class)))
           .thenThrow(
-              new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+              new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
                   "down",
                   null,
                   503,

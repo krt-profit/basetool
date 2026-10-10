@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
-import de.greluc.krt.profit.basetool.frontend.validation.WholeNumber;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.WholeNumber;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;

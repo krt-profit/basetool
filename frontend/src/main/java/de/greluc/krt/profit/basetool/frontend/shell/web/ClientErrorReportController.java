@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.shell.web;
 
-import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.frontend.kernel.observability.MetricNames;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.net.URI;
