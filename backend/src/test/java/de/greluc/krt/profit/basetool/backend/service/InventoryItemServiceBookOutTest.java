@@ -123,6 +123,11 @@ class InventoryItemServiceBookOutTest {
 
   @BeforeEach
   void setUpEntities() {
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        service,
+        "stockSoldForTarget",
+        new de.greluc.krt.profit.basetool.backend.mission.internal.MissionSaleIncome(
+            missionParticipantRepository, missionFinanceEntryRepository));
     owner = new User();
     owner.setId(OWNER_ID);
     owner.setUsername("alice");
@@ -620,6 +625,7 @@ class InventoryItemServiceBookOutTest {
       mission.setId(UUID.randomUUID());
       MissionParticipant participant = new MissionParticipant();
       participant.setId(UUID.randomUUID());
+      participant.setMission(mission);
 
       InventoryItem item = newItem(10.0, 1L);
       InventoryAllocations.addMission(item, mission, 4.0);
@@ -659,8 +665,10 @@ class InventoryItemServiceBookOutTest {
       missionB.setId(UUID.randomUUID());
       MissionParticipant participantA = new MissionParticipant();
       participantA.setId(UUID.randomUUID());
+      participantA.setMission(missionA);
       MissionParticipant participantB = new MissionParticipant();
       participantB.setId(UUID.randomUUID());
+      participantB.setMission(missionB);
 
       InventoryItem item = newItem(10.0, 1L);
       InventoryAllocations.addMission(item, missionA, 1.0);
@@ -700,6 +708,7 @@ class InventoryItemServiceBookOutTest {
       mission.setId(UUID.randomUUID());
       MissionParticipant participant = new MissionParticipant();
       participant.setId(UUID.randomUUID());
+      participant.setMission(mission);
 
       InventoryItem item = newItem(5.0, 1L);
       InventoryAllocations.addMission(item, mission, 5.0);
@@ -973,6 +982,7 @@ class InventoryItemServiceBookOutTest {
       mission.setId(UUID.randomUUID());
       MissionParticipant participant = new MissionParticipant();
       participant.setId(UUID.randomUUID());
+      participant.setMission(mission);
 
       InventoryItem item = newItem(10.0, 1L);
       InventoryAllocations.addMission(item, mission, 1.0);

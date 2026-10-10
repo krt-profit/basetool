@@ -90,8 +90,8 @@ class InventoryItemServiceVersionFlushTest {
             inventoryItemRepository,
             userRepository,
             locationRepository,
-            missionFinanceEntryRepository,
-            missionParticipantRepository,
+            new de.greluc.krt.profit.basetool.backend.mission.internal.MissionSaleIncome(
+                missionParticipantRepository, missionFinanceEntryRepository),
             new MaterialExchangeStockOfferLookup(materialExchangeOfferRepository),
             offerRatchet,
             inventoryItemMapper,

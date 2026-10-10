@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeEffects;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockSoldForTarget;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredFromUserEvent;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredToUserEvent;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.TransferredLot;
@@ -40,16 +41,12 @@ import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.BulkRebookMode;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
-import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
-import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -62,8 +59,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebo
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -122,8 +117,7 @@ public class InventoryCheckoutService {
   private final InventoryItemRepository inventoryItemRepository;
   private final UserRepository userRepository;
   private final LocationRepository locationRepository;
-  private final MissionFinanceEntryRepository missionFinanceEntryRepository;
-  private final MissionParticipantRepository missionParticipantRepository;
+  private final StockSoldForTarget stockSoldForTarget;
   private final StockOfferLookup stockOfferLookup;
   private final StockChangeObserver stockChangeObserver;
   private final InventoryItemMapper inventoryItemMapper;
@@ -446,19 +440,11 @@ public class InventoryCheckoutService {
     }
     BigDecimal proceeds = dto.sellAmount() != null ? dto.sellAmount() : BigDecimal.ZERO;
 
-    List<MissionFinanceEntry> entries = new ArrayList<>();
+    List<StockSoldForTarget.MissionShare> shares = new ArrayList<>();
     for (Map.Entry<UUID, Double> reduction : missionReductions.entrySet()) {
       InventoryMissionAllocation slice =
           InventoryAllocations.missionSlice(item, reduction.getKey());
       if (slice == null || slice.getMission() == null) {
-        continue;
-      }
-      Mission mission = slice.getMission();
-      MissionParticipant participant =
-          missionParticipantRepository
-              .findByMissionIdAndUserId(mission.getId(), currentUserId)
-              .orElse(null);
-      if (participant == null) {
         continue;
       }
       BigDecimal credit =
@@ -468,21 +454,12 @@ public class InventoryCheckoutService {
       if (credit.signum() <= 0) {
         continue;
       }
-      MissionFinanceEntry entry = new MissionFinanceEntry();
-      entry.setMission(mission);
-      entry.setParticipant(participant);
-      entry.setType(FinanceType.INCOME);
-      entry.setAmount(credit);
-      entry.setNote("Sale of " + dto.amount() + "x " + catalogName(item) + " at " + dto.terminal());
-      entries.add(entry);
+      shares.add(new StockSoldForTarget.MissionShare(slice.getMission().getId(), credit));
     }
-
-    List<UUID> financeEntryIds = new ArrayList<>();
-    for (MissionFinanceEntry entry : entries) {
-      missionFinanceEntryRepository.save(entry);
-      financeEntryIds.add(entry.getId());
-    }
-    return financeEntryIds;
+    return stockSoldForTarget.soldForMissions(
+        currentUserId,
+        shares,
+        "Sale of " + dto.amount() + "x " + catalogName(item) + " at " + dto.terminal());
   }
 
   /**
