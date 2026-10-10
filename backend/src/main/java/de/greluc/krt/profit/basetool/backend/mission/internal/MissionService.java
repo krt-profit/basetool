@@ -106,7 +106,11 @@ public class MissionService implements MissionCommands {
   private final AuditRecorder auditRecorder;
   private final MissionTimelineService missionTimelineService;
   private final MissionParticipantService missionParticipantService;
+
   private final MissionStructureService missionStructureService;
+
+  /** Publishes the mission notifications (REQ-MISSION-021…029). */
+  private final MissionNotificationPublisher notificationPublisher;
 
   /**
    * Always throws; listing missions must go through {@link #searchMissions(String, Instant,
@@ -397,6 +401,11 @@ public class MissionService implements MissionCommands {
             && !"ACTIVE".equals(mission.getStatus())
             && explicitActualStart == null;
     Instant effectiveActualStart = autoStampActualStart ? Instant.now() : explicitActualStart;
+    final String oldStatus = mission.getStatus();
+    final Instant oldMeetingTime = mission.getMeetingTime();
+    final Instant oldPlannedStart = mission.getPlannedStartTime();
+    final Instant oldPlannedEnd = mission.getPlannedEndTime();
+    final Instant oldActualEnd = mission.getActualEndTime();
 
     mission.setName(request.name());
     mission.setDescription(request.description());
@@ -433,6 +442,9 @@ public class MissionService implements MissionCommands {
     }
 
     validateMissionTimes(mission);
+    notificationPublisher.scheduleChanged(mission, oldMeetingTime, oldPlannedStart);
+    notificationPublisher.endChanged(mission, oldPlannedEnd, oldActualEnd);
+    notificationPublisher.statusChanged(mission, oldStatus);
 
     bumpSectionVersion(mission, MissionSection.CORE);
     bumpSectionVersion(mission, MissionSection.SCHEDULE);
@@ -473,6 +485,7 @@ public class MissionService implements MissionCommands {
     enforceSectionVersion(
         missionRepository, mission, MissionSection.CORE, expectedCoreVersion, missionId);
 
+    final String oldStatus = mission.getStatus();
     if ("ACTIVE".equals(status)
         && !"ACTIVE".equals(mission.getStatus())
         && mission.getActualStartTime() == null) {
@@ -486,6 +499,7 @@ public class MissionService implements MissionCommands {
     if (status != null) {
       mission.setStatus(status);
     }
+    notificationPublisher.statusChanged(mission, oldStatus);
 
     if (operationId != null) {
       Operation op =
@@ -524,6 +538,10 @@ public class MissionService implements MissionCommands {
     Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
         missionRepository, mission, MissionSection.SCHEDULE, expectedScheduleVersion, missionId);
+    final Instant oldMeetingTime = mission.getMeetingTime();
+    final Instant oldPlannedStart = mission.getPlannedStartTime();
+    final Instant oldPlannedEnd = mission.getPlannedEndTime();
+    final Instant oldActualEnd = mission.getActualEndTime();
     mission.setMeetingTime(meetingTime);
     mission.setPlannedStartTime(plannedStartTime);
     mission.setPlannedEndTime(plannedEndTime);
@@ -531,6 +549,8 @@ public class MissionService implements MissionCommands {
     mission.setActualEndTime(actualEndTime);
 
     validateMissionTimes(mission);
+    notificationPublisher.scheduleChanged(mission, oldMeetingTime, oldPlannedStart);
+    notificationPublisher.endChanged(mission, oldPlannedEnd, oldActualEnd);
     Mission saved = missionRepository.save(mission);
 
     if (actualEndTime != null) {
@@ -593,6 +613,7 @@ public class MissionService implements MissionCommands {
 
     final UUID deletedMissionId = mission.getId();
     final String deletedMissionName = mission.getName();
+    final Set<UUID> deletedParticipants = MissionNotificationPublisher.participantUserIds(mission);
 
     if (mission.getRefineryOrders() != null) {
       mission.getRefineryOrders().forEach(order -> order.setMission(null));
@@ -605,6 +626,7 @@ public class MissionService implements MissionCommands {
     }
 
     missionRepository.delete(mission);
+    notificationPublisher.deleted(deletedMissionId, deletedMissionName, deletedParticipants);
     auditRecorder.record(
         AuditEventType.MISSION_DELETED, deletedMissionId, deletedMissionName, null, null);
   }
@@ -1202,6 +1224,7 @@ public class MissionService implements MissionCommands {
     long ownershipVersion = upsertMissionOwnership(mission, user, expectedOwnershipVersion);
     mission.setOwner(user);
     mission.setOwnershipVersion(ownershipVersion);
+    notificationPublisher.responsibilityAssigned(mission, userId, "OWNER");
     auditRecorder.record(
         AuditEventType.MISSION_OWNER_CHANGED, mission.getId(), mission.getName(), userId, null);
     return mission;
