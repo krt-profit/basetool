@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Create or update payload of a quality tier, relayed to {@code /api/v1/admin/quality-tiers}
  * (REQ-ORDERS-036). The backend validates every component.
@@ -31,6 +33,7 @@ package de.greluc.krt.profit.basetool.frontend.catalogue.model;
  * @param active whether the tier is offered for new requirements
  * @param version the version read; required on update, ignored on create
  */
+@DtoMirror
 public record QualityTierWriteDto(
     String code,
     Integer minQuality,

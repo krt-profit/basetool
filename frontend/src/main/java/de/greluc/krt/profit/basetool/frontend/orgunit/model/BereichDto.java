@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.orgunit.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -34,6 +35,7 @@ import java.util.UUID;
  * @param department the backend {@code Department} name, or {@code null}
  * @param version the optimistic-lock version
  */
+@DtoMirror
 public record BereichDto(
     UUID id,
     String name,

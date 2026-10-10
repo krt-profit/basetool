@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 
@@ -27,4 +28,5 @@ import java.time.Instant;
  *
  * @param since the point in time from which on the client's writes are undone, in UTC
  */
+@DtoMirror
 public record ExchangeUndoRequestDto(@NotNull Instant since) {}

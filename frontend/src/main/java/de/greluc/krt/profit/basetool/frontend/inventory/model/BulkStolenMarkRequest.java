@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
@@ -32,5 +33,6 @@ import org.jetbrains.annotations.Nullable;
  * @param itemIds the selected rows; at least one, none null
  * @param stolen the requested marker
  */
+@DtoMirror
 public record BulkStolenMarkRequest(
     @NotNull @NotEmpty List<@NotNull UUID> itemIds, @Nullable Boolean stolen) {}

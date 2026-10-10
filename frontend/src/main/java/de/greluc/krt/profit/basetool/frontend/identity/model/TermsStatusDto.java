@@ -19,10 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend's Terms-of-Use consent status (REQ-SEC-028).
  *
  * @param accepted {@code true} when the caller has accepted the version currently in force
  * @param currentVersion content digest of that wording, carried for diagnostics
  */
+@DtoMirror
 public record TermsStatusDto(boolean accepted, String currentVersion) {}

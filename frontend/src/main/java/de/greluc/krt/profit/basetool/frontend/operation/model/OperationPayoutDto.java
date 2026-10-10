@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.operation.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.PayoutPreference;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -47,6 +48,7 @@ import java.time.Instant;
  * @param paidOutAt timestamp of the last paid-out transition ({@code null} when never set)
  * @param paidOutByName effective name of the auditor that flipped the flag, or {@code null}
  */
+@DtoMirror
 public record OperationPayoutDto(
     String participantId,
     String participantName,

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.notification.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -38,6 +39,7 @@ import java.util.UUID;
  * @param createdAt creation timestamp
  * @param updatedAt last-modification timestamp
  */
+@DtoMirror
 public record NotificationDto(
     UUID id,
     String type,

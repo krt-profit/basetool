@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -31,5 +32,6 @@ import java.util.UUID;
  * @param lastSeenAt when it was last seen
  * @param unseen whether its new-connection notification is still unread
  */
+@DtoMirror
 public record ConnectedInstallationDto(
     UUID id, String label, Instant firstSeenAt, Instant lastSeenAt, boolean unseen) {}

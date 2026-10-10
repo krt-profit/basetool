@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -27,4 +28,5 @@ import java.util.UUID;
  * @param owningOrgUnitId the new owning org unit, or {@code null} for ownerless
  * @param version the owning-org-unit version the client read
  */
+@DtoMirror
 public record UpdateMissionOwningOrgUnitRequest(UUID owningOrgUnitId, Long version) {}

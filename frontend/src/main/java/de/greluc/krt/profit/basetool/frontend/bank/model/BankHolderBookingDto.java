@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -44,6 +45,7 @@ import org.jetbrains.annotations.Nullable;
  * @param transferFee the in-game transfer fee borne by the debited source (REQ-BANK-033); {@code 0}
  *     for non-fee rows; an outgoing leg is the gross debited
  */
+@DtoMirror
 public record BankHolderBookingDto(
     UUID postingId,
     UUID transactionId,

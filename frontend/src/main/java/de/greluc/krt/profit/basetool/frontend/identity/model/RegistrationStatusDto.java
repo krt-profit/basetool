@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 
 /**
  * The calling user's own approval status, read once per session to route a {@code PENDING}/{@code
@@ -28,4 +29,5 @@ import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
  * @param approvalStatus the caller's approval lifecycle state ({@code PENDING}/{@code
  *     ACTIVE}/{@code REJECTED})
  */
+@DtoMirror
 public record RegistrationStatusDto(@BackendEnumAsString String approvalStatus) {}

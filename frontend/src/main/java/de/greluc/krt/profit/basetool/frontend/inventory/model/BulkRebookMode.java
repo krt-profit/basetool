@@ -19,11 +19,14 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend {@code BulkRebookMode}: which move a bulk rebooking
  * (Massen-Umbuchen, REQ-INV-036) performs. The two personal directions are explicit modes rather
  * than inferred from the source rows, because a bulk selection can mix personal and shared stock.
  */
+@DtoMirror
 public enum BulkRebookMode {
 
   /** Move the marked rows to a target user / location / owning org-unit pool. */

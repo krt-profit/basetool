@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,6 +33,7 @@ import java.util.UUID;
  * / {@code missionAllocations} (REQ-INV-027) supersede the single {@code jobOrderId} / {@code
  * missionId}.
  */
+@DtoMirror
 public record InventoryItemCreateDto(
     UUID userId,
     UUID materialId,

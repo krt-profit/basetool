@@ -19,7 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /** Enumeration of Checkout Type values. */
+@DtoMirror
 public enum CheckoutType {
   DISCARD,
   TRANSFER,

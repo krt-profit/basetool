@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -37,6 +38,7 @@ import java.util.UUID;
  * @param suggestions fuzzy candidates (highest score first); empty unless {@code status} is {@link
  *     BlueprintImportStatus#SUGGESTED}
  */
+@DtoMirror
 public record BlueprintImportEntryDto(
     String externalName,
     BlueprintImportStatus status,

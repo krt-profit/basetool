@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
 import java.util.List;
 
@@ -32,5 +33,6 @@ import java.util.List;
  *     explicitly rather than hiding
  * @param materials the unit's aggregated material buckets, pre-sorted by the backend
  */
+@DtoMirror
 public record MaterialDemandGroupDto(
     SquadronReferenceDto orgUnit, List<MaterialDemandRowDto> materials) {}

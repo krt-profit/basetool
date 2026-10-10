@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Write payload for changing a grant's capability flags (REQ-BANK-009).
  *
@@ -27,5 +29,6 @@ package de.greluc.krt.profit.basetool.frontend.bank.model;
  * @param canTransfer new transfer capability
  * @param version the grant version the client read
  */
+@DtoMirror
 public record UpdateBankGrantRequest(
     Boolean canDeposit, Boolean canWithdraw, Boolean canTransfer, Long version) {}

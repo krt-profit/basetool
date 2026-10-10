@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend {@code BlueprintImportResultDto}: the applied-import summary shown
  * as a toast.
@@ -30,5 +32,6 @@ package de.greluc.krt.profit.basetool.frontend.blueprint.model;
  * @param acquiredAtUpdated number of already-owned rows whose acquisition time this import pulled
  *     earlier
  */
+@DtoMirror
 public record BlueprintImportResultDto(
     int added, int aliasesLearned, int skipped, int alreadyOwned, int acquiredAtUpdated) {}

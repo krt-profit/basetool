@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.time.Instant;
 
@@ -29,4 +30,5 @@ import java.time.Instant;
  * @param date the bucket-end instant the balance is sampled at (UTC)
  * @param balance the running account balance as of {@code date} (whole aUEC)
  */
+@DtoMirror
 public record BankBalancePointDto(Instant date, BigDecimal balance) {}

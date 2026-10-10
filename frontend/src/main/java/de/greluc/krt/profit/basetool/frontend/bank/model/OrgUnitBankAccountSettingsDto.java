@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -54,6 +55,7 @@ import org.jetbrains.annotations.Nullable;
  * @param canConfigureApprovalLimits whether the caller may set/clear approval limits (REQ-BANK-041)
  * @param approvalLimits the account's per-tier approval limits with the org-unit edit affordance
  */
+@DtoMirror
 public record OrgUnitBankAccountSettingsDto(
     UUID accountId,
     String accountNo,

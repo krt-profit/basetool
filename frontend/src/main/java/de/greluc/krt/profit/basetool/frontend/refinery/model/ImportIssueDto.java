@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.refinery.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -35,6 +36,7 @@ import java.util.List;
  *     LOW_CONFIDENCE_MATERIAL}, otherwise the row's read confidence; nullable
  * @param suggestions ranked candidates for material issues; {@code null} otherwise
  */
+@DtoMirror
 public record ImportIssueDto(
     String field,
     String rawValue,

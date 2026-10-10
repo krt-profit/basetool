@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.promotion.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.UUID;
 
 /** Frontend DTO for a rank requirement entry. */
+@DtoMirror
 public record RankRequirementDto(
     UUID id,
     Long version,

@@ -19,10 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.personalinventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Outbound write DTO for updating an existing personal inventory entry. The {@code version} field
  * is mandatory on the backend (optimistic locking).
  */
+@DtoMirror
 public record PersonalInventoryItemUpdateRequest(
     String name,
     String note,

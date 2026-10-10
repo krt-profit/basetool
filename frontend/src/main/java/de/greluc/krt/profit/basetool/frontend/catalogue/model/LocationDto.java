@@ -19,8 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /** Data transfer record carrying Location payload. */
+@DtoMirror
 public record LocationDto(
     UUID id, String name, String description, boolean hidden, boolean homeLocation, Long version) {}

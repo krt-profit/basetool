@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.promotion.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
 import java.time.Instant;
 import java.util.UUID;
@@ -36,6 +37,7 @@ import org.jetbrains.annotations.Nullable;
  * @param createdAt creation time
  * @param updatedAt last modification time
  */
+@DtoMirror
 public record PromotionTopicDto(
     UUID id,
     Long version,

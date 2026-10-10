@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -31,6 +32,7 @@ import org.jetbrains.annotations.NotNull;
  * @param unchanged the ops that find their state already
  * @param notApplied the ops refused or not matched
  */
+@DtoMirror
 public record ConnectedAppMassChangeResultDto(
     @NotNull String clientName,
     @NotNull String resource,

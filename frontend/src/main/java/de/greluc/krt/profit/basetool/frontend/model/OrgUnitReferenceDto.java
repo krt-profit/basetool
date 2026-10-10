@@ -34,5 +34,6 @@ import java.util.UUID;
  * @param kind discriminator string ({@code SQUADRON} or {@code SPECIAL_COMMAND}), kept as a plain
  *     string so the frontend needs no parallel enum that could drift from the backend.
  */
+@DtoMirror
 public record OrgUnitReferenceDto(
     UUID id, String name, String shorthand, @BackendEnumAsString String kind) {}

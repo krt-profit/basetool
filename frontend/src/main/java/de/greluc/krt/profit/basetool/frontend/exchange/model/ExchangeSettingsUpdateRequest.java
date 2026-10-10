@@ -19,10 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Turns the global exchange switch on or off (REQ-XCH-003).
  *
  * @param enabled the new state
  * @param version the optimistic-lock version the admin last saw
  */
+@DtoMirror
 public record ExchangeSettingsUpdateRequest(Boolean enabled, Long version) {}

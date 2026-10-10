@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -32,6 +33,7 @@ import java.util.List;
  * @param ingredients flat ingredient list used as the fallback when {@code requirementGroups} is
  *     empty
  */
+@DtoMirror
 public record PersonalBlueprintRecipeDto(
     String productName,
     int variantCount,

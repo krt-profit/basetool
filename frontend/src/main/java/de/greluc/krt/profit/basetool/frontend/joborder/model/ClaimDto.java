@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
 import java.time.Instant;
 import java.util.UUID;
@@ -34,6 +35,7 @@ import java.util.UUID;
  * @param claimedAt creation instant (UTC)
  * @param version optimistic-lock version
  */
+@DtoMirror
 public record ClaimDto(
     UUID id,
     SquadronReferenceDto claimingOrgUnit,

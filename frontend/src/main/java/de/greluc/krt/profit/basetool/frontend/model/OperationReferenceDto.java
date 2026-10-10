@@ -27,4 +27,5 @@ import java.util.UUID;
  * mission-detail page's operation-picker dropdown to avoid pulling the full {@link OperationDto}
  * payload for every option.
  */
+@DtoMirror
 public record OperationReferenceDto(UUID id, String name) {}

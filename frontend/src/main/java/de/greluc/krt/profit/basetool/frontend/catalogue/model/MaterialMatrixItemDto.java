@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.UUID;
 
@@ -29,6 +30,7 @@ import java.util.UUID;
  * <p>{@code planetName} is the effective planet system of the terminal (direct, via its moon, or
  * via a like-named orbit), or {@code null} when the terminal belongs to no planet.
  */
+@DtoMirror
 public record MaterialMatrixItemDto(
     UUID materialId,
     String materialName,

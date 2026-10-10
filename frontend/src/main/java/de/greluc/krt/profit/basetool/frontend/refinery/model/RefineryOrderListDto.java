@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.refinery.model;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.RefiningMethodDto;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
@@ -31,6 +32,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /** Data transfer record carrying Refinery Order List payload. */
+@DtoMirror
 public record RefineryOrderListDto(
     UUID id,
     UserReferenceDto owner,

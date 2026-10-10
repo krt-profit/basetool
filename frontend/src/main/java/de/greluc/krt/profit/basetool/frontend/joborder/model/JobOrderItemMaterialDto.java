@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.QualityTierDto;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -35,6 +36,7 @@ import java.util.UUID;
  * @param qualityTier the bucket's quality tier, with its labels and floor
  * @param version optimistic-lock version
  */
+@DtoMirror
 public record JobOrderItemMaterialDto(
     UUID id,
     MaterialDto material,

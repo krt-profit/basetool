@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend {@code BulkOrgUnitChangeResultDto}: how many rows of a selection
  * changed their org unit and how many already carried it (REQ-INV-052).
@@ -26,4 +28,5 @@ package de.greluc.krt.profit.basetool.frontend.inventory.model;
  * @param changed the number of rows that now carry the target unit
  * @param skipped the number of rows that already carried it
  */
+@DtoMirror
 public record BulkOrgUnitChangeResultDto(int changed, int skipped) {}

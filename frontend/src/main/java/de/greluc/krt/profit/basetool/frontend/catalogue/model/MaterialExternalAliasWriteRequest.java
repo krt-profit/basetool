@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -35,6 +36,7 @@ import java.util.UUID;
  * @param note free-form provenance note
  * @param version optimistic-lock token; {@code null} on create, from the GET response on update
  */
+@DtoMirror
 public record MaterialExternalAliasWriteRequest(
     UUID materialId,
     String sourceSystem,

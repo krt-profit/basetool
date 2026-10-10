@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -26,6 +27,7 @@ import java.time.Instant;
 import java.util.List;
 
 /** Data transfer record carrying Job Order Handover Create payload. */
+@DtoMirror
 public record JobOrderHandoverCreateDto(
     @NotNull Instant handoverTime,
     @NotBlank String recipientHandle,

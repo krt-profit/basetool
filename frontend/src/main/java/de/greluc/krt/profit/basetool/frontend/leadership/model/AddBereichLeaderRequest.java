@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.leadership.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -28,4 +29,5 @@ import java.util.UUID;
  * @param userId the member
  * @param role the backend {@code BereichLeadershipRole} name
  */
+@DtoMirror
 public record AddBereichLeaderRequest(UUID userId, @BackendEnumAsString String role) {}

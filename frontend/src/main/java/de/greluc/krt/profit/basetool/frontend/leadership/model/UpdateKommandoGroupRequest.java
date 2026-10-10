@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.leadership.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Body of the backend Kommandogruppe rename and reorder call.
  *
@@ -26,4 +28,5 @@ package de.greluc.krt.profit.basetool.frontend.leadership.model;
  * @param sortIndex the position among the squadron's groups
  * @param version the group's optimistic-lock version
  */
+@DtoMirror
 public record UpdateKommandoGroupRequest(String name, Integer sortIndex, Long version) {}

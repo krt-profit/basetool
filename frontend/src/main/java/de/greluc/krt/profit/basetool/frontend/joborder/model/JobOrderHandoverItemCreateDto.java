@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
 import de.greluc.krt.profit.basetool.frontend.inventory.model.AllocationReductionDto;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -38,6 +39,7 @@ import org.jetbrains.annotations.Nullable;
  * @param qualityRequirement the code of the quality tier the amount is booked against, or {@code
  *     null} for the highest tier the entry meets (REQ-ORDERS-038)
  */
+@DtoMirror
 public record JobOrderHandoverItemCreateDto(
     @NotNull UUID inventoryItemId,
     @NotNull @Positive Double amount,

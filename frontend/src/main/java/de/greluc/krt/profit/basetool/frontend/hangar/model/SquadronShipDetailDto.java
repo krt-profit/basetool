@@ -19,5 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.hangar.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /** Data transfer record carrying Squadron Ship Detail payload. */
+@DtoMirror
 public record SquadronShipDetailDto(String ownerName, String locationName, boolean fitted) {}

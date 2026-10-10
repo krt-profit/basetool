@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /** Data transfer record carrying Material Category payload. */
+@DtoMirror
 public record MaterialCategoryDto(UUID id, String name, Long version) {}

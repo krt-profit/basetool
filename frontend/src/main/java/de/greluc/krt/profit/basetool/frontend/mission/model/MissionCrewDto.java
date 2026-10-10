@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.JobTypeDto;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.Set;
 import java.util.UUID;
 
@@ -27,5 +28,6 @@ import java.util.UUID;
  * Frontend mirror of the backend {@code MissionCrewDto}: a participant's crew assignment with its
  * job types. {@code version} is echoed back by the crew edit form for optimistic locking.
  */
+@DtoMirror
 public record MissionCrewDto(
     UUID id, UUID participantId, String participantName, Long version, Set<JobTypeDto> jobTypes) {}

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgunit.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -29,4 +30,5 @@ import java.util.UUID;
  * @param parentOrgUnitId the new parent's id, or {@code null} to detach the unit.
  * @param version the child unit's current optimistic-lock version.
  */
+@DtoMirror
 public record OrgUnitParentUpdateRequest(UUID parentOrgUnitId, Long version) {}

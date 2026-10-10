@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.hangar.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -30,6 +31,7 @@ import java.util.UUID;
  * <p>{@code owningOrgUnitId} is the owning-org-unit picker output; {@code null} lets the backend
  * stamp it, otherwise it is validated against the target user's memberships.
  */
+@DtoMirror
 public record ShipRequestDto(
     String name,
     @NotNull(message = "{ship.validation.shiptype.required}") UUID shipTypeId,

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -28,5 +29,6 @@ import java.util.List;
  * @param truncated whether the overall cap was reached, shown so a capped list is not taken as
  *     complete
  */
+@DtoMirror
 public record PersonSearchResultDto(
     List<PersonSearchHitDto> hits, boolean truncated, List<String> cappedColumns) {}

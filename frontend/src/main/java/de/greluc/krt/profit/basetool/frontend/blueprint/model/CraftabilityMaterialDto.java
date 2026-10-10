@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -42,6 +43,7 @@ import java.util.UUID;
  * @param craftableWithRefinery crafts this material alone allows including refinery yield
  * @param quantityType the unit of the {@code *Scu} figures, {@code "SCU"} or {@code "PIECE"}
  */
+@DtoMirror
 public record CraftabilityMaterialDto(
     UUID materialId,
     String materialName,

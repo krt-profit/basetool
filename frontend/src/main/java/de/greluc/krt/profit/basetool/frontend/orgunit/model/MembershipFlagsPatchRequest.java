@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgunit.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Body of the backend Logistiker / Einsatzmanager flag patch on an org-unit membership.
  *
@@ -26,5 +28,6 @@ package de.greluc.krt.profit.basetool.frontend.orgunit.model;
  * @param isMissionManager the new Einsatzmanager flag, or {@code null} to keep it
  * @param version the membership's optimistic-lock version
  */
+@DtoMirror
 public record MembershipFlagsPatchRequest(
     Boolean isLogistician, Boolean isMissionManager, Long version) {}

@@ -19,5 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /** Frontend mirror of the backend blueprint summary-property DTO (an aggregated affected stat). */
+@DtoMirror
 public record BlueprintSummaryPropertyDto(String propertyKey, String label, String betterWhen) {}

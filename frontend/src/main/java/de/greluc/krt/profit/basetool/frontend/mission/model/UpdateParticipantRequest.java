@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -37,6 +38,7 @@ import java.util.UUID;
  * @param payoutPreference the payout preference constant, or {@code null}
  * @param version the participant version the client read
  */
+@DtoMirror
 public record UpdateParticipantRequest(
     UUID desiredMissionJobTypeId,
     UUID plannedMissionJobTypeId,

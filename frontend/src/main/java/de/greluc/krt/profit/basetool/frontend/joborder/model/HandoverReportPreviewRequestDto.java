@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -31,6 +32,7 @@ import java.util.List;
  * @param recipientHandle the recipient's handle
  * @param items the handed-over material lines
  */
+@DtoMirror
 public record HandoverReportPreviewRequestDto(
     String jobOrderNumber,
     LocalDateTime handoverTime,

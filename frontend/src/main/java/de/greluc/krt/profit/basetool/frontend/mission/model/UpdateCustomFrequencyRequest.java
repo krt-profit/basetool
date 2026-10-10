@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 
 /**
@@ -28,4 +29,5 @@ import java.math.BigDecimal;
  * @param value the channel value
  * @param version the frequency row version the client read
  */
+@DtoMirror
 public record UpdateCustomFrequencyRequest(String name, BigDecimal value, Long version) {}

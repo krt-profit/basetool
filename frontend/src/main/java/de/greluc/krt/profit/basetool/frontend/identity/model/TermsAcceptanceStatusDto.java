@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -30,6 +31,7 @@ import java.util.UUID;
  * @param displayName the callsign, may be {@code null} for an account that never set one
  * @param acceptedAt when this user accepted the wording in force, or {@code null} if they have not
  */
+@DtoMirror
 public record TermsAcceptanceStatusDto(
     UUID userId, String username, String displayName, Instant acceptedAt) {
 

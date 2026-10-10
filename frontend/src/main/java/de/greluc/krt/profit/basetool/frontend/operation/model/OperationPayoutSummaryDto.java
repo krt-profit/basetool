@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.operation.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -33,5 +34,6 @@ import java.util.List;
  *     donated
  * @param payouts the per-participant payout rows, sorted by participant name
  */
+@DtoMirror
 public record OperationPayoutSummaryDto(
     BigDecimal totalDonations, List<OperationPayoutDto> payouts) {}

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -35,6 +36,7 @@ import java.util.UUID;
  * @param allocatedQuantity the whole-unit slice earmarked to this order
  * @param delivered whether this order's slice is marked delivered
  */
+@DtoMirror
 public record JobOrderItemStockEntryDto(
     UUID inventoryEntryId,
     long version,

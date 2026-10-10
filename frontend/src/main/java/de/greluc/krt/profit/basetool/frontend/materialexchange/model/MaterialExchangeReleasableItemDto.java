@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.materialexchange.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -41,6 +42,7 @@ import java.util.UUID;
  * @param alreadyReleased whether an active offer already exists for this row.
  * @param stolen whether the row is marked „gestohlen" (REQ-INV-053).
  */
+@DtoMirror
 public record MaterialExchangeReleasableItemDto(
     UUID inventoryItemId,
     @BackendEnumAsString String kind,

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 
 /**
@@ -29,4 +30,5 @@ import java.time.Instant;
  * @param note free-form note, or {@code null}
  * @param version the last seen optimistic-lock version
  */
+@DtoMirror
 public record PersonalBlueprintUpdateRequest(Instant acquiredAt, String note, Long version) {}

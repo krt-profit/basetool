@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 
 /**
@@ -31,6 +32,7 @@ import java.time.Instant;
  * @param actualEndTime the actual end, or {@code null}
  * @param version the schedule version the client read
  */
+@DtoMirror
 public record PatchMissionScheduleRequest(
     Instant meetingTime,
     Instant plannedStartTime,

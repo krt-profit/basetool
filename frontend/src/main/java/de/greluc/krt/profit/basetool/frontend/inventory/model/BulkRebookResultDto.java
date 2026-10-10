@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend {@code BulkRebookResultDto}: the outcome of a Massen-Umbuchen
  * (REQ-INV-036).
@@ -26,4 +28,5 @@ package de.greluc.krt.profit.basetool.frontend.inventory.model;
  * @param rebooked the number of rows that were moved
  * @param skipped the number of rows that already sat in the requested target state
  */
+@DtoMirror
 public record BulkRebookResultDto(int rebooked, int skipped) {}

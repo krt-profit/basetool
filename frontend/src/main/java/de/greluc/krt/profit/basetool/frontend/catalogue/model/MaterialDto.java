@@ -20,9 +20,11 @@
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /** Data transfer record carrying Material payload. */
+@DtoMirror
 public record MaterialDto(
     UUID id,
     String name,

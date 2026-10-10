@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 import java.util.UUID;
 
@@ -33,6 +34,7 @@ import java.util.UUID;
  * @param orgUnitIds the org units the participant flies for, or {@code null}
  * @param payoutPreference the payout preference constant, or {@code null}
  */
+@DtoMirror
 public record AddExternalParticipantRequest(
     UUID userId,
     String guestName,

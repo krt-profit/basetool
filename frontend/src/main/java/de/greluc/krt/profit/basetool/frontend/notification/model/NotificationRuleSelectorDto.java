@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.notification.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -33,6 +34,7 @@ import java.util.UUID;
  * @param orgRelativeRole org-relative role for {@code ORG_RELATIVE_ROLE}, else {@code null}
  * @param contextRole context org unit for {@code ORG_RELATIVE_ROLE}, else {@code null}
  */
+@DtoMirror
 public record NotificationRuleSelectorDto(
     UUID id,
     @BackendEnumAsString String kind,

@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.UUID;
 
 /** Data transfer record carrying Material Price payload. */
+@DtoMirror
 public record MaterialPriceDto(
     UUID id,
     String terminalName,

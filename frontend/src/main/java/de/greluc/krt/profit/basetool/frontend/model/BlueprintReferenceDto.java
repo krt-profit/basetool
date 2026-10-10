@@ -29,4 +29,5 @@ import java.util.UUID;
  * @param outputName the produced item's name as recorded on the blueprint
  * @param scwikiKey the SC-Wiki key (stable disambiguator)
  */
+@DtoMirror
 public record BlueprintReferenceDto(UUID id, String outputName, String scwikiKey) {}

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BlueprintReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.GameItemReferenceDto;
 import java.util.List;
 import java.util.UUID;
@@ -40,6 +41,7 @@ import java.util.UUID;
  *     after an SC-Wiki re-sync, making the snapshotted materials a foreign recipe (REQ-ORDERS-033)
  * @param version optimistic-lock version
  */
+@DtoMirror
 public record JobOrderItemDto(
     UUID id,
     GameItemReferenceDto gameItem,

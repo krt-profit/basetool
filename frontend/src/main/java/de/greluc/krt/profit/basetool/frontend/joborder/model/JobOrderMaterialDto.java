@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.QualityTierDto;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 import java.util.UUID;
 
@@ -38,6 +39,7 @@ import java.util.UUID;
  * @param openAmount {@code required − Σ claims}; {@code null} for non-SK orders
  * @param version optimistic-lock version
  */
+@DtoMirror
 public record JobOrderMaterialDto(
     UUID id,
     MaterialDto material,

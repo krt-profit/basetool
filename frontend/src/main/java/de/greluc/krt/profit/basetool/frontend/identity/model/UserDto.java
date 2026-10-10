@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
 import java.time.LocalDate;
 import java.util.List;
@@ -33,6 +34,7 @@ import org.jetbrains.annotations.Nullable;
  * REQ-ORG-017). {@code discordLinked} tells whether a Discord account is federated (REQ-SEC-019)
  * and is {@code null} on redacted projections.
  */
+@DtoMirror
 public record UserDto(
     UUID id,
     String username,

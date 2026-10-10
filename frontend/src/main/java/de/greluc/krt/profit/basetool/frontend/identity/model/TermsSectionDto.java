@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -28,4 +29,5 @@ import java.util.List;
  *     text, so the template renders it rather than deriving it from list position
  * @param clauses the section's paragraphs, in document order
  */
+@DtoMirror
 public record TermsSectionDto(String heading, List<TermsClauseDto> clauses) {}

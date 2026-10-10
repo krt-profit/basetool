@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.promotion.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -30,5 +31,6 @@ import java.util.UUID;
  * @param sortOrder the display position
  * @param version the optimistic-lock version, required on update
  */
+@DtoMirror
 public record PromotionCategoryWriteRequest(
     UUID topicId, String name, String description, Integer sortOrder, Long version) {}

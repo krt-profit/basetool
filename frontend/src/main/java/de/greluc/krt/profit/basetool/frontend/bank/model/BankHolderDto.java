@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -36,6 +37,7 @@ import org.jetbrains.annotations.Nullable;
  * @param roleManaged whether the holder was auto-created from a bank role (REQ-BANK-029)
  * @param version optimistic-locking version to echo on mutations
  */
+@DtoMirror
 public record BankHolderDto(
     UUID id,
     @Nullable UUID userId,

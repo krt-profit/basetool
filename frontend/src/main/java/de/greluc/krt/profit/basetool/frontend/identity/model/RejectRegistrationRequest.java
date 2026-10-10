@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -27,4 +28,5 @@ import org.jetbrains.annotations.Nullable;
  * @param reason optional free-text reason recorded in the approval audit
  * @param version the optimistic-lock version the admin last read; {@code null} bypasses the check
  */
+@DtoMirror
 public record RejectRegistrationRequest(@Nullable String reason, @Nullable Long version) {}

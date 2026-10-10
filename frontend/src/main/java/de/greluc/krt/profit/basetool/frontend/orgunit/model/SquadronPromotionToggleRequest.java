@@ -19,9 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgunit.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Body of the backend {@code PATCH /api/v1/squadrons/{id}/promotion-enabled} toggle.
  *
  * @param enabled whether the promotion feature is on for the squadron
  */
+@DtoMirror
 public record SquadronPromotionToggleRequest(Boolean enabled) {}

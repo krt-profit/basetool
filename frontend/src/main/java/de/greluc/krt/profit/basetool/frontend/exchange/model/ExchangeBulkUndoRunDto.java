@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -42,6 +43,7 @@ import java.util.UUID;
  * @param startedAt when the run started
  * @param finishedAt when it ended, or {@code null} while it runs
  */
+@DtoMirror
 public record ExchangeBulkUndoRunDto(
     UUID id,
     UUID exchangeClientId,

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.UUID;
 
@@ -30,5 +31,6 @@ import java.util.UUID;
  * @param amount whole-aUEC amount
  * @param note free-text note, or {@code null}
  */
+@DtoMirror
 public record BankHolderTransferRequest(
     UUID sourceHolderId, UUID destinationHolderId, BigDecimal amount, String note) {}

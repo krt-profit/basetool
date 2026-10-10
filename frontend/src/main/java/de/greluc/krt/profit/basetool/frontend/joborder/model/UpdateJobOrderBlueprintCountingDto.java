@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * DTO for toggling an item order's blueprint-coverage variant-counting mode via the backend API.
  * {@code true} counts cosmetic variants of the ordered items toward availability (family matching),
@@ -27,5 +29,6 @@ package de.greluc.krt.profit.basetool.frontend.joborder.model;
  * @param countBlueprintsWithVariants the requested counting mode
  * @param version the order's expected optimistic-lock version
  */
+@DtoMirror
 public record UpdateJobOrderBlueprintCountingDto(
     Boolean countBlueprintsWithVariants, Long version) {}

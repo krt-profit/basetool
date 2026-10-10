@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.QualityTierDto;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -39,6 +40,7 @@ import java.util.List;
  *     be gathered
  * @param orders the contributing orders and their shares, for the row's drill-down
  */
+@DtoMirror
 public record MaterialDemandRowDto(
     MaterialDto material,
     String qualityRequirement,

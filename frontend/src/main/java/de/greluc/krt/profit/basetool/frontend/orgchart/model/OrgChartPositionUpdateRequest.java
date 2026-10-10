@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgchart.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -30,5 +31,6 @@ import java.util.UUID;
  * @param version the optimistic-lock version the editor last saw
  * @param displayName the free-text holder, or {@code null}
  */
+@DtoMirror
 public record OrgChartPositionUpdateRequest(
     UUID userId, String name, Integer sortIndex, Long version, String displayName) {}

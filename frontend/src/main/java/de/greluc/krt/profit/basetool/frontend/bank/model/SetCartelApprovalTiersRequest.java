@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 
 /**
@@ -28,5 +29,6 @@ import java.math.BigDecimal;
  * @param areaLeadCeiling the Bereichsleiter-Profit ceiling T2, or {@code null} to clear it
  * @param version the account version the client read
  */
+@DtoMirror
 public record SetCartelApprovalTiersRequest(
     BigDecimal employeeCeiling, BigDecimal areaLeadCeiling, Long version) {}

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.promotion.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -34,6 +35,7 @@ import java.util.UUID;
  * @param description the description, or {@code null}
  * @param version the optimistic-lock version, required on update
  */
+@DtoMirror
 public record RankRequirementWriteRequest(
     Integer fromRank,
     Integer toRank,

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.mission.model;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
 import java.util.List;
 import java.util.UUID;
@@ -31,6 +32,7 @@ import java.util.UUID;
  * <p>When {@code responsibleUser} is {@code null} the view falls back to the assigned ship's owner.
  * {@code version} is echoed back by the edit form for optimistic locking.
  */
+@DtoMirror
 public record MissionUnitDto(
     UUID id,
     String name,

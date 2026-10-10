@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.leadership.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -31,5 +32,6 @@ import java.util.UUID;
  * @param sortIndex the display order within the Staffel.
  * @param version the optimistic-lock version, echoed back on a rename / reorder.
  */
+@DtoMirror
 public record KommandoGroupDto(
     UUID id, UUID squadronId, String name, int sortIndex, Long version) {}

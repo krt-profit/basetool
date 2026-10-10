@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.io.IOException;
 import java.lang.reflect.RecordComponent;
 import java.nio.file.Files;
@@ -34,10 +35,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import org.junit.jupiter.api.Test;
-import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 
 /**
- * Contract test diffing every hand-mirrored frontend {@code model/dto} record against the
+ * Contract test diffing every hand-mirrored frontend {@link DtoMirror} record against the
  * same-named schema in the committed backend {@code openapi.json}, without classpath coupling.
  *
  * <p>It fails on:
@@ -53,9 +53,6 @@ import org.springframework.context.annotation.ClassPathScanningCandidateComponen
  */
 class FrontendDtoContractTest {
 
-  /** Package holding the hand-mirrored frontend DTO records. */
-  private static final String DTO_PACKAGE = "de.greluc.krt.profit.basetool.frontend.model.dto";
-
   /** Candidate locations of the committed OpenAPI document, relative to the test working dir. */
   private static final List<Path> OPENAPI_CANDIDATES =
       List.of(
@@ -67,7 +64,7 @@ class FrontendDtoContractTest {
     JsonNode schemas = loadOpenApiSchemas();
     List<Class<?>> records = frontendDtoRecords();
     assertThat(records)
-        .as("classpath scan of %s should find the hand-mirrored DTO records", DTO_PACKAGE)
+        .as("the @DtoMirror scan should find the hand-mirrored DTO records")
         .hasSizeGreaterThan(100);
 
     List<String> problems = new ArrayList<>();
@@ -177,32 +174,12 @@ class FrontendDtoContractTest {
   }
 
   /**
-   * Reflectively enumerates every {@code record} class in {@link #DTO_PACKAGE} via a Spring
-   * classpath scan with a match-all filter (the DTOs are plain records, not Spring components).
+   * Enumerates every {@code record} among the {@link DtoMirror} types, nested ones included.
    *
    * @return the frontend DTO record classes
    */
   private List<Class<?>> frontendDtoRecords() {
-    ClassPathScanningCandidateComponentProvider scanner =
-        new ClassPathScanningCandidateComponentProvider(false);
-    scanner.addIncludeFilter((metadataReader, factory) -> true);
-    List<Class<?>> records = new ArrayList<>();
-    scanner
-        .findCandidateComponents(DTO_PACKAGE)
-        .forEach(
-            beanDefinition -> {
-              try {
-                Class<?> clazz = Class.forName(beanDefinition.getBeanClassName());
-                if (clazz.isRecord()) {
-                  records.add(clazz);
-                }
-              } catch (ClassNotFoundException ex) {
-                throw new IllegalStateException(
-                    "Scanned DTO class could not be loaded: " + beanDefinition.getBeanClassName(),
-                    ex);
-              }
-            });
-    return records;
+    return DtoMirrorScan.types().stream().filter(Class::isRecord).toList();
   }
 
   /**

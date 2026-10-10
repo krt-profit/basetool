@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgunit.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -32,6 +33,7 @@ import org.jetbrains.annotations.Nullable;
  *     state (an empty list removes every Staffel membership).
  * @param specialCommands list of SK-side changes; may be {@code null} or empty.
  */
+@DtoMirror
 public record MembershipDeltaRequest(
     @Nullable List<StaffelChange> staffeln, @Nullable List<SpecialCommandChange> specialCommands) {
 

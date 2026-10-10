@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -41,6 +42,7 @@ import java.util.UUID;
  * @param createdAt row creation timestamp
  * @param updatedAt row last-update timestamp
  */
+@DtoMirror
 public record MaterialExternalAliasDto(
     UUID id,
     Long version,

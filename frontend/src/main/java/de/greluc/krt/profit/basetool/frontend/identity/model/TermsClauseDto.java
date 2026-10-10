@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -28,4 +29,5 @@ import java.util.List;
  * @param bullets the list items under it; empty for a paragraph that has none, so the template can
  *     omit the {@code <ul>} entirely rather than rendering an empty one
  */
+@DtoMirror
 public record TermsClauseDto(String text, List<String> bullets) {}

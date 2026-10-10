@@ -19,10 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Write payload replacing a mission's flags section.
  *
  * @param isInternal whether the mission is internal
  * @param version the flags version the client read
  */
+@DtoMirror
 public record PatchMissionFlagsRequest(Boolean isInternal, Long version) {}

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -33,6 +34,7 @@ import java.util.List;
  * @param alreadyOwned count of already-owned rows
  * @param entries the per-name preview rows, in upload order
  */
+@DtoMirror
 public record BlueprintImportPreviewDto(
     int total,
     int matched,

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -32,6 +33,7 @@ import java.util.UUID;
  * lets the backend stamp the owner. {@link #objectives} and {@link #steps} carry the optional Ziele
  * and Ablauf rows created with the mission, {@code null} when none.
  */
+@DtoMirror
 public record CreateMissionRequest(
     String name,
     String description,

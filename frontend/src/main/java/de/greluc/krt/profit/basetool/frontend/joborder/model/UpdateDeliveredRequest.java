@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
@@ -30,5 +31,6 @@ import java.util.UUID;
  * @param jobOrderId the earmarked job order whose slice to toggle
  * @param version the owning inventory entry's optimistic-locking version
  */
+@DtoMirror
 public record UpdateDeliveredRequest(
     @NotNull Boolean delivered, @NotNull UUID jobOrderId, @NotNull Long version) {}

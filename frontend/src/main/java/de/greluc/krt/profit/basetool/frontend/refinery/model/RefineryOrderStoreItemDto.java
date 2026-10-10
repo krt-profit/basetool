@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.refinery.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -28,6 +29,7 @@ import java.util.UUID;
  * it. {@code personal} books the output as the receiver's private stock (REQ-INV-035) and cannot be
  * combined with {@code jobOrderId}.
  */
+@DtoMirror
 public record RefineryOrderStoreItemDto(
     UUID materialId,
     UUID locationId,

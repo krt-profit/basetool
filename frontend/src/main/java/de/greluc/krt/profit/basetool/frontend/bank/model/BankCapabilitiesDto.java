@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the caller's booking capabilities on one bank account (REQ-BANK-009); decides
  * which K1 action buttons render.
@@ -28,5 +30,6 @@ package de.greluc.krt.profit.basetool.frontend.bank.model;
  * @param canTransfer whether the caller may transfer out of / rebook within the account
  * @param management whether the caller has the management perspective
  */
+@DtoMirror
 public record BankCapabilitiesDto(
     boolean canDeposit, boolean canWithdraw, boolean canTransfer, boolean management) {}

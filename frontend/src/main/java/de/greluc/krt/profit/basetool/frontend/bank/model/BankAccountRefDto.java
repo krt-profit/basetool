@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -31,5 +32,6 @@ import java.util.UUID;
  * @param name the account's display name
  * @param type account-type enum name
  */
+@DtoMirror
 public record BankAccountRefDto(
     UUID id, String accountNo, String name, @BackendEnumAsString String type) {}

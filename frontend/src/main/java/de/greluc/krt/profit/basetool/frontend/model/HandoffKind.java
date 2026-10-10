@@ -23,6 +23,7 @@ package de.greluc.krt.profit.basetool.frontend.model;
  * Kind of draft a one-click ingest handoff carries, mirroring the ingest gateway's {@code
  * HandoffKind}; tells the frontend which review surface to pre-fill.
  */
+@DtoMirror
 public enum HandoffKind {
   /** A refinery-order draft; pre-fills the refinery create form. */
   REFINERY,

@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend {@code BlueprintProductDto}: one searchable blueprint product, the
  * de-duplicated unit of ownership.
@@ -30,6 +32,7 @@ package de.greluc.krt.profit.basetool.frontend.blueprint.model;
  * @param exampleKey one representative SC Wiki recipe key, or {@code null}
  * @param ownedByCurrentUser whether the calling user already owns this product
  */
+@DtoMirror
 public record BlueprintProductDto(
     String productKey,
     String name,

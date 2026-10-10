@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -26,4 +27,5 @@ import java.util.UUID;
  *
  * @param userId the user to register as custodian
  */
+@DtoMirror
 public record RegisterBankHolderRequest(UUID userId) {}

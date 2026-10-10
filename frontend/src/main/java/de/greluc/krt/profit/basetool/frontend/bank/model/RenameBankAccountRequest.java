@@ -19,10 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Write payload for renaming a bank account.
  *
  * @param name the new display name
  * @param version the account version the client read
  */
+@DtoMirror
 public record RenameBankAccountRequest(String name, Long version) {}

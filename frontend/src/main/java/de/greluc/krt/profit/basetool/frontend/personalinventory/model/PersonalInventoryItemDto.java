@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.personalinventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.UUID;
 
 /** Read DTO mirroring {@code PersonalInventoryItemResponse} from the backend module. */
+@DtoMirror
 public record PersonalInventoryItemDto(
     UUID id,
     String name,

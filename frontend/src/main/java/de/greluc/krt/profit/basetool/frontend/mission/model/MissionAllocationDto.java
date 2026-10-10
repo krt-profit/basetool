@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -31,5 +32,6 @@ import java.util.UUID;
  * @param missionPlannedStartTime the earmarked mission's planned start time, or {@code null}.
  * @param amount the SCU/piece amount of the entry earmarked to this mission.
  */
+@DtoMirror
 public record MissionAllocationDto(
     UUID missionId, String missionName, Instant missionPlannedStartTime, Double amount) {}

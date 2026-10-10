@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
 import java.time.Instant;
@@ -30,6 +31,7 @@ import org.jetbrains.annotations.Nullable;
  * Frontend mirror of the backend's {@code JobOrderHandoverDto}, including the executing user and
  * squadron snapshot, which may be {@code null}.
  */
+@DtoMirror
 public record JobOrderHandoverDto(
     UUID id,
     UUID jobOrderId,

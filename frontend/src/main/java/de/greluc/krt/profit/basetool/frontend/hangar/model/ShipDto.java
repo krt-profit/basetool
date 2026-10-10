@@ -22,10 +22,12 @@ package de.greluc.krt.profit.basetool.frontend.hangar.model;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
 import java.util.UUID;
 
 /** Data transfer record carrying Ship payload. */
+@DtoMirror
 public record ShipDto(
     UUID id,
     String name,

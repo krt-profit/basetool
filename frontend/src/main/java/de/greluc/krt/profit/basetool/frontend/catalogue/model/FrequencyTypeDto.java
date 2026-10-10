@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -32,5 +33,6 @@ import java.util.UUID;
  * @param sortIndex position in the admin order, assigned by the backend
  * @param version optimistic-lock counter, {@code null} on create
  */
+@DtoMirror
 public record FrequencyTypeDto(
     UUID id, String name, String description, boolean active, Integer sortIndex, Long version) {}

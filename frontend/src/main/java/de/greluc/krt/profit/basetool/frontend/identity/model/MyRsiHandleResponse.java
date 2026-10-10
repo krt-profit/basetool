@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -27,4 +28,5 @@ import org.jetbrains.annotations.Nullable;
  * @param rsiHandle the stored handle, or {@code null} when none is stored
  * @param version the user row's current optimistic-lock version
  */
+@DtoMirror
 public record MyRsiHandleResponse(@Nullable String rsiHandle, Long version) {}

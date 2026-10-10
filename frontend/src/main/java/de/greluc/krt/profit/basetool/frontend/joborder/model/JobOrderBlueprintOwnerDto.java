@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -30,5 +31,6 @@ import java.util.List;
  * @param orgUnitMember {@code true} when the owner is a member of the order's responsible org unit,
  *     {@code false} when visible only via global blueprint sharing (REQ-INV-018)
  */
+@DtoMirror
 public record JobOrderBlueprintOwnerDto(
     String ownerName, List<String> ownedProductNames, boolean orgUnitMember) {}

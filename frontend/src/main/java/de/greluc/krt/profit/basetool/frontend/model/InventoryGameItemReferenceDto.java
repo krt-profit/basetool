@@ -31,5 +31,6 @@ import java.util.UUID;
  * @param manufacturer the manufacturer's display name, or {@code null} when unresolved
  * @param kind the {@code GameItemKind} name, relayed as a string for API stability
  */
+@DtoMirror
 public record InventoryGameItemReferenceDto(
     UUID id, String name, String manufacturer, String kind) {}

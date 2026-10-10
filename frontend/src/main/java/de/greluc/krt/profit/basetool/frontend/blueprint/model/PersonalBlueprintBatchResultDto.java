@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Mirror of the backend {@code PersonalBlueprintBatchResult}: the outcome of a multi-select add,
  * shown as a toast.
@@ -27,5 +29,6 @@ package de.greluc.krt.profit.basetool.frontend.blueprint.model;
  * @param skippedAlreadyOwned number of keys skipped because they were already owned
  * @param skippedUnresolved number of keys skipped because they matched no active product
  */
+@DtoMirror
 public record PersonalBlueprintBatchResultDto(
     int added, int skippedAlreadyOwned, int skippedUnresolved) {}

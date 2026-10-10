@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend {@code BulkStolenMarkResultDto}: how many rows of a selection
  * changed their „gestohlen" marker and how many already carried it (REQ-INV-053).
@@ -26,4 +28,5 @@ package de.greluc.krt.profit.basetool.frontend.inventory.model;
  * @param changed the number of rows that now carry the requested marker
  * @param skipped the number of rows that already carried it
  */
+@DtoMirror
 public record BulkStolenMarkResultDto(int changed, int skipped) {}

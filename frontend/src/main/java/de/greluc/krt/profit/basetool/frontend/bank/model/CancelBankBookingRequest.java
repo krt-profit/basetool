@@ -19,9 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Write payload for cancelling one's own pending booking request (REQ-BANK-022).
  *
  * @param version the request version the client read
  */
+@DtoMirror
 public record CancelBankBookingRequest(Long version) {}

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +37,7 @@ import java.util.Map;
  *     {@code terminals}
  * @param groups the material rows, grouped by category and in display order (top to bottom)
  */
+@DtoMirror
 public record MatrixGridDto(
     List<Column> terminals, List<SystemGroup> systemGroups, List<Group> groups) {
 

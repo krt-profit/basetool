@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -28,4 +29,5 @@ import java.util.UUID;
  * @param targetId the job order / mission to earmark part of the new entry to.
  * @param amount the SCU to earmark to {@code targetId}.
  */
+@DtoMirror
 public record InventoryAllocationInput(UUID targetId, Double amount) {}

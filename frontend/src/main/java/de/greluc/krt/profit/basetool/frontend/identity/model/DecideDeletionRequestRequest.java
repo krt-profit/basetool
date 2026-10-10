@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -28,5 +29,6 @@ import org.jetbrains.annotations.Nullable;
  * @param note the reason of a refusal, or {@code null} on execution
  * @param version the request row's optimistic-lock version, or {@code null} to skip the check
  */
+@DtoMirror
 public record DecideDeletionRequestRequest(
     boolean grantHistoryErasure, @Nullable String note, @Nullable Long version) {}

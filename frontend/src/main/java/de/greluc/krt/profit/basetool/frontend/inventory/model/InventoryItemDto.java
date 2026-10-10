@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderAllocationDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionAllocationDto;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto;
@@ -39,6 +40,7 @@ import java.util.UUID;
  * row carries {@code gameItem} with {@code null} material and quality (REQ-INV-029). {@code stolen}
  * is the „gestohlen" marker (REQ-INV-053).
  */
+@DtoMirror
 public record InventoryItemDto(
     UUID id,
     UserReferenceDto user,

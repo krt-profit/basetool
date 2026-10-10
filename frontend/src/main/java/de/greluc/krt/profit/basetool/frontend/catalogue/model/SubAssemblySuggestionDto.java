@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BlueprintReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.GameItemReferenceDto;
 import java.util.List;
 
@@ -31,5 +32,6 @@ import java.util.List;
  * @param quantity whole-unit count needed for the previewed amount
  * @param blueprints the blueprints that produce {@code gameItem}
  */
+@DtoMirror
 public record SubAssemblySuggestionDto(
     GameItemReferenceDto gameItem, Integer quantity, List<BlueprintReferenceDto> blueprints) {}

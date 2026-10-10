@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
@@ -34,6 +35,7 @@ import java.util.UUID;
  * @param mergeStock stock-merge opt-in for the new row (REQ-INV-026), honoured only for an {@code
  *     SCU} material; {@code null} or {@code false} keeps it separate
  */
+@DtoMirror
 public record InventoryItemPersonalRebookDto(
     @NotNull @Min(0) Double amount,
     @NotNull Long version,

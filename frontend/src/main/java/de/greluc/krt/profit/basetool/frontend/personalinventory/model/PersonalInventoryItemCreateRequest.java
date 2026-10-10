@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.personalinventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Outbound write DTO for creating a personal inventory entry. Validation is enforced on the
  * frontend form ({@link
@@ -26,6 +28,7 @@ package de.greluc.krt.profit.basetool.frontend.personalinventory.model;
  * record is just the wire shape sent to the backend, so re-declaring constraints here would only
  * duplicate the backend-side validation that ultimately decides acceptance.
  */
+@DtoMirror
 public record PersonalInventoryItemCreateRequest(
     String name,
     String note,

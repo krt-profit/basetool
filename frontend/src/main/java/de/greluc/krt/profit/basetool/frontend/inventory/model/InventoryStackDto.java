@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
@@ -42,6 +43,7 @@ import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
  * @param maxQuality the highest quality among the entries
  * @param entryCount the number of underlying entries
  */
+@DtoMirror
 public record InventoryStackDto(
     UserReferenceDto user,
     LocationReferenceDto location,

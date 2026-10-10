@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
@@ -30,6 +31,7 @@ import java.util.Objects;
  * InventoryStackDto} stacks. A material group carries {@code material} and quality aggregates; a
  * game-item group carries {@code gameItem} with {@code null} quality aggregates (REQ-INV-029).
  */
+@DtoMirror
 public record GroupedInventoryDto(
     MaterialReferenceDto material,
     InventoryGameItemReferenceDto gameItem,

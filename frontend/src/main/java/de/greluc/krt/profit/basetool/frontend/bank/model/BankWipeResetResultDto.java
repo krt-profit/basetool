@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 
 /**
@@ -29,5 +30,6 @@ import java.math.BigDecimal;
  * @param holderStashesZeroed number of (account, holder) sub-balances brought to zero
  * @param totalZeroed sum of all zeroed balances
  */
+@DtoMirror
 public record BankWipeResetResultDto(
     int accountsReset, int holderStashesZeroed, BigDecimal totalZeroed) {}

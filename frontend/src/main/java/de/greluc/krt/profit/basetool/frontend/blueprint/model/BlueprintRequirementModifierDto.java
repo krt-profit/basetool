@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -27,6 +28,7 @@ import java.util.List;
  *
  * <p>The slider spans {@code effectiveQualityMin..effectiveQualityMax}, which covers all segments.
  */
+@DtoMirror
 public record BlueprintRequirementModifierDto(
     String propertyKey,
     String label,

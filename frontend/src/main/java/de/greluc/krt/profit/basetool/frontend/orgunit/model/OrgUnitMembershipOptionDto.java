@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.orgunit.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -34,6 +35,7 @@ import java.util.UUID;
  * @param isProfitEligible Whether the org unit may be the responsible unit of a Job Order; {@code
  *     null} counts as not eligible.
  */
+@DtoMirror
 public record OrgUnitMembershipOptionDto(
     UUID orgUnitId,
     String orgUnitName,

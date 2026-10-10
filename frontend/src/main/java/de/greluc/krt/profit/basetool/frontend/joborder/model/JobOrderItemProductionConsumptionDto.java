@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -30,5 +31,6 @@ import java.util.UUID;
  * @param amount the SCU/PIECE consumed from this entry
  * @param version the inventory entry's optimistic-lock version
  */
+@DtoMirror
 public record JobOrderItemProductionConsumptionDto(
     UUID inventoryItemId, UUID materialId, Double amount, Long version) {}

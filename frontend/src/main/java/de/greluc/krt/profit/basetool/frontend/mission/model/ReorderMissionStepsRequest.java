@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,4 +29,5 @@ import java.util.UUID;
  * @param stepIds every step id in the desired order
  * @param stepsVersion the steps-section version the client read
  */
+@DtoMirror
 public record ReorderMissionStepsRequest(List<UUID> stepIds, Long stepsVersion) {}

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgunit.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -41,6 +42,7 @@ import java.util.UUID;
  * @param joinedAt timestamp when the membership was granted.
  * @param version optimistic-lock counter; required on PATCH requests.
  */
+@DtoMirror
 public record OrgUnitMembershipDto(
     UUID userId,
     String userDisplayName,

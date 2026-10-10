@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -31,5 +32,6 @@ import java.util.UUID;
  * @param revoked whether it is disconnected
  * @param entries how many of its journal entries are not undone
  */
+@DtoMirror
 public record ExchangeBulkUndoInstallationDto(
     UUID installationId, String memberName, Instant lastSeenAt, boolean revoked, long entries) {}

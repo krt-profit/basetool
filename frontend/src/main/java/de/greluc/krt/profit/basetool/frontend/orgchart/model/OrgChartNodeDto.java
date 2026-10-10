@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.orgchart.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -41,6 +42,7 @@ import java.util.UUID;
  * @param sortIndex stable display order within the sibling group.
  * @param version optimistic-lock version, echoed back on reassign.
  */
+@DtoMirror
 public record OrgChartNodeDto(
     UUID positionId,
     @BackendEnumAsString String positionType,

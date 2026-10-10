@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -29,5 +30,6 @@ import org.jetbrains.annotations.Nullable;
  * @param stolen the requested marker
  * @param amount the part to change, split off as a new row; {@code null} changes the whole row
  */
+@DtoMirror
 public record InventoryItemStolenMarkDto(
     @Nullable Long version, @Nullable Boolean stolen, @Nullable Double amount) {}

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.materialexchange.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
@@ -60,6 +61,7 @@ import java.util.UUID;
  * @param stolen whether the offered Lager row is marked „gestohlen" (REQ-INV-053); always {@code
  *     false} for a free-stated item offer.
  */
+@DtoMirror
 public record MaterialExchangeOfferDto(
     UUID id,
     @BackendEnumAsString String kind,

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.mission.model;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.JobTypeDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.PayoutPreference;
 import java.time.Instant;
@@ -35,6 +36,7 @@ import java.util.UUID;
  * <p>A row without {@code user} is an external participant recorded by mission leadership
  * (ADR-0159).
  */
+@DtoMirror
 public record MissionParticipantDto(
     UUID id,
     UserDto user,

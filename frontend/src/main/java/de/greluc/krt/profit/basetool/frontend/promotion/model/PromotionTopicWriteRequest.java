@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.promotion.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Body of the backend promotion-topic create and update calls.
  *
@@ -27,5 +29,6 @@ package de.greluc.krt.profit.basetool.frontend.promotion.model;
  * @param sortOrder the display position
  * @param version the optimistic-lock version, required on update
  */
+@DtoMirror
 public record PromotionTopicWriteRequest(
     String name, String description, Integer sortOrder, Long version) {}

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.materialexchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -30,5 +31,6 @@ import java.util.UUID;
  * @param requestedAmount the wanted quantity in the material's unit
  * @param remark the description, or {@code null}
  */
+@DtoMirror
 public record MaterialRequestCreateRequest(
     UUID materialId, Integer minQuality, Double requestedAmount, String remark) {}

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
 import java.time.Instant;
 import java.util.List;
@@ -33,6 +34,7 @@ import java.util.UUID;
  * <p>{@code redacted} is {@code true} when the caller sees the order only as a member of the
  * requesting org unit (REQ-ORDERS-023).
  */
+@DtoMirror
 public record JobOrderDto(
     UUID id,
     Integer displayId,

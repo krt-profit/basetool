@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
 import java.util.List;
 import java.util.UUID;
@@ -32,6 +33,7 @@ import java.util.UUID;
  * {@code gameItemNeeds} label options with the outstanding need (REQ-INV-039) and are empty unless
  * requested with {@code withNeeds=true}. {@code requestingOrgUnit} may be {@code null}.
  */
+@DtoMirror
 public record JobOrderReferenceDto(
     UUID id,
     Integer displayId,

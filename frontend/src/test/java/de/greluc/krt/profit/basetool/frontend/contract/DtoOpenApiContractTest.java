@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.contract;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.annotation.Annotation;
@@ -39,7 +40,6 @@ import java.util.TreeSet;
 import java.util.function.Predicate;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
-import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -47,14 +47,11 @@ import tools.jackson.databind.json.JsonMapper;
  * Contract test pinning the frontend DTO mirror records against the backend's committed OpenAPI
  * document ({@code backend/src/main/resources/api/openapi.json}).
  *
- * <p>For every record in {@code model.dto} with a same-named schema, each component must exist as a
+ * <p>For every {@link DtoMirror} record with a same-named schema, each component must exist as a
  * schema property; new API fields are allowed. Records without a schema and schemas without {@code
  * properties} are skipped, and a floor on matched records guards against checking nothing.
  */
 class DtoOpenApiContractTest {
-
-  /** Package holding the frontend's hand-mirrored DTO records. */
-  private static final String DTO_PACKAGE = "de.greluc.krt.profit.basetool.frontend.model.dto";
 
   /**
    * Minimum number of records that must match a schema-with-properties. Far below the real count
@@ -71,10 +68,10 @@ class DtoOpenApiContractTest {
   private static final int MIN_MATCHED_ENUMS = 1;
 
   /**
-   * Frontend enums in the DTO package that mirror another module than the backend, so no backend
-   * schema is theirs: {@code HandoffKind} mirrors the ingest gateway's staged-handoff kind. Without
-   * this list the superset fallback below pairs such an enum with whichever backend enum happens to
-   * contain its values.
+   * Frontend mirror enums that mirror another module than the backend, so no backend schema is
+   * theirs: {@code HandoffKind} mirrors the ingest gateway's staged-handoff kind. Without this list
+   * the superset fallback below pairs such an enum with whichever backend enum happens to contain
+   * its values.
    */
   private static final Set<String> NOT_BACKEND_MIRRORS = Set.of("HandoffKind");
 
@@ -312,9 +309,8 @@ class DtoOpenApiContractTest {
   }
 
   /**
-   * Scans {@link #DTO_PACKAGE} for record classes via a Spring classpath scan (accept-all filter,
-   * default filters off), so the test discovers new DTOs automatically instead of being
-   * hand-listed.
+   * Returns the record classes among the {@link DtoMirror} types, so the test discovers new DTOs
+   * automatically instead of being hand-listed.
    *
    * @return the frontend DTO record classes
    */
@@ -323,8 +319,8 @@ class DtoOpenApiContractTest {
   }
 
   /**
-   * Scans {@link #DTO_PACKAGE} for enum classes, so the enum-coverage check discovers new mirror
-   * enums automatically instead of being hand-listed.
+   * Returns the enum classes among the {@link DtoMirror} types, so the enum-coverage check
+   * discovers new mirror enums automatically instead of being hand-listed.
    *
    * @return the frontend DTO enum classes
    */
@@ -333,32 +329,13 @@ class DtoOpenApiContractTest {
   }
 
   /**
-   * Scans {@link #DTO_PACKAGE} via a Spring classpath scan (accept-all filter, default filters off)
-   * and returns the loaded classes the given filter accepts.
+   * Returns the {@link DtoMirror} types, nested ones included, that the given filter accepts.
    *
-   * @param filter the predicate selecting which scanned classes to keep (records, enums, …)
+   * @param filter the predicate selecting which types to keep (records, enums, …)
    * @return the matching frontend DTO classes
    */
   private static List<Class<?>> frontendDtoTypes(Predicate<Class<?>> filter) {
-    ClassPathScanningCandidateComponentProvider scanner =
-        new ClassPathScanningCandidateComponentProvider(false);
-    scanner.addIncludeFilter((metadataReader, metadataReaderFactory) -> true);
-    List<Class<?>> types = new ArrayList<>();
-    scanner
-        .findCandidateComponents(DTO_PACKAGE)
-        .forEach(
-            beanDefinition -> {
-              try {
-                Class<?> type = Class.forName(beanDefinition.getBeanClassName());
-                if (filter.test(type)) {
-                  types.add(type);
-                }
-              } catch (ClassNotFoundException e) {
-                throw new IllegalStateException(
-                    "Scanned DTO class not loadable: " + beanDefinition.getBeanClassName(), e);
-              }
-            });
-    return types;
+    return DtoMirrorScan.types().stream().filter(filter).toList();
   }
 
   /**

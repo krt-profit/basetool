@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +40,7 @@ import org.jetbrains.annotations.Nullable;
  * @param areaMembersLimit the configured "Mitglieder des Bereichs" limit, or {@code null}
  * @param userLimits the configured individual-user limits, with resolved display names
  */
+@DtoMirror
 public record BankApprovalLimitsDto(
     boolean canEdit,
     boolean configurable,

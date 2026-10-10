@@ -19,5 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /** Frontend mirror of the backend blueprint dismantle-return DTO. */
+@DtoMirror
 public record BlueprintDismantleReturnDto(String name, Double quantityScu) {}

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -37,6 +38,7 @@ import java.util.UUID;
  * @param externalName external display name, or {@code null}
  * @param detail free-form detail
  */
+@DtoMirror
 public record SyncReportDto(
     UUID id,
     UUID runId,

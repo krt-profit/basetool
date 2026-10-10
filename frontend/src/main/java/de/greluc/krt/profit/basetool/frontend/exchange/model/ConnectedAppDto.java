@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -30,6 +31,7 @@ import java.util.List;
  * @param installations the live installations, newest first
  * @param activity the client's latest writes to the member's data, newest first
  */
+@DtoMirror
 public record ConnectedAppDto(
     String clientId,
     String displayName,

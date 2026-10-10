@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import org.jetbrains.annotations.NotNull;
 
@@ -32,6 +33,7 @@ import org.jetbrains.annotations.NotNull;
  * @param changeSet the change set as the client sent it, as JSON
  * @param stagedAt when the gateway staged it
  */
+@DtoMirror
 public record ConnectedAppMassChangeRequestDto(
     @NotNull String clientId,
     @NotNull String installationKey,

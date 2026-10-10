@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.orgunit.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -35,6 +36,7 @@ import java.util.UUID;
  * @param department the Bereich's department name (Bereichsfarbe), or {@code null} for other kinds.
  * @param version the optimistic-lock version, required by the set-parent PATCH.
  */
+@DtoMirror
 public record OrgUnitNodeDto(
     UUID id,
     String name,

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
@@ -33,6 +34,7 @@ import org.jetbrains.annotations.Nullable;
  * @param targetOwningOrgUnitId one of the caller's direct memberships, or {@code null} for no unit
  * @param mergeStock the stock-merge opt-in (REQ-INV-026) applied to every changed row
  */
+@DtoMirror
 public record BulkOrgUnitChangeRequest(
     @NotNull @NotEmpty List<@NotNull UUID> itemIds,
     @Nullable UUID targetOwningOrgUnitId,

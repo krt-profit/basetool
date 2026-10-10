@@ -19,9 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.personalinventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend enum that tells cities from space stations among UEX locations.
  */
+@DtoMirror
 public enum PersonalInventoryLocationType {
   CITY,
   SPACE_STATION

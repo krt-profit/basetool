@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 
 /**
@@ -31,6 +32,7 @@ import java.math.BigDecimal;
  * @param expenseSum summed amount of all expense finance entries plus refinery-order expenses
  * @param expenseCount number of expense finance entries plus refinery orders carrying an expense
  */
+@DtoMirror
 public record MissionFinanceTotalsDto(
     BigDecimal total,
     BigDecimal incomeSum,

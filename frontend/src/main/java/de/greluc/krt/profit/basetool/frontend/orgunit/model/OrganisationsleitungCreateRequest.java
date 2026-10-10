@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgunit.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Create payload for the singleton Organisationsleitung, relayed to the backend {@code POST
  * /api/v1/org-hierarchy/organisationsleitung} (REQ-ORG-014); a second create is rejected with 409.
@@ -27,5 +29,6 @@ package de.greluc.krt.profit.basetool.frontend.orgunit.model;
  * @param shorthand the OL's short tag; required.
  * @param description free-form text; nullable.
  */
+@DtoMirror
 public record OrganisationsleitungCreateRequest(
     String name, String shorthand, String description) {}

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -32,6 +33,7 @@ import org.jetbrains.annotations.Nullable;
  * @param linkKind the bounded route key this page turns into a link, or {@code null} when the row
  *     has no page of its own
  */
+@DtoMirror
 public record PersonSearchHitDto(
     String area,
     String table,

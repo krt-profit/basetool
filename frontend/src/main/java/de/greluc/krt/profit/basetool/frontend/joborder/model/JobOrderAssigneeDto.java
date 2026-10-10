@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -30,4 +31,5 @@ import org.jetbrains.annotations.Nullable;
  * @param note the assignee's note, or {@code null} when none is set
  * @param version optimistic-lock version of the assignee edge
  */
+@DtoMirror
 public record JobOrderAssigneeDto(UserDto user, @Nullable String note, Long version) {}

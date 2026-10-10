@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.orgunit.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -30,5 +31,6 @@ import java.util.UUID;
  * @param parentOrgUnitId the new parent, or {@code null} when detached
  * @param version the child's bumped optimistic-lock version
  */
+@DtoMirror
 public record OrgUnitParentResponse(
     UUID orgUnitId, @BackendEnumAsString String kind, UUID parentOrgUnitId, Long version) {}

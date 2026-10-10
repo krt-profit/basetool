@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.UUID;
 
@@ -30,4 +31,5 @@ import java.util.UUID;
  * @param displayName the user's effective display name (handle)
  * @param limitAmount the whole-aUEC ceiling configured for this user
  */
+@DtoMirror
 public record BankApprovalLimitUserDto(UUID userId, String displayName, BigDecimal limitAmount) {}

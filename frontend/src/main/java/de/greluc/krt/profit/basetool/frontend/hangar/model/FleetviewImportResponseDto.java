@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.hangar.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -30,6 +31,7 @@ import java.util.List;
  * @param skippedShips the names of the skipped entries
  * @param duplicateShips the names of the duplicate entries
  */
+@DtoMirror
 public record FleetviewImportResponseDto(
     int importedCount,
     int skippedCount,

@@ -19,10 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * The body of {@code PUT /api/v1/announcement}.
  *
  * @param content the new Markdown text
  * @param version the version it replaces, or {@code null} for the first announcement
  */
+@DtoMirror
 public record AnnouncementRequest(String content, Long version) {}

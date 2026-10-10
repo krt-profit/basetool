@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.materialexchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Outbound mirror of the backend {@code MaterialExchangeItemReleaseRequest}: lists a craftable item
  * on the Materialbörse.
@@ -27,5 +29,6 @@ package de.greluc.krt.profit.basetool.frontend.materialexchange.model;
  * @param quantity the offered whole-piece quantity
  * @param remark the trade remark, or {@code null}
  */
+@DtoMirror
 public record MaterialExchangeItemReleaseRequest(
     String productKey, Integer quantity, String remark) {}

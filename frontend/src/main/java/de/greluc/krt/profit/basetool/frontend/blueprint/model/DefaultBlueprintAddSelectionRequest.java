@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
@@ -28,4 +29,5 @@ import org.jetbrains.annotations.Nullable;
  *
  * @param productKeys the staged normalized product keys; {@code null} or blank entries are skipped
  */
+@DtoMirror
 public record DefaultBlueprintAddSelectionRequest(@Nullable List<String> productKeys) {}

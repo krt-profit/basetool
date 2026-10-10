@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationDto;
@@ -36,6 +37,7 @@ import java.util.UUID;
  * {@code partyLeadGuestName} are mutually exclusive. The mission's inventory and refinery orders
  * are not included and are fetched separately.
  */
+@DtoMirror
 public record MissionDto(
     UUID id,
     String name,

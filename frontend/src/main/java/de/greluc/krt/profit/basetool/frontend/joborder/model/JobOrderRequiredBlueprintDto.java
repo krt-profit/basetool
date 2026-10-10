@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend {@code JobOrderRequiredBlueprintDto}: one required variant family
  * of an item order and how many responsible-org-unit members own its blueprint. A zero count marks
@@ -31,5 +33,6 @@ package de.greluc.krt.profit.basetool.frontend.joborder.model;
  *     or any variant of it
  * @param variantInclusive whether the count includes owners of cosmetic variants
  */
+@DtoMirror
 public record JobOrderRequiredBlueprintDto(
     String productKey, String productName, int ownerCount, boolean variantInclusive) {}

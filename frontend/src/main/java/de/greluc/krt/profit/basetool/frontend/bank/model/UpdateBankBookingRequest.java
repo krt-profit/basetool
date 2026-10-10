@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.UUID;
 
@@ -33,6 +34,7 @@ import java.util.UUID;
  * @param counterpartyOrgUnitId that Empfänger's org unit, or {@code null}
  * @param version the request version the client read; {@code null} counts as {@code 0}
  */
+@DtoMirror
 public record UpdateBankBookingRequest(
     BigDecimal amount,
     String note,

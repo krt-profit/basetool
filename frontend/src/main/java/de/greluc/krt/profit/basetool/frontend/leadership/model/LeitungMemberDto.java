@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.leadership.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -33,6 +34,7 @@ import java.util.UUID;
  * @param version the membership row's optimistic-lock version, echoed on a squadron-rank write.
  * @param self whether this row is the caller's own seat, rendered read-only for a non-admin.
  */
+@DtoMirror
 public record LeitungMemberDto(
     UUID userId,
     String userDisplayName,

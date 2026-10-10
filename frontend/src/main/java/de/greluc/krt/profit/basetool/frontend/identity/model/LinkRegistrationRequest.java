@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
@@ -30,4 +31,5 @@ import org.jetbrains.annotations.Nullable;
  * @param version the pending registration's optimistic-lock version the admin last read; {@code
  *     null} bypasses the check
  */
+@DtoMirror
 public record LinkRegistrationRequest(@Nullable UUID targetUserId, @Nullable Long version) {}

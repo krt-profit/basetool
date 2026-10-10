@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.materialexchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend view of the Materialbörse tab counts (all active offers / the caller's own),
  * deserialized from {@code /api/v1/material-exchange/counts}. Drives the "Alle Angebote" / "Meine
@@ -27,4 +29,5 @@ package de.greluc.krt.profit.basetool.frontend.materialexchange.model;
  * @param all the number of active offers across the whole board.
  * @param mine the number of the caller's own active offers.
  */
+@DtoMirror
 public record MaterialExchangeCountsDto(long all, long mine) {}

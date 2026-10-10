@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.List;
 import org.jetbrains.annotations.Nullable;
@@ -31,5 +32,6 @@ import org.jetbrains.annotations.Nullable;
  * @param balanceTarget the account's balance target (REQ-BANK-036) drawn as the reference line, or
  *     {@code null} when no target is set
  */
+@DtoMirror
 public record BankBalanceSeriesDto(
     List<BankBalancePointDto> points, @Nullable BigDecimal balanceTarget) {}

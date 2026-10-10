@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.refinery.model;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.RefiningMethodDto;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
@@ -37,6 +38,7 @@ import org.jetbrains.annotations.Nullable;
  * <p>{@code owningOrgUnitId} is the owning-org-unit picker output sent on create; {@code null}
  * stamps the owner's home Staffel.
  */
+@DtoMirror
 public record RefineryOrderDto(
     UUID id,
     UserReferenceDto owner,

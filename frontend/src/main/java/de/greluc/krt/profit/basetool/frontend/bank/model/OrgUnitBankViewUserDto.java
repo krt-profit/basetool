@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -28,4 +29,5 @@ import java.util.UUID;
  * @param userId the granted user's id (echoed back to revoke the grant)
  * @param displayName the user's effective display name (handle)
  */
+@DtoMirror
 public record OrgUnitBankViewUserDto(UUID userId, String displayName) {}

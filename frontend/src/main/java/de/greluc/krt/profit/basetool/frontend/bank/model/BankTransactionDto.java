@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -31,5 +32,6 @@ import java.util.UUID;
  * @param note the persisted note, or {@code null}
  * @param createdAt the booking instant
  */
+@DtoMirror
 public record BankTransactionDto(
     UUID id, @BackendEnumAsString String type, String note, Instant createdAt) {}

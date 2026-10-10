@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -29,4 +30,5 @@ import java.util.UUID;
  * @param installationId the one installation to undo, or {@code null} for all
  * @param resource {@code BLUEPRINT}, {@code STOCK} or {@code SHIP}, or {@code null} for all
  */
+@DtoMirror
 public record ExchangeBulkUndoRequest(Instant since, UUID installationId, String resource) {}

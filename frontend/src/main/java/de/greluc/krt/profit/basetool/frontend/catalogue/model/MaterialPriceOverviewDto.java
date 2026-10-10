@@ -20,10 +20,12 @@
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.UUID;
 
 /** Data transfer record carrying Material Price Overview payload. */
+@DtoMirror
 public record MaterialPriceOverviewDto(
     UUID id,
     String name,

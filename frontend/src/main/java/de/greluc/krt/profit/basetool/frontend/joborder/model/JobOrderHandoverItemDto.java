@@ -20,12 +20,14 @@
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
  * Frontend mirror of one handed-over line of a job-order handover: the material, quality, amount
  * and origin location snapshot, and whether the stock was marked „gestohlen" (REQ-INV-053).
  */
+@DtoMirror
 public record JobOrderHandoverItemDto(
     UUID id,
     UUID jobOrderHandoverId,

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.promotion.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -37,6 +38,7 @@ import java.util.UUID;
  * @param satisfied {@code true} iff {@code achievedCount >= requiredCount}
  * @param description free-text description rendered next to the rule
  */
+@DtoMirror
 public record PromotionRequirementCheckDto(
     UUID requirementId,
     UUID topicId,

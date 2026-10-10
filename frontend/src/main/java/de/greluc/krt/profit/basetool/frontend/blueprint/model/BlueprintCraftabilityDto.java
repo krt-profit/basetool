@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 import java.util.UUID;
 
@@ -38,6 +39,7 @@ import java.util.UUID;
  * @param groups per-requirement-group overlay, in recipe order
  * @param materials per-material breakdown
  */
+@DtoMirror
 public record BlueprintCraftabilityDto(
     UUID blueprintId,
     boolean recipeResolved,

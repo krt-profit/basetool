@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
@@ -31,6 +32,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param skipped how many keys were already a default (the backend's {@code 409}), silently skipped
  * @param failedKeys the keys whose add failed for any other reason, in the order they were sent
  */
+@DtoMirror
 public record DefaultBlueprintAddResultDto(
     int added, int skipped, @NotNull @Unmodifiable List<String> failedKeys) {
 

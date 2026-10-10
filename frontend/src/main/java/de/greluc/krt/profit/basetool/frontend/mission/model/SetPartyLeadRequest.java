@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -29,4 +30,5 @@ import java.util.UUID;
  * @param guestName the free-text handle to resolve, or {@code null}
  * @param version the party-lead version the client read
  */
+@DtoMirror
 public record SetPartyLeadRequest(UUID userId, String guestName, Long version) {}

@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend {@code BlueprintOverviewOwnerDto}: one owner of a blueprint in the
  * overview drill-down, by display name only.
@@ -28,4 +30,5 @@ package de.greluc.krt.profit.basetool.frontend.blueprint.model;
  *     the admin "all org units" scope); {@code false} when visible only via global sharing
  *     (REQ-INV-018)
  */
+@DtoMirror
 public record BlueprintOverviewOwnerDto(String ownerName, boolean orgUnitMember) {}

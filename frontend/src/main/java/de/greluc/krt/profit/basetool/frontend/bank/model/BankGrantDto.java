@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -36,6 +37,7 @@ import java.util.UUID;
  *     the row inert
  * @param version optimistic-locking version to echo on flag changes
  */
+@DtoMirror
 public record BankGrantDto(
     UUID userId,
     String userHandle,

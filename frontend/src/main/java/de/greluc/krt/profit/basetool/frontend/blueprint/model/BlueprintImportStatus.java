@@ -19,10 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend {@code BlueprintImportStatus}: the per-name resolution outcome
  * that groups rows in the import preview.
  */
+@DtoMirror
 public enum BlueprintImportStatus {
   /** The external name matched an existing product directly. */
   MATCHED,

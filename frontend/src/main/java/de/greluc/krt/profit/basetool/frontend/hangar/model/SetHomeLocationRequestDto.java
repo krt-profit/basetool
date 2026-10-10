@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.hangar.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -27,4 +28,5 @@ import java.util.UUID;
  *
  * @param locationId the curated home location id
  */
+@DtoMirror
 public record SetHomeLocationRequestDto(UUID locationId) {}

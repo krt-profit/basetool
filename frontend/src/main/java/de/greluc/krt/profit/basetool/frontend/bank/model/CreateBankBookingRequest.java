@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.UUID;
 
@@ -38,6 +39,7 @@ import java.util.UUID;
  * @param counterpartyUserId the member receiving a withdrawal payout, or {@code null}
  * @param counterpartyOrgUnitId that member's org unit, or {@code null}
  */
+@DtoMirror
 public record CreateBankBookingRequest(
     UUID sourceAccountId,
     @BackendEnumAsString String type,

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -29,6 +30,7 @@ import org.jetbrains.annotations.Nullable;
  * @param restored how many entries were set back
  * @param skipped the entries left as they are, with the reason
  */
+@DtoMirror
 public record ExchangeUndoResultDto(int restored, @NotNull List<Skipped> skipped) {
 
   /**

@@ -19,7 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.refinery.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /** Enumeration of Refinery Order Status values. */
+@DtoMirror
 public enum RefineryOrderStatus {
   OPEN,
   IN_PROGRESS,

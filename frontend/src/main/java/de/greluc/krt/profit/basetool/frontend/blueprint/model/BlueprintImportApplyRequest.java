@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -27,4 +28,5 @@ import java.util.List;
  *
  * @param resolutions the per-name decisions
  */
+@DtoMirror
 public record BlueprintImportApplyRequest(List<BlueprintImportResolutionDto> resolutions) {}

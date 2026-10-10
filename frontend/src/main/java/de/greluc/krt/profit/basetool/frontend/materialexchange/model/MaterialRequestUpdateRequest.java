@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.materialexchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Outbound mirror of the backend {@code MaterialRequestUpdateRequest}: the editable fields of a
  * Materialbörse request plus its optimistic-lock version.
@@ -28,5 +30,6 @@ package de.greluc.krt.profit.basetool.frontend.materialexchange.model;
  * @param remark the new description, or {@code null}
  * @param version the last seen optimistic-lock version
  */
+@DtoMirror
 public record MaterialRequestUpdateRequest(
     Double desiredAmount, Integer minQuality, String remark, Long version) {}

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.notification.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -34,6 +35,7 @@ import java.util.List;
  * @param version expected version on update, {@code null} on create
  * @param selectors the recipient selectors (may be empty)
  */
+@DtoMirror
 public record NotificationRuleWriteRequest(
     @BackendEnumAsString String eventType,
     @BackendEnumAsString String notificationType,

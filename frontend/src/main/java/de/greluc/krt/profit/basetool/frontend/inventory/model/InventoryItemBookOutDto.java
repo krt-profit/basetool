@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -34,6 +35,7 @@ import java.util.UUID;
  * jobOrderReductions} / {@code missionReductions} name which earmark slices the amount comes from
  * (REQ-INV-027); {@code null} or empty takes it from the unassigned rest.
  */
+@DtoMirror
 public record InventoryItemBookOutDto(
     @NotNull @Min(0) Double amount,
     UUID targetUserId,

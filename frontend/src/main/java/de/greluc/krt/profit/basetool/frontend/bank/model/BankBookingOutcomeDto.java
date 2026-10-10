@@ -19,11 +19,14 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Result of a bank-staff direct withdrawal or transfer; exactly one field is set (REQ-BANK-047).
  *
  * @param transaction the booked transaction, or {@code null} when a request was filed instead
  * @param pendingRequest the pending request filed for an over-ceiling amount, or {@code null}
  */
+@DtoMirror
 public record BankBookingOutcomeDto(
     BankTransactionDto transaction, BankBookingRequestDto pendingRequest) {}

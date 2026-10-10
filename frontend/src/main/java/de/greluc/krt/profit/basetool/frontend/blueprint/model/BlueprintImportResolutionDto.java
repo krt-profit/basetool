@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 
 /**
@@ -30,5 +31,6 @@ import java.time.Instant;
  * @param acquiredAt optional acquisition time to stamp
  * @param note optional free-form note
  */
+@DtoMirror
 public record BlueprintImportResolutionDto(
     String externalName, String productKey, Instant acquiredAt, String note) {}

@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend {@code DerivedMaterialDto}: one resolved material requirement in
  * an item-order derivation preview, with the quantity for the previewed amount and the quality the
@@ -29,6 +31,7 @@ package de.greluc.krt.profit.basetool.frontend.catalogue.model;
  * @param defaultQuality the code of the pre-selected quality tier
  * @param defaultQualityTier the pre-selected quality tier
  */
+@DtoMirror
 public record DerivedMaterialDto(
     MaterialDto material,
     Double requiredQuantity,

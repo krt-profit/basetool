@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend {@code BlueprintOverviewEntryDto}: one variant family of the
  * org-unit blueprint overview with the number of in-scope members owning any of it.
@@ -27,4 +29,5 @@ package de.greluc.krt.profit.basetool.frontend.blueprint.model;
  * @param productName the family's display label (case-preserving base name)
  * @param ownerCount number of distinct in-scope members that own the base or any variant
  */
+@DtoMirror
 public record BlueprintOverviewEntryDto(String productKey, String productName, long ownerCount) {}

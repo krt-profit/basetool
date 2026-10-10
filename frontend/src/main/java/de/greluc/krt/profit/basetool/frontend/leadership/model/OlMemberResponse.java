@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.leadership.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -29,5 +30,6 @@ import java.util.UUID;
  * @param isOlMember whether the member sits in the Organisationsleitung
  * @param version the membership's optimistic-lock version
  */
+@DtoMirror
 public record OlMemberResponse(
     UUID organisationsleitungId, UUID userId, boolean isOlMember, Long version) {}

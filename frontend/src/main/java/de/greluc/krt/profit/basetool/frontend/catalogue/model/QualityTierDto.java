@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -34,6 +35,7 @@ import java.util.UUID;
  * @param active whether the tier is offered for new requirements
  * @param version optimistic-lock version
  */
+@DtoMirror
 public record QualityTierDto(
     UUID id,
     String code,

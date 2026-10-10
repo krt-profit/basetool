@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 
 /**
  * Write payload for appending a goal to a mission.
@@ -28,5 +29,6 @@ import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
  * @param kind the goal classification constant
  * @param objectivesVersion the goals-section version the client read
  */
+@DtoMirror
 public record AddMissionObjectiveRequest(
     String title, @BackendEnumAsString String kind, Long objectivesVersion) {}

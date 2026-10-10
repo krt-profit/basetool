@@ -19,10 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Write payload for setting an Ablauf step's shared done flag.
  *
  * @param done the new done state
  * @param stepsVersion the steps-section version the client read
  */
+@DtoMirror
 public record ToggleMissionStepRequest(Boolean done, Long stepsVersion) {}

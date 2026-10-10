@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.operation.model.OperationDto;
 import java.time.Instant;
@@ -29,6 +30,7 @@ import java.util.UUID;
  *
  * <p>{@code signedUp} is {@code true} iff the calling member is signed up for the mission.
  */
+@DtoMirror
 public record MissionListDto(
     UUID id,
     String name,

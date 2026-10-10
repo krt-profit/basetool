@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 import java.util.UUID;
 
@@ -35,6 +36,7 @@ import java.util.UUID;
  * @param clientLineId transient client id for provenance linking
  * @param parentClientLineId transient client id of the line this was adopted from
  */
+@DtoMirror
 public record CreateJobOrderItemLineDto(
     UUID id,
     UUID gameItemId,

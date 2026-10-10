@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.LocalDate;
 import org.jetbrains.annotations.Nullable;
 
 /** Data transfer record carrying User Attributes Update payload. */
+@DtoMirror
 public record UserAttributesUpdateDto(
     Integer rank,
     String description,

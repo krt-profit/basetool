@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 
 /**
@@ -26,4 +27,5 @@ import java.math.BigDecimal;
  *
  * @param limit the whole-aUEC ceiling up to which the tier may request without approval
  */
+@DtoMirror
 public record SetBankApprovalLimitRequest(BigDecimal limit) {}

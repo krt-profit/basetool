@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.leadership.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.orgchart.model.OrgChartNodeDto;
 import java.util.List;
 
@@ -31,6 +32,7 @@ import java.util.List;
  * @param coordinators the Bereichskoordinatoren; never {@code null}.
  * @param operators the Bereichsoperatoren; never {@code null}.
  */
+@DtoMirror
 public record AreaLeadershipDto(
     OrgChartNodeDto lead,
     List<OrgChartNodeDto> commanders,

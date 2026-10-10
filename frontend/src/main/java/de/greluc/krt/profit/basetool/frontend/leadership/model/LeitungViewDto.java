@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.leadership.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -32,6 +33,7 @@ import java.util.List;
  * @param specialCommands the Spezialkommandos the caller may appoint a lead on or whose members
  *     they may manage.
  */
+@DtoMirror
 public record LeitungViewDto(
     boolean admin,
     List<LeitungUnitDto> organisationsleitungen,

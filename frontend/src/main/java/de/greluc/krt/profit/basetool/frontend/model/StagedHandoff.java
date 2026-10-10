@@ -27,4 +27,5 @@ package de.greluc.krt.profit.basetool.frontend.model;
  * @param kind which draft this is ({@code REFINERY} / {@code BLUEPRINT})
  * @param draftJson the backend draft response, stored verbatim as JSON text
  */
+@DtoMirror
 public record StagedHandoff(HandoffKind kind, String draftJson) {}

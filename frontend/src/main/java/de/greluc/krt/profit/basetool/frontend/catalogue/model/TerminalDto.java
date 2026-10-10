@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -47,6 +48,7 @@ import java.util.UUID;
  * @param uexSyncedAt UTC instant of the last UEX sweep that touched the terminal, or {@code null}
  * @param hidden whether the terminal is hidden from regular dropdowns / lists
  */
+@DtoMirror
 public record TerminalDto(
     UUID id,
     String name,

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.notification.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -30,5 +31,6 @@ import java.util.List;
  * @param totalElements the caller's total notification count across all pages
  * @param hasMore whether at least one further page exists after the requested one
  */
+@DtoMirror
 public record NotificationPageSliceDto(
     List<NotificationViewDto> items, long totalElements, boolean hasMore) {}

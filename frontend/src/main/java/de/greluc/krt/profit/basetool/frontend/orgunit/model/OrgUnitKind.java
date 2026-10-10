@@ -19,12 +19,15 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgunit.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend {@code OrgUnitKind}: the four kinds of {@code org_unit} rows.
  *
  * <p>Must carry every backend constant under the same name, or deserialising a response that
  * contains it fails.
  */
+@DtoMirror
 public enum OrgUnitKind {
   /** Staffel — the original tenant kind that has driven the multi-tenancy work since Phase 1. */
   SQUADRON,

@@ -22,5 +22,6 @@ package de.greluc.krt.profit.basetool.frontend.model;
 import java.util.UUID;
 
 /** Data transfer record carrying Material Reference payload. */
+@DtoMirror
 public record MaterialReferenceDto(
     UUID id, String name, @BackendEnumAsString String quantityType) {}

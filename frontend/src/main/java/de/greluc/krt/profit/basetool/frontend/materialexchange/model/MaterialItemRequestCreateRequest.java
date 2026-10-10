@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.materialexchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Outbound mirror of the backend {@code MaterialItemRequestCreateRequest}: posts a craftable-item
  * wanted-listing to the Materialbörse.
@@ -28,5 +30,6 @@ package de.greluc.krt.profit.basetool.frontend.materialexchange.model;
  * @param quantity the wanted whole-piece quantity
  * @param remark the description, or {@code null}
  */
+@DtoMirror
 public record MaterialItemRequestCreateRequest(
     String productKey, Integer minQuality, Integer quantity, String remark) {}

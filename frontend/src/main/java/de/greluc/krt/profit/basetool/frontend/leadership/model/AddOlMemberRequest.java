@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.leadership.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -26,4 +27,5 @@ import java.util.UUID;
  *
  * @param userId the member
  */
+@DtoMirror
 public record AddOlMemberRequest(UUID userId) {}

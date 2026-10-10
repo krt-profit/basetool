@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.notification.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -39,6 +40,7 @@ import java.util.UUID;
  * @param updatedAt last-modification timestamp
  * @param selectors the recipient selectors
  */
+@DtoMirror
 public record NotificationRuleDto(
     UUID id,
     @BackendEnumAsString String eventType,

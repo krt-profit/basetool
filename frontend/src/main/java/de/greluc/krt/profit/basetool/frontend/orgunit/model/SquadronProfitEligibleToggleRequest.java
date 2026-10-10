@@ -19,9 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgunit.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Body of the backend {@code PATCH /api/v1/squadrons/{id}/profit-eligible} toggle.
  *
  * @param eligible whether the squadron may process Job Orders
  */
+@DtoMirror
 public record SquadronProfitEligibleToggleRequest(Boolean eligible) {}

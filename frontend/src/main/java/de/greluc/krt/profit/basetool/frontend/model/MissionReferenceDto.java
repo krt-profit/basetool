@@ -23,4 +23,5 @@ import java.time.Instant;
 import java.util.UUID;
 
 /** Data transfer record carrying Mission Reference payload. */
+@DtoMirror
 public record MissionReferenceDto(UUID id, String name, String status, Instant plannedStartTime) {}

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.QualityTierDto;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -35,6 +36,7 @@ import java.util.List;
  * @param openRemaining {@code requiredAmount − claimedAmount}, floored at 0
  * @param claims the individual per-squadron claims on this bucket
  */
+@DtoMirror
 public record ClaimBucketDto(
     MaterialDto material,
     String qualityRequirement,

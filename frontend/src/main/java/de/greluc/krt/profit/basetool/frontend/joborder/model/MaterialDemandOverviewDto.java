@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -28,4 +29,5 @@ import java.util.List;
  * @param groups one group per responsible org unit with outstanding demand; empty when the caller
  *     may see no non-terminal order, which the page renders as its empty state
  */
+@DtoMirror
 public record MaterialDemandOverviewDto(List<MaterialDemandGroupDto> groups) {}

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -30,4 +31,5 @@ import java.util.UUID;
  * @param updatedAt when it was last saved
  * @param version the optimistic-lock version
  */
+@DtoMirror
 public record AnnouncementDto(UUID id, String content, Instant updatedAt, Long version) {}

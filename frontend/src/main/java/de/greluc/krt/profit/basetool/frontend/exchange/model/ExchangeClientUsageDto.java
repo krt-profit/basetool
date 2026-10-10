@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -29,4 +30,5 @@ import java.util.UUID;
  * @param connectedMembers how many members have at least one live installation of it
  * @param lastSeenAt when any live installation of it was last seen, or {@code null}
  */
+@DtoMirror
 public record ExchangeClientUsageDto(UUID id, long connectedMembers, Instant lastSeenAt) {}

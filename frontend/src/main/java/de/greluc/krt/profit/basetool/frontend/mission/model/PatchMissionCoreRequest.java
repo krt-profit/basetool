@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -32,6 +33,7 @@ import java.util.UUID;
  * @param version the core version the client read
  * @param meetingPoint the meeting point, or {@code null}
  */
+@DtoMirror
 public record PatchMissionCoreRequest(
     String name,
     String description,

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
@@ -31,4 +32,5 @@ import java.util.UUID;
  *
  * @param itemIds the ids of the owned inventory items to fully book out; at least one, none null
  */
+@DtoMirror
 public record BulkCheckoutRequest(@NotNull @NotEmpty List<@NotNull UUID> itemIds) {}

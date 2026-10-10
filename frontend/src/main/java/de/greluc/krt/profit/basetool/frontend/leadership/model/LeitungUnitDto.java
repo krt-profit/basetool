@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.leadership.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitKind;
 import java.util.List;
 import java.util.UUID;
@@ -39,6 +40,7 @@ import java.util.UUID;
  * @param grandAdmiralUserId the Grand Admiral's account id (REQ-ORG-021), set only on the
  *     Organisationsleitung, or {@code null}.
  */
+@DtoMirror
 public record LeitungUnitDto(
     UUID id,
     String name,

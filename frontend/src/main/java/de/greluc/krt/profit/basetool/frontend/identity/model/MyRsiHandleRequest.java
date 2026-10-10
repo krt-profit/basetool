@@ -19,10 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * The member's own RSI handle as {@code PUT /api/v1/users/me/rsi-handle} takes it (REQ-SEC-072).
  *
  * @param rsiHandle the trimmed handle; an empty string clears it
  * @param version the user row's optimistic-lock version
  */
+@DtoMirror
 public record MyRsiHandleRequest(String rsiHandle, Long version) {}

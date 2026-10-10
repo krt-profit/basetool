@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.leadership.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -27,4 +28,5 @@ import java.util.UUID;
  * @param userId the designated member, or {@code null}
  * @param displayName a free display name, or {@code null}
  */
+@DtoMirror
 public record GrandAdmiralRequest(UUID userId, String displayName) {}

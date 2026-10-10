@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
 import java.time.Instant;
@@ -39,6 +40,7 @@ import org.jetbrains.annotations.Nullable;
  * @param entries the delivered item-line quantities
  * @param version optimistic-lock version
  */
+@DtoMirror
 public record JobOrderItemHandoverDto(
     UUID id,
     UUID jobOrderId,

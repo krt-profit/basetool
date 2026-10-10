@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.refinery.model;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.util.UUID;
@@ -30,6 +31,7 @@ import java.util.UUID;
  * <p>{@code yieldBonusPercent} is a read-only backend enrichment (positive = bonus, negative =
  * malus, {@code null} = no yield known) and is ignored on submit.
  */
+@DtoMirror
 public record RefineryGoodDto(
     UUID id,
     MaterialDto inputMaterial,

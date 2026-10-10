@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgunit.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -31,5 +32,6 @@ import java.util.UUID;
  * @param active whether it is active
  * @param version the optimistic-lock version
  */
+@DtoMirror
 public record OrganisationsleitungDto(
     UUID id, String name, String shorthand, String description, Boolean active, Long version) {}

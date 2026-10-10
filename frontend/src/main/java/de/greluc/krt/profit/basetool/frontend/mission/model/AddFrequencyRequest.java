@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.UUID;
 
@@ -28,4 +29,5 @@ import java.util.UUID;
  * @param frequencyTypeId the frequency type
  * @param value the channel value
  */
+@DtoMirror
 public record AddFrequencyRequest(UUID frequencyTypeId, BigDecimal value) {}

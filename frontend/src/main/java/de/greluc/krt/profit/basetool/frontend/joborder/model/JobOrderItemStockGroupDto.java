@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.InventoryGameItemReferenceDto;
 import java.util.List;
 
@@ -32,6 +33,7 @@ import java.util.List;
  * @param allocatedTotal whole units of stock earmarked to this order across the group's entries
  * @param entries the linked entries backing the group, in owner/location display order
  */
+@DtoMirror
 public record JobOrderItemStockGroupDto(
     InventoryGameItemReferenceDto gameItem,
     int orderedAmount,

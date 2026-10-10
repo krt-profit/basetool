@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -42,6 +43,7 @@ import org.jetbrains.annotations.Nullable;
  * @param bereichDepartment the owning Bereich's department enum name (drives the group colour), or
  *     {@code null}
  */
+@DtoMirror
 public record BankDashboardAccountDto(
     UUID id,
     String accountNo,

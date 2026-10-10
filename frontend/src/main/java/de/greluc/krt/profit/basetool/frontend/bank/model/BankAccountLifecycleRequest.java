@@ -19,9 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Write payload of the account close and reopen endpoints, which carry only the version.
  *
  * @param version the account version the client read
  */
+@DtoMirror
 public record BankAccountLifecycleRequest(Long version) {}

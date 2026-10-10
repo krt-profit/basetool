@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 
 /**
@@ -27,4 +28,5 @@ import java.math.BigDecimal;
  *
  * @param rate the fee rate as a fraction in {@code [0, 1)} (e.g. {@code 0.005} = 0.5%)
  */
+@DtoMirror
 public record BankTransferFeeRateDto(BigDecimal rate) {}

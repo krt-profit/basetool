@@ -19,11 +19,14 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend blueprint ingredient-line DTO. {@code quantityType} ({@code "SCU"}
  * / {@code "PIECE"}, {@code null} for ITEM or unresolved RESOURCE lines) tells the recipe view
  * which unit label to render for {@code quantityScu}.
  */
+@DtoMirror
 public record BlueprintRequirementIngredientDto(
     String kind,
     String name,

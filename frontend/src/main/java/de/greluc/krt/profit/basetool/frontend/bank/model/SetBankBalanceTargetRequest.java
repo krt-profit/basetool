@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 
 /**
@@ -27,4 +28,5 @@ import java.math.BigDecimal;
  * @param target the new whole-aUEC target, or {@code null} to clear it
  * @param version the account version the client read
  */
+@DtoMirror
 public record SetBankBalanceTargetRequest(BigDecimal target, Long version) {}

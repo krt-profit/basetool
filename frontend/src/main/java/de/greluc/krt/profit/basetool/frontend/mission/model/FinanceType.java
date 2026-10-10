@@ -19,7 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /** Enumeration of Finance Type values. */
+@DtoMirror
 public enum FinanceType {
   INCOME,
   EXPENSE

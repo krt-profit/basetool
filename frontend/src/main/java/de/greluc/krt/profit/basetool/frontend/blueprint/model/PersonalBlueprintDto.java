@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -43,6 +44,7 @@ import java.util.UUID;
  * @param sourceClientName the registry display name of {@code sourceClientId}, or {@code null} when
  *     there is no client or it is no longer registered
  */
+@DtoMirror
 public record PersonalBlueprintDto(
     UUID id,
     String productKey,

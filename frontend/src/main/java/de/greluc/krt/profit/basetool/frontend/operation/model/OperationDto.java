@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.operation.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
 import java.time.Instant;
 import java.util.UUID;
@@ -38,6 +39,7 @@ import java.util.UUID;
  * @param payoutPreliminary {@code true} when at least one mission lacks {@code actualStartTime} or
  *     {@code actualEndTime}; {@code null} outside the detail endpoint, treated as unknown
  */
+@DtoMirror
 public record OperationDto(
     UUID id,
     String name,

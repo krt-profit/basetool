@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgunit.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -35,6 +36,7 @@ import java.util.UUID;
  *     picker
  * @param version optimistic-lock counter
  */
+@DtoMirror
 public record SquadronDto(
     UUID id,
     String name,

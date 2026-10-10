@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -31,5 +32,6 @@ import java.util.UUID;
  * @param canWithdraw initial withdrawal capability
  * @param canTransfer initial transfer capability
  */
+@DtoMirror
 public record CreateBankGrantRequest(
     UUID userId, UUID accountId, Boolean canDeposit, Boolean canWithdraw, Boolean canTransfer) {}

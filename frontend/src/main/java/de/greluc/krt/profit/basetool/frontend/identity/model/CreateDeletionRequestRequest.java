@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * The member's own Art. 17 erasure request as {@code POST /api/v1/users/me/deletion-request} takes
  * it (REQ-SEC-061).
@@ -26,4 +28,5 @@ package de.greluc.krt.profit.basetool.frontend.identity.model;
  * @param eraseHistory whether the member also asks for the surviving handle snapshots to be
  *     anonymised
  */
+@DtoMirror
 public record CreateDeletionRequestRequest(boolean eraseHistory) {}

@@ -22,5 +22,6 @@ package de.greluc.krt.profit.basetool.frontend.model;
 import java.util.UUID;
 
 /** Data transfer record carrying User Reference payload. */
+@DtoMirror
 public record UserReferenceDto(
     UUID id, String username, String displayName, String effectiveName, Integer rank) {}

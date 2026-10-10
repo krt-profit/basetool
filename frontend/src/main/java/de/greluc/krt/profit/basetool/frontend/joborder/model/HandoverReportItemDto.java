@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * One material line of a handover report preview.
  *
@@ -28,6 +30,7 @@ package de.greluc.krt.profit.basetool.frontend.joborder.model;
  * @param quality the line's quality value
  * @param quantityType the material's unit, {@code SCU} or {@code PIECE}, or {@code null}
  */
+@DtoMirror
 public record HandoverReportItemDto(
     String materialName,
     String locationName,

@@ -19,9 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Write payload for reversing a transaction (REQ-BANK-004).
  *
  * @param note the correction note shown in the booking history, or {@code null}
  */
+@DtoMirror
 public record ReverseBankTransactionRequest(String note) {}

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 
 /**
@@ -30,6 +31,7 @@ import java.math.BigDecimal;
  * @param activeAccounts number of active accounts
  * @param closedAccounts number of closed accounts
  */
+@DtoMirror
 public record BankDashboardTotalsDto(
     BigDecimal totalBalance,
     BigDecimal inflow30d,

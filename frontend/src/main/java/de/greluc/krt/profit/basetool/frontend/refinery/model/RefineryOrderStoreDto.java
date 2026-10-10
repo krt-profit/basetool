@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.refinery.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /** Data transfer record carrying Refinery Order Store payload. */
+@DtoMirror
 public record RefineryOrderStoreDto(List<RefineryOrderStoreItemDto> items) {}

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -36,6 +37,7 @@ import java.util.UUID;
  *     creates a second account for it
  * @param version optimistic-lock version, echoed back on approve/reject
  */
+@DtoMirror
 public record PendingRegistrationDto(
     UUID id,
     String username,

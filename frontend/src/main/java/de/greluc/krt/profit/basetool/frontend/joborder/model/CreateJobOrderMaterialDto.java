@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /** Data transfer record carrying Create Job Order Material payload. */
+@DtoMirror
 public record CreateJobOrderMaterialDto(UUID materialId, Integer minQuality, Double amount) {}

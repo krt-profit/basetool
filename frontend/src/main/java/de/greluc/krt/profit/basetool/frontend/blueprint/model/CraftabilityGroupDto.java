@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -30,5 +31,6 @@ import java.util.UUID;
  * @param effectiveQualityWithRefinery the effective quality including the open refinery yield, or
  *     {@code null}
  */
+@DtoMirror
 public record CraftabilityGroupDto(
     UUID materialId, Double effectiveQuality, Double effectiveQualityWithRefinery) {}

@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Read DTO mirroring the backend {@code PersonalBlueprintBulkDeleteResult} (REQ-INV-023 /
  * REQ-INV-024): the number of blueprints removed by a "delete all my blueprints" clear or the admin
@@ -27,4 +29,5 @@ package de.greluc.krt.profit.basetool.frontend.blueprint.model;
  *
  * @param deleted number of removable owned-blueprint rows removed by the operation
  */
+@DtoMirror
 public record PersonalBlueprintBulkDeleteResultDto(int deleted) {}

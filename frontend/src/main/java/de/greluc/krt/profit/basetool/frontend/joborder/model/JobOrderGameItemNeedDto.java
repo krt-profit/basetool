@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -32,6 +33,7 @@ import java.util.UUID;
  * @param outstandingAmount {@code ordered − delivered − allocated}, floored at 0; the figure to
  *     render
  */
+@DtoMirror
 public record JobOrderGameItemNeedDto(
     UUID gameItemId,
     Integer orderedAmount,

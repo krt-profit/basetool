@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgchart.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 import java.util.UUID;
 
@@ -41,6 +42,7 @@ import java.util.UUID;
  * @param deputy the Stv. Kommandoleiter node, or {@code null} when vacant.
  * @param ensigns the Ensigns reporting into this Kommando; never {@code null}, possibly empty.
  */
+@DtoMirror
 public record CommandChartDto(
     UUID positionId,
     String name,

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.List;
 
@@ -31,6 +32,7 @@ import java.util.List;
  * @param recipientHandle the recipient's handle
  * @param entries the delivered item-line quantities (at least one)
  */
+@DtoMirror
 public record JobOrderItemHandoverCreateDto(
     Instant handoverTime,
     String recipientHandle,

@@ -19,9 +19,11 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /** Data transfer record carrying Ship Type payload. */
+@DtoMirror
 public record ShipTypeDto(
     UUID id,
     String name,

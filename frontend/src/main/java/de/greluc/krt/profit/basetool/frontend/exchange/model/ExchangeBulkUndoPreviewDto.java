@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 
 /**
@@ -29,5 +30,6 @@ import java.time.Instant;
  * @param entries how many journal entries are in scope
  * @param clientActive whether starting suspends the client first
  */
+@DtoMirror
 public record ExchangeBulkUndoPreviewDto(
     Instant since, int members, long entries, boolean clientActive) {}

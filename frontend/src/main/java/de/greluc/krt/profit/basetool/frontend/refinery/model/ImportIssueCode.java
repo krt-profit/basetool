@@ -19,11 +19,14 @@
 
 package de.greluc.krt.profit.basetool.frontend.refinery.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend {@code ImportIssueCode}: the machine-readable reason of one
  * refinery-import review finding, translated via {@code refineryImport.issue.<CODE>}. Must match
  * the backend constants, or Jackson binding fails.
  */
+@DtoMirror
 public enum ImportIssueCode {
 
   /** No master-data material matched the raw screen name; suggestions accompany the issue. */

@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.PayoutPreference;
 
 /** Inbound request payload for the Update Payout Preference operation. */
+@DtoMirror
 public record UpdatePayoutPreferenceRequest(PayoutPreference preference) {}

@@ -29,4 +29,5 @@ import java.util.UUID;
  * @param name the item's display name
  * @param kind the item kind name (e.g. {@code WEAPON})
  */
+@DtoMirror
 public record GameItemReferenceDto(UUID id, String name, String kind) {}

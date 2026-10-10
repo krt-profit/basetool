@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgunit.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -33,6 +34,7 @@ import java.util.UUID;
  * @param isProfitEligible whether the SK appears in the Job-Order responsible (processing) picker.
  * @param version optimistic-lock counter.
  */
+@DtoMirror
 public record SpecialCommandDto(
     UUID id,
     String name,

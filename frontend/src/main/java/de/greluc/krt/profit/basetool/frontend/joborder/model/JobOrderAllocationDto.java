@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -29,4 +30,5 @@ import java.util.UUID;
  * @param jobOrderDisplayId the earmarked job order's human-facing display id (chip label).
  * @param amount the SCU/piece amount of the entry earmarked to this job order.
  */
+@DtoMirror
 public record JobOrderAllocationDto(UUID jobOrderId, Integer jobOrderDisplayId, Double amount) {}

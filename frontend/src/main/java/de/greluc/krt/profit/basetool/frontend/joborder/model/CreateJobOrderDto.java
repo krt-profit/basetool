@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -28,6 +29,7 @@ import org.jetbrains.annotations.Nullable;
  * profit-eligible Staffel or SK that processes the order; {@link #requestingOrgUnitId} is the
  * customer, which may be any org unit.
  */
+@DtoMirror
 public record CreateJobOrderDto(
     @Nullable UUID responsibleOrgUnitId,
     @Nullable UUID requestingOrgUnitId,

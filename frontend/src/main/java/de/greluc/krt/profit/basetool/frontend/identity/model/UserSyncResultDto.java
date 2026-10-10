@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend view of the backend's {@code POST /api/v1/users/sync} response: the number of users the
  * admin-triggered manual Keycloak sync reconciled. Deserialised by {@code BackendApiClient} and
@@ -27,4 +29,5 @@ package de.greluc.krt.profit.basetool.frontend.identity.model;
  *
  * @param syncedCount the number of users the manual sync reconciled
  */
+@DtoMirror
 public record UserSyncResultDto(int syncedCount) {}

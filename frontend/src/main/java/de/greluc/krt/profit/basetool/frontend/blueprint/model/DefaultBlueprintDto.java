@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -35,6 +36,7 @@ import java.util.UUID;
  * @param createdAt row creation timestamp
  * @param version optimistic-lock version
  */
+@DtoMirror
 public record DefaultBlueprintDto(
     UUID id,
     String productKey,

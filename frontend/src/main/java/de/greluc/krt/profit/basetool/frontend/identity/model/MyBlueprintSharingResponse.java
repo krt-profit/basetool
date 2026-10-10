@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * The member's global blueprint-sharing flag as {@code GET /api/v1/users/me/blueprint-sharing}
  * returns it.
@@ -26,4 +28,5 @@ package de.greluc.krt.profit.basetool.frontend.identity.model;
  * @param shareBlueprintsGlobally whether the member's blueprints are shared with every member
  * @param version the user row's current optimistic-lock version
  */
+@DtoMirror
 public record MyBlueprintSharingResponse(boolean shareBlueprintsGlobally, Long version) {}

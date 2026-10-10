@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -34,6 +35,7 @@ import org.jetbrains.annotations.Nullable;
  * @param items the ordered finished-item lines
  * @param version optimistic-lock version (unused on create)
  */
+@DtoMirror
 public record CreateJobOrderItemRequestDto(
     @Nullable UUID responsibleOrgUnitId,
     @Nullable UUID requestingOrgUnitId,

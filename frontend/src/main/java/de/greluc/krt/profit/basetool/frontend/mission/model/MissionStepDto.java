@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -31,4 +32,5 @@ import java.util.UUID;
  * @param done the shared completion flag every viewer sees
  * @param orderIndex the zero-based position within the mission's Ablauf
  */
+@DtoMirror
 public record MissionStepDto(UUID id, String title, String meta, boolean done, int orderIndex) {}

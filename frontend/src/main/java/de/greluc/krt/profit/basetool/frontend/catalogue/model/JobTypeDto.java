@@ -20,9 +20,11 @@
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /** Data transfer record carrying Job Type payload. */
+@DtoMirror
 public record JobTypeDto(
     UUID id,
     String name,

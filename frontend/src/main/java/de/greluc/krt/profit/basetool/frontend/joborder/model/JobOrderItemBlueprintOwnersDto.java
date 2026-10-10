@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -29,6 +30,7 @@ import java.util.List;
  * @param requiredBlueprints the order's distinct required products with per-product owner counts
  * @param owners the members owning at least one required blueprint, with the products they hold
  */
+@DtoMirror
 public record JobOrderItemBlueprintOwnersDto(
     List<JobOrderRequiredBlueprintDto> requiredBlueprints,
     List<JobOrderBlueprintOwnerDto> owners) {}

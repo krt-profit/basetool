@@ -19,12 +19,15 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend's {@code MissionObjectiveKind} — the classification of a mission
  * goal (Ziel). Drives the grouped overview display (Hauptziel -&gt; Nebenziel -&gt; Nicht-Ziel) and
  * the per-row selector in the goals editor. The localized German labels come from the message
  * bundle (key {@code mission.objective.kind.*}).
  */
+@DtoMirror
 public enum MissionObjectiveKind {
 
   /** A primary objective ("Hauptziel") — a core, must-achieve goal of the mission. */

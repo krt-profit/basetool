@@ -20,9 +20,11 @@
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 
 /**
  * DTO for updating the status of a JobOrder via the backend API. Includes the version field for
  * optimistic locking.
  */
+@DtoMirror
 public record UpdateJobOrderStatusDto(@BackendEnumAsString String status, Long version) {}

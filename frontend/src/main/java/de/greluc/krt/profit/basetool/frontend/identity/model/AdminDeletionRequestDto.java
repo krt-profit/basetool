@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -38,6 +39,7 @@ import org.jetbrains.annotations.Nullable;
  * @param decisionNote the admin's recorded reasoning on a refusal
  * @param version optimistic-lock version
  */
+@DtoMirror
 public record AdminDeletionRequestDto(
     UUID id,
     UUID userId,

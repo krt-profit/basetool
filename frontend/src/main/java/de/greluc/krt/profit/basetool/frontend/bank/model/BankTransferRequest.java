@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.UUID;
 
@@ -36,6 +37,7 @@ import java.util.UUID;
  * @param feeInclusive whether the fee is taken from the amount; {@code null} counts as {@code
  *     false}
  */
+@DtoMirror
 public record BankTransferRequest(
     UUID sourceAccountId,
     UUID sourceHolderId,

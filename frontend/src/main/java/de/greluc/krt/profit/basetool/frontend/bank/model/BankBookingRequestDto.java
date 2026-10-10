@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -78,6 +79,7 @@ import org.jetbrains.annotations.Nullable;
  * @param callerMayConfirm on the staff queue, whether the caller may confirm this request now;
  *     {@code null} on every other read (REQ-BANK-023)
  */
+@DtoMirror
 public record BankBookingRequestDto(
     UUID id,
     UUID accountId,

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.audit.model;
 
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankAuditEventDto;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import org.jetbrains.annotations.Nullable;
 
@@ -35,6 +36,7 @@ import org.jetbrains.annotations.Nullable;
  * @param clientId the bounded label of the client the mutation came through (REQ-AUDIT-005), e.g.
  *     {@code basetool-android}, or {@code null} when not recorded
  */
+@DtoMirror
 public record AuditRowView(
     Instant occurredAt,
     String actorHandle,

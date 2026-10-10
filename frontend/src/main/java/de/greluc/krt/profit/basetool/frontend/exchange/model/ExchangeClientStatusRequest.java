@@ -19,9 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Suspends or activates an exchange client (REQ-XCH-003).
  *
  * @param version the optimistic-lock version the admin last saw
  */
+@DtoMirror
 public record ExchangeClientStatusRequest(Long version) {}

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.UUID;
 
@@ -39,6 +40,7 @@ import java.util.UUID;
  * @param sellTerminalName the best selling terminal
  * @param sellTerminalLocation that terminal's location
  */
+@DtoMirror
 public record ProfitCalculationDto(
     UUID materialId,
     String materialName,

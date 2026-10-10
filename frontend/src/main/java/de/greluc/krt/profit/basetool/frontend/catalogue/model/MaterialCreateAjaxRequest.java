@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
@@ -45,6 +46,7 @@ import java.util.UUID;
  * @param isVolatileQt warning flag (volatile under Quantum Travel).
  * @param isVolatileTime warning flag (decays over time).
  */
+@DtoMirror
 public record MaterialCreateAjaxRequest(
     @NotBlank @Size(max = 255) String name,
     @NotBlank String type,

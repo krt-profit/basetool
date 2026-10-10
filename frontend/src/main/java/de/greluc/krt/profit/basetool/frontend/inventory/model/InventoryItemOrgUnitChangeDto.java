@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
@@ -30,5 +31,6 @@ import org.jetbrains.annotations.Nullable;
  * @param targetOwningOrgUnitId one of the caller's direct memberships, or {@code null} for no unit
  * @param mergeStock the stock-merge opt-in (REQ-INV-026), honoured only for an {@code SCU} material
  */
+@DtoMirror
 public record InventoryItemOrgUnitChangeDto(
     @Nullable Long version, @Nullable UUID targetOwningOrgUnitId, @Nullable Boolean mergeStock) {}

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BlueprintReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -32,6 +33,7 @@ import java.util.List;
  * @param subAssemblies adoptable sub-assembly suggestions
  * @param unresolvedIngredients names of ingredient lines with no resolved material/item
  */
+@DtoMirror
 public record ItemDerivationDto(
     BlueprintReferenceDto blueprint,
     Integer amount,

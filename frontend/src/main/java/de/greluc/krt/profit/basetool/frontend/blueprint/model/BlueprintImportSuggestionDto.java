@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend {@code BlueprintImportSuggestionDto}: one fuzzy-match candidate
  * for an unmatched blueprint name.
@@ -27,4 +29,5 @@ package de.greluc.krt.profit.basetool.frontend.blueprint.model;
  * @param productName display spelling of the candidate product
  * @param score similarity to the external name in {@code [0.0, 1.0]}
  */
+@DtoMirror
 public record BlueprintImportSuggestionDto(String productKey, String productName, double score) {}

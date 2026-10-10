@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgchart.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 import java.util.UUID;
 
@@ -36,6 +37,7 @@ import java.util.UUID;
  * @param members the remaining OL members (OL_MEMBER positions, excluding the Grand Admiral); never
  *     {@code null}, possibly empty.
  */
+@DtoMirror
 public record OlChartDto(
     UUID orgUnitId,
     String name,

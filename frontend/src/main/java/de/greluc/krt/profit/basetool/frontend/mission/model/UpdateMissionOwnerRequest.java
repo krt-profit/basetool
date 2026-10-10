@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -27,4 +28,5 @@ import java.util.UUID;
  * @param userId the new owner
  * @param version the ownership version the client read
  */
+@DtoMirror
 public record UpdateMissionOwnerRequest(UUID userId, Long version) {}

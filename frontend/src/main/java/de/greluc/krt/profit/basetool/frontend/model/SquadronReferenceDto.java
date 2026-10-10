@@ -26,4 +26,5 @@ import java.util.UUID;
  * short handle the templates render in the staffel column / badge. Kept structurally identical to
  * the backend record so Jackson maps the response payload one-to-one without custom mixins.
  */
+@DtoMirror
 public record SquadronReferenceDto(UUID id, String name, String shorthand) {}

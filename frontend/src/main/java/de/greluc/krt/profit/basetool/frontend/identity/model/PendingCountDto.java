@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * How many users still owe Terms-of-Use consent, as {@code GET /api/v1/admin/terms/pending-count}
  * returns it (REQ-SEC-028).
@@ -26,4 +28,5 @@ package de.greluc.krt.profit.basetool.frontend.identity.model;
  * @param pending how many login-capable users still owe consent
  * @param termsVersion the wording that count refers to
  */
+@DtoMirror
 public record PendingCountDto(long pending, String termsVersion) {}

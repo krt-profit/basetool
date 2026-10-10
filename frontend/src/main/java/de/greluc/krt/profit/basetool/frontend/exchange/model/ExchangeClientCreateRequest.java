@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -32,6 +33,7 @@ import java.util.List;
  * @param requestsPerMinute the per-minute limit override, or {@code null}
  * @param writesPerDay the daily write quota override, or {@code null}
  */
+@DtoMirror
 public record ExchangeClientCreateRequest(
     String clientId,
     String displayName,

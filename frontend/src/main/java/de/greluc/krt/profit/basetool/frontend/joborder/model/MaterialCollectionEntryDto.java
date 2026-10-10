@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -26,6 +27,7 @@ import java.util.UUID;
  * the entry's total physical stock (backs the full-row transfer); {@code allocatedQuantity} is the
  * share earmarked to this job order (Variante C / REQ-INV-027), {@code <= quantity}.
  */
+@DtoMirror
 public record MaterialCollectionEntryDto(
     UUID inventoryEntryId,
     long version,

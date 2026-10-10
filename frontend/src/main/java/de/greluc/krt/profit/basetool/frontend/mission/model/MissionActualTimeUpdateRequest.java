@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import org.jetbrains.annotations.Nullable;
 
@@ -35,5 +36,6 @@ import org.jetbrains.annotations.Nullable;
  * @param value UTC instant to set ({@link Instant}). {@code null} clears the value.
  * @param version Current entity version (optimistic locking).
  */
+@DtoMirror
 public record MissionActualTimeUpdateRequest(
     @Nullable String field, @Nullable Instant value, @Nullable Long version) {}

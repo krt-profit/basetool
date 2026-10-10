@@ -19,9 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend blueprint modifier-segment DTO (one linear step of a stepped /
  * piecewise-linear stat curve, used by the admin blueprint slider to compute non-linear values).
  */
+@DtoMirror
 public record BlueprintRequirementModifierSegmentDto(
     Double qualityMin, Double qualityMax, Double modifierAtStart, Double modifierAtEnd) {}

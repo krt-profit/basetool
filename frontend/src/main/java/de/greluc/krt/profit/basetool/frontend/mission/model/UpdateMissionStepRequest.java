@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Write payload for editing an Ablauf step.
  *
@@ -26,4 +28,5 @@ package de.greluc.krt.profit.basetool.frontend.mission.model;
  * @param meta the time or place hint, or {@code null}
  * @param stepsVersion the steps-section version the client read
  */
+@DtoMirror
 public record UpdateMissionStepRequest(String title, String meta, Long stepsVersion) {}

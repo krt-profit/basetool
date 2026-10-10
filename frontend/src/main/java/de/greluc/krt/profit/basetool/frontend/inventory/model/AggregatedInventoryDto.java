@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.InventoryGameItemReferenceDto;
 
 /**
@@ -29,6 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.model.InventoryGameItemReferenceDt
  * <p>A material row carries {@code material} and the quality figures; a game-item row carries
  * {@code gameItem} and {@code null} quality columns (REQ-INV-029).
  */
+@DtoMirror
 public record AggregatedInventoryDto(
     MaterialDto material,
     InventoryGameItemReferenceDto gameItem,

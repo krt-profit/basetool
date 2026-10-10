@@ -19,10 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend {@code SyncReportPurgeResultDto}, the result of the "delete
  * reports older than X days" action; must match it field for field.
  *
  * @param deleted number of sync-report rows deleted by the purge
  */
+@DtoMirror
 public record SyncReportPurgeResultDto(int deleted) {}

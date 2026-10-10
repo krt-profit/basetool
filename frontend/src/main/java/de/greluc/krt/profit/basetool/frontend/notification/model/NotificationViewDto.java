@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.notification.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -34,6 +35,7 @@ import java.util.UUID;
  * @param href same-origin path of the page the notification is about, or {@code null} when the web
  *     app has no page the recipient can open for it
  */
+@DtoMirror
 public record NotificationViewDto(
     UUID id,
     String text,

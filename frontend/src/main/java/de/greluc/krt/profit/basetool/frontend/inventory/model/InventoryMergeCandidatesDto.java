@@ -19,10 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Backend answer of the Einbuchen merge probe (REQ-INV-026), relayed to the form's script.
  *
  * @param exists {@code true} when a book-in with the probed stock identity would merge with an
  *     existing row
  */
+@DtoMirror
 public record InventoryMergeCandidatesDto(boolean exists) {}

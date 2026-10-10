@@ -19,10 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.notification.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend bulk-mutation result (mark-all-read / clear-read).
  *
  * @param affected number of notifications changed
  * @param unreadCount the caller's unread count after the operation
  */
+@DtoMirror
 public record NotificationBulkResultDto(int affected, long unreadCount) {}

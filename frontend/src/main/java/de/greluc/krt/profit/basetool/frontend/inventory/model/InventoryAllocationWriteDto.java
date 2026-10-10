@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -30,5 +31,6 @@ import java.util.UUID;
  * @param amount the slice amount (add/change only).
  * @param version the owning entry's optimistic-lock version, echoed for the 409 check.
  */
+@DtoMirror
 public record InventoryAllocationWriteDto(
     InventoryAllocationDimension field, UUID targetId, Double amount, Long version) {}

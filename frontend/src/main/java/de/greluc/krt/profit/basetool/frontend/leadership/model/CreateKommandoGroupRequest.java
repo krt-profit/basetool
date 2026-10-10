@@ -19,9 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.leadership.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Body of the backend Kommandogruppe create call.
  *
  * @param name the group name
  */
+@DtoMirror
 public record CreateKommandoGroupRequest(String name) {}

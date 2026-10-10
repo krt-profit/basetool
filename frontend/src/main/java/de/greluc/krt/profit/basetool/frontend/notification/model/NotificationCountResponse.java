@@ -19,9 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.notification.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend unread-count payload; backs the always-on bell badge.
  *
  * @param count number of unread notifications for the caller
  */
+@DtoMirror
 public record NotificationCountResponse(Long count) {}

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,4 +29,5 @@ import java.util.UUID;
  * @param jobTypeIds the crew job types, or {@code null}
  * @param version the crew version the client read, or {@code null}
  */
+@DtoMirror
 public record UpdateCrewRequest(List<UUID> jobTypeIds, Long version) {}

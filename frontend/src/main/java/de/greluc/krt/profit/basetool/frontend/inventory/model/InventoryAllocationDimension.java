@@ -19,11 +19,14 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend allocation-dimension discriminator (Variante C, REQ-INV-027):
  * which of an inventory entry's two independent quantity splits an {@link
  * InventoryAllocationWriteDto} targets. Serialized by name to the backend allocation endpoints.
  */
+@DtoMirror
 public enum InventoryAllocationDimension {
 
   /** The job-order split. */

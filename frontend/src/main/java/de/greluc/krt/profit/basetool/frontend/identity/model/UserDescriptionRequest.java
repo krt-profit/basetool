@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -29,5 +30,6 @@ import org.jetbrains.annotations.Nullable;
  * @param displayName the display name
  * @param version the user row's optimistic-lock version, or {@code null} when the form carried none
  */
+@DtoMirror
 public record UserDescriptionRequest(
     String description, String displayName, @Nullable Long version) {}

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.operation.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.UUID;
 
@@ -30,4 +31,5 @@ import java.util.UUID;
  * @param missionName the mission's display name
  * @param totalSum the mission's signed bottom line in aUEC (income − expense + refinery profit)
  */
+@DtoMirror
 public record OperationMissionFinanceDto(UUID missionId, String missionName, BigDecimal totalSum) {}

@@ -19,10 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Write payload for toggling a holder's active flag (REQ-BANK-003).
  *
  * @param active the new flag value
  * @param version the holder version the client read
  */
+@DtoMirror
 public record UpdateBankHolderRequest(Boolean active, Long version) {}

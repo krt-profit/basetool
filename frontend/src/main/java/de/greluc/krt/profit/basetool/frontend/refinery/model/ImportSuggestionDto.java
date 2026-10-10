@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.refinery.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -29,4 +30,5 @@ import java.util.UUID;
  * @param name display name of the candidate, e.g. {@code "Stileron (Raw)"}
  * @param score similarity to the raw screen name in {@code [0.0, 1.0]}
  */
+@DtoMirror
 public record ImportSuggestionDto(UUID id, String name, double score) {}

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 
 /**
@@ -32,6 +33,7 @@ import java.math.BigDecimal;
  * @param approvalLimits the account's per-tier approval limits (REQ-BANK-041), with the
  *     bank-surface edit affordance
  */
+@DtoMirror
 public record BankAccountDetailDto(
     BankAccountDto account,
     BigDecimal delta30d,

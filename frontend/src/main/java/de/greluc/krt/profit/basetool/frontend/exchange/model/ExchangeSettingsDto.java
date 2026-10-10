@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 
 /**
@@ -28,4 +29,5 @@ import java.time.Instant;
  * @param updatedAt when the switch last changed, or {@code null}
  * @param version the optimistic-lock version
  */
+@DtoMirror
 public record ExchangeSettingsDto(boolean enabled, Instant updatedAt, Long version) {}

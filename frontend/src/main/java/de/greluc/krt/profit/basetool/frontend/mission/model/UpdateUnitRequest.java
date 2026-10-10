@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -33,6 +34,7 @@ import java.util.UUID;
  * @param note the unit note, or {@code null}
  * @param version the unit version the client read, or {@code null}
  */
+@DtoMirror
 public record UpdateUnitRequest(
     String name,
     UUID shipTypeId,

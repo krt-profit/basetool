@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -30,5 +31,6 @@ import java.util.UUID;
  * @param kind the classification (primary / secondary / non-goal) driving the grouped display
  * @param orderIndex the zero-based position within the mission's goal list
  */
+@DtoMirror
 public record MissionObjectiveDto(
     UUID id, String title, MissionObjectiveKind kind, int orderIndex) {}

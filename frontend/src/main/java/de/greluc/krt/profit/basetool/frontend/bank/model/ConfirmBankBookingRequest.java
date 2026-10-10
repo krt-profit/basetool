@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -31,6 +32,7 @@ import java.util.UUID;
  * @param staffNote internal note of the confirming employee, or {@code null}
  * @param version the request version the client read
  */
+@DtoMirror
 public record ConfirmBankBookingRequest(
     UUID holderId,
     UUID destinationHolderId,

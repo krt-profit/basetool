@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 
 /**
  * Frontend mirror of the backend {@code P4kImportResultDto}, shared by a P4K import preview and
@@ -36,6 +37,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * @param runId id of the persisted import run, or {@code null} for a preview
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
+@DtoMirror
 public record P4kImportResultDto(
     boolean dryRun,
     boolean seedingEnabled,

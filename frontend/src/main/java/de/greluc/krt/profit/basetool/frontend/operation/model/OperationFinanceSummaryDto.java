@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.operation.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -33,6 +34,7 @@ import java.util.UUID;
  * @param truncated {@code true} when the operation has more missions than the cap and the breakdown
  *     was clipped
  */
+@DtoMirror
 public record OperationFinanceSummaryDto(
     UUID operationId,
     BigDecimal totalSum,

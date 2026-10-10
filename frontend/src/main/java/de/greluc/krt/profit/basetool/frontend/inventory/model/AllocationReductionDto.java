@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import java.util.UUID;
@@ -30,4 +31,5 @@ import java.util.UUID;
  * @param targetId the job order or mission whose slice to shrink; never {@code null}.
  * @param amount the SCU (or whole pieces) to subtract from that slice; strictly positive.
  */
+@DtoMirror
 public record AllocationReductionDto(@NotNull UUID targetId, @NotNull @Positive Double amount) {}

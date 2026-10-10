@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.contract;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
@@ -36,16 +37,13 @@ import org.springframework.context.annotation.ClassPathScanningCandidateComponen
 import org.springframework.core.type.filter.AssignableTypeFilter;
 
 /**
- * Compares the property names of the hand-written {@code frontend/model/dto} mirrors with the types
- * generated from {@code openapi.json} (ADR-0161).
+ * Compares the property names of the hand-written {@link DtoMirror} types with the types generated
+ * from {@code openapi.json} (ADR-0161).
  *
  * <p>Only names are compared; types and nullability are covered by {@code ExternalContractTest}
  * (REQ-API-009). Existing drift is listed in {@link #KNOWN_DRIFT}.
  */
 class GeneratedDtoAgreementTest {
-
-  /** Where the hand-written mirrors live. */
-  private static final String MIRROR_PACKAGE = "de.greluc.krt.profit.basetool.frontend.model.dto";
 
   /** Where the generator writes. */
   private static final String GENERATED_PACKAGE =
@@ -74,8 +72,8 @@ class GeneratedDtoAgreementTest {
           Map.entry("UserAttributesUpdateDto", "UserAttributesRequest"));
 
   /**
-   * Types under {@code model/dto} that mirror no backend schema. Any other type without a
-   * counterpart fails the test.
+   * {@link DtoMirror} types that mirror no backend schema. Any other type without a counterpart
+   * fails the test.
    */
   private static final Set<String> FRONTEND_ONLY =
       Set.of(
@@ -108,7 +106,7 @@ class GeneratedDtoAgreementTest {
   @DisplayName("every mirrored DTO carries exactly the fields the contract declares")
   void mirrorsAgreeWithTheGeneratedModels() {
     Map<String, Class<?>> generated = scan(GENERATED_PACKAGE);
-    Map<String, Class<?>> mirrors = scan(MIRROR_PACKAGE);
+    Map<String, Class<?>> mirrors = mirrors();
 
     assertThat(generated)
         .as("the generator produced no models, which would make every case below vacuous")
@@ -170,6 +168,21 @@ class GeneratedDtoAgreementTest {
             "pre-existing drifts, frozen with their reasons. This number goes DOWN when one is"
                 + " fixed; it goes up only with the same justification the entry carries")
         .hasSize(1);
+  }
+
+  /**
+   * Finds the hand-written mirrors: every top-level non-enum {@link DtoMirror} type.
+   *
+   * @return simple name to class
+   */
+  private static Map<String, Class<?>> mirrors() {
+    Map<String, Class<?>> found = new LinkedHashMap<>();
+    for (Class<?> type : DtoMirrorScan.topLevelTypes()) {
+      if (!type.isEnum()) {
+        found.put(type.getSimpleName(), type);
+      }
+    }
+    return found;
   }
 
   /**

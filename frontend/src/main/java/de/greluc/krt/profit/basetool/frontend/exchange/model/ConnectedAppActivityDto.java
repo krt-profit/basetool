@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 
 /**
@@ -30,5 +31,6 @@ import java.time.Instant;
  * @param label the entry's name, or {@code null} when it is no longer known
  * @param undone whether the member has undone it
  */
+@DtoMirror
 public record ConnectedAppActivityDto(
     Instant recordedAt, String resource, String action, String label, boolean undone) {}

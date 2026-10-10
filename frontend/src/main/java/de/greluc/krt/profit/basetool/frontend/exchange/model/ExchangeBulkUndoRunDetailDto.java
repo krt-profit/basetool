@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -28,6 +29,7 @@ import java.util.List;
  * @param skipped the first skipped entries, failed members first
  * @param skippedTotal how many skipped entries the run has in all
  */
+@DtoMirror
 public record ExchangeBulkUndoRunDetailDto(
     ExchangeBulkUndoRunDto run, List<SkippedEntry> skipped, long skippedTotal) {
 

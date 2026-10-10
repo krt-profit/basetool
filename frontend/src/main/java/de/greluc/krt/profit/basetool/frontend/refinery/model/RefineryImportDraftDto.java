@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.refinery.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -32,6 +33,7 @@ import java.util.List;
  * @param goodsTotal number of material rows read from the screenshots (incl. skipped)
  * @param rowsSkipped number of rows not added to the draft (refine-off, zero-qty, un-quoted)
  */
+@DtoMirror
 public record RefineryImportDraftDto(
     RefineryOrderDto order,
     List<ImportIssueDto> issues,

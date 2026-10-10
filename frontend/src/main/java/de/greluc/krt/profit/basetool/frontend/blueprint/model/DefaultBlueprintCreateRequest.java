@@ -19,10 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Write DTO relayed to the backend when an admin adds a product to the default-blueprint set
  * (REQ-INV-017).
  *
  * @param productKey normalized product key of the blueprint product to mark as default
  */
+@DtoMirror
 public record DefaultBlueprintCreateRequest(String productKey) {}

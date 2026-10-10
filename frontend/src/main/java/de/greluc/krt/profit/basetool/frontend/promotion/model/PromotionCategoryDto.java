@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.promotion.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.UUID;
 
 /** Frontend DTO for a promotion category, mirroring the backend response. */
+@DtoMirror
 public record PromotionCategoryDto(
     UUID id,
     Long version,

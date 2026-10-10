@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgchart.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 import java.util.UUID;
 
@@ -31,6 +32,7 @@ import java.util.UUID;
  * @param commanders the SK-Leiter nodes; never {@code null}, at most two.
  * @param canAddCommander whether another SK-Leiter may still be added.
  */
+@DtoMirror
 public record SpecialCommandChartDto(
     UUID orgUnitId,
     String name,

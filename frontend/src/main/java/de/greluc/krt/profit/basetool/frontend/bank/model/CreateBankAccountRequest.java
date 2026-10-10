@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -31,5 +32,6 @@ import java.util.UUID;
  * @param areaName free-form Bereich name of an {@code AREA} account without an org unit, or {@code
  *     null}
  */
+@DtoMirror
 public record CreateBankAccountRequest(
     String name, @BackendEnumAsString String type, UUID orgUnitId, String areaName) {}

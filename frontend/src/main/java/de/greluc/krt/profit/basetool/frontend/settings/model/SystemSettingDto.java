@@ -19,5 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.settings.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /** Data transfer record carrying System Setting payload. */
+@DtoMirror
 public record SystemSettingDto(String id, String value, Long version) {}

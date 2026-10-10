@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 
 /**
  * Frontend mirror of the backend {@code P4kImportJobDto}, polled by the P4K import page: {@link
@@ -42,6 +43,7 @@ import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
  * @param finishedAt ISO-8601 instant the worker finished, or {@code null}
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
+@DtoMirror
 public record P4kImportJobDto(
     String id,
     @BackendEnumAsString String kind,

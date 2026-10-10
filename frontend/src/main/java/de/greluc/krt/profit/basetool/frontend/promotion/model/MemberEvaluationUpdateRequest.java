@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.promotion.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 
 /**
  * Body of the backend upsert of a member's evaluation in one category.
@@ -27,5 +28,6 @@ import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
  * @param version the evaluation's optimistic-lock version, or {@code null} for a new one
  * @param assignedLevel the backend {@code PromotionLevel} name
  */
+@DtoMirror
 public record MemberEvaluationUpdateRequest(
     Long version, @BackendEnumAsString String assignedLevel) {}

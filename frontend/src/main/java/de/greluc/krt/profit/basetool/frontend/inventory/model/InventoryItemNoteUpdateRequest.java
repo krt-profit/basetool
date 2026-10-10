@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.jetbrains.annotations.Nullable;
@@ -28,5 +29,6 @@ import org.jetbrains.annotations.Nullable;
  * empty {@code note} removes the existing note. {@code version} carries the entity version for
  * optimistic locking.
  */
+@DtoMirror
 public record InventoryItemNoteUpdateRequest(
     @Nullable @Size(max = 1000) String note, @NotNull Long version) {}

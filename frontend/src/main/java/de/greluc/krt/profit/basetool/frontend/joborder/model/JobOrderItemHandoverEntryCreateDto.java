@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -30,4 +31,5 @@ import java.util.UUID;
  * @param jobOrderItemId the ordered item line being fulfilled
  * @param amount whole-unit count delivered for that line (≥ 1)
  */
+@DtoMirror
 public record JobOrderItemHandoverEntryCreateDto(UUID jobOrderItemId, Integer amount) {}

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -29,4 +30,5 @@ import java.util.UUID;
  * @param materialId the material the choice applies to
  * @param quality the code of the requested quality tier
  */
+@DtoMirror
 public record CreateJobOrderItemMaterialDto(UUID materialId, String quality) {}

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgunit.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -28,4 +29,5 @@ import java.util.List;
  *
  * @param memberships post-write membership rows, sorted Staffel-first.
  */
+@DtoMirror
 public record MembershipDeltaResponse(List<OrgUnitMembershipDto> memberships) {}

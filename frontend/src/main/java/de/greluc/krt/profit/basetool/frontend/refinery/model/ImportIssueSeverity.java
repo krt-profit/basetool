@@ -19,10 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.refinery.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Frontend mirror of the backend {@code ImportIssueSeverity}: the visual grading (danger / warning
  * / info) of an import review finding.
  */
+@DtoMirror
 public enum ImportIssueSeverity {
 
   /** A required pre-fill is impossible (e.g. every row un-quoted); rendered danger-tinted. */

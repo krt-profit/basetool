@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.GameItemReferenceDto;
 import java.util.UUID;
 
@@ -31,5 +32,6 @@ import java.util.UUID;
  * @param gameItem the produced item (slim reference)
  * @param amount whole-unit count delivered in this entry
  */
+@DtoMirror
 public record JobOrderItemHandoverEntryDto(
     UUID id, UUID jobOrderItemId, GameItemReferenceDto gameItem, Integer amount) {}

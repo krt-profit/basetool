@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.UUID;
 
@@ -37,6 +38,7 @@ import java.util.UUID;
  *     false}
  * @param counterpartyExternalName Empfänger without an account, or {@code null}
  */
+@DtoMirror
 public record BankWithdrawalRequest(
     UUID accountId,
     UUID holderId,

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -33,6 +34,7 @@ import org.jetbrains.annotations.Nullable;
  * @param value the frequency value.
  * @param version the optimistic-lock version echoed back on edits.
  */
+@DtoMirror
 public record MissionFrequencyDto(
     UUID id, FrequencyTypeRef frequencyType, String name, BigDecimal value, Long version) {
   /** Immutable record carrying Frequency Type Ref data. */

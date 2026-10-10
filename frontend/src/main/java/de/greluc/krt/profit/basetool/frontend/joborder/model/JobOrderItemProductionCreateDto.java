@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 import java.util.UUID;
 
@@ -34,6 +35,7 @@ import java.util.UUID;
  * @param bookIn where and for whom the produced units are booked into the Lager (REQ-INV-032), or
  *     {@code null} to create no stock
  */
+@DtoMirror
 public record JobOrderItemProductionCreateDto(
     Integer amount,
     Long version,

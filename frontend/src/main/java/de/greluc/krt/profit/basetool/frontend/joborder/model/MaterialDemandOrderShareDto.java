@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -36,6 +37,7 @@ import java.util.UUID;
  * @param bookedAmount the inventory linked to this order for the bucket
  * @param claimedAmount the amount claimed on this order's bucket; {@code 0.0} for a non-SK order
  */
+@DtoMirror
 public record MaterialDemandOrderShareDto(
     UUID jobOrderId,
     Integer displayId,

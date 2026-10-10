@@ -19,12 +19,14 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryLocationType;
 
 /**
  * Combined typeahead entry for cities and space stations. Mirrors the backend {@code
  * UexLocationDto}.
  */
+@DtoMirror
 public record UexLocationDto(
     Integer uexId,
     PersonalInventoryLocationType type,

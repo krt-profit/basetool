@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.materialexchange.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
@@ -55,6 +56,7 @@ import java.util.UUID;
  * @param status the request status name (ACTIVE / DEACTIVATED).
  * @param version the optimistic-lock version.
  */
+@DtoMirror
 public record MaterialRequestDto(
     UUID id,
     @BackendEnumAsString String kind,

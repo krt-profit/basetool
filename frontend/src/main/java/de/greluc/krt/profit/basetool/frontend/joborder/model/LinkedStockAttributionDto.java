@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -28,4 +29,5 @@ import java.util.UUID;
  * @param qualityTierId the bucket's quality tier, or {@code null} for the part no bucket accepts
  * @param amount the attributed amount, in the material's unit
  */
+@DtoMirror
 public record LinkedStockAttributionDto(UUID inventoryItemId, UUID qualityTierId, double amount) {}

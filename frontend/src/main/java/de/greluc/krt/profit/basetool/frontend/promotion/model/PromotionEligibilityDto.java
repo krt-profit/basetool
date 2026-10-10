@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.promotion.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -32,6 +33,7 @@ import java.util.List;
  *     transition
  * @param checks per-requirement evaluation, in stable display order
  */
+@DtoMirror
 public record PromotionEligibilityDto(
     String userId,
     int fromRank,

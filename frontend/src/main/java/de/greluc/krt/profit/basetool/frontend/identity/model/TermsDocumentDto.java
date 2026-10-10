@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -32,6 +33,7 @@ import java.util.List;
  * @param sections the numbered sections, in document order
  * @param lastUpdated the "Stand ..." line
  */
+@DtoMirror
 public record TermsDocumentDto(
     String version,
     String title,

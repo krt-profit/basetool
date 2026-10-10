@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
@@ -29,6 +30,7 @@ import org.jetbrains.annotations.Nullable;
  * @param accounts one entry per visible account, ordered by account number
  * @param totals the aggregate strip; {@code null} for plain employees
  */
+@DtoMirror
 public record BankDashboardDto(
     boolean management,
     List<BankDashboardAccountDto> accounts,

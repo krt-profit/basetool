@@ -19,10 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * The body of {@code PUT /api/v1/orders/{id}/assignees/{userId}/note}.
  *
  * @param note the new note text; blank or {@code null} clears the note
  * @param version the assignee edge version the client last saw, or {@code null} to skip the check
  */
+@DtoMirror
 public record AssigneeNoteRequest(String note, Long version) {}

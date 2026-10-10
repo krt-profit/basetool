@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 
 /**
@@ -27,4 +28,5 @@ import java.math.BigDecimal;
  * @param name the free-text label
  * @param value the channel value
  */
+@DtoMirror
 public record AddCustomFrequencyRequest(String name, BigDecimal value) {}

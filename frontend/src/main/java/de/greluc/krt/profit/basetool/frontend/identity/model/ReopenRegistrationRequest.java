@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -29,4 +30,5 @@ import org.jetbrains.annotations.Nullable;
  *     was wrong
  * @param version the optimistic-lock version the admin last read; {@code null} bypasses the check
  */
+@DtoMirror
 public record ReopenRegistrationRequest(@Nullable String reason, @Nullable Long version) {}

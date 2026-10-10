@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -31,5 +32,6 @@ import java.util.UUID;
  * @param claimingOrgUnitId the squadron making the claim
  * @param amount the claimed partial quantity (strictly positive)
  */
+@DtoMirror
 public record CreateClaimDto(
     UUID materialId, String qualityRequirement, UUID claimingOrgUnitId, Double amount) {}

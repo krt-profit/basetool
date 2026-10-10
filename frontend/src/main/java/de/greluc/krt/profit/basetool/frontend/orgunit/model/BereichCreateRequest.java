@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgunit.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -31,5 +32,6 @@ import java.util.UUID;
  * @param parentOrgUnitId the owning Organisationsleitung's id, or {@code null} to leave unparented.
  * @param department the Kartell department / Bereichsfarbe name, or {@code null} to leave untinted.
  */
+@DtoMirror
 public record BereichCreateRequest(
     String name, String shorthand, String description, UUID parentOrgUnitId, String department) {}

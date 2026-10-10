@@ -19,10 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgunit.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
+
 /**
  * Body of the backend SK-Leiter toggle on a Spezialkommando membership.
  *
  * @param isLead the new lead state
  * @param version the membership's optimistic-lock version
  */
+@DtoMirror
 public record MembershipLeadToggleRequest(Boolean isLead, Long version) {}

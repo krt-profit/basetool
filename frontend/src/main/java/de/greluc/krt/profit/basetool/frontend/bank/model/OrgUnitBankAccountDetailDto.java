@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.math.BigDecimal;
 import org.jetbrains.annotations.Nullable;
 
@@ -40,6 +41,7 @@ import org.jetbrains.annotations.Nullable;
  * @param approvalExempt {@code true} iff the caller is this account's responsible holder and is
  *     bound by no approval ceiling (REQ-BANK-041, owner decision)
  */
+@DtoMirror
 public record OrgUnitBankAccountDetailDto(
     BankAccountDetailDto detail,
     boolean canExportStatement,

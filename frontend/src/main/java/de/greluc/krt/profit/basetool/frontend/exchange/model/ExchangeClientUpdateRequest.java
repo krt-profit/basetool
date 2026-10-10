@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.List;
 
 /**
@@ -32,6 +33,7 @@ import java.util.List;
  * @param writesPerDay the daily write quota override, or {@code null}
  * @param version the optimistic-lock version the admin last saw
  */
+@DtoMirror
 public record ExchangeClientUpdateRequest(
     String displayName,
     List<String> capabilities,

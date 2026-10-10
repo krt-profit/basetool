@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.identity.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -30,5 +31,6 @@ import org.jetbrains.annotations.Nullable;
  *     chosen
  * @param version the user row's current optimistic-lock version
  */
+@DtoMirror
 public record MyPayoutPreferenceResponse(
     @Nullable @BackendEnumAsString String defaultPayoutPreference, Long version) {}

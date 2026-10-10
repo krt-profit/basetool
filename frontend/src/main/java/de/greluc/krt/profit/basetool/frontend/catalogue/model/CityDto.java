@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -31,6 +32,7 @@ import java.util.UUID;
  * @param hasLoadingDock current effective "has loading dock" value
  * @param hasLoadingDockOverridden whether {@code hasLoadingDock} is admin-pinned
  */
+@DtoMirror
 public record CityDto(
     UUID id,
     String name,

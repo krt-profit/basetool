@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.leadership.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.util.UUID;
 
 /**
@@ -31,6 +32,7 @@ import java.util.UUID;
  * @param isBereichsoperator whether the member operates in the Bereich
  * @param version the membership's optimistic-lock version
  */
+@DtoMirror
 public record BereichMemberResponse(
     UUID bereichId,
     UUID userId,

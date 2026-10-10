@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
 import de.greluc.krt.profit.basetool.frontend.model.BackendEnumAsString;
+import de.greluc.krt.profit.basetool.frontend.model.DtoMirror;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -41,6 +42,7 @@ import java.util.UUID;
  * @param updatedAt when the client last changed, or {@code null}
  * @param version the optimistic-lock version
  */
+@DtoMirror
 public record ExchangeClientDto(
     UUID id,
     String clientId,
