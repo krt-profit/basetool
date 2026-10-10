@@ -33,14 +33,16 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankTransaction;
 import de.greluc.krt.profit.basetool.backend.controller.HangarController;
 import de.greluc.krt.profit.basetool.backend.controller.InventoryItemController;
-import de.greluc.krt.profit.basetool.backend.controller.MissionController;
-import de.greluc.krt.profit.basetool.backend.controller.MissionFinanceEntryController;
 import de.greluc.krt.profit.basetool.backend.controller.SpecialCommandController;
 import de.greluc.krt.profit.basetool.backend.controller.SpecialCommandMembershipController;
 import de.greluc.krt.profit.basetool.backend.controller.UserController;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOffer;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
+import de.greluc.krt.profit.basetool.backend.mission.web.MissionController;
+import de.greluc.krt.profit.basetool.backend.mission.web.MissionFinanceEntryController;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
@@ -67,7 +69,7 @@ import de.greluc.krt.profit.basetool.backend.promotion.web.RankRequirementContro
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.refinery.web.RefineryOrderController;
 import de.greluc.krt.profit.basetool.backend.service.AccessGateService;
-import de.greluc.krt.profit.basetool.backend.service.MissionSecurityService;
+import de.greluc.krt.profit.basetool.backend.service.InventoryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.SpecialCommandSecurityService;
@@ -104,6 +106,8 @@ class TenancyGuardTest {
           OperationAccessPolicy.class,
           RefineryAccessPolicy.class,
           JobOrderAccessPolicy.class,
+          MissionAccessPolicy.class,
+          InventoryAccessPolicy.class,
           MissionSecurityService.class,
           SpecialCommandSecurityService.class,
           OrgRoleManagementSecurityService.class);

@@ -85,3 +85,8 @@ simple name; Spring Framework builds itself with the same pair.
   `@Contract("null -> null; !null -> !null")`, two map reads the code guarantees present are
   wrapped in `Objects.requireNonNull`, and the blueprint-owner fold skips a missing product name
   before it builds a family, as its empty match key already did.
+- **Widened (2026-10-10)** to the whole `mission` module. Its first run reported 50 findings:
+  missing `@Nullable` on the optional parameters of the mission commands (search filters, the
+  core and schedule patches, participant add, party lead, owning org unit, step meta), 19
+  `getAuthority()` dereferences in `MissionSecurityService`, now compared constant-first, and two
+  reorder lookups wrapped in `Objects.requireNonNull`.

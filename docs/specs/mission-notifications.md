@@ -101,8 +101,8 @@ open amount, how many payouts are paid out, and how many missions are unfinished
 **Enforced by:** `MissionNotificationPublisherTest`, `MissionNoticeIntegrationTest`,
 `OperationPayoutServiceTest` (`SetPayoutStatusTests`), `SeededNotificationRulesIntegrationTest`,
 `NotificationPageControllerTest` (`targetOf_…`) · **Code:** `mission/api/events/MissionNotices`,
-`operation/api/events/OperationNotices`, `service/MissionNotificationPublisher`,
-`service/MissionReminderNoticeProducer`, `service/MissionNeverEndedNoticeProducer`,
+`operation/api/events/OperationNotices`, `mission/internal/MissionNotificationPublisher`,
+`mission/internal/MissionReminderNoticeProducer`, `mission/internal/MissionNeverEndedNoticeProducer`,
 `operation/internal/OperationPayoutService`, `operation/internal/OperationService`,
 `V272__add_mission_notification_markers.sql`, `V273__seed_mission_and_operation_notification_rules.sql`
 · **Issues:** #2414

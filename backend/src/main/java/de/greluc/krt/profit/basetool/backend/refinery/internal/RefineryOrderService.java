@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
@@ -104,6 +105,7 @@ public class RefineryOrderService implements CraftabilityYieldSource {
   private final JobOrderItemService jobOrderItemService;
   private final RefineryYieldRepository refineryYieldRepository;
   private final OwnerScopeService ownerScopeService;
+  private final BookInPolicy bookInPolicy;
   private final AuditRecorder auditRecorder;
 
   /** Publishes the refinery notices after the commit (REQ-REFINERY-024). */
@@ -674,7 +676,7 @@ public class RefineryOrderService implements CraftabilityYieldSource {
               : (order.getOwner() != null ? order.getOwner().getId() : null);
       if (targetUserId != null
           && !userId.equals(targetUserId)
-          && !ownerScopeService.canManageUserInventory(targetUserId)) {
+          && !bookInPolicy.mayBookInFor(targetUserId)) {
         throw new AccessDeniedException(
             "Access denied: You are not allowed to store refinery output for other users");
       }
