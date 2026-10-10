@@ -27,6 +27,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
@@ -362,4 +363,22 @@ public interface MissionRepository
   @EntityGraph(attributePaths = {"participants"})
   @Query("SELECT m FROM Mission m WHERE m.id = :id")
   Optional<Mission> findByIdForFullReplace(@Param("id") UUID id);
+
+  /**
+   * Returns the id of the member who owns a mission.
+   *
+   * @param id the mission
+   * @return the owner's user id, or empty for an ownerless mission
+   */
+  @Query("SELECT m.owner.id FROM Mission m WHERE m.id = :id AND m.owner IS NOT NULL")
+  Optional<UUID> findOwnerUserIdById(@Param("id") UUID id);
+
+  /**
+   * Returns the ids of the co-managers of a mission.
+   *
+   * @param id the mission
+   * @return the managers' user ids; never {@code null}, possibly empty
+   */
+  @Query("SELECT u.id FROM Mission m JOIN m.managers u WHERE m.id = :id")
+  Set<UUID> findManagerUserIdsById(@Param("id") UUID id);
 }

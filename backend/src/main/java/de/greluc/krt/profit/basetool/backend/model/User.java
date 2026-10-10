@@ -105,8 +105,8 @@ public class User extends AbstractEntity<UUID> {
   /**
    * The user's default payout preference, pre-filled into the participant's {@code
    * payoutPreference} on mission sign-up (see {@link
-   * de.greluc.krt.profit.basetool.backend.service.MissionService#addParticipant}). {@code null}
-   * means no choice, falling back to {@link PayoutPreference#PAYOUT}; changes never rewrite
+   * de.greluc.krt.profit.basetool.backend.mission.internal.MissionService#addParticipant}). {@code
+   * null} means no choice, falling back to {@link PayoutPreference#PAYOUT}; changes never rewrite
    * existing {@link MissionParticipant} rows (REQ-MISSION-002).
    */
   @Nullable

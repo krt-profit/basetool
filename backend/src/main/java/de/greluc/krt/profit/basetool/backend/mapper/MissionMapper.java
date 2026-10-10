@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
-import de.greluc.krt.profit.basetool.backend.mission.internal.MissionViewerAccess;
 import de.greluc.krt.profit.basetool.backend.model.FrequencyType;
 import de.greluc.krt.profit.basetool.backend.model.JobType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
@@ -246,7 +245,7 @@ public abstract class MissionMapper {
   /**
    * Counts participants that have been checked in. A participant is considered checked in as soon
    * as {@code startTime} is set (see {@link
-   * de.greluc.krt.profit.basetool.backend.service.MissionService#checkIn}).
+   * de.greluc.krt.profit.basetool.backend.mission.internal.MissionService#checkIn}).
    */
   public int resolveCheckedInParticipants(Mission mission) {
     if (mission == null || mission.getParticipants() == null) {

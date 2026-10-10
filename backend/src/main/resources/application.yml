@@ -156,6 +156,9 @@ app:
       max-age: ${APP_NOTIFICATIONS_RETENTION_MAX_AGE:P90D}
       unread-max-age: ${APP_NOTIFICATIONS_RETENTION_UNREAD_MAX_AGE:P180D}
       interval: ${APP_NOTIFICATIONS_RETENTION_INTERVAL:PT24H}
+    timed:
+      enabled: ${APP_NOTIFICATIONS_TIMED_ENABLED:true}
+      interval: ${APP_NOTIFICATIONS_TIMED_INTERVAL:PT1M}
     redis-fanout:
       enabled: ${APP_NOTIFICATIONS_REDIS_FANOUT_ENABLED:false}
       channel: ${APP_NOTIFICATIONS_REDIS_FANOUT_CHANNEL:basetool:notify:published}

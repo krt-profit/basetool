@@ -50,7 +50,7 @@ public class FixtureAggregateWriter {
    * @param id the aggregate id
    */
   public void touchChecked(UUID id) {
-    if (!ownerScopeService.canEditMission(id)) {
+    if (!ownerScopeService.canEditSquadron(id)) {
       throw new IllegalStateException("out of scope");
     }
     repository.save(repository.findById(id).orElseThrow());

@@ -10,6 +10,17 @@
   mitliest und neben `external-clients.json` auf den Host gehört. Alle offenen Schritte nur für den Betreiber:
   `docs/OWNER_STEPS_2026-10.md` (REQ-SEC-082).
 
+- **Zeitgesteuerte Benachrichtigungen (Grundlage).** Ein Dienst im Minutentakt kann künftig
+  Hinweise auslösen, hinter denen keine Nutzeraktion steht (Erinnerungen, abholbereite
+  Raffinerieaufträge); er läuft nur auf einer Instanz und meldet sich im Monitoring (Alarm
+  `NotificationTimedStale`). Neue Variablen `APP_NOTIFICATIONS_TIMED_ENABLED` und
+  `APP_NOTIFICATIONS_TIMED_INTERVAL` (REQ-NOTIF-026, #2414).
+
+- **Benachrichtigungsregeln erreichen Gruppen.** Der Regel-Editor bietet vier neue Empfängerarten
+  (Einsatz-Teilnehmer, Einsatzleitung, Inhaber einer verbundenen Anwendung, Ereignis-Adressaten) und
+  die Rolle „Einheitsleitung"; eine Nachricht lässt sich außerdem nur für einzelne Empfänger
+  wegräumen (REQ-NOTIF-024/-025, #2414).
+
 - **Benachrichtigungen räumen auf und folgen Änderungen.** Entschiedene Registrierungen und
   abgeschlossene, abgelehnte oder gelöschte Aufträge verschwinden aus allen Posteingängen. Ein
   geänderter Buchungsantrag ersetzt die alte Nachricht durch eine mit dem neuen Betrag. Neue
