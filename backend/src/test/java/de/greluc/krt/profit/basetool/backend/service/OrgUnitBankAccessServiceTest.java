@@ -219,8 +219,6 @@ class OrgUnitBankAccessServiceTest {
         account(UUID.randomUUID(), "KB-0002", squadron(UUID.randomUUID(), "Foreign", "FRG"));
     when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of(ownStaffelId)));
-    when(ownerScopeService.currentOwnLevelOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of(ownStaffelId)));
     when(bankAccountRepository.findAllByOrderByAccountNoAsc())
         .thenReturn(List.of(ownAccount, foreignAccount));
     when(bankPostingRepository.accountBalances(List.of(ownAccountId)))
@@ -260,8 +258,6 @@ class OrgUnitBankAccessServiceTest {
     BankAccount accountB = account(accountBId, "KB-0002", squadron(UUID.randomUUID(), "B", "BBB"));
     when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
-    when(ownerScopeService.currentOwnLevelOversightScope())
-        .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(bankAccountRepository.findAllByOrderByAccountNoAsc())
         .thenReturn(List.of(accountA, accountB));
     when(bankPostingRepository.accountBalances(List.of(accountAId, accountBId)))
@@ -290,8 +286,6 @@ class OrgUnitBankAccessServiceTest {
     grant.setRoleCode(MembershipRole.ENSIGN.name());
     when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
-    when(ownerScopeService.currentOwnLevelOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(viewGrantRepository.findByAccountIdIn(anyCollection())).thenReturn(List.of(grant));
     when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(staffelId, MembershipRole.ENSIGN))
         .thenReturn(true);
@@ -316,8 +310,6 @@ class OrgUnitBankAccessServiceTest {
     BankAccount cartel = typedAccount(cartelId, "KB-0001", BankAccountType.CARTEL, ol);
     when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
-    when(ownerScopeService.currentOwnLevelOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(authHelperService.isMemberOrAbove()).thenReturn(true);
     when(bankAccountRepository.findAllByOrderByAccountNoAsc()).thenReturn(List.of(cartel));
     when(bankPostingRepository.accountBalances(List.of(cartelId)))
@@ -339,8 +331,6 @@ class OrgUnitBankAccessServiceTest {
         typedAccount(cartelBankId, "KB-0001", BankAccountType.CARTEL_BANK, null);
     when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
-    when(ownerScopeService.currentOwnLevelOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(bereichRepository.findByDepartment(any())).thenReturn(List.of(profit));
     when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(
             profitBereichId, MembershipRole.BEREICHSLEITER))
@@ -359,8 +349,6 @@ class OrgUnitBankAccessServiceTest {
     UUID specialId = UUID.randomUUID();
     BankAccount special = specialAccount(specialId, "KB-0001", BankAccountStatus.ACTIVE);
     when(ownerScopeService.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
-    when(ownerScopeService.currentOwnLevelOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(ownerScopeService.currentUserIsBereichsleiter()).thenReturn(true);
     when(bankAccountRepository.findAllByOrderByAccountNoAsc()).thenReturn(List.of(special));
@@ -381,8 +369,6 @@ class OrgUnitBankAccessServiceTest {
     BankAccount ownAccount = account(ownAccountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
     BankAccount special = specialAccount(UUID.randomUUID(), "KB-0002", BankAccountStatus.ACTIVE);
     when(ownerScopeService.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of(staffelId)));
-    when(ownerScopeService.currentOwnLevelOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of(staffelId)));
     when(ownerScopeService.currentUserIsOlMember()).thenReturn(false);
     when(ownerScopeService.currentUserIsBereichsleiter()).thenReturn(false);

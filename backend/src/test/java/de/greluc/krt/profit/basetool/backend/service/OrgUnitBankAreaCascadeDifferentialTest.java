@@ -94,9 +94,6 @@ class OrgUnitBankAreaCascadeDifferentialTest {
                       target,
                       fixture.ownerScope().currentDirectMembershipOrgUnitIds(),
                       fixture.orgUnits().findChildOrgUnitIds(target));
-              assertThat(fixture.ownerScope().currentUserIsMemberOfAreaCascade(target))
-                  .as("former hub method against its verbatim copy")
-                  .isEqualTo(expected);
               assertThat(actual)
                   .as(
                       "authenticated=%s admin=%s pin=%s memberships=%s target=%s",
