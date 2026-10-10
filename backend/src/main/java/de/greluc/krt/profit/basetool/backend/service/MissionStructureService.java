@@ -97,7 +97,7 @@ public class MissionStructureService {
   /** Records the state-mutating unit/crew activities into the audit log (REQ-AUDIT-001). */
   private final AuditRecorder auditRecorder;
 
-  /** Publishes the mission notifications (REQ-MISSION-050…056). */
+  /** Publishes the mission notifications (REQ-MISSION-021…029). */
   private final MissionNotificationPublisher notificationPublisher;
 
   /**

@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/** The notification events the operation module publishes (REQ-OPERATION-020, -021). */
+/** The notification events the operation module publishes (REQ-MISSION-028, -029). */
 @NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.operation.api.events;
 

@@ -31,7 +31,7 @@ import org.springframework.stereotype.Component;
 /**
  * Tells a mission's leadership when an active or completed mission is more than {@code
  * app.missions.notices.overdue-after} past its planned end and still has no actual end time
- * (REQ-MISSION-054), once per mission.
+ * (REQ-MISSION-025), once per mission.
  */
 @Component
 @RequiredArgsConstructor

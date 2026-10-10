@@ -472,7 +472,14 @@ public class UserService {
    *     caller has no row
    */
   public @NotNull ActorRef currentActor() {
-    return getCurrentUser()
+    Optional<User> current;
+    try {
+      current = getCurrentUser();
+    } catch (AuthenticationServiceException e) {
+      log.debug("The caller's subject names no member; the event has no actor", e);
+      return ActorRef.system();
+    }
+    return current
         .map(
             user ->
                 new ActorRef(

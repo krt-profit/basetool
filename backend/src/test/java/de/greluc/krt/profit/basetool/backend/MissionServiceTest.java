@@ -99,6 +99,7 @@ class MissionServiceTest {
    */
   @Mock private ParticipantTargetResolver participantTargetResolver;
 
+  @Mock private MissionNotificationPublisher notificationPublisher;
   @InjectMocks private MissionParticipantService missionParticipantService;
   private MissionService missionService;
 

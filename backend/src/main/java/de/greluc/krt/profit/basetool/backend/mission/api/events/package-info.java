@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/** The notification events the mission module publishes (REQ-MISSION-050…056). */
+/** The notification events the mission module publishes (REQ-MISSION-021…029). */
 @NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.mission.api.events;
 

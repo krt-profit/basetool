@@ -33,7 +33,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 /**
- * Raises the reminders 24 hours and one hour before a planned mission (REQ-MISSION-051), once per
+ * Raises the reminders 24 hours and one hour before a planned mission (REQ-MISSION-022), once per
  * mission and lead: the mission's marker is set in the same transaction that publishes the events.
  *
  * <p>The 24-hour reminder is raised only in the hour after the 24-hour mark, so a mission planned

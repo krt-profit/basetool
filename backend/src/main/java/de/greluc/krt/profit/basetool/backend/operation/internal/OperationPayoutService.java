@@ -108,7 +108,7 @@ public class OperationPayoutService {
   private final SystemSettings systemSettings;
   private final AuditRecorder auditRecorder;
 
-  /** Publishes the payout notifications after the commit (REQ-OPERATION-020). */
+  /** Publishes the payout notifications after the commit (REQ-MISSION-028). */
   private final ApplicationEventPublisher eventPublisher;
 
   /**
@@ -359,7 +359,7 @@ public class OperationPayoutService {
 
   /**
    * Tells a participant that their payout was paid out, or takes that notice back, when the mark
-   * really changed (REQ-OPERATION-020). A participant without an account has nobody to tell.
+   * really changed (REQ-MISSION-028). A participant without an account has nobody to tell.
    *
    * @param operation the managed operation
    * @param participantKey the participant key of the payout
@@ -405,7 +405,7 @@ public class OperationPayoutService {
   }
 
   /**
-   * Announces a completed operation to the people who have to pay it out (REQ-OPERATION-021).
+   * Announces a completed operation to the people who have to pay it out (REQ-MISSION-029).
    *
    * @param operation the managed operation, already completed
    */

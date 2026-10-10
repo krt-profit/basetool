@@ -93,7 +93,7 @@ class ModularityTest {
    * other module may depend on them and no declaration allows them.
    */
   private static final Set<String> INTERNAL_ONLY_MODULES =
-      Set.of("dashboard", "operation", "orgchart", "promotion");
+      Set.of("dashboard", "orgchart", "promotion");
 
   private static final String API = "api";
 

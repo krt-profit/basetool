@@ -33,7 +33,7 @@ import org.jetbrains.annotations.Nullable;
 public record ActorRef(@Nullable UUID id, @NotNull String name) {
 
   /** The text for a name that is not known. */
-  public static final String UNKNOWN_NAME = "\u2014";
+  public static final String UNKNOWN_NAME = "—";
 
   /**
    * The actor of an event no member caused.

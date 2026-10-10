@@ -86,6 +86,7 @@ class MissionServiceSectionPatchTest {
 
   @Mock private AuditService auditService;
 
+  @Mock private MissionNotificationPublisher notificationPublisher;
   @InjectMocks private MissionParticipantService missionParticipantService;
 
   @InjectMocks private MissionStructureService missionStructureService;

@@ -368,7 +368,7 @@ public interface MissionRepository
 
   /**
    * Returns the planned missions that reach the 24-hour mark in the given window and have not been
-   * reminded of it yet (REQ-MISSION-051).
+   * reminded of it yet (REQ-MISSION-022).
    *
    * @param from the earliest start time, inclusive
    * @param to the latest start time, inclusive
@@ -384,7 +384,7 @@ public interface MissionRepository
 
   /**
    * Returns the planned missions that start within the given window and have not been reminded of
-   * it yet (REQ-MISSION-051).
+   * it yet (REQ-MISSION-022).
    *
    * @param from the earliest start time, exclusive
    * @param to the latest start time, inclusive
@@ -401,7 +401,7 @@ public interface MissionRepository
 
   /**
    * Returns the active or completed missions whose planned end is before the cutoff and that have
-   * no actual end time and no never-ended notice yet (REQ-MISSION-054).
+   * no actual end time and no never-ended notice yet (REQ-MISSION-025).
    *
    * @param cutoff the latest planned end that counts as overdue
    * @return the missions; never {@code null}

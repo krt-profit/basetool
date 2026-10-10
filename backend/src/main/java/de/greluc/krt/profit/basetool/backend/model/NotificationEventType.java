@@ -153,99 +153,99 @@ public enum NotificationEventType {
   BANK_ACCOUNT_RESPONSIBLE_ASSIGNED,
 
   /**
-   * A mission's meeting time or planned start changed (REQ-MISSION-050). The default rule notifies
+   * A mission's meeting time or planned start changed (REQ-MISSION-021). The default rule notifies
    * the participants and clears the earlier reschedule and reminder notices.
    */
   MISSION_RESCHEDULED,
 
   /**
-   * A mission was cancelled (REQ-MISSION-050). The default rule notifies the participants and
+   * A mission was cancelled (REQ-MISSION-021). The default rule notifies the participants and
    * clears the mission's reschedule, reminder and check-in notices.
    */
   MISSION_CANCELLED,
 
   /**
-   * A mission was deleted (REQ-MISSION-050). Carries the participants as event-listed recipients
+   * A mission was deleted (REQ-MISSION-021). Carries the participants as event-listed recipients
    * because the mission is gone; clears the mission's other notices.
    */
   MISSION_DELETED,
 
   /**
-   * A mission starts in 24 hours or in one hour (REQ-MISSION-051). Published once per participant
+   * A mission starts in 24 hours or in one hour (REQ-MISSION-022). Published once per participant
    * by the time-based producer; the default rule notifies that participant.
    */
   MISSION_REMINDER_DUE,
 
   /**
-   * A mission became active (REQ-MISSION-052). The default rule notifies the participants who have
+   * A mission became active (REQ-MISSION-023). The default rule notifies the participants who have
    * not checked in.
    */
   MISSION_STARTED,
 
   /**
-   * A participant checked in (REQ-MISSION-052). Creates no notification; clears that participant's
+   * A participant checked in (REQ-MISSION-023). Creates no notification; clears that participant's
    * open check-in notice.
    */
   MISSION_CHECKED_IN,
 
   /**
-   * Somebody else added a member to a mission (REQ-MISSION-053). The default rule notifies that
+   * Somebody else added a member to a mission (REQ-MISSION-024). The default rule notifies that
    * member.
    */
   MISSION_PARTICIPANT_ADDED,
 
   /**
-   * Somebody else removed a member from a mission (REQ-MISSION-053). The default rule notifies that
+   * Somebody else removed a member from a mission (REQ-MISSION-024). The default rule notifies that
    * member; the event clears their add, reminder and check-in notices.
    */
   MISSION_PARTICIPANT_REMOVED,
 
   /**
-   * A participant left a mission they held a slot in or that starts soon (REQ-MISSION-056). The
+   * A participant left a mission they held a slot in or that starts soon (REQ-MISSION-027). The
    * default rule notifies the mission's leadership.
    */
   MISSION_PARTICIPANT_LEFT,
 
   /**
    * A mission was completed without an end time, or ran past its planned end without one
-   * (REQ-MISSION-054). The default rule notifies the mission's leadership.
+   * (REQ-MISSION-025). The default rule notifies the mission's leadership.
    */
   MISSION_NEVER_ENDED,
 
   /**
-   * A mission got its actual end time (REQ-MISSION-054). Creates no notification; clears the
+   * A mission got its actual end time (REQ-MISSION-025). Creates no notification; clears the
    * mission's never-ended and check-in notices.
    */
   MISSION_END_RECORDED,
 
   /**
    * A member became the owner, a co-manager, the party lead or the responsible of a unit of a
-   * mission (REQ-MISSION-055). The default rule notifies that member.
+   * mission (REQ-MISSION-026). The default rule notifies that member.
    */
   MISSION_RESPONSIBILITY_ASSIGNED,
 
   /**
-   * A participant's payout of an operation was marked paid out (REQ-OPERATION-020). The default
-   * rule notifies that participant; when it was the last open payout the event clears the managers'
+   * A participant's payout of an operation was marked paid out (REQ-MISSION-028). The default rule
+   * notifies that participant; when it was the last open payout the event clears the managers'
    * completion notice.
    */
   OPERATION_PAYOUT_MARKED,
 
   /**
-   * A participant's paid-out mark was taken back (REQ-OPERATION-020). Creates no notification;
-   * clears that participant's paid-out notice.
+   * A participant's paid-out mark was taken back (REQ-MISSION-028). Creates no notification; clears
+   * that participant's paid-out notice.
    */
   OPERATION_PAYOUT_UNMARKED,
 
   /**
-   * An operation of an organisational unit was completed (REQ-OPERATION-021). The default rule
+   * An operation of an organisational unit was completed (REQ-MISSION-029). The default rule
    * notifies the unit's Einsatzmanager and officers.
    */
   OPERATION_COMPLETED,
 
   /**
-   * An operation without an owning unit was completed (REQ-OPERATION-021). The default rule
-   * notifies every officer.
+   * An operation without an owning unit was completed (REQ-MISSION-029). The default rule notifies
+   * every officer.
    */
   OPERATION_COMPLETED_UNOWNED
 }

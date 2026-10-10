@@ -126,17 +126,17 @@ public class Mission extends AbstractEntity<UUID> {
   @OptimisticLock(excluded = true)
   private Boolean isInternal = false;
 
-  /** When the 24-hour reminder was raised, or {@code null} (REQ-MISSION-051). */
+  /** When the 24-hour reminder was raised, or {@code null} (REQ-MISSION-022). */
   @Column(name = "reminder_24h_sent_at")
   @OptimisticLock(excluded = true)
   private Instant reminder24hSentAt;
 
-  /** When the one-hour reminder was raised, or {@code null} (REQ-MISSION-051). */
+  /** When the one-hour reminder was raised, or {@code null} (REQ-MISSION-022). */
   @Column(name = "reminder_1h_sent_at")
   @OptimisticLock(excluded = true)
   private Instant reminder1hSentAt;
 
-  /** When the never-ended notice was raised, or {@code null} (REQ-MISSION-054). */
+  /** When the never-ended notice was raised, or {@code null} (REQ-MISSION-025). */
   @Column(name = "never_ended_notified_at")
   @OptimisticLock(excluded = true)
   private Instant neverEndedNotifiedAt;

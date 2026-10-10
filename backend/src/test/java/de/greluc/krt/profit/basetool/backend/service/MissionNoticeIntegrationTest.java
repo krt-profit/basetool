@@ -48,7 +48,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The mission notices end to end against Postgres (REQ-MISSION-050…056): the seeded rules resolve
+ * The mission notices end to end against Postgres (REQ-MISSION-021…029): the seeded rules resolve
  * the right members, the producers raise each reminder once, and a check-in clears one member's
  * notice only. The test runs in a rolled-back transaction, so nothing is delivered asynchronously.
  */

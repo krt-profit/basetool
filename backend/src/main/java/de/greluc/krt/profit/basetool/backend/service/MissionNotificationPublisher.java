@@ -41,7 +41,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 /**
- * Publishes the notifications of the mission services (REQ-MISSION-050…056). Every method is called
+ * Publishes the notifications of the mission services (REQ-MISSION-021…029). Every method is called
  * inside the transaction that changes the mission and publishes after the commit, never for a
  * change that rolls back.
  */

@@ -61,6 +61,22 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `EXCHANGE_BULK_UNDO_APPLIED` | `EXCHANGE_BULK_UNDO_APPLIED` | V257 | `EVENT_RECIPIENT` (the member whose entries an admin's bulk undo restored; one per member and run); rendered with the registry's `client` name and the restored `count` only | [REQ-XCH-034](external-exchange.md) |
 | `INVENTORY_TRANSFERRED_TO_USER` | `INVENTORY_TRANSFERRED_TO_USER` | V267 | `EVENT_RECIPIENT` (the member a Lager transfer booked stock onto; one per action and new owner); rendered with `actor`, `count` and `lots` | [REQ-INV-055](inventory-lager.md) |
 | `INVENTORY_TRANSFERRED_FROM_USER` | `INVENTORY_TRANSFERRED_FROM_USER` | V267 | `EVENT_RECIPIENT` (the member someone else moved stock away from; one per action, previous and new owner); rendered with `actor`, `newOwner`, `count` and `lots` | [REQ-INV-055](inventory-lager.md) |
+| `MISSION_RESCHEDULED` | `MISSION_RESCHEDULED` | V273 | `MISSION_PARTICIPANTS`; supersedes the earlier reschedule and reminder notices | REQ-MISSION-021 |
+| `MISSION_CANCELLED` | `MISSION_CANCELLED` | V273 | `MISSION_PARTICIPANTS`; supersedes every open notice of the mission | REQ-MISSION-021 |
+| `MISSION_DELETED` | `MISSION_DELETED` | V273 | `EVENT_RECIPIENTS` (the participants captured before the delete); supersedes every open notice of the mission | REQ-MISSION-021 |
+| `MISSION_REMINDER_DUE` | `MISSION_REMINDER` | V273 | `EVENT_RECIPIENT` (one event per participant, raised by the time-based producer) | REQ-MISSION-022 |
+| `MISSION_STARTED` | `MISSION_CHECKIN_OPEN` | V273 | `MISSION_PARTICIPANTS` not yet checked in; supersedes the reminders | REQ-MISSION-023 |
+| `MISSION_CHECKED_IN` | none (no rule) | — | supersedes that participant's `MISSION_CHECKIN_OPEN` only (REQ-NOTIF-025) | REQ-MISSION-023 |
+| `MISSION_PARTICIPANT_ADDED` | `MISSION_PARTICIPANT_ADDED_BY_OTHER` | V273 | `EVENT_RECIPIENT` (the added member) | REQ-MISSION-024 |
+| `MISSION_PARTICIPANT_REMOVED` | `MISSION_PARTICIPANT_REMOVED_BY_OTHER` | V273 | `EVENT_RECIPIENT` (the removed member); supersedes their add, reminder and check-in notices | REQ-MISSION-024 |
+| `MISSION_PARTICIPANT_LEFT` | `MISSION_PARTICIPANT_LEFT` | V273 | `MISSION_LEADERSHIP` | REQ-MISSION-027 |
+| `MISSION_NEVER_ENDED` | `MISSION_NEVER_ENDED` | V273 | `MISSION_LEADERSHIP` | REQ-MISSION-025 |
+| `MISSION_END_RECORDED` | none (no rule) | — | supersedes `MISSION_NEVER_ENDED` and `MISSION_CHECKIN_OPEN` | REQ-MISSION-025 |
+| `MISSION_RESPONSIBILITY_ASSIGNED` | `MISSION_RESPONSIBILITY_ASSIGNED` | V273 | `EVENT_RECIPIENT` (the new responsible member) | REQ-MISSION-026 |
+| `OPERATION_PAYOUT_MARKED` | `OPERATION_PAYOUT_PAID_OUT` | V273 | `EVENT_RECIPIENT` (the participant); the last open payout supersedes `OPERATION_COMPLETED` | REQ-MISSION-028 |
+| `OPERATION_PAYOUT_UNMARKED` | none (no rule) | — | supersedes that participant's `OPERATION_PAYOUT_PAID_OUT` | REQ-MISSION-028 |
+| `OPERATION_COMPLETED` | `OPERATION_COMPLETED` | V273 | `ORG_RELATIVE_ROLE` `MISSION_MANAGER` and `OFFICER` on `RESPONSIBLE` | REQ-MISSION-029 |
+| `OPERATION_COMPLETED_UNOWNED` | `OPERATION_COMPLETED` | V273 | `ROLE` `OFFICER` (an operation without an owning unit) | REQ-MISSION-029 |
 
 Every notification type renders through `notifications.type.<TYPE>` in all three frontend bundles.
 The e-mail consumers of REQ-NOTIF-013 (`UserApprovalMailService`, `PendingRegistrationMailService`)

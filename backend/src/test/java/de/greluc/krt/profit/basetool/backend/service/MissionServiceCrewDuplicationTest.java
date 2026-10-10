@@ -42,6 +42,7 @@ class MissionServiceCrewDuplicationTest {
   @Mock private SquadronRepository squadronRepository;
 
   @Mock private AuditService auditService;
+  @Mock private MissionNotificationPublisher notificationPublisher;
   @InjectMocks private MissionStructureService missionStructureService;
 
   @Test

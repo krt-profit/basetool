@@ -107,7 +107,7 @@ public class MissionService implements MissionCommands {
 
   private final MissionStructureService missionStructureService;
 
-  /** Publishes the mission notifications (REQ-MISSION-050…056). */
+  /** Publishes the mission notifications (REQ-MISSION-021…029). */
   private final MissionNotificationPublisher notificationPublisher;
 
   /**

@@ -98,7 +98,7 @@ public class MissionParticipantService {
   /** Resolves a free-text participant name to a registered member or an external name. */
   private final ParticipantTargetResolver participantTargetResolver;
 
-  /** Publishes the mission notifications (REQ-MISSION-050…056). */
+  /** Publishes the mission notifications (REQ-MISSION-021…029). */
   private final MissionNotificationPublisher notificationPublisher;
 
   /**

@@ -35,7 +35,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The notification events of the operation module (REQ-OPERATION-020, -021), built from scalars so
+ * The notification events of the operation module (REQ-MISSION-028, -029), built from scalars so
  * they can be delivered after the commit.
  */
 public final class OperationNotices {
@@ -45,7 +45,7 @@ public final class OperationNotices {
 
   private OperationNotices() {}
 
-  private static String aUec(@NotNull BigDecimal amount) {
+  private static String whole(@NotNull BigDecimal amount) {
     return amount.setScale(0, RoundingMode.HALF_UP).toPlainString();
   }
 
@@ -80,8 +80,8 @@ public final class OperationNotices {
       int unfinished) {
     Map<String, String> params = new LinkedHashMap<>();
     params.put("operation", operationName);
-    params.put("total", aUec(total));
-    params.put("open", aUec(open));
+    params.put("total", whole(total));
+    params.put("open", whole(open));
     params.put("paid", Integer.toString(paid));
     params.put("count", Integer.toString(count));
     params.put("unfinished", Integer.toString(unfinished));
@@ -127,7 +127,7 @@ public final class OperationNotices {
       boolean lastOpenPayout) {
     Map<String, String> params = new LinkedHashMap<>();
     params.put("operation", operationName);
-    params.put("amount", aUec(amount));
+    params.put("amount", whole(amount));
     params.put("donation", fraction(donation));
     params.put("fee", fraction(fee));
     params.put("actor", actor.name());

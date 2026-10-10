@@ -4,6 +4,13 @@
 
 ### Added
 
+- **Benachrichtigungen zu Einsätzen und Operationen.** Teilnehmer erfahren, wenn ein Einsatz verschoben,
+  abgesagt oder gelöscht wird, werden 24 Stunden und eine Stunde vorher erinnert und bekommen den offenen Check-in
+  gemeldet; wer von jemand anderem hinzugefügt oder entfernt wird, erfährt es ebenso wie neue Verantwortliche und die
+  Auszahlung einer Operation. Die Einsatzleitung hört, wenn ein Teilnehmer abspringt oder ein Einsatz nie beendet
+  wurde, Einsatzmanager und Offiziere, wenn eine Operation abgeschlossen und die Auszahlung fällig ist. Neue
+  Variable `APP_MISSIONS_NOTICES_OVERDUE_AFTER` (REQ-MISSION-021…029, Migrationen V272/V273, #2414).
+
 - **Benachrichtigungen abbestellen.** Unter Profil → Benachrichtigungen schaltest du jede Art von
   Benachrichtigung einzeln ab; eine abbestellte Art landet weder im Posteingang noch in der App.
   Die Löschantrags-Hinweise und die Warnung vor einer neuen Anwendungsverbindung bleiben immer

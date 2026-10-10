@@ -43,6 +43,7 @@ class MissionServicePayoutTest {
   @Mock private MissionParticipantRepository missionParticipantRepository;
 
   @Mock private AuditService auditService;
+  @Mock private MissionNotificationPublisher notificationPublisher;
   @InjectMocks private MissionParticipantService missionParticipantService;
 
   @Test

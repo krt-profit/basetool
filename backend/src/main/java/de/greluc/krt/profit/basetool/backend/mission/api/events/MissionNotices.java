@@ -34,7 +34,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The notification events of the mission module (REQ-MISSION-050…056), built from scalars so they
+ * The notification events of the mission module (REQ-MISSION-021…029), built from scalars so they
  * can be delivered after the commit. Each factory names the event, its recipients' context, its
  * render parameters and the notices it supersedes.
  */

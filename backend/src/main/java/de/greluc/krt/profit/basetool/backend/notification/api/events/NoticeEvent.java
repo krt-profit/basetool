@@ -64,19 +64,19 @@ public record NoticeEvent(
     @Nullable UUID actorSub,
     @NotNull String entityType,
     @NotNull UUID entityId,
-    @Nullable Map<NotificationContextRole, OrgUnitRef> contextOrgUnits,
+    Map<NotificationContextRole, OrgUnitRef> contextOrgUnits,
     @Nullable UUID contextAccountId,
     @Nullable UUID contextRecipientUserId,
-    @Nullable Set<UUID> contextRecipientUserIds,
+    Set<UUID> contextRecipientUserIds,
     @Nullable UUID contextMissionId,
     boolean contextMissionOnlyNotCheckedIn,
     @Nullable UUID contextExchangeClientId,
     boolean contextAllExchangeClients,
-    @Nullable Map<String, String> renderParams,
-    @Nullable Set<NotificationType> resolvesNotificationTypes,
-    @Nullable Set<NotificationType> resolvesNotificationTypesForRecipients,
-    @Nullable Set<UUID> supersedeRecipients,
-    @Nullable Set<UUID> reconcileRecipients)
+    Map<String, String> renderParams,
+    Set<NotificationType> resolvesNotificationTypes,
+    Set<NotificationType> resolvesNotificationTypesForRecipients,
+    Set<UUID> supersedeRecipients,
+    Set<UUID> reconcileRecipients)
     implements NotificationEvent {
 
   /**

@@ -27,7 +27,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Validated configuration of the mission notices raised by time (REQ-MISSION-054, prefix {@code
+ * Validated configuration of the mission notices raised by time (REQ-MISSION-025, prefix {@code
  * app.missions.notices}). A violation refuses to start the context.
  *
  * @param overdueAfter how long after its planned end a mission without an end time is reported as
