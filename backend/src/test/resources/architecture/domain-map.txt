@@ -86,8 +86,6 @@ class RefineryYield catalogue UEX refinery-yield matrix row, written by UexRefin
 class RefineryYieldRepository catalogue repository of the UEX yield matrix
 class RefineryImportProperties refinery refinery screenshot import tuning
 class ShipTypeMatcher hangar ShipType resolver for the hangar import
-class MaterialCollectionController joborder material collection overview of a job order
-class JobOrderItemStockController joborder order-detail item stock panel
 class MeController identity the caller's own profile surface (/me)
 class UserZone platform web argument binding
 class UserZoneArgumentResolver platform web argument binding

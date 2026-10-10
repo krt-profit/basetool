@@ -65,7 +65,7 @@ public class JobOrderStockProjectionService {
   private final InventoryItemRepository inventoryItemRepository;
 
   /** Supplies the per-order / page-batched SK material-claim view. */
-  private final MaterialClaimService materialClaimService;
+  private final ClaimBucketSource claimBucketSource;
 
   /** Maps the base order + material rows to their DTOs. */
   private final JobOrderMapper jobOrderMapper;
@@ -87,7 +87,7 @@ public class JobOrderStockProjectionService {
     return assembleDto(
         jobOrder,
         loadOrderLinkedStockIndex(List.of(jobOrder.getId())),
-        order -> materialClaimService.getClaimBucketsForOrder(order));
+        claimBucketSource::getClaimBucketsForOrder);
   }
 
   /**
@@ -102,7 +102,7 @@ public class JobOrderStockProjectionService {
     OrderLinkedStockIndex stockIndex =
         loadOrderLinkedStockIndex(orders.stream().map(JobOrder::getId).toList());
     Map<UUID, List<ClaimBucketDto>> claimsByOrder =
-        materialClaimService.getClaimBucketsForOrders(
+        claimBucketSource.getClaimBucketsForOrders(
             orders.stream()
                 .filter(JobOrderStockProjectionService::isSpecialCommandResponsible)
                 .toList());

@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.controller.MissionFinanceEntryContr
 import de.greluc.krt.profit.basetool.backend.controller.SpecialCommandController;
 import de.greluc.krt.profit.basetool.backend.controller.SpecialCommandMembershipController;
 import de.greluc.krt.profit.basetool.backend.controller.UserController;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOffer;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeRequest;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -66,7 +67,6 @@ import de.greluc.krt.profit.basetool.backend.promotion.web.RankRequirementContro
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.refinery.web.RefineryOrderController;
 import de.greluc.krt.profit.basetool.backend.service.AccessGateService;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.service.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;

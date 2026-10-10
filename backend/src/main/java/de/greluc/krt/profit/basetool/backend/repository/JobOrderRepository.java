@@ -84,10 +84,9 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    * requirements the active-order lookup reads, ordered by ascending {@code priority} (nulls last),
    * then descending {@code displayId}.
    *
-   * <p>Fetches exactly what {@link
-   * de.greluc.krt.profit.basetool.backend.service.JobOrderQueryService#findAllActiveReference()}
-   * reads, each order exactly once (REQ-ORDERS-018). Handovers are not fetched, since they would
-   * multiply the SQL rows.
+   * <p>Fetches exactly what {@code JobOrderQueryService#findAllActiveReference()} reads, each order
+   * exactly once (REQ-ORDERS-018). Handovers are not fetched, since they would multiply the SQL
+   * rows.
    */
   @EntityGraph(
       attributePaths = {
