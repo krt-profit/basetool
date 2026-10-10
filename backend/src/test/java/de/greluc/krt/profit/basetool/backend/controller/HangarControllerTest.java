@@ -293,7 +293,7 @@ class HangarControllerTest {
     ShipDto result = controller.addUserShip(targetUser, request);
 
     assertThat(result).isSameAs(dto);
-    verify(hangarService).addShip(targetUser, request);
+    verify(hangarService).addShipByAdmin(targetUser, request);
   }
 
   @Test
@@ -310,7 +310,7 @@ class HangarControllerTest {
     ShipDto result = controller.updateUserShip(targetUser, shipId, request);
 
     assertThat(result).isSameAs(dto);
-    verify(hangarService).updateShip(targetUser, shipId, request);
+    verify(hangarService).updateShipByAdmin(targetUser, shipId, request);
   }
 
   @Test
