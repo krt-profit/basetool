@@ -36,6 +36,7 @@ import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
@@ -98,7 +99,7 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
   private static final String TERMS_STATUS_URI = "/api/v1/terms/status";
 
   private final BackendApiClient backendApiClient;
-  private final org.springframework.core.env.Environment environment;
+  private final Environment environment;
 
   @Override
   protected void doFilterInternal(

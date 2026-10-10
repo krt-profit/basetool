@@ -22,10 +22,12 @@ package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.dashboard.client.DashboardBackendClient;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
 import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -37,12 +39,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
  * Controller for {@code /}: the landing page for anonymous visitors and the dashboard (upcoming
@@ -72,9 +78,7 @@ public class HomeController {
   @NotNull
   @GetMapping("/")
   public String home(
-      Model model,
-      @AuthenticationPrincipal OidcUser principal,
-      jakarta.servlet.http.HttpServletRequest request) {
+      Model model, @AuthenticationPrincipal OidcUser principal, HttpServletRequest request) {
     if (principal == null) {
       return "landing";
     }
@@ -109,8 +113,7 @@ public class HomeController {
     }
 
     try {
-      de.greluc.krt.profit.basetool.frontend.identity.model.UserDto currentUser =
-          dashboardClient.currentUser();
+      UserDto currentUser = dashboardClient.currentUser();
       model.addAttribute("currentUser", currentUser);
 
       Set<UUID> myOrgUnitIds = new HashSet<>();
@@ -165,10 +168,9 @@ public class HomeController {
    * @return redirect back to {@code /}
    */
   @NotNull
-  @org.springframework.web.bind.annotation.PostMapping("/announcement/read")
+  @PostMapping("/announcement/read")
   @PreAuthorize("isAuthenticated()")
-  public String markAnnouncementAsRead(
-      @org.springframework.web.bind.annotation.RequestParam UUID id) {
+  public String markAnnouncementAsRead(@RequestParam UUID id) {
     try {
       dashboardClient.markAnnouncementRead(id);
     } catch (Exception e) {
@@ -184,19 +186,16 @@ public class HomeController {
    * @param id announcement id to mark as read
    * @return {@code 200} on success, {@code 502} on a backend failure
    */
-  @org.springframework.web.bind.annotation.PostMapping(
-      value = "/announcement/read",
-      headers = "X-Requested-With=XMLHttpRequest")
-  @org.springframework.web.bind.annotation.ResponseBody
+  @PostMapping(value = "/announcement/read", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
   @PreAuthorize("isAuthenticated()")
-  public org.springframework.http.ResponseEntity<Void> markAnnouncementAsReadAjax(
-      @org.springframework.web.bind.annotation.RequestParam UUID id) {
+  public ResponseEntity<Void> markAnnouncementAsReadAjax(@RequestParam UUID id) {
     try {
       dashboardClient.markAnnouncementRead(id);
-      return org.springframework.http.ResponseEntity.ok().build();
+      return ResponseEntity.ok().build();
     } catch (Exception e) {
       log.error("Failed to mark announcement as read", e);
-      return org.springframework.http.ResponseEntity.status(502).build();
+      return ResponseEntity.status(502).build();
     }
   }
 }

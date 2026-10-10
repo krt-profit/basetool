@@ -28,21 +28,28 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.BulkRebookRequest;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.BulkRebookResultDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryAllocationInput;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryAllocationWriteDto;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryBookOutForm;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryForm;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemPersonalRebookDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import jakarta.validation.Valid;
+import java.net.URI;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -57,6 +64,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
@@ -157,7 +165,7 @@ public class InventoryWriteController {
    */
   @PostMapping(value = "/input", headers = "X-Requested-With=XMLHttpRequest")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> addInventoryItemAjax(
+  public ResponseEntity<Object> addInventoryItemAjax(
       @Valid @ModelAttribute("inventoryForm") InventoryForm form, BindingResult bindingResult) {
     validateCatalogMode(form, bindingResult);
     if (formPersonalWithAssignment(form)) {
@@ -172,14 +180,13 @@ public class InventoryWriteController {
     try {
       InventoryItemCreateDto request = buildCreateRequest(form);
       inventoryClient.create(request);
-      return org.springframework.http.ResponseEntity.ok(
-          java.util.Map.of("targetUrl", inventorySourceTarget(form.getSource())));
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(Map.of("targetUrl", inventorySourceTarget(form.getSource())));
+    } catch (BackendServiceException e) {
       log.debug("Failed to add inventory item (ajax): {}", e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to add inventory item (ajax)", e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -342,13 +349,12 @@ public class InventoryWriteController {
    * @param code the validation code ({@code INVENTORY_PERSONAL_ASSIGNMENT} / {@code VALIDATION})
    * @return a {@code 422} {@code problem+json} response
    */
-  private static org.springframework.http.ResponseEntity<Object> inventoryValidationError(
-      String code) {
-    java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+  private static ResponseEntity<Object> inventoryValidationError(String code) {
+    Map<String, Object> body = new LinkedHashMap<>();
     body.put("status", 422);
     body.put("code", code);
-    return org.springframework.http.ResponseEntity.unprocessableContent()
-        .contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON)
+    return ResponseEntity.unprocessableContent()
+        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
         .body(body);
   }
 
@@ -369,8 +375,7 @@ public class InventoryWriteController {
   @PostMapping("/{id}/book-out")
   public String bookOutInventoryItem(
       @PathVariable @NotNull UUID id,
-      @Valid @ModelAttribute("inventoryBookOutForm")
-          de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryBookOutForm form,
+      @Valid @ModelAttribute("inventoryBookOutForm") InventoryBookOutForm form,
       BindingResult bindingResult,
       Model model,
       RedirectAttributes redirectAttributes,
@@ -422,16 +427,15 @@ public class InventoryWriteController {
    *
    * <p>Returns the plain base path when the referer is empty, unparseable or has no query.
    */
-  @org.jetbrains.annotations.NotNull
+  @NotNull
   static String buildInventoryRedirectFromReferer(
-      @org.jetbrains.annotations.NotNull String basePath,
-      @org.jetbrains.annotations.Nullable String referer) {
+      @NotNull String basePath, @Nullable String referer) {
     if (referer == null || referer.isBlank()) {
       return basePath;
     }
     String query;
     try {
-      java.net.URI uri = java.net.URI.create(referer);
+      URI uri = URI.create(referer);
       query = uri.getRawQuery();
     } catch (IllegalArgumentException ex) {
       return basePath;
@@ -466,21 +470,21 @@ public class InventoryWriteController {
    */
   @PostMapping("/{id}/transfer")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> transferInventoryItem(
+  public ResponseEntity<Object> transferInventoryItem(
       @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryItemBookOutDto dto) {
     try {
       InventoryItemDto result = inventoryClient.transfer(id, dto);
       if (result == null) {
-        return org.springframework.http.ResponseEntity.noContent().build();
+        return ResponseEntity.noContent().build();
       }
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug(
           "Failed to transfer inventory item: status={}, {}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to transfer inventory item", e);
-      return org.springframework.http.ResponseEntity.status(500).build();
+      return ResponseEntity.status(500).build();
     }
   }
 
@@ -494,18 +498,18 @@ public class InventoryWriteController {
    */
   @PostMapping("/{id}/personal-rebook")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> rebookPersonalInventoryItem(
+  public ResponseEntity<Object> rebookPersonalInventoryItem(
       @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryItemPersonalRebookDto dto) {
     try {
       InventoryItemDto result = inventoryClient.personalRebook(id, dto);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug(
           "Failed to rebook inventory item: status={}, {}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to rebook inventory item", e);
-      return org.springframework.http.ResponseEntity.status(500).build();
+      return ResponseEntity.status(500).build();
     }
   }
 
@@ -518,20 +522,19 @@ public class InventoryWriteController {
    */
   @PostMapping("/bulk-checkout")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> bulkCheckout(
-      @RequestBody BulkCheckoutRequest request) {
+  public ResponseEntity<Object> bulkCheckout(@RequestBody BulkCheckoutRequest request) {
     if (request == null || request.itemIds() == null || request.itemIds().isEmpty()) {
       return inventoryValidationError("VALIDATION");
     }
     try {
       inventoryClient.bulkCheckout(request);
-      return org.springframework.http.ResponseEntity.noContent().build();
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.noContent().build();
+    } catch (BackendServiceException e) {
       log.debug("Failed to bulk-checkout inventory items (ajax): {}", e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to bulk-checkout inventory items (ajax)", e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -546,8 +549,7 @@ public class InventoryWriteController {
    */
   @PostMapping("/bulk-rebook")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> bulkRebook(
-      @RequestBody BulkRebookRequest request) {
+  public ResponseEntity<Object> bulkRebook(@RequestBody BulkRebookRequest request) {
     if (request == null || request.itemIds() == null || request.itemIds().isEmpty()) {
       return inventoryValidationError("VALIDATION");
     }
@@ -556,13 +558,13 @@ public class InventoryWriteController {
     }
     try {
       BulkRebookResultDto result = inventoryClient.bulkRebook(request);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug("Failed to bulk-rebook inventory items (ajax): {}", e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to bulk-rebook inventory items (ajax)", e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -576,21 +578,21 @@ public class InventoryWriteController {
    */
   @PostMapping("/{id}/allocation")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> addAllocation(
+  public ResponseEntity<Object> addAllocation(
       @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryAllocationWriteDto dto) {
     try {
       InventoryItemDto updated = inventoryClient.addAllocation(id, dto);
-      return org.springframework.http.ResponseEntity.ok(updated);
+      return ResponseEntity.ok(updated);
     } catch (BackendServiceException e) {
       log.debug(
           "Failed to add inventory allocation: status={}, {}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
-    } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
+    } catch (WebClientResponseException e) {
       log.error("Failed to add inventory allocation: {}", e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return ResponseEntity.status(e.getStatusCode()).build();
     } catch (Exception e) {
       log.error("Failed to add inventory allocation", e);
-      return org.springframework.http.ResponseEntity.status(500).build();
+      return ResponseEntity.status(500).build();
     }
   }
 
@@ -604,23 +606,23 @@ public class InventoryWriteController {
    */
   @PatchMapping("/{id}/allocation")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> changeAllocation(
+  public ResponseEntity<Object> changeAllocation(
       @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryAllocationWriteDto dto) {
     try {
       InventoryItemDto updated = inventoryClient.changeAllocation(id, dto);
-      return org.springframework.http.ResponseEntity.ok(updated);
+      return ResponseEntity.ok(updated);
     } catch (BackendServiceException e) {
       log.debug(
           "Failed to change inventory allocation: status={}, {}",
           e.getStatusCode(),
           e.getMessage());
       return propagateBackendError(e);
-    } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
+    } catch (WebClientResponseException e) {
       log.error("Failed to change inventory allocation: {}", e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return ResponseEntity.status(e.getStatusCode()).build();
     } catch (Exception e) {
       log.error("Failed to change inventory allocation", e);
-      return org.springframework.http.ResponseEntity.status(500).build();
+      return ResponseEntity.status(500).build();
     }
   }
 
@@ -634,23 +636,23 @@ public class InventoryWriteController {
    */
   @DeleteMapping("/{id}/allocation")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> removeAllocation(
+  public ResponseEntity<Object> removeAllocation(
       @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryAllocationWriteDto dto) {
     try {
       InventoryItemDto updated = inventoryClient.removeAllocation(id, dto);
-      return org.springframework.http.ResponseEntity.ok(updated);
+      return ResponseEntity.ok(updated);
     } catch (BackendServiceException e) {
       log.debug(
           "Failed to remove inventory allocation: status={}, {}",
           e.getStatusCode(),
           e.getMessage());
       return propagateBackendError(e);
-    } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
+    } catch (WebClientResponseException e) {
       log.error("Failed to remove inventory allocation: {}", e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return ResponseEntity.status(e.getStatusCode()).build();
     } catch (Exception e) {
       log.error("Failed to remove inventory allocation", e);
-      return org.springframework.http.ResponseEntity.status(500).build();
+      return ResponseEntity.status(500).build();
     }
   }
 
@@ -662,21 +664,21 @@ public class InventoryWriteController {
    */
   @PutMapping("/{id}/note")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<InventoryItemDto> updateInventoryItemNote(
+  public ResponseEntity<InventoryItemDto> updateInventoryItemNote(
       @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryItemNoteUpdateRequest request) {
     try {
       InventoryItemDto updated = inventoryClient.updateNote(id, request);
-      return org.springframework.http.ResponseEntity.ok(updated);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(updated);
+    } catch (BackendServiceException e) {
       log.debug(
           "Failed to update inventory item note: status={}, {}", e.getStatusCode(), e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
-    } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
+      return ResponseEntity.status(e.getStatusCode()).build();
+    } catch (WebClientResponseException e) {
       log.error("Failed to update inventory item note: {}", e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return ResponseEntity.status(e.getStatusCode()).build();
     } catch (Exception e) {
       log.error("Failed to update inventory item note", e);
-      return org.springframework.http.ResponseEntity.status(500).build();
+      return ResponseEntity.status(500).build();
     }
   }
 
@@ -687,23 +689,21 @@ public class InventoryWriteController {
    */
   @PatchMapping("/{id}/delivered")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> updateDelivered(
-      @PathVariable @NotNull UUID id,
-      @RequestBody @Valid
-          de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateDeliveredRequest request) {
+  public ResponseEntity<Object> updateDelivered(
+      @PathVariable @NotNull UUID id, @RequestBody @Valid UpdateDeliveredRequest request) {
     try {
       InventoryItemDto updated = inventoryClient.updateDelivered(id, request);
-      return org.springframework.http.ResponseEntity.ok(updated);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(updated);
+    } catch (BackendServiceException e) {
       log.debug(
           "Failed to update delivered status: status={}, {}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
-    } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
+    } catch (WebClientResponseException e) {
       log.error("Failed to update delivered status: {}", e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+      return ResponseEntity.status(e.getStatusCode()).build();
     } catch (Exception e) {
       log.error("Failed to update delivered status", e);
-      return org.springframework.http.ResponseEntity.status(500).build();
+      return ResponseEntity.status(500).build();
     }
   }
 }

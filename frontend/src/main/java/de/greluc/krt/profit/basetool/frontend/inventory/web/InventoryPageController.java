@@ -20,31 +20,48 @@
 package de.greluc.krt.profit.basetool.frontend.inventory.web;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.GroupedInventoryDto;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryBookOutForm;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryForm;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryStackDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderGameItemNeedDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialNeedDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.model.InventoryGameItemReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.model.LocationReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.model.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -100,7 +117,7 @@ public class InventoryPageController {
   private final ParallelPageLoader parallelPageLoader;
 
   /** Resolves ADMIN/OFFICER onto LOGISTICIAN so the gate is asked, not enumerated. */
-  private final org.springframework.security.access.hierarchicalroles.RoleHierarchy roleHierarchy;
+  private final RoleHierarchy roleHierarchy;
 
   /**
    * Exposes the caller's {@code app_user.id} to the Lager pages as {@code currentMemberId}, the id
@@ -150,8 +167,7 @@ public class InventoryPageController {
       model.addAttribute("error", "error.inventory.aggregate.load");
     }
 
-    List<de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto> materials =
-        itemsView ? List.of() : fetchMaterials();
+    List<MaterialReferenceDto> materials = itemsView ? List.of() : fetchMaterials();
 
     model.addAttribute("view", itemsView ? "items" : "material");
     model.addAttribute("aggregated", aggregated);
@@ -220,8 +236,7 @@ public class InventoryPageController {
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
       return "inventory-material :: inventoryMaterialResults";
     }
-    List<de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto> materials =
-        fetchMaterials();
+    List<MaterialReferenceDto> materials = fetchMaterials();
     model.addAttribute("materials", materials);
     model.addAttribute("materialName", drilldownMaterialName(materialId, items, materials));
     return "inventory-material";
@@ -240,18 +255,18 @@ public class InventoryPageController {
   private static String drilldownMaterialName(
       @NotNull UUID materialId,
       @NotNull List<InventoryItemDto> items,
-      @NotNull List<de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto> materials) {
+      @NotNull List<MaterialReferenceDto> materials) {
     return items.stream()
         .map(InventoryItemDto::material)
-        .filter(java.util.Objects::nonNull)
-        .map(de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto::name)
-        .filter(java.util.Objects::nonNull)
+        .filter(Objects::nonNull)
+        .map(MaterialReferenceDto::name)
+        .filter(Objects::nonNull)
         .findFirst()
         .or(
             () ->
                 materials.stream()
                     .filter(m -> materialId.equals(m.id()))
-                    .map(de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto::name)
+                    .map(MaterialReferenceDto::name)
                     .findFirst())
         .orElse(null);
   }
@@ -304,8 +319,8 @@ public class InventoryPageController {
         "gameItemName",
         items.stream()
             .map(InventoryItemDto::gameItem)
-            .filter(java.util.Objects::nonNull)
-            .map(de.greluc.krt.profit.basetool.frontend.model.InventoryGameItemReferenceDto::name)
+            .filter(Objects::nonNull)
+            .map(InventoryGameItemReferenceDto::name)
             .findFirst()
             .orElse(null));
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
@@ -347,12 +362,11 @@ public class InventoryPageController {
    *     {@code null}
    */
   @GetMapping("/item-search")
-  @org.springframework.web.bind.annotation.ResponseBody
-  public List<de.greluc.krt.profit.basetool.frontend.model.InventoryGameItemReferenceDto>
-      itemSearch(@RequestParam(required = false) String q) {
+  @ResponseBody
+  public List<InventoryGameItemReferenceDto> itemSearch(@RequestParam(required = false) String q) {
     try {
-      PageResponse<de.greluc.krt.profit.basetool.frontend.model.InventoryGameItemReferenceDto>
-          page = inventoryClient.itemCatalog(PickerSearch.PAGE_SIZE, q == null ? "" : q);
+      PageResponse<InventoryGameItemReferenceDto> page =
+          inventoryClient.itemCatalog(PickerSearch.PAGE_SIZE, q == null ? "" : q);
       return page != null && page.content() != null ? page.content() : List.of();
     } catch (Exception e) {
       log.error("Failed to search bookable game items", e);
@@ -402,9 +416,7 @@ public class InventoryPageController {
       model.addAttribute("inventoryForm", new InventoryForm());
     }
     if (!model.containsAttribute("inventoryBookOutForm")) {
-      model.addAttribute(
-          "inventoryBookOutForm",
-          new de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryBookOutForm());
+      model.addAttribute("inventoryBookOutForm", new InventoryBookOutForm());
     }
     boolean itemsView = isItemsView(view);
     model.addAttribute("view", itemsView ? "items" : "material");
@@ -564,7 +576,7 @@ public class InventoryPageController {
    * @return the ids of every matching entry, in creation order; never {@code null}
    */
   @GetMapping("/my/entry-ids")
-  @org.springframework.web.bind.annotation.ResponseBody
+  @ResponseBody
   public List<UUID> myEntryIds(
       @RequestParam(required = false) String view,
       @RequestParam(required = false) List<UUID> materialIds,
@@ -741,12 +753,11 @@ public class InventoryPageController {
    * @param unfilteredFetch supplies the unfiltered grouped result for this page and view
    * @return the distinct in-scope locations to offer, ordered by name
    */
-  private List<de.greluc.krt.profit.basetool.frontend.model.LocationReferenceDto>
-      resolveLocationFilterOptions(
-          @NotNull List<GroupedInventoryDto> groupedItems,
-          boolean fragment,
-          boolean anyFilterActive,
-          @NotNull java.util.function.Supplier<List<GroupedInventoryDto>> unfilteredFetch) {
+  private List<LocationReferenceDto> resolveLocationFilterOptions(
+      @NotNull List<GroupedInventoryDto> groupedItems,
+      boolean fragment,
+      boolean anyFilterActive,
+      @NotNull Supplier<List<GroupedInventoryDto>> unfilteredFetch) {
     List<GroupedInventoryDto> source = groupedItems;
     if (!fragment && anyFilterActive) {
       try {
@@ -761,13 +772,12 @@ public class InventoryPageController {
     return source.stream()
         .filter(group -> group.stacks() != null)
         .flatMap(group -> group.stacks().stream())
-        .map(de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryStackDto::location)
-        .filter(java.util.Objects::nonNull)
+        .map(InventoryStackDto::location)
+        .filter(Objects::nonNull)
         .distinct()
         .sorted(
-            java.util.Comparator.comparing(
-                de.greluc.krt.profit.basetool.frontend.model.LocationReferenceDto::name,
-                java.util.Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+            Comparator.comparing(
+                LocationReferenceDto::name, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
         .toList();
   }
 
@@ -784,14 +794,13 @@ public class InventoryPageController {
    * @param personalFlagActive whether a personal/non-personal narrowing flag is active
    * @return the distinct gameItem references to offer in the filter multi-select
    */
-  private List<de.greluc.krt.profit.basetool.frontend.model.InventoryGameItemReferenceDto>
-      resolveGameItemFilterOptions(
-          @NotNull InventoryBackendClient.Listing listing,
-          @NotNull List<GroupedInventoryDto> groupedItems,
-          boolean fragment,
-          List<UUID> gameItemIds,
-          List<UUID> jobOrderIds,
-          boolean personalFlagActive) {
+  private List<InventoryGameItemReferenceDto> resolveGameItemFilterOptions(
+      @NotNull InventoryBackendClient.Listing listing,
+      @NotNull List<GroupedInventoryDto> groupedItems,
+      boolean fragment,
+      List<UUID> gameItemIds,
+      List<UUID> jobOrderIds,
+      boolean personalFlagActive) {
     boolean anyFilterActive =
         (gameItemIds != null && !gameItemIds.isEmpty())
             || (jobOrderIds != null && !jobOrderIds.isEmpty())
@@ -810,7 +819,7 @@ public class InventoryPageController {
     }
     return source.stream()
         .map(GroupedInventoryDto::gameItem)
-        .filter(java.util.Objects::nonNull)
+        .filter(Objects::nonNull)
         .distinct()
         .toList();
   }
@@ -850,9 +859,7 @@ public class InventoryPageController {
       model.addAttribute("inventoryForm", new InventoryForm());
     }
     if (!model.containsAttribute("inventoryBookOutForm")) {
-      model.addAttribute(
-          "inventoryBookOutForm",
-          new de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryBookOutForm());
+      model.addAttribute("inventoryBookOutForm", new InventoryBookOutForm());
     }
     boolean itemsView = isItemsView(view);
     model.addAttribute("view", itemsView ? "items" : "material");
@@ -1160,7 +1167,7 @@ public class InventoryPageController {
    *     (REQ-INV-031)
    */
   private void fetchStackEntriesIntoModel(
-      @NotNull java.util.function.Supplier<PageResponse<InventoryItemDto>> read,
+      @NotNull Supplier<PageResponse<InventoryItemDto>> read,
       Model model,
       boolean includeMissions) {
     PageResponse<InventoryItemDto> p = null;
@@ -1174,16 +1181,12 @@ public class InventoryPageController {
         (p != null && p.content() != null) ? new ArrayList<>(p.content()) : new ArrayList<>();
     model.addAttribute("entries", entries);
     model.addAttribute("entriesPage", p);
-    List<de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto>
-        stackJobOrders = fetchActiveJobOrders(true);
+    List<JobOrderReferenceDto> stackJobOrders = fetchActiveJobOrders(true);
     model.addAttribute("jobOrders", stackJobOrders);
     model.addAttribute("orderNeedAmounts", orderNeedAmounts(stackJobOrders));
     model.addAttribute("orderGameItemNeedAmounts", orderGameItemNeedAmounts(stackJobOrders));
     model.addAttribute(
-        "missions",
-        includeMissions
-            ? fetchMissions()
-            : List.<de.greluc.krt.profit.basetool.frontend.model.MissionReferenceDto>of());
+        "missions", includeMissions ? fetchMissions() : List.<MissionReferenceDto>of());
   }
 
   /**
@@ -1230,8 +1233,7 @@ public class InventoryPageController {
     model.addAttribute("materials", materialsFuture.join());
     model.addAttribute("locations", locationsFuture.join());
     model.addAttribute("missions", missionsFuture.join());
-    List<de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto>
-        inputJobOrders = jobOrdersFuture.join();
+    List<JobOrderReferenceDto> inputJobOrders = jobOrdersFuture.join();
     model.addAttribute("jobOrders", inputJobOrders);
     model.addAttribute("jobOrderNeedsJson", writeOrderNeedsJson(orderNeeds(inputJobOrders)));
     model.addAttribute("ownerOptions", ownerFuture.join());
@@ -1260,16 +1262,13 @@ public class InventoryPageController {
    * @return outstanding amount by {@code orderId|materialId}; only entries still needed.
    */
   @NotNull
-  private static Map<String, Double> orderNeedAmounts(
-      List<de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto> orders) {
+  private static Map<String, Double> orderNeedAmounts(List<JobOrderReferenceDto> orders) {
     Map<String, Double> amounts = new LinkedHashMap<>();
-    for (de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto order :
-        orders) {
+    for (JobOrderReferenceDto order : orders) {
       if (order.id() == null || order.materialNeeds() == null) {
         continue;
       }
-      for (de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialNeedDto need :
-          order.materialNeeds()) {
+      for (JobOrderMaterialNeedDto need : order.materialNeeds()) {
         if (need.materialId() == null
             || need.outstandingAmount() == null
             || need.outstandingAmount() <= 0.0) {
@@ -1290,14 +1289,10 @@ public class InventoryPageController {
    *     null}.
    */
   @NotNull
-  private static Map<String, Object> orderNeeds(
-      List<de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto> orders) {
-    Map<UUID, List<de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialNeedDto>>
-        materials = new LinkedHashMap<>();
-    Map<UUID, List<de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderGameItemNeedDto>>
-        gameItems = new LinkedHashMap<>();
-    for (de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto order :
-        orders) {
+  private static Map<String, Object> orderNeeds(List<JobOrderReferenceDto> orders) {
+    Map<UUID, List<JobOrderMaterialNeedDto>> materials = new LinkedHashMap<>();
+    Map<UUID, List<JobOrderGameItemNeedDto>> gameItems = new LinkedHashMap<>();
+    for (JobOrderReferenceDto order : orders) {
       if (order.id() == null) {
         continue;
       }
@@ -1322,16 +1317,13 @@ public class InventoryPageController {
    * @return outstanding whole units by {@code orderId|gameItemId}; only entries still needed.
    */
   @NotNull
-  private static Map<String, Integer> orderGameItemNeedAmounts(
-      List<de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto> orders) {
+  private static Map<String, Integer> orderGameItemNeedAmounts(List<JobOrderReferenceDto> orders) {
     Map<String, Integer> amounts = new LinkedHashMap<>();
-    for (de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto order :
-        orders) {
+    for (JobOrderReferenceDto order : orders) {
       if (order.id() == null || order.gameItemNeeds() == null) {
         continue;
       }
-      for (de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderGameItemNeedDto need :
-          order.gameItemNeeds()) {
+      for (JobOrderGameItemNeedDto need : order.gameItemNeeds()) {
         if (need.gameItemId() == null
             || need.outstandingAmount() == null
             || need.outstandingAmount() <= 0) {
@@ -1366,8 +1358,7 @@ public class InventoryPageController {
    *     lookup fails.
    */
   @Nullable
-  private de.greluc.krt.profit.basetool.frontend.identity.model.UserDto fetchSelectedInputUser(
-      InventoryForm form) {
+  private UserDto fetchSelectedInputUser(InventoryForm form) {
     if (form == null || !Boolean.TRUE.equals(form.getIsGlobal()) || form.getUserId() == null) {
       return null;
     }
@@ -1408,10 +1399,9 @@ public class InventoryPageController {
     }
   }
 
-  private List<de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto> fetchUsers() {
+  private List<UserReferenceDto> fetchUsers() {
     try {
-      List<de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto> content =
-          inventoryClient.users();
+      List<UserReferenceDto> content = inventoryClient.users();
       if (content != null) {
         return content;
       }
@@ -1422,12 +1412,10 @@ public class InventoryPageController {
   }
 
   @NotNull
-  private List<de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto> fetchMaterials() {
-    List<de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto> materials =
-        new ArrayList<>();
+  private List<MaterialReferenceDto> fetchMaterials() {
+    List<MaterialReferenceDto> materials = new ArrayList<>();
     try {
-      List<de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto> content =
-          inventoryClient.materials();
+      List<MaterialReferenceDto> content = inventoryClient.materials();
       if (content != null) {
         materials.addAll(content);
       }
@@ -1438,12 +1426,10 @@ public class InventoryPageController {
   }
 
   @NotNull
-  private List<de.greluc.krt.profit.basetool.frontend.model.LocationReferenceDto> fetchLocations() {
-    List<de.greluc.krt.profit.basetool.frontend.model.LocationReferenceDto> locations =
-        new ArrayList<>();
+  private List<LocationReferenceDto> fetchLocations() {
+    List<LocationReferenceDto> locations = new ArrayList<>();
     try {
-      List<de.greluc.krt.profit.basetool.frontend.model.LocationReferenceDto> content =
-          inventoryClient.locations();
+      List<LocationReferenceDto> content = inventoryClient.locations();
       if (content != null) {
         locations.addAll(content);
       }
@@ -1454,8 +1440,7 @@ public class InventoryPageController {
   }
 
   @NotNull
-  private List<de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto>
-      fetchActiveJobOrders() {
+  private List<JobOrderReferenceDto> fetchActiveJobOrders() {
     return fetchActiveJobOrders(false);
   }
 
@@ -1467,13 +1452,10 @@ public class InventoryPageController {
    * @return the active orders the caller may see; empty (never {@code null}) when the lookup fails
    */
   @NotNull
-  private List<de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto>
-      fetchActiveJobOrders(boolean withNeeds) {
-    List<de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto> orders =
-        new ArrayList<>();
+  private List<JobOrderReferenceDto> fetchActiveJobOrders(boolean withNeeds) {
+    List<JobOrderReferenceDto> orders = new ArrayList<>();
     try {
-      List<de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto> content =
-          inventoryClient.activeJobOrders(withNeeds);
+      List<JobOrderReferenceDto> content = inventoryClient.activeJobOrders(withNeeds);
       if (content != null) {
         orders.addAll(content);
       }
@@ -1483,10 +1465,9 @@ public class InventoryPageController {
     return orders;
   }
 
-  private List<de.greluc.krt.profit.basetool.frontend.model.MissionReferenceDto> fetchMissions() {
+  private List<MissionReferenceDto> fetchMissions() {
     try {
-      List<de.greluc.krt.profit.basetool.frontend.model.MissionReferenceDto> content =
-          inventoryClient.missions();
+      List<MissionReferenceDto> content = inventoryClient.missions();
       if (content != null) {
         return content;
       }
@@ -1498,9 +1479,7 @@ public class InventoryPageController {
 
   @Nullable
   private static String currentAuthName() {
-    org.springframework.security.core.Authentication auth =
-        org.springframework.security.core.context.SecurityContextHolder.getContext()
-            .getAuthentication();
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     return auth != null ? auth.getName() : null;
   }
 
@@ -1511,9 +1490,7 @@ public class InventoryPageController {
    * @return {@code true} iff the caller holds Logistician or a role above it.
    */
   private boolean hasLogisticianOrAbove() {
-    org.springframework.security.core.Authentication auth =
-        org.springframework.security.core.context.SecurityContextHolder.getContext()
-            .getAuthentication();
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     if (auth == null || auth.getAuthorities() == null) {
       return false;
     }

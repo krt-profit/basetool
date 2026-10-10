@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
+import de.greluc.krt.profit.basetool.frontend.model.PayoutPreference;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.UUID;
@@ -37,5 +38,5 @@ public record ParticipantForm(
     List<UUID> orgUnitIds,
     String startTime,
     String endTime,
-    de.greluc.krt.profit.basetool.frontend.model.PayoutPreference payoutPreference,
+    PayoutPreference payoutPreference,
     Long version) {}

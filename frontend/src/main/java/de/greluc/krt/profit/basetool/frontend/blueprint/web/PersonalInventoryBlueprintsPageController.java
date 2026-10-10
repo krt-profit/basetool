@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintU
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemDto;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.StringNormalization;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
@@ -483,8 +484,7 @@ public class PersonalInventoryBlueprintsPageController {
    * @return the resolved toast key
    */
   private String classifyError(Exception e, String defaultKey) {
-    if (e instanceof de.greluc.krt.profit.basetool.frontend.service.BackendServiceException bse
-        && bse.getStatusCode() == 409) {
+    if (e instanceof BackendServiceException bse && bse.getStatusCode() == 409) {
       return "personalInventory.blueprints.error.conflict";
     }
     return defaultKey;

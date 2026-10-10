@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.model.InventoryGameItemReferenceDt
 import de.greluc.krt.profit.basetool.frontend.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Frontend mirror of the per-catalog-entry Lager roll-up, broken down into {@link
@@ -47,7 +48,7 @@ public record GroupedInventoryDto(
     return (int)
         stacks.stream()
             .map(InventoryStackDto::user)
-            .filter(java.util.Objects::nonNull)
+            .filter(Objects::nonNull)
             .map(UserReferenceDto::id)
             .distinct()
             .count();

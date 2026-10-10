@@ -38,7 +38,9 @@ import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.ui.Model;
@@ -295,10 +297,7 @@ public class GlobalExceptionHandler {
    * gets the sign-in wording and an {@code unauthenticated=true} model attribute that shows the
    * sign-in button; an authenticated one gets the missing-permission wording.
    */
-  @ExceptionHandler({
-    org.springframework.security.access.AccessDeniedException.class,
-    org.springframework.security.authorization.AuthorizationDeniedException.class
-  })
+  @ExceptionHandler({AccessDeniedException.class, AuthorizationDeniedException.class})
   @ResponseStatus(HttpStatus.FORBIDDEN)
   public Object handleAccessDenied(
       @NotNull Exception ex, @NotNull HttpServletRequest request, @NotNull Model model) {

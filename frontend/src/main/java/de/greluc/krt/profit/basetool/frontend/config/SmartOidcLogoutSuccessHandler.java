@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -62,7 +63,7 @@ public class SmartOidcLogoutSuccessHandler extends SimpleUrlLogoutSuccessHandler
       @NotNull HttpServletRequest request,
       @NotNull HttpServletResponse response,
       Authentication authentication)
-      throws IOException, jakarta.servlet.ServletException {
+      throws IOException, ServletException {
     if (hasValidOidcToken(authentication)) {
       log.debug(
           "[Logout] Active OIDC session found – delegating to Keycloak end-session endpoint.");

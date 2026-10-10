@@ -35,10 +35,12 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.ProfileRsiHandleFor
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDescriptionRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.model.PayoutPreference;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -56,6 +58,7 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -244,7 +247,7 @@ public class ProfileController {
               form.displayName() == null ? "" : form.displayName(),
               form.version()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+    } catch (BackendServiceException e) {
       log.debug("Update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
@@ -290,7 +293,7 @@ public class ProfileController {
               form.description() == null ? "" : form.description(),
               form.displayName() == null ? "" : form.displayName(),
               form.version() == null ? 0L : form.version()));
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+    } catch (BackendServiceException e) {
       log.debug("AJAX profile description update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -341,7 +344,7 @@ public class ProfileController {
                   : form.defaultPayoutPreference().name(),
               form.version()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+    } catch (BackendServiceException e) {
       log.debug("Update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
@@ -388,7 +391,7 @@ public class ProfileController {
     try {
       identityClient.updateMyPayoutPreference(
           new MyPayoutPreferenceRequest(preference, form.version() == null ? 0L : form.version()));
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+    } catch (BackendServiceException e) {
       log.debug("AJAX payout-preference update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -435,7 +438,7 @@ public class ProfileController {
           new MyBlueprintSharingRequest(
               form.shareBlueprintsGlobally(), form.version() == null ? 0L : form.version()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+    } catch (BackendServiceException e) {
       log.debug("Update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
@@ -479,7 +482,7 @@ public class ProfileController {
       identityClient.updateMyBlueprintSharing(
           new MyBlueprintSharingRequest(
               form.shareBlueprintsGlobally(), form.version() == null ? 0L : form.version()));
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+    } catch (BackendServiceException e) {
       log.debug("AJAX blueprint-sharing update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -527,7 +530,7 @@ public class ProfileController {
               form.rsiHandle() == null ? "" : form.rsiHandle().trim(),
               form.version() == null ? 0L : form.version()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+    } catch (BackendServiceException e) {
       log.debug("RSI handle update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
@@ -580,7 +583,7 @@ public class ProfileController {
    */
   private String firstFieldError(@NotNull BindingResult bindingResult) {
     return bindingResult.getFieldErrors().stream()
-        .map(org.springframework.validation.FieldError::getDefaultMessage)
+        .map(FieldError::getDefaultMessage)
         .filter(message -> message != null && !message.isBlank())
         .findFirst()
         .orElseGet(() -> msg("error.profile.update.failed"));
@@ -615,7 +618,7 @@ public class ProfileController {
 
   private Object getSingleClaim(@NotNull OidcUser principal, String claim) {
     Object value = principal.getAttribute(claim);
-    if (value instanceof java.util.List<?> list && !list.isEmpty()) {
+    if (value instanceof List<?> list && !list.isEmpty()) {
       return list.get(0);
     }
     return value;

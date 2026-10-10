@@ -43,7 +43,10 @@ import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -53,6 +56,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -242,7 +246,7 @@ public class OperationPageController {
       return missionsFragment(id, page, size, model);
     }
     try {
-      return switch (fragment.toLowerCase(java.util.Locale.ROOT)) {
+      return switch (fragment.toLowerCase(Locale.ROOT)) {
         case "overview" -> {
           loadFullModel(id, page, size, authentication, model);
           yield "operation-detail :: overviewSection";
@@ -549,16 +553,11 @@ public class OperationPageController {
    * @param request JSON body carrying the raw Markdown under the {@code markdown} key
    * @return the sanitized rendered HTML (text/html)
    */
-  @PostMapping(
-      value = "/markdown-preview",
-      produces = org.springframework.http.MediaType.TEXT_HTML_VALUE)
+  @PostMapping(value = "/markdown-preview", produces = MediaType.TEXT_HTML_VALUE)
   @ResponseBody
-  public ResponseEntity<String> markdownPreview(
-      @RequestBody java.util.Map<String, String> request) {
+  public ResponseEntity<String> markdownPreview(@RequestBody Map<String, String> request) {
     String source = request != null ? request.get("markdown") : null;
-    return ResponseEntity.ok()
-        .contentType(org.springframework.http.MediaType.TEXT_HTML)
-        .body(markdown.render(source));
+    return ResponseEntity.ok().contentType(MediaType.TEXT_HTML).body(markdown.render(source));
   }
 
   /**
@@ -621,7 +620,7 @@ public class OperationPageController {
         "update operation (ajax) for " + id,
         () -> {
           OperationDto updated = operationClient.updateOperationAndRead(id, form);
-          java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+          Map<String, Object> result = new LinkedHashMap<>();
           result.put("version", updated.version());
           result.put("name", updated.name());
           result.put("status", updated.status());

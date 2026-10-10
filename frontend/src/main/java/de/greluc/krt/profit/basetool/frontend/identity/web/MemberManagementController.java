@@ -41,6 +41,8 @@ import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -51,6 +53,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.context.MessageSource;
+import org.springframework.context.NoSuchMessageException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -127,7 +130,7 @@ public class MemberManagementController {
       model.addAttribute("usersPage", pageResponse);
       model.addAttribute("search", search);
 
-      Map<UUID, List<OrgUnitMembershipOptionDto>> skMemberships = new java.util.HashMap<>();
+      Map<UUID, List<OrgUnitMembershipOptionDto>> skMemberships = new HashMap<>();
       if (users != null) {
         for (UserDto u : users) {
           if (u == null || u.id() == null) {
@@ -136,14 +139,14 @@ public class MemberManagementController {
           try {
             List<OrgUnitMembershipOptionDto> all = identityClient.memberships(u.id());
             if (all == null) {
-              skMemberships.put(u.id(), java.util.Collections.emptyList());
+              skMemberships.put(u.id(), Collections.emptyList());
               continue;
             }
             skMemberships.put(
                 u.id(), all.stream().filter(m -> "SPECIAL_COMMAND".equals(m.kind())).toList());
           } catch (Exception ex) {
             log.debug("Failed to load SK memberships for member-list row userId={}", u.id(), ex);
-            skMemberships.put(u.id(), java.util.Collections.emptyList());
+            skMemberships.put(u.id(), Collections.emptyList());
           }
         }
       }
@@ -210,11 +213,11 @@ public class MemberManagementController {
             "memberMemberships",
             memberships != null
                 ? memberships
-                : java.util.Collections.<OrgUnitMembershipOptionDto>emptyList());
+                : Collections.<OrgUnitMembershipOptionDto>emptyList());
       } catch (Exception ex) {
         log.debug("Failed to load memberships for member-edit panel", ex);
         model.addAttribute(
-            "memberMemberships", java.util.Collections.<OrgUnitMembershipOptionDto>emptyList());
+            "memberMemberships", Collections.<OrgUnitMembershipOptionDto>emptyList());
       }
 
       List<OrgUnitMembershipDto> staffelRows = List.of();
@@ -427,7 +430,7 @@ public class MemberManagementController {
   private String resolveFieldMessage(FieldError fieldError, Locale locale) {
     try {
       return messageSource.getMessage(fieldError, locale);
-    } catch (org.springframework.context.NoSuchMessageException e) {
+    } catch (NoSuchMessageException e) {
       return fieldError.getDefaultMessage();
     }
   }

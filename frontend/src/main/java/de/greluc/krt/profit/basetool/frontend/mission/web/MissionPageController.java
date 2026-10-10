@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClien
 import de.greluc.krt.profit.basetool.frontend.mission.model.CrewForm;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceEntryDto;
+import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceEntryForm;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceTotalsDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionForm;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
@@ -43,22 +44,32 @@ import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingDto;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.propertyeditors.StringTrimmerEditor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -172,9 +183,7 @@ public class MissionPageController {
       model.addAttribute("crewForm", new CrewForm(null, null));
     }
     if (!model.containsAttribute("financeForm")) {
-      model.addAttribute(
-          "financeForm",
-          new de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceEntryForm());
+      model.addAttribute("financeForm", new MissionFinanceEntryForm());
     }
   }
 
@@ -283,7 +292,7 @@ public class MissionPageController {
       MissionDto mission = missionClient.mission(id);
 
       final boolean fullRender = fragment == null;
-      final String frag = fullRender ? null : fragment.toLowerCase(java.util.Locale.ROOT);
+      final String frag = fullRender ? null : fragment.toLowerCase(Locale.ROOT);
       final boolean needMgmt = fullRender || "mgmt".equals(frag);
       final boolean needCrewBoard = fullRender || "crew-board".equals(frag);
       final boolean needFinance = fullRender || "finance".equals(frag);
@@ -416,12 +425,7 @@ public class MissionPageController {
           model.addAttribute(
               "financePerShare",
               (totals.total() != null && registered != null && registered > 0)
-                  ? totals
-                      .total()
-                      .divide(
-                          java.math.BigDecimal.valueOf(registered),
-                          0,
-                          java.math.RoundingMode.HALF_UP)
+                  ? totals.total().divide(BigDecimal.valueOf(registered), 0, RoundingMode.HALF_UP)
                   : null);
 
           model.addAttribute("financeEntries", entriesFuture.join().content());
@@ -429,9 +433,7 @@ public class MissionPageController {
           model.addAttribute("inventoryEntries", inventoryFuture.join());
         } catch (Exception e) {
           Throwable cause =
-              (e instanceof java.util.concurrent.CompletionException && e.getCause() != null)
-                  ? e.getCause()
-                  : e;
+              (e instanceof CompletionException && e.getCause() != null) ? e.getCause() : e;
           log.error("Error loading finance entries, refinery orders or mission inventory", cause);
         }
       }
@@ -446,7 +448,7 @@ public class MissionPageController {
     }
     model.addAttribute("authUserId", CurrentUser.userIdText(principal));
     if (fragment != null) {
-      return switch (fragment.toLowerCase(java.util.Locale.ROOT)) {
+      return switch (fragment.toLowerCase(Locale.ROOT)) {
         case "crew-board" -> "mission-detail :: crewBoard";
         case "finance" -> "mission-detail :: financeSection";
         case "mgmt" -> "mission-detail :: mgmtPanels";
@@ -506,42 +508,9 @@ public class MissionPageController {
     model.addAttribute(
         "mission",
         new MissionDto(
-            null,
-            "",
-            null,
-            null,
-            "PLANNED",
-            null,
-            null,
-            null,
-            null,
-            null,
-            false,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            true,
-            true,
-            null,
-            null,
-            null,
-            null,
-            0,
-            0,
-            null,
-            null,
-            null,
-            null,
-            0L,
-            java.util.List.of(),
-            0L,
-            java.util.List.of(),
-            0L,
-            null,
-            0L));
+            null, "", null, null, "PLANNED", null, null, null, null, null, false, null, null, null,
+            null, null, null, true, true, null, null, null, null, 0, 0, null, null, null, null, 0L,
+            List.of(), 0L, List.of(), 0L, null, 0L));
     addFormsToModel(model, principal, true);
     addOperationsToModel(model);
     model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));
@@ -575,14 +544,13 @@ public class MissionPageController {
    */
   @GetMapping(
       value = "/{id}/participants/unassigned/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+      produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> getUnassignedParticipantsAjax(
-      @PathVariable @NotNull UUID id) {
+  public ResponseEntity<Object> getUnassignedParticipantsAjax(@PathVariable @NotNull UUID id) {
     try {
       List<MissionParticipantDto> result = missionClient.unassignedParticipants(id);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug(
           "Get unassigned participants (AJAX) failed: status={}, msg={}",
           e.getStatusCode(),
@@ -590,7 +558,7 @@ public class MissionPageController {
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("UNEXPECTED ERROR in getUnassignedParticipantsAjax for mission {}", id, e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -613,26 +581,26 @@ public class MissionPageController {
    * round trip uses this fixed zone for the zoneless local-datetime form the hidden input carries
    * when a field is rendered but never re-edited.
    */
-  private static final java.time.ZoneId MISSION_TIME_ZONE = java.time.ZoneId.of("Europe/Berlin");
+  private static final ZoneId MISSION_TIME_ZONE = ZoneId.of("Europe/Berlin");
 
   private String formatInstant(Object instantObj) {
     if (instantObj == null) {
       return "";
     }
     try {
-      java.time.Instant instant;
-      if (instantObj instanceof java.time.Instant i) {
+      Instant instant;
+      if (instantObj instanceof Instant i) {
         instant = i;
       } else if (instantObj instanceof String s) {
         if (s.isBlank()) {
           return "";
         }
-        instant = java.time.Instant.parse(s);
+        instant = Instant.parse(s);
       } else {
         return String.valueOf(instantObj);
       }
-      java.time.ZonedDateTime zdt = instant.atZone(MISSION_TIME_ZONE);
-      return zdt.toLocalDateTime().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString();
+      ZonedDateTime zdt = instant.atZone(MISSION_TIME_ZONE);
+      return zdt.toLocalDateTime().truncatedTo(ChronoUnit.SECONDS).toString();
     } catch (Exception e) {
       log.warn("Failed to format instant: {}", instantObj);
       return String.valueOf(instantObj);

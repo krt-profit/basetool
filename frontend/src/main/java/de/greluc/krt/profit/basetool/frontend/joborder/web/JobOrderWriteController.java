@@ -42,8 +42,10 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverEntryCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverForm;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderStatusDto;
+import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.MutationResponseHelper;
@@ -56,16 +58,23 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -78,6 +87,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
@@ -218,13 +228,13 @@ public class JobOrderWriteController {
    */
   @PostMapping(value = "/items", headers = "X-Requested-With=XMLHttpRequest")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> createItemOrderAjax(
+  public ResponseEntity<Object> createItemOrderAjax(
       @ModelAttribute("jobOrderItemForm") JobOrderItemForm form,
       @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
       @AuthenticationPrincipal OidcUser principal) {
     List<CreateJobOrderItemLineDto> lines = buildItemLineDtos(form);
     if (lines.isEmpty()) {
-      return org.springframework.http.ResponseEntity.badRequest().build();
+      return ResponseEntity.badRequest().build();
     }
     return relay(
         log,
@@ -240,9 +250,8 @@ public class JobOrderWriteController {
                   form.getVersion());
           jobOrderClient.createItemOrder(dto);
           liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
-          return org.springframework.http.ResponseEntity.ok(
-              java.util.Map.of(
-                  "targetUrl", postCreateTarget(principal, canViewJobOrders, form.getSource())));
+          return ResponseEntity.ok(
+              Map.of("targetUrl", postCreateTarget(principal, canViewJobOrders, form.getSource())));
         });
   }
 
@@ -299,11 +308,11 @@ public class JobOrderWriteController {
   @PostMapping(value = "/{id}/items/update", headers = "X-Requested-With=XMLHttpRequest")
   @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> updateItemOrderAjax(
+  public ResponseEntity<Object> updateItemOrderAjax(
       @PathVariable UUID id, @ModelAttribute("jobOrderItemForm") JobOrderItemForm form) {
     List<CreateJobOrderItemLineDto> lines = buildItemLineDtos(form);
     if (lines.isEmpty()) {
-      return org.springframework.http.ResponseEntity.badRequest().build();
+      return ResponseEntity.badRequest().build();
     }
     return relay(
         log,
@@ -318,8 +327,7 @@ public class JobOrderWriteController {
                   lines,
                   form.getVersion());
           jobOrderClient.updateItemOrder(id, dto);
-          return org.springframework.http.ResponseEntity.ok(
-              java.util.Map.of("targetUrl", "/orders/" + id));
+          return ResponseEntity.ok(Map.of("targetUrl", "/orders/" + id));
         });
   }
 
@@ -427,13 +435,13 @@ public class JobOrderWriteController {
    */
   @PostMapping(value = "/create", headers = "X-Requested-With=XMLHttpRequest")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> createOrderAjax(
+  public ResponseEntity<Object> createOrderAjax(
       @ModelAttribute("jobOrderForm") JobOrderForm form,
       @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
       @AuthenticationPrincipal OidcUser principal) {
     List<CreateJobOrderMaterialDto> materials = buildMaterialDtos(form);
     if (materials.isEmpty()) {
-      return org.springframework.http.ResponseEntity.badRequest().build();
+      return ResponseEntity.badRequest().build();
     }
     return relay(
         log,
@@ -449,9 +457,8 @@ public class JobOrderWriteController {
                   form.getVersion());
           jobOrderClient.createOrder(dto);
           liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
-          return org.springframework.http.ResponseEntity.ok(
-              java.util.Map.of(
-                  "targetUrl", postCreateTarget(principal, canViewJobOrders, form.getSource())));
+          return ResponseEntity.ok(
+              Map.of("targetUrl", postCreateTarget(principal, canViewJobOrders, form.getSource())));
         });
   }
 
@@ -489,14 +496,14 @@ public class JobOrderWriteController {
   @PutMapping("/{id}/priority/ajax")
   @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> updatePriorityAjax(
+  public ResponseEntity<Object> updatePriorityAjax(
       @PathVariable UUID id, @RequestParam Integer priority) {
     return relay(
         log,
         "update priority (ajax) for order " + id,
         () -> {
           JobOrderDto result = jobOrderClient.updatePriority(id, priority);
-          return org.springframework.http.ResponseEntity.ok(result);
+          return ResponseEntity.ok(result);
         });
   }
 
@@ -508,15 +515,15 @@ public class JobOrderWriteController {
    * @return updated order on success, propagated backend status code on failure
    */
   @PostMapping("/{id}/status")
-  @org.springframework.web.bind.annotation.ResponseBody
-  public org.springframework.http.ResponseEntity<Object> updateStatus(
+  @ResponseBody
+  public ResponseEntity<Object> updateStatus(
       @PathVariable UUID id, @RequestBody UpdateJobOrderStatusDto dto) {
     return relay(
         log,
         "update status for order " + id,
         () -> {
           JobOrderDto result = jobOrderClient.updateStatus(id, dto);
-          return org.springframework.http.ResponseEntity.ok(result);
+          return ResponseEntity.ok(result);
         });
   }
 
@@ -530,15 +537,15 @@ public class JobOrderWriteController {
    */
   @PostMapping("/{id}/blueprint-variant-counting")
   @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
-  @org.springframework.web.bind.annotation.ResponseBody
-  public org.springframework.http.ResponseEntity<Object> updateBlueprintVariantCounting(
+  @ResponseBody
+  public ResponseEntity<Object> updateBlueprintVariantCounting(
       @PathVariable UUID id, @RequestBody UpdateJobOrderBlueprintCountingDto dto) {
     return relay(
         log,
         "update blueprint variant counting for order " + id,
         () -> {
           JobOrderDto result = jobOrderClient.updateBlueprintVariantCounting(id, dto);
-          return org.springframework.http.ResponseEntity.ok(result);
+          return ResponseEntity.ok(result);
         });
   }
 
@@ -554,16 +561,14 @@ public class JobOrderWriteController {
   @PostMapping("/{id}/claims")
   @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> upsertClaim(
+  public ResponseEntity<Object> upsertClaim(
       @PathVariable UUID id, @RequestBody CreateClaimDto dto) {
     return relay(
         log,
         "upsert claim on order " + id,
         () -> {
           ClaimDto result = jobOrderClient.upsertClaim(id, dto);
-          return org.springframework.http.ResponseEntity.status(
-                  org.springframework.http.HttpStatus.CREATED)
-              .body(result);
+          return ResponseEntity.status(HttpStatus.CREATED).body(result);
         });
   }
 
@@ -577,14 +582,13 @@ public class JobOrderWriteController {
   @PostMapping("/{id}/claims/{claimId}/withdraw")
   @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> withdrawClaim(
-      @PathVariable UUID id, @PathVariable UUID claimId) {
+  public ResponseEntity<Object> withdrawClaim(@PathVariable UUID id, @PathVariable UUID claimId) {
     return relay(
         log,
         "withdraw claim " + claimId + " on order " + id,
         () -> {
           jobOrderClient.withdrawClaim(id, claimId);
-          return org.springframework.http.ResponseEntity.noContent().build();
+          return ResponseEntity.noContent().build();
         });
   }
 
@@ -645,12 +649,10 @@ public class JobOrderWriteController {
    * @param form the edit payload (requestingOrgUnitId, handle, comment, version, materials[])
    * @return the updated order on success, or the propagated RFC 7807 backend error
    */
-  @PostMapping(
-      value = "/{id}/update",
-      consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PostMapping(value = "/{id}/update", consumes = MediaType.APPLICATION_JSON_VALUE)
   @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> updateOrderAjax(
+  public ResponseEntity<Object> updateOrderAjax(
       @PathVariable UUID id, @NotNull @RequestBody JobOrderForm form) {
     List<CreateJobOrderMaterialDto> materials =
         form.getMaterials().stream()
@@ -661,7 +663,7 @@ public class JobOrderWriteController {
                         m.getMaterialId(), m.getMinQuality(), m.getAmount()))
             .toList();
     if (materials.isEmpty()) {
-      return org.springframework.http.ResponseEntity.badRequest().build();
+      return ResponseEntity.badRequest().build();
     }
     return relay(
         log,
@@ -676,7 +678,7 @@ public class JobOrderWriteController {
                   materials,
                   form.getVersion());
           JobOrderDto updated = jobOrderClient.updateOrder(id, dto);
-          return org.springframework.http.ResponseEntity.ok(updated);
+          return ResponseEntity.ok(updated);
         });
   }
 
@@ -730,11 +732,9 @@ public class JobOrderWriteController {
    * @param form the edit payload (comment, version, materials[])
    * @return the updated redacted order on success, or the propagated RFC 7807 backend error
    */
-  @PostMapping(
-      value = "/{id}/requested-update",
-      consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PostMapping(value = "/{id}/requested-update", consumes = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> updateOrderAsRequesterAjax(
+  public ResponseEntity<Object> updateOrderAsRequesterAjax(
       @PathVariable UUID id, @NotNull @RequestBody JobOrderForm form) {
     List<CreateJobOrderMaterialDto> materials =
         form.getMaterials().stream()
@@ -745,7 +745,7 @@ public class JobOrderWriteController {
                         m.getMaterialId(), m.getMinQuality(), m.getAmount()))
             .toList();
     if (materials.isEmpty()) {
-      return org.springframework.http.ResponseEntity.badRequest().build();
+      return ResponseEntity.badRequest().build();
     }
     return relay(
         log,
@@ -755,7 +755,7 @@ public class JobOrderWriteController {
               new CreateJobOrderDto(
                   null, null, null, form.getComment(), materials, form.getVersion());
           JobOrderDto updated = jobOrderClient.updateOrderAsRequester(id, dto);
-          return org.springframework.http.ResponseEntity.ok(updated);
+          return ResponseEntity.ok(updated);
         });
   }
 
@@ -783,13 +783,13 @@ public class JobOrderWriteController {
    */
   @DeleteMapping("/{id}")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> deleteOrderAjax(@PathVariable UUID id) {
+  public ResponseEntity<Object> deleteOrderAjax(@PathVariable UUID id) {
     return relay(
         log,
         "delete order " + id + " (ajax)",
         () -> {
           jobOrderClient.deleteOrder(id);
-          return org.springframework.http.ResponseEntity.noContent().build();
+          return ResponseEntity.noContent().build();
         });
   }
 
@@ -881,8 +881,7 @@ public class JobOrderWriteController {
       jobOrderClient.createHandover(id, dto);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.handover");
     } catch (BackendServiceException bse) {
-      de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging.warn(
-          log, "POST /api/v1/orders/{id}/handovers", id, bse);
+      BackendErrorLogging.warn(log, "POST /api/v1/orders/{id}/handovers", id, bse);
       redirectAttributes.addFlashAttribute("errorToast", "error.joborder.handover.failed");
     } catch (Exception e) {
       log.error(
@@ -958,8 +957,7 @@ public class JobOrderWriteController {
       jobOrderClient.createItemHandover(id, dto);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.handover");
     } catch (BackendServiceException bse) {
-      de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging.warn(
-          log, "POST /api/v1/orders/{id}/item-handovers", id, bse);
+      BackendErrorLogging.warn(log, "POST /api/v1/orders/{id}/item-handovers", id, bse);
       redirectAttributes.addFlashAttribute("errorToast", "error.joborder.handover.failed");
     } catch (Exception e) {
       log.error(
@@ -1005,9 +1003,7 @@ public class JobOrderWriteController {
    * @param form the handover payload (handoverTime, recipientHandle, recipientSquadron, items[])
    * @return the refreshed order on success, or the propagated RFC 7807 backend error
    */
-  @PostMapping(
-      value = "/{id}/handovers",
-      consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PostMapping(value = "/{id}/handovers", consumes = MediaType.APPLICATION_JSON_VALUE)
   @PreAuthorize(
       "hasRole('"
           + Roles.LOGISTICIAN
@@ -1017,7 +1013,7 @@ public class JobOrderWriteController {
           + Roles.ADMIN
           + "')")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> createHandoverAjax(
+  public ResponseEntity<Object> createHandoverAjax(
       @PathVariable UUID id, @NotNull @RequestBody JobOrderHandoverForm form) {
     List<JobOrderHandoverItemCreateDto> items =
         form.getItems().stream()
@@ -1035,7 +1031,7 @@ public class JobOrderWriteController {
                         item.getQualityRequirement()))
             .toList();
     if (items.isEmpty()) {
-      return org.springframework.http.ResponseEntity.badRequest().build();
+      return ResponseEntity.badRequest().build();
     }
     try {
       JobOrderHandoverCreateDto dto =
@@ -1046,16 +1042,13 @@ public class JobOrderWriteController {
               items);
       jobOrderClient.createHandover(id, dto);
       JobOrderDto order = jobOrderClient.order(id);
-      return org.springframework.http.ResponseEntity.ok(order);
+      return ResponseEntity.ok(order);
     } catch (BackendServiceException bse) {
-      de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging.warn(
-          log, "POST /api/v1/orders/{id}/handovers (ajax)", id, bse);
+      BackendErrorLogging.warn(log, "POST /api/v1/orders/{id}/handovers (ajax)", id, bse);
       return propagateBackendError(bse);
     } catch (Exception e) {
       log.error("Failed to create handover (ajax) for order {}", id, e);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 
@@ -1067,9 +1060,7 @@ public class JobOrderWriteController {
    * @param form the item-handover payload (handoverTime, recipientHandle, entries[])
    * @return the refreshed order on success, or the propagated RFC 7807 backend error
    */
-  @PostMapping(
-      value = "/{id}/item-handovers",
-      consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PostMapping(value = "/{id}/item-handovers", consumes = MediaType.APPLICATION_JSON_VALUE)
   @PreAuthorize(
       "hasRole('"
           + Roles.LOGISTICIAN
@@ -1079,7 +1070,7 @@ public class JobOrderWriteController {
           + Roles.ADMIN
           + "')")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> createItemHandoverAjax(
+  public ResponseEntity<Object> createItemHandoverAjax(
       @PathVariable UUID id, @NotNull @RequestBody JobOrderItemHandoverForm form) {
     List<JobOrderItemHandoverEntryCreateDto> entries =
         form.getEntries().stream()
@@ -1088,7 +1079,7 @@ public class JobOrderWriteController {
             .map(e -> new JobOrderItemHandoverEntryCreateDto(e.getJobOrderItemId(), e.getAmount()))
             .toList();
     if (entries.isEmpty()) {
-      return org.springframework.http.ResponseEntity.badRequest().build();
+      return ResponseEntity.badRequest().build();
     }
     try {
       JobOrderItemHandoverCreateDto dto =
@@ -1096,16 +1087,13 @@ public class JobOrderWriteController {
               parseHandoverTime(form.getHandoverTime()), form.getRecipientHandle(), entries);
       jobOrderClient.createItemHandover(id, dto);
       JobOrderDto order = jobOrderClient.order(id);
-      return org.springframework.http.ResponseEntity.ok(order);
+      return ResponseEntity.ok(order);
     } catch (BackendServiceException bse) {
-      de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging.warn(
-          log, "POST /api/v1/orders/{id}/item-handovers (ajax)", id, bse);
+      BackendErrorLogging.warn(log, "POST /api/v1/orders/{id}/item-handovers (ajax)", id, bse);
       return propagateBackendError(bse);
     } catch (Exception e) {
       log.error("Failed to create item handover (ajax) for order {}", id, e);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 
@@ -1120,7 +1108,7 @@ public class JobOrderWriteController {
    */
   @PostMapping(
       value = "/{id}/items/{itemId}/production",
-      consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+      consumes = MediaType.APPLICATION_JSON_VALUE)
   @PreAuthorize(
       "hasRole('"
           + Roles.LOGISTICIAN
@@ -1130,25 +1118,21 @@ public class JobOrderWriteController {
           + Roles.ADMIN
           + "')")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> bookProductionAjax(
+  public ResponseEntity<Object> bookProductionAjax(
       @PathVariable UUID id,
       @PathVariable UUID itemId,
-      @RequestBody
-          de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemProductionCreateDto
-              dto) {
+      @RequestBody JobOrderItemProductionCreateDto dto) {
     try {
       jobOrderClient.bookProduction(id, itemId, dto);
       JobOrderDto order = jobOrderClient.order(id);
-      return org.springframework.http.ResponseEntity.ok(order);
+      return ResponseEntity.ok(order);
     } catch (BackendServiceException bse) {
-      de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging.warn(
+      BackendErrorLogging.warn(
           log, "POST /api/v1/orders/{id}/items/{itemId}/production (ajax)", id, bse);
       return propagateBackendError(bse);
     } catch (Exception e) {
       log.error("Failed to book production (ajax) for order {} item {}", id, itemId, e);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 
@@ -1168,8 +1152,7 @@ public class JobOrderWriteController {
       jobOrderClient.unlinkMaterial(id, materialId);
       redirectAttributes.addFlashAttribute("successToast", "orders.detail.material.unlink.success");
     } catch (BackendServiceException bse) {
-      de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging.warn(
-          log, "DELETE /api/v1/orders/{id}/materials/{materialId}", id, bse);
+      BackendErrorLogging.warn(log, "DELETE /api/v1/orders/{id}/materials/{materialId}", id, bse);
       redirectAttributes.addFlashAttribute("errorToast", "orders.detail.material.unlink.error");
     } catch (Exception e) {
       log.error("Failed to unlink material {} from jobOrder={}", materialId, id, e);
@@ -1197,7 +1180,7 @@ public class JobOrderWriteController {
       redirectAttributes.addFlashAttribute(
           "successToast", "orders.detail.inventory.unlink.success");
     } catch (BackendServiceException bse) {
-      de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging.warn(
+      BackendErrorLogging.warn(
           log, "DELETE /api/v1/orders/{id}/inventory/{inventoryItemId}/unlink", id, bse);
       redirectAttributes.addFlashAttribute("errorToast", "orders.detail.inventory.unlink.error");
     } catch (Exception e) {
@@ -1219,7 +1202,7 @@ public class JobOrderWriteController {
   @PreAuthorize(
       "hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.OFFICER + "', '" + Roles.ADMIN + "')")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> unlinkInventoryItemAjax(
+  public ResponseEntity<Object> unlinkInventoryItemAjax(
       @PathVariable UUID id, @PathVariable UUID inventoryItemId) {
     return relay(
         log,
@@ -1227,7 +1210,7 @@ public class JobOrderWriteController {
         () -> {
           jobOrderClient.unlinkInventoryItem(id, inventoryItemId);
           JobOrderDto order = jobOrderClient.order(id);
-          return org.springframework.http.ResponseEntity.ok(order);
+          return ResponseEntity.ok(order);
         });
   }
 
@@ -1313,18 +1296,15 @@ public class JobOrderWriteController {
    * @param call the backend call returning the updated order
    * @return the updated order on success
    */
-  private JobOrderDto callAssigneeMutation(
-      String action, java.util.function.Supplier<JobOrderDto> call) {
+  private JobOrderDto callAssigneeMutation(String action, Supplier<JobOrderDto> call) {
     try {
       return call.get();
     } catch (BackendServiceException bse) {
       log.warn("Failed to {} (status {})", action, bse.getStatusCode());
-      throw new org.springframework.web.server.ResponseStatusException(
-          org.springframework.http.HttpStatus.valueOf(bse.getStatusCode()));
+      throw new ResponseStatusException(HttpStatus.valueOf(bse.getStatusCode()));
     } catch (Exception e) {
       log.error("Failed to {}", action, e);
-      throw new org.springframework.web.server.ResponseStatusException(
-          org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -1381,9 +1361,7 @@ public class JobOrderWriteController {
       return false;
     }
 
-    org.springframework.security.core.Authentication auth =
-        org.springframework.security.core.context.SecurityContextHolder.getContext()
-            .getAuthentication();
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     Collection<? extends GrantedAuthority> authorities =
         (auth != null) ? auth.getAuthorities() : principal.getAuthorities();
 

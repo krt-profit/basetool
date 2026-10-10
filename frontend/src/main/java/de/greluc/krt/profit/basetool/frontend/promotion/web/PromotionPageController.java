@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.promotion.web;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.promotion.client.PromotionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.promotion.model.MemberEvaluationDto;
@@ -32,7 +33,9 @@ import de.greluc.krt.profit.basetool.frontend.promotion.model.RankRequirementDto
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages.CompleteCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -113,7 +116,7 @@ public class PromotionPageController {
     Map<String, List<RankRequirementDto>> groupedRankRequirements = new LinkedHashMap<>();
     rankRequirements.stream()
         .sorted(
-            java.util.Comparator.comparingInt(RankRequirementDto::fromRank)
+            Comparator.comparingInt(RankRequirementDto::fromRank)
                 .thenComparingInt(RankRequirementDto::toRank))
         .forEach(
             req -> {
@@ -126,8 +129,7 @@ public class PromotionPageController {
     model.addAttribute("categoryContentMap", categoryContentMap);
     List<List<RankRequirementDto>> rankSteps = new ArrayList<>(groupedRankRequirements.values());
     rankSteps.sort(
-        java.util.Comparator.comparingInt(
-                (List<RankRequirementDto> step) -> step.getFirst().fromRank())
+        Comparator.comparingInt((List<RankRequirementDto> step) -> step.getFirst().fromRank())
             .reversed());
 
     model.addAttribute("rankRequirements", rankRequirements);
@@ -309,26 +311,24 @@ public class PromotionPageController {
     CompleteCatalog<MemberEvaluationDto> evaluationsCatalog = fetchAllEvaluations();
     List<MemberEvaluationDto> allEvaluations = evaluationsCatalog.items();
     Map<String, MemberEvaluationDto> evaluationMap = new LinkedHashMap<>();
-    Map<String, java.time.Instant> lastEvaluatedByUser = new LinkedHashMap<>();
+    Map<String, Instant> lastEvaluatedByUser = new LinkedHashMap<>();
     Map<String, Boolean> hasEvaluationsByUser = new LinkedHashMap<>();
     for (MemberEvaluationDto eval : allEvaluations) {
       evaluationMap.put(eval.userId() + "_" + eval.categoryId(), eval);
       hasEvaluationsByUser.put(eval.userId(), Boolean.TRUE);
       if (eval.updatedAt() != null) {
-        java.time.Instant prev = lastEvaluatedByUser.get(eval.userId());
+        Instant prev = lastEvaluatedByUser.get(eval.userId());
         if (prev == null || eval.updatedAt().isAfter(prev)) {
           lastEvaluatedByUser.put(eval.userId(), eval.updatedAt());
         }
       }
     }
 
-    CompleteCatalog<de.greluc.krt.profit.basetool.frontend.identity.model.UserDto> membersCatalog =
-        fetchMembers();
-    List<de.greluc.krt.profit.basetool.frontend.identity.model.UserDto> members =
-        membersCatalog.items();
+    CompleteCatalog<UserDto> membersCatalog = fetchMembers();
+    List<UserDto> members = membersCatalog.items();
 
     Map<String, List<PromotionEligibilityDto>> eligibilityByUser = new LinkedHashMap<>();
-    for (de.greluc.krt.profit.basetool.frontend.identity.model.UserDto member : members) {
+    for (UserDto member : members) {
       if (member.id() != null) {
         eligibilityByUser.put(member.id().toString(), fetchEligibilityForUser(member.id()));
       }
@@ -414,7 +414,7 @@ public class PromotionPageController {
     Map<String, List<RankRequirementDto>> groupedRequirements = new LinkedHashMap<>();
     requirements.stream()
         .sorted(
-            java.util.Comparator.comparingInt(RankRequirementDto::fromRank)
+            Comparator.comparingInt(RankRequirementDto::fromRank)
                 .thenComparingInt(RankRequirementDto::toRank))
         .forEach(
             req -> {
@@ -551,8 +551,7 @@ public class PromotionPageController {
   @Nullable
   private Integer fetchCurrentUserRank() {
     try {
-      de.greluc.krt.profit.basetool.frontend.identity.model.UserDto me =
-          promotionClient.currentUser();
+      UserDto me = promotionClient.currentUser();
       return me != null ? me.rank() : null;
     } catch (Exception e) {
       log.warn("Failed to fetch current user rank for promotion overview", e);
@@ -593,8 +592,7 @@ public class PromotionPageController {
    *
    * @return the complete member catalogue with its truncation flag
    */
-  private CompleteCatalog<de.greluc.krt.profit.basetool.frontend.identity.model.UserDto>
-      fetchMembers() {
+  private CompleteCatalog<UserDto> fetchMembers() {
     try {
       return CatalogPages.fetchAll(
           page -> promotionClient.evaluatableMembers(MATRIX_FETCH_PAGE_SIZE, page));

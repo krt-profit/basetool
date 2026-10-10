@@ -63,7 +63,7 @@ public class RefineryOrderForm {
   private UUID refiningMethodId;
   private UUID locationId;
   private UUID missionId;
-  private de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStatus status;
+  private RefineryOrderStatus status;
   private Long version;
   private String source;
 

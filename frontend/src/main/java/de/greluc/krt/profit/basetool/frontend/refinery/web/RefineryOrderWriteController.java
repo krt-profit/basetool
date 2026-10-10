@@ -21,12 +21,19 @@ package de.greluc.krt.profit.basetool.frontend.refinery.web;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
+import de.greluc.krt.profit.basetool.frontend.model.MissionReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.client.RefineryBackendClient;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodForm;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderForm;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreForm;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreItemDto;
@@ -34,12 +41,20 @@ import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreI
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus;
 import jakarta.validation.Valid;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
@@ -47,6 +62,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
@@ -85,23 +101,23 @@ public class RefineryOrderWriteController {
    * <p>Accepts an ISO instant with {@code Z} or an offset, a date only, or a local date-time
    * without zone, which is interpreted as UTC.
    */
-  static java.time.Instant parseStartedAt(String raw) {
+  static Instant parseStartedAt(String raw) {
     if (raw == null || raw.trim().isEmpty()) {
-      return java.time.Instant.now();
+      return Instant.now();
     }
     String input = raw.trim();
     try {
-      return java.time.Instant.parse(input);
+      return Instant.parse(input);
     } catch (Exception ignored) {
     }
     try {
-      return java.time.OffsetDateTime.parse(input).toInstant();
+      return OffsetDateTime.parse(input).toInstant();
     } catch (Exception ignored) {
     }
     if (input.length() == 10) {
-      return java.time.LocalDate.parse(input).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+      return LocalDate.parse(input).atStartOfDay(ZoneOffset.UTC).toInstant();
     }
-    return java.time.LocalDateTime.parse(input).toInstant(java.time.ZoneOffset.UTC);
+    return LocalDateTime.parse(input).toInstant(ZoneOffset.UTC);
   }
 
   /**
@@ -320,12 +336,11 @@ public class RefineryOrderWriteController {
   @NotNull
   private RefineryOrderDto buildRefineryOrderDto(
       UUID id, RefineryOrderForm form, UUID owningOrgUnitId) {
-    List<de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodDto> goodsDto =
-        new ArrayList<>();
+    List<RefineryGoodDto> goodsDto = new ArrayList<>();
     for (RefineryGoodForm g : form.getGoods()) {
       if (g.getInputMaterialId() != null && g.getInputQuantity() != null) {
-        de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto inMat =
-            new de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto(
+        MaterialDto inMat =
+            new MaterialDto(
                 g.getInputMaterialId(),
                 null,
                 null,
@@ -341,9 +356,9 @@ public class RefineryOrderWriteController {
                 null,
                 null,
                 null);
-        de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto outMat =
+        MaterialDto outMat =
             g.getOutputMaterialId() != null
-                ? new de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto(
+                ? new MaterialDto(
                     g.getOutputMaterialId(),
                     null,
                     null,
@@ -361,7 +376,7 @@ public class RefineryOrderWriteController {
                     null)
                 : null;
         goodsDto.add(
-            new de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodDto(
+            new RefineryGoodDto(
                 null,
                 inMat,
                 g.getInputQuantity(),
@@ -371,20 +386,17 @@ public class RefineryOrderWriteController {
                 null));
       }
     }
-    java.time.Instant startedAtTime = parseStartedAt(form.getStartedAt());
+    Instant startedAtTime = parseStartedAt(form.getStartedAt());
     return new RefineryOrderDto(
         id,
         form.getOwnerId() != null
-            ? new de.greluc.krt.profit.basetool.frontend.model.UserReferenceDto(
-                form.getOwnerId(), null, null, null, null)
+            ? new UserReferenceDto(form.getOwnerId(), null, null, null, null)
             : null,
         form.getLocationId() != null
-            ? new de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto(
-                form.getLocationId(), null, null, false, false, null)
+            ? new LocationDto(form.getLocationId(), null, null, false, false, null)
             : null,
         form.getMissionId() != null
-            ? new de.greluc.krt.profit.basetool.frontend.model.MissionReferenceDto(
-                form.getMissionId(), null, null, null)
+            ? new MissionReferenceDto(form.getMissionId(), null, null, null)
             : null,
         startedAtTime,
         (long)
@@ -395,13 +407,10 @@ public class RefineryOrderWriteController {
         nullToZero(form.getOreSales()),
         null,
         form.getRefiningMethodId() != null
-            ? new de.greluc.krt.profit.basetool.frontend.catalogue.model.RefiningMethodDto(
-                form.getRefiningMethodId(), null, null, null, null, null, null)
+            ? new RefiningMethodDto(form.getRefiningMethodId(), null, null, null, null, null, null)
             : null,
         goodsDto,
-        form.getStatus() != null
-            ? form.getStatus()
-            : de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStatus.OPEN,
+        form.getStatus() != null ? form.getStatus() : RefineryOrderStatus.OPEN,
         null,
         form.getVersion(),
         owningOrgUnitId);
@@ -459,31 +468,28 @@ public class RefineryOrderWriteController {
    */
   @PostMapping(value = "/{id}", headers = "X-Requested-With=XMLHttpRequest")
   @PreAuthorize("isAuthenticated()")
-  @org.springframework.web.bind.annotation.ResponseBody
-  public org.springframework.http.ResponseEntity<Object> updateOrderAjax(
+  @ResponseBody
+  public ResponseEntity<Object> updateOrderAjax(
       @PathVariable UUID id,
       @Valid @ModelAttribute("refineryOrderForm") RefineryOrderForm form,
       BindingResult bindingResult) {
     if (bindingResult.hasErrors()) {
-      return org.springframework.http.ResponseEntity.badRequest().build();
+      return ResponseEntity.badRequest().build();
     }
     RefineryOrderDto orderDto = buildRefineryOrderDto(id, form, null);
     if (orderDto.goods().isEmpty()) {
-      return org.springframework.http.ResponseEntity.badRequest().build();
+      return ResponseEntity.badRequest().build();
     }
     try {
       refineryClient.update(id, orderDto);
       liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
-      return org.springframework.http.ResponseEntity.ok(
-          java.util.Map.of("targetUrl", "/refinery-orders"));
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException bse) {
+      return ResponseEntity.ok(Map.of("targetUrl", "/refinery-orders"));
+    } catch (BackendServiceException bse) {
       log.debug("Failed to update refinery order {} (ajax): {}", id, bse.getMessage());
       return propagateBackendError(bse);
     } catch (Exception e) {
       log.error("Failed to update refinery order {} (ajax)", id, e);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 
@@ -498,28 +504,25 @@ public class RefineryOrderWriteController {
    */
   @PostMapping(value = "/{id}/store", headers = "X-Requested-With=XMLHttpRequest")
   @PreAuthorize("isAuthenticated()")
-  @org.springframework.web.bind.annotation.ResponseBody
-  public org.springframework.http.ResponseEntity<Object> storeOrderAjax(
+  @ResponseBody
+  public ResponseEntity<Object> storeOrderAjax(
       @PathVariable UUID id,
       @Valid @ModelAttribute("storeForm") RefineryOrderStoreForm form,
       BindingResult bindingResult) {
     if (bindingResult.hasErrors() || storePersonalWithJobOrder(form)) {
-      return org.springframework.http.ResponseEntity.badRequest().build();
+      return ResponseEntity.badRequest().build();
     }
     try {
       refineryClient.store(id, buildStoreDto(form));
       liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
       liveSyncLocalBus.publish("inventory", INVENTORY_STOCK_SECTION);
-      return org.springframework.http.ResponseEntity.ok(
-          java.util.Map.of("targetUrl", "/refinery-orders"));
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException bse) {
+      return ResponseEntity.ok(Map.of("targetUrl", "/refinery-orders"));
+    } catch (BackendServiceException bse) {
       log.debug("Failed to store refinery order {} (ajax): {}", id, bse.getMessage());
       return propagateBackendError(bse);
     } catch (Exception e) {
       log.error("Failed to store refinery order {} (ajax)", id, e);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 
@@ -531,21 +534,18 @@ public class RefineryOrderWriteController {
    */
   @PostMapping(value = "/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
   @PreAuthorize("isAuthenticated()")
-  @org.springframework.web.bind.annotation.ResponseBody
-  public org.springframework.http.ResponseEntity<Object> deleteOrderAjax(@PathVariable UUID id) {
+  @ResponseBody
+  public ResponseEntity<Object> deleteOrderAjax(@PathVariable UUID id) {
     try {
       refineryClient.cancel(id);
       liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
-      return org.springframework.http.ResponseEntity.ok(
-          java.util.Map.of("targetUrl", "/refinery-orders"));
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException bse) {
+      return ResponseEntity.ok(Map.of("targetUrl", "/refinery-orders"));
+    } catch (BackendServiceException bse) {
       log.debug("Failed to cancel refinery order {} (ajax): {}", id, bse.getMessage());
       return propagateBackendError(bse);
     } catch (Exception e) {
       log.error("Failed to cancel refinery order {} (ajax)", id, e);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 
@@ -559,30 +559,27 @@ public class RefineryOrderWriteController {
    */
   @PostMapping(value = "/create", headers = "X-Requested-With=XMLHttpRequest")
   @PreAuthorize("isAuthenticated()")
-  @org.springframework.web.bind.annotation.ResponseBody
-  public org.springframework.http.ResponseEntity<Object> createOrderAjax(
+  @ResponseBody
+  public ResponseEntity<Object> createOrderAjax(
       @Valid @ModelAttribute("refineryOrderForm") RefineryOrderForm form,
       BindingResult bindingResult) {
     if (bindingResult.hasErrors()) {
-      return org.springframework.http.ResponseEntity.badRequest().build();
+      return ResponseEntity.badRequest().build();
     }
     RefineryOrderDto orderDto = buildRefineryOrderDto(null, form, form.getOwningOrgUnitId());
     if (orderDto.goods().isEmpty()) {
-      return org.springframework.http.ResponseEntity.badRequest().build();
+      return ResponseEntity.badRequest().build();
     }
     try {
       refineryClient.create(orderDto);
       liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
-      return org.springframework.http.ResponseEntity.ok(
-          java.util.Map.of("targetUrl", "/refinery-orders"));
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException bse) {
+      return ResponseEntity.ok(Map.of("targetUrl", "/refinery-orders"));
+    } catch (BackendServiceException bse) {
       log.debug("Failed to create refinery order (ajax): {}", bse.getMessage());
       return propagateBackendError(bse);
     } catch (Exception e) {
       log.error("Failed to create refinery order (ajax)", e);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 

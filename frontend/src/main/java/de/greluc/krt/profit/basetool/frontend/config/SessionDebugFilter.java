@@ -30,6 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -43,7 +44,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * <p>Sessions are identified by a {@link SessionIdFingerprint}, never by the raw session id.
  */
 @Component
-@org.springframework.context.annotation.Profile({"dev", "test"})
+@Profile({"dev", "test"})
 @Slf4j
 public class SessionDebugFilter extends OncePerRequestFilter {
 

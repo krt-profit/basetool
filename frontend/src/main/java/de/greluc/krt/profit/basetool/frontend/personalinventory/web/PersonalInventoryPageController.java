@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalIn
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
 import jakarta.validation.Valid;
@@ -397,8 +398,7 @@ public class PersonalInventoryPageController {
    * worth distinguishing for the user).
    */
   private String classifyError(Exception e, String defaultKey) {
-    if (e instanceof de.greluc.krt.profit.basetool.frontend.service.BackendServiceException bse
-        && bse.getStatusCode() == 409) {
+    if (e instanceof BackendServiceException bse && bse.getStatusCode() == 409) {
       return "personalInventory.error.conflict";
     }
     return defaultKey;

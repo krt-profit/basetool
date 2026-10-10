@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendCli
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyRsiHandleRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyRsiHandleResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.ProfileRsiHandleForm;
+import jakarta.validation.Valid;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -70,8 +71,7 @@ public class ProfileRsiHandleProxyController {
       consumes = MediaType.APPLICATION_JSON_VALUE,
       produces = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity<Object> updateRsiHandle(
-      @jakarta.validation.Valid @RequestBody @NotNull ProfileRsiHandleForm form,
-      BindingResult bindingResult) {
+      @Valid @RequestBody @NotNull ProfileRsiHandleForm form, BindingResult bindingResult) {
     if (bindingResult.hasErrors()) {
       Map<String, Object> body = new LinkedHashMap<>();
       body.put("status", 422);

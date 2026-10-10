@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverIte
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverForm;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.BlueprintReferenceDto;
@@ -49,8 +50,11 @@ import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -61,10 +65,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -74,6 +81,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
@@ -199,8 +207,7 @@ public class JobOrderPageController {
         orders = new ArrayList<>(p.content());
         if (log.isDebugEnabled()) {
           for (JobOrderDto order : orders) {
-            for (de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto mat :
-                order.materials()) {
+            for (JobOrderMaterialDto mat : order.materials()) {
               log.debug(
                   "Received stock for job order #{} ({}): {}/{} (material: {})",
                   order.displayId(),
@@ -337,8 +344,7 @@ public class JobOrderPageController {
           form.setVersion(order.version());
           form.getMaterials().clear();
           if (order.materials() != null) {
-            for (de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto mat :
-                order.materials()) {
+            for (JobOrderMaterialDto mat : order.materials()) {
               JobOrderForm.JobOrderMaterialForm mf = new JobOrderForm.JobOrderMaterialForm();
               mf.setMaterialId(mat.material().id());
               mf.setMinQuality(mat.minQuality());
@@ -374,8 +380,7 @@ public class JobOrderPageController {
           form.setVersion(order.version());
           form.getMaterials().clear();
           if (order.materials() != null) {
-            for (de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto mat :
-                order.materials()) {
+            for (JobOrderMaterialDto mat : order.materials()) {
               JobOrderForm.JobOrderMaterialForm mf = new JobOrderForm.JobOrderMaterialForm();
               mf.setMaterialId(mat.material().id());
               mf.setMinQuality(mat.minQuality());
@@ -470,7 +475,7 @@ public class JobOrderPageController {
       return "redirect:/orders";
     }
     if (fragment != null) {
-      return switch (fragment.toLowerCase(java.util.Locale.ROOT)) {
+      return switch (fragment.toLowerCase(Locale.ROOT)) {
         case "materials" -> "orders-detail :: materialsSection";
         case "aggregated" -> "orders-detail :: aggregatedSection";
         case "header" -> "orders-detail :: orderHeader";
@@ -592,25 +597,23 @@ public class JobOrderPageController {
    * @return the JS-serializable prefill list
    */
   @NotNull
-  private List<java.util.Map<String, Object>> buildEditItems(@NotNull JobOrderDto order) {
-    List<de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto> items =
-        order.items() != null ? order.items() : List.of();
-    java.util.Map<UUID, Integer> idToIndex = new java.util.HashMap<>();
+  private List<Map<String, Object>> buildEditItems(@NotNull JobOrderDto order) {
+    List<JobOrderItemDto> items = order.items() != null ? order.items() : List.of();
+    Map<UUID, Integer> idToIndex = new HashMap<>();
     for (int i = 0; i < items.size(); i++) {
       idToIndex.put(items.get(i).id(), i);
     }
-    List<java.util.Map<String, Object>> result = new ArrayList<>();
-    for (de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto line : items) {
-      java.util.Map<String, String> qualities = new java.util.LinkedHashMap<>();
+    List<Map<String, Object>> result = new ArrayList<>();
+    for (JobOrderItemDto line : items) {
+      Map<String, String> qualities = new LinkedHashMap<>();
       if (line.materials() != null) {
-        for (de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemMaterialDto m :
-            line.materials()) {
+        for (JobOrderItemMaterialDto m : line.materials()) {
           if (m.material() != null && m.material().id() != null) {
             qualities.put(m.material().id().toString(), m.qualityRequirement());
           }
         }
       }
-      java.util.Map<String, Object> entry = new java.util.LinkedHashMap<>();
+      Map<String, Object> entry = new LinkedHashMap<>();
       entry.put("id", line.id() != null ? line.id().toString() : null);
       entry.put("manufactured", line.manufacturedAmount() != null ? line.manufacturedAmount() : 0);
       entry.put("gameItemId", line.gameItem() != null ? line.gameItem().id().toString() : null);
@@ -719,9 +722,8 @@ public class JobOrderPageController {
       return jobOrderClient.inventoryForMaterial(id, matId);
     } catch (Exception e) {
       log.error("Failed to fetch inventory items for job order {} and material {}", id, matId, e);
-      throw new org.springframework.web.server.ResponseStatusException(
-          org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR,
-          "Failed to load inventory items");
+      throw new ResponseStatusException(
+          HttpStatus.INTERNAL_SERVER_ERROR, "Failed to load inventory items");
     }
   }
 
@@ -1058,7 +1060,7 @@ public class JobOrderPageController {
     return fetchSquadrons().stream()
         .filter(s -> Boolean.TRUE.equals(s.active()))
         .sorted(
-            java.util.Comparator.comparing(
+            Comparator.comparing(
                 s -> s.name() != null ? s.name() : "", String.CASE_INSENSITIVE_ORDER))
         .toList();
   }
@@ -1149,9 +1151,7 @@ public class JobOrderPageController {
       return false;
     }
 
-    org.springframework.security.core.Authentication auth =
-        org.springframework.security.core.context.SecurityContextHolder.getContext()
-            .getAuthentication();
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     Collection<? extends GrantedAuthority> authorities =
         (auth != null) ? auth.getAuthorities() : principal.getAuthorities();
 

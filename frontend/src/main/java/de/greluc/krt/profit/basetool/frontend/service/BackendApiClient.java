@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.TermsDocumentDto;
 import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -250,7 +251,7 @@ public class BackendApiClient {
       }
     }
     if (log.isDebugEnabled()) {
-      log.debug("Evicted catalogue cache(s) {}", java.util.Arrays.toString(domains));
+      log.debug("Evicted catalogue cache(s) {}", Arrays.toString(domains));
     }
   }
 

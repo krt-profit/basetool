@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
+import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronContext;
 import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
@@ -81,7 +82,7 @@ public class OrgUnitContextAdvice {
     HttpSession session = request.getSession(false);
     if (session != null) {
       UUID fromSession =
-          de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronContext.coerce(
+          ActiveSquadronContext.coerce(
               session.getAttribute(MeFrontendController.ACTIVE_ORG_UNIT_SESSION_KEY));
       if (fromSession != null) {
         return fromSession;

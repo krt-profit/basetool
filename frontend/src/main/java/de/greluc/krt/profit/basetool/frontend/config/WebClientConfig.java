@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronRelayFilter;
+import de.greluc.krt.profit.basetool.frontend.logging.ClientIpRelayFilter;
 import de.greluc.krt.profit.basetool.frontend.logging.UserLocaleRelayFilter;
 import de.greluc.krt.profit.basetool.frontend.logging.WebClientLoggingFilter;
 import io.github.resilience4j.bulkhead.Bulkhead;
@@ -34,6 +35,7 @@ import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryRegistry;
 import io.github.resilience4j.timelimiter.TimeLimiter;
 import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ApplicationProtocolNames;
@@ -43,6 +45,9 @@ import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import java.security.KeyStore;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -55,6 +60,7 @@ import org.springframework.boot.ssl.SslBundle;
 import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.ReactorClientHttpRequestFactory;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
@@ -82,6 +88,7 @@ import reactor.core.publisher.Mono;
 import reactor.netty.http.HttpProtocol;
 import reactor.netty.http.client.Http2AllocationStrategy;
 import reactor.netty.http.client.HttpClient;
+import reactor.netty.resources.ConnectionProvider;
 
 /** Spring configuration for Web Client. */
 @Configuration
@@ -102,15 +109,14 @@ public class WebClientConfig {
    * always evicts first and never dispatches onto a connection the server has already closed.
    * Package-private for a test asserting that margin.
    */
-  static final java.time.Duration BACKEND_POOL_MAX_IDLE_TIME = java.time.Duration.ofSeconds(10);
+  static final Duration BACKEND_POOL_MAX_IDLE_TIME = Duration.ofSeconds(10);
 
   /**
    * Background sweep period for {@link #BACKEND_POOL_MAX_IDLE_TIME}. Half the idle bound, so an
    * expired connection is closed promptly instead of lingering up to a full bound past it — which
    * is what pushed the old pair's effective retention from 20&nbsp;s out to 30.
    */
-  private static final java.time.Duration BACKEND_POOL_EVICT_INTERVAL =
-      java.time.Duration.ofSeconds(5);
+  private static final Duration BACKEND_POOL_EVICT_INTERVAL = Duration.ofSeconds(5);
 
   /**
    * Context-attributes mapper for the {@link DefaultOAuth2AuthorizedClientManager} that yields an
@@ -128,9 +134,8 @@ public class WebClientConfig {
   private final WebClientLoggingFilter webClientLoggingFilter;
   private final ActiveSquadronRelayFilter activeSquadronRelayFilter;
   private final UserLocaleRelayFilter userLocaleRelayFilter;
-  private final de.greluc.krt.profit.basetool.frontend.logging.ClientIpRelayFilter
-      clientIpRelayFilter;
-  private final org.springframework.core.env.Environment environment;
+  private final ClientIpRelayFilter clientIpRelayFilter;
+  private final Environment environment;
   private final SslBundles sslBundles;
 
   /**
@@ -138,7 +143,7 @@ public class WebClientConfig {
    * observation customizer does not reach; records {@code http.client.requests} and propagates
    * trace context when tracing is enabled (REQ-OBS-009).
    */
-  private final io.micrometer.observation.ObservationRegistry observationRegistry;
+  private final ObservationRegistry observationRegistry;
 
   /**
    * Dedicated connection pool for the OAuth2 token-endpoint calls to Keycloak ({@code
@@ -147,13 +152,13 @@ public class WebClientConfig {
    * <p>Evicts idle connections after 20 s and sweeps every 10 s, below the edge proxy's keep-alive,
    * so no token call reuses a server-closed socket. Exposes pool metrics.
    */
-  private final reactor.netty.resources.ConnectionProvider oauthTokenPool =
-      reactor.netty.resources.ConnectionProvider.builder("frontend-oauth-pool")
+  private final ConnectionProvider oauthTokenPool =
+      ConnectionProvider.builder("frontend-oauth-pool")
           .maxConnections(20)
-          .maxIdleTime(java.time.Duration.ofSeconds(20))
-          .maxLifeTime(java.time.Duration.ofSeconds(60))
-          .pendingAcquireTimeout(java.time.Duration.ofSeconds(5))
-          .evictInBackground(java.time.Duration.ofSeconds(10))
+          .maxIdleTime(Duration.ofSeconds(20))
+          .maxLifeTime(Duration.ofSeconds(60))
+          .pendingAcquireTimeout(Duration.ofSeconds(5))
+          .evictInBackground(Duration.ofSeconds(10))
           .metrics(true)
           .build();
 
@@ -187,7 +192,7 @@ public class WebClientConfig {
         !streaming && httpProperties.backendProtocol() == AppHttpProperties.BackendProtocol.H2;
     try {
       SslContextBuilder builder = SslContextBuilder.forClient();
-      java.util.List<String> profiles = java.util.Arrays.asList(environment.getActiveProfiles());
+      List<String> profiles = Arrays.asList(environment.getActiveProfiles());
       boolean pinnedTrust = false;
       if (profiles.contains("dev") || profiles.contains("test")) {
         builder = builder.trustManager(InsecureTrustManagerFactory.INSTANCE);
@@ -221,23 +226,23 @@ public class WebClientConfig {
                   || profiles.contains("test")
                   || !httpProperties.verifyBackendHostname());
 
-      final reactor.netty.resources.ConnectionProvider provider;
+      final ConnectionProvider provider;
       if (streaming) {
         provider =
-            reactor.netty.resources.ConnectionProvider.builder(poolName)
+            ConnectionProvider.builder(poolName)
                 .maxConnections(1000)
                 .maxIdleTime(BACKEND_POOL_MAX_IDLE_TIME)
-                .pendingAcquireTimeout(java.time.Duration.ofSeconds(10))
+                .pendingAcquireTimeout(Duration.ofSeconds(10))
                 .evictInBackground(BACKEND_POOL_EVICT_INTERVAL)
                 .metrics(true)
                 .build();
       } else {
-        reactor.netty.resources.ConnectionProvider.Builder pool =
-            reactor.netty.resources.ConnectionProvider.builder(poolName)
+        ConnectionProvider.Builder pool =
+            ConnectionProvider.builder(poolName)
                 .maxConnections(100)
                 .maxIdleTime(BACKEND_POOL_MAX_IDLE_TIME)
-                .maxLifeTime(java.time.Duration.ofSeconds(60))
-                .pendingAcquireTimeout(java.time.Duration.ofSeconds(5))
+                .maxLifeTime(Duration.ofSeconds(60))
+                .pendingAcquireTimeout(Duration.ofSeconds(5))
                 .evictInBackground(BACKEND_POOL_EVICT_INTERVAL)
                 .metrics(true);
         if (http2) {
@@ -498,7 +503,7 @@ public class WebClientConfig {
    *
    * @param filters the builder's filter list, outermost first
    */
-  private void guardOriginFirst(@NotNull java.util.List<ExchangeFilterFunction> filters) {
+  private void guardOriginFirst(@NotNull List<ExchangeFilterFunction> filters) {
     filters.addFirst(BackendOriginGuard.forBaseUrl(backendProperties.backendUrl()).filter());
   }
 
@@ -509,11 +514,11 @@ public class WebClientConfig {
    *
    * @return the media types this client accepts from the backend, most preferred first
    */
-  private java.util.List<MediaType> backendAcceptTypes() {
+  private List<MediaType> backendAcceptTypes() {
     if (httpProperties.codec() == AppHttpProperties.BackendCodec.CBOR) {
-      return java.util.List.of(MediaType.APPLICATION_CBOR, MediaType.APPLICATION_JSON);
+      return List.of(MediaType.APPLICATION_CBOR, MediaType.APPLICATION_JSON);
     }
-    return java.util.List.of(MediaType.APPLICATION_JSON);
+    return List.of(MediaType.APPLICATION_JSON);
   }
 
   /**
@@ -567,8 +572,7 @@ public class WebClientConfig {
         .filter(activeSquadronRelayFilter.relayActiveSquadron())
         .filter(userLocaleRelayFilter.relayUserLocale())
         .filter(clientIpRelayFilter.relayClientIp())
-        .defaultHeaders(
-            headers -> headers.setAccept(java.util.List.of(MediaType.TEXT_EVENT_STREAM)))
+        .defaultHeaders(headers -> headers.setAccept(List.of(MediaType.TEXT_EVENT_STREAM)))
         .baseUrl(backendProperties.backendUrl())
         .filters(this::guardOriginFirst)
         .build();

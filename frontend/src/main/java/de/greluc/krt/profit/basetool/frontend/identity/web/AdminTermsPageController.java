@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.TermsAcceptanceStat
 import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -104,7 +105,7 @@ public class AdminTermsPageController {
     if (filter == null) {
       return "PENDING";
     }
-    String normalized = filter.toUpperCase(java.util.Locale.ROOT);
+    String normalized = filter.toUpperCase(Locale.ROOT);
     return ALLOWED_FILTERS.contains(normalized) ? normalized : "PENDING";
   }
 }

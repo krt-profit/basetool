@@ -26,7 +26,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -34,17 +36,24 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.authority.mapping.GrantedAuthoritiesMapper;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
@@ -53,10 +62,14 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUserAuthority;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter;
+import org.springframework.security.web.header.HeaderWriterFilter;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.savedrequest.RequestCache;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.session.SessionInformationExpiredEvent;
 import org.springframework.security.web.session.SessionInformationExpiredStrategy;
+import org.springframework.web.servlet.support.RequestContextUtils;
 
 /** Spring configuration for Security. */
 @Configuration
@@ -82,8 +95,7 @@ public class SecurityConfig {
    * finding M-15: the filter logs raw session ids + principal names which must never reach prod
    * logs even if an operator flips the per-class log level).
    */
-  private final org.springframework.beans.factory.ObjectProvider<SessionDebugFilter>
-      sessionDebugFilter;
+  private final ObjectProvider<SessionDebugFilter> sessionDebugFilter;
 
   private final SsoReAuthenticationEntryPoint ssoReAuthenticationEntryPoint;
   private final CspNonceFilter cspNonceFilter;
@@ -145,12 +157,10 @@ public class SecurityConfig {
       @Value("${spring.security.oauth2.client.provider.keycloak.issuer-uri:}")
           String keycloakIssuerUri,
       @Value("${app.security.trusted-types:report}") String trustedTypesMode,
-      org.springframework.beans.factory.ObjectProvider<
-              org.springframework.security.core.session.SessionRegistry>
-          sessionRegistryProvider,
+      ObjectProvider<SessionRegistry> sessionRegistryProvider,
       AuthenticationSuccessHandler oauth2LoginSuccessHandler,
       RequestCache navigationRequestCache,
-      org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient<
+      OAuth2AccessTokenResponseClient<
               org.springframework.security.oauth2.client.endpoint
                   .OAuth2AuthorizationCodeGrantRequest>
           oauthAuthorizationCodeTokenResponseClient)
@@ -158,26 +168,19 @@ public class SecurityConfig {
     SmartOidcLogoutSuccessHandler oidcLogoutSuccessHandler =
         new SmartOidcLogoutSuccessHandler(clientRegistrationRepository, "{baseUrl}");
 
-    http.addFilterBefore(
-            cspNonceFilter, org.springframework.security.web.header.HeaderWriterFilter.class)
-        .addFilterBefore(
-            botProtectionFilter,
-            org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter
-                .class);
+    http.addFilterBefore(cspNonceFilter, HeaderWriterFilter.class)
+        .addFilterBefore(botProtectionFilter, WebAsyncManagerIntegrationFilter.class);
     sessionDebugFilter.ifAvailable(
         f ->
             http.addFilterBefore(
                 f,
                 org.springframework.security.web.context.request.async
                     .WebAsyncManagerIntegrationFilter.class));
-    http.addFilterBefore(
-            requestLoggingFilter,
-            org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter
-                .class)
+    http.addFilterBefore(requestLoggingFilter, WebAsyncManagerIntegrationFilter.class)
         .addFilterBefore(backendRoleSyncFilter, AuthorizationFilter.class)
         .addFilterAfter(termsAcceptanceGateFilter, BackendRoleSyncFilter.class)
         .requestCache(cache -> cache.requestCache(navigationRequestCache))
-        .csrf(org.springframework.security.config.Customizer.withDefaults())
+        .csrf(Customizer.withDefaults())
         .headers(
             SecurityHeaders.frontend(keycloakIssuerUri, TrustedTypesMode.parse(trustedTypesMode)))
         .authorizeHttpRequests(
@@ -266,9 +269,8 @@ public class SecurityConfig {
    */
   @NotNull
   @Bean
-  public org.springframework.security.web.session.HttpSessionEventPublisher
-      httpSessionEventPublisher() {
-    return new org.springframework.security.web.session.HttpSessionEventPublisher();
+  public HttpSessionEventPublisher httpSessionEventPublisher() {
+    return new HttpSessionEventPublisher();
   }
 
   /**
@@ -287,7 +289,7 @@ public class SecurityConfig {
     HttpSessionRequestCache cache = new HttpSessionRequestCache();
     cache.setRequestMatcher(
         request ->
-            org.springframework.http.HttpMethod.GET.matches(request.getMethod())
+            HttpMethod.GET.matches(request.getMethod())
                 && isNavigation(request)
                 && !isMonitoringProbe(request));
     return cache;
@@ -301,7 +303,7 @@ public class SecurityConfig {
    * @return {@code true} for a declared navigation, or for an HTML {@code Accept} when the client
    *     sends no Fetch Metadata
    */
-  private static boolean isNavigation(@NotNull jakarta.servlet.http.HttpServletRequest request) {
+  private static boolean isNavigation(@NotNull HttpServletRequest request) {
     String fetchMode = request.getHeader(SEC_FETCH_MODE_HEADER);
     if (fetchMode != null) {
       return NAVIGATE_FETCH_MODE.equalsIgnoreCase(fetchMode);
@@ -316,8 +318,7 @@ public class SecurityConfig {
    * @param request the request to inspect; never {@code null}
    * @return {@code true} when the request carries the probe marker
    */
-  private static boolean isMonitoringProbe(
-      @NotNull jakarta.servlet.http.HttpServletRequest request) {
+  private static boolean isMonitoringProbe(@NotNull HttpServletRequest request) {
     return request.getHeader(MONITORING_PROBE_HEADER) != null;
   }
 
@@ -328,12 +329,9 @@ public class SecurityConfig {
    * @param request the request to inspect; never {@code null}
    * @return {@code true} when the {@code Accept} header names {@code text/html}
    */
-  private static boolean acceptsHtml(@NotNull jakarta.servlet.http.HttpServletRequest request) {
-    String accept = request.getHeader(org.springframework.http.HttpHeaders.ACCEPT);
-    return accept != null
-        && accept
-            .toLowerCase(java.util.Locale.ROOT)
-            .contains(org.springframework.http.MediaType.TEXT_HTML_VALUE);
+  private static boolean acceptsHtml(@NotNull HttpServletRequest request) {
+    String accept = request.getHeader(HttpHeaders.ACCEPT);
+    return accept != null && accept.toLowerCase(Locale.ROOT).contains(MediaType.TEXT_HTML_VALUE);
   }
 
   /**
@@ -384,10 +382,8 @@ public class SecurityConfig {
         if (req == null) {
           return null;
         }
-        java.util.Locale locale =
-            org.springframework.web.servlet.support.RequestContextUtils.getLocale(request);
-        Map<String, Object> additionalParameters =
-            new java.util.HashMap<>(req.getAdditionalParameters());
+        Locale locale = RequestContextUtils.getLocale(request);
+        Map<String, Object> additionalParameters = new HashMap<>(req.getAdditionalParameters());
         additionalParameters.put("ui_locales", locale.getLanguage());
         String prompt = request.getParameter("prompt");
         if ("none".equals(prompt)) {

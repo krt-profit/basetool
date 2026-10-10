@@ -36,6 +36,7 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +46,7 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
@@ -367,8 +369,7 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
             } else if (currentName.equals(oidcUser.getEmail())) {
               nameAttributeKey = "email";
             } else {
-              for (java.util.Map.Entry<String, Object> entry :
-                  oidcUser.getAttributes().entrySet()) {
+              for (Map.Entry<String, Object> entry : oidcUser.getAttributes().entrySet()) {
                 if (currentName.equals(String.valueOf(entry.getValue()))) {
                   nameAttributeKey = entry.getKey();
                   break;
@@ -403,8 +404,7 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
         newAuth.setDetails(token.getDetails());
         log.info("Replaced Authentication in SecurityContext for the current user");
 
-        org.springframework.security.core.context.SecurityContext context =
-            SecurityContextHolder.getContext();
+        SecurityContext context = SecurityContextHolder.getContext();
         context.setAuthentication(newAuth);
         securityContextRepository.saveContext(context, request, response);
       } else {

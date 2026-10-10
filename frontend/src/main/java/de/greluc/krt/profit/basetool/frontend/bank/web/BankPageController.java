@@ -99,7 +99,7 @@ public class BankPageController {
         "bereich".equals(effectiveGroup)
             ? BankDashboardViewAssembler.buildGroups(cards)
             : List.of());
-    model.addAttribute("now", java.time.Instant.now().toString());
+    model.addAttribute("now", Instant.now().toString());
     if ("bankGrid".equals(fragment)) {
       return "bank-dashboard :: bankGrid";
     }

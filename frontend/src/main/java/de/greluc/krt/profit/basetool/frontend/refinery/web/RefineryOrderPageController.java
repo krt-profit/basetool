@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.model.HandoffKind;
 import de.greluc.krt.profit.basetool.frontend.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.client.RefineryBackendClient;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodForm;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryImportDraftDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
@@ -43,7 +44,11 @@ import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingDto;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -52,6 +57,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -63,8 +69,10 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -650,7 +658,7 @@ public class RefineryOrderPageController {
       @RequestParam(required = false) String fragment,
       Model model,
       @AuthenticationPrincipal OidcUser principal) {
-    String section = fragment == null ? null : fragment.toLowerCase(java.util.Locale.ROOT);
+    String section = fragment == null ? null : fragment.toLowerCase(Locale.ROOT);
     if (section != null && !FRAGMENT_ORDER.equals(section) && !FRAGMENT_STORE.equals(section)) {
       return "refinery-orders-details :: fragmentError";
     }
@@ -659,7 +667,7 @@ public class RefineryOrderPageController {
 
     if (!model.containsAttribute("refineryOrderForm") || !model.containsAttribute("storeForm")) {
       try {
-        RefineryOrderDto orderDto = java.util.Objects.requireNonNull(refineryClient.order(id));
+        RefineryOrderDto orderDto = Objects.requireNonNull(refineryClient.order(id));
         UUID currentUserId = getCurrentUserId(principal);
 
         boolean isOwner =
@@ -706,8 +714,7 @@ public class RefineryOrderPageController {
 
           if (orderDto.goods() != null && !orderDto.goods().isEmpty()) {
             List<RefineryGoodForm> goodsForm = new ArrayList<>();
-            for (de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodDto goodDto :
-                orderDto.goods()) {
+            for (RefineryGoodDto goodDto : orderDto.goods()) {
               RefineryGoodForm goodForm = new RefineryGoodForm();
               if (goodDto.inputMaterial() != null) {
                 goodForm.setInputMaterialId(goodDto.inputMaterial().id());
@@ -730,8 +737,7 @@ public class RefineryOrderPageController {
           RefineryOrderStoreForm storeForm = new RefineryOrderStoreForm();
           if (orderDto.goods() != null) {
             String roundingMode = fetchRoundingMode();
-            for (de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodDto good :
-                orderDto.goods()) {
+            for (RefineryGoodDto good : orderDto.goods()) {
               if (good.outputMaterial() != null) {
                 RefineryOrderStoreItemForm storeItem = new RefineryOrderStoreItemForm();
                 storeItem.setMaterialId(good.outputMaterial().id());
@@ -743,14 +749,14 @@ public class RefineryOrderPageController {
                   if ("PIECE".equals(materialQuantityType)) {
                     amount = good.outputQuantity();
                   } else {
-                    java.math.RoundingMode rm;
+                    RoundingMode rm;
                     try {
-                      rm = java.math.RoundingMode.valueOf(roundingMode);
+                      rm = RoundingMode.valueOf(roundingMode);
                     } catch (Exception e) {
-                      rm = java.math.RoundingMode.HALF_UP;
+                      rm = RoundingMode.HALF_UP;
                     }
                     amount =
-                        java.math.BigDecimal.valueOf(good.outputQuantity() / 100.0)
+                        BigDecimal.valueOf(good.outputQuantity() / 100.0)
                             .setScale(3, rm)
                             .doubleValue();
                   }
@@ -995,8 +1001,7 @@ public class RefineryOrderPageController {
       if (p == null) {
         return new ArrayList<>();
       }
-      java.time.Instant cutoff =
-          java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).minusMonths(3).toInstant();
+      Instant cutoff = OffsetDateTime.now(ZoneOffset.UTC).minusMonths(3).toInstant();
       return filterAndSortMissionsForDropdown(p.content(), cutoff, preserveMissionId);
     } catch (Exception e) {
       log.error("Failed to fetch missions", e);
@@ -1015,7 +1020,7 @@ public class RefineryOrderPageController {
    */
   @NotNull
   static List<MissionListDto> filterAndSortMissionsForDropdown(
-      List<MissionListDto> all, java.time.Instant cutoff, UUID preserveMissionId) {
+      List<MissionListDto> all, Instant cutoff, UUID preserveMissionId) {
     if (all == null || all.isEmpty()) {
       return new ArrayList<>();
     }
@@ -1137,7 +1142,7 @@ public class RefineryOrderPageController {
 
   private String fetchRoundingMode() {
     try {
-      SystemSettingDto setting = java.util.Objects.requireNonNull(refineryClient.roundingMode());
+      SystemSettingDto setting = Objects.requireNonNull(refineryClient.roundingMode());
       return setting.value();
     } catch (Exception e) {
       log.warn("Failed to fetch refinery rounding mode, using default UP");
@@ -1169,9 +1174,7 @@ public class RefineryOrderPageController {
       return false;
     }
 
-    org.springframework.security.core.Authentication auth =
-        org.springframework.security.core.context.SecurityContextHolder.getContext()
-            .getAuthentication();
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     Collection<? extends GrantedAuthority> authorities =
         (auth != null) ? auth.getAuthorities() : principal.getAuthorities();
 
@@ -1188,8 +1191,7 @@ public class RefineryOrderPageController {
                         || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
     if (!result) {
       try {
-        de.greluc.krt.profit.basetool.frontend.identity.model.UserDto me =
-            refineryClient.currentUser();
+        UserDto me = refineryClient.currentUser();
         if (me != null && Boolean.TRUE.equals(me.isLogistician())) {
           log.info("Granting logistician by backend flag");
           result = true;

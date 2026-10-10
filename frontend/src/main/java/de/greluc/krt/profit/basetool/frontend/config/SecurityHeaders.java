@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
+import java.net.URI;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.security.config.Customizer;
@@ -26,6 +27,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.web.header.HeaderWriter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
 
 /**
  * The frontend's security response headers: the per-request nonce-gated {@code
@@ -88,7 +90,7 @@ public final class SecurityHeaders {
       headers.httpStrictTransportSecurity(
           hsts -> hsts.includeSubDomains(true).preload(true).maxAgeInSeconds(31_536_000L));
       headers.addHeaderWriter(
-          new org.springframework.security.web.header.writers.StaticHeadersWriter(
+          new StaticHeadersWriter(
               "Permissions-Policy",
               "geolocation=(), camera=(), microphone=(), fullscreen=(),"
                   + " payment=(), usb=(), serial=(), bluetooth=(), accelerometer=(),"
@@ -141,7 +143,7 @@ public final class SecurityHeaders {
       return "";
     }
     try {
-      java.net.URI uri = java.net.URI.create(issuerUri.trim());
+      URI uri = URI.create(issuerUri.trim());
       String scheme = uri.getScheme();
       String host = uri.getHost();
       if (scheme == null || host == null) {
