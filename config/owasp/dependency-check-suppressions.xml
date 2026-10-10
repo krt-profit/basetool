@@ -4,7 +4,6 @@
   <suppress until="2027-04-10Z">
     <notes>Compile-time only: the Guava 30.1.1 shaded into dataflow-errorprone (NullAway's dataflow engine, ADR-0237) runs inside javac on the errorprone processor path and never reaches a runtime classpath, an image or an SBOM. CVE-2023-2976 and CVE-2020-8908 concern temporary files created by FileBackedOutputStream and Files.createTempDir, which the compiler plugin does not use. Drop when NullAway ships a dataflow build on a current Guava.</notes>
     <filePath regex="true">.*dataflow-errorprone-.*\.jar.*</filePath>
-    <vulnerabilityName>GHSA-68fv-2mgg-jv7q</vulnerabilityName>
     <cve>CVE-2023-2976</cve>
     <cve>CVE-2020-8908</cve>
   </suppress>
