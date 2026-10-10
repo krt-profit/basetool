@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Benachrichtigungen zur Organisation.** Admins erfahren, wenn nach einer Leitungsänderung die OFFICER-Rolle eines Mitglieds nicht zu seinen Posten passt; die Leitung einer Einheit erfährt, wenn ein Mitglied ausgeschieden ist, und die des übergeordneten Bereichs, wenn dadurch ein Leitungsposten frei wird (REQ-ORG-029, -030, Migration V279, #2414).
+
 - **Benachrichtigungen zur Bank.** Wer einen freigegebenen Antrag bestätigen kann, erfährt, dass er bereit ist; Bankmitarbeiter hören, wenn ihre Berechtigung auf ein Konto erteilt, geändert oder entzogen wird. Auszahlungen, Halterübertragungen und Direktbuchungen von Bankpersonal melden sich bei den Betroffenen (Konto-Verantwortliche), und die Bankleitung erfährt, wenn ein deaktivierter Halter noch Geld hält (REQ-BANK-057…060, Migration V278, #2414).
 
 - **Benachrichtigungen zu Materialbörse und Lager.** Wer an einem Angebot Interesse angemeldet oder zugesagt hat, ein Gesuch zu beliefern, erfährt, wenn das Angebot nicht mehr verfügbar oder das Gesuch zurückgezogen ist; wessen Bestand jemand anderes ausbucht oder verkauft, wird benachrichtigt (REQ-MARKET-021, -022, REQ-INV-056, Migration V277, #2414).

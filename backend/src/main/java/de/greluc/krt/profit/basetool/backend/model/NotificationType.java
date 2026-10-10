@@ -300,7 +300,19 @@ public enum NotificationType {
    * A bank holder was deactivated but still holds aUEC (REQ-BANK-060), rendered with {@code holder}
    * and {@code balance}.
    */
-  BANK_HOLDER_DEACTIVATED_WITH_BALANCE;
+  BANK_HOLDER_DEACTIVATED_WITH_BALANCE,
+
+  /**
+   * A member's OFFICER role does not fit their leadership seats (REQ-ORG-029), rendered with {@code
+   * member}, {@code unit}, the {@code seat} and {@code rank} words and the {@code mismatch} word.
+   */
+  ORG_LEADERSHIP_ROLE_MISMATCH,
+
+  /**
+   * A member of the recipient's unit left the organisation (REQ-ORG-030), rendered with {@code
+   * member}, {@code unit}, the {@code reason} word and the {@code vacancy} word.
+   */
+  ORG_MEMBER_DEPARTED;
 
   /**
    * Whether a member may mute this type (REQ-NOTIF-027). The account-deletion types serve a legal
@@ -357,7 +369,9 @@ public enum NotificationType {
           BANK_PAYOUT_RECEIVED,
           BANK_HOLDER_TRANSFER_RECEIVED,
           BANK_ACCOUNT_DEBITED,
-          BANK_HOLDER_DEACTIVATED_WITH_BALANCE ->
+          BANK_HOLDER_DEACTIVATED_WITH_BALANCE,
+          ORG_LEADERSHIP_ROLE_MISMATCH,
+          ORG_MEMBER_DEPARTED ->
           true;
     };
   }

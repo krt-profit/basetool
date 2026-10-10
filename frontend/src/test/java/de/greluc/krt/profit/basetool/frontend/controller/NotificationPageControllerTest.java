@@ -272,6 +272,14 @@ class NotificationPageControllerTest {
   }
 
   @Test
+  void targetOf_organisationNoticesHaveNoPageToLink() {
+    UUID id = UUID.randomUUID();
+    assertNull(NotificationPageController.targetOf("ORG_MEMBER_DEPARTED", "ORG_UNIT_MEMBER", id));
+    assertNull(
+        NotificationPageController.targetOf("ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_UNIT_MEMBER", id));
+  }
+
+  @Test
   void targetOf_jobOrderLinksTheOrder() {
     UUID orderId = UUID.fromString("00000000-0000-0000-0000-000000000099");
 

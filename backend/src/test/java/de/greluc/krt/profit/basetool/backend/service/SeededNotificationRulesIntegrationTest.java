@@ -203,6 +203,16 @@ class SeededNotificationRulesIntegrationTest {
             true,
             SelectorKind.ROLE),
         rule(
+            NotificationEventType.ORG_LEADERSHIP_ROLE_MISMATCH,
+            NotificationType.ORG_LEADERSHIP_ROLE_MISMATCH,
+            false,
+            SelectorKind.ROLE),
+        rule(
+            NotificationEventType.ORG_MEMBER_DEPARTED,
+            NotificationType.ORG_MEMBER_DEPARTED,
+            true,
+            SelectorKind.ORG_RELATIVE_ROLE),
+        rule(
             NotificationEventType.OPERATION_COMPLETED_UNOWNED,
             NotificationType.OPERATION_COMPLETED,
             true,

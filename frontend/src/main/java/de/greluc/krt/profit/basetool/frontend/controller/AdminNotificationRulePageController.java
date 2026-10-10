@@ -121,7 +121,10 @@ public class AdminNotificationRulePageController {
           "BANK_HOLDER_TRANSFER_BOOKED",
           "BANK_ACCOUNT_DEBITED",
           "BANK_HOLDER_DEACTIVATED_WITH_BALANCE",
-          "BANK_HOLDER_NOTICE_CLEARED");
+          "BANK_HOLDER_NOTICE_CLEARED",
+          "ORG_LEADERSHIP_ROLE_MISMATCH",
+          "ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED",
+          "ORG_MEMBER_DEPARTED");
 
   /**
    * {@code NotificationType} codes, labelled via {@code admin.notificationRules.notificationType}.
@@ -173,7 +176,9 @@ public class AdminNotificationRulePageController {
           "BANK_PAYOUT_RECEIVED",
           "BANK_HOLDER_TRANSFER_RECEIVED",
           "BANK_ACCOUNT_DEBITED",
-          "BANK_HOLDER_DEACTIVATED_WITH_BALANCE");
+          "BANK_HOLDER_DEACTIVATED_WITH_BALANCE",
+          "ORG_LEADERSHIP_ROLE_MISMATCH",
+          "ORG_MEMBER_DEPARTED");
 
   /**
    * {@code SelectorKind} codes, labelled via {@code admin.notificationRules.selector.kind}. All but
