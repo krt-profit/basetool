@@ -22,8 +22,11 @@ package de.greluc.krt.profit.basetool.frontend.kernel.web;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.observability.LoggingProperties;
+import de.greluc.krt.profit.basetool.testsupport.logging.CorrelationIdParity;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.FilterChain;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
@@ -168,5 +171,27 @@ class CorrelationIdFilterTest {
 
     assertThat(seen).containsOnlyNulls();
     assertThat(res.getHeader("X-Correlation-Id")).isNull();
+  }
+
+  /**
+   * Every inbound header of the shared case list comes back as an id that holds the contract all
+   * three correlation filters share (PSA-03).
+   *
+   * @throws Exception if the filter fails
+   */
+  @Test
+  void echoedIdsHoldTheContractTheThreeFiltersShare() throws Exception {
+    List<String> violations = new ArrayList<>();
+    for (String inbound : CorrelationIdParity.inboundCases()) {
+      MockHttpServletRequest request = new MockHttpServletRequest("GET", "/missions");
+      if (inbound != null) {
+        request.addHeader(props.correlationIdHeader(), inbound);
+      }
+      MockHttpServletResponse response = new MockHttpServletResponse();
+      filter.doFilter(request, response, (_, _) -> {});
+      violations.addAll(
+          CorrelationIdParity.violations(inbound, response.getHeader(props.correlationIdHeader())));
+    }
+    assertThat(violations).isEmpty();
   }
 }

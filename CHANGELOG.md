@@ -194,6 +194,10 @@
 
 ### Changed
 
+- **UEX und SC Wiki werden nur über externe Adressen angesprochen.** Der Abruf lehnt Namen ab, die auf
+  interne, Loopback- oder Link-Local-Adressen auflösen, folgt keiner Weiterleitung und läuft höchstens
+  vier (UEX) bzw. zwei (SC Wiki) Aufrufe gleichzeitig. Eine auf einen internen Host zeigende
+  `app.uex`- oder `app.scwiki`-URL funktioniert damit nicht mehr (REQ-SEC-081).
 - **Frontend-Code nach Fachbereichen gepackt (Betrieb).** Controller, DTOs und Formulare liegen in
   `frontend.<bereich>.web` / `.model`, der Kern in `frontend.kernel.*`; die Logger-Kategorien aller
   Frontend-Klassen ändern sich. Nur nach
