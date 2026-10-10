@@ -32,7 +32,9 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -46,6 +48,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -64,6 +67,7 @@ class BankHolderServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private BankHolderMapper bankHolderMapper;
   @Mock private BankAuditService bankAuditService;
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks private BankHolderService bankHolderService;
 
@@ -128,6 +132,46 @@ class BankHolderServiceTest {
 
     verify(bankAuditService)
         .record(eq(BankAuditEventType.HOLDER_DEACTIVATED), any(), any(), any(), eq("carol"));
+  }
+
+  @Test
+  void updateHolder_reactivationClearsTheDeactivatedWithBalanceNotice() {
+    UUID holderId = UUID.randomUUID();
+    BankHolder holder = new BankHolder();
+    holder.setId(holderId);
+    holder.setHandle("carol");
+    holder.setActive(false);
+    holder.setVersion(4L);
+    when(holderRepository.findById(holderId)).thenReturn(Optional.of(holder));
+    when(holderRepository.save(any(BankHolder.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(holderPostingRepository.holderTotal(holderId)).thenReturn(BigDecimal.ZERO);
+
+    bankHolderService.updateHolder(holderId, new UpdateBankHolderRequest(true, 4L));
+
+    ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher).publishEvent(published.capture());
+    NoticeEvent notice = (NoticeEvent) published.getValue();
+    assertEquals(NotificationEventType.BANK_HOLDER_NOTICE_CLEARED, notice.eventType());
+    assertEquals(holderId, notice.entityId());
+  }
+
+  @Test
+  void updateHolder_deactivationAnnouncesNothing() {
+    UUID holderId = UUID.randomUUID();
+    BankHolder holder = new BankHolder();
+    holder.setId(holderId);
+    holder.setHandle("carol");
+    holder.setActive(true);
+    holder.setVersion(4L);
+    when(holderRepository.findById(holderId)).thenReturn(Optional.of(holder));
+    when(holderRepository.save(any(BankHolder.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(holderPostingRepository.holderTotal(holderId)).thenReturn(BigDecimal.TEN);
+
+    bankHolderService.updateHolder(holderId, new UpdateBankHolderRequest(false, 4L));
+
+    verify(eventPublisher, never()).publishEvent(any(Object.class));
   }
 
   @Test

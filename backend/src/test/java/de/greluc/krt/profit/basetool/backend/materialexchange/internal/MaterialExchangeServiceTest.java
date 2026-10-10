@@ -41,6 +41,8 @@ import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
+import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
@@ -50,6 +52,7 @@ import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
@@ -680,6 +683,34 @@ class MaterialExchangeServiceTest {
 
     verify(offerRepository, never()).saveAndFlush(any());
     verify(auditService, never()).record(any(), any(), any(), any(), any());
+    verify(eventPublisher, never()).publishEvent(any(Object.class));
+  }
+
+  /**
+   * Withdrawing an active offer tells the members who registered interest and clears the owner's.
+   */
+  @Test
+  void deactivate_active_tellsTheInterestedMembersItIsWithdrawn() {
+    UUID fan = UUID.randomUUID();
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(offerRepository.findById(offerId)).thenReturn(Optional.of(offer));
+    when(interestRepository.findInterestedUserIdsByOfferId(offerId)).thenReturn(Set.of(fan));
+
+    service.deactivate(offerId);
+
+    ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher).publishEvent(published.capture());
+    NoticeEvent notice = (NoticeEvent) published.getValue();
+    assertThat(notice.eventType())
+        .isEqualTo(NotificationEventType.MATERIAL_EXCHANGE_OFFER_UNAVAILABLE);
+    assertThat(notice.entityId()).isEqualTo(offerId);
+    assertThat(notice.contextRecipientUserIds()).containsExactly(fan);
+    assertThat(notice.actorSub()).isEqualTo(ownerId);
+    assertThat(notice.renderParams())
+        .containsEntry("item", "Agricium")
+        .containsEntry("reasonCode", "WITHDRAWN");
+    assertThat(notice.resolvesNotificationTypes())
+        .containsExactly(NotificationType.MATERIAL_EXCHANGE_INTEREST_REGISTERED);
   }
 
   /**

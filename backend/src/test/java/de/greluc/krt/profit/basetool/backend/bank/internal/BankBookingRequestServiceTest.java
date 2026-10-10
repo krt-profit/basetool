@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
@@ -589,7 +590,8 @@ class BankBookingRequestServiceTest {
     assertThat(event.getValue().resolvesNotificationTypes())
         .containsExactlyInAnyOrder(
             NotificationType.BANK_BOOKING_REQUEST_CREATED,
-            NotificationType.BANK_BOOKING_REQUEST_UPDATED);
+            NotificationType.BANK_BOOKING_REQUEST_UPDATED,
+            NotificationType.BANK_BOOKING_REQUEST_APPROVED);
   }
 
   @Test
@@ -911,7 +913,8 @@ class BankBookingRequestServiceTest {
     assertThat(event.getValue().resolvesNotificationTypes())
         .containsExactlyInAnyOrder(
             NotificationType.BANK_BOOKING_REQUEST_CREATED,
-            NotificationType.BANK_BOOKING_REQUEST_UPDATED);
+            NotificationType.BANK_BOOKING_REQUEST_UPDATED,
+            NotificationType.BANK_BOOKING_REQUEST_APPROVED);
   }
 
   @Test
@@ -1195,7 +1198,8 @@ class BankBookingRequestServiceTest {
     assertThat(event.getValue().resolvesNotificationTypes())
         .containsExactlyInAnyOrder(
             NotificationType.BANK_BOOKING_REQUEST_CREATED,
-            NotificationType.BANK_BOOKING_REQUEST_UPDATED);
+            NotificationType.BANK_BOOKING_REQUEST_UPDATED,
+            NotificationType.BANK_BOOKING_REQUEST_APPROVED);
   }
 
   @Test
@@ -1319,6 +1323,41 @@ class BankBookingRequestServiceTest {
             eq(null),
             eq(requester),
             any());
+    ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher).publishEvent(published.capture());
+    NoticeEvent notice = (NoticeEvent) published.getValue();
+    assertThat(notice.eventType()).isEqualTo(NotificationEventType.BANK_BOOKING_REQUEST_APPROVED);
+    assertThat(notice.entityId()).isEqualTo(requestId);
+    assertThat(notice.contextAccountId()).isEqualTo(accountId);
+    assertThat(notice.contextRecipientUserId()).isEqualTo(requester);
+    assertThat(notice.actorSub()).isEqualTo(approver);
+    assertThat(notice.resolvesNotificationTypes())
+        .containsExactly(NotificationType.BANK_BOOKING_REQUEST_APPROVED);
+  }
+
+  @Test
+  void applyOwnerApprovalWithinTransaction_revoke_clearsTheReadyToConfirmNotices() {
+    UUID requestId = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(
+            requestId,
+            account(UUID.randomUUID()),
+            BankBookingRequestType.DEPOSIT,
+            UUID.randomUUID(),
+            0L);
+    request.setRequiresOwnerApproval(true);
+    request.setOwnerApprovalGranted(true);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
+
+    service.applyOwnerApprovalWithinTransaction(request, false);
+
+    ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher).publishEvent(published.capture());
+    NoticeEvent notice = (NoticeEvent) published.getValue();
+    assertThat(notice.eventType())
+        .isEqualTo(NotificationEventType.BANK_BOOKING_REQUEST_APPROVAL_REVOKED);
+    assertThat(notice.resolvesNotificationTypes())
+        .containsExactly(NotificationType.BANK_BOOKING_REQUEST_APPROVED);
   }
 
   @Test

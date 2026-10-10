@@ -100,6 +100,7 @@ class UserReconciliationServiceTest {
   @Mock private KeycloakService keycloakService;
   @Mock private UserDeletionService userDeletionService;
   @Mock private ObjectProvider<UserRegistrationService> selfProvider;
+  @Mock private OrgUnitSeatNotifier seatNotifier;
 
   private UserRegistrationService userRegistrationService;
   private UserReconciliationService userReconciliationService;
@@ -136,6 +137,7 @@ class UserReconciliationServiceTest {
             userRegistrationService,
             userService,
             partialRoleScopeProperties,
+            List.of(seatNotifier),
             meterRegistry);
     lenient()
         .when(userService.getUserIdFromJwt(any(Jwt.class)))
@@ -719,6 +721,7 @@ class UserReconciliationServiceTest {
           Set.of("KRT Member"),
           roleNames(existing.getRoles()),
           "a complete claim must still be able to remove a role");
+      verify(seatNotifier).onRolesChanged(USER_ID, existing.getRoles());
     }
 
     /**

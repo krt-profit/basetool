@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -44,6 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -60,7 +62,15 @@ class NotificationCreationServiceTest {
   @Mock private RuleEvaluationService ruleEvaluationService;
   @Mock private NotificationRepository notificationRepository;
   @Mock private NotificationParamsCodec notificationParamsCodec;
+  @Mock private NotificationMuteService notificationMuteService;
   @InjectMocks private NotificationCreationService service;
+
+  @BeforeEach
+  void muteNobody() {
+    lenient()
+        .when(notificationMuteService.withoutMuted(any()))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+  }
 
   private static JobOrderCreatedEvent event() {
     return new JobOrderCreatedEvent(
@@ -132,7 +142,7 @@ class NotificationCreationServiceTest {
     BankBookingRequestConfirmedEvent event =
         new BankBookingRequestConfirmedEvent(
             requestId, UUID.randomUUID(), "KB-0001", new BigDecimal("500"), requester, staffA);
-    Set<NotificationType> superseded = BankBookingRequestEvent.OPEN_REQUEST_NOTICES;
+    Set<NotificationType> superseded = BankBookingRequestEvent.DECIDED_REQUEST_NOTICES;
     when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
             superseded, "BANK_BOOKING_REQUEST", requestId))
         .thenReturn(List.of(staffA, staffB));
@@ -165,7 +175,7 @@ class NotificationCreationServiceTest {
     UUID staff = UUID.fromString("00000000-0000-0000-0000-0000000000e1");
     BankBookingRequestCancelledEvent event =
         new BankBookingRequestCancelledEvent(requestId, UUID.randomUUID(), UUID.randomUUID());
-    Set<NotificationType> superseded = BankBookingRequestEvent.OPEN_REQUEST_NOTICES;
+    Set<NotificationType> superseded = BankBookingRequestEvent.DECIDED_REQUEST_NOTICES;
     when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
             superseded, "BANK_BOOKING_REQUEST", requestId))
         .thenReturn(List.of(staff));
@@ -186,7 +196,7 @@ class NotificationCreationServiceTest {
     BankBookingRequestCancelledEvent event =
         new BankBookingRequestCancelledEvent(requestId, UUID.randomUUID(), UUID.randomUUID());
     when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
-            eq(BankBookingRequestEvent.OPEN_REQUEST_NOTICES),
+            eq(BankBookingRequestEvent.DECIDED_REQUEST_NOTICES),
             eq("BANK_BOOKING_REQUEST"),
             eq(requestId)))
         .thenReturn(List.of());

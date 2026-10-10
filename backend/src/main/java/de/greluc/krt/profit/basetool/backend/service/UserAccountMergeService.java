@@ -118,6 +118,7 @@ public class UserAccountMergeService {
           OwnedRows.of("bank_holder", "user_id"),
           OwnedRows.of("notification", "recipient_user_id"),
           OwnedRows.of("notification_rule_selector", "user_id"),
+          OwnedRows.deduped("notification_mute", "user_id", "notification_type"),
           OwnedRows.deduped("member_evaluation", "user_id", "category_id"),
           OwnedRows.deduped(
               "exchange_installation", "user_id", "exchange_client_id", "key_thumbprint"),

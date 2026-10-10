@@ -19,21 +19,26 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationPreferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -102,5 +107,64 @@ class ProfileControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("profile"))
         .andExpect(model().attributeDoesNotExist("monthsInSquadron"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void profile_ShouldRenderTheNotificationCardWithMutedAndLockedTypes() throws Exception {
+    when(backendApiClient.get("/api/v1/users/me", UserDto.class)).thenReturn(me(null));
+    when(backendApiClient.get(
+            eq("/api/v1/notifications/preferences"), any(ParameterizedTypeReference.class)))
+        .thenReturn(
+            List.of(
+                new NotificationPreferenceDto("JOB_ORDER_CREATED", true, false),
+                new NotificationPreferenceDto("BANK_BOOKING_REQUEST_CREATED", true, true),
+                new NotificationPreferenceDto("ACCOUNT_DELETION_REQUESTED", false, false)));
+
+    String html =
+        mockMvc
+            .perform(get("/profile").with(oidcLogin()))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    org.assertj.core.api.Assertions.assertThat(html)
+        .contains("id=\"profile-notifications-card\"")
+        .contains("data-testid=\"profile-notifications-group-orders\"")
+        .contains("data-testid=\"profile-notifications-group-bank\"")
+        .contains("data-testid=\"profile-notifications-group-account\"")
+        .doesNotContain("profile-notifications-unavailable")
+        .doesNotContain("??profile.notifications");
+    org.assertj.core.api.Assertions.assertThat(checkboxOf(html, "JOB_ORDER_CREATED"))
+        .contains("checked")
+        .doesNotContain("disabled");
+    org.assertj.core.api.Assertions.assertThat(checkboxOf(html, "BANK_BOOKING_REQUEST_CREATED"))
+        .doesNotContain("checked")
+        .doesNotContain("disabled");
+    org.assertj.core.api.Assertions.assertThat(checkboxOf(html, "ACCOUNT_DELETION_REQUESTED"))
+        .contains("checked")
+        .contains("disabled");
+  }
+
+  @Test
+  void profile_ShouldFlagTheNotificationCardUnavailableWhenThePreferencesCannotBeRead()
+      throws Exception {
+    when(backendApiClient.get("/api/v1/users/me", UserDto.class)).thenReturn(me(null));
+
+    mockMvc
+        .perform(get("/profile").with(oidcLogin()))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("notificationPrefsUnavailable", true))
+        .andExpect(
+            content()
+                .string(org.hamcrest.Matchers.containsString("profile-notifications-unavailable")));
+  }
+
+  private static String checkboxOf(String html, String type) {
+    int at = html.indexOf("data-notification-type=\"" + type + "\"");
+    org.assertj.core.api.Assertions.assertThat(at).as("checkbox of %s", type).isPositive();
+    int start = html.lastIndexOf("<input", at);
+    return html.substring(start, html.indexOf('>', at));
   }
 }

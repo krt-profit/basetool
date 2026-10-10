@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankNotices;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
@@ -34,6 +35,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -56,6 +58,7 @@ public class BankHolderService {
   private final UserRepository userRepository;
   private final BankHolderMapper bankHolderMapper;
   private final BankAuditService bankAuditService;
+  private final ApplicationEventPublisher eventPublisher;
 
   /**
    * Lists all holders with their global custody totals from one grouped query (ADR-0039), sorted
@@ -263,6 +266,9 @@ public class BankHolderService {
           null,
           saved.getUser() != null ? saved.getUser().getId() : null,
           saved.getHandle());
+      if (saved.isActive()) {
+        eventPublisher.publishEvent(BankNotices.holderNoticeCleared(saved.getId()));
+      }
     }
     BigDecimal total = holderPostingRepository.holderTotal(holderId);
     return bankHolderMapper.toDto(saved, total);

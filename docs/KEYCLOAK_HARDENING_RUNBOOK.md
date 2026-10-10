@@ -36,7 +36,7 @@ value (§ 0.5) before acting on an "open" row.**
 |-------|-----------------------------------------------|--------------------------------|------------------------------------------------------------------------------------------------------------------------------------|
 | 3     | `Require SSL` → `external`                    | **Done**                       | `sslRequired: "external"`                                                                                                        |
 | 1     | `Edit username` off                           | **Done**                       | `editUsernameAllowed: false`                                                                                                     |
-| 2     | `Forgot password` — decide on Keycloak's SMTP | **Open**                       | `resetPasswordAllowed: true`; no record that the Email tab's *Test connection* was run                                           |
+| 2     | `Forgot password` — decide on Keycloak's SMTP | **Open** — scripted 2026-10-10, [owner step 5](OWNER_STEPS_2026-10.md#5-keycloak-step-2-forgot-password-and-the-realms-sender) | `resetPasswordAllowed: true`; no record that the Email tab's *Test connection* was run                                           |
 | 4     | Events on, 30 d                               | **Done** — verified 2026-09-16 | both event switches on, `eventsExpiration` and the `adminEventsExpiration` attribute `2592000`, details off                      |
 | 5     | Clear service-account redirect/origin lists   | **Done**                       | `backend-service`, `basetool-ingest-gateway`: `redirectUris: []`, `webOrigins: []`                                               |
 | 6     | `basetool-frontend` PKCE `S256`               | **Done**                       | `pkce.code.challenge.method: S256`                                                                                               |
@@ -44,8 +44,8 @@ value (§ 0.5) before acting on an "open" row.**
 | 8     | Extractor `fullScopeAllowed: false`           | **Done**                       | `basetool-sc-extractor`: `fullScopeAllowed: false`                                                                               |
 | 9     | Audience scopes off defaults and `grafana`    | **Done**                       | neither scope in `defaultDefaultClientScopes`; `grafana` carries neither; `basetool-ingest-gateway` keeps both                   |
 | 10    | `offline_access` off `default-roles-iri`      | **Reversed 2026-09-28** (owner decision, ADR-0202 amendment 5) | done by 2026-09-09; the composite is back since the owner's hand fix of 2026-09-28, and the provisioner keeps it — do **not** re-run this step |
-| 12    | Decide the session windows                    | **Open**                       | still 30 d / 180 d, with and without remember-me                                                                                 |
-| 11    | OTP for `Admin`, browser **and** Discord      | **Open** — not started         | `browserFlow: "browser"` (the built-in flow); the `discord` IdP has no `postBrokerLoginFlowAlias`                                 |
+| 12    | Decide the session windows                    | **Open** — scripted 2026-10-10, [owner step 6](OWNER_STEPS_2026-10.md#6-keycloak-step-12-session-windows) | still 30 d / 180 d, with and without remember-me                                                                                 |
+| 11    | OTP for `Admin`, browser **and** Discord      | **Open** — scripted 2026-10-10, [owner step 7](OWNER_STEPS_2026-10.md#7-keycloak-step-11-otp-for-admins--last) | `browserFlow: "browser"` (the built-in flow); the `discord` IdP has no `postBrokerLoginFlowAlias`                                 |
 | 13th  | Extractor's unused authorization-code flow    | **Decided 2026-09-22 — off**; pending production apply | `standardFlowEnabled: true`, loopback redirect wildcards, no PKCE (see step 6); the provisioner's target is flow off, no redirect URI |
 | After | Delete `basetool-provisioner`, re-export      | **Open**                       | the client is in the export (taken mid-procedure); it stays until step 11 is done                                                |
 
@@ -420,6 +420,13 @@ send the reset mail at all.
 **CLI:** `… update realms/iri -s resetPasswordAllowed=false` (or `true`).
 
 **Verify:** `… get realms/iri --fields resetPasswordAllowed`.
+
+> **Scripted since 2026-10-10:** `scripts/harden-keycloak-realm.py --step 2` reports the switch and
+> the sender (the password is never printed) and changes the switch with `--reset-password on|off`;
+> the *Test connection* stays a console action, because Keycloak mails the admin who clicks it.
+> Proven against a throwaway Keycloak: a reset mail with an action token reaches the realm's sender.
+> The procedure with expected output and rollback is
+> [`OWNER_STEPS_2026-10.md` § 5](OWNER_STEPS_2026-10.md#5-keycloak-step-2-forgot-password-and-the-realms-sender).
 
 ---
 
@@ -921,6 +928,13 @@ two *Remember me* variants).
 
 **Rollback:** the four numbers above.
 
+> **Scripted since 2026-10-10:** the numbers live in `scripts/keycloak/session-windows.json`
+> (profile `active` is what the realm has; `proposal` keeps the 30 d idle window and shortens the
+> maximum to 90 d). The realm provisioner reads the same file, so it never puts the old numbers
+> back. `harden-keycloak-realm.py --step 12` applies it and lists the client overrides above it.
+> **The owner picks the numbers**; the procedure is
+> [`OWNER_STEPS_2026-10.md` § 6](OWNER_STEPS_2026-10.md#6-keycloak-step-12-session-windows).
+
 **If it goes wrong:** shortening these logs members out sooner than they expect, which is a support
 question and not an outage. The Android app refreshes against the same windows — a max lifespan
 below the app's usage gap means a member reopening the app after that long must sign in again.
@@ -931,6 +945,28 @@ below the app's usage gap means a member reopening the app after that long must 
 
 > **Status:** **open, not started** — on 2026-09-09 the realm still bound the built-in `browser`
 > flow and the `discord` provider had no `postBrokerLoginFlowAlias`.
+
+> [!bug] Corrected 2026-10-10 — three things the console recipe below gets wrong
+> Found by building the flow with `scripts/harden-keycloak-realm.py` and logging in against a
+> real Keycloak 26.8:
+>
+> 1. **An OTP Form that is simply *Required* asks an admin who already has a device twice.** The
+>    built-in browser flow has its own *Browser - Conditional 2FA* step, and a second OTP Form
+>    wants a fresh code (Keycloak accepts a code once). The block belongs *behind* that step, with
+>    a second condition — *Condition - credential*, OTP, *Included* off — so it runs only while no
+>    OTP was presented in this login: the admin without a device.
+> 2. **The required action *Configure OTP* must be registered and enabled.** Without it that
+>    admin is refused with *Cannot login, credential setup required* instead of being asked to set
+>    a device up. A realm created from an import with an explicit `requiredActions` list can lack
+>    it; production's must be read before the step.
+> 3. **The post login flow of 11b is not the browser copy.** A post login flow runs after the
+>    provider; the browser copy would ask a brokered user for a username and password. It is a
+>    small top-level flow of its own (condition *User Role* `Admin`, OTP Form).
+>
+> `scripts/harden-keycloak-realm.py --step 11` builds exactly that, idempotently, and
+> [`OWNER_STEPS_2026-10.md` § 7](OWNER_STEPS_2026-10.md#7-keycloak-step-11-otp-for-admins--last) is
+> the procedure. The console recipe below stays as the manual fallback and the explanation; read
+> its 11a/11b together with the three points above.
 
 Two halves, and the incomplete version looks finished: the browser flow alone is half the gate,
 because an admin who signs in **through Discord** never traverses it. The realm's `discord` provider
@@ -955,8 +991,8 @@ A *Conditional* sub-flow acts as *Required* when all its conditions evaluate tru
 
 ### 11b — the Discord identity provider
 
-**Console:** *Identity providers* → `discord` → **Post login flow** → select the flow from 11a →
-*Save*.
+**Console:** *Identity providers* → `discord` → **Post login flow** → select the small post-broker
+flow described in the note above (**not** the browser copy of 11a) → *Save*.
 
 **Verify — both paths, with a real admin account:**
 1. Sign in with username + password → OTP is demanded.
