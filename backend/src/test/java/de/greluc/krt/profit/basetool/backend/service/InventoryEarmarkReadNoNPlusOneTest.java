@@ -249,7 +249,8 @@ class InventoryEarmarkReadNoNPlusOneTest {
       item.setStolen(false);
       InventoryAllocations.addMission(item, shared.getId(), 1.0);
       InventoryAllocations.addMission(item, mission("Own " + tag + " " + i).getId(), 2.0);
-      InventoryAllocations.addJobOrder(item, jobOrder("earmark-" + tag + "-" + i), 3.0, false);
+      InventoryAllocations.addJobOrder(
+          item, jobOrder("earmark-" + tag + "-" + i).getId(), 3.0, false);
       created.add(inventoryItemRepository.save(item));
     }
     return new Seed(owner, material, location, shared);

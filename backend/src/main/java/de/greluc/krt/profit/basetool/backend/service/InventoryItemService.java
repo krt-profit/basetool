@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
@@ -530,7 +531,7 @@ public class InventoryItemService {
         assertMaterialRequiredByJobOrder(material, order);
       }
       InventoryAllocations.addJobOrder(
-          item, order, InventoryItem.roundToScuScale(allocation.amount()), false);
+          item, order.getId(), InventoryItem.roundToScuScale(allocation.amount()), false);
     }
     Set<UUID> seenMissions = new HashSet<>();
     for (InventoryAllocationInput allocation : missionAllocations) {
@@ -556,7 +557,7 @@ public class InventoryItemService {
         AuditDetails.of("qty", item.getAmount())
             .with("q", item.getQuality())
             .with("personal", item.getPersonal())
-            .with("jobOrder", InventoryAuditLabels.jobOrderRef(item))
+            .with("jobOrder", InventoryAuditLabels.jobOrderRef(item, this::jobOrderDisplayIdOf))
             .with("mission", InventoryAuditLabels.missionName(item, this::missionNameOf)));
     InventoryItem merged =
         inventoryCheckoutService.mergeStockIfRequested(
@@ -674,7 +675,7 @@ public class InventoryItemService {
         assertFits(sumJobOrderAllocated(item, null) + amount, item.getAmount());
         InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
         slice.setInventoryItem(item);
-        slice.setJobOrder(jobOrder);
+        slice.setJobOrderId(jobOrder.getId());
         slice.setAmount(amount);
         item.getJobOrderAllocations().add(slice);
         recordAllocation(
@@ -740,7 +741,7 @@ public class InventoryItemService {
             AuditEventType.INVENTORY_ALLOCATION_CHANGED,
             item,
             dto.field(),
-            "#" + slice.getJobOrder().getDisplayId(),
+            "#" + jobOrderDisplayIdOf(slice.getJobOrderId()),
             amount);
       }
       case MISSION -> {
@@ -787,7 +788,8 @@ public class InventoryItemService {
         if (slice == null) {
           throw new NotFoundException("Job-order allocation not found");
         }
-        String ref = slice.getJobOrder() != null ? "#" + slice.getJobOrder().getDisplayId() : "-";
+        JobOrderEarmark target = earmarkTargets.jobOrder(slice.getJobOrderId());
+        String ref = target != null ? "#" + target.displayId() : "-";
         item.getJobOrderAllocations().remove(slice);
         recordAllocation(AuditEventType.INVENTORY_ALLOCATION_REMOVED, item, dto.field(), ref, null);
       }
@@ -918,10 +920,21 @@ public class InventoryItemService {
    */
   private double sumJobOrderAllocated(@NotNull InventoryItem item, UUID excludeTargetId) {
     return item.getJobOrderAllocations().stream()
-        .filter(a -> a.getJobOrder() != null)
-        .filter(a -> excludeTargetId == null || !excludeTargetId.equals(a.getJobOrder().getId()))
+        .filter(a -> a.getJobOrderId() != null)
+        .filter(a -> excludeTargetId == null || !excludeTargetId.equals(a.getJobOrderId()))
         .mapToDouble(a -> a.getAmount() == null ? 0.0 : a.getAmount())
         .sum();
+  }
+
+  /**
+   * Looks up the running number of a job order the Lager's stock is earmarked to.
+   *
+   * @param jobOrderId the job order
+   * @return its running number, or {@code null} when it is unknown or not assigned
+   */
+  private @Nullable Integer jobOrderDisplayIdOf(UUID jobOrderId) {
+    JobOrderEarmark jobOrder = earmarkTargets.jobOrder(jobOrderId);
+    return jobOrder == null ? null : jobOrder.displayId();
   }
 
   /**
@@ -960,7 +973,7 @@ public class InventoryItemService {
   private InventoryJobOrderAllocation findJobOrderSlice(
       @NotNull InventoryItem item, UUID targetId) {
     return item.getJobOrderAllocations().stream()
-        .filter(a -> a.getJobOrder() != null && targetId.equals(a.getJobOrder().getId()))
+        .filter(a -> targetId.equals(a.getJobOrderId()))
         .findFirst()
         .orElse(null);
   }

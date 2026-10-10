@@ -136,7 +136,7 @@ class InventoryAllocationSoakDataTest {
     item.setAmount(amount);
     item.setPersonal(false);
     item.setOwningOrgUnit(iridium);
-    InventoryAllocations.addJobOrder(item, order, amount, false);
+    InventoryAllocations.addJobOrder(item, order.getId(), amount, false);
     inventoryItemRepository.save(item);
 
     return new Fixture(item.getId(), order.getId(), material.getId());

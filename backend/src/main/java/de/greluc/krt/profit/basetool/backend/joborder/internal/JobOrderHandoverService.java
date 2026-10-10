@@ -269,8 +269,7 @@ public class JobOrderHandoverService {
               inventoryItemRepository.findByIdForUpdate(itemDto.inventoryItemId()),
               "Inventory item not found");
 
-      if (inventoryItem.getJobOrderAllocations().stream()
-          .noneMatch(a -> a.getJobOrder() != null && a.getJobOrder().getId().equals(jobOrderId))) {
+      if (InventoryAllocations.jobOrderSlice(inventoryItem, jobOrderId) == null) {
         throw new BadRequestException(ERROR_ITEM_NOT_LINKED_TO_ORDER);
       }
 

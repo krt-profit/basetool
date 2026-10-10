@@ -90,7 +90,7 @@ class JobOrderHandoverQualityTierTest {
         service,
         "stockCommands",
         new InventoryStockCommands(
-            inventoryItemRepository, null, null, null, auditService, null, offerRatchet, null));
+            inventoryItemRepository, null, null, null, auditService, null, offerRatchet));
     orderId = UUID.randomUUID();
     order = new JobOrder();
     order.setId(orderId);
@@ -123,7 +123,7 @@ class JobOrderHandoverQualityTierTest {
     item.setMaterial(material);
     item.setQuality(quality);
     item.setAmount(amount);
-    InventoryAllocations.addJobOrder(item, order, amount, false);
+    InventoryAllocations.addJobOrder(item, order.getId(), amount, false);
     lenient()
         .when(inventoryItemRepository.findByIdForUpdate(item.getId()))
         .thenReturn(Optional.of(item));

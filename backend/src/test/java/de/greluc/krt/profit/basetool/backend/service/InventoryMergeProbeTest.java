@@ -83,7 +83,7 @@ class InventoryMergeProbeTest {
         null,
         ownerScopeService,
         inventoryAccessPolicy,
-        new InventoryStockCommands(null, null, null, null, null, inventoryAccessPolicy, null, null),
+        new InventoryStockCommands(null, null, null, null, null, inventoryAccessPolicy, null),
         null,
         null,
         null,

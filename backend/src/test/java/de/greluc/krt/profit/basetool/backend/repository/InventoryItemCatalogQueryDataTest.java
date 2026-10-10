@@ -135,8 +135,8 @@ class InventoryItemCatalogQueryDataTest {
                 .handle("item-catalog-" + UUID.randomUUID())
                 .status(JobOrderStatus.OPEN)
                 .build());
-    InventoryAllocations.addJobOrder(materialRow, order, 100.0, false);
-    InventoryAllocations.addJobOrder(itemRow, order, 3.0, false);
+    InventoryAllocations.addJobOrder(materialRow, order.getId(), 100.0, false);
+    InventoryAllocations.addJobOrder(itemRow, order.getId(), 3.0, false);
     inventoryItemRepository.save(materialRow);
     inventoryItemRepository.save(itemRow);
     entityManager.flush();

@@ -44,7 +44,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemStolenMarkDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import jakarta.persistence.EntityManager;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -88,7 +87,6 @@ public class InventoryStockCommands implements StockCommands {
   private final AuditRecorder auditRecorder;
   private final BookInPolicy bookInPolicy;
   private final StockChangeObserver stockChangeObserver;
-  private final EntityManager entityManager;
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
@@ -313,6 +311,12 @@ public class InventoryStockCommands implements StockCommands {
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
+  public void releaseJobOrderEarmark(@NotNull InventoryItem row, @NotNull UUID jobOrderId) {
+    row.getJobOrderAllocations().removeIf(a -> jobOrderId.equals(a.getJobOrderId()));
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
   public void releaseJobOrderMaterialEarmarks(@NotNull UUID jobOrderId, @NotNull UUID materialId) {
     inventoryRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(jobOrderId, materialId);
   }
@@ -343,7 +347,7 @@ public class InventoryStockCommands implements StockCommands {
     stockRow.setAmount((double) amount);
     stockRow.setPersonal(personal);
     if (earmark) {
-      InventoryAllocations.addJobOrder(stockRow, entityManager, orderId, (double) amount, false);
+      InventoryAllocations.addJobOrder(stockRow, orderId, (double) amount, false);
     }
     InventoryItem saved = inventoryRepository.save(stockRow);
     InventoryItem merged = checkoutService.mergeStockIfRequested(saved, false);
@@ -383,7 +387,7 @@ public class InventoryStockCommands implements StockCommands {
     item.setNote(note);
     item.setPersonal(personal);
     if (jobOrderId != null) {
-      InventoryAllocations.addJobOrder(item, entityManager, jobOrderId, item.getAmount(), false);
+      InventoryAllocations.addJobOrder(item, jobOrderId, item.getAmount(), false);
     }
     if (!personal && missionId != null) {
       InventoryAllocations.addMission(item, missionId, item.getAmount());

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.mapper;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
@@ -88,10 +89,19 @@ public abstract class InventoryItemMapper {
    * @param allocation the job-order slice; {@code null} returns {@code null}.
    * @return the populated slice DTO.
    */
-  @Mapping(source = "jobOrder.id", target = "jobOrderId")
-  @Mapping(source = "jobOrder.displayId", target = "jobOrderDisplayId")
-  public abstract JobOrderAllocationDto jobOrderAllocationToDto(
-      InventoryJobOrderAllocation allocation);
+  public JobOrderAllocationDto jobOrderAllocationToDto(InventoryJobOrderAllocation allocation) {
+    if (allocation == null) {
+      return null;
+    }
+    JobOrderEarmark jobOrder =
+        allocation.getJobOrderId() == null
+            ? null
+            : earmarkTargets.jobOrder(allocation.getJobOrderId());
+    return new JobOrderAllocationDto(
+        allocation.getJobOrderId(),
+        jobOrder == null ? null : jobOrder.displayId(),
+        allocation.getAmount());
+  }
 
   /**
    * Maps one mission slice to its outbound chip DTO, flattening the earmarked mission to its id,

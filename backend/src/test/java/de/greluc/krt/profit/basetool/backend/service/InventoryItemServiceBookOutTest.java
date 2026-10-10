@@ -1228,7 +1228,7 @@ class InventoryItemServiceBookOutTest {
       JobOrder order = new JobOrder();
       order.setId(UUID.randomUUID());
       InventoryItem item = newItem(10.0, 1L);
-      InventoryAllocations.addJobOrder(item, order, 6.0, false);
+      InventoryAllocations.addJobOrder(item, order.getId(), 6.0, false);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
 
@@ -1257,7 +1257,7 @@ class InventoryItemServiceBookOutTest {
       JobOrder order = new JobOrder();
       order.setId(UUID.randomUUID());
       InventoryItem item = newItem(10.0, 1L);
-      InventoryAllocations.addJobOrder(item, order, 8.0, false);
+      InventoryAllocations.addJobOrder(item, order.getId(), 8.0, false);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
       InventoryItemBookOutDto dto =
@@ -1280,7 +1280,7 @@ class InventoryItemServiceBookOutTest {
       mission.setId(UUID.randomUUID());
 
       InventoryItem item = newItem(10.0, 1L);
-      InventoryAllocations.addJobOrder(item, order, 6.0, true);
+      InventoryAllocations.addJobOrder(item, order.getId(), 6.0, true);
       InventoryAllocations.addMission(item, mission.getId(), 4.0);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(userRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
@@ -1503,7 +1503,7 @@ class InventoryItemServiceBookOutTest {
       JobOrder order = new JobOrder();
       order.setId(UUID.randomUUID());
       InventoryItem item = newGameItemRow(4.0, 1L);
-      InventoryAllocations.addJobOrder(item, order, 4.0, true);
+      InventoryAllocations.addJobOrder(item, order.getId(), 4.0, true);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(userRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
       when(inventoryItemRepository.save(any(InventoryItem.class)))

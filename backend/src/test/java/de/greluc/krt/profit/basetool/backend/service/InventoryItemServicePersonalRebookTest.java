@@ -361,7 +361,7 @@ class InventoryItemServicePersonalRebookTest {
       InventoryItem item = newItem(10.0, 1L, false);
       JobOrder jobOrder = new JobOrder();
       jobOrder.setId(UUID.randomUUID());
-      InventoryAllocations.addJobOrder(item, jobOrder, item.getAmount(), false);
+      InventoryAllocations.addJobOrder(item, jobOrder.getId(), item.getAmount(), false);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
       BadRequestException ex =

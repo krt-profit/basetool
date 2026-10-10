@@ -1210,6 +1210,19 @@ as each pair is decoupled.
     the change, keeps six Lager reads at the same statement count for 25 rows as for 3 (proven
     able to fail: without the context scan the by-material read rises from 9 to 31 statements).
     Baseline **75 → 67** (`inventory -> mission` is gone).
+  - **5d-3 — done 2026-10-10.** `InventoryJobOrderAllocation.jobOrder` becomes `jobOrderId` (same
+    column and foreign key). The order's running number comes through
+    `EarmarkTargets.JobOrders` (`JobOrderEarmarkTargets`, one projection query) and the same
+    per-transaction memo, which now scans the context for both earmark kinds; the mapper's
+    `JobOrderAllocationDto`, the delivered toggle's and the check-in's audit labels are
+    byte-identical. The job order no longer reaches into a row's earmark collections: the handover
+    asks `InventoryAllocations.jobOrderSlice`, and unlinking a row goes through
+    `StockCommands.releaseJobOrderEarmark`. `StockWriteOwnershipTest` now also refuses a reach into
+    the earmark collections outside the Lager, proven on a planted drain.
+    `InventoryEarmarkReadNoNPlusOneTest` stays green (proven able to fail: without the context
+    scan the by-material read rises from 8 to 30 statements). Baseline **67 → 61**; the remaining
+    `inventory -> joborder` edges are the requirement checks of the allocation and the order-facing
+    stock reads (`JobOrderItemStockGroupDto`, the stock row projections), which move with 5e.
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |

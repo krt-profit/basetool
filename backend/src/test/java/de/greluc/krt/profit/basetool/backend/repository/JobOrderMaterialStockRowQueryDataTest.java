@@ -179,7 +179,7 @@ class JobOrderMaterialStockRowQueryDataTest {
     inv.setAmount(amount);
     inv.setPersonal(false);
     inv.setOwningOrgUnit(owner);
-    InventoryAllocations.addJobOrder(inv, order, amount, false);
+    InventoryAllocations.addJobOrder(inv, order.getId(), amount, false);
     return inventoryItemRepository.save(inv);
   }
 }

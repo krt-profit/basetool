@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -135,7 +134,7 @@ class InventoryItemServiceAllocationTest {
   private void addJobOrderSlice(InventoryItem item, JobOrder order, double amount) {
     InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
     slice.setInventoryItem(item);
-    slice.setJobOrder(order);
+    slice.setJobOrderId(order.getId());
     slice.setAmount(amount);
     item.getJobOrderAllocations().add(slice);
   }
@@ -169,7 +168,7 @@ class InventoryItemServiceAllocationTest {
     assertEquals(2L, result.version());
     assertEquals(1, item.getJobOrderAllocations().size());
     assertEquals(4.0, item.getJobOrderAllocations().get(0).getAmount(), 1e-9);
-    assertSame(order, item.getJobOrderAllocations().get(0).getJobOrder());
+    assertEquals(order.getId(), item.getJobOrderAllocations().get(0).getJobOrderId());
     verify(auditService)
         .record(
             eq(AuditEventType.INVENTORY_ALLOCATION_ADDED),
@@ -392,7 +391,7 @@ class InventoryItemServiceAllocationTest {
         false);
 
     assertEquals(1, item.getJobOrderAllocations().size());
-    assertSame(order, item.getJobOrderAllocations().get(0).getJobOrder());
+    assertEquals(order.getId(), item.getJobOrderAllocations().get(0).getJobOrderId());
     verify(jobOrderItemService, never()).requiredMaterialIds(any(JobOrder.class));
   }
 

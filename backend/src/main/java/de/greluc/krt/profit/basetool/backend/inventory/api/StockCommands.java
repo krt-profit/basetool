@@ -169,6 +169,14 @@ public interface StockCommands {
   void releaseJobOrderEarmarks(@NotNull UUID jobOrderId);
 
   /**
+   * Releases a job order's earmark on one row.
+   *
+   * @param row the row
+   * @param jobOrderId the order
+   */
+  void releaseJobOrderEarmark(@NotNull InventoryItem row, @NotNull UUID jobOrderId);
+
+  /**
    * Releases a job order's earmarks on the rows of one material.
    *
    * @param jobOrderId the order
