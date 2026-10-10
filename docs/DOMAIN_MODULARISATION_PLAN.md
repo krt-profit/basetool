@@ -1092,6 +1092,45 @@ as each pair is decoupled.
   writes a job order; the exchange only reads the demand. (3) The earmark caller rule of the risk
   table (the ungated order-linked stock query callable only from joborder) is P3-5's: that query
   is the Lager's and still has no module to be guarded from.
+- `mission` — **done 2026-10-10.**
+  1. *Characterise*: `MissionModuleContractTest` pins that create, step add, core patch, join and
+     delete each record their audit event in the command's transaction; that a member of another
+     org unit is refused on every per-mission read entry point of an internal mission (detail, the
+     three finance reads, join); and that a mission manager of another org unit is refused on the
+     write entry points of a public mission while still reading it.
+  2. *Access policy out of the scope hub* (§5.4, ADR-0236): `MissionAccessPolicy` (bean
+     `missionAccessPolicy`) holds `canSeeMission` (the parent-chain walk, the public escape, the
+     ownerless rule) and `canEditMission`, on the kernel's `canSeeSquadron`/`canEditSquadron` and
+     `isMemberOrAbove`. `MissionSecurityService` keeps the finer write gates (manage, owner change,
+     participant access, finance entries) and asks the policy for the edit scope. The seven read
+     gates, the live-sync room and those five checks switched; the authorization matrix changed
+     on exactly seven lines. The differential verdict test compared the policy, the live scope hub
+     and a restatement over 18 callers × 25 missions × 2 gates = 900 verdicts before the old
+     methods went (proven able to fail by stopping the parent walk at the mission itself) and
+     keeps comparing against the restatement. Baseline **87 → 85** (`scope -> mission` is gone).
+  3. *Inversions* (write families 8 and 9): `hangar.api.ShipDeletionObserver`, implemented by
+     `MissionUnitShipRelease` (the unit drops the ship and records `MISSION_UNIT_UPDATED`, as
+     before), and `catalogue.api.JobTypeDesignationObserver`, implemented by
+     `MissionLeadDesignationRelease` (the participants' lead flags are cleared with the same
+     query). `hangar` becomes a declared module with only its `api` package. Baseline **85 → 81**.
+  4. *Move*: the two controllers into `mission.web`; the mission, structure, participant,
+     timeline and finance services, the security service, the policy, the viewer-access service,
+     the participant-target resolver, the live-sync authorizer, the crew, frequency, objective,
+     step and unit repositories and the 30 request DTOs into `mission.internal`.
+  **Corrections:** (1) `Mission` and its children, `MissionRepository` with its authorization
+  fragment, the participant, finance-entry and ownership repositories, the finance aggregates,
+  `MissionMapper` and the response DTOs stay in the layer packages: the Lager (earmarks and the
+  sale entries, write family 7), the refinery, the operation's finance and payout services and the
+  GDPR services use them. They follow with P3-5 (`StockSoldForTarget`, the earmark id) and P3-8
+  (the `Mission.operation`, `Mission.refineryOrders` and `MissionUnit.ship` associations, the
+  `MissionFinanceContributor` and `OperationSummaryProvider` SPIs). (2) The mapper's viewer-access
+  seam `MissionViewerAccess` moves from `mission.internal` to `mapper`, beside `MissionMapper`,
+  because a `mapper -> mission` edge would close a package cycle with the moved services. (3) No
+  new command API: no other module writes a mission beyond `detachFromOperation`. (4) Peer
+  redaction (BE-SIMP-05) already lived in `mission.internal.MissionPeerRedactor`; the section
+  counters are kept verbatim (`@DynamicUpdate`, no ADR needed). (5) `TenancyGuardRules` counts a
+  caller of an `@ObserverSpi` whose implementation writes tenant data as a writer, so moving a
+  write behind an observer does not shrink what the guard checks.
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
@@ -1242,7 +1281,7 @@ features only, no preview flags) stands; every proposal below uses final feature
 | **Do not adopt** Markdown documentation comments (`///`, JEP 467): Checkstyle 14.3.0 does not treat them as Javadoc; gatherers: no loop here is clearer as one | — | — | — | — |
 | **ADR-0223 corrections** — **done 2026-10-10** (the corrections were recorded in the ADR on 2026-10-02; the missing gate is `scripts/check-final-java-only.py`, REQ-OPS-043): JDK 26 does add a final library feature (JEP 517, HTTP/3 for the HTTP client); JEP 510 (KDF) is final in 25; Checkstyle already enforces the module-import and compact-source bans in `main` (not in `test`/`e2e`); there are 42 `super(…)` calls, not 34; a `--enable-preview` gate is still missing | The decision record stays authoritative | — | Review | S |
 
-**Nullness** — **started 2026-10-10** (ADR-0237 *Implementation*: the backend's 18 module `api` packages are checked; seven annotations were wrong or missing; the whole `joborder`, `refinery` and `materialexchange` modules followed with the job-order move). Error Prone 2.50.0 with NullAway 0.14.2 runs on JDK 25 and accepts the JetBrains
+**Nullness** — **started 2026-10-10** (ADR-0237 *Implementation*: the backend's 18 module `api` packages are checked; seven annotations were wrong or missing; the whole `joborder`, `refinery` and `materialexchange` modules followed with the job-order move, `mission` with its own). Error Prone 2.50.0 with NullAway 0.14.2 runs on JDK 25 and accepts the JetBrains
 annotations by simple name; Spring Framework builds itself with the same pair. Starting with the new
 module API packages, it would turn the annotations into a checked contract and close arc42 §11.4
 ("derived nullity annotations have no gate"). Cost: a compile-time dependency, about ten javac
