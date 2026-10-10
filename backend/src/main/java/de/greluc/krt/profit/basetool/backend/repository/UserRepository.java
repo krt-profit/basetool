@@ -499,4 +499,17 @@ public interface UserRepository
   @Modifying
   @Query("UPDATE User u SET u.approvedById = null WHERE u.approvedById = :adminId")
   void clearApprovedBy(@Param("adminId") @NotNull UUID adminId);
+
+  /**
+   * Whether a member holds at least one of the given roles.
+   *
+   * @param userId the member
+   * @param roleCodes the stable role codes to look for
+   * @return {@code true} when the member holds any of them
+   */
+  @Query(
+      "SELECT COUNT(u) > 0 FROM User u JOIN u.roles r WHERE u.id = :userId AND r.code IN"
+          + " :roleCodes")
+  boolean hasAnyRoleCode(
+      @Param("userId") UUID userId, @Param("roleCodes") java.util.Collection<String> roleCodes);
 }

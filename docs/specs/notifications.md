@@ -97,6 +97,9 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `BANK_ACCOUNT_DEBITED` | `BANK_ACCOUNT_DEBITED` | V278 | `ACCOUNT_RESPONSIBLE`; coded `debitCode` | REQ-BANK-059 |
 | `BANK_HOLDER_DEACTIVATED_WITH_BALANCE` | `BANK_HOLDER_DEACTIVATED_WITH_BALANCE` | V278 | `ROLE` `BANK_MANAGEMENT`; replaces itself | REQ-BANK-060 |
 | `BANK_HOLDER_NOTICE_CLEARED` | none (no rule) | — | supersedes the holder's deactivated-with-balance notice | REQ-BANK-060 |
+| `ORG_LEADERSHIP_ROLE_MISMATCH` | `ORG_LEADERSHIP_ROLE_MISMATCH` | V279 | `ROLE` `ADMIN`; coded `seatCode`, `rankCode`, `mismatchCode`; replaces itself | REQ-ORG-029 |
+| `ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED` | none (no rule) | — | supersedes the member's mismatch notice | REQ-ORG-029 |
+| `ORG_MEMBER_DEPARTED` | `ORG_MEMBER_DEPARTED` | V279 | `ORG_RELATIVE_ROLE` `UNIT_LEADERSHIP` on `RESPONSIBLE` (each unit of the member, the parent Bereich of a vacated seat); coded `reasonCode`, `vacancyCode` | REQ-ORG-030 |
 
 Every notification type renders through `notifications.type.<TYPE>` in all three frontend bundles.
 The e-mail consumers of REQ-NOTIF-013 (`UserApprovalMailService`, `PendingRegistrationMailService`)
