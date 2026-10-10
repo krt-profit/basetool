@@ -58,8 +58,10 @@ public interface JobOrderItemHandoverRepository extends JpaRepository<JobOrderIt
    */
   @Modifying
   @Query(
-      "UPDATE JobOrderItemHandover h SET h.recipientHandle = :sentinel"
-          + " WHERE lower(h.recipientHandle) = lower(:handle)"
-          + " AND h.recipientHandle <> :sentinel")
+      """
+      UPDATE JobOrderItemHandover h SET h.recipientHandle = :sentinel
+      WHERE lower(h.recipientHandle) = lower(:handle)
+      AND h.recipientHandle <> :sentinel
+      """)
   int anonymiseRecipientHandle(@Param("handle") String handle, @Param("sentinel") String sentinel);
 }
