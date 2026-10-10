@@ -34,6 +34,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
 import de.greluc.krt.profit.basetool.backend.model.City;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Location;
@@ -101,6 +102,7 @@ class RefineryOrderServiceTest {
   @Mock private JobOrderItemService jobOrderItemService;
   @Mock private RefineryYieldRepository refineryYieldRepository;
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private BookInPolicy bookInPolicy;
 
   @Mock private AuditService auditService;
   @InjectMocks private RefineryOrderService refineryOrderService;
@@ -306,7 +308,7 @@ class RefineryOrderServiceTest {
       when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(location));
       when(userRepository.findById(OTHER_USER_ID)).thenReturn(Optional.empty());
 
-      when(ownerScopeService.canManageUserInventory(OTHER_USER_ID)).thenReturn(true);
+      when(bookInPolicy.mayBookInFor(OTHER_USER_ID)).thenReturn(true);
       assertThrows(
           NotFoundException.class,
           () ->
@@ -359,7 +361,7 @@ class RefineryOrderServiceTest {
       stubLookupsForSingleItem();
       when(userRepository.findById(OTHER_USER_ID)).thenReturn(Optional.of(other));
 
-      when(ownerScopeService.canManageUserInventory(OTHER_USER_ID)).thenReturn(true);
+      when(bookInPolicy.mayBookInFor(OTHER_USER_ID)).thenReturn(true);
       refineryOrderService.storeRefineryOrder(
           OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(item(OTHER_USER_ID, null))), true);
 
@@ -393,7 +395,7 @@ class RefineryOrderServiceTest {
     @Test
     void throwsAccessDenied_whenLogisticianNamesAnAssigneeOutsideTheirOrgUnitScope() {
       stubLookupsForSingleItem();
-      when(ownerScopeService.canManageUserInventory(OTHER_USER_ID)).thenReturn(false);
+      when(bookInPolicy.mayBookInFor(OTHER_USER_ID)).thenReturn(false);
 
       assertThrows(
           AccessDeniedException.class,

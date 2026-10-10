@@ -1131,6 +1131,32 @@ as each pair is decoupled.
   counters are kept verbatim (`@DynamicUpdate`, no ADR needed). (5) `TenancyGuardRules` counts a
   caller of an `@ObserverSpi` whose implementation writes tenant data as a writer, so moving a
   write behind an observer does not shrink what the guard checks.
+- `inventory` — in five parts, each its own pull request and releasable on its own (owner
+  decision 2026-10-10): **5a** the contract test and the access policy; **5b**
+  `inventory.api.StockCommands` with the ADR-0229 lot-lock protocol moved in, for the exchange's
+  stock write and undo; **5c** the job-order and refinery Lager writes through `StockCommands`,
+  with the APPSEC-01 book-in check once, before any lookup; **5d** the earmarks
+  (`InventoryJobOrderAllocation.jobOrder`, `InventoryMissionAllocation.mission`) and
+  `MaterialExchangeOffer.inventoryItem` as ids, and `StockSoldForTarget` for the sale entries
+  (write family 7), which also settles P3-13 by inversion instead of a rank swap; **5e** the move,
+  NullAway and the idioms.
+  - **5a — done 2026-10-10.** `InventoryModuleContractTest` pins that create, note update,
+    personal rebook and book-out each record their audit event in the command's transaction, and
+    that a logistician of another org unit is refused on every per-row write entry point (book-out,
+    personal rebook, note, org unit, stolen, delivered, the three allocation verbs), each with a
+    body that passes validation. `InventoryAccessPolicy` (bean `inventoryAccessPolicy`) holds
+    `canSeeInventoryItem` and `canEditInventoryItem` on the kernel's `permitsOwnedRow`, and
+    `canManageUserInventory` on `canActOnTargetUser`; it implements `inventory.api.BookInPolicy`
+    (`mayBookInFor`), which the job-order production and the refinery store ask instead of the
+    scope hub. The nine row-write gates switched (the authorization matrix changed on exactly
+    those nine lines), and so did the Lager row flag of `StockViewerAccessService` and the two
+    on-behalf checks of `InventoryItemService`. The differential verdict test compared the policy,
+    the live scope hub and a restatement over 9 callers × (7 rows × 2 gates + 5 target members)
+    = 171 verdicts before the old methods went (proven able to fail by dropping the owner from the
+    edit gate) and keeps comparing against the restatement. Baseline **81 → 79**
+    (`scope -> inventory` is gone). *Correction:* the read and edit scopes coincide over this
+    matrix, as for the refinery, so swapping the edit gate's scope for the read scope is not
+    caught; the owner escape and the ownerless rule are.
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |

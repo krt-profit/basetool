@@ -33,7 +33,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class StockViewerAccessService implements StockViewerAccess {
 
-  private final AccessGateService accessGateService;
+  private final InventoryAccessPolicy inventoryAccessPolicy;
   private final AuthHelperService authHelperService;
   private final EarmarkTargetPolicy earmarkTargetPolicy;
 
@@ -41,7 +41,7 @@ public class StockViewerAccessService implements StockViewerAccess {
   @Override
   public boolean mayEditInventoryItem(UUID inventoryItemId, UUID ownerId) {
     return inventoryItemId != null
-        && accessGateService.canEditInventoryItem(inventoryItemId)
+        && inventoryAccessPolicy.canEditInventoryItem(inventoryItemId)
         && (isCaller(ownerId) || authHelperService.isLogisticianOrAbove());
   }
 

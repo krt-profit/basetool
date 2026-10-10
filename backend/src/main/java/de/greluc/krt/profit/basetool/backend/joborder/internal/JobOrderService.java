@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderClosedEvent;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderCreatedEvent;
+import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderNotices;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderUpdatedByRequesterEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
@@ -43,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
@@ -53,6 +55,7 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.QualityTierService;
+import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -101,6 +104,8 @@ public class JobOrderService {
   private final JobOrderPriorityService jobOrderPriorityService;
   private final QualityTierService qualityTierService;
   private final OwnerScopeService ownerScopeService;
+
+  private final UserService userService;
 
   /**
    * Persists a new job order in the next free priority slot (1 is highest), taking each material's
@@ -251,6 +256,22 @@ public class JobOrderService {
    *
    * @param jobOrderId the completed, rejected or deleted order
    */
+  private void publishJobOrderFinished(@NotNull JobOrder jobOrder, @NotNull String statusCode) {
+    eventPublisher.publishEvent(finishedNotice(jobOrder, statusCode));
+  }
+
+  private NoticeEvent finishedNotice(@NotNull JobOrder jobOrder, @NotNull String statusCode) {
+    OrgUnit requesting = jobOrder.getRequestingOrgUnit();
+    return JobOrderNotices.finished(
+        jobOrder.getId(),
+        jobOrder.getDisplayId(),
+        jobOrder.getHandle(),
+        requesting == null ? null : new OrgUnitRef(requesting.getId(), requesting.getKind()),
+        requesting == null ? null : requesting.getShorthand(),
+        statusCode,
+        userService.currentActor());
+  }
+
   private void publishJobOrderClosed(@NotNull UUID jobOrderId) {
     eventPublisher.publishEvent(
         new JobOrderClosedEvent(jobOrderId, authHelperService.currentUserId().orElse(null)));
@@ -303,6 +324,7 @@ public class JobOrderService {
     if (isTerminal && !wasTerminal) {
       inventoryItemRepository.deleteJobOrderAllocationsByJobOrder(jobOrder.getId());
       publishJobOrderClosed(jobOrder.getId());
+      publishJobOrderFinished(jobOrder, status.name());
     }
 
     if (status == JobOrderStatus.COMPLETED && previousStatus != JobOrderStatus.COMPLETED) {
@@ -847,6 +869,7 @@ public class JobOrderService {
     final Integer priority = jobOrder.getPriority();
     final UUID deletedId = jobOrder.getId();
     final String deletedLabel = orderLabel(jobOrder);
+    final NoticeEvent deletedNotice = finishedNotice(jobOrder, "DELETED");
     jobOrderRepository.delete(jobOrder);
     jobOrderRepository.flush();
     if (priority != null) {
@@ -859,6 +882,7 @@ public class JobOrderService {
         null,
         AuditDetails.of("priorityWas", priority));
     publishJobOrderClosed(deletedId);
+    eventPublisher.publishEvent(deletedNotice);
   }
 
   /**
@@ -1016,6 +1040,7 @@ public class JobOrderService {
           null,
           "autoCompleted=true");
       publishJobOrderClosed(jobOrder.getId());
+      publishJobOrderFinished(jobOrder, "COMPLETED");
     }
   }
 
@@ -1078,6 +1103,16 @@ public class JobOrderService {
         previous != null ? previous.getKind() : null,
         target.getId(),
         target.getKind());
+
+    eventPublisher.publishEvent(
+        JobOrderNotices.reassigned(
+            jobOrder.getId(),
+            jobOrder.getDisplayId(),
+            jobOrder.getHandle(),
+            previous == null ? null : previous.getShorthand(),
+            new OrgUnitRef(target.getId(), target.getKind()),
+            target.getShorthand(),
+            userService.currentActor()));
 
     int claimsWithdrawn = 0;
     if (target.getKind() == OrgUnitKind.SQUADRON) {

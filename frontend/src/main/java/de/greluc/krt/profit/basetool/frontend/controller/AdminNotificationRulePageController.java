@@ -101,7 +101,12 @@ public class AdminNotificationRulePageController {
           "OPERATION_PAYOUT_MARKED",
           "OPERATION_PAYOUT_UNMARKED",
           "OPERATION_COMPLETED",
-          "OPERATION_COMPLETED_UNOWNED");
+          "OPERATION_COMPLETED_UNOWNED",
+          "JOB_ORDER_REASSIGNED",
+          "JOB_ORDER_FINISHED",
+          "JOB_ORDER_ASSIGNEE_ADDED",
+          "JOB_ORDER_ASSIGNEE_REMOVED",
+          "JOB_ORDER_CLAIM_WITHDRAWN");
 
   /**
    * {@code NotificationType} codes, labelled via {@code admin.notificationRules.notificationType}.
@@ -137,7 +142,11 @@ public class AdminNotificationRulePageController {
           "MISSION_NEVER_ENDED",
           "MISSION_RESPONSIBILITY_ASSIGNED",
           "OPERATION_PAYOUT_PAID_OUT",
-          "OPERATION_COMPLETED");
+          "OPERATION_COMPLETED",
+          "JOB_ORDER_REASSIGNED",
+          "JOB_ORDER_FINISHED",
+          "JOB_ORDER_ASSIGNED",
+          "JOB_ORDER_CLAIM_WITHDRAWN");
 
   /**
    * {@code SelectorKind} codes, labelled via {@code admin.notificationRules.selector.kind}. All but

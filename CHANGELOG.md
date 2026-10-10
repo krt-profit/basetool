@@ -10,6 +10,8 @@
   mitliest und neben `external-clients.json` auf den Host gehört. Alle offenen Schritte nur für den Betreiber:
   `docs/OWNER_STEPS_2026-10.md` (REQ-SEC-082).
 
+- **Benachrichtigungen zu Aufträgen.** Wer einen Auftrag übernimmt, an den er übergeben wurde, erfährt es (Offiziere, Leads und Logistiker der neuen Einheit); die anfragende Einheit hört, wenn ihr Auftrag abgeschlossen, abgelehnt oder gelöscht wurde. Wer einem Auftrag zugewiesen wird, und wessen Materialzusage durch eine Änderung oder Rückstufung entfällt, wird benachrichtigt (REQ-ORDERS-041…044, Migration V274, #2414).
+
 - **Benachrichtigungen zu Einsätzen und Operationen.** Teilnehmer erfahren, wenn ein Einsatz verschoben,
   abgesagt oder gelöscht wird, werden 24 Stunden und eine Stunde vorher erinnert und bekommen den offenen Check-in
   gemeldet; wer von jemand anderem hinzugefügt oder entfernt wird, erfährt es ebenso wie neue Verantwortliche und die

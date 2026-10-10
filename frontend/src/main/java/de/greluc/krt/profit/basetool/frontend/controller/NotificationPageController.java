@@ -96,13 +96,9 @@ public class NotificationPageController {
   private static final int PAGE_LIMIT = 50;
   private static final int DROPDOWN_LIMIT = 10;
 
-  /** Notification types whose subject is the job order their entity id names. */
-  private static final Set<String> JOB_ORDER_TYPES =
-      Set.of("JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER");
-
   /** The detail page of the record a notification is about, by the notification's entity type. */
   private static final Map<String, String> ENTITY_PAGES =
-      Map.of("MISSION", "/missions/", "OPERATION", "/operations/");
+      Map.of("MISSION", "/missions/", "OPERATION", "/operations/", "JOB_ORDER", "/orders/");
 
   /** The types whose record is gone, so the row has nothing to link to. */
   private static final Set<String> UNLINKED_TYPES = Set.of("MISSION_DELETED");
@@ -451,9 +447,6 @@ public class NotificationPageController {
       @Nullable String type, @Nullable String entityType, @Nullable UUID entityId) {
     if (type == null) {
       return null;
-    }
-    if (JOB_ORDER_TYPES.contains(type)) {
-      return "JOB_ORDER".equals(entityType) && entityId != null ? "/orders/" + entityId : null;
     }
     String fixed = PAGE_TARGETS.get(type);
     if (fixed != null || UNLINKED_TYPES.contains(type)) {

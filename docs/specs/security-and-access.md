@@ -391,7 +391,8 @@ REQ-SEC-009; this scope gate applies only to *user-linked* participants.)
 The same rule binds every **create-stock-for-another-member** path. `POST /api/v1/inventory`, `POST
 /api/v1/refinery-orders` (its `owner` override) and the per-item receiver of `POST
 /api/v1/refinery-orders/{id}/store` MUST each authorise the **target**, through
-`OwnerScopeService.canManageUserInventory(...)` / `canManageUserRefineryOrders(...)`, and MUST NOT
+`InventoryAccessPolicy.canManageUserInventory(...)` (published as `BookInPolicy.mayBookInFor`) /
+`RefineryAccessPolicy.canManageUserRefineryOrders(...)`, and MUST NOT
 substitute a bare `AuthHelperService.isLogisticianOrAbove()` for it. All three did until the
 2026-08-30 audit, which made them cross-tenant writes by construction; the fourth entry point,
 `POST /api/v1/refinery-orders/users/{userId}`, had been closed in PR #808 and is the shape the other
@@ -3031,7 +3032,8 @@ anonymous status of every admitted path), `EdgeProbeBackendStatusTest`, `EdgeAdm
 `POST /api/v1/refinery-orders/{id}/store` takes a `userId` per stored item that names the
 **receiving stock owner**. Because it decides whose ledger the output lands in, it MUST be
 authorized against **the caller and that target together**: naming somebody else requires
-`@ownerScopeService.canManageUserInventory(<receiver>)` — admin, self, or at least one shared
+`BookInPolicy.mayBookInFor(<receiver>)` (the inventory access policy's `canManageUserInventory`) —
+admin, self, or at least one shared
 **editable** org unit with the receiver — and any other value is refused with `403`. The check runs
 on the **requested** id and **before** the user is loaded, so an unauthorised caller cannot
 distinguish an existing member id from an unknown one.
@@ -3378,7 +3380,7 @@ layer directly.
 **Enforced by:** `MeControllerTest`, `StockViewerAccessServiceTest`, `InventoryItemMapperTest` ·
 **Code:** `MeController`, `StockViewerAccess`, `StockViewerAccessService`,
 `EarmarkTargetPolicy#mayEditJobOrderEarmarks` (implemented by `JobOrderAccessPolicy`),
-`AccessGateService#canEditInventoryItem`, `InventoryItemMapper`,
+`InventoryAccessPolicy#canEditInventoryItem`, `InventoryItemMapper`,
 `JobOrderMapper` · **Related:** REQ-SEC-046, ADR-0047, and the Android counterpart REQ-APP-AUTH-014
 (`basetool-android` `docs/specs/auth.md`)
 

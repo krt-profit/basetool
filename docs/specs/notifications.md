@@ -77,6 +77,11 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `OPERATION_PAYOUT_UNMARKED` | none (no rule) | — | supersedes that participant's `OPERATION_PAYOUT_PAID_OUT` | REQ-MISSION-028 |
 | `OPERATION_COMPLETED` | `OPERATION_COMPLETED` | V273 | `ORG_RELATIVE_ROLE` `MISSION_MANAGER` and `OFFICER` on `RESPONSIBLE` | REQ-MISSION-029 |
 | `OPERATION_COMPLETED_UNOWNED` | `OPERATION_COMPLETED` | V273 | `ROLE` `OFFICER` (an operation without an owning unit) | REQ-MISSION-029 |
+| `JOB_ORDER_REASSIGNED` | `JOB_ORDER_REASSIGNED` | V274 | `ORG_RELATIVE_ROLE` OFFICER / LEAD / LOGISTICIAN on `RESPONSIBLE` (the new unit); supersedes `JOB_ORDER_CREATED`, `…_UPDATED_BY_REQUESTER` and itself | REQ-ORDERS-041 |
+| `JOB_ORDER_FINISHED` | `JOB_ORDER_FINISHED` | V274 | `ORG_RELATIVE_ROLE` OFFICER / LEAD / LOGISTICIAN on `REQUESTING`; the status word is the coded parameter `statusCode` | REQ-ORDERS-042 |
+| `JOB_ORDER_ASSIGNEE_ADDED` | `JOB_ORDER_ASSIGNED` | V274 | `EVENT_RECIPIENT` (the assignee); clears a removal | REQ-ORDERS-043 |
+| `JOB_ORDER_ASSIGNEE_REMOVED` | none (no rule) | — | supersedes that member's `JOB_ORDER_ASSIGNED` (REQ-NOTIF-025) | REQ-ORDERS-043 |
+| `JOB_ORDER_CLAIM_WITHDRAWN` | `JOB_ORDER_CLAIM_WITHDRAWN` | V274 | `EVENT_RECIPIENT` (the member who made the claim); coded reason `reasonCode` | REQ-ORDERS-044 |
 
 Every notification type renders through `notifications.type.<TYPE>` in all three frontend bundles.
 The e-mail consumers of REQ-NOTIF-013 (`UserApprovalMailService`, `PendingRegistrationMailService`)
