@@ -295,7 +295,9 @@ the thread that holds the MDC. Each module builds its clients in one `RestClient
 `config`, ingest `relay`), wires the observation registry by hand (neither ships Boot's
 `spring-boot-restclient`), pins HTTP/1.1 and caps the response body with a
 `ResponseSizeLimitInterceptor`; a new outbound call in either module goes through those clients
-rather than a fresh `RestClient.builder()`, or it is neither observed nor bounded. In the ingest,
+rather than a fresh `RestClient.builder()`, or it is neither observed nor bounded. The backend's
+clients for third parties come from the external builder, which refuses loopback, private and
+link-local addresses and follows no redirect (REQ-SEC-081). In the ingest,
 `ConcernPackageRulesTest` fails on an outbound HTTP client outside `relay` (REQ-INGEST-014).
 
 In the ingest the exchange relay runs on `exchangeRestClient` (30 s) under its own breaker

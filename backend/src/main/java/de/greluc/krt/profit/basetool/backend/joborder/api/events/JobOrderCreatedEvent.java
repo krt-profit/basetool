@@ -27,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Domain event published right after a new job order is persisted. Carries the scalars the
@@ -49,9 +50,9 @@ public record JobOrderCreatedEvent(
     String handle,
     OrgUnitRef responsibleOrgUnit,
     String responsibleOrgUnitShorthand,
-    OrgUnitRef requestingOrgUnit,
-    String jobOrderType,
-    UUID actorSub)
+    @Nullable OrgUnitRef requestingOrgUnit,
+    @Nullable String jobOrderType,
+    @Nullable UUID actorSub)
     implements NotificationEvent {
 
   /** Loose entity-type tag stored on the produced notifications. */

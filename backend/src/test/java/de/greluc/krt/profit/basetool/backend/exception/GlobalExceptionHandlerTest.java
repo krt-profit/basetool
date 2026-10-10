@@ -961,7 +961,7 @@ class GlobalExceptionHandlerTest {
         "the caller must still be told why");
 
     java.lang.reflect.Method origin =
-        java.util.Arrays.stream(GlobalExceptionHandler.class.getDeclaredMethods())
+        java.util.Arrays.stream(ApplicationProblemHandlers.class.getDeclaredMethods())
             .filter(m -> "originOf".equals(m.getName()))
             .findFirst()
             .orElseThrow();

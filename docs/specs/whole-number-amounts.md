@@ -104,7 +104,7 @@ over-delivery beyond the outstanding amount.
 - [ ] An item-handover entry amount is a whole number `≥ 1` and `≤ outstanding`; blank / `0` rows are dropped and an all-empty handover is rejected.
 
 **Enforced by:** `JobOrderItemHandoverServiceTest`. **Code:**
-`backend/.../model/dto/JobOrderItemHandoverEntryCreateDto`,
+`backend/.../joborder/internal/JobOrderItemHandoverEntryCreateDto`,
 `backend/.../model/JobOrderItemHandoverEntry` (`amount` is `Integer`),
 `templates/orders-detail.html`, `JobOrderWriteController#createItemHandover`. **Issues:** PR #465.
 

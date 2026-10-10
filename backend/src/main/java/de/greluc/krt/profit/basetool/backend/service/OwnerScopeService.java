@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
@@ -420,91 +419,6 @@ public class OwnerScopeService {
    */
   public boolean canEditMission(@NotNull UUID missionId) {
     return accessGateService.canEditMission(missionId);
-  }
-
-  /**
-   * Delegates to {@link AccessGateService#canSeeJobOrder(UUID)}: whether the caller may read job
-   * order {@code jobOrderId} (SK-public / squadron-private + profit gate).
-   *
-   * @param jobOrderId job order to inspect; never {@code null}.
-   * @return {@code true} iff the caller may read the order.
-   */
-  public boolean canSeeJobOrder(@NotNull UUID jobOrderId) {
-    return accessGateService.canSeeJobOrder(jobOrderId);
-  }
-
-  /**
-   * Delegates to {@link AccessGateService#canSeeJobOrder(JobOrder)}: the managed-entity overload of
-   * {@link #canSeeJobOrder(UUID)}.
-   *
-   * @param order the job order to inspect; never {@code null}.
-   * @return {@code true} iff the caller may read the order.
-   */
-  public boolean canSeeJobOrder(@NotNull JobOrder order) {
-    return accessGateService.canSeeJobOrder(order);
-  }
-
-  /**
-   * Delegates to {@link AccessGateService#canSeeJobOrderBlueprintOwners(UUID)}: the stricter
-   * blueprint-coverage view gate (responsible-org-unit membership only, no SK-public escape).
-   *
-   * @param jobOrderId the job order whose blueprint-coverage view the caller wants to read; never
-   *     {@code null}.
-   * @return {@code true} iff the caller is a member of the order's responsible org unit (or an
-   *     admin with matching scope).
-   */
-  public boolean canSeeJobOrderBlueprintOwners(@NotNull UUID jobOrderId) {
-    return accessGateService.canSeeJobOrderBlueprintOwners(jobOrderId);
-  }
-
-  /**
-   * Delegates to {@link AccessGateService#canSeeJobOrderInventoryOwners(UUID)}: whether the caller
-   * may see the owner identity and location of the stock linked to the order (responsible-org-unit
-   * membership only, no SK-public escape — a requesting-side viewer gets owner/location redacted,
-   * REQ-ORDERS-029 / ADR-0107).
-   *
-   * @param jobOrderId the job order whose linked-inventory owner/location the caller wants to read;
-   *     never {@code null}.
-   * @return {@code true} iff the caller is a member of the order's responsible org unit (or an
-   *     admin with matching scope).
-   */
-  public boolean canSeeJobOrderInventoryOwners(@NotNull UUID jobOrderId) {
-    return accessGateService.canSeeJobOrderInventoryOwners(jobOrderId);
-  }
-
-  /**
-   * Delegates to {@link AccessGateService#canEditJobOrder(UUID)}: whether the caller may edit job
-   * order {@code jobOrderId} (mirrors the read path for writes).
-   *
-   * @param jobOrderId job order to inspect; never {@code null}.
-   * @return {@code true} iff the caller may edit the order.
-   */
-  public boolean canEditJobOrder(@NotNull UUID jobOrderId) {
-    return accessGateService.canEditJobOrder(jobOrderId);
-  }
-
-  /**
-   * Delegates to {@link AccessGateService#canSeeJobOrderAsRequester(UUID)}: whether the caller may
-   * read job order {@code jobOrderId} as its requester (a direct member of its requesting org
-   * unit), the profit-gate-independent requester escape (REQ-ORDERS-023).
-   *
-   * @param jobOrderId job order to inspect; never {@code null}.
-   * @return {@code true} iff the caller may read the order as its requester.
-   */
-  public boolean canSeeJobOrderAsRequester(@NotNull UUID jobOrderId) {
-    return accessGateService.canSeeJobOrderAsRequester(jobOrderId);
-  }
-
-  /**
-   * Delegates to {@link AccessGateService#canEditJobOrderAsRequester(UUID)}: whether the caller may
-   * edit job order {@code jobOrderId} within the requester limits — a direct member of its
-   * requesting org unit and the order still fully undelivered (REQ-ORDERS-023).
-   *
-   * @param jobOrderId job order to inspect; never {@code null}.
-   * @return {@code true} iff the caller may edit the order as its (still-undelivered) requester.
-   */
-  public boolean canEditJobOrderAsRequester(@NotNull UUID jobOrderId) {
-    return accessGateService.canEditJobOrderAsRequester(jobOrderId);
   }
 
   /**

@@ -20,7 +20,7 @@ read/write is isolated to the calling user unless the caller is privileged.
 > ends on a page with a way back). The mission finance-entry scope below shared `REQ-SEC-019` with the
 > Discord-link indicator until 2026-09-22, when it was renumbered to **REQ-SEC-065** on the owner's
 > decision (see the renumbering table in [`INDEX.md`](INDEX.md)). **REQ-SEC-054** was never
-> allocated. The next free id is **REQ-SEC-081** (corrected 2026-10-03: REQ-SEC-073…080 went to the
+> allocated. The next free id is **REQ-SEC-082** (corrected 2026-10-03: REQ-SEC-073…080 went to the
 > Phase 0 guard packages of the modularisation plan) — re-check `origin/main` and open PRs before claiming it. Requirements are grouped by subject, not strictly by number.
 
 ### REQ-SEC-001 — OIDC topology
@@ -3115,8 +3115,9 @@ asserts that a redaction method is *called*, never that the redaction is *comple
 - [x] ~~The strict outsider level inherits the pass from the member-peer level.~~ Retired with the
   outsider tier (ADR-0159); there is one level left.
 - [x] A unit with no assigned ship redacts without error.
+- [x] A walk over the types, not a list of cases: every record reachable from `MissionDto` is filled with sentinel values, peer redaction runs, and every `UserDto` left anywhere in the result holds only the public tuple (`id`, `username`, `displayName`, `effectiveName`, `rank`, `inKeycloak`, `version`); the owner and managers are hidden from a reader; no other type reachable from a mission declares a private member component (PRV-10). Proven able to fail with a planted `email`.
 
-**Enforced by:** `MissionPeerRedactorTest` · **Code:** `MissionPeerRedactor#cleanupUnitForPeer`,
+**Enforced by:** `MissionPeerRedactorTest`, `MissionPeerRedactionSentinelTest` · **Code:** `MissionPeerRedactor#cleanupUnitForPeer`,
 `#cleanupShipForPeer` · **Related:** REQ-SEC-007, REQ-SEC-009, ADR-0159 (supersedes ADR-0034)
 
 ### REQ-SEC-041 — The mission description is gated on membership, not on authentication
@@ -3376,7 +3377,8 @@ layer directly.
 
 **Enforced by:** `MeControllerTest`, `StockViewerAccessServiceTest`, `InventoryItemMapperTest` ·
 **Code:** `MeController`, `StockViewerAccess`, `StockViewerAccessService`,
-`AccessGateService#mayEditJobOrder`, `AccessGateService#canEditInventoryItem`, `InventoryItemMapper`,
+`EarmarkTargetPolicy#mayEditJobOrderEarmarks` (implemented by `JobOrderAccessPolicy`),
+`AccessGateService#canEditInventoryItem`, `InventoryItemMapper`,
 `JobOrderMapper` · **Related:** REQ-SEC-046, ADR-0047, and the Android counterpart REQ-APP-AUTH-014
 (`basetool-android` `docs/specs/auth.md`)
 
@@ -5640,6 +5642,33 @@ consent.
 `PathControlInventoryTest`, `AnonymousSurfaceSweepTest` · **Code:** `PendingApprovalAccessFilter`,
 `TermsAcceptanceAccessFilter`, `ActingMemberFilter` · **Related:** REQ-SEC-017, REQ-SEC-028,
 REQ-SEC-053, REQ-XCH-009
+
+### REQ-SEC-081 — The external-integration clients reach external addresses only
+
+The backend's clients for third parties (UEX and SC Wiki) are built from the `externalRestClientBuilder`
+of `RestClientConfig`. Its JDK client carries Spring Boot's `InetAddressFilter.externalAddresses()`,
+which checks the address a name resolves to before a connection is opened and refuses loopback,
+private, link-local and other special-purpose ranges with a `FilteredHostException`; the fail-soft
+fetch counts it like any other transport error. The client follows no redirect. The unqualified,
+primary builder, which the Keycloak admin client uses, has no filter: the internal clients must reach
+internal hosts. A base URL pointing at an internal host therefore stops working for UEX and SC Wiki.
+
+Each of the two clients also carries `@ConcurrencyLimit` at class level (UEX 4, SC Wiki 2, the maximum
+pool size of its executor), enabled by `AsyncConfig`; further callers wait. The find-or-create retry
+stays an explicit loop, not an annotation.
+
+**Acceptance**
+
+- [x] The external builder refuses a connection to a loopback address and the primary builder still
+  reaches it (`RestClientConfigTest`).
+- [x] The external request factory follows no redirect (`RestClientConfigTest`).
+- [x] Calls in flight through the UEX client never exceed its limit, and both clients declare theirs
+  (`ExternalClientConcurrencyLimitTest`).
+
+**Enforced by:** `RestClientConfigTest`, `ExternalClientConcurrencyLimitTest` · **Code:**
+`RestClientConfig`, `AsyncConfig`, `UexClient`, `ScWikiClient` · **Related:** REQ-OBS-009, ADR-0204
+
+---
 
 ## Out of scope
 

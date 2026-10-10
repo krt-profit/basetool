@@ -27,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Domain event published when a requesting owner (Auftraggeber) edits one of their own job orders
@@ -51,9 +52,9 @@ public record JobOrderUpdatedByRequesterEvent(
     String handle,
     OrgUnitRef responsibleOrgUnit,
     String responsibleOrgUnitShorthand,
-    OrgUnitRef requestingOrgUnit,
-    String requestingOrgUnitShorthand,
-    UUID actorSub)
+    @Nullable OrgUnitRef requestingOrgUnit,
+    @Nullable String requestingOrgUnitShorthand,
+    @Nullable UUID actorSub)
     implements NotificationEvent {
 
   /** Loose entity-type tag stored on the produced notifications (shared with the create event). */

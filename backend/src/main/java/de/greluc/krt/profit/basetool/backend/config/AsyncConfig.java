@@ -27,17 +27,20 @@ import org.slf4j.MDC;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.TaskDecorator;
+import org.springframework.resilience.annotation.EnableResilientMethods;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
- * Enables {@code @Async} and provides the dedicated bounded executors for asynchronous workloads.
+ * Enables {@code @Async} and {@code @ConcurrencyLimit} and provides the dedicated bounded executors
+ * for asynchronous workloads.
  *
  * <p>Each pool rejects with a {@link java.util.concurrent.RejectedExecutionException} when full
  * instead of growing without bound.
  */
 @Configuration
 @EnableAsync
+@EnableResilientMethods
 public class AsyncConfig {
 
   /** Spring-bean name of the UEX executor, referenced from {@code @Async("uexExecutor")}. */
